@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cameras On Site Technician Readiness</title>
+<style>html,body{margin:0;height:100%;background:#f4f6f8}#app{border:0;width:100%;height:100vh;display:block}</style>
+</head>
+<body>
+<iframe id="app" src="./index.html?v=releasefix2" title="Cameras On Site Technician Readiness"></iframe>
+<script>
+const frame=document.getElementById('app');
+frame.addEventListener('load',()=>{
+  const w=frame.contentWindow,d=frame.contentDocument;
+  try{
+    w.eval(`
+      releasePrep = function(id){
+        const p=D.preps.find(x=>x.id===id);
+        if(!p||p.status!=='draft') return;
+        for(let ri=0;ri<p.requirements.length;ri++){
+          const r=p.requirements[ri];
+          if(r.units.length>=r.qty) continue;
+          const pre='u_'+p.id+'_'+ri+'_';
+          const tag=document.getElementById(pre+'tag')?.value.trim();
+          if(!tag) continue;
+          const b=BATTERY[r.type];
+          const battery=Number(document.getElementById(pre+'battery')?.value||0);
+          const power=document.getElementById(pre+'power')?.checked;
+          const functions=document.getElementById(pre+'functions')?.checked;
+          const safe=document.getElementById(pre+'safe')?.checked;
+          if(activeTagUsed(tag,p.id)||p.requirements.some(rr=>rr.units.some(u=>String(u.tag).toLowerCase()===tag.toLowerCase()))) return alert('Unit '+tag+' is already assigned to an active prep ticket.');
+          if(!power||!functions||!safe) return alert('Complete all three IT checks first.');
+          if(b&&battery<b.per) return alert(r.type+' requires at least '+b.per+' '+b.label+'.');
+          const n=now();
+          r.units.push({tag,battery,verifiedBy:p.createdBy,verifiedAt:n.when,verifiedTs:n.ts});
+        }
+        if(!prepReady(p)){
+          save();renderAll();
+          const missing=p.requirements.reduce((n,r)=>n+Math.max(0,r.qty-r.units.length),0);
+          return alert('Saved the completed unit check. '+missing+' more spare unit'+(missing===1?' is':'s are')+' still needed before this ticket can be released.');
+        }
+        const n=now();
+        p.status='released';p.releasedAt=n.when;p.releasedTs=n.ts;
+        addReport('IT PREP RELEASED',p.createdBy,'Ticket #'+p.no+' released: '+unitSummary(p),p.no);
+        save();renderAll();
+        alert('Ticket #'+p.no+' is ready for Service to match by ticket number.');
+      };
+    `);
+    const unlock=()=>{
+      [...d.querySelectorAll('button')].forEach(b=>{
+        if((b.textContent||'').trim()==='Release Ticket to Service') b.disabled=false;
+      });
+    };
+    unlock();
+    new MutationObserver(unlock).observe(d.body,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled']});
+  }catch(e){console.error(e)}
+});
+</script>
+</body>
+</html>
