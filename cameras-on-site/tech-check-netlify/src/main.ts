@@ -3,3 +3,4 @@ import './styles.css';
 import './app.js';
 import './corrections.js';
 import './handoff-safety-fixed.js';
+import './management.js';
