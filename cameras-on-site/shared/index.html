@@ -15,16 +15,16 @@
   <div class="hero"><img src="../logo.svg" alt="Cameras On Site logo"><div><h1>Cameras On Site</h1><div>Technician Readiness</div><div class="small">Secure shared technician login</div></div></div>
   <div class="card">
     <h2>Sign In</h2>
-    <label>Email</label><input id="loginEmail" type="email" autocomplete="username" placeholder="name@company.com">
+    <label>Username</label><input id="loginUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username">
     <label style="margin-top:10px">Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password">
     <button class="btn" onclick="login()">Sign In</button>
     <div id="loginMessage"></div>
     <div class="sep"></div>
     <details>
       <summary><b>First-time Owner Setup</b></summary>
-      <div class="setupNote small">Use this once to create the first Owner/Admin account. Your authorized Owner email is used for this one-time setup; no separate setup code is required. After an owner exists, this setup is automatically locked.</div>
+      <div class="setupNote small">Use this once to create the first Owner/Admin account with a username and password. After an owner exists, this setup is automatically locked.</div>
       <label style="margin-top:10px">Owner Full Name</label><input id="setupName" placeholder="Full name">
-      <label style="margin-top:10px">Owner Email</label><input id="setupEmail" type="email" placeholder="Email">
+      <label style="margin-top:10px">Owner Username</label><input id="setupUsername" type="text" autocapitalize="none" spellcheck="false" placeholder="Username">
       <label style="margin-top:10px">Owner Password</label><input id="setupPassword" type="password" placeholder="At least 8 characters">
       <button class="btn" onclick="bootstrapOwner()">Create Owner Account</button>
       <div id="setupMessage"></div>
@@ -71,9 +71,9 @@
     <div class="card"><h2 style="margin-top:0">Owner Reports</h2><div class="small">Shown top-to-bottom in the order the work happened.</div><div id="reports"></div></div>
     <div class="card">
       <h2 style="margin-top:0">Technician Accounts</h2>
-      <div class="small">Only the Owner can create or change technician access. Techs sign in with their own email and password.</div>
+      <div class="small">Only the Owner can create or change technician access. Techs sign in with their own username and password. No company email address is required.</div>
       <h3>Create Technician</h3>
-      <div class="grid4"><div><label>Full Name</label><input id="newTechName" placeholder="Technician name"></div><div><label>Email</label><input id="newTechEmail" type="email" placeholder="Email"></div><div><label>Role</label><select id="newTechRole"><option value="service">Service Tech</option><option value="it">IT Tech</option></select></div><div><label>Temporary Password</label><input id="newTechPassword" type="password" placeholder="8+ characters"></div></div>
+      <div class="grid4"><div><label>Full Name</label><input id="newTechName" placeholder="Technician name"></div><div><label>Username</label><input id="newTechUsername" type="text" autocapitalize="none" spellcheck="false" placeholder="Username"></div><div><label>Role</label><select id="newTechRole"><option value="service">Service Tech</option><option value="it">IT Tech</option></select></div><div><label>Temporary Password</label><input id="newTechPassword" type="password" placeholder="8+ characters"></div></div>
       <button class="btn" onclick="createTech()">Create Technician Login</button><div id="userMessage"></div>
       <div class="sep"></div><h3>Current Users</h3><div id="userList"></div>
     </div>
