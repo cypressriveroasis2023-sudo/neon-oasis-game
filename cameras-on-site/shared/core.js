@@ -25,23 +25,11 @@ async function bootstrapOwner(){
   const fullName=$('setupName').value.trim();
   const email=$('setupEmail').value.trim();
   const password=$('setupPassword').value;
-  const setupCode=$('setupCode').value.trim();
-  if(!fullName||!email||password.length<8||!setupCode){return msg('setupMessage','Enter your name, email, a password of at least 8 characters, and the full Owner Setup Code.','bad')}
-  if(setupCode.length<20){return msg('setupMessage','The Owner Setup Code looks incomplete. Paste the entire setup code, not just the first few characters.','bad')}
+  if(!fullName||!email||password.length<8){return msg('setupMessage','Enter your full name, authorized Owner email, and a password of at least 8 characters.','bad')}
   setBusy(true);
-  const body={full_name:fullName,email,password,setup_code:setupCode};
+  const body={full_name:fullName,email,password};
   const {data,error}=await db.functions.invoke('bootstrap-owner',{body});
-  if(error){
-    let detail=error.message||'Owner setup failed.';
-    try{
-      if(error.context&&typeof error.context.json==='function'){
-        const payload=await error.context.json();
-        if(payload?.error)detail=payload.error;
-      }
-    }catch(_e){}
-    setBusy(false);
-    return msg('setupMessage',detail,'bad');
-  }
+  if(error){setBusy(false);return msg('setupMessage',error.message||'Owner setup failed.','bad')}
   if(data?.error){setBusy(false);return msg('setupMessage',data.error,'bad')}
   const {data:sign,error:signErr}=await db.auth.signInWithPassword({email:body.email,password:body.password});
   setBusy(false);
