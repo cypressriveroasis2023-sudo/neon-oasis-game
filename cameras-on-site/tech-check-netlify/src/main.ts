@@ -8,3 +8,4 @@ import './handoff-evidence.js';
 import './handoff-evidence-fix.js';
 import './flow-ui.js';
 import './evidence-history.js';
+import './technician-wizard.js';
