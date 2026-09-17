@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Cameras On Site</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#18222d;padding:30px;text-align:center}strong{display:block;margin-top:30vh;font-size:22px}</style>
+</head>
+<body><strong>Loading Cameras On Site…</strong>
+<script>
+(async()=>{
+  try{
+    const build='20260916-2253';
+    const r=await fetch('../shared/index.html?build='+build,{cache:'no-store'});
+    let html=await r.text();
+    html=html.replace('src="core.js"','src="../shared/core.js?build='+build+'"')
+             .replace('src="it.js"','src="../shared/it.js?build='+build+'"')
+             .replace('src="service.js"','src="../shared/service.js?build='+build+'"')
+             .replace('src="owner.js"','src="../shared/owner.js?build='+build+'"');
+    document.open();document.write(html);document.close();
+  }catch(e){document.body.innerHTML='<strong>Could not load the app. Please refresh.</strong>'}
+})();
+</script>
+</body>
+</html>
