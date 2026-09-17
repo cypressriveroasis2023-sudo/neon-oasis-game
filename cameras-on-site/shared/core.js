@@ -5,15 +5,17 @@ const $=id=>document.getElementById(id);
 const AUTH_DOMAIN='cameras-on-site.invalid';
 const USERNAME_RE=/^[a-z0-9][a-z0-9._-]{2,31}$/;
 const OWNER_SETUP_TOKEN=new URLSearchParams(window.location.search).get('setup')||'';
-const BATTERY={Sniper:{per:1,label:'12V 30Ah battery'},Ranger:{per:1,label:'Ranger lithium battery'},'Solar Spotter':{per:4,label:'12V 110Ah batteries'}};
+const BATTERY={Sniper:{per:2,label:'12V 35Ah batteries'},Ranger:{per:1,label:'Ranger lithium battery'},'Solar Spotter':{per:4,label:'12V 110Ah batteries'},Helios:{per:1,label:'charged Helios battery box'},'Recon 2':{dynamic:true,label:'Recon batteries'}};
 const TRUCK=['Fuel level sufficient for today’s route','Tires appear safe and properly inflated','Headlights / signals / brake lights working','Windshield and mirrors are safe and clear','No visible fluid leaks','Required tools and service supplies onboard','Ladders / cargo / equipment secured','Truck cab and bed organized'];
 const TRAILER=['Trailer tires appear safe and properly inflated','Hitch / coupler fully secured','Safety chains attached correctly','Trailer plug connected; lights and signals working','Jack / supports secured for travel','Load balanced and equipment tied down','No visible structural damage or unsafe condition'];
 let state={session:null,profile:null,preps:[],reports:[],profiles:[],matched:[],sessionClosed:[]};
 let draftNeeds=[];let liveChannel=null;
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function msg(id,text,type='warn'){const el=$(id);if(!el)return;el.innerHTML=text?'<div class="'+type+'">'+esc(text)+'</div>':''}
-function badge(p){return '<span class="pill '+(p==='SWAP'?'swap':'backup')+'">'+esc(p)+'</span>'}
+function badge(p){const cls=p==='SWAP'?'swap':p==='DELIVERY'?'delivery':'backup';return '<span class="pill '+cls+'">'+esc(p)+'</span>'}
 function roleLabel(r){return r==='owner'?'Owner/Admin':r==='it'?'IT Tech':r==='service'?'Service Tech':'Pending'}
+function eqLabel(t){return t==='Recon 2'?'Recon II':t}
+function requiredBattery(item){const meta=BATTERY[item?.equipment_type];if(!meta)return 0;const stored=Number(item?.required_battery_count);return Number.isFinite(stored)&&stored>0?stored:Number(meta.per||0)}
 function setBusy(on){document.body.classList.toggle('busy',on)}
 function normalizeUsername(v){return String(v||'').trim().toLowerCase()}
 function authId(username){return normalizeUsername(username)+'@'+AUTH_DOMAIN}
