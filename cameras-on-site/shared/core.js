@@ -4,6 +4,7 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);
 const AUTH_DOMAIN='cameras-on-site.invalid';
 const USERNAME_RE=/^[a-z0-9][a-z0-9._-]{2,31}$/;
+const OWNER_SETUP_TOKEN=new URLSearchParams(window.location.search).get('setup')||'';
 const BATTERY={Sniper:{per:1,label:'12V 30Ah battery'},Ranger:{per:1,label:'Ranger lithium battery'},'Solar Spotter':{per:4,label:'12V 110Ah batteries'}};
 const TRUCK=['Fuel level sufficient for today’s route','Tires appear safe and properly inflated','Headlights / signals / brake lights working','Windshield and mirrors are safe and clear','No visible fluid leaks','Required tools and service supplies onboard','Ladders / cargo / equipment secured','Truck cab and bed organized'];
 const TRAILER=['Trailer tires appear safe and properly inflated','Hitch / coupler fully secured','Safety chains attached correctly','Trailer plug connected; lights and signals working','Jack / supports secured for travel','Load balanced and equipment tied down','No visible structural damage or unsafe condition'];
@@ -39,11 +40,16 @@ async function bootstrapOwner(){
   const fullName=$('setupName').value.trim();
   const username=normalizeUsername($('setupUsername').value);
   const password=$('setupPassword').value;
+  if(!OWNER_SETUP_TOKEN)return msg('setupMessage','Open the private first-time Owner setup link to create the Owner account.','bad');
   if(!fullName||!validUsername(username)||password.length<8){return msg('setupMessage','Enter your full name, a username of 3–32 letters/numbers/dots/dashes/underscores, and a password of at least 8 characters.','bad')}
   setBusy(true);
-  const body={full_name:fullName,username,password};
+  const body={full_name:fullName,username,password,setup_token:OWNER_SETUP_TOKEN};
   const {data,error}=await db.functions.invoke('bootstrap-owner',{body});
-  if(error){setBusy(false);return msg('setupMessage',error.message||'Owner setup failed.','bad')}
+  if(error){
+    let detail=error.message||'Owner setup failed.';
+    try{if(error.context&&typeof error.context.json==='function'){const payload=await error.context.json();if(payload?.error)detail=payload.error}}catch(_e){}
+    setBusy(false);return msg('setupMessage',detail,'bad')
+  }
   if(data?.error){setBusy(false);return msg('setupMessage',data.error,'bad')}
   const {data:sign,error:signErr}=await db.auth.signInWithPassword({email:authId(username),password});
   setBusy(false);
