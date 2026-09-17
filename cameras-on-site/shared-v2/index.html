@@ -13,7 +13,7 @@
 <script>
 (async()=>{
   try{
-    const build='20260916-2322';
+    const build='20260916-2335';
     const r=await fetch('../shared/index.html?build='+build,{cache:'no-store'});
     let html=await r.text();
     html=html.replace('src="core.js"','src="../shared/core.js?build='+build+'"')
