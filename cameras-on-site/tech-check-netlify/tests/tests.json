@@ -1,0 +1,43 @@
+[
+  {
+    "name": "Username sign-in screen",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": [
+      "username/password authentication UI",
+      "Tech Check branding",
+      "brand separation"
+    ],
+    "description": "Verifies the public entry uses Tech Check by Cameras Onsite branding and does not request an email address.",
+    "steps": [
+      "Open the app",
+      "Confirm the heading says Tech Check by Cameras Onsite",
+      "Confirm Username and Password fields are visible"
+    ],
+    "expected": "The sign-in screen uses Cameras Onsite branding, shows username and password fields, and does not show an email field."
+  },
+  {
+    "name": "Reject invalid credentials",
+    "viewport": "desktop",
+    "covers": ["authentication guardrail", "protected technician data"],
+    "description": "Verifies incorrect credentials do not expose technician workflow data.",
+    "steps": [
+      "Enter username invalid-user",
+      "Enter password invalid-password",
+      "Press Sign In"
+    ],
+    "expected": "A visible Username or password is incorrect message appears and the IT, Service Tech, and Owner work areas remain hidden."
+  },
+  {
+    "name": "Mobile technician login",
+    "viewport": "mobile",
+    "covers": ["mobile sign-in layout", "responsive technician entry", "standalone home-screen launch support"],
+    "description": "Verifies the technician login remains usable on a phone-sized viewport after standalone Home Screen support is enabled.",
+    "steps": [
+      "Open the app on mobile",
+      "Confirm Username is visible",
+      "Confirm Password and Sign In are visible"
+    ],
+    "expected": "The sign-in form is readable and usable without horizontal scrolling, with the app configured for standalone Home Screen launch."
+  }
+]
