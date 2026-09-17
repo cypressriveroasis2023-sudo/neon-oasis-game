@@ -20,7 +20,34 @@ async function init(){
 }
 function showAuth(){state={session:null,profile:null,preps:[],reports:[],profiles:[],matched:[],sessionClosed:[]};$('authView').classList.remove('hidden');$('appView').classList.add('hidden');if(liveChannel){db.removeChannel(liveChannel);liveChannel=null}}
 async function login(){msg('loginMessage','');setBusy(true);const email=$('loginEmail').value.trim(),password=$('loginPassword').value;const {data,error}=await db.auth.signInWithPassword({email,password});setBusy(false);if(error)return msg('loginMessage',error.message,'bad');await enterApp(data.session)}
-async function bootstrapOwner(){msg('setupMessage','');setBusy(true);const body={full_name:$('setupName').value.trim(),email:$('setupEmail').value.trim(),password:$('setupPassword').value,setup_code:$('setupCode').value};const {data,error}=await db.functions.invoke('bootstrap-owner',{body});if(error){setBusy(false);return msg('setupMessage',error.message,'bad')}if(data?.error){setBusy(false);return msg('setupMessage',data.error,'bad')}const {data:sign,error:signErr}=await db.auth.signInWithPassword({email:body.email,password:body.password});setBusy(false);if(signErr)return msg('setupMessage','Owner created. Sign in above with the email and password you chose.','ok');await enterApp(sign.session)}
+async function bootstrapOwner(){
+  msg('setupMessage','');
+  const fullName=$('setupName').value.trim();
+  const email=$('setupEmail').value.trim();
+  const password=$('setupPassword').value;
+  const setupCode=$('setupCode').value.trim();
+  if(!fullName||!email||password.length<8||!setupCode){return msg('setupMessage','Enter your name, email, a password of at least 8 characters, and the full Owner Setup Code.','bad')}
+  if(setupCode.length<20){return msg('setupMessage','The Owner Setup Code looks incomplete. Paste the entire setup code, not just the first few characters.','bad')}
+  setBusy(true);
+  const body={full_name:fullName,email,password,setup_code:setupCode};
+  const {data,error}=await db.functions.invoke('bootstrap-owner',{body});
+  if(error){
+    let detail=error.message||'Owner setup failed.';
+    try{
+      if(error.context&&typeof error.context.json==='function'){
+        const payload=await error.context.json();
+        if(payload?.error)detail=payload.error;
+      }
+    }catch(_e){}
+    setBusy(false);
+    return msg('setupMessage',detail,'bad');
+  }
+  if(data?.error){setBusy(false);return msg('setupMessage',data.error,'bad')}
+  const {data:sign,error:signErr}=await db.auth.signInWithPassword({email:body.email,password:body.password});
+  setBusy(false);
+  if(signErr)return msg('setupMessage','Owner created. Sign in above with the email and password you chose.','ok');
+  await enterApp(sign.session)
+}
 async function enterApp(session){state.session=session;const {data:profile,error}=await db.from('profiles').select('*').eq('user_id',session.user.id).single();if(error||!profile){await db.auth.signOut();return msg('loginMessage','No active Cameras On Site profile was found.','bad')}if(!profile.active||profile.role==='pending'){await db.auth.signOut();return msg('loginMessage','Your account is not active yet. Contact the Owner/Admin.','bad')}state.profile=profile;$('authView').classList.add('hidden');$('appView').classList.remove('hidden');$('whoName').textContent=profile.full_name||session.user.email;$('whoRole').textContent=roleLabel(profile.role);configureTabs();setupRealtime();await refreshData()}
 function configureTabs(){const r=state.profile.role;$('tab-it').classList.toggle('hidden',!['it','owner'].includes(r));$('tab-svc').classList.toggle('hidden',!['service','owner'].includes(r));$('tab-owner').classList.toggle('hidden',r!=='owner');if(r==='owner')show('owner');else if(r==='it')show('it');else show('svc')}
 function show(which){['it','svc','owner'].forEach(n=>{$('view-'+n).classList.toggle('hidden',n!==which);$('tab-'+n).classList.toggle('on',n===which)})}
