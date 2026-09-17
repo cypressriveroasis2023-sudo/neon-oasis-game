@@ -5,89 +5,104 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cameras On Site Technician Readiness</title>
 <style>
-:root{--bg:#f4f6f8;--card:#fff;--ink:#18222d;--muted:#6b7682;--line:#dde3e8;--blue:#0f5fa8;--hero:#101820;--ok:#e8f7ed;--okline:#acd6b8;--warn:#fff2df;--warnline:#efcf9a;--bad:#fdeceb;--badline:#efb4ae}
-*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink)}.wrap{max-width:900px;margin:auto;padding:14px}.hero{background:var(--hero);color:white;padding:18px;border-radius:18px;display:flex;gap:14px;align-items:center}.hero img{width:64px;height:64px;border-radius:12px;background:#fff;padding:4px;object-fit:contain;flex:none}.hero h1{margin:0 0 4px;font-size:24px}.hero .sub{opacity:.9;font-size:14px}.demo{background:#fff7e6;border:1px solid #f0cf8e;border-radius:12px;padding:12px;margin-top:12px}.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}.tabs button,.btn,.mini{border:0;border-radius:10px;padding:12px;font-weight:800;cursor:pointer}.tabs button{background:#e5ebf0}.tabs .on{background:var(--blue);color:#fff}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;margin:12px 0}.hidden{display:none}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}label{font-size:13px;font-weight:800;display:block;margin-bottom:4px}input,select,textarea{width:100%;padding:10px;border:1px solid #ccd4dc;border-radius:9px;font-size:16px;box-sizing:border-box}.btn{background:var(--blue);color:#fff;width:100%;margin-top:10px}.mini{background:#eef3f7;color:#24303b;padding:8px 10px;font-size:13px}.ok{background:var(--ok);border:1px solid var(--okline);padding:10px;border-radius:9px;margin-top:8px}.warn{background:var(--warn);border:1px solid var(--warnline);padding:10px;border-radius:9px;margin-top:8px}.bad{background:var(--bad);border:1px solid var(--badline);padding:10px;border-radius:9px;margin-top:8px}.check{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #edf0f2}.check input{width:20px;height:20px;flex:none}.item{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px}.small{font-size:12px;color:var(--muted)}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sectiontitle{display:flex;justify-content:space-between;align-items:center;gap:8px}.pill{display:inline-block;background:#edf2f5;border-radius:999px;padding:4px 8px;font-weight:800;font-size:12px}.danger{background:#fdeceb;color:#a61b12}.good{background:#e8f7ed;color:#166534}.req{padding:8px 0;border-bottom:1px solid #edf0f2}.req:last-child{border-bottom:0}@media(max-width:650px){.tabs,.grid,.grid3{grid-template-columns:1fr}.hero{align-items:flex-start}}
+:root{--bg:#f4f6f8;--card:#fff;--ink:#18222d;--muted:#6b7682;--line:#dde3e8;--blue:#1769b3;--hero:#101820;--ok:#e8f7ed;--okline:#acd6b8;--warn:#fff3df;--warnline:#efcf9a;--bad:#fdeceb;--badline:#efb4ae}
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink)}.wrap{max-width:920px;margin:auto;padding:14px}.hero{background:var(--hero);color:#fff;padding:18px;border-radius:18px;display:flex;gap:14px;align-items:center}.hero img{width:64px;height:64px;border-radius:12px;background:#fff;padding:4px;object-fit:contain}.hero h1{margin:0 0 3px;font-size:24px}.small{font-size:13px;color:var(--muted)}.hero .small{color:#d8e0e8}.demo{background:#fff7e6;border:1px solid #f0cf8e;border-radius:12px;padding:12px;margin-top:12px}.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}.tabs button,.btn,.mini{border:0;border-radius:10px;padding:12px;font-weight:800;cursor:pointer}.tabs button{background:#e6ebf1;color:#2580d5}.tabs button.on{background:var(--blue);color:#fff}.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:16px;margin:12px 0}.hidden{display:none}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}label{display:block;font-weight:800;font-size:13px;margin-bottom:5px}input,select,textarea{width:100%;padding:11px;border:1px solid #cbd4dd;border-radius:10px;font-size:16px;background:#fff}.btn{width:100%;background:var(--blue);color:#fff;margin-top:10px}.mini{background:#eef3f7;color:#26333f;padding:9px 11px}.danger{background:#fdeceb;color:#a61b12}.good{background:#e7f6ec;color:#166534}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sectiontitle{display:flex;justify-content:space-between;align-items:center;gap:10px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#edf2f5;font-size:12px;font-weight:800}.pill.green{background:#e8f7ed;color:#166534}.pill.amber{background:#fff2df;color:#8a4b00}.item{border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:9px}.ok{background:var(--ok);border:1px solid var(--okline);border-radius:10px;padding:11px;margin-top:8px}.warn{background:var(--warn);border:1px solid var(--warnline);border-radius:10px;padding:11px;margin-top:8px}.bad{background:var(--bad);border:1px solid var(--badline);border-radius:10px;padding:11px;margin-top:8px}.check{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid #edf0f2}.check input{width:21px;height:21px;flex:none}.req{border-top:1px solid #edf0f2;margin-top:10px;padding-top:10px}.unitForm{background:#f8fafc;border:1px solid #e2e7ec;border-radius:10px;padding:10px;margin-top:8px}.prepared{border-left:5px solid var(--blue)}.closed{opacity:.82}.statusline{margin-top:8px;font-weight:800}.lookup{display:grid;grid-template-columns:1fr auto;gap:8px}.truckStatus{margin-top:10px}@media(max-width:660px){.tabs,.grid,.grid3,.lookup{grid-template-columns:1fr}.hero{align-items:flex-start}.sectiontitle{align-items:flex-start}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<div class="hero"><img src="logo.svg" alt="Cameras On Site logo"><div><h1>Cameras On Site</h1><div class="sub">Technician Readiness</div><div class="small" style="color:#d7dee6;margin-top:4px">IT verifies and releases spare units. Service Techs assign those units to specific MHelpDesk tickets.</div></div></div>
-<div class="demo"><b>TEST MODE</b><div class="small">Load sample units and tickets to test the flow, or clear them and enter your own.</div><div class="row" style="margin-top:10px"><button class="mini" onclick="demo()">Load Demo Data</button><button class="mini" onclick="clearAll()">Clear Test Data</button></div></div>
-<div class="tabs"><button id="t1" class="on" onclick="show('it')">IT Tech</button><button id="t2" onclick="show('svc')">Service Tech</button><button id="t3" onclick="show('owner')">Owner Reports</button></div>
-
-<section id="it">
-  <div class="card">
-    <div class="sectiontitle"><h2 style="margin:0">IT Unit Check</h2><span class="pill">Step 1</span></div>
-    <p class="small">IT does not work inside a service ticket. IT checks spare equipment and decides what is available for Service Techs to take.</p>
-    <div class="grid"><div><label>IT Technician</label><input id="itname" placeholder="Name"></div><div><label>Unit Type</label><select id="ittype" onchange="batteryHint()"><option>Sniper</option><option>Ranger</option><option>Helios</option><option>Solar Spotter</option><option>Spotter</option><option>Recon 2</option></select></div></div>
-    <label style="margin-top:10px">Unit Tag</label><input id="ittag" placeholder="Example 028 or SN-1003">
-    <div id="batteryBox" style="margin-top:10px"></div>
-    <div class="check"><input id="pwr" type="checkbox"><div><b>Powers on correctly</b></div></div>
-    <div class="check"><input id="fun" type="checkbox"><div><b>Functions tested and working</b></div></div>
-    <div class="check"><input id="safe" type="checkbox"><div><b>Safe for field use</b></div></div>
-    <button class="btn" onclick="releaseUnit()">Add to Available Service Units</button>
-  </div>
-  <div class="card">
-    <div class="sectiontitle"><h2 style="margin:0">Available Service Units — Verified by IT</h2><span class="pill" id="poolCount">0 available</span></div>
-    <div class="small">Only these units can be selected by a Service Tech. Units already assigned to a ticket are shown separately.</div>
-    <div id="pool"></div>
-  </div>
-</section>
-
-<section id="svc" class="hidden">
-  <div class="card">
-    <div class="sectiontitle"><h2 style="margin:0">Service Technician Morning Check</h2><span class="pill">Step 2</span></div>
-    <div class="grid"><div><label>Service Technician</label><input id="svcname" placeholder="Name"></div><div><label>Date</label><input id="svcdate" type="date"></div></div>
-    <div class="check"><input id="mhelp" type="checkbox" onchange="status()"><div><b>Reviewed today's MHelpDesk jobs</b></div></div>
+  <div class="hero">
+    <img src="logo.svg" alt="Cameras On Site logo">
+    <div><h1>Cameras On Site</h1><div>Technician Readiness</div><div class="small" style="margin-top:5px">IT prepares spare/swap equipment by MHelpDesk ticket. Service Techs retrieve and close the matching prepared ticket.</div></div>
   </div>
 
-  <div class="card">
-    <h2 style="margin-top:0">Add MHelpDesk Service Ticket</h2>
-    <div class="grid"><div><label>Ticket Number</label><input id="ticketNo" placeholder="Ticket #"></div><div><label>Customer / Site</label><input id="ticketSite" placeholder="Site or customer"></div></div>
-    <h3>Equipment this ticket may need serviced</h3>
-    <div class="grid3"><div><label>Equipment Type</label><select id="reqType"><option>Sniper</option><option>Ranger</option><option>Helios</option><option>Solar Spotter</option><option>Spotter</option><option>Recon 2</option></select></div><div><label>Qty</label><input id="reqQty" type="number" min="1" value="1"></div><div style="display:flex;align-items:end"><button class="mini" style="width:100%" onclick="addDraftReq()">Add</button></div></div>
-    <div id="draftReqs"></div>
-    <button class="btn" onclick="saveTicket()">Add Ticket to Morning Check</button>
-  </div>
+  <div class="demo"><b>TEST MODE</b><div class="small">Load one prepared demo ticket to test the new flow, or clear it and enter your own.</div><div class="row" style="margin-top:9px"><button class="mini" onclick="loadDemo()">Load Demo Ticket</button><button class="mini" onclick="clearTest()">Clear Test Data</button></div></div>
 
-  <div class="card"><h2 style="margin-top:0">Tickets & Spare Unit Assignment</h2><div class="small">Choose the exact IT-verified spare unit for each equipment need on each specific ticket.</div><div id="tickets"></div></div>
+  <div class="tabs"><button id="tab-it" class="on" onclick="show('it')">IT Tech</button><button id="tab-svc" onclick="show('svc')">Service Tech</button><button id="tab-owner" onclick="show('owner')">Owner Reports</button></div>
 
-  <div class="card"><h2 style="margin-top:0">Truck Inspection</h2><div id="truck"></div><div id="ready"></div><button class="btn" onclick="submitSvc()">Finish & Submit Service Check</button></div>
-</section>
+  <section id="view-it">
+    <div class="card">
+      <div class="sectiontitle"><h2 style="margin:0">Create IT Prep for Service Ticket</h2><span class="pill">Step 1</span></div>
+      <p class="small">Enter the MHelpDesk ticket number first. Then tell the system what spare or swap units IT needs to prepare for that ticket.</p>
+      <div class="grid"><div><label>IT Technician</label><input id="itName" placeholder="Technician name"></div><div><label>MHelpDesk Ticket #</label><input id="itTicket" placeholder="Example 123456"></div></div>
+      <label style="margin-top:10px">Customer / Site</label><input id="itSite" placeholder="Customer or site">
+      <h3>Add Equipment Needed</h3>
+      <div class="grid3"><div><label>Equipment Type</label><select id="needType"><option>Sniper</option><option>Ranger</option><option>Helios</option><option>Solar Spotter</option><option>Spotter</option><option>Recon 2</option></select></div><div><label>Qty</label><input id="needQty" type="number" min="1" value="1"></div><div style="display:flex;align-items:end"><button class="mini" style="width:100%" onclick="addNeed()">Add</button></div></div>
+      <div id="needDraft"></div>
+      <button class="btn" onclick="createPrep()">Create IT Prep Ticket</button>
+    </div>
 
-<section id="owner" class="hidden"><div class="card"><div class="sectiontitle"><h2 style="margin:0">Owner Reports</h2><span class="pill">Step 3</span></div><div class="small">Completed IT releases and Service Tech morning checks appear here.</div><div id="reports"></div></div></section>
+    <div class="card">
+      <div class="sectiontitle"><h2 style="margin:0">IT Prep Tickets</h2><span id="openPrepCount" class="pill">0 open</span></div>
+      <div class="small">Add and verify the exact spare unit tags for each ticket. A ticket cannot be released to Service until every requested unit is verified.</div>
+      <div id="itPreps"></div>
+    </div>
+  </section>
+
+  <section id="view-svc" class="hidden">
+    <div class="card">
+      <div class="sectiontitle"><h2 style="margin:0">Find IT-Prepared Ticket</h2><span class="pill">Step 2</span></div>
+      <p class="small">Type the same MHelpDesk ticket number IT prepared. The equipment list and exact spare unit tags will load automatically.</p>
+      <label>Service Technician</label><input id="svcName" placeholder="Technician name">
+      <div class="lookup" style="margin-top:10px"><input id="svcLookup" placeholder="Enter MHelpDesk ticket #"><button class="mini" onclick="findPrep()">Find Ticket</button></div>
+      <div id="lookupMessage"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Matched Prepared Tickets</h2>
+      <div id="matchedPreps"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Truck Inspection</h2>
+      <div id="truckChecks"></div>
+      <div id="truckStatus" class="truckStatus"></div>
+      <button class="btn" onclick="submitMorning()">Finish & Submit Morning Check</button>
+    </div>
+  </section>
+
+  <section id="view-owner" class="hidden">
+    <div class="card">
+      <div class="sectiontitle"><h2 style="margin:0">Prepared Ticket Status</h2><span class="pill">Owner</span></div>
+      <div id="ownerPrepStatus"></div>
+    </div>
+    <div class="card"><h2 style="margin-top:0">Owner Reports</h2><div id="reports"></div></div>
+  </section>
 </div>
+
 <script>
-const BATTERY={Sniper:{label:'12V 30Ah battery',per:1},Ranger:{label:'Ranger lithium battery',per:1},'Solar Spotter':{label:'12V 110Ah batteries',per:4}};
-const STORE='cos_live_test_v3';
-let D=JSON.parse(localStorage.getItem(STORE)||'{"pool":[],"reports":[],"tickets":[]}');
-let draftReqs=[];
-const trucks=['Fuel sufficient','Tires safe','Lights / signals / brake lights working','Windshield and mirrors safe','No visible fluid leaks','Tools and supplies onboard','Ladders / cargo / equipment secured','Truck cab and bed organized'];
+const STORE='cos_ticket_prep_v4';
+const BATTERY={Sniper:{per:1,label:'12V 30Ah battery'},Ranger:{per:1,label:'Ranger lithium battery'},'Solar Spotter':{per:4,label:'12V 110Ah batteries'}};
+const TRUCK=['Fuel level sufficient for today’s route','Tires appear safe and properly inflated','Headlights / signals / brake lights working','Windshield and mirrors are safe and clear','No visible fluid leaks','Required tools and service supplies onboard','Ladders / cargo / equipment secured','Truck cab and bed organized'];
+let D=JSON.parse(localStorage.getItem(STORE)||'{"preps":[],"reports":[]}');
+let draftNeeds=[];
+let matched=[];
 function save(){localStorage.setItem(STORE,JSON.stringify(D))}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function show(x){['it','svc','owner'].forEach((n,i)=>{document.getElementById(n).classList.toggle('hidden',n!==x);document.getElementById('t'+(i+1)).classList.toggle('on',n===x)});render()}
-function batteryHint(){const b=BATTERY[ittype.value];batteryBox.innerHTML=b?'<label>Batteries Prepared With This Spare</label><input id="itbattery" type="number" min="0" value="'+b.per+'"><div class="small">Required: '+b.per+' × '+b.label+'</div>':''}
-function demo(){D.pool=[{type:'Sniper',tag:'SN-1001',battery:1,by:'Demo IT',when:new Date().toLocaleString(),status:'available'},{type:'Sniper',tag:'SN-1002',battery:1,by:'Demo IT',when:new Date().toLocaleString(),status:'available'},{type:'Ranger',tag:'RG-2201',battery:1,by:'Demo IT',when:new Date().toLocaleString(),status:'available'},{type:'Helios',tag:'HL-3101',battery:0,by:'Demo IT',when:new Date().toLocaleString(),status:'available'}];D.tickets=[{no:'TEST-1001',site:'North Lot',reqs:[{type:'Sniper',qty:1,picks:['']},{type:'Ranger',qty:1,picks:['']}]},{no:'TEST-1002',site:'South Lot',reqs:[{type:'Sniper',qty:1,picks:['']},{type:'Helios',qty:1,picks:['']}]}];D.reports=[];save();render();alert('Demo loaded. Open Service Tech and assign the available units to each ticket.')}
-function clearAll(){if(!confirm('Clear all test data on this device?'))return;D={pool:[],reports:[],tickets:[]};draftReqs=[];save();document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);render()}
-function releaseUnit(){const name=itname.value.trim(),type=ittype.value,tag=ittag.value.trim(),b=BATTERY[type],battery=Number(document.getElementById('itbattery')?.value||0);if(!name||!tag)return alert('Enter IT Technician name and unit tag.');if(!pwr.checked||!fun.checked||!safe.checked)return alert('Complete all three equipment checks first.');if(b&&battery<b.per)return alert('This '+type+' needs at least '+b.per+' '+b.label+'.');D.pool=D.pool.filter(x=>x.tag.toLowerCase()!==tag.toLowerCase());D.pool.push({type,tag,battery,by:name,when:new Date().toLocaleString(),status:'available'});D.reports.unshift({kind:'IT',name,when:new Date().toLocaleString(),text:type+' '+tag+' verified and released as available for Service Tech use.'});save();ittag.value='';pwr.checked=fun.checked=safe.checked=false;batteryHint();render();alert(type+' '+tag+' is now available for Service Techs.')}
-function addDraftReq(){const type=reqType.value,qty=Math.max(1,Number(reqQty.value||1));const e=draftReqs.find(x=>x.type===type);if(e)e.qty+=qty;else draftReqs.push({type,qty});renderDraft()}
-function renderDraft(){draftReqsEl=document.getElementById('draftReqs');draftReqsEl.innerHTML=draftReqs.map((r,i)=>'<div class="item"><b>'+r.qty+' × '+esc(r.type)+'</b> <button class="mini danger" onclick="draftReqs.splice('+i+',1);renderDraft()">Remove</button></div>').join('')}
-function saveTicket(){const no=ticketNo.value.trim(),site=ticketSite.value.trim();if(!no||!draftReqs.length)return alert('Enter the ticket number and at least one equipment requirement.');if(D.tickets.some(t=>t.no===no))return alert('That ticket is already in this morning check.');D.tickets.push({no,site,reqs:draftReqs.map(r=>({type:r.type,qty:r.qty,picks:Array(r.qty).fill('')}))});draftReqs=[];ticketNo.value='';ticketSite.value='';save();renderDraft();render()}
-function usedTags(exTi,exRi,exSi){const used=new Set();D.tickets.forEach((t,ti)=>t.reqs.forEach((r,ri)=>r.picks.forEach((tag,si)=>{if(tag&&!(ti===exTi&&ri===exRi&&si===exSi))used.add(tag)})));return used}
-function unitSelect(ti,ri,si,r){const current=r.picks[si]||'',used=usedTags(ti,ri,si);const opts=D.pool.filter(u=>u.status==='available'&&u.type===r.type&&(!used.has(u.tag)||u.tag===current));return '<select onchange="pickUnit('+ti+','+ri+','+si+',this.value)"><option value="">Select IT-verified '+esc(r.type)+'</option>'+opts.map(u=>'<option value="'+esc(u.tag)+'" '+(u.tag===current?'selected':'')+'>'+esc(u.tag)+(BATTERY[u.type]?' · '+u.battery+' battery'+(u.battery===1?'':'ies'):'')+'</option>').join('')+'</select>'}
-function pickUnit(ti,ri,si,tag){D.tickets[ti].reqs[ri].picks[si]=tag;save();render()}
-function removeTicket(i){D.tickets.splice(i,1);save();render()}
-function render(){
- const avail=D.pool.filter(u=>u.status==='available'),assigned=D.pool.filter(u=>u.status==='assigned');poolCount.textContent=avail.length+' available';
- pool.innerHTML=(avail.length?avail.map(u=>'<div class="ok"><b>'+esc(u.type)+' — '+esc(u.tag)+'</b><div class="small">VERIFIED BY '+esc(u.by)+(BATTERY[u.type]?' · Batteries: '+u.battery:'')+'</div></div>').join(''):'<div class="warn">No available units yet. IT must verify and release them first.</div>')+(assigned.length?'<h3>Already Assigned</h3>'+assigned.map(u=>'<div class="item"><b>'+esc(u.type)+' — '+esc(u.tag)+'</b><div class="small">Assigned to Ticket #'+esc(u.assignedTo||'')+'</div></div>').join(''):'');
- tickets.innerHTML=D.tickets.length?D.tickets.map((t,ti)=>'<div class="item"><div class="sectiontitle"><div><b>Ticket #'+esc(t.no)+'</b><div class="small">'+esc(t.site||'No site entered')+'</div></div><button class="mini danger" onclick="removeTicket('+ti+')">Remove</button></div>'+t.reqs.map((r,ri)=>'<div class="req"><b>'+r.qty+' × '+esc(r.type)+'</b>'+r.picks.map((p,si)=>'<div style="margin-top:7px"><label>Spare '+(si+1)+'</label>'+unitSelect(ti,ri,si,r)+'</div>').join('')+'</div>').join('')+'</div>').join(''):'<div class="warn">No service tickets added yet.</div>';
- reports.innerHTML=D.reports.length?D.reports.map(r=>'<div class="item"><b>'+esc(r.kind)+' CHECK</b><div>'+esc(r.name)+'</div><div class="small">'+esc(r.when)+'</div><div>'+esc(r.text)+'</div></div>').join(''):'<div class="warn">No reports yet.</div>';
- status();
-}
-function status(){let miss=[];if(!mhelp.checked)miss.push('MHelpDesk jobs not confirmed');if(!D.tickets.length)miss.push('No service tickets added');D.tickets.forEach(t=>t.reqs.forEach(r=>r.picks.forEach((p,i)=>{if(!p)miss.push('Ticket '+t.no+' needs '+r.type+' spare '+(i+1))})));let truckIncomplete=false;document.querySelectorAll('.truckbox').forEach(x=>{if(!x.checked)truckIncomplete=true});if(truckIncomplete)miss.push('Truck inspection incomplete');ready.innerHTML=miss.length?'<div class="bad"><b>NOT READY</b><div class="small">'+[...new Set(miss)].join('<br>')+'</div></div>':'<div class="ok"><b>READY FOR DISPATCH</b></div>';return miss}
-function submitSvc(){const name=svcname.value.trim(),date=svcdate.value;if(!name||!date)return alert('Enter Service Technician name and date.');const miss=status();if(miss.length)return alert('Finish all required checks first.');let summary=[];D.tickets.forEach(t=>{let parts=[];t.reqs.forEach(r=>r.picks.forEach(tag=>{parts.push(r.type+' '+tag);const u=D.pool.find(x=>x.tag===tag);if(u){u.status='assigned';u.assignedTo=t.no;u.assignedBy=name}}));summary.push('Ticket '+t.no+': '+parts.join(', '))});D.reports.unshift({kind:'SERVICE',name,when:new Date().toLocaleString(),text:summary.join(' | ')});D.tickets=[];save();mhelp.checked=false;document.querySelectorAll('.truckbox').forEach(x=>x.checked=false);render();alert('Service check submitted. Selected spare units are now assigned to their tickets.')}
-truck.innerHTML=trucks.map(x=>'<div class="check"><input class="truckbox" type="checkbox" onchange="status()"><div><b>'+x+'</b></div></div>').join('');
-svcdate.value=new Date().toISOString().slice(0,10);batteryHint();renderDraft();render();
+function show(which){['it','svc','owner'].forEach(n=>{document.getElementById('view-'+n).classList.toggle('hidden',n!==which);document.getElementById('tab-'+n).classList.toggle('on',n===which)});renderAll()}
+function addNeed(){const type=needType.value,qty=Math.max(1,Number(needQty.value||1));const old=draftNeeds.find(x=>x.type===type);if(old)old.qty+=qty;else draftNeeds.push({type,qty});renderDraftNeeds()}
+function renderDraftNeeds(){needDraft.innerHTML=draftNeeds.map((n,i)=>'<div class="item"><b>'+n.qty+' × '+esc(n.type)+'</b> <button class="mini danger" onclick="draftNeeds.splice('+i+',1);renderDraftNeeds()">Remove</button></div>').join('')}
+function createPrep(){const by=itName.value.trim(),no=itTicket.value.trim(),site=itSite.value.trim();if(!by||!no)return alert('Enter the IT Technician and MHelpDesk ticket number.');if(!draftNeeds.length)return alert('Add at least one spare/swap equipment need.');if(D.preps.some(p=>p.no===no&&p.status!=='closed'))return alert('There is already an open IT prep for Ticket #'+no+'.');D.preps.unshift({id:Date.now(),no,site,createdBy:by,createdAt:new Date().toLocaleString(),status:'draft',requirements:draftNeeds.map(n=>({type:n.type,qty:n.qty,units:[]}))});D.reports.unshift({kind:'IT PREP CREATED',name:by,when:new Date().toLocaleString(),text:'Ticket #'+no+' prep created: '+draftNeeds.map(n=>n.qty+' × '+n.type).join(', ')});draftNeeds=[];itTicket.value='';itSite.value='';save();renderDraftNeeds();renderAll()}
+function activeTagUsed(tag,prepId){const low=tag.toLowerCase();return D.preps.some(p=>p.id!==prepId&&p.status!=='closed'&&p.requirements.some(r=>r.units.some(u=>u.tag.toLowerCase()===low)))}
+function addVerifiedUnit(prepId,ri){const p=D.preps.find(x=>x.id===prepId),r=p.requirements[ri];const prefix='u_'+prepId+'_'+ri+'_';const tag=document.getElementById(prefix+'tag').value.trim();const b=BATTERY[r.type],battery=Number(document.getElementById(prefix+'battery')?.value||0);const power=document.getElementById(prefix+'power').checked,functions=document.getElementById(prefix+'functions').checked,safe=document.getElementById(prefix+'safe').checked;if(!tag)return alert('Enter the unit tag.');if(r.units.length>=r.qty)return alert('This equipment requirement already has enough verified units.');if(activeTagUsed(tag,prepId)||p.requirements.some((rr,j)=>rr.units.some(u=>u.tag.toLowerCase()===tag.toLowerCase())))return alert('Unit '+tag+' is already assigned to an active prep ticket.');if(!power||!functions||!safe)return alert('Complete all three IT unit checks first.');if(b&&battery<b.per)return alert(r.type+' requires '+b.per+' '+b.label+'.');r.units.push({tag,battery,verifiedBy:p.createdBy,verifiedAt:new Date().toLocaleString()});save();renderAll()}
+function removeUnit(prepId,ri,ui){const p=D.preps.find(x=>x.id===prepId);if(p.status!=='draft')return;p.requirements[ri].units.splice(ui,1);save();renderAll()}
+function prepReady(p){return p.requirements.every(r=>r.units.length===r.qty)}
+function releasePrep(id){const p=D.preps.find(x=>x.id===id);if(!prepReady(p))return alert('Every requested spare/swap unit must be verified before release.');p.status='released';p.releasedAt=new Date().toLocaleString();D.reports.unshift({kind:'IT PREP RELEASED',name:p.createdBy,when:p.releasedAt,text:'Ticket #'+p.no+' released to Service with '+unitSummary(p)});save();renderAll();alert('Ticket #'+p.no+' is ready for the Service Tech to retrieve.')}
+function deleteDraft(id){const p=D.preps.find(x=>x.id===id);if(!p||p.status!=='draft')return;if(confirm('Delete IT prep Ticket #'+p.no+'?')){D.preps=D.preps.filter(x=>x.id!==id);save();renderAll()}}
+function unitSummary(p){return p.requirements.flatMap(r=>r.units.map(u=>r.type+' '+u.tag)).join(', ')}
+function itPrepHtml(p){const badge=p.status==='draft'?'<span class="pill amber">IT PREP</span>':p.status==='released'?'<span class="pill green">READY FOR SERVICE</span>':'<span class="pill">CLOSED</span>';let body=p.requirements.map((r,ri)=>{const b=BATTERY[r.type];let units=r.units.map((u,ui)=>'<div class="ok"><b>'+esc(r.type)+' — '+esc(u.tag)+'</b><div class="small">Verified'+(b?' · Batteries: '+u.battery:'')+'</div>'+(p.status==='draft'?'<button class="mini danger" style="margin-top:7px" onclick="removeUnit('+p.id+','+ri+','+ui+')">Remove</button>':'')+'</div>').join('');let form='';if(p.status==='draft'&&r.units.length<r.qty){const pre='u_'+p.id+'_'+ri+'_';form='<div class="unitForm"><b>Add verified '+esc(r.type)+' spare '+(r.units.length+1)+' of '+r.qty+'</b><label style="margin-top:8px">Unit Tag</label><input id="'+pre+'tag" placeholder="Unit tag">'+(b?'<label style="margin-top:8px">Batteries Prepared</label><input id="'+pre+'battery" type="number" min="0" value="'+b.per+'"><div class="small">Required: '+b.per+' × '+b.label+'</div>':'')+'<div class="check"><input id="'+pre+'power" type="checkbox"><div><b>Powers on correctly</b></div></div><div class="check"><input id="'+pre+'functions" type="checkbox"><div><b>Functions tested and working</b></div></div><div class="check"><input id="'+pre+'safe" type="checkbox"><div><b>Safe for field use</b></div></div><button class="mini good" onclick="addVerifiedUnit('+p.id+','+ri+')">Verify & Add Unit</button></div>'}return '<div class="req"><div class="row"><b>'+r.qty+' × '+esc(r.type)+'</b><span class="pill">'+r.units.length+'/'+r.qty+' verified</span></div>'+units+form+'</div>'}).join('');return '<div class="item prepared '+(p.status==='closed'?'closed':'')+'"><div class="sectiontitle"><div><b>Ticket #'+esc(p.no)+'</b><div class="small">'+esc(p.site||'No site entered')+' · IT: '+esc(p.createdBy)+'</div></div>'+badge+'</div>'+body+(p.status==='draft'?'<button class="btn" '+(prepReady(p)?'':'disabled style="opacity:.45"')+' onclick="releasePrep('+p.id+')">Release Prepared Ticket to Service</button><button class="mini danger" style="margin-top:8px" onclick="deleteDraft('+p.id+')">Delete Draft</button>':'')+'</div>'}
+function findPrep(){const no=svcLookup.value.trim();lookupMessage.innerHTML='';if(!no)return;const p=D.preps.find(x=>x.no===no);if(!p){lookupMessage.innerHTML='<div class="bad">No IT prep was found for Ticket #'+esc(no)+'.</div>';return}if(p.status==='draft'){lookupMessage.innerHTML='<div class="warn">Ticket #'+esc(no)+' is still being prepared by IT and has not been released yet.</div>';return}if(p.status==='closed'){lookupMessage.innerHTML='<div class="warn">Ticket #'+esc(no)+' has already been closed by Service.</div>';return}if(!matched.includes(p.id))matched.push(p.id);svcLookup.value='';lookupMessage.innerHTML='<div class="ok">Ticket #'+esc(no)+' matched to the IT-prepared equipment list.</div>';renderMatched()}
+function confirmId(prepId,ri,ui){return 'c_'+prepId+'_'+ri+'_'+ui}
+function matchedHtml(p){let list=p.requirements.map((r,ri)=>'<div class="req"><b>'+r.qty+' × '+esc(r.type)+'</b>'+r.units.map((u,ui)=>'<div class="check"><input class="unitConfirm" data-prep="'+p.id+'" id="'+confirmId(p.id,ri,ui)+'" type="checkbox"><div><b>'+esc(r.type)+' — '+esc(u.tag)+'</b><div class="small">Confirm this exact unit is physically loaded'+(BATTERY[r.type]?' · Batteries prepared by IT: '+u.battery:'')+'</div></div></div>').join('')+'</div>').join('');return '<div class="item prepared"><div class="sectiontitle"><div><b>Ticket #'+esc(p.no)+'</b><div class="small">'+esc(p.site||'No site entered')+'</div></div><span class="pill green">IT READY</span></div>'+list+'<button class="btn" onclick="closePreparedTicket('+p.id+')">Confirm Units & Close Prepared Ticket</button></div>'}
+function renderMatched(){const ps=matched.map(id=>D.preps.find(p=>p.id===id)).filter(p=>p&&p.status==='released');matchedPreps.innerHTML=ps.length?ps.map(matchedHtml).join(''):'<div class="warn">No prepared tickets matched yet. Enter a ticket number above.</div>'}
+function closePreparedTicket(id){const name=svcName.value.trim();if(!name)return alert('Enter the Service Technician name first.');const p=D.preps.find(x=>x.id===id);if(!p||p.status!=='released')return;const checks=[...document.querySelectorAll('.unitConfirm[data-prep="'+id+'"]')];if(!checks.length||checks.some(x=>!x.checked))return alert('Confirm every exact spare/swap unit before closing this ticket.');p.status='closed';p.closedBy=name;p.closedAt=new Date().toLocaleString();D.reports.unshift({kind:'SERVICE TICKET MATCH',name,when:p.closedAt,text:'Ticket #'+p.no+' matched and closed with '+unitSummary(p)});matched=matched.filter(x=>x!==id);save();renderAll();alert('Prepared Ticket #'+p.no+' is closed and matched to the service ticket.')}
+function truckComplete(){const c=[...document.querySelectorAll('.truckCheck')];return c.length===TRUCK.length&&c.every(x=>x.checked)}
+function updateTruckStatus(){truckStatus.innerHTML=truckComplete()?'<div class="ok"><b>Truck inspection complete.</b></div>':'<div class="warn"><b>Truck inspection not complete.</b></div>'}
+function submitMorning(){const name=svcName.value.trim();if(!name)return alert('Enter Service Technician name.');if(!truckComplete())return alert('Complete the truck inspection first.');const stillOpen=matched.map(id=>D.preps.find(p=>p.id===id)).filter(p=>p&&p.status==='released');if(stillOpen.length)return alert('Close all matched prepared tickets first.');D.reports.unshift({kind:'SERVICE MORNING CHECK',name,when:new Date().toLocaleString(),text:'Truck inspection complete and matched prepared tickets closed.'});save();renderAll();alert('Morning Service Tech check submitted to Owner Reports.')}
+function renderAll(){const open=D.preps.filter(p=>p.status!=='closed');openPrepCount.textContent=open.length+' open';itPreps.innerHTML=D.preps.length?D.preps.map(itPrepHtml).join(''):'<div class="warn">No IT prep tickets yet.</div>';renderMatched();ownerPrepStatus.innerHTML=D.preps.length?D.preps.map(p=>'<div class="item"><div class="sectiontitle"><div><b>Ticket #'+esc(p.no)+'</b><div class="small">'+esc(p.site||'No site')+' · '+esc(unitSummary(p)||'No units verified yet')+'</div></div><span class="pill '+(p.status==='released'?'green':p.status==='draft'?'amber':'')+'">'+p.status.toUpperCase()+'</span></div>'+(p.closedBy?'<div class="small">Closed by '+esc(p.closedBy)+' · '+esc(p.closedAt)+'</div>':'')+'</div>').join(''):'<div class="warn">No prepared ticket records.</div>';reports.innerHTML=D.reports.length?D.reports.map(r=>'<div class="item"><b>'+esc(r.kind)+'</b><div>'+esc(r.name)+'</div><div class="small">'+esc(r.when)+'</div><div>'+esc(r.text)+'</div></div>').join(''):'<div class="warn">No reports yet.</div>';updateTruckStatus()}
+function loadDemo(){D={preps:[{id:1001,no:'123456',site:'Demo North Lot',createdBy:'Demo IT Tech',createdAt:new Date().toLocaleString(),releasedAt:new Date().toLocaleString(),status:'released',requirements:[{type:'Sniper',qty:1,units:[{tag:'006',battery:1,verifiedBy:'Demo IT Tech',verifiedAt:new Date().toLocaleString()}]},{type:'Ranger',qty:1,units:[{tag:'028',battery:1,verifiedBy:'Demo IT Tech',verifiedAt:new Date().toLocaleString()}]}]}],reports:[]};matched=[];save();renderAll();alert('Demo prepared Ticket #123456 loaded. Open Service Tech and search 123456.')}
+function clearTest(){if(!confirm('Clear all test data on this device?'))return;D={preps:[],reports:[]};draftNeeds=[];matched=[];save();document.querySelectorAll('input[type=checkbox]').forEach(x=>x.checked=false);renderDraftNeeds();renderAll()}
+truckChecks.innerHTML=TRUCK.map(x=>'<div class="check"><input class="truckCheck" type="checkbox" onchange="updateTruckStatus()"><div><b>'+esc(x)+'</b></div></div>').join('');renderDraftNeeds();renderAll();
 </script>
 </body>
 </html>
