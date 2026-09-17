@@ -22,11 +22,10 @@
     <div class="sep"></div>
     <details>
       <summary><b>First-time Owner Setup</b></summary>
-      <div class="setupNote small">Use this once to create the first Owner/Admin account. After an owner exists, this setup is automatically locked.</div>
+      <div class="setupNote small">Use this once to create the first Owner/Admin account. Your authorized Owner email is used for this one-time setup; no separate setup code is required. After an owner exists, this setup is automatically locked.</div>
       <label style="margin-top:10px">Owner Full Name</label><input id="setupName" placeholder="Full name">
       <label style="margin-top:10px">Owner Email</label><input id="setupEmail" type="email" placeholder="Email">
       <label style="margin-top:10px">Owner Password</label><input id="setupPassword" type="password" placeholder="At least 8 characters">
-      <label style="margin-top:10px">Owner Setup Code</label><input id="setupCode" type="password" placeholder="Private setup code">
       <button class="btn" onclick="bootstrapOwner()">Create Owner Account</button>
       <div id="setupMessage"></div>
     </details>
