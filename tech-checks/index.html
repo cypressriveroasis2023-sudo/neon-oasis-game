@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Tech Checks at Cameras On Site</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#18222d;padding:30px;text-align:center}strong{display:block;margin-top:30vh;font-size:22px}</style>
+</head>
+<body><strong>Loading Tech Checks at Cameras On Site…</strong>
+<script>
+(async()=>{
+  try{
+    const build='20260916-2342';
+    const r=await fetch('../cameras-on-site/shared/index.html?build='+build,{cache:'no-store'});
+    let html=await r.text();
+    html=html.replace('<title>Cameras On Site Technician Readiness</title>','<title>Tech Checks at Cameras On Site</title>')
+             .replaceAll('<div>Technician Readiness</div>','<div>Tech Checks at Cameras On Site</div>')
+             .replace('src="core.js"','src="../cameras-on-site/shared/core.js?build='+build+'"')
+             .replace('src="it.js"','src="../cameras-on-site/shared/it.js?build='+build+'"')
+             .replace('src="service.js"','src="../cameras-on-site/shared/service.js?build='+build+'"')
+             .replace('src="owner.js"','src="../cameras-on-site/shared/owner.js?build='+build+'"')
+             .replace('src="../logo.svg"','src="../cameras-on-site/logo.svg"');
+    document.open();document.write(html);document.close();
+  }catch(e){document.body.innerHTML='<strong>Could not load Tech Checks at Cameras On Site. Please refresh.</strong>'}
+})();
+</script>
+</body>
+</html>
