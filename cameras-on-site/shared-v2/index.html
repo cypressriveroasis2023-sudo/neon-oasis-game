@@ -13,10 +13,17 @@
 <script>
 (async()=>{
   try{
-    const build='20260916-2253';
+    const build='20260916-2312';
     const r=await fetch('../shared/index.html?build='+build,{cache:'no-store'});
     let html=await r.text();
-    html=html.replace('src="core.js"','src="../shared/core.js?build='+build+'"')
+    html=html.replace('MHelpDesk ticket number connects IT preparation to Service checkout.','MHelpDesk ticket number connects IT equipment preparation to Service equipment checkout verification.')
+             .replace('Create IT Prep From MHelpDesk Ticket','Create IT Equipment Prep From MHelpDesk Ticket')
+             .replace('Create IT Prep Ticket','Create IT Equipment Prep')
+             .replace('IT Prep Tickets','IT Equipment Prep')
+             .replace('The blue release button saves the completed verification fields and releases the ticket.','The blue release button saves the completed IT verification and releases the prepared equipment to Service.')
+             .replace('Confirm the exact unit tag and physically count required batteries before closing each prepared ticket.','Confirm the exact unit tag and physically count required batteries before completing the equipment checkout verification.')
+             .replace('Prepared Ticket Status','Equipment Prep Status')
+             .replace('src="core.js"','src="../shared/core.js?build='+build+'"')
              .replace('src="it.js"','src="../shared/it.js?build='+build+'"')
              .replace('src="service.js"','src="../shared/service.js?build='+build+'"')
              .replace('src="owner.js"','src="../shared/owner.js?build='+build+'"');
