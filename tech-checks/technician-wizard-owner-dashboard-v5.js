@@ -2594,7 +2594,7 @@ function ownerAIJobTimeline(a,prep,solarCheck=null){
 function ownerAIAlertHistoryHtml(a,prep,solarCheck=null){
   const id=String(a?.id||a?.ticket_no||''), current=ownerLiveAIStatus(a,prep,solarCheck), rows=ownerAIAckRows.filter(r=>String(r.assignment_id)===id);
   if(!rows.length&&current.state!=='attention')return '';
-  const items=rows.map(r=>{const active=current.state==='attention'&&ownerAINotificationKey(a,current)===r.alert_key;return `<div class='wl-ai-history-row'><div><b>${active?'🔴 ACTIVE':'✓ RESOLVED / CHANGED'}</b><span>${esc(r.alert_detail||'AI Attention alert')}</span></div><div class='small'>Acknowledged by <b>${esc(r.acknowledged_by_name||'Owner/Admin')}</b>${r.acknowledged_at?' · '+esc(ownerTimelineWhen(r.acknowledged_at)):''}</div></div>`}).join('');
+  const items=rows.map(r=>{const active=current.state==='attention'&&ownerAINotificationKey(a,current)===r.alert_key&&!r.resolved_at;return `<div class='wl-ai-history-row'><div><b>${active?'🔴 ACTIVE':'✓ RESOLVED'}</b><span>${esc(r.alert_detail||'AI Attention alert')}</span></div><div class='small'>Acknowledged by <b>${esc(r.acknowledged_by_name||'Owner/Admin')}</b>${r.acknowledged_at?' · '+esc(ownerTimelineWhen(r.acknowledged_at)):''}</div>${r.resolved_at?`<div class='small'><b>Resolved:</b> ${esc(ownerTimelineWhen(r.resolved_at))}${r.resolution_note?' · '+esc(r.resolution_note):''}</div>`:''}</div>`}).join('');
   const unacked=current.state==='attention'&&!ownerAIIsAcknowledged(a,current)?`<div class='wl-ai-history-row active'><div><b>🔴 ACTIVE · NOT ACKNOWLEDGED</b><span>${esc(current.detail)}</span></div></div>`:'';
   return `<details class='wl-ai-alert-history'><summary>🔔 AI Alert History <span class='pill'>${rows.length+(unacked?1:0)}</span></summary><div>${unacked}${items||"<div class='small'>No acknowledged alerts yet.</div>"}</div></details>`;
 }
@@ -2616,6 +2616,16 @@ async function ownerAIAcknowledge(id,key,detail,ticket){
   const {error}=await liveDb.from('owner_ai_alert_acknowledgements').upsert({assignment_id:String(id),alert_key:key,ticket_no:String(ticket||''),alert_detail:String(detail||''),acknowledged_by:tech.id,acknowledged_by_name:tech.name||tech.full_name||tech.username||'Owner',acknowledged_at:new Date().toISOString()},{onConflict:'assignment_id,alert_key'});
   if(error)return alert(error.message);
   await installOwnerAssignments(true);
+}
+async function ownerAISyncResolutions(aiStates){
+  const activeKeys=new Set(aiStates.filter(x=>x.s.state==='attention').map(x=>ownerAINotificationKey(x.a,x.s)));
+  const pending=ownerAIAckRows.filter(r=>!r.resolved_at&&!activeKeys.has(r.alert_key));
+  if(!pending.length)return;
+  const now=new Date().toISOString();
+  for(const row of pending){
+    const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({resolved_at:now,resolution_note:'Underlying AI Attention condition is no longer active.'}).eq('id',row.id).is('resolved_at',null);
+    if(!error){row.resolved_at=now;row.resolution_note='Underlying AI Attention condition is no longer active.';}
+  }
 }
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
@@ -2671,6 +2681,7 @@ async function installOwnerAssignments(force = false) {
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
   const aiStates=active.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
+  await ownerAISyncResolutions(aiStates);
   const aiAttention=aiStates.filter(x=>x.s.state==='attention').length, aiWaiting=aiStates.filter(x=>x.s.state==='waiting').length, aiWorking=aiStates.filter(x=>x.s.state==='working').length, aiOnTrack=aiStates.filter(x=>x.s.state==='healthy').length;
   const aiNotices=aiStates.filter(x=>x.s.state==='attention').map(x=>({...x,key:ownerAINotificationKey(x.a,x.s),ack:ownerAIIsAcknowledged(x.a,x.s)})); const aiUnread=aiNotices.filter(x=>!x.ack).length;
   const assignedRows = assignedWaiting.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
