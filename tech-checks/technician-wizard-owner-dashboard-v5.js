@@ -1071,6 +1071,11 @@ async function startITIntake(id) {
 }
 function intakeAIReview(row){
   const answered=intakeWizard.answers.filter(v=>v!==null).length,noCount=intakeWizard.answers.filter(v=>v===false).length,remaining=intakeWizard.answers.length-answered,flags=[];
+  const yes=(i)=>intakeWizard.answers[i]===true, servicePhotos=Array.isArray(row?.return_photo_paths)?row.return_photo_paths:[], intakePhotos=Array.isArray(row?.intake_photo_paths)?row.intake_photo_paths:[];
+  if(yes(1)&&!servicePhotos.length) flags.push('Evidence mismatch: Service damage/photo review is YES, but no Service return photo is attached.');
+  if(yes(0)&&!String(row?.unit_tag||'').trim()) flags.push('Evidence mismatch: unit/tag verification is YES, but the returned unit tag is missing.');
+  if(intakeWizard.step>intakeLabels.length && !intakeWizard.photo && !intakePhotos.length) flags.push('Required IT Intake photo is still missing.');
+  if(yes(12)&&!intakeWizard.meta?.cancellationDoc) flags.push('Evidence mismatch: SIM cancellation documentation is YES, but the date/job/unit/initials record is missing.');
   if(noCount) flags.push(noCount+' intake check'+(noCount===1?' is':'s are')+' marked NO.');
   if(row?.return_notes) flags.push('Service documented return/damage notes — review them against the photos.');
   if(!row?.return_photo_paths?.length) flags.push('No Service return photo is attached.');
