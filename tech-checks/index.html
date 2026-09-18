@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=mobile-overflow-v32" />
+    <link rel="stylesheet" href="./styles.css?v=role-tabs-v33" />
   </head>
   <body>
     <div id="app">
@@ -87,9 +87,11 @@
           </div>
         </div>
 
-        <div class="tabs">
-          <button id="tab-it" onclick="show('it')">IT Technician</button><div id="itWelcome" class="itWelcome" aria-live="polite"><b>Welcome, Technician</b><span id="itWelcomeDateTime"></span></div><div id="itWeather" class="itWeather" aria-live="polite"><b>☁ Katy Weather</b><span id="itWeatherNow">Loading weather…</span></div><button id="tab-svc" onclick="show('svc')">Service Tech</button
-          ><button id="tab-owner" onclick="show('owner')">Owner</button>
+        <div class="techStatusRow"><div id="itWelcome" class="itWelcome" aria-live="polite"><b>Welcome, Technician</b><span id="itWelcomeDateTime"></span></div><div id="itWeather" class="itWeather" aria-live="polite"><b>☁ Katy Weather</b><span id="itWeatherNow">Loading weather…</span></div></div>
+        <div class="tabs mainRoleTabs">
+          <button id="tab-owner" onclick="show('owner')">Owner</button
+          ><button id="tab-svc" onclick="show('svc')">Service Tech</button
+          ><button id="tab-it" onclick="show('it')">IT Technician</button>
         </div>
         </div>
 
