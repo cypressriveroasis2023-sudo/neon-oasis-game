@@ -633,10 +633,10 @@ async function startAssignedJob(id) {
     if (ticket) ticket.value = assignment.ticket_no || '';
     if (site) site.value = assignment.site || '';
     fillTicketPartInputs(assignment, 'wlPart');
-    const requestedDevices = assignment.requested_unit_count == null ? null : Number(assignment.requested_unit_count || 0);
-    const assignedCount = requestedDevices == null ? equipmentManifestTotal(pendingAssignmentManifest) : requestedDevices + equipmentManifestStandTotal(pendingAssignmentManifest);
+    const requestedDevices = assignment.requested_unit_count == null ? equipmentManifestDeviceTotal(pendingAssignmentManifest) : Number(assignment.requested_unit_count || 0);
     const totalInput = document.getElementById('wlTotalUnits');
-    if (totalInput && assignedCount > 0) totalInput.value = String(assignedCount);
+    if (totalInput) totalInput.value = String(requestedDevices);
+    syncITEquipmentCounts();
     totalInput?.focus();
     return;
   }
@@ -748,6 +748,15 @@ function equipmentManifestDeviceTotal(raw) {
 function equipmentManifestText(raw) {
   return normalizedEquipmentManifest(raw).map(row => row.qty + ' × ' + row.label).join(' · ');
 }
+function equipmentManifestExpanded(raw) {
+  const out=[];
+  normalizedEquipmentManifest(raw).forEach(row => {
+    if (row.category !== 'device' && row.category !== 'stand') return;
+    for (let i=0;i<row.qty;i++) out.push(row.label);
+  });
+  return out;
+}
+
 function equipmentManifestInlineHtml(data) {
   const rows = normalizedEquipmentManifest(data?.equipment_manifest || data);
   if (!rows.length) return '';
@@ -1397,7 +1406,7 @@ async function showItPrep(prepId) {
     itUnitPhase = 'final';
   } else if (itUnitIndex >= items.length) {
     itUnitPhase = 'type';
-    itTypeChoice = '';
+    itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
     itPurposeChoice = '';
     itReconRequired = 1;
   } else {
@@ -1406,7 +1415,7 @@ async function showItPrep(prepId) {
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
     itReconRequired = Number(item.required_battery_count || 1);
-    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = ''; itPurposeChoice = ''; }
+    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || ''; }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
       if (!issues.length) itUnitPhase = 'review';
@@ -2161,7 +2170,9 @@ async function ownerAssignJob() {
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
   if (requestedUnitCount === null) return alert('Enter how many units are listed on the MHelpDesk ticket. Use 0 if this job has no unit/device.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
-  if (selectedDeviceCount > 0 && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Units / Devices section adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
+  const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
+  if (role === 'it' && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
+  if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
@@ -2181,6 +2192,7 @@ async function ownerAssignJob() {
     p_micro_sd_qty: parts.micro_sd_qty,
     p_equipment_manifest: equipmentManifest,
     p_requires_it_handoff: false,
+    p_scheduled_for: scheduledFor,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
