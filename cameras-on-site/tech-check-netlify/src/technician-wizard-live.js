@@ -2633,8 +2633,21 @@ document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') 
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
+let serviceSolarRealtimeStarted=false;
+function setupServiceSolarRealtime() {
+  if (serviceSolarRealtimeStarted) return;
+  serviceSolarRealtimeStarted=true;
+  liveDb.channel('tech-check-service-solar-live')
+    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_checks'},async()=>{
+      if (roleText().includes('Owner/Admin')) await installOwnerAssignments(true);
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_evidence'},async()=>{
+      if (roleText().includes('Owner/Admin')) await installOwnerAssignments(true);
+    })
+    .subscribe();
+}
 function boot() {
-  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
+  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
