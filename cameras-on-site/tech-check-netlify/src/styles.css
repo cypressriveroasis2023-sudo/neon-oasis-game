@@ -904,7 +904,7 @@ select {
 
 @media (max-width: 680px) {
   .accountbar .accountActions {
-    grid-template-columns: 42px auto auto !important;
+    grid-template-columns: auto auto auto !important;
   }
   .wl-notify-overlay {
     padding: 0;
@@ -1518,4 +1518,79 @@ select {
   .equipmentAssignRow { grid-template-columns:1fr; }
   .archivedTeamCard { align-items:flex-start; flex-direction:column; }
   .archivedTeamCard .mini { width:100%; }
+}
+
+
+/* Structured equipment requirements on Owner dispatch and technician assignments */
+.wl-owner-equipment-requirements {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.wl-requirement-section {
+  border-top: 1px solid #dce4e9;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.wl-requirement-section:first-child { margin-top: 0; }
+.wl-requirement-heading {
+  font-size: 13px;
+  font-weight: 950;
+  color: #173047;
+  margin-bottom: 7px;
+}
+.wl-owner-equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 7px;
+}
+.wl-owner-equipment-qty {
+  margin: 0;
+  padding: 9px;
+  border: 1px solid #d6e0e7;
+  border-radius: 10px;
+  background: #fff;
+}
+.wl-owner-equipment-qty span,
+.wl-owner-equipment-qty small {
+  display: block;
+}
+.wl-owner-equipment-qty small {
+  color: #7a8792;
+  font-size: 10px;
+  margin: 2px 0 5px;
+}
+.wl-owner-equipment-qty input {
+  text-align: center;
+  font-weight: 900;
+}
+.wl-equipment-manifest {
+  margin-top: 9px;
+  border: 1px solid #d6e1e8;
+  border-radius: 11px;
+  background: #f8fafb;
+  padding: 10px;
+}
+.wl-manifest-title {
+  font-size: 13px;
+  font-weight: 950;
+  color: #173047;
+}
+.wl-manifest-group { margin-top: 8px; }
+.wl-manifest-group > b {
+  font-size: 11px !important;
+  color: #687887;
+  text-transform: uppercase;
+  letter-spacing: .35px;
+}
+
+.techMenuMini {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+@media (max-width:680px) {
+  .wl-owner-equipment-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
 }
