@@ -626,13 +626,17 @@ async function startAssignedJob(id) {
     }
     if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
     pendingAssignmentLinkId = id;
+    pendingAssignmentManifest = normalizedEquipmentManifest(assignment.equipment_manifest);
     showNewPrep();
     const ticket = document.getElementById('itTicket');
     const site = document.getElementById('itSite');
     if (ticket) ticket.value = assignment.ticket_no || '';
     if (site) site.value = assignment.site || '';
     fillTicketPartInputs(assignment, 'wlPart');
-    document.getElementById('wlTotalUnits')?.focus();
+    const assignedCount = equipmentManifestTotal(pendingAssignmentManifest);
+    const totalInput = document.getElementById('wlTotalUnits');
+    if (totalInput && assignedCount > 0) totalInput.value = String(assignedCount);
+    totalInput?.focus();
     return;
   }
 
@@ -811,6 +815,10 @@ function showNewPrep() {
   if (totalWrap) totalWrap.style.display = '';
   if (partsWrap) partsWrap.style.display = '';
   head.innerHTML = progress('Job Setup', 'Enter the ticket, units, and parts required', 1, 1);
+  let req = document.getElementById('wlAssignedEquipmentReq');
+  if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
+  req.style.display = pendingAssignmentManifest.length ? '' : 'none';
+  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Requested From Shelf</b><div class='small'>Use this as the equipment list for the assigned MHelpDesk job.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
@@ -848,6 +856,7 @@ async function createPrepAndStartChecks() {
     if (linkError) return alert(linkError.message);
     pendingAssignmentLinkId = null;
   }
+  pendingAssignmentManifest = [];
   document.getElementById('itTicket').value = '';
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
