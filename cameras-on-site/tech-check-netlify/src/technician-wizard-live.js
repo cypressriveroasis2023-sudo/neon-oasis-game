@@ -642,6 +642,7 @@ async function startAssignedJob(id) {
     return;
   }
 
+  activeSvcAssignment = assignment;
   const { data: released } = await liveDb.from('prep_tickets')
     .select('id,ticket_no,status')
     .eq('ticket_no', assignment.ticket_no)
@@ -1505,7 +1506,26 @@ async function showReceiveLookup() {
   card.innerHTML = `${progress('Step 1', 'Enter the MHelpDesk ticket number', 1, 5)}<button class='wl-back' data-wl-home='svc'>← Service Home</button><label>MHelpDesk Ticket #</label><input id='wlTicketInput' inputmode='numeric' placeholder='Ticket #'><button class='wl-big wl-blue top10' data-wl-match>Find IT Equipment →</button><div id='wlLookupMsg'></div>`;
   hideChildren(viewSvc(), [card]); resetWizardPosition();
 }
-async function openServiceTicket(ticket) { await showReceiveLookup(); const input=document.getElementById('wlTicketInput'); if(input) input.value=ticket; return matchSvcTicket(); }
+async function myServiceAssignmentForTicket(ticket, prepId=null) {
+  const tech=await currentTechIdentity().catch(()=>null);
+  if (!tech?.id) return null;
+  let q=liveDb.from('job_assignments').select('*')
+    .eq('assigned_role','service')
+    .eq('assignee_user_id',tech.id)
+    .eq('ticket_no',String(ticket || ''))
+    .in('status',['assigned','started'])
+    .order('assigned_at',{ascending:false})
+    .limit(5);
+  const { data }=await q;
+  const rows=data || [];
+  return rows.find(row => prepId && row.prep_ticket_id===prepId) || rows[0] || null;
+}
+async function openServiceTicket(ticket) {
+  await showReceiveLookup();
+  const input=document.getElementById('wlTicketInput');
+  if(input) input.value=ticket;
+  return matchSvcTicket();
+}
 async function matchSvcTicket() {
   const entered = document.getElementById('wlTicketInput')?.value || '';
   const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,status').eq('status', 'released');
@@ -1515,6 +1535,7 @@ async function matchSvcTicket() {
   await window.findPrep();
   await new Promise(r => setTimeout(r, 200));
   activeSvcPrep = await getPrep(prep.id);
+  activeSvcAssignment = activeSvcAssignment?.ticket_no === activeSvcPrep.ticket_no ? activeSvcAssignment : await myServiceAssignmentForTicket(activeSvcPrep.ticket_no, activeSvcPrep.id);
   svcUnitIndex = 0;
   svcQuestionIndex = 0;
   showSvcTicketConfirmation();
