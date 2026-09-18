@@ -46,6 +46,7 @@ const INVENTORY_TYPES = [
   'Other',
 ];
 let ownerEquipmentFilter = 'all';
+let ownerDailyDate = localDateKey(new Date());
 let state = {
   session: null,
   profile: null,
@@ -57,6 +58,8 @@ let state = {
   assetInventory: [],
   assetHistory: [],
   accessHistory: [],
+  ownerAssignments: [],
+  dailyInspections: [],
   matched: [],
   sessionClosed: [],
 };
@@ -104,6 +107,26 @@ function roleLabel(r) {
 function eqLabel(t) {
   return t === 'Recon 2' ? 'Recon II' : t;
 }
+function localDateKey(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + day;
+}
+function dateFromKey(key) {
+  const [y,m,d] = String(key || '').split('-').map(Number);
+  return new Date(y || 1970,(m || 1)-1,d || 1,12,0,0,0);
+}
+function shiftDateKey(key,days) {
+  const d = dateFromKey(key);
+  d.setDate(d.getDate() + Number(days || 0));
+  return localDateKey(d);
+}
+function dateLabel(key) {
+  return new Intl.DateTimeFormat(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'}).format(dateFromKey(key));
+}
+
 function requiredBattery(item) {
   const meta = BATTERY[item?.equipment_type];
   if (!meta) return 0;
