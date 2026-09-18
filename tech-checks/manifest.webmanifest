@@ -1,0 +1,11 @@
+{
+  "name": "Tech Check by Cameras Onsite",
+  "short_name": "Tech Check",
+  "description": "Cameras Onsite technician equipment readiness and checkout verification.",
+  "id": ".",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#101820"
+}
