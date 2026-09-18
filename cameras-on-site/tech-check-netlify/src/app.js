@@ -1423,10 +1423,10 @@ function teamRoleClass(role) {
 function teamMemberCard(p) {
   const self = p.user_id === state.profile?.user_id;
   const status = p.active ? 'ACTIVE' : 'DISABLED';
-  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody"><div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div><div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div><div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div><div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Access</button></div></div><details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>' + (self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Remove from Active Team</button>') + '</div></details>';
+  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody"><div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div><div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div><div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div><div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Access</button></div></div><details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>' + (self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>') + '</div></details>';
 }
 function archivedTeamCard(p) {
-  return '<div class="archivedTeamCard"><div><b>' + esc(p.full_name || p.username || 'Team Member') + '</b><div class="small">@' + esc(p.username || 'no-username') + ' · ' + esc(roleLabel(p.role)) + '</div><div class="small">Archived ' + (p.archived_at ? new Date(p.archived_at).toLocaleString() : '') + (p.archived_reason ? ' · ' + esc(p.archived_reason) : '') + '</div></div><button class="mini" onclick="restoreUser(\'' + p.user_id + '\')">Restore</button></div>';
+  return '<div class="archivedTeamCard"><div><b>' + esc(p.full_name || p.username || 'Team Member') + '</b><div class="small">@' + esc(p.username || 'no-username') + ' · ' + esc(roleLabel(p.role)) + '</div><div class="small">Deleted from Techs on File ' + (p.archived_at ? new Date(p.archived_at).toLocaleString() : '') + (p.archived_reason ? ' · ' + esc(p.archived_reason) : '') + '</div></div><button class="mini" onclick="restoreUser(\'' + p.user_id + '\')">Restore</button></div>';
 }
 function renderTeamAccessHistory() {
   const host=$('teamAccessHistory');
@@ -1436,10 +1436,11 @@ function renderTeamAccessHistory() {
 }
 function renderUsers() {
   if (state.profile?.role !== 'owner') return;
-  const activeTeam=state.profiles.filter(p => !p.archived_at);
+  const activeTeam=state.profiles.filter(p => !p.archived_at && p.active);
+  const inactiveTeam=state.profiles.filter(p => !p.archived_at && !p.active);
   const archived=state.profiles.filter(p => p.archived_at);
-  const activeTechCount=activeTeam.filter(p => p.active && (p.role==='it' || p.role==='service')).length;
-  const ownerCount=activeTeam.filter(p => p.active && p.role==='owner').length;
+  const activeTechCount=activeTeam.filter(p => p.role==='it' || p.role==='service').length;
+  const ownerCount=activeTeam.filter(p => p.role==='owner').length;
   const resetCount=(state.resetRequests || []).filter(r => r.status==='pending' && new Date(r.expires_at).getTime()>Date.now()).length;
   const accountsBadge=$('ownerAccountsBadge');
   if (accountsBadge) {
@@ -1448,18 +1449,22 @@ function renderUsers() {
     accountsBadge.classList.toggle('neutral',resetCount===0);
   }
   const stats=$('ownerTeamStats');
-  if (stats) stats.innerHTML='<span><b>' + activeTechCount + '</b> Active Techs</span><span><b>' + ownerCount + '</b> Owners/Admins</span><span><b>' + archived.length + '</b> Archived</span>';
+  if (stats) stats.innerHTML='<span><b>' + activeTechCount + '</b> Active Techs</span><span><b>' + ownerCount + '</b> Owners/Admins</span><span><b>' + inactiveTeam.length + '</b> Inactive</span>';
+  if ($('activeTeamCount')) $('activeTeamCount').textContent=String(activeTeam.length);
+  if ($('inactiveTeamCount')) $('inactiveTeamCount').textContent=String(inactiveTeam.length);
   if ($('archivedTeamCount')) $('archivedTeamCount').textContent=String(archived.length);
   $('userList').innerHTML=activeTeam.length ? activeTeam.map(teamMemberCard).join('') : '<div class="warn">No active team members.</div>';
+  const inactiveHost=$('inactiveUserList');
+  if (inactiveHost) inactiveHost.innerHTML=inactiveTeam.length ? inactiveTeam.map(teamMemberCard).join('') : '<div class="ok"><b>✓ No inactive team members.</b></div>';
   const archivedHost=$('archivedUserList');
-  if (archivedHost) archivedHost.innerHTML=archived.length ? archived.map(archivedTeamCard).join('') : '<div class="ok"><b>✓ No archived team members.</b></div>';
+  if (archivedHost) archivedHost.innerHTML=archived.length ? archived.map(archivedTeamCard).join('') : '<div class="ok"><b>✓ No deleted / former team members.</b></div>';
   renderTeamAccessHistory();
 }
 async function archiveUser(id) {
   const p=state.profiles.find(row=>row.user_id===id);
   if (!p) return;
-  if (!confirm('Remove ' + (p.full_name || p.username) + ' from Active Team?\n\nTheir login will be disabled, but all historical tickets, checks, photos, handoffs, and reports will keep their name.')) return;
-  const reason=prompt('Archive note / reason (optional):','') || '';
+  if (!confirm('Delete ' + (p.full_name || p.username) + ' from Techs on File?\n\nThey will disappear from Active and Inactive Team lists and will not be able to sign in. Their historical tickets, checks, photos, handoffs, and reports will still keep their name.')) return;
+  const reason=prompt('Delete / former team note (optional):','') || '';
   setBusy(true);
   const { data,error }=await db.functions.invoke('admin-user-management',{ body:{ action:'archive',user_id:id,reason } });
   setBusy(false);
