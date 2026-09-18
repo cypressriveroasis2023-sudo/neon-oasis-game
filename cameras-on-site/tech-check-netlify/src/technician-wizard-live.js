@@ -2032,7 +2032,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
+        <div><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058'></div>
         <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
       </div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
