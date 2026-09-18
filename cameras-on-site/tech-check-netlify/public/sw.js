@@ -44,3 +44,18 @@ self.addEventListener('fetch', event => {
     return new Response('',{status:503,statusText:'Offline'});
   })());
 });
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = event.notification?.data?.url || './';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const same = list.find(client => client.url && client.url.includes('/tech-checks/'));
+      if (same) {
+        same.focus();
+        return same.navigate(target);
+      }
+      return clients.openWindow(target);
+    })
+  );
+});
