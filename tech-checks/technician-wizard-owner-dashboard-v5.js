@@ -2423,7 +2423,7 @@ async function installOwnerAssignments(force = false) {
     host.insertAdjacentElement('afterend', liveHost);
   }
 
-  const wasOpen = host.open;
+  const wasOpen = host.dataset.loaded === '1' ? host.open : true;
   const liveWasOpen = liveHost.open;
   host.dataset.loaded = '1';
 
@@ -2497,7 +2497,7 @@ async function installOwnerAssignments(force = false) {
         </div>
         <input type='hidden' id='ownerAssignRole' value='it'>
       </div>
-      <div class='top10'><label>Assign Techs <span class='small'>(optional)</span></label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><button type='button' class='btn wl-add-tech-launch' id='ownerAddTech'>＋ Add Tech</button><div id='ownerTechPicker' class='wl-tech-picker hidden'></div><div id='ownerAssignTechHint' class='small'>Add specific IT techs, or leave blank for the IT Department queue.</div></div>
+      <div class='top10'><label>Assign Techs <span class='small'>(optional)</span></label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div id='ownerTechPicker' class='wl-tech-picker'>${ownerTechPickerHtml('it')}</div><div id='ownerAssignTechHint' class='small'>Tap technician names to add them. Leave blank for the IT Department queue.</div></div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
       <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
@@ -2787,7 +2787,6 @@ document.addEventListener('click', async e => {
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
 document.addEventListener('change', e => {
-  if (e.target?.id === 'ownerAddTech') { e.preventDefault(); const p=document.getElementById('ownerTechPicker'); if(p){ p.classList.toggle('hidden'); p.innerHTML=ownerTechPickerHtml(document.getElementById('ownerAssignRole')?.value||'it'); } }
   const roleBtn=e.target?.closest?.('[data-owner-role]'); if(roleBtn){ e.preventDefault(); const input=document.getElementById('ownerAssignRole'); if(input) input.value=roleBtn.dataset.ownerRole; refreshOwnerAssignmentTechOptions(); }
   const techBtn=e.target?.closest?.('[data-add-tech-id]'); if(techBtn){ e.preventDefault(); addOwnerTechPill(techBtn.dataset.addTechId,techBtn.dataset.addTechRole); }
   if (e.target?.matches?.('[data-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); }
