@@ -2406,7 +2406,9 @@ function ownerAssignmentTechOptions(role) {
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
-  if (host && host.dataset.loaded === '1' && !force) return;
+  // Always let the real assignment renderer replace the static loading shell.
+  // Only skip when this function itself has already rendered the live form.
+  if (host && host.dataset.assignmentRendered === '1' && !force) return;
   if (!host) {
     host = document.createElement('details');
     host.id = 'ownerJobAssignments';
@@ -2436,6 +2438,7 @@ async function installOwnerAssignments(force = false) {
   ownerAssignmentProfiles = profiles || [];
   ownerAssignmentAssets = assets || [];
   host.dataset.loaded = '1';
+  host.dataset.assignmentRendered = '1';
   const all = assignments || [];
   const prepMap = new Map((preps || []).map(p => [p.id,p]));
   const solarCheckMap = new Map((solarChecks || []).map(row => [row.prep_ticket_id,row]));
