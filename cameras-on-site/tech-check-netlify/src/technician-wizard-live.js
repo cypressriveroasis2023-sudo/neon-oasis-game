@@ -134,6 +134,7 @@ function injectStyles() {
     .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
     .wl-assigned-inventory{margin:12px 0;padding:12px;border:1px solid #cfdce5;border-radius:13px;background:#f3f7fa}.wl-assigned-inventory-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.wl-assigned-inventory-list span{display:inline-block;border:1px solid #d4dee6;border-radius:999px;background:#fff;padding:7px 9px;font-size:12px;color:#526472}.wl-assigned-inventory-list b{color:#102a40}
     .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
+    .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -244,14 +245,7 @@ async function pushAlertState() {
   }
   return { supported:true, permission, subscribed, ready:permission === 'granted' && subscribed };
 }
-function phoneAlertBanner(state) {
-  if (currentRoleKey() === 'owner' || state?.ready) return '';
-  const blocked = state?.permission === 'denied';
-  const message = blocked
-    ? 'Phone alerts are blocked for Tech Check on this device. Update the phone notification permission, then enable alerts again.'
-    : 'Enable phone alerts so Owner-assigned jobs can notify you even when Tech Check is closed.';
-  return `<div class='warn wl-phone-alert-banner'><b>🔔 Phone alerts are OFF</b><div class='small'>${esc(message)}</div><button class='mini top8' data-wl-enable-browser-alerts>Enable Phone Alerts</button></div>`;
-}
+function phoneAlertBanner() { return ''; }
 async function registerPhonePush() {
   const tech = await currentTechIdentity();
   const reg = await navigator.serviceWorker.ready;
@@ -293,7 +287,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
     { kicker:'RETURN TO IT', title:'Send returning units and parts back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
-    { kicker:'DAILY TOOLS', title:'Inspection, alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Use Notifications for assigned work and equipment-ready alerts. Use History to review work that has already been submitted.</p><p>Phone alerts only work after you enable them once on that device.</p>` },
+    { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
     { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>SERVICE TECH CLAIMS</b><span>→</span><b>RECEIVE FROM IT</b><span>→</span><b>VERIFY UNITS + PARTS</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
   ];
   if (role === 'owner') return [
@@ -309,7 +303,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
     { kicker:'RELEASE TO SERVICE', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, release the equipment to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for units and parts returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
-    { kicker:'ALERTS & HISTORY', title:'Use the app to stay on your work', body:`<p>Notifications tell you about new Owner assignments and returned units. Status & History shows previous IT work. Phone alerts only work after you enable them once on that device.</p>` },
+    { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help & Training</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
     { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>IT TECH CLAIMS</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>RELEASE TO SERVICE</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
   ];
 }
@@ -355,17 +349,51 @@ async function completeHelpWalkthrough() {
   document.getElementById('wlHelpOverlay')?.classList.add('hidden');
 }
 function ensureHelpButton() {
-  if (document.getElementById('helpTrainingButton')) return;
-  const notify = document.getElementById('notificationSettingsButton');
-  if (!notify) return;
-  const btn = document.createElement('button');
-  btn.id = 'helpTrainingButton';
-  btn.type = 'button';
-  btn.className = 'mini helpMini';
-  btn.title = 'Help & Training';
-  btn.setAttribute('aria-label','Help & Training');
-  btn.textContent = '? Help';
-  notify.insertAdjacentElement('afterend', btn);
+  // Help now lives inside the Tech Check Menu instead of a separate header button.
+}
+function ensureTechMenuPanel() {
+  let panel = document.getElementById('wlTechMenuPanel');
+  if (panel) return panel;
+  panel = document.createElement('div');
+  panel.id = 'wlTechMenuPanel';
+  panel.className = 'wl-menu-overlay hidden';
+  panel.innerHTML = `<div class='wl-menu-sheet'>
+    <div class='wl-menu-head'>
+      <div><div class='wl-next-kicker'>TECH CHECK</div><h2>Menu</h2></div>
+      <button class='mini' data-wl-menu-close>Close</button>
+    </div>
+    <div id='wlTechMenuBody'></div>
+  </div>`;
+  document.body.append(panel);
+  return panel;
+}
+async function openTechMenu() {
+  const panel = ensureTechMenuPanel();
+  const body = document.getElementById('wlTechMenuBody');
+  const role = currentRoleKey();
+  const push = role === 'owner' ? null : await pushAlertState();
+  const pushLabel = !push ? '' : push.ready ? 'Phone alerts are enabled on this device.' : push.permission === 'denied' ? 'Phone alerts are blocked in this device settings.' : 'Enable once if you want new assignments to alert this phone.';
+  body.innerHTML = `
+    <div class='wl-app-menu-list'>
+      <button class='wl-app-menu-item' data-wl-menu-help>
+        <span class='wl-app-menu-icon'>?</span>
+        <span><b>Help & Training</b><small>Replay the full ${role === 'it' ? 'IT Technician' : role === 'service' ? 'Service Tech' : 'Owner'} walkthrough.</small></span>
+        <strong>›</strong>
+      </button>
+      ${role !== 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-phone-alerts>
+        <span class='wl-app-menu-icon'>↗</span>
+        <span><b>Phone Alerts</b><small>${esc(pushLabel)}</small></span>
+        <strong>${push?.ready ? 'ON' : '›'}</strong>
+      </button>` : ''}
+      <button class='wl-app-menu-item' data-wl-menu-refresh>
+        <span class='wl-app-menu-icon'>↻</span>
+        <span><b>Refresh Tech Check</b><small>Reload the latest assignments, equipment, and workflow status.</small></span>
+        <strong>›</strong>
+      </button>
+    </div>
+    ${role === 'owner' ? `<div class='wl-menu-future'><div class='wl-next-kicker'>OWNER TOOLS</div><b>AI Dispatch</b><div class='small'>This menu is ready for the Owner AI dispatch assistant we discussed. It is not enabled yet.</div></div>` : ''}
+  `;
+  panel.classList.remove('hidden');
 }
 async function maybeShowFirstTimeWalkthrough() {
   if (walkthroughDismissedSession || document.getElementById('appView')?.classList.contains('hidden')) return;
@@ -423,12 +451,9 @@ async function myNotifications(limit = 30) {
   return data || [];
 }
 async function refreshNotificationBadge() {
-  const badge = document.getElementById('notificationBadge');
-  if (!badge || document.getElementById('appView')?.classList.contains('hidden')) return;
+  if (document.getElementById('appView')?.classList.contains('hidden')) return;
   const rows = await myNotifications(50);
   const unread = rows.filter(n => !n.read_at).length;
-  badge.textContent = String(unread);
-  badge.classList.toggle('hidden', unread === 0);
   try {
     if ('setAppBadge' in navigator && 'clearAppBadge' in navigator) {
       if (unread > 0) await navigator.setAppBadge(unread);
@@ -2124,27 +2149,17 @@ async function installOwnerIntake(force = false) {
 }
 
 document.addEventListener('click', async e => {
+  if (e.target.closest('#techMenuButton')) return openTechMenu();
+  if (e.target.closest('[data-wl-menu-close]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-menu-help]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return openHelpWalkthrough(false); }
+  if (e.target.closest('[data-wl-menu-phone-alerts]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return enableBrowserAlerts(); }
+  if (e.target.closest('[data-wl-menu-refresh]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); await window.refreshData?.(); return; }
   if (e.target.closest('#helpTrainingButton')) return openHelpWalkthrough(false);
   if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
-  if (e.target.closest('#notificationSettingsButton')) return openNotificationPanel();
-  if (e.target.closest('[data-wl-notify-close]')) { document.getElementById('wlNotificationPanel')?.classList.add('hidden'); return; }
-  if (e.target.closest('[data-wl-save-notify]')) return saveNotificationSettings();
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
-  if (e.target.closest('[data-wl-notify-read-all]')) {
-    await liveDb.rpc('mark_all_my_notifications_read');
-    await refreshNotificationBadge();
-    return openNotificationPanel();
-  }
-  const notificationItem = e.target.closest('[data-wl-notification-id]');
-  if (notificationItem) {
-    await liveDb.rpc('mark_my_notification_read', { p_notification_id: notificationItem.dataset.wlNotificationId });
-    await refreshNotificationBadge();
-    if (notificationItem.dataset.wlNotificationAssignment) return openAssignmentFromNotification(notificationItem.dataset.wlNotificationAssignment);
-    return openNotificationPanel();
-  }
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
@@ -2162,7 +2177,7 @@ document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
 function boot() {
-  injectStyles(); installTabs(); ensureHelpButton(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
+  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
