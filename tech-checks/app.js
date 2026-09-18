@@ -486,7 +486,7 @@ async function refreshData() {
     const selectedStart = dateFromKey(ownerDailyDate); selectedStart.setHours(0,0,0,0);
     const selectedEnd = new Date(selectedStart); selectedEnd.setDate(selectedEnd.getDate()+1);
     const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory] = await Promise.all([
-      db.from('reports').select('*').order('created_at', { ascending: true }),
+      db.from('reports').select('*').order('created_at', { ascending: false }),
       db.from('profiles').select('*').order('created_at', { ascending: true }),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(50),
       db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
@@ -1501,7 +1501,7 @@ function renderOwner() {
   $('ownerPrepStatus').innerHTML = activePreps.length ? activePreps.slice().reverse().map(prepHtml).join('') : '<div class="ok"><b>✓ No active equipment handoffs.</b></div>';
   $('ownerPrepHistoryCount').textContent = String(completedPreps.length);
   $('ownerPrepHistory').innerHTML = completedPreps.length ? completedPreps.map(prepHtml).join('') : '<div class="small">No completed equipment history yet.</div>';
-  const recentReports = state.reports.slice().reverse().slice(0, ownerReportLimit);
+  const recentReports = state.reports.slice().sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, ownerReportLimit);
   $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(r.kind) + '</b><span class="small ownerFoldHint">' + esc(ownerActorLabel(r)) + (r.ticket_no ? ' · MHelpDesk #' + esc(r.ticket_no) : '') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(r.text) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
   const more = $('ownerReportsMore'); if (more) { more.classList.toggle('hidden', ownerReportLimit >= state.reports.length); more.textContent = 'Show More Activity (' + Math.max(0, state.reports.length - ownerReportLimit) + ' older)'; more.onclick = () => { ownerReportLimit += 25; renderOwner(); }; }
   ensureStartFreshCard();
