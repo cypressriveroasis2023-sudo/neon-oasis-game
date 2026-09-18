@@ -2115,3 +2115,27 @@ select {
 .wl-preview-grid span,.wl-preview-section>span{display:block;font-size:11px;font-weight:700;color:#66788a;text-transform:uppercase;margin-bottom:3px}
 .wl-preview-confirm{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:10px;border-top:1px solid #dbe4ec}
 @media(max-width:768px){.wl-preview-grid{grid-template-columns:1fr}.wl-preview-confirm{align-items:stretch;flex-direction:column}.wl-preview-confirm button{width:100%}}
+
+/* Bright green confirmation state for a successfully matched Service ticket */
+.wl-service-ticket-preview{
+  border:3px solid #16a34a !important;
+  background:#ecfdf3 !important;
+  box-shadow:0 0 0 3px rgba(34,197,94,.16),0 8px 22px rgba(22,163,74,.18);
+}
+.wl-service-ticket-preview .wl-next-kicker{
+  color:#087a34 !important;
+  background:#bbf7d0;
+  border-radius:7px;
+  padding:6px 9px;
+  display:inline-block;
+  font-weight:900;
+}
+.wl-service-ticket-preview .wl-preview-title{color:#065f2b;font-size:20px}
+.wl-service-ticket-preview .wl-preview-grid>div,
+.wl-service-ticket-preview .wl-preview-section{background:#f7fff9;border-color:#86efac}
+.wl-service-ticket-preview .wl-preview-confirm{border-top:2px solid #86efac}
+.wl-service-ticket-preview [data-wl-service-take-job]{
+  background:#16a34a !important;border-color:#16a34a !important;color:#fff !important;
+  font-weight:900;box-shadow:0 4px 12px rgba(22,163,74,.3)
+}
+.wl-service-ticket-preview [data-wl-service-take-job]:hover{background:#15803d !important}
