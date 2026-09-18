@@ -288,7 +288,7 @@ async function openNotificationPanel() {
       ? 'Alerts are blocked in this device’s browser settings.'
       : 'Enable alerts on this device when you want system notifications.';
   const toggles = [
-    notificationToggle('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.'),
+    role !== 'owner' ? notificationToggle('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.') : '',
     role === 'it' ? notificationToggle('wlPrefReturns','Returned units waiting for IT',prefs.returned_units,'When Service sends a unit back for IT Intake.') : '',
     role === 'service' ? notificationToggle('wlPrefService','Equipment ready for Service',prefs.equipment_ready_service,'When IT releases equipment for Service checkout.') : '',
     role === 'owner' ? notificationToggle('wlPrefOwner','Owner actions',prefs.owner_actions,'When IT finishes intake and MHelpDesk inventory confirmation is needed.') : '',
@@ -316,7 +316,7 @@ async function saveNotificationSettings() {
   const role = currentRoleKey();
   const browserAllowed = typeof Notification !== 'undefined' && Notification.permission === 'granted';
   const { error } = await liveDb.rpc('save_my_notification_preferences', {
-    p_new_assignments: Boolean(document.getElementById('wlPrefAssignments')?.checked),
+    p_new_assignments: role === 'owner' ? Boolean(prefs.new_assignments) : Boolean(document.getElementById('wlPrefAssignments')?.checked),
     p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns')?.checked) : Boolean(prefs.returned_units),
     p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService')?.checked) : Boolean(prefs.equipment_ready_service),
     p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner')?.checked) : Boolean(prefs.owner_actions),
@@ -365,6 +365,12 @@ async function setupNotificationRealtime() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications', filter: 'recipient_user_id=eq.' + tech.id }, payload => {
       refreshNotificationBadge();
       showSystemNotification(payload.new);
+      if ((payload.new.kind === 'new_assignment' || payload.new.kind === 'returned_unit') && isIT() && !viewIT()?.classList.contains('hidden')) showITHome();
+      if ((payload.new.kind === 'new_assignment' || payload.new.kind === 'equipment_ready_service') && isSvc() && !viewSvc()?.classList.contains('hidden')) showSvcHome();
+      if (payload.new.kind === 'owner_action' && roleText().includes('Owner/Admin')) {
+        installOwnerIntake(true);
+        window.refreshData?.();
+      }
     })
     .subscribe();
   refreshNotificationBadge();
@@ -1597,8 +1603,7 @@ async function installOwnerAssignments(force = false) {
     host.className = 'card';
     const view = document.getElementById('view-owner');
     const attention = document.getElementById('ownerAttentionCard');
-    if (attention) attention.after(host);
-    else view?.prepend(host);
+    view?.prepend(host);
   }
   host.dataset.loaded = '1';
 
