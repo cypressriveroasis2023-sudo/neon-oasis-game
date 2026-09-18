@@ -473,12 +473,16 @@ async function refreshData() {
   if (!prepQ.error) state.preps = prepQ.data || [];
   if (state.profile.role === 'owner') {
     const dayStart = new Date(); dayStart.setHours(0,0,0,0);
-    const [rep, prof, resets, returns, inspections, registry, assets, assetHistory, accessHistory] = await Promise.all([
+    const selectedStart = dateFromKey(ownerDailyDate); selectedStart.setHours(0,0,0,0);
+    const selectedEnd = new Date(selectedStart); selectedEnd.setDate(selectedEnd.getDate()+1);
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory] = await Promise.all([
       db.from('reports').select('*').order('created_at', { ascending: true }),
       db.from('profiles').select('*').order('created_at', { ascending: true }),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(50),
       db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
+      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
+      db.from('job_assignments').select('*').eq('scheduled_for',ownerDailyDate).order('assigned_at',{ascending:true}),
       db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(500),
       db.from('asset_inventory').select('*').order('asset_category',{ascending:true}).order('unit_tag',{ascending:true}),
       db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(300),
@@ -489,6 +493,8 @@ async function refreshData() {
     if (!resets.error) state.resetRequests = resets.data || [];
     if (!returns.error) state.ownerReturns = returns.data || [];
     if (!inspections.error) state.todayInspections = inspections.data || [];
+    if (!selectedInspections.error) state.dailyInspections = selectedInspections.data || [];
+    if (!assignments.error) state.ownerAssignments = assignments.data || [];
     if (!registry.error) state.unitRegistry = registry.data || [];
     if (!assets.error) state.assetInventory = assets.data || [];
     if (!assetHistory.error) state.assetHistory = assetHistory.data || [];
@@ -496,6 +502,7 @@ async function refreshData() {
     renderOwner();
     renderOwnerUnitSearch();
     renderOwnerEquipment();
+    renderOwnerTechOverview();
     renderOwnerAttention();
     renderPasswordResetRequests();
     renderUsers();
