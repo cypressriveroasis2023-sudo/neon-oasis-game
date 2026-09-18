@@ -1920,3 +1920,44 @@ select {
   height: 18px;
   margin: 0;
 }
+
+
+/* Separate Owner dispatch form from live assignment tracking */
+#view-owner .ownerLiveJobsCard > .ownerDashSummary {
+  background: #eef7f2;
+  border-left: 6px solid #237457;
+}
+.ownerLiveSummary {
+  grid-template-columns: repeat(4,minmax(0,1fr));
+}
+.ownerJobStatusSection {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #d6e0e7;
+  border-radius: 14px;
+  background: #f8fafb;
+}
+.ownerJobStatusSection.assigned {
+  border-left: 5px solid #315f9a;
+}
+.ownerJobStatusSection.progress {
+  border-left: 5px solid #d49a1c;
+  background: #fffaf0;
+}
+.ownerJobStatusSection .ownerActiveLabel {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .45px;
+  text-transform: uppercase;
+  color: #4f6170;
+}
+.ownerJobStatusSection .wl-assignment-row {
+  margin-top: 8px;
+  background: #fff;
+}
+@media (max-width: 640px) {
+  .ownerLiveSummary {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
