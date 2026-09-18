@@ -81,7 +81,8 @@
             <div id="syncStatus" class="small">Connected to shared data</div>
           </div>
           <div class="row accountActions">
-            <button class="mini" onclick="refreshData()">Refresh</button
+            <button class="mini notificationMini" id="notificationSettingsButton" type="button" aria-label="Notifications" title="Notifications">🔔<span id="notificationBadge" class="notificationBadge hidden">0</span></button
+            ><button class="mini" onclick="refreshData()">Refresh</button
             ><button class="mini danger" onclick="logout()">Sign Out</button>
           </div>
         </div>
