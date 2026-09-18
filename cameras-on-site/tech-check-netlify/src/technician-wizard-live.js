@@ -568,6 +568,7 @@ function readTicketPartInputs(prefix='wlPart') {
 function ticketPartsRows(data) {
   return TICKET_PARTS.map(part => ({ ...part, qty: cleanPartQty(data?.[part.key]) }));
 }
+function ticketPartsTotal(data) { return ticketPartsRows(data).reduce((sum,row) => sum + row.qty, 0); }
 function ticketPartsInlineHtml(data) {
   const rows = ticketPartsRows(data).filter(row => row.qty > 0);
   return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>No extra replacement parts listed.</div></div>`;
@@ -1248,9 +1249,10 @@ function showSvcTicketConfirmation() {
   const forms = svcForms(card);
   const types = [...new Set((activeSvcPrep.prep_items || []).map(item => item.equipment_type).filter(Boolean))];
   const wizard = svcWizardCard();
+  const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Units IT is giving you:</b> ${forms.length}</div>${types.length ? `<div><b>Equipment:</b> ${esc(types.join(', '))}</div>` : ''}</div><div class='wl-question'><div class='qtext'>Does this ticket number and name match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
+  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Units IT is giving you:</b> ${forms.length}</div>${types.length ? `<div><b>Equipment:</b> ${esc(types.join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div><div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
   resetWizardPosition();
 }
 function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPreps > .item.prepared')].find(c => c.textContent.includes(`MHelpDesk Ticket #${ticket}`)); }
@@ -1285,21 +1287,31 @@ async function renderSvcPrep() {
   if (!base || !card) return alert('Could not open the matched equipment.');
   const forms = svcForms(card);
   const wizard = svcWizardCard();
+  const partsTotal = ticketPartsTotal(activeSvcPrep);
+  const hasParts = partsTotal > 0;
+  const partStep = forms.length;
+  const proofStep = forms.length + (hasParts ? 1 : 0);
+  const photoStep = proofStep + 1;
+  const signStep = proofStep + 2;
+  const finalStep = proofStep + 3;
+  const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  const proofStep = forms.length; const photoStep = forms.length + 1; const signStep = forms.length + 2; const finalStep = forms.length + 3;
   if (svcUnitIndex < forms.length) {
     const questions = svcQuestions(forms[svcUnitIndex]);
     const q = questions[svcQuestionIndex];
-    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) + (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? 'Compare IT Photos →' : 'Next Unit →') : 'Next →'}</button></div>`;
+    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) + (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? (hasParts ? 'Verify Parts →' : 'Compare IT Photos →') : 'Next Unit →') : 'Next →'}</button></div>`;
+  } else if (hasParts && svcUnitIndex === partStep) {
+    const confirmed = Boolean(activeSvcPrep.service_parts_confirmed);
+    wizard.innerHTML = progress('Parts Handoff', `Verify parts from IT Tech ${preparedBy}`, 1, 1) + `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
   } else if (svcUnitIndex === proofStep) {
-    wizard.innerHTML = progress('Compare', 'Look at IT’s handoff photos', 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
+    wizard.innerHTML = progress('Compare', `Look at IT Tech ${preparedBy}’s handoff photos`, 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   } else if (svcUnitIndex === photoStep) {
     const itEv = await evidenceRows(activeSvcPrep.id, 'it');
     const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
     wizard.innerHTML = progress('Service Photos', `Take ${requiredPhotos} matching receipt photo${requiredPhotos === 1 ? '' : 's'}`, 1, 1) + await photoOnlyHtml(activeSvcPrep.id, 'service', null, requiredPhotos) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
   } else if (svcUnitIndex === signStep) {
-    wizard.innerHTML = progress('Service Signature', 'Sign that you received and verified it', 1, 1) + await signatureOnlyHtml(activeSvcPrep.id, 'service') + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;
+    wizard.innerHTML = progress('Service Signature', `Sign that you received and verified the handoff from IT Tech ${preparedBy}`, 1, 1) + await signatureOnlyHtml(activeSvcPrep.id, 'service') + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;
     wizard.querySelectorAll('canvas').forEach(wireCanvas);
   } else {
     const ev = await evidenceRows(activeSvcPrep.id, 'service');
@@ -1307,9 +1319,10 @@ async function renderSvcPrep() {
     const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
     const servicePhotos = ev.filter(x => x.kind === 'photo').length;
     const allChecksOk = forms.every(form => svcQuestions(form).every(q => q.kind === 'number' ? q.input.value !== '' : q.input.checked));
+    const partsReady = !hasParts || Boolean(activeSvcPrep.service_parts_confirmed);
     const proofReady = servicePhotos === requiredPhotos && ev.some(x => x.kind === 'signature');
-    const ready = proofReady && allChecksOk;
-    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'>📷 Service photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and Service signature saved.' : 'Matching photo count and signature are still required.'}</div>${allChecksOk ? `<div class='small'>✓ Every Service verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept & Mark Deployed to Field →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const ready = proofReady && allChecksOk && partsReady;
+    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and Service signature saved.' : 'Matching photo count and signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -1603,22 +1616,37 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-svc-next]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
     const forms = svcForms(card);
+    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const partStep = forms.length;
+    const proofStep = forms.length + (hasParts ? 1 : 0);
+    const photoStep = proofStep + 1;
+    const signStep = proofStep + 2;
     if (svcUnitIndex < forms.length) return advanceSvcVerification();
-    if (svcUnitIndex === forms.length + 1) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
-    if (svcUnitIndex === forms.length + 2) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+    if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
+    if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
+    if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
     svcUnitIndex++; return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-svc-prev]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
     const forms = svcForms(card);
+    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const partStep = forms.length;
     if (svcUnitIndex < forms.length) {
       if (svcQuestionIndex > 0) { svcQuestionIndex--; return renderSvcPrep(); }
       if (svcUnitIndex > 0) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
       return showReceiveLookup();
     }
-    if (svcUnitIndex === forms.length && forms.length) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
+    if (svcUnitIndex === partStep && forms.length) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
     svcUnitIndex = Math.max(0, svcUnitIndex - 1); return renderSvcPrep();
   }
+  if (e.target.closest('[data-wl-confirm-service-parts]')) {
+    const { error } = await liveDb.rpc('confirm_service_parts', { p_prep_id: activeSvcPrep.id });
+    if (error) return alert(error.message);
+    activeSvcPrep = await getPrep(activeSvcPrep.id);
+    return renderSvcPrep();
+  }
+  if (e.target.closest('[data-wl-service-parts-mismatch]')) return alert('Do not accept the handoff. Compare the parts with IT and the MHelpDesk ticket, then correct the mismatch before continuing.');
   if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) { const panel = upload.closest('.wl-proof'); const input = panel.querySelector('.wl-file'); const files = [...(input.files || [])]; if (!files.length) return alert('Take or select at least one photo.'); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const expected = Number(panel.dataset.expected || 0) || null; if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.'); if (panel.dataset.stage === 'service' && expected) { const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length; if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`); } upload.disabled = true; upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…'; try { const optimized = await Promise.all(files.map(optimizeEvidencePhoto)); upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…'; await Promise.all(optimized.map((f, i) => { const original = f.name || files[i].name; const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original; return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId); })); if (panel.dataset.stage === 'it' && unitNo && activeItPrep) { activeItPrep = await getPrep(activeItPrep.id); return renderItUnitStep(); } await refreshProofPanel(panel); } catch (err) { upload.disabled = false; upload.textContent = 'Save Photo(s)'; alert(err.message || 'Upload failed.'); } return; }
   const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
