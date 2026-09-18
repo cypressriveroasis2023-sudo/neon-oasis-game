@@ -1993,12 +1993,14 @@ async function installOwnerAssignments(force = false) {
   const wasOpen = host.open;
   host.dataset.loaded = '1';
 
-  const [{ data: profiles }, { data: assignments }, { data: preps }] = await Promise.all([
-    liveDb.from('profiles').select('user_id,full_name,username,role,active').eq('active', true).in('role', ['it','service']).order('full_name'),
+  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }] = await Promise.all([
+    liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
     liveDb.from('prep_tickets').select('id,ticket_no,status,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
+    liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
   ]);
   ownerAssignmentProfiles = profiles || [];
+  ownerAssignmentAssets = assets || [];
   const all = assignments || [];
   const prepMap = new Map((preps || []).map(p => [p.id,p]));
   const now = Date.now();
@@ -2028,9 +2030,10 @@ async function installOwnerAssignments(force = false) {
         <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
       </div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
-        <div class='qtext'>Parts Required for IT</div>
-        <div class='small'>Optional. Enter the quantities shown on the MHelpDesk ticket.</div>
-        ${ticketPartsInputsHtml('ownerPart')}
+        <div class='qtext'>Equipment & Parts Required for IT</div>
+        <div class='small'>Choose how many units/devices, stands, and extra parts IT needs to pull from the shelf for this MHelpDesk job.</div>
+        ${ownerEquipmentManifestInputsHtml()}
+        <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
         <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
