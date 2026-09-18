@@ -630,6 +630,7 @@ async function startAssignedJob(id) {
     if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
     pendingAssignmentLinkId = id;
     pendingAssignmentManifest = normalizedEquipmentManifest(assignment.equipment_manifest);
+    pendingAssignmentWorkType = assignment.work_type || 'service';
     showNewPrep();
     const ticket = document.getElementById('itTicket');
     const site = document.getElementById('itSite');
@@ -914,7 +915,7 @@ function showNewPrep() {
   let req = document.getElementById('wlAssignedEquipmentReq');
   if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
   req.style.display = pendingAssignmentManifest.length ? '' : 'none';
-  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment</b><div class='small'>The Unit Area and Stand Area above were prefilled from the Owner assignment. They must match before you start the Tech Check.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
+  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment · ${esc(String(pendingAssignmentWorkType || 'service').toUpperCase())}</b><div class='small'>The IT equipment above was prefilled from the Owner assignment. Solar Spotter Delivery support (Solar Stand + 4 batteries per Spotter) and Ranger solar panels are handled automatically on the Service side.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}${automaticServiceSolarPlanHtml(pendingAssignmentManifest,pendingAssignmentWorkType)}</div>` : '';
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
@@ -943,7 +944,7 @@ async function createPrepAndStartChecks() {
   const totalItems = requestedUnits + equipmentManifestStandTotal(manifest);
   const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v3', {
+  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v4', {
     p_ticket_no: ticket,
     p_site: site,
     p_requested_unit_count: requestedUnits,
@@ -953,6 +954,7 @@ async function createPrepAndStartChecks() {
     p_camera_replacement_qty: parts.camera_replacement_qty,
     p_sim_replacement_qty: parts.sim_replacement_qty,
     p_micro_sd_qty: parts.micro_sd_qty,
+    p_work_type: pendingAssignmentWorkType || 'service',
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -962,6 +964,7 @@ async function createPrepAndStartChecks() {
     pendingAssignmentLinkId = null;
   }
   pendingAssignmentManifest = [];
+  pendingAssignmentWorkType = 'service';
   document.getElementById('itTicket').value = '';
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
@@ -1450,7 +1453,7 @@ async function showItPrep(prepId) {
   } else if (itUnitIndex >= items.length) {
     itUnitPhase = 'type';
     itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
-    itPurposeChoice = '';
+    itPurposeChoice = prepPurposeFromWorkType(activeItPrep.work_type) || '';
     itReconRequired = 1;
   } else {
     const item = items[itUnitIndex];
@@ -1458,7 +1461,7 @@ async function showItPrep(prepId) {
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
     itReconRequired = Number(item.required_battery_count || 1);
-    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || ''; }
+    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || ''; }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
       if (!issues.length) itUnitPhase = 'review';
@@ -1942,9 +1945,9 @@ document.addEventListener('click', async e => {
     if (typeof window.refreshData === 'function') await window.refreshData();
     return;
   }
-  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
+  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; pendingAssignmentWorkType='service'; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
   if (e.target.closest("[data-wl-home='it']")) return showITHome(); if (e.target.closest("[data-wl-home='svc']")) return showSvcHome();
-  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
+  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; pendingAssignmentWorkType='service'; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
   const openIt = e.target.closest('[data-wl-open-it]'); if (openIt) return showItPrep(openIt.dataset.wlOpenIt);
   const countMinus = e.target.closest('[data-wl-count-minus]'); if (countMinus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) - 1)); return; }
   const countPlus = e.target.closest('[data-wl-count-plus]'); if (countPlus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) + 1)); return; }
