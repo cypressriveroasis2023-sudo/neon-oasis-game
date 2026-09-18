@@ -713,7 +713,7 @@ const TICKET_PARTS = [
   { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
   { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
   { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'SD / Micro SD Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'Replacement SD / Micro SD Cards' },
 ];
 function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function readTicketPartInputs(prefix='wlPart') {
