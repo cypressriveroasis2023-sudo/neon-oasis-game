@@ -131,6 +131,10 @@ function injectStyles() {
     .wl-next{background:#d20b12!important}.wl-stop a,.wl-red{background:#d20b12!important}
     .wl-ticket{border:1px solid #d8dde2!important;box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .wl-issue-list{display:grid;gap:8px;margin-top:10px}.wl-issue-link{width:100%;border:1px solid #e5aaa6;border-radius:11px;background:#fff;color:#9e2119;padding:11px 12px;text-align:left;font-weight:850;cursor:pointer}.wl-issue-link:hover{background:#fff5f4}.wl-issue-link b{display:block;color:#741b15}.wl-issue-link span{display:block;font-size:12px;margin-top:2px;color:#9e2119}
+    .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
+    .wl-assigned-inventory{margin:12px 0;padding:12px;border:1px solid #cfdce5;border-radius:13px;background:#f3f7fa}.wl-assigned-inventory-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.wl-assigned-inventory-list span{display:inline-block;border:1px solid #d4dee6;border-radius:999px;background:#fff;padding:7px 9px;font-size:12px;color:#526472}.wl-assigned-inventory-list b{color:#102a40}
+    .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
+    .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -215,6 +219,61 @@ async function currentTechIdentity() {
 let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
+let ownerAssignmentAssets = [];
+let pendingAssignmentLinkId = null;
+let pendingAssignmentManifest = [];
+let helpWalkthroughStep = 0;
+let helpWalkthroughMode = 'help';
+let walkthroughCheckedUserId = null;
+let walkthroughDismissedSession = false;
+const TECHCHECK_VAPID_PUBLIC_KEY = 'BAvDfBdTqTbyOxAOYDQ25EfMKregOkdUmOkVW_BlHEQ4CP--otdlOCrDobnj7eVUg-5YMcjVM8sfLHg_qNr2fq0';
+
+function vapidKeyBytes(value) {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+async function pushAlertState() {
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+  if (!supported) return { supported:false, permission:'unsupported', subscribed:false, ready:false };
+  const permission = Notification.permission;
+  let subscribed = false;
+  if (permission === 'granted') {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      subscribed = Boolean(await reg.pushManager.getSubscription());
+    } catch {}
+  }
+  return { supported:true, permission, subscribed, ready:permission === 'granted' && subscribed };
+}
+function phoneAlertBanner() { return ''; }
+async function registerPhonePush() {
+  const tech = await currentTechIdentity();
+  const reg = await navigator.serviceWorker.ready;
+  let subscription = await reg.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidKeyBytes(TECHCHECK_VAPID_PUBLIC_KEY),
+    });
+  }
+  const json = subscription.toJSON();
+  const p256dh = json.keys?.p256dh || '';
+  const auth = json.keys?.auth || '';
+  if (!p256dh || !auth) throw new Error('This device did not return a valid push subscription.');
+  const { error } = await liveDb.from('push_subscriptions').upsert({
+    user_id: tech.id,
+    endpoint: subscription.endpoint,
+    p256dh,
+    auth,
+    user_agent: navigator.userAgent,
+    enabled: true,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'endpoint' });
+  if (error) throw error;
+  return subscription;
+}
 
 function currentRoleKey() {
   const role = roleText();
@@ -222,17 +281,160 @@ function currentRoleKey() {
   if (role.includes('Service Tech')) return 'service';
   return 'it';
 }
+function techCheckDateKey(value = new Date()) {
+  const d=value instanceof Date ? value : new Date(value);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function helpStepsForRole(role = currentRoleKey()) {
+  if (role === 'service') return [
+    { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
+    { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be sent directly to you or to the <b>Service Department queue</b>.</p><p>If it is a department task, tap <b>Claim & Start</b>. Once you claim it, the Owner can see which Service Tech took responsibility for the task.</p>` },
+    { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT releases equipment, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
+    { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
+    { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
+    { kicker:'RETURN TO IT', title:'Send returning units and parts back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
+    { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>SERVICE TECH CLAIMS</b><span>→</span><b>RECEIVE FROM IT</b><span>→</span><b>VERIFY UNITS + PARTS</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
+  ];
+  if (role === 'owner') return [
+    { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
+    { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows <b>Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
+    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p>IT Techs prepare and release equipment. Service Techs receive and verify the handoff, do the field work, and return equipment to IT. Returning equipment goes back through IT Intake before shelf inventory.</p>` },
+    { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
+  ];
+  return [
+    { kicker:'WELCOME', title:'IT Tech · How Tech Check Works', body:`<p>Tech Check is your equipment-prep and intake workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Owner-assigned work is the normal flow, but IT can still create an <b>on-the-fly Equipment Prep</b> when the job requires it.</p>` },
+    { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
+    { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units, and parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
+    { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
+    { kicker:'RELEASE TO SERVICE', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, release the equipment to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
+    { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for units and parts returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
+    { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help & Training</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
+    { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>IT TECH CLAIMS</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>RELEASE TO SERVICE</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
+  ];
+}
+function ensureHelpOverlay() {
+  let overlay = document.getElementById('wlHelpOverlay');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'wlHelpOverlay';
+  overlay.className = 'wl-help-overlay hidden';
+  overlay.innerHTML = `<div class='wl-help-sheet'><div class='wl-help-head'><div><div class='wl-next-kicker'>CAMERAS ONSITE</div><h2>Help & Training</h2></div><button class='mini' data-wl-help-close>Close</button></div><div id='wlHelpBody'></div></div>`;
+  document.body.append(overlay);
+  return overlay;
+}
+function renderHelpWalkthrough() {
+  const overlay = ensureHelpOverlay();
+  const body = document.getElementById('wlHelpBody');
+  const steps = helpStepsForRole();
+  helpWalkthroughStep = Math.max(0, Math.min(helpWalkthroughStep, steps.length - 1));
+  const step = steps[helpWalkthroughStep];
+  const pct = Math.round((helpWalkthroughStep + 1) / steps.length * 100);
+  const firstTime = helpWalkthroughMode === 'first';
+  const last = helpWalkthroughStep === steps.length - 1;
+  body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div></div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
+  overlay.classList.remove('hidden');
+}
+async function openHelpWalkthrough(firstTime = false) {
+  helpWalkthroughMode = firstTime ? 'first' : 'help';
+  helpWalkthroughStep = 0;
+  if (!firstTime) {
+    const tech = await currentTechIdentity().catch(() => null);
+    if (tech?.id) await liveDb.from('technician_training_state').upsert({ user_id:tech.id, last_help_opened_at:new Date().toISOString(), updated_at:new Date().toISOString() }, { onConflict:'user_id' });
+  }
+  renderHelpWalkthrough();
+}
+async function completeHelpWalkthrough() {
+  if (helpWalkthroughMode !== 'first') { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  const tech = await currentTechIdentity().catch(() => null);
+  if (tech?.id) {
+    const now = new Date().toISOString();
+    const { error } = await liveDb.from('technician_training_state').upsert({ user_id:tech.id, walkthrough_completed_at:now, last_help_opened_at:now, updated_at:now }, { onConflict:'user_id' });
+    if (error) return alert(error.message);
+  }
+  document.getElementById('wlHelpOverlay')?.classList.add('hidden');
+}
+function ensureHelpButton() {
+  // Help now lives inside the Tech Check Menu instead of a separate header button.
+}
+function ensureTechMenuPanel() {
+  let panel = document.getElementById('wlTechMenuPanel');
+  if (panel) return panel;
+  panel = document.createElement('div');
+  panel.id = 'wlTechMenuPanel';
+  panel.className = 'wl-menu-overlay hidden';
+  panel.innerHTML = `<div class='wl-menu-sheet'>
+    <div class='wl-menu-head'>
+      <div><div class='wl-next-kicker'>TECH CHECK</div><h2>Menu</h2></div>
+      <button class='mini' data-wl-menu-close>Close</button>
+    </div>
+    <div id='wlTechMenuBody'></div>
+  </div>`;
+  document.body.append(panel);
+  return panel;
+}
+async function openTechMenu() {
+  const panel = ensureTechMenuPanel();
+  const body = document.getElementById('wlTechMenuBody');
+  const role = currentRoleKey();
+  const push = role === 'owner' ? null : await pushAlertState();
+  const pushLabel = !push ? '' : push.ready ? 'Phone alerts are enabled on this device.' : push.permission === 'denied' ? 'Phone alerts are blocked in this device settings.' : 'Enable once if you want new assignments to alert this phone.';
+  body.innerHTML = `
+    <div class='wl-app-menu-list'>
+      <button class='wl-app-menu-item' data-wl-menu-help>
+        <span class='wl-app-menu-icon'>?</span>
+        <span><b>Help & Training</b><small>Replay the full ${role === 'it' ? 'IT Technician' : role === 'service' ? 'Service Tech' : 'Owner'} walkthrough.</small></span>
+        <strong>›</strong>
+      </button>
+      ${role !== 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-phone-alerts>
+        <span class='wl-app-menu-icon'>↗</span>
+        <span><b>Phone Alerts</b><small>${esc(pushLabel)}</small></span>
+        <strong>${push?.ready ? 'ON' : '›'}</strong>
+      </button>` : ''}
+      <button class='wl-app-menu-item' data-wl-menu-refresh>
+        <span class='wl-app-menu-icon'>↻</span>
+        <span><b>Refresh Tech Check</b><small>Reload the latest assignments, equipment, and workflow status.</small></span>
+        <strong>›</strong>
+      </button>
+    </div>
+    ${role === 'owner' ? `<div class='wl-menu-future'><div class='wl-next-kicker'>OWNER TOOLS</div><b>AI Dispatch</b><div class='small'>This menu is ready for the Owner AI dispatch assistant we discussed. It is not enabled yet.</div></div>` : ''}
+  `;
+  panel.classList.remove('hidden');
+}
+async function maybeShowFirstTimeWalkthrough() {
+  if (walkthroughDismissedSession || document.getElementById('appView')?.classList.contains('hidden')) return;
+  const roleLabel = roleText();
+  if (!roleLabel.includes('IT Technician') && !roleLabel.includes('Service Tech')) return;
+  const tech = await currentTechIdentity().catch(() => null);
+  if (!tech?.id || walkthroughCheckedUserId === tech.id) return;
+  walkthroughCheckedUserId = tech.id;
+  const { data } = await liveDb.from('technician_training_state').select('walkthrough_completed_at').eq('user_id',tech.id).maybeSingle();
+  if (!data?.walkthrough_completed_at) openHelpWalkthrough(true);
+}
+
 async function myActiveAssignments(role = null) {
-  const tech = await currentTechIdentity();
-  let q = liveDb.from('job_assignments')
-    .select('*')
-    .eq('assignee_user_id', tech.id)
-    .in('status', ['assigned','started'])
-    .order('assigned_at', { ascending: true });
-  if (role) q = q.eq('assigned_role', role);
-  const { data, error } = await q;
-  if (error) return [];
+  const wantedRole = role || currentRoleKey();
+  if (!['it','service'].includes(wantedRole)) return [];
+  const { data, error } = await liveDb.rpc('my_available_assignments', { p_role: wantedRole });
+  if (error) { console.warn('Could not load assignment queue', error); return []; }
   return data || [];
+}
+async function myAssignedInventoryAssets() {
+  const tech = await currentTechIdentity().catch(() => null);
+  if (!tech?.id) return [];
+  const { data, error } = await liveDb.from('asset_inventory')
+    .select('unit_key,unit_tag,asset_type,asset_category,availability_status,assigned_to_name,last_event')
+    .eq('assigned_to', tech.id)
+    .eq('availability_status', 'assigned')
+    .order('asset_category', { ascending:true })
+    .order('unit_tag', { ascending:true });
+  if (error) { console.warn('Could not load assigned equipment', error); return []; }
+  return data || [];
+}
+function assignedInventoryHtml(rows=[]) {
+  if (!rows.length) return '';
+  return `<div class='wl-assigned-inventory'><div class='wl-next-kicker'>EQUIPMENT ASSIGNED TO ME</div><div class='wl-assigned-inventory-list'>${rows.map(r => `<span><b>${esc(r.unit_tag)}</b> · ${esc(r.asset_type)}${r.asset_category === 'stand' ? ' · Stand' : ''}</span>`).join('')}</div></div>`;
 }
 async function myNotificationPreferences() {
   const tech = await currentTechIdentity();
@@ -256,12 +458,10 @@ async function myNotifications(limit = 30) {
   return data || [];
 }
 async function refreshNotificationBadge() {
-  const badge = document.getElementById('notificationBadge');
-  if (!badge || document.getElementById('appView')?.classList.contains('hidden')) return;
-  const rows = await myNotifications(50);
-  const unread = rows.filter(n => !n.read_at).length;
-  badge.textContent = String(unread);
-  badge.classList.toggle('hidden', unread === 0);
+  if (document.getElementById('appView')?.classList.contains('hidden')) return;
+  try {
+    if ('clearAppBadge' in navigator) await navigator.clearAppBadge();
+  } catch {}
 }
 function ensureNotificationPanel() {
   let panel = document.getElementById('wlNotificationPanel');
@@ -279,14 +479,19 @@ function notificationToggle(id, label, checked, detail = '') {
 async function openNotificationPanel() {
   const panel = ensureNotificationPanel();
   const body = document.getElementById('wlNotifyBody');
-  const [prefs, rows] = await Promise.all([myNotificationPreferences(), myNotifications(30)]);
+  const [prefs, rows, pushState] = await Promise.all([myNotificationPreferences(), myNotifications(30), pushAlertState()]);
   const role = currentRoleKey();
-  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
-  const browserStatus = permission === 'granted'
-    ? 'iPhone/browser alerts are allowed on this device while Tech Check is active.'
+  const permission = pushState.permission;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const browserStatus = pushState.ready
+    ? 'Phone alerts are ON. Tech Check can notify this device even when the app is closed.'
     : permission === 'denied'
-      ? 'Alerts are blocked in this device’s browser settings.'
-      : 'Enable alerts on this device when you want system notifications.';
+      ? 'Alerts are blocked in this device’s notification settings.'
+      : !pushState.supported
+        ? 'Push alerts are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.'
+        : (!standalone && /iPhone|iPad|iPod/i.test(navigator.userAgent))
+          ? 'On iPhone, add Tech Check to the Home Screen first, then open it and enable phone alerts.'
+          : 'Tap Enable to allow Tech Check to notify this phone when work is assigned.';
   const toggles = [
     role !== 'owner' ? notificationToggle('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.') : '',
     role === 'it' ? notificationToggle('wlPrefReturns','Returned units waiting for IT',prefs.returned_units,'When Service sends a unit back for IT Intake.') : '',
@@ -300,9 +505,9 @@ async function openNotificationPanel() {
       ${toggles}
       <div class='wl-notify-system'>
         <div><b>iPhone / Browser Alerts</b><div class='small'>${esc(browserStatus)}</div></div>
-        <button class='mini' data-wl-enable-browser-alerts>${permission === 'granted' ? 'Enabled' : 'Enable'}</button>
+        <button class='mini' data-wl-enable-browser-alerts>${pushState.ready ? 'Enabled' : 'Enable'}</button>
       </div>
-      <div class='small top8'>These settings control Tech Check alerts. Closed-app push delivery requires the separate web-push service; Tech Check will not claim background push until that is connected.</div>
+      <div class='small top8'>Once enabled on this device, new Owner-assigned jobs can appear as phone notifications while Tech Check is closed. The Home Screen app badge also reflects unread Tech Check notifications when supported by the phone.</div>
       <button class='btn' data-wl-save-notify>Save Notification Settings</button>
     </div>
     <div class='wl-notify-section'>
@@ -316,10 +521,10 @@ async function saveNotificationSettings() {
   const role = currentRoleKey();
   const browserAllowed = typeof Notification !== 'undefined' && Notification.permission === 'granted';
   const { error } = await liveDb.rpc('save_my_notification_preferences', {
-    p_new_assignments: role === 'owner' ? Boolean(prefs.new_assignments) : Boolean(document.getElementById('wlPrefAssignments')?.checked),
-    p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns')?.checked) : Boolean(prefs.returned_units),
-    p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService')?.checked) : Boolean(prefs.equipment_ready_service),
-    p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner')?.checked) : Boolean(prefs.owner_actions),
+    p_new_assignments: role === 'owner' ? Boolean(prefs.new_assignments) : Boolean(document.getElementById('wlPrefAssignments') ? document.getElementById('wlPrefAssignments').checked : prefs.new_assignments),
+    p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns') ? document.getElementById('wlPrefReturns').checked : prefs.returned_units) : Boolean(prefs.returned_units),
+    p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService') ? document.getElementById('wlPrefService').checked : prefs.equipment_ready_service) : Boolean(prefs.equipment_ready_service),
+    p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner') ? document.getElementById('wlPrefOwner').checked : prefs.owner_actions) : Boolean(prefs.owner_actions),
     p_browser_notifications: browserAllowed,
   });
   if (error) return alert(error.message);
@@ -327,12 +532,24 @@ async function saveNotificationSettings() {
   await openNotificationPanel();
 }
 async function enableBrowserAlerts() {
-  if (typeof Notification === 'undefined') {
-    return alert('System notifications are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.');
+  const state = await pushAlertState();
+  if (!state.supported) {
+    return alert('Phone push notifications are not available here. On iPhone, add Tech Check to the Home Screen, open the installed app, and try again.');
   }
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return alert('Notification permission was not enabled on this device.');
-  await saveNotificationSettings();
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !standalone) {
+    return alert('On iPhone, install Tech Check to your Home Screen first. Then open the Home Screen app and tap Enable again.');
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return alert('Notification permission was not enabled on this device.');
+    await registerPhonePush();
+    await saveNotificationSettings();
+    alert('Phone alerts are enabled for Tech Check on this device.');
+  } catch (error) {
+    console.warn('Could not enable Tech Check push notifications', error);
+    alert(error?.message || 'Could not enable phone alerts on this device.');
+  }
 }
 async function showSystemNotification(row) {
   const prefs = await myNotificationPreferences();
@@ -376,9 +593,21 @@ async function setupNotificationRealtime() {
   refreshNotificationBadge();
 }
 async function startAssignedJob(id) {
-  const { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
-  const assignment = rows?.[0];
+  let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
+  let assignment = rows?.[0];
   if (!assignment) return alert('That assignment is no longer available.');
+
+  if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
+    const { error: claimError } = await liveDb.rpc('claim_my_department_assignment', { p_assignment_id: id });
+    if (claimError) {
+      alert(claimError.message || 'Another technician already claimed this department task.');
+      if (assignment.assigned_role === 'it') showITHome(); else showSvcHome();
+      return;
+    }
+    ({ data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1));
+    assignment = rows?.[0];
+    if (!assignment) return alert('The claimed assignment could not be reopened.');
+  }
 
   if (assignment.assigned_role === 'it') {
     const tech = await currentTechIdentity();
@@ -389,15 +618,26 @@ async function startAssignedJob(id) {
       .eq('created_by', tech.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
-    if (existing?.[0]) return showItPrep(existing[0].id);
+    if (existing?.[0]) {
+      const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: existing[0].id });
+      if (linkError) return alert(linkError.message);
+      pendingAssignmentLinkId = null;
+      return showItPrep(existing[0].id);
+    }
+    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    pendingAssignmentLinkId = id;
+    pendingAssignmentManifest = normalizedEquipmentManifest(assignment.equipment_manifest);
     showNewPrep();
     const ticket = document.getElementById('itTicket');
     const site = document.getElementById('itSite');
     if (ticket) ticket.value = assignment.ticket_no || '';
     if (site) site.value = assignment.site || '';
     fillTicketPartInputs(assignment, 'wlPart');
-    document.getElementById('wlTotalUnits')?.focus();
+    const requestedDevices = assignment.requested_unit_count == null ? equipmentManifestDeviceTotal(pendingAssignmentManifest) : Number(assignment.requested_unit_count || 0);
+    const totalInput = document.getElementById('wlTotalUnits');
+    if (totalInput) totalInput.value = String(requestedDevices);
+    syncITEquipmentCounts();
+    totalInput?.focus();
     return;
   }
 
@@ -405,11 +645,14 @@ async function startAssignedJob(id) {
     .select('id,ticket_no,status')
     .eq('ticket_no', assignment.ticket_no)
     .eq('status', 'released')
+    .order('released_at', { ascending: false })
     .limit(1);
   if (!released?.length) {
-    return alert('This MHelpDesk job is assigned to you, but IT has not released the equipment yet. It will stay under Assigned to Me.');
+    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    return alert('This MHelpDesk job is assigned to you, but IT has not released the equipment yet. It will stay under My Work Today.');
   }
-  await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+  const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: released[0].id });
+  if (linkError) return alert(linkError.message);
   return openServiceTicket(assignment.ticket_no);
 }
 async function openAssignmentFromNotification(id) {
@@ -424,12 +667,13 @@ async function showITHome() {
   if (!isIT() || !viewIT()) return;
   let home = document.getElementById('wlItHome');
   if (!home) { home = document.createElement('div'); home.id = 'wlItHome'; home.className = 'card wl-home'; viewIT().prepend(home); }
-  const [c,r,assignments] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it')]);
+  const [c,r,assignments,phoneAlerts,assignedAssets] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it'), pushAlertState(), myAssignedInventoryAssets()]);
   const assigned = assignments[0] || null;
+  const alertBanner = phoneAlertBanner(phoneAlerts);
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.assigned_role === 'it' ? ticketPartsInlineHtml(assigned) : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.assigned_role === 'it' ? equipmentManifestInlineHtml(assigned) + ticketPartsInlineHtml(assigned) : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
-  home.innerHTML = `<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div><div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
+  home.innerHTML = `${alertBanner}<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
   resetWizardPosition();
 }
@@ -447,7 +691,7 @@ function ensureTotalUnitsField(ticketGrid) {
   if (!wrap) {
     wrap = document.createElement('div');
     wrap.id = 'wlTotalUnitsWrap';
-    wrap.innerHTML = `<label>Total Units for This Ticket</label><input id='wlTotalUnits' type='number' inputmode='numeric' min='1' placeholder='How many units total?'>`;
+    wrap.innerHTML = `<label>Total Units / Devices for This Ticket</label><input id='wlTotalUnits' type='number' inputmode='numeric' min='0' readonly placeholder='Choose units below'><div class='small'>Auto-calculated from the Unit Area below. Stands are separate.</div>`;
     ticketGrid.append(wrap);
   }
   return wrap;
@@ -455,12 +699,16 @@ function ensureTotalUnitsField(ticketGrid) {
 function expectedUnitCount() {
   return Math.max(0, Math.floor(Number(document.getElementById('wlTotalUnits')?.value || 0)));
 }
+function expectedPrepItemCount() {
+  const manifest=readITEquipmentManifest();
+  return equipmentManifestDeviceTotal(manifest) + equipmentManifestStandTotal(manifest);
+}
 const TICKET_PARTS = [
   { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
   { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
   { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
   { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'Micro SD Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'SD / Micro SD Cards' },
 ];
 function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function readTicketPartInputs(prefix='wlPart') {
@@ -471,12 +719,115 @@ function readTicketPartInputs(prefix='wlPart') {
 function ticketPartsRows(data) {
   return TICKET_PARTS.map(part => ({ ...part, qty: cleanPartQty(data?.[part.key]) }));
 }
+function ticketPartsTotal(data) { return ticketPartsRows(data).reduce((sum,row) => sum + row.qty, 0); }
 function ticketPartsInlineHtml(data) {
   const rows = ticketPartsRows(data).filter(row => row.qty > 0);
   return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>No extra replacement parts listed.</div></div>`;
 }
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
+}
+const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
+const OWNER_STAND_TYPES = ['110V Stand','Solar Stand','Solar Pole','Pole'];
+function equipmentDisplayLabel(label) { return label === 'Recon 2' ? 'Recon II' : label; }
+function normalizedEquipmentManifest(raw) {
+  return (Array.isArray(raw) ? raw : []).map(row => ({
+    category: ['device','stand','other'].includes(row?.category) ? row.category : 'other',
+    label: String(row?.label || '').trim() === 'Recon II' ? 'Recon 2' : String(row?.label || '').trim(),
+    qty: Math.max(1, Math.floor(Number(row?.qty || 1))),
+  })).filter(row => row.label);
+}
+function equipmentManifestTotal(raw) {
+  return normalizedEquipmentManifest(raw).filter(row => row.category === 'device' || row.category === 'stand').reduce((sum,row) => sum + row.qty, 0);
+}
+function equipmentManifestStandTotal(raw) {
+  return normalizedEquipmentManifest(raw).filter(row => row.category === 'stand').reduce((sum,row) => sum + row.qty, 0);
+}
+function equipmentManifestDeviceTotal(raw) {
+  return normalizedEquipmentManifest(raw).filter(row => row.category === 'device').reduce((sum,row) => sum + row.qty, 0);
+}
+function equipmentManifestText(raw) {
+  return normalizedEquipmentManifest(raw).map(row => row.qty + ' × ' + row.label).join(' · ');
+}
+function equipmentManifestExpanded(raw) {
+  const out=[];
+  normalizedEquipmentManifest(raw).forEach(row => {
+    if (row.category !== 'device' && row.category !== 'stand') return;
+    for (let i=0;i<row.qty;i++) out.push(row.label);
+  });
+  return out;
+}
+
+function equipmentManifestInlineHtml(data) {
+  const rows = normalizedEquipmentManifest(data?.equipment_manifest || data);
+  if (!rows.length) return '';
+  const devices = rows.filter(r => r.category === 'device');
+  const stands = rows.filter(r => r.category === 'stand');
+  const other = rows.filter(r => r.category === 'other');
+  const group = (title,list) => list.length ? `<div class='wl-manifest-group'><b>${esc(title)}</b><div class='wl-parts-chips'>${list.map(row => `<span><b>${row.qty}</b> × ${esc(equipmentDisplayLabel(row.label))}</span>`).join('')}</div></div>` : '';
+  return `<div class='wl-equipment-manifest'><div class='wl-manifest-title'>Equipment Required From Shelf</div>${group('Units / Devices',devices)}${group('Stands',stands)}${group('Other Equipment',other)}</div>`;
+}
+function ownerEquipmentTypeList(category) {
+  const defaults = category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
+  const fromInventory = ownerAssignmentAssets.filter(a => a.asset_category === category && a.availability_status !== 'retired').map(a => a.asset_type);
+  return [...new Set([...defaults,...fromInventory].filter(Boolean))];
+}
+function ownerEquipmentQtyGrid(category) {
+  return ownerEquipmentTypeList(category).map(label => {
+    const available = ownerAssignmentAssets.filter(a => a.asset_category === category && a.asset_type === label && a.availability_status === 'shop').length;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+  }).join('');
+}
+function ownerEquipmentManifestInputsHtml() {
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Choose any stands or poles going out with this ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+}
+function readOwnerEquipmentManifest() {
+  return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
+}
+function itEquipmentQtyGrid(category, data=[]) {
+  const rows=normalizedEquipmentManifest(data);
+  const types=category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
+  return types.map(label => {
+    const qty=rows.find(row => row.category===category && row.label===label)?.qty || 0;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><input type='number' inputmode='numeric' min='0' step='1' value='${qty}' data-it-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+  }).join('');
+}
+function itEquipmentManifestInputsHtml(data=[]) {
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose exactly what is going out for this MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('device',data)}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Stands are counted separately from the unit/device count.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('stand',data)}</div></div></div>`;
+}
+function readITEquipmentManifest() {
+  return [...document.querySelectorAll('#wlITEquipmentWrap [data-it-equipment-qty]')].map(input => ({
+    category: input.dataset.category || 'other',
+    label: input.dataset.label || '',
+    qty: cleanPartQty(input.value),
+  })).filter(row => row.label && row.qty > 0);
+}
+function equipmentManifestKey(raw) {
+  return normalizedEquipmentManifest(raw).map(row => row.category+'|'+row.label+'|'+row.qty).sort().join('||');
+}
+function syncITEquipmentCounts() {
+  const manifest=readITEquipmentManifest();
+  const unitCount=equipmentManifestDeviceTotal(manifest);
+  const standCount=equipmentManifestStandTotal(manifest);
+  const total=document.getElementById('wlTotalUnits');
+  if (total) total.value=String(unitCount);
+  const summary=document.getElementById('wlITEquipmentCountSummary');
+  if (summary) summary.innerHTML=`<b>${unitCount}</b> unit/device${unitCount===1?'':'s'} · <b>${standCount}</b> stand/pole${standCount===1?'':'s'} · <b>${unitCount+standCount}</b> total equipment item${unitCount+standCount===1?'':'s'}`;
+}
+function ensureITEquipmentManifestFields(ticketGrid) {
+  if (!ticketGrid) return null;
+  let wrap=document.getElementById('wlITEquipmentWrap');
+  if (!wrap) {
+    wrap=document.createElement('div');
+    wrap.id='wlITEquipmentWrap';
+    wrap.className='wl-ticket-parts-setup wl-it-equipment-setup';
+    wrap.style.gridColumn='1 / -1';
+    ticketGrid.append(wrap);
+  }
+  wrap.innerHTML=`<div class='qtext'>Equipment Going Out</div><div class='small'>Select the exact units/devices and stands being sent for this ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div>`;
+  wrap.querySelectorAll('[data-it-equipment-qty]').forEach(input => input.addEventListener('input', syncITEquipmentCounts));
+  syncITEquipmentCounts();
+  return wrap;
 }
 function ensureTicketPartsFields(ticketGrid) {
   if (!ticketGrid) return null;
@@ -506,7 +857,7 @@ function draftedUnitCount() {
 function updateUnitCountStatus() {
   const status = document.getElementById('wlUnitCountStatus');
   if (!status) return;
-  const expected = expectedUnitCount();
+  const expected = expectedPrepItemCount();
   const added = draftedUnitCount();
   const remaining = expected - added;
   status.className = remaining === 0 ? 'ok' : remaining > 0 ? 'warn' : 'bad';
@@ -517,7 +868,9 @@ function showNewPrep() {
   if (!p.card) return;
   itCreateStep = 0;
   const totalWrap = ensureTotalUnitsField(p.ticket);
+  const equipmentWrap = ensureITEquipmentManifestFields(p.ticket);
   const partsWrap = ensureTicketPartsFields(p.ticket);
+  if (equipmentWrap && partsWrap && equipmentWrap.nextSibling !== partsWrap) p.ticket.insertBefore(equipmentWrap, partsWrap);
   hideChildren(viewIT(), [p.card]);
   [...p.card.children].forEach(el => el.style.display = 'none');
   let head = document.getElementById('wlCreateHead');
@@ -528,30 +881,46 @@ function showNewPrep() {
   nav.style.display = '';
   if (p.ticket) p.ticket.style.display = 'grid';
   if (totalWrap) totalWrap.style.display = '';
+  if (equipmentWrap) equipmentWrap.style.display = '';
   if (partsWrap) partsWrap.style.display = '';
   head.innerHTML = progress('Job Setup', 'Enter the ticket, units, and parts required', 1, 1);
+  let req = document.getElementById('wlAssignedEquipmentReq');
+  if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
+  req.style.display = pendingAssignmentManifest.length ? '' : 'none';
+  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment</b><div class='small'>The Unit Area and Stand Area above were prefilled from the Owner assignment. They must match before you start the Tech Check.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
 function validateCreateStep() {
   if (!document.getElementById('itTicket')?.value.trim()) { alert('Enter the MHelpDesk ticket number first.'); return false; }
   if (!document.getElementById('itSite')?.value.trim()) { alert('Enter the ticket name / customer / site so Service can verify the same ticket.'); return false; }
-  const total = expectedUnitCount();
-  if (total < 1) { alert('Enter how many total units will be checked for this ticket.'); return false; }
-  itExpectedUnits = total;
+  const manifest = readITEquipmentManifest();
+  const unitCount = equipmentManifestDeviceTotal(manifest);
+  const standCount = equipmentManifestStandTotal(manifest);
+  const totalItems = unitCount + standCount;
+  if (totalItems < 1) { alert('Choose at least one unit/device or stand being sent out.'); return false; }
+  if (expectedUnitCount() !== unitCount) { alert('The Unit Area total does not match the Total Units / Devices field.'); return false; }
+  if (pendingAssignmentManifest.length && equipmentManifestKey(manifest) !== equipmentManifestKey(pendingAssignmentManifest)) {
+    alert('This assigned job must match the Owner’s Unit Area and Stand Area. If the equipment changed, have the Owner update the assignment before continuing.');
+    return false;
+  }
+  itExpectedUnits = totalItems;
   return true;
 }
 async function createPrepAndStartChecks() {
   if (!validateCreateStep()) return;
   const ticket = document.getElementById('itTicket').value.trim();
   const site = document.getElementById('itSite').value.trim();
-  const total = expectedUnitCount();
+  const manifest = readITEquipmentManifest();
+  const requestedUnits = equipmentManifestDeviceTotal(manifest);
+  const totalItems = requestedUnits + equipmentManifestStandTotal(manifest);
   const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v2', {
+  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v3', {
     p_ticket_no: ticket,
     p_site: site,
-    p_expected_unit_count: total,
+    p_requested_unit_count: requestedUnits,
+    p_equipment_manifest: manifest,
     p_solar_panel_qty: parts.solar_panel_qty,
     p_battery_replacement_qty: parts.battery_replacement_qty,
     p_camera_replacement_qty: parts.camera_replacement_qty,
@@ -560,12 +929,19 @@ async function createPrepAndStartChecks() {
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
+  if (pendingAssignmentLinkId) {
+    const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: pendingAssignmentLinkId, p_prep_id: prepId });
+    if (linkError) return alert(linkError.message);
+    pendingAssignmentLinkId = null;
+  }
+  pendingAssignmentManifest = [];
   document.getElementById('itTicket').value = '';
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
   if (totalInput) totalInput.value = '';
+  document.querySelectorAll('#wlITEquipmentWrap [data-it-equipment-qty]').forEach(input => { input.value='0'; });
   fillTicketPartInputs({}, 'wlPart');
-  itExpectedUnits = total;
+  itExpectedUnits = totalItems;
   await window.refreshData?.();
   return showItPrep(prepId);
 }
@@ -628,7 +1004,7 @@ async function showPendingList() {
   const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,created_at,expected_unit_count,prep_items(id)').eq('status', 'draft').order('created_at', { ascending: true });
   let card = document.getElementById('wlPendingList'); if (!card) { card = document.createElement('div'); card.id = 'wlPendingList'; card.className = 'card'; viewIT().append(card); }
   const rows = data || [];
-  card.innerHTML = `${progress('Pending IT Work', rows.length ? 'Choose a ticket to continue' : 'Nothing is waiting in IT', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows.map(r => { const started=(r.prep_items||[]).length; const total=r.expected_unit_count||started; const next=started<total ? `Next: start Unit ${started+1} of ${total}` : 'Next: continue the first incomplete check'; return `<div class='wl-ticket'><b>MHelpDesk #${esc(r.ticket_no)}</b><div class='small'>${esc(r.site || 'No site / description')}</div><div class='small'>Units started: ${started} of ${total}</div><div class='ok top8'><b>${esc(next)}</b></div><button class='wl-big wl-blue' data-wl-open-it='${r.id}'>Resume This Prep →</button></div>`; }).join('') || `<div class='ok'><b>No pending prep.</b></div>`}`;
+  card.innerHTML = `${progress('Pending IT Work', rows.length ? 'Choose a ticket to continue' : 'Nothing is waiting in IT', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows.map(r => { const started=(r.prep_items||[]).length; const total=r.expected_unit_count||started; const next=started<total ? `Next: start equipment item ${started+1} of ${total}` : 'Next: continue the first incomplete check'; return `<div class='wl-ticket'><b>MHelpDesk #${esc(r.ticket_no)}</b><div class='small'>${esc(r.site || 'No site / description')}</div><div class='small'>Equipment items started: ${started} of ${total}</div><div class='ok top8'><b>${esc(next)}</b></div><button class='wl-big wl-blue' data-wl-open-it='${r.id}'>Resume This Prep →</button></div>`; }).join('') || `<div class='ok'><b>No pending prep.</b></div>`}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
 }
 function findItCard(ticket) {
@@ -651,7 +1027,7 @@ async function editItPrepUnitCount(nextValue) {
   return;
 }
 function unitCountEditor(totalUnits) {
-  return `<div class='wl-count-editor' aria-label='Change total units'><button type='button' class='wl-gray' data-wl-count-minus aria-label='Subtract one unit'>−</button><input id='wlUnitCountEdit' type='number' min='1' step='1' inputmode='numeric' value='${totalUnits}' aria-label='Total units for this ticket'><button type='button' class='wl-gray' data-wl-count-plus aria-label='Add one unit'>+</button><button type='button' class='wl-blue wl-count-save' data-wl-edit-total>Save Unit Count</button></div>`;
+  return `<div class='wl-count-editor wl-count-readonly' aria-label='Total equipment items'><b>${Number(totalUnits || 0)}</b><span>Total equipment items from the Unit Area + Stand Area</span></div>`;
 }
 async function getPrep(id) {
   const { data } = await liveDb.from('prep_tickets').select('*,prep_items(*)').eq('id', id).single(); return data;
@@ -971,7 +1347,7 @@ function itUnitReviewHtml(item, evidence, unitNo) {
 function itTicketSummaryHtml(items, evidence) {
   const units = items.map((item, index) => { const unitNo = index + 1; const photos = unitEvidence(evidence, unitNo, 'photo'); const sig = unitSignature(evidence, unitNo); const issues = itIssueLinksHtml(item, evidence, unitNo); return `<div class='wl-ticket'><b>Unit ${unitNo} — ${esc(item.equipment_type)}</b><div>${esc(item.purpose)} · Unit ${esc(item.unit_tag || '')}</div><div>📷 ${photos.length} photo${photos.length === 1 ? '' : 's'}</div><div>✍️ ${sig ? `Signed by ${esc(sig.created_by_name || 'IT Technician')} · ${new Date(sig.created_at).toLocaleString()}` : 'Signature missing'}</div>${issues}</div>`; }).join('');
   const partsEditor = activeItPrep?.status === 'draft' ? `<div class='wl-question top10'><div class='qtext'>Parts Required</div><div class='small'>Update these only if the MHelpDesk ticket changes before release.</div>${ticketPartsInputsHtml('wlEditPart', activeItPrep)}<button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-prep-parts>Save Parts List</button></div>` : ticketPartsInlineHtml(activeItPrep);
-  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div>${items.length} total unit${items.length === 1 ? '' : 's'}</div></div>${partsEditor}${units}`;
+  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div><b>Units / Devices:</b> ${Number(activeItPrep.requested_unit_count ?? equipmentManifestDeviceTotal(activeItPrep.equipment_manifest))}</div><div><b>Stands / Poles:</b> ${equipmentManifestStandTotal(activeItPrep.equipment_manifest)}</div><div><b>Total Equipment Items:</b> ${items.length}</div></div>${equipmentManifestInlineHtml(activeItPrep)}${partsEditor}${units}`;
 }
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
@@ -979,7 +1355,7 @@ async function releaseItPrepUnitByUnit() {
   const evidence = await evidenceRows(activeItPrep.id, 'it');
   const expected = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
   const ready = items.length === expected && items.every((item, index) => itUnitIssues(item, evidence, index + 1).length === 0);
-  if (!ready) return alert(`Complete all ${expected} units with checks, a photo showing the matching unit tag, and an IT signature before sending to Service.`);
+  if (!ready) return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before sending to Service.`);
   const button = document.querySelector('[data-wl-send-it]');
   const msg = document.getElementById('wlSendItMsg');
   if (button) { button.disabled = true; button.textContent = 'Sending to Service…'; }
@@ -1031,7 +1407,7 @@ async function showItPrep(prepId) {
     itUnitPhase = 'final';
   } else if (itUnitIndex >= items.length) {
     itUnitPhase = 'type';
-    itTypeChoice = '';
+    itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
     itPurposeChoice = '';
     itReconRequired = 1;
   } else {
@@ -1040,7 +1416,7 @@ async function showItPrep(prepId) {
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
     itReconRequired = Number(item.required_battery_count || 1);
-    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = ''; itPurposeChoice = ''; }
+    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || ''; }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
       if (!issues.length) itUnitPhase = 'review';
@@ -1060,7 +1436,7 @@ async function renderItUnitStep() {
   if (itUnitIndex >= totalUnits || itUnitPhase === 'final') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const ready = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
-    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Send this ticket to the Service Tech' : 'Review all completed units', 1, 1) + itTicketSummaryHtml(items, ev) + `<div class='wl-question top10'><div class='qtext'>Total Units For This Ticket</div>${unitCountEditor(totalUnits)}</div><div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to send this ticket to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>SEND TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Send this ticket to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div><div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to send this ticket to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>SEND TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -1069,7 +1445,7 @@ async function renderItUnitStep() {
   if (itUnitPhase === 'type') {
     const cameraOptions = CAMERA_UNIT_TYPES.map(type => `<option value='${esc(type)}' ${itTypeChoice === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
     const supportOptions = STAND_POLE_TYPES.map(type => `<option value='${esc(type)}' ${itTypeChoice === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
-    wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, `What type of equipment is Item ${unitNo}?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Total Units For This Ticket</div>${unitCountEditor(totalUnits)}</div><div class='wl-question top10'><div class='qtext'>Choose the equipment type</div><select id='wlItUnitType'><option value=''>Choose type…</option><optgroup label='Camera / Unit Types'>${cameraOptions}</optgroup><optgroup label='Stand / Pole Types'>${supportOptions}</optgroup></select></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, `What type of equipment is Item ${unitNo}?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Equipment Plan</div>${equipmentManifestInlineHtml(activeItPrep)}${unitCountEditor(totalUnits)}</div><div class='wl-question top10'><div class='qtext'>Choose the equipment type</div><select id='wlItUnitType'><option value=''>Choose type…</option><optgroup label='Camera / Unit Types'>${cameraOptions}</optgroup><optgroup label='Stand / Pole Types'>${supportOptions}</optgroup></select></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'purpose') {
     const purposes = itAllowedPurposes(itTypeChoice);
     wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `What is Unit ${unitNo} for?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Choose BACKUP, SWAP, or DELIVERY</div><div class='wl-options'>${purposes.map(p => `<button class='${itPurposeChoice === p ? 'pass on' : 'pass'}' data-wl-unit-purpose='${p}'>${p}</button>`).join('')}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
@@ -1095,12 +1471,12 @@ async function renderItUnitStep() {
   resetWizardPosition();
 }
 async function showITStatus() {
-  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_by_name,released_at,closed_by_name,closed_at,solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty').order('created_at', { ascending: false }).limit(50);
+  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_by_name,released_at,closed_by_name,closed_at,requested_unit_count,equipment_manifest,solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty').order('created_at', { ascending: false }).limit(50);
   let card = document.getElementById('wlItStatus'); if (!card) { card = document.createElement('div'); card.id = 'wlItStatus'; card.className = 'card wl-history'; viewIT().append(card); }
   const rows = (data || []).map(r => {
     const cls = r.status === 'draft' ? 'wl-status-pending' : r.status === 'released' ? 'wl-status-waiting' : 'wl-status-complete';
     const label = r.status === 'draft' ? '🔴 PENDING IT' : r.status === 'released' ? '🟠 SENT — WAITING FOR SERVICE' : '🟢 COMPLETED / DEPLOYED';
-    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}${ticketPartsInlineHtml(r)}<div class='small top8'>Prepared by: ${esc(r.released_by_name || 'Not sent yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
+    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}${equipmentManifestInlineHtml(r)}${ticketPartsInlineHtml(r)}<div class='small top8'>Prepared by: ${esc(r.released_by_name || 'Not sent yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
   }).join('');
   card.innerHTML = `${progress('Status & History', 'Equipment handoff history', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows || '<div class="warn">No history yet.</div>'}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
@@ -1108,14 +1484,15 @@ async function showITStatus() {
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
   let home = document.getElementById('wlSvcHome'); if (!home) { home = document.createElement('div'); home.id = 'wlSvcHome'; home.className = 'card wl-home'; viewSvc().prepend(home); }
-  const [r, work, assignments] = await Promise.all([myReturnCounts(), serviceWorkData(), myActiveAssignments('service')]);
+  const [r, work, assignments,phoneAlerts,assignedAssets] = await Promise.all([myReturnCounts(), serviceWorkData(), myActiveAssignments('service'), pushAlertState(), myAssignedInventoryAssets()]);
   const assigned = assignments[0] || null;
+  const alertBanner = phoneAlertBanner(phoneAlerts);
   const readyForService = work.released.length;
   const nextReleased = work.released[0] || null;
   const nextDeployed = work.deployed[0] || null;
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`);
-  home.innerHTML = `<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div><div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
+  home.innerHTML = `${alertBanner}<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
   hideChildren(viewSvc(), [home]); resetWizardPosition();
 }
 async function showReceiveLookup() {
@@ -1145,9 +1522,10 @@ function showSvcTicketConfirmation() {
   const forms = svcForms(card);
   const types = [...new Set((activeSvcPrep.prep_items || []).map(item => item.equipment_type).filter(Boolean))];
   const wizard = svcWizardCard();
+  const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Units IT is giving you:</b> ${forms.length}</div>${types.length ? `<div><b>Equipment:</b> ${esc(types.join(', '))}</div>` : ''}</div><div class='wl-question'><div class='qtext'>Does this ticket number and name match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
+  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Total equipment items IT is giving you:</b> ${forms.length}</div>${equipmentManifestInlineHtml(activeSvcPrep)}${types.length ? `<div class='small top8'><b>Checked equipment types:</b> ${esc(types.map(equipmentDisplayLabel).join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div><div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
   resetWizardPosition();
 }
 function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPreps > .item.prepared')].find(c => c.textContent.includes(`MHelpDesk Ticket #${ticket}`)); }
@@ -1182,21 +1560,31 @@ async function renderSvcPrep() {
   if (!base || !card) return alert('Could not open the matched equipment.');
   const forms = svcForms(card);
   const wizard = svcWizardCard();
+  const partsTotal = ticketPartsTotal(activeSvcPrep);
+  const hasParts = partsTotal > 0;
+  const partStep = forms.length;
+  const proofStep = forms.length + (hasParts ? 1 : 0);
+  const photoStep = proofStep + 1;
+  const signStep = proofStep + 2;
+  const finalStep = proofStep + 3;
+  const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  const proofStep = forms.length; const photoStep = forms.length + 1; const signStep = forms.length + 2; const finalStep = forms.length + 3;
   if (svcUnitIndex < forms.length) {
     const questions = svcQuestions(forms[svcUnitIndex]);
     const q = questions[svcQuestionIndex];
-    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) + (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? 'Compare IT Photos →' : 'Next Unit →') : 'Next →'}</button></div>`;
+    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) + (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? (hasParts ? 'Verify Parts →' : 'Compare IT Photos →') : 'Next Unit →') : 'Next →'}</button></div>`;
+  } else if (hasParts && svcUnitIndex === partStep) {
+    const confirmed = Boolean(activeSvcPrep.service_parts_confirmed);
+    wizard.innerHTML = progress('Parts Handoff', `Verify parts from IT Tech ${preparedBy}`, 1, 1) + `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
   } else if (svcUnitIndex === proofStep) {
-    wizard.innerHTML = progress('Compare', 'Look at IT’s handoff photos', 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
+    wizard.innerHTML = progress('Compare', `Look at IT Tech ${preparedBy}’s handoff photos`, 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   } else if (svcUnitIndex === photoStep) {
     const itEv = await evidenceRows(activeSvcPrep.id, 'it');
     const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
     wizard.innerHTML = progress('Service Photos', `Take ${requiredPhotos} matching receipt photo${requiredPhotos === 1 ? '' : 's'}`, 1, 1) + await photoOnlyHtml(activeSvcPrep.id, 'service', null, requiredPhotos) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
   } else if (svcUnitIndex === signStep) {
-    wizard.innerHTML = progress('Service Signature', 'Sign that you received and verified it', 1, 1) + await signatureOnlyHtml(activeSvcPrep.id, 'service') + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;
+    wizard.innerHTML = progress('Service Signature', `Sign that you received and verified the handoff from IT Tech ${preparedBy}`, 1, 1) + await signatureOnlyHtml(activeSvcPrep.id, 'service') + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;
     wizard.querySelectorAll('canvas').forEach(wireCanvas);
   } else {
     const ev = await evidenceRows(activeSvcPrep.id, 'service');
@@ -1204,9 +1592,10 @@ async function renderSvcPrep() {
     const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
     const servicePhotos = ev.filter(x => x.kind === 'photo').length;
     const allChecksOk = forms.every(form => svcQuestions(form).every(q => q.kind === 'number' ? q.input.value !== '' : q.input.checked));
+    const partsReady = !hasParts || Boolean(activeSvcPrep.service_parts_confirmed);
     const proofReady = servicePhotos === requiredPhotos && ev.some(x => x.kind === 'signature');
-    const ready = proofReady && allChecksOk;
-    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'>📷 Service photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and Service signature saved.' : 'Matching photo count and signature are still required.'}</div>${allChecksOk ? `<div class='small'>✓ Every Service verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept & Mark Deployed to Field →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const ready = proofReady && allChecksOk && partsReady;
+    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and Service signature saved.' : 'Matching photo count and signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -1327,9 +1716,9 @@ document.addEventListener('click', async e => {
     if (typeof window.refreshData === 'function') await window.refreshData();
     return;
   }
-  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') showNewPrep(0); if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
+  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
   if (e.target.closest("[data-wl-home='it']")) return showITHome(); if (e.target.closest("[data-wl-home='svc']")) return showSvcHome();
-  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') showITHome(); else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
+  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
   const openIt = e.target.closest('[data-wl-open-it]'); if (openIt) return showItPrep(openIt.dataset.wlOpenIt);
   const countMinus = e.target.closest('[data-wl-count-minus]'); if (countMinus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) - 1)); return; }
   const countPlus = e.target.closest('[data-wl-count-plus]'); if (countPlus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) + 1)); return; }
@@ -1500,22 +1889,37 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-svc-next]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
     const forms = svcForms(card);
+    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const partStep = forms.length;
+    const proofStep = forms.length + (hasParts ? 1 : 0);
+    const photoStep = proofStep + 1;
+    const signStep = proofStep + 2;
     if (svcUnitIndex < forms.length) return advanceSvcVerification();
-    if (svcUnitIndex === forms.length + 1) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
-    if (svcUnitIndex === forms.length + 2) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+    if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
+    if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
+    if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
     svcUnitIndex++; return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-svc-prev]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
     const forms = svcForms(card);
+    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const partStep = forms.length;
     if (svcUnitIndex < forms.length) {
       if (svcQuestionIndex > 0) { svcQuestionIndex--; return renderSvcPrep(); }
       if (svcUnitIndex > 0) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
       return showReceiveLookup();
     }
-    if (svcUnitIndex === forms.length && forms.length) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
+    if (svcUnitIndex === partStep && forms.length) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
     svcUnitIndex = Math.max(0, svcUnitIndex - 1); return renderSvcPrep();
   }
+  if (e.target.closest('[data-wl-confirm-service-parts]')) {
+    const { error } = await liveDb.rpc('confirm_service_parts', { p_prep_id: activeSvcPrep.id });
+    if (error) return alert(error.message);
+    activeSvcPrep = await getPrep(activeSvcPrep.id);
+    return renderSvcPrep();
+  }
+  if (e.target.closest('[data-wl-service-parts-mismatch]')) return alert('Do not accept the handoff. Compare the parts with IT and the MHelpDesk ticket, then correct the mismatch before continuing.');
   if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) { const panel = upload.closest('.wl-proof'); const input = panel.querySelector('.wl-file'); const files = [...(input.files || [])]; if (!files.length) return alert('Take or select at least one photo.'); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const expected = Number(panel.dataset.expected || 0) || null; if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.'); if (panel.dataset.stage === 'service' && expected) { const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length; if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`); } upload.disabled = true; upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…'; try { const optimized = await Promise.all(files.map(optimizeEvidencePhoto)); upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…'; await Promise.all(optimized.map((f, i) => { const original = f.name || files[i].name; const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original; return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId); })); if (panel.dataset.stage === 'it' && unitNo && activeItPrep) { activeItPrep = await getPrep(activeItPrep.id); return renderItUnitStep(); } await refreshProofPanel(panel); } catch (err) { upload.disabled = false; upload.textContent = 'Save Photo(s)'; alert(err.message || 'Upload failed.'); } return; }
   const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
@@ -1646,6 +2050,25 @@ function wrapCreatePrep() {
   };
 }
 
+function ownerAssignmentProgress(a, prep) {
+  const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
+  if (a.status === 'completed') return { step:5, label:'DONE', detail: roleLabel + ' task completed' };
+  if (!a.assignee_user_id && a.assignment_scope === 'department') return { step:1, label:'WAITING FOR ' + roleLabel + ' TECH', detail:'Sent to the ' + (a.assigned_role === 'it' ? 'IT Department' : 'Service Department') + ' queue' };
+  if (a.status === 'assigned') return { step:1, label:'SENT', detail:'Waiting for ' + a.assignee_name + ' to start' };
+  if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
+  if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Prepared and released by IT' };
+  if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
+  return { step:2, label:'CLAIMED / IN PROCESS', detail:a.assignee_name + ' started the task' };
+}
+function ownerAssignmentRowHtml(a, prep) {
+  const p = ownerAssignmentProgress(a, prep);
+  const pct = Math.max(8, Math.min(100, p.step / 5 * 100));
+  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>Units Required:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${a.assigned_role === 'it' ? equipmentManifestInlineHtml(a) + ticketPartsInlineHtml(a) : ''}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+}
+function ownerAssignmentTechOptions(role) {
+  const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
+  return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
+}
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
@@ -1660,71 +2083,66 @@ async function installOwnerAssignments(force = false) {
   const wasOpen = host.open;
   host.dataset.loaded = '1';
 
-  const [{ data: profiles }, { data: assignments }] = await Promise.all([
-    liveDb.from('profiles').select('user_id,full_name,username,role,active').eq('active', true).in('role', ['it','service']).order('full_name'),
-    liveDb.from('job_assignments').select('*').in('status', ['assigned','started']).order('assigned_at', { ascending: false }),
+  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }] = await Promise.all([
+    liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
+    liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
+    liveDb.from('prep_tickets').select('id,ticket_no,status,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
+    liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
   ]);
   ownerAssignmentProfiles = profiles || [];
-  const active = assignments || [];
-  const techOptions = role => ownerAssignmentProfiles
-    .filter(p => p.role === role)
-    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
-    .join('');
-
+  ownerAssignmentAssets = assets || [];
+  const all = assignments || [];
+  const prepMap = new Map((preps || []).map(p => [p.id,p]));
+  const now = Date.now();
+  const active = all.filter(a => a.status !== 'completed');
+  const completed = all.filter(a => a.status === 'completed' && now - new Date(a.completed_at || a.updated_at || a.assigned_at).getTime() < 24*60*60*1000);
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
-  const rows = active.map(a => `
-    <div class='wl-assignment-row'>
-      <div class='wl-assignment-main'>
-        <div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div>
-        <div class='small'><b>Assigned to:</b> ${esc(a.assignee_name)} · ${a.status === 'started' ? 'Started' : 'Assigned'}</div>
-        ${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}
-        ${a.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(a.unit_summary)}</div>` : ''}
-        ${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}
-        ${a.assigned_role === 'it' ? ticketPartsInlineHtml(a) : ''}
-        ${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}
-      </div>
-      <button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>
-    </div>`).join('');
+  const rows = active.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
+  const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
 
   host.innerHTML = `
     <summary class='ownerDashSummary'>
-      <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
+      <div><b>Create / Assign Job</b><span>Send work to a department queue or directly to a technician</span></div>
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
-        <div class='small'>Nothing is synced or pulled from MHelpDesk. Enter the reference number, unit/equipment, customer/site, and job description here so your technician sees the same information.</div>
+        <div class='small'>Use the current MHelpDesk ticket as the source of truth every time. Enter the MHelpDesk reference, unit count, equipment, and work exactly as shown there. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
       </div>
       <div class='grid top10'>
         <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
         <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
+        <div><label>Units Required <span class='small'>(from MHelpDesk)</span></label><input id='ownerAssignUnitCount' type='number' inputmode='numeric' min='0' step='1' placeholder='Example: 2'></div>
         <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
       </div>
+      <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
-        <div class='qtext'>Parts Required for IT</div>
-        <div class='small'>Optional. Enter the quantities shown on the MHelpDesk ticket.</div>
-        ${ticketPartsInputsHtml('ownerPart')}
+        <div class='qtext'>Equipment & Parts Required for IT</div>
+        <div class='small'>Choose how many units/devices, stands, and extra parts IT needs to pull from the shelf for this MHelpDesk job.</div>
+        ${ownerEquipmentManifestInputsHtml()}
+        <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
-        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
-        <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+        <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
+        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
       </div>
+      <div class='top10'><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
-      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Job to Technician</button>
+      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
 
       <div class='ownerDispatchSummary'>
-        <span><b>${active.length}</b> active</span>
+        <span><b>${active.length}</b> live</span>
         <span><b>${itCount}</b> IT</span>
         <span><b>${svcCount}</b> Service</span>
       </div>
-      <div class='ownerActiveLabel'>Active Tech Check Assignments</div>
+      <div class='ownerActiveLabel'>Live Job Progress</div>
       <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>
+      ${doneRows ? `<details class='ownerHistoryFold'><summary>Completed in the last 24 hours <span class='pill'>${completed.length}</span></summary><div>${doneRows}</div></details>` : ''}
     </div>`;
   host.open = wasOpen;
 }
@@ -1732,32 +2150,39 @@ function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
   if (!select) return;
-  select.innerHTML = ownerAssignmentProfiles
-    .filter(p => p.role === role)
-    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
-    .join('');
+  select.innerHTML = ownerAssignmentTechOptions(role);
   document.getElementById('ownerAssignParts')?.classList.toggle('hidden', role !== 'it');
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
   const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
   const units = document.getElementById('ownerAssignUnits')?.value.trim() || '';
+  const requestedUnitCountRaw = document.getElementById('ownerAssignUnitCount')?.value;
+  const requestedUnitCount = requestedUnitCountRaw === '' || requestedUnitCountRaw == null ? null : Math.max(0, Math.floor(Number(requestedUnitCountRaw || 0)));
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
-  const assignee = document.getElementById('ownerAssignTech')?.value || '';
+  const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
+  const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
+  const equipmentManifest = role === 'it' ? readOwnerEquipmentManifest() : [];
   const parts = role === 'it' ? readTicketPartInputs('ownerPart') : {
     solar_panel_qty:0,battery_replacement_qty:0,camera_replacement_qty:0,sim_replacement_qty:0,micro_sd_qty:0
   };
-  if (!ticket || !assignee) return alert('Enter the MHelpDesk reference number and choose a technician.');
+  if (!ticket) return alert('Enter the MHelpDesk reference number.');
+  if (requestedUnitCount === null) return alert('Enter how many units are listed on the MHelpDesk ticket. Use 0 if this job has no unit/device.');
+  const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
+  const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
+  if (role === 'it' && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
+  if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { error } = await liveDb.rpc('owner_assign_job_v3', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v7', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
     p_assignee_user_id: assignee,
+    p_requested_unit_count: requestedUnitCount,
     p_unit_summary: units,
     p_job_description: description,
     p_notes: notes,
@@ -1766,16 +2191,33 @@ async function ownerAssignJob() {
     p_camera_replacement_qty: parts.camera_replacement_qty,
     p_sim_replacement_qty: parts.sim_replacement_qty,
     p_micro_sd_qty: parts.micro_sd_qty,
+    p_equipment_manifest: equipmentManifest,
+    p_requires_it_handoff: false,
+    p_scheduled_for: scheduledFor,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
 
-  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  fillTicketPartInputs({}, 'ownerPart');
+  let pushMessage = '';
+  if (assignmentId) {
+    try {
+      const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', { body: { assignment_id: assignmentId } });
+      if (pushError) throw pushError;
+      const sent = Number(pushResult?.sent || 0);
+      pushMessage = sent > 0 ? ` Phone notification${sent === 1 ? '' : 's'} sent to ${sent} device${sent === 1 ? '' : 's'}.` : ' Tech Check inbox alert created. Phone push will appear on devices where technicians have enabled alerts.';
+    } catch (pushError) {
+      console.warn('Assignment saved but phone push could not be sent', pushError);
+      pushMessage = ' Tech Check inbox alert created; phone push could not be delivered this time.';
+    }
+  }
 
+  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
+  fillTicketPartInputs({}, 'ownerPart');
+  document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
-  alert('Sent in Tech Check. This does not change or sync anything in MHelpDesk.');
+  const target = assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
   if (!activeItPrep?.id) return;
@@ -1860,22 +2302,17 @@ async function installOwnerIntake(force = false) {
 }
 
 document.addEventListener('click', async e => {
-  if (e.target.closest('#notificationSettingsButton')) return openNotificationPanel();
-  if (e.target.closest('[data-wl-notify-close]')) { document.getElementById('wlNotificationPanel')?.classList.add('hidden'); return; }
-  if (e.target.closest('[data-wl-save-notify]')) return saveNotificationSettings();
+  if (e.target.closest('#techMenuButton')) return openTechMenu();
+  if (e.target.closest('[data-wl-menu-close]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-menu-help]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return openHelpWalkthrough(false); }
+  if (e.target.closest('[data-wl-menu-phone-alerts]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return enableBrowserAlerts(); }
+  if (e.target.closest('[data-wl-menu-refresh]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); await window.refreshData?.(); return; }
+  if (e.target.closest('#helpTrainingButton')) return openHelpWalkthrough(false);
+  if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
+  if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
-  if (e.target.closest('[data-wl-notify-read-all]')) {
-    await liveDb.rpc('mark_all_my_notifications_read');
-    await refreshNotificationBadge();
-    return openNotificationPanel();
-  }
-  const notificationItem = e.target.closest('[data-wl-notification-id]');
-  if (notificationItem) {
-    await liveDb.rpc('mark_my_notification_read', { p_notification_id: notificationItem.dataset.wlNotificationId });
-    await refreshNotificationBadge();
-    if (notificationItem.dataset.wlNotificationAssignment) return openAssignmentFromNotification(notificationItem.dataset.wlNotificationAssignment);
-    return openNotificationPanel();
-  }
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
@@ -1895,7 +2332,7 @@ window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerI
 function boot() {
   injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
-  if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); }
+  if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
 let bootQueued = false;
 function scheduleBoot() { if (bootQueued) return; bootQueued = true; requestAnimationFrame(() => { bootQueued = false; boot(); }); }
