@@ -522,3 +522,37 @@ select {
     scroll-margin-top: 12px;
   }
 }
+
+
+/* Mobile navigation overlap fix — keep role and IT mode controls in normal flow. */
+@media (max-width: 680px) {
+  .tabs {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    margin: 10px 0 12px !important;
+  }
+
+  .wl-mode-pills {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    margin: 10px 0 16px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .wl-mode-pills button {
+    width: 100%;
+    min-width: 0;
+    min-height: 54px;
+    padding: 10px 12px;
+    white-space: normal !important;
+    line-height: 1.15;
+    text-align: center;
+  }
+}
