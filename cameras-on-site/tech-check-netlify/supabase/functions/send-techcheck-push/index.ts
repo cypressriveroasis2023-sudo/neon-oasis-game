@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: assignment, error: assignmentError } = await admin
       .from('job_assignments')
-      .select('id,ticket_no,assignee_user_id,assigned_by_name,status')
+      .select('id,ticket_no,assignee_user_id,assignee_name,assigned_role,assignment_scope,assigned_by_name,status')
       .eq('id', assignmentId)
       .maybeSingle();
     if (assignmentError || !assignment) {
@@ -66,68 +66,98 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const [{ data: prefs }, { data: subs }, { data: cfg }, unreadResult] = await Promise.all([
-      admin.from('notification_preferences')
-        .select('new_assignments,browser_notifications')
-        .eq('user_id', assignment.assignee_user_id)
-        .maybeSingle(),
-      admin.from('push_subscriptions')
-        .select('id,endpoint,p256dh,auth')
-        .eq('user_id', assignment.assignee_user_id)
-        .eq('enabled', true),
-      admin.from('push_config').select('key,value').in('key', ['vapid_public','vapid_private','vapid_subject']),
-      admin.from('app_notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('recipient_user_id', assignment.assignee_user_id)
-        .is('read_at', null),
-    ]);
-
-    if (prefs && (!prefs.new_assignments || !prefs.browser_notifications)) {
-      return new Response(JSON.stringify({ ok: true, sent: 0, skipped: 'notification preference disabled' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let recipientIds: string[] = [];
+    if (assignment.assignee_user_id) {
+      recipientIds = [assignment.assignee_user_id];
+    } else {
+      const { data: departmentUsers } = await admin
+        .from('profiles')
+        .select('user_id')
+        .eq('active', true)
+        .eq('role', assignment.assigned_role);
+      recipientIds = (departmentUsers || []).map((row: { user_id: string }) => row.user_id);
     }
-    if (!subs?.length) {
-      return new Response(JSON.stringify({ ok: true, sent: 0, skipped: 'no registered phone/browser subscription' }), {
+
+    if (!recipientIds.length) {
+      return new Response(JSON.stringify({ ok: true, sent: 0, skipped: 'no eligible recipients' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const { data: cfg } = await admin.from('push_config').select('key,value').in('key', ['vapid_public','vapid_private','vapid_subject']);
     const config = Object.fromEntries((cfg || []).map((row: { key: string; value: string }) => [row.key, row.value]));
     if (!config.vapid_public || !config.vapid_private || !config.vapid_subject) throw new Error('Push configuration is missing.');
     webpush.setVapidDetails(config.vapid_subject, config.vapid_public, config.vapid_private);
 
-    const payload = JSON.stringify({
-      title: 'New Tech Check job assigned',
-      body: 'MHelpDesk #' + assignment.ticket_no + ' was assigned to you by ' + (assignment.assigned_by_name || 'Owner') + '.',
-      url: '/?assignment=' + encodeURIComponent(assignment.id),
-      assignment_id: assignment.id,
-      ticket_no: assignment.ticket_no,
-      kind: 'new_assignment',
-      badge_count: String(Math.max(1, Number(unreadResult.count || 1))),
-    });
-
     let sent = 0;
+    let skipped = 0;
     const failed: Array<{ id: string; status?: number }> = [];
-    for (const sub of subs) {
-      try {
-        await webpush.sendNotification({
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth },
-        }, payload, { TTL: 3600 });
-        sent += 1;
-      } catch (error) {
-        const status = Number((error as { statusCode?: number })?.statusCode || 0);
-        failed.push({ id: sub.id, status });
-        if (status === 404 || status === 410) {
-          await admin.from('push_subscriptions')
-            .update({ enabled: false, updated_at: new Date().toISOString() })
-            .eq('id', sub.id);
+    const isDepartment = !assignment.assignee_user_id || assignment.assignment_scope === 'department';
+    const roleLabel = assignment.assigned_role === 'it' ? 'IT Department' : 'Service Department';
+
+    for (const recipientId of recipientIds) {
+      const [{ data: prefs }, { data: subs }, unreadResult] = await Promise.all([
+        admin.from('notification_preferences')
+          .select('new_assignments,browser_notifications')
+          .eq('user_id', recipientId)
+          .maybeSingle(),
+        admin.from('push_subscriptions')
+          .select('id,endpoint,p256dh,auth')
+          .eq('user_id', recipientId)
+          .eq('enabled', true),
+        admin.from('app_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('recipient_user_id', recipientId)
+          .is('read_at', null),
+      ]);
+
+      if (prefs && (!prefs.new_assignments || !prefs.browser_notifications)) {
+        skipped += 1;
+        continue;
+      }
+      if (!subs?.length) {
+        skipped += 1;
+        continue;
+      }
+
+      const payload = JSON.stringify({
+        title: isDepartment ? 'New ' + roleLabel + ' job available' : 'New Tech Check job assigned',
+        body: isDepartment
+          ? 'MHelpDesk #' + assignment.ticket_no + ' is available to claim from ' + (assignment.assigned_by_name || 'Owner') + '.'
+          : 'MHelpDesk #' + assignment.ticket_no + ' was assigned to you by ' + (assignment.assigned_by_name || 'Owner') + '.',
+        url: '/?assignment=' + encodeURIComponent(assignment.id),
+        assignment_id: assignment.id,
+        ticket_no: assignment.ticket_no,
+        kind: 'new_assignment',
+        badge_count: String(Math.max(1, Number(unreadResult.count || 1))),
+      });
+
+      for (const sub of subs) {
+        try {
+          await webpush.sendNotification({
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+          }, payload, { TTL: 3600 });
+          sent += 1;
+        } catch (error) {
+          const status = Number((error as { statusCode?: number })?.statusCode || 0);
+          failed.push({ id: sub.id, status });
+          if (status === 404 || status === 410) {
+            await admin.from('push_subscriptions')
+              .update({ enabled: false, updated_at: new Date().toISOString() })
+              .eq('id', sub.id);
+          }
         }
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, sent, failed: failed.length }), {
+    return new Response(JSON.stringify({
+      ok: true,
+      sent,
+      recipients: recipientIds.length,
+      skipped,
+      failed: failed.length,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
