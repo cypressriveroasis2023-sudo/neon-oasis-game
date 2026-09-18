@@ -32,6 +32,21 @@ const TRAILER = [
   'Load balanced and equipment tied down',
   'No visible structural damage or unsafe condition',
 ];
+const INVENTORY_TYPES = [
+  'Sniper',
+  'Ranger',
+  'Helios',
+  'Solar Spotter',
+  'Spotter',
+  'Recon II',
+  '110V Stand',
+  'Solar Stand',
+  'Solar Pole',
+  'Pole',
+  'Other',
+];
+let ownerEquipmentFilter = 'all';
+let ownerDailyDate = localDateKey(new Date());
 let state = {
   session: null,
   profile: null,
@@ -40,6 +55,11 @@ let state = {
   profiles: [],
   resetRequests: [],
   unitRegistry: [],
+  assetInventory: [],
+  assetHistory: [],
+  accessHistory: [],
+  ownerAssignments: [],
+  dailyInspections: [],
   matched: [],
   sessionClosed: [],
 };
@@ -87,6 +107,26 @@ function roleLabel(r) {
 function eqLabel(t) {
   return t === 'Recon 2' ? 'Recon II' : t;
 }
+function localDateKey(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + day;
+}
+function dateFromKey(key) {
+  const [y,m,d] = String(key || '').split('-').map(Number);
+  return new Date(y || 1970,(m || 1)-1,d || 1,12,0,0,0);
+}
+function shiftDateKey(key,days) {
+  const d = dateFromKey(key);
+  d.setDate(d.getDate() + Number(days || 0));
+  return localDateKey(d);
+}
+function dateLabel(key) {
+  return new Intl.DateTimeFormat(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'}).format(dateFromKey(key));
+}
+
 function requiredBattery(item) {
   const meta = BATTERY[item?.equipment_type];
   if (!meta) return 0;
@@ -145,6 +185,11 @@ function showAuth() {
     preps: [],
     reports: [],
     profiles: [],
+    resetRequests: [],
+    unitRegistry: [],
+    assetInventory: [],
+    assetHistory: [],
+    accessHistory: [],
     matched: [],
     sessionClosed: [],
   };
@@ -371,7 +416,32 @@ function setupRealtime() {
     )
     .on(
       'postgres_changes',
+      { event: '*', schema: 'public', table: 'job_assignments' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'morning_checks' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
       { event: '*', schema: 'public', table: 'profiles' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'asset_inventory' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'asset_inventory_history' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'team_access_history' },
       scheduleRefreshData
     )
     .on(
@@ -393,6 +463,19 @@ function setupRealtime() {
 }
 async function refreshData() {
   if (!state.session) return;
+  const { data: currentProfile } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
+  if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
+    await db.auth.signOut();
+    return showAuth();
+  }
+  if (currentProfile.role !== state.profile?.role || currentProfile.full_name !== state.profile?.full_name) {
+    state.profile = currentProfile;
+    $('whoName').textContent = currentProfile.full_name || currentProfile.username || 'Technician';
+    $('whoRole').textContent = roleLabel(currentProfile.role);
+    configureTabs();
+  } else {
+    state.profile = currentProfile;
+  }
   const prepQ = await db
     .from('prep_tickets')
     .select('*,prep_items(*)')
@@ -400,22 +483,36 @@ async function refreshData() {
   if (!prepQ.error) state.preps = prepQ.data || [];
   if (state.profile.role === 'owner') {
     const dayStart = new Date(); dayStart.setHours(0,0,0,0);
-    const [rep, prof, resets, returns, inspections, registry] = await Promise.all([
+    const selectedStart = dateFromKey(ownerDailyDate); selectedStart.setHours(0,0,0,0);
+    const selectedEnd = new Date(selectedStart); selectedEnd.setDate(selectedEnd.getDate()+1);
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory] = await Promise.all([
       db.from('reports').select('*').order('created_at', { ascending: true }),
       db.from('profiles').select('*').order('created_at', { ascending: true }),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(50),
       db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
-      db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(500)
+      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
+      db.from('job_assignments').select('*').eq('scheduled_for',ownerDailyDate).order('assigned_at',{ascending:true}),
+      db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(500),
+      db.from('asset_inventory').select('*').order('asset_category',{ascending:true}).order('unit_tag',{ascending:true}),
+      db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(300),
+      db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(100)
     ]);
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
     if (!resets.error) state.resetRequests = resets.data || [];
     if (!returns.error) state.ownerReturns = returns.data || [];
     if (!inspections.error) state.todayInspections = inspections.data || [];
+    if (!selectedInspections.error) state.dailyInspections = selectedInspections.data || [];
+    if (!assignments.error) state.ownerAssignments = assignments.data || [];
     if (!registry.error) state.unitRegistry = registry.data || [];
+    if (!assets.error) state.assetInventory = assets.data || [];
+    if (!assetHistory.error) state.assetHistory = assetHistory.data || [];
+    if (!accessHistory.error) state.accessHistory = accessHistory.data || [];
     renderOwner();
     renderOwnerUnitSearch();
+    renderOwnerEquipment();
+    renderOwnerTechOverview();
     renderOwnerAttention();
     renderPasswordResetRequests();
     renderUsers();
@@ -1060,6 +1157,99 @@ function resetMorningInputs() {
 }
 
 function ownerAgeHours(value) { const time = value ? new Date(value).getTime() : NaN; return Number.isFinite(time) ? Math.max(0,(Date.now()-time)/3600000) : 0; }
+function ownerTechRoleName(profile) {
+  const name = profile?.full_name || profile?.username || 'Technician';
+  return profile?.role === 'it' ? 'IT Tech ' + name : profile?.role === 'service' ? 'Service Tech ' + name : profile?.role === 'owner' ? 'Owner/Admin ' + name : name;
+}
+function ownerActorLabel(report) {
+  const profile=(state.profiles || []).find(p => p.user_id === report?.actor_id);
+  if (profile) return ownerTechRoleName(profile);
+  return report?.actor_name || 'Technician';
+}
+function inspectionSummary(row) {
+  if (!row) return null;
+  const truckValues=Object.values(row.truck_checks || {}).filter(v => typeof v === 'boolean');
+  const trailerValues=Object.values(row.trailer_checks || {}).filter(v => typeof v === 'boolean');
+  const truckFail=truckValues.includes(false);
+  const trailerFail=Boolean(row.taking_trailer) && trailerValues.includes(false);
+  return {
+    failed: truckFail || trailerFail,
+    truck: truckFail ? 'FAILED' : 'PASS',
+    trailer: !row.taking_trailer ? 'Not taking trailer' : trailerFail ? 'FAILED' : 'PASS',
+  };
+}
+function ownerAssignmentStatusLabel(a) {
+  return a.status === 'completed' ? 'DONE' : a.status === 'started' ? 'IN PROCESS' : a.status === 'cancelled' ? 'CANCELLED' : a.assignee_user_id ? 'ASSIGNED' : 'DEPARTMENT QUEUE';
+}
+async function setOwnerDailyDate(value) {
+  const next=String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
+  ownerDailyDate=next;
+  await refreshData();
+}
+async function moveOwnerDailyDate(days) { return setOwnerDailyDate(shiftDateKey(ownerDailyDate,days)); }
+async function ownerDailyToday() { return setOwnerDailyDate(localDateKey(new Date())); }
+function renderOwnerTechOverview() {
+  if (state.profile?.role !== 'owner') return;
+  const host=$('ownerTechOverview');
+  if (!host) return;
+  const today=localDateKey(new Date());
+  const isToday=ownerDailyDate===today;
+  const isPast=ownerDailyDate<today;
+  const techs=(state.profiles || [])
+    .filter(p => p.active && !p.archived_at && (p.role==='it' || p.role==='service'))
+    .sort((a,b) => (a.role===b.role ? String(a.full_name || a.username).localeCompare(String(b.full_name || b.username)) : a.role==='service' ? -1 : 1));
+  const assignments=(state.ownerAssignments || []).filter(a => a.status !== 'cancelled');
+  const inspectionMap=new Map();
+  (state.dailyInspections || []).forEach(row => { if (!inspectionMap.has(row.service_tech_id)) inspectionMap.set(row.service_tech_id,row); });
+  const missingService=techs.filter(t => t.role==='service' && !inspectionMap.has(t.user_id));
+  const queue=assignments.filter(a => !a.assignee_user_id && a.status==='assigned');
+  const badge=$('ownerTechOverviewBadge');
+  if (badge) {
+    badge.textContent=isToday && missingService.length ? missingService.length + ' DUE' : String(techs.length);
+    badge.classList.toggle('alert',isToday && missingService.length>0);
+    badge.classList.toggle('neutral',!(isToday && missingService.length>0));
+  }
+  const techCards=techs.map(tech => {
+    const name=ownerTechRoleName(tech);
+    const jobs=assignments.filter(a => a.assignee_user_id===tech.user_id);
+    const assets=(state.assetInventory || []).filter(a => a.assigned_to===tech.user_id && a.availability_status==='assigned');
+    const inspection=tech.role==='service' ? inspectionMap.get(tech.user_id) : null;
+    const ins=inspectionSummary(inspection);
+    let dailyStatus='';
+    if (tech.role==='service') {
+      if (ins) {
+        dailyStatus=`<div class='ownerDailyCheck ${ins.failed ? 'fail' : 'pass'}'><b>Daily Truck / Trailer Check · ${ins.failed ? 'NEEDS REVIEW' : 'SUBMITTED'}</b><span>Truck: ${esc(ins.truck)} · Trailer: ${esc(ins.trailer)} · ${new Date(inspection.submitted_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div>`;
+      } else {
+        const label=isToday ? 'DUE TODAY' : isPast ? 'NOT SUBMITTED' : 'UPCOMING';
+        dailyStatus=`<div class='ownerDailyCheck ${isToday || isPast ? 'missing' : ''}'><b>Daily Truck / Trailer Check · ${label}</b><span>${isToday ? 'Waiting for this Service Tech to submit the daily inspection.' : isPast ? 'No submitted inspection was found for this date.' : 'Daily inspection will be due on the selected work date.'}</span></div>`;
+      }
+    } else {
+      dailyStatus=`<div class='ownerDailyCheck info'><b>IT Technician</b><span>Track assigned Tech Check jobs and equipment below.</span></div>`;
+    }
+    const jobHtml=jobs.length ? jobs.map(a => `<div class='ownerDailyJob'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><span>${esc(a.site || 'No customer / site')} · ${esc(a.job_description || 'No job description')}</span>${a.requested_unit_count != null ? `<span>${Number(a.requested_unit_count)} unit${Number(a.requested_unit_count)===1?'':'s'} required</span>` : ''}</div><span class='pill ${a.status==='completed'?'green':a.status==='started'?'amber':''}'>${ownerAssignmentStatusLabel(a)}</span></div>`).join('') : `<div class='small ownerDailyEmpty'>No Tech Check tickets assigned to ${esc(name)} for this date.</div>`;
+    const assetHtml=assets.length ? `<div class='ownerDailyAssets'><b>Current Assigned Equipment</b><div>${assets.map(a => `<span>${esc(a.unit_tag)} · ${esc(a.asset_type)}</span>`).join('')}</div></div>` : '';
+    const roleClass=tech.role==='service'?'service':'it';
+    return `<details class='ownerTechDayCard ${roleClass}' open><summary><div><b>${esc(name)}</b><span>${jobs.length} ticket${jobs.length===1?'':'s'} scheduled · ${assets.length} assigned asset${assets.length===1?'':'s'}</span></div><span class='pill roleBadge ${roleClass}'>${tech.role==='service'?'SERVICE':'IT'}</span></summary><div class='ownerTechDayBody'>${dailyStatus}<div class='ownerDailySectionLabel'>Assigned Work</div>${jobHtml}${assetHtml}</div></details>`;
+  }).join('');
+  const queueHtml=queue.length ? `<div class='ownerDepartmentQueue'><b>Unclaimed Department Tasks</b>${queue.map(a => `<div><span><b>${a.assigned_role==='it'?'IT':'SERVICE'} · MHelpDesk #${esc(a.ticket_no)}</b><small>${esc(a.site || '')} · ${esc(a.job_description || '')}</small></span><span class='pill amber'>WAITING TO CLAIM</span></div>`).join('')}</div>` : '';
+  host.innerHTML=`
+    <div class='ownerDailyToolbar'>
+      <button class='mini' onclick="moveOwnerDailyDate(-1)">← Previous</button>
+      <div class='ownerDailyDateCenter'><b>${esc(dateLabel(ownerDailyDate))}</b><input type='date' value='${esc(ownerDailyDate)}' onchange="setOwnerDailyDate(this.value)"></div>
+      <button class='mini' onclick="moveOwnerDailyDate(1)">Next →</button>
+      <button class='mini ownerTodayButton' onclick="ownerDailyToday()">Today</button>
+    </div>
+    <div class='ownerDailySummary'>
+      <span><b>${techs.length}</b> active techs</span>
+      <span><b>${assignments.length}</b> scheduled tickets</span>
+      <span><b>${queue.length}</b> unclaimed</span>
+      <span><b>${missingService.length}</b> Service checks ${isToday ? 'due' : 'missing'}</span>
+    </div>
+    ${queueHtml}
+    <div class='ownerTechDayGrid'>${techCards || '<div class="warn">No active IT or Service technicians.</div>'}</div>`;
+}
+
 function ownerJump(target) {
   const el = target === 'returns'
     ? document.getElementById('ownerIntakeTracking')
@@ -1067,7 +1257,9 @@ function ownerJump(target) {
       ? document.getElementById('ownerAccountsCard')
       : target === 'activity'
         ? document.getElementById('ownerActivityCard')
-        : document.getElementById('ownerHandoffsCard');
+        : target === 'daily'
+          ? document.getElementById('ownerTechOverviewCard')
+          : document.getElementById('ownerHandoffsCard');
   if (!el) return;
   if (el.tagName === 'DETAILS') el.open = true;
   el.scrollIntoView({behavior:'smooth',block:'start'});
@@ -1112,7 +1304,7 @@ function renderOwnerAttention() {
   if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
   const row = (kind,title,detail,target,urgent=false) => `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini' onclick="ownerJump('${target}')">Open →</button></div>`;
-  const nextOwner = manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('activity')">Open Activity →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
+  const nextOwner = manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
   const parts = [];
   if (manager.length) parts.push(row('manager',`${manager.length} return${manager.length===1?'':'s'} need your MHelpDesk inventory confirmation`,manager.map(r => `Unit ${r.unit_tag} · #${r.ticket_no}${ownerAgeHours(r.it_received_at || r.updated_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',true));
   if (resetPending.length) parts.push(row('reset',`${resetPending.length} password reset request${resetPending.length===1?'':'s'} waiting for approval`,resetPending.map(r => r.username).join(' · '),'accounts',true));
@@ -1122,8 +1314,8 @@ function renderOwnerAttention() {
   if (released.length) parts.push(row('service',`${released.length} prepared ticket${released.length===1?'':'s'} waiting for Service checkout`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
   host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
 }
-function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
-function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
+function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
+function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'assigned_to_tech' ? 'delivery' : status === 'maintenance' || status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'retired' ? 'neutral' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
 function renderOwnerUnitSearch() {
   if (state.profile?.role !== 'owner') return;
   const unitBadge = $('ownerUnitStatusBadge');
@@ -1136,6 +1328,117 @@ function renderOwnerUnitSearch() {
   const title = q ? `${rows.length} matching unit${rows.length===1?'':'s'}` : 'Recently Updated Units';
   host.innerHTML = `<div class='small top8'><b>${esc(title)}</b></div>${rows.length ? rows.map(r => `<div class='unitStatusRow'><div><b>Unit ${esc(r.unit_tag)}</b><div class='small'>${esc(r.equipment_type || 'Equipment type not recorded')} · MHelpDesk ${r.ticket_no ? '#' + esc(r.ticket_no) : 'not linked'}</div><div class='small'>${esc(r.last_event || 'Status updated')}${r.current_holder_name ? ` · Last tech: ${esc(r.current_holder_name)}` : ''}</div><div class='small'>Updated ${new Date(r.updated_at).toLocaleString()}</div></div><span class='pill ${unitLifecycleClass(r.lifecycle_status)}'>${esc(unitLifecycleLabel(r.lifecycle_status))}</span></div>`).join('') : `<div class='${q ? 'warn' : 'ok'} top8'><b>${q ? 'No unit matched that search.' : 'No units have entered the lifecycle yet.'}</b><div class='small'>Unit status is created automatically as IT starts preparing equipment.</div></div>`}`;
 }
+
+function inventoryStatusLabel(status) {
+  return ({shop:'SHOP / SHELF',assigned:'ASSIGNED',maintenance:'MAINTENANCE',retired:'RETIRED'})[status] || String(status || '').toUpperCase();
+}
+function inventoryStatusClass(status) {
+  return status === 'shop' ? 'green' : status === 'assigned' ? 'delivery' : status === 'maintenance' ? 'amber' : 'neutral';
+}
+function inventoryTypeOptions(selected='') {
+  return INVENTORY_TYPES.map(type => '<option value="' + esc(type) + '" ' + (type===selected?'selected':'') + '>' + esc(type) + '</option>').join('');
+}
+function inventoryTechOptions(selected='') {
+  const techs=(state.profiles || []).filter(p => p.active && !p.archived_at && (p.role==='it' || p.role==='service'));
+  return '<option value="">Choose technician…</option>' + techs.map(p => '<option value="' + p.user_id + '" ' + (p.user_id===selected?'selected':'') + '>' + esc(roleLabel(p.role).replace('Technician','Tech')) + ' · ' + esc(p.full_name || p.username || 'Technician') + '</option>').join('');
+}
+function inventoryHistoryHtml(unitKey) {
+  const rows=(state.assetHistory || []).filter(h => h.unit_key===unitKey).slice(0,8);
+  if (!rows.length) return '<div class="small">No inventory history yet.</div>';
+  return rows.map(h => '<div class="inventoryHistoryRow"><b>' + esc(String(h.action || '').replaceAll('_',' ').toUpperCase()) + '</b><span>' + esc(h.actor_name || 'Owner/Admin') + ' · ' + new Date(h.created_at).toLocaleString() + '</span>' + (h.to_user_name ? '<span>To: ' + esc(h.to_user_name) + '</span>' : '') + (h.notes ? '<span>' + esc(h.notes) + '</span>' : '') + '</div>').join('');
+}
+function renderOwnerEquipment() {
+  if (state.profile?.role !== 'owner') return;
+  const host=$('ownerEquipmentManager');
+  if (!host) return;
+  const rows=state.assetInventory || [];
+  const active=rows.filter(r => r.availability_status!=='retired');
+  const assigned=rows.filter(r => r.availability_status==='assigned');
+  const shop=rows.filter(r => r.availability_status==='shop');
+  const badge=$('ownerEquipmentBadge');
+  if (badge) {
+    badge.textContent=String(active.length);
+    badge.classList.toggle('alert',assigned.length>0);
+    badge.classList.toggle('neutral',assigned.length===0);
+  }
+  const filtered=rows.filter(r => {
+    if (ownerEquipmentFilter==='all') return r.availability_status!=='retired';
+    if (ownerEquipmentFilter==='device' || ownerEquipmentFilter==='stand') return r.asset_category===ownerEquipmentFilter && r.availability_status!=='retired';
+    return r.availability_status===ownerEquipmentFilter;
+  });
+
+  host.innerHTML =
+    '<div class="ownerEquipmentIntro"><b>Master Equipment Inventory</b><div class="small">Add permanent unit / asset tags here, then assign devices or stands to an IT Tech or Service Tech. MHelpDesk tickets can close; the equipment record stays.</div></div>' +
+    '<div class="ownerEquipmentAdd"><div><label>Unit / Asset Tag</label><input id="inventoryTag" placeholder="Example: 058 or Stand-12"></div><div><label>Type</label><select id="inventoryType">' + inventoryTypeOptions() + '</select></div><div><label>Category</label><select id="inventoryCategory"><option value="device">Device</option><option value="stand">Stand</option></select></div><div><label>Notes</label><input id="inventoryNotes" placeholder="Optional shelf / condition note"></div><button class="btn" id="inventoryAddButton" type="button">Add to Inventory</button></div>' +
+    '<div class="ownerEquipmentStats"><span><b>' + shop.length + '</b> Shop</span><span><b>' + assigned.length + '</b> Assigned</span><span><b>' + rows.filter(r=>r.availability_status==='maintenance').length + '</b> Maintenance</span><span><b>' + rows.filter(r=>r.asset_category==='stand' && r.availability_status!=='retired').length + '</b> Stands</span></div>' +
+    '<div class="ownerEquipmentFilters"><button data-equipment-filter="all" class="' + (ownerEquipmentFilter==='all'?'on':'') + '">Active</button><button data-equipment-filter="device" class="' + (ownerEquipmentFilter==='device'?'on':'') + '">Devices</button><button data-equipment-filter="stand" class="' + (ownerEquipmentFilter==='stand'?'on':'') + '">Stands</button><button data-equipment-filter="assigned" class="' + (ownerEquipmentFilter==='assigned'?'on':'') + '">Assigned</button><button data-equipment-filter="maintenance" class="' + (ownerEquipmentFilter==='maintenance'?'on':'') + '">Maintenance</button><button data-equipment-filter="retired" class="' + (ownerEquipmentFilter==='retired'?'on':'') + '">Retired</button></div>' +
+    '<div class="ownerEquipmentList">' + (filtered.length ? filtered.map((r,i) => {
+      const role = state.profiles.find(p => p.user_id===r.assigned_to)?.role;
+      const holder = r.assigned_to_name ? (role==='it'?'IT Tech ':role==='service'?'Service Tech ':'') + r.assigned_to_name : '';
+      const assignmentControls = r.availability_status==='shop'
+        ? '<div class="equipmentAssignRow"><select data-asset-tech="' + i + '">' + inventoryTechOptions() + '</select><button class="mini" data-asset-assign="' + i + '">Assign to Tech</button></div>'
+        : r.availability_status==='assigned'
+          ? '<div class="equipmentActionRow"><button class="mini" data-asset-shop="' + i + '">Return to Shop</button><button class="mini" data-asset-maintenance="' + i + '">Maintenance</button></div>'
+          : r.availability_status==='maintenance'
+            ? '<div class="equipmentActionRow"><button class="mini" data-asset-shop="' + i + '">Return to Shop</button><button class="mini danger" data-asset-retire="' + i + '">Retire</button></div>'
+            : '<div class="equipmentActionRow"><button class="mini" data-asset-shop="' + i + '">Restore to Shop</button></div>';
+      return '<details class="equipmentAssetCard ' + esc(r.asset_category) + '"><summary><div><b>' + esc(r.unit_tag) + '</b><span>' + esc(r.asset_type) + ' · ' + esc(r.asset_category.toUpperCase()) + '</span></div><span class="pill ' + inventoryStatusClass(r.availability_status) + '">' + esc(inventoryStatusLabel(r.availability_status)) + '</span></summary><div class="equipmentAssetBody">' + (holder ? '<div class="equipmentHolder"><b>Assigned to:</b> ' + esc(holder) + '</div>' : '') + (r.last_event ? '<div class="small"><b>Last event:</b> ' + esc(r.last_event) + '</div>' : '') + (r.notes ? '<div class="small"><b>Notes:</b> ' + esc(r.notes) + '</div>' : '') + assignmentControls + '<details class="equipmentHistoryFold"><summary>Inventory History</summary><div>' + inventoryHistoryHtml(r.unit_key) + '</div></details></div></details>';
+    }).join('') : '<div class="ok"><b>No equipment in this view.</b><div class="small">Add your devices and stands above.</div></div>') + '</div>';
+
+  $('inventoryAddButton')?.addEventListener('click', addInventoryAsset);
+  host.querySelectorAll('[data-equipment-filter]').forEach(btn => btn.addEventListener('click', () => { ownerEquipmentFilter=btn.dataset.equipmentFilter; renderOwnerEquipment(); }));
+  host.querySelectorAll('[data-asset-assign]').forEach(btn => btn.addEventListener('click', () => {
+    const row=filtered[Number(btn.dataset.assetAssign)];
+    const select=host.querySelector('[data-asset-tech="' + btn.dataset.assetAssign + '"]');
+    if (row) assignInventoryAsset(row.unit_key, select?.value || '');
+  }));
+  host.querySelectorAll('[data-asset-shop]').forEach(btn => btn.addEventListener('click', () => {
+    const row=filtered[Number(btn.dataset.assetShop)]; if (row) setInventoryAssetStatus(row.unit_key,'shop');
+  }));
+  host.querySelectorAll('[data-asset-maintenance]').forEach(btn => btn.addEventListener('click', () => {
+    const row=filtered[Number(btn.dataset.assetMaintenance)]; if (row) setInventoryAssetStatus(row.unit_key,'maintenance');
+  }));
+  host.querySelectorAll('[data-asset-retire]').forEach(btn => btn.addEventListener('click', () => {
+    const row=filtered[Number(btn.dataset.assetRetire)]; if (row) setInventoryAssetStatus(row.unit_key,'retired');
+  }));
+}
+async function addInventoryAsset() {
+  const tag=$('inventoryTag')?.value.trim() || '';
+  const type=$('inventoryType')?.value || '';
+  const category=$('inventoryCategory')?.value || 'device';
+  const notes=$('inventoryNotes')?.value.trim() || '';
+  if (!tag || !type) return alert('Enter the unit / asset tag and equipment type.');
+  setBusy(true);
+  const { error }=await db.rpc('owner_add_inventory_asset',{ p_unit_tag:tag,p_asset_type:type,p_asset_category:category,p_notes:notes });
+  setBusy(false);
+  if (error) return alert(error.message);
+  await refreshData();
+}
+async function assignInventoryAsset(unitKey,userId) {
+  if (!userId) return alert('Choose the technician who should receive this equipment.');
+  const asset=(state.assetInventory || []).find(r=>r.unit_key===unitKey);
+  const tech=(state.profiles || []).find(p=>p.user_id===userId);
+  if (!asset || !tech) return alert('Equipment or technician could not be found.');
+  if (!confirm('Assign ' + asset.unit_tag + ' (' + asset.asset_type + ') to ' + (tech.role==='it'?'IT Tech ':'Service Tech ') + (tech.full_name || tech.username) + '?')) return;
+  setBusy(true);
+  const { error }=await db.rpc('owner_assign_inventory_asset',{ p_unit_key:unitKey,p_user_id:userId });
+  setBusy(false);
+  if (error) return alert(error.message);
+  await refreshData();
+}
+async function setInventoryAssetStatus(unitKey,status) {
+  const asset=(state.assetInventory || []).find(r=>r.unit_key===unitKey);
+  if (!asset) return;
+  const verb=status==='shop'?'return to Shop / Shelf Inventory':status==='maintenance'?'move to Maintenance':'retire from active inventory';
+  if (!confirm('Do you want to ' + verb + ': ' + asset.unit_tag + '?')) return;
+  const notes=status==='maintenance' ? (prompt('Maintenance note (optional):','') || '') : '';
+  setBusy(true);
+  const { error }=await db.rpc('owner_set_inventory_asset_status',{ p_unit_key:unitKey,p_status:status,p_notes:notes });
+  setBusy(false);
+  if (error) return alert(error.message);
+  await refreshData();
+}
+
 const OWNER_TICKET_PARTS = [
   { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
   { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
@@ -1199,7 +1502,7 @@ function renderOwner() {
   $('ownerPrepHistoryCount').textContent = String(completedPreps.length);
   $('ownerPrepHistory').innerHTML = completedPreps.length ? completedPreps.map(prepHtml).join('') : '<div class="small">No completed equipment history yet.</div>';
   const recentReports = state.reports.slice().reverse().slice(0, ownerReportLimit);
-  $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(r.kind) + '</b><span class="small ownerFoldHint">' + esc(r.actor_name || 'Technician') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(r.text) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
+  $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(r.kind) + '</b><span class="small ownerFoldHint">' + esc(ownerActorLabel(r)) + (r.ticket_no ? ' · MHelpDesk #' + esc(r.ticket_no) : '') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(r.text) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
   const more = $('ownerReportsMore'); if (more) { more.classList.toggle('hidden', ownerReportLimit >= state.reports.length); more.textContent = 'Show More Activity (' + Math.max(0, state.reports.length - ownerReportLimit) + ' older)'; more.onclick = () => { ownerReportLimit += 25; renderOwner(); }; }
   ensureStartFreshCard();
 }
@@ -1231,7 +1534,7 @@ async function createTech() {
   $('newTechPassword').value = '';
   msg(
     'userMessage',
-    'Technician login created for username ' + username + '. The temporary password must be changed privately at first sign in.',
+    'Team member login created for username ' + username + '. The temporary password must be changed privately at first sign in.',
     'ok'
   );
   await refreshData();
@@ -1249,56 +1552,76 @@ async function ownerReviewPasswordReset(id, approve) {
   await refreshData();
   alert(approve ? 'Reset approved. The technician can now retrieve a one-time temporary password from the requesting device.' : 'Reset request closed.');
 }
+function teamRoleClass(role) {
+  return role === 'owner' ? 'owner' : role === 'it' ? 'it' : role === 'service' ? 'service' : 'pending';
+}
+function teamMemberCard(p) {
+  const self = p.user_id === state.profile?.user_id;
+  const status = p.active ? 'ACTIVE' : 'DISABLED';
+  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody"><div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div><div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div><div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div><div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Access</button></div></div><details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>' + (self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>') + '</div></details>';
+}
+function archivedTeamCard(p) {
+  return '<div class="archivedTeamCard"><div><b>' + esc(p.full_name || p.username || 'Team Member') + '</b><div class="small">@' + esc(p.username || 'no-username') + ' · ' + esc(roleLabel(p.role)) + '</div><div class="small">Deleted from Techs on File ' + (p.archived_at ? new Date(p.archived_at).toLocaleString() : '') + (p.archived_reason ? ' · ' + esc(p.archived_reason) : '') + '</div></div><button class="mini" onclick="restoreUser(\'' + p.user_id + '\')">Restore</button></div>';
+}
+function renderTeamAccessHistory() {
+  const host=$('teamAccessHistory');
+  if (!host) return;
+  const rows=(state.accessHistory || []).slice(0,50);
+  host.innerHTML=rows.length ? rows.map(h => '<div class="teamHistoryRow"><div><b>' + esc(h.user_name) + '</b><span>' + esc(String(h.action || '').replaceAll('_',' ').toUpperCase()) + '</span></div><div class="small">' + esc(h.actor_name || 'Owner/Admin') + ' · ' + new Date(h.created_at).toLocaleString() + '</div>' + (h.detail ? '<div class="small">' + esc(h.detail) + '</div>' : '') + '</div>').join('') : '<div class="small">No access changes logged yet.</div>';
+}
 function renderUsers() {
   if (state.profile?.role !== 'owner') return;
-  const activeTechCount = state.profiles.filter(p => p.active && (p.role === 'it' || p.role === 'service')).length;
-  const resetCount = (state.resetRequests || []).filter(r => r.status === 'pending' && new Date(r.expires_at).getTime() > Date.now()).length;
-  const accountsBadge = $('ownerAccountsBadge');
+  const activeTeam=state.profiles.filter(p => !p.archived_at && p.active);
+  const inactiveTeam=state.profiles.filter(p => !p.archived_at && !p.active);
+  const archived=state.profiles.filter(p => p.archived_at);
+  const activeTechCount=activeTeam.filter(p => p.role==='it' || p.role==='service').length;
+  const ownerCount=activeTeam.filter(p => p.role==='owner').length;
+  const resetCount=(state.resetRequests || []).filter(r => r.status==='pending' && new Date(r.expires_at).getTime()>Date.now()).length;
+  const accountsBadge=$('ownerAccountsBadge');
   if (accountsBadge) {
-    accountsBadge.textContent = resetCount ? `${resetCount} RESET${resetCount === 1 ? '' : 'S'}` : `${activeTechCount} TECH${activeTechCount === 1 ? '' : 'S'}`;
-    accountsBadge.classList.toggle('alert', resetCount > 0);
-    accountsBadge.classList.toggle('neutral', resetCount === 0);
+    accountsBadge.textContent=resetCount ? resetCount + ' RESET' + (resetCount===1?'':'S') : (activeTechCount + ownerCount) + ' TEAM';
+    accountsBadge.classList.toggle('alert',resetCount>0);
+    accountsBadge.classList.toggle('neutral',resetCount===0);
   }
-  $('userList').innerHTML = state.profiles.length
-    ? state.profiles
-        .map(
-          p =>
-            '<div class="usercard"><div><b>' +
-            esc(p.full_name || p.username || 'User') +
-            '</b><div class="small">Username: ' +
-            esc(p.username || 'Not set') +
-            '</div><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div></div><div class="usergrid top8"><div><label>Role</label><select id="role_' +
-            p.user_id +
-            '"><option value="service" ' +
-            (p.role === 'service' ? 'selected' : '') +
-            '>Service Tech</option><option value="it" ' +
-            (p.role === 'it' ? 'selected' : '') +
-            '>IT Technician</option><option value="owner" ' +
-            (p.role === 'owner' ? 'selected' : '') +
-            '>Owner/Admin</option><option value="pending" ' +
-            (p.role === 'pending' ? 'selected' : '') +
-            '>Pending</option></select></div><div><label>Active</label><select id="active_' +
-            p.user_id +
-            '"><option value="true" ' +
-            (p.active ? 'selected' : '') +
-            '>Active</option><option value="false" ' +
-            (!p.active ? 'selected' : '') +
-            '>Disabled</option></select></div><div><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' +
-            p.user_id +
-            '\')">Save Access</button></div></div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' +
-            p.user_id +
-            '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' +
-            p.user_id +
-            '\')">Set Temporary Password</button></div></div><div class="small top8">After an Owner reset, the technician must create a new private password at the next sign in.</div></div>'
-        )
-        .join('')
-    : '<div class="warn">No users yet.</div>';
+  const stats=$('ownerTeamStats');
+  if (stats) stats.innerHTML='<span><b>' + activeTechCount + '</b> Active Techs</span><span><b>' + ownerCount + '</b> Owners/Admins</span><span><b>' + inactiveTeam.length + '</b> Inactive</span>';
+  if ($('activeTeamCount')) $('activeTeamCount').textContent=String(activeTeam.length);
+  if ($('inactiveTeamCount')) $('inactiveTeamCount').textContent=String(inactiveTeam.length);
+  if ($('archivedTeamCount')) $('archivedTeamCount').textContent=String(archived.length);
+  $('userList').innerHTML=activeTeam.length ? activeTeam.map(teamMemberCard).join('') : '<div class="warn">No active team members.</div>';
+  const inactiveHost=$('inactiveUserList');
+  if (inactiveHost) inactiveHost.innerHTML=inactiveTeam.length ? inactiveTeam.map(teamMemberCard).join('') : '<div class="ok"><b>✓ No inactive team members.</b></div>';
+  const archivedHost=$('archivedUserList');
+  if (archivedHost) archivedHost.innerHTML=archived.length ? archived.map(archivedTeamCard).join('') : '<div class="ok"><b>✓ No deleted / former team members.</b></div>';
+  renderTeamAccessHistory();
+}
+async function archiveUser(id) {
+  const p=state.profiles.find(row=>row.user_id===id);
+  if (!p) return;
+  if (!confirm('Delete ' + (p.full_name || p.username) + ' from Techs on File?\n\nThey will disappear from Active and Inactive Team lists and will not be able to sign in. Their historical tickets, checks, photos, handoffs, and reports will still keep their name.')) return;
+  const reason=prompt('Delete / former team note (optional):','') || '';
+  setBusy(true);
+  const { data,error }=await db.functions.invoke('admin-user-management',{ body:{ action:'archive',user_id:id,reason } });
+  setBusy(false);
+  if (error || data?.error) return alert(error?.message || data.error);
+  await refreshData();
+}
+async function restoreUser(id) {
+  const p=state.profiles.find(row=>row.user_id===id);
+  if (!p) return;
+  if (!confirm('Restore ' + (p.full_name || p.username) + ' to Active Team? Their existing username and password will work again.')) return;
+  setBusy(true);
+  const { data,error }=await db.functions.invoke('admin-user-management',{ body:{ action:'restore',user_id:id } });
+  setBusy(false);
+  if (error || data?.error) return alert(error?.message || data.error);
+  await refreshData();
 }
 async function saveUserAccess(id) {
   const role = $('role_' + id).value,
-    active = $('active_' + id).value === 'true';
+    active = $('active_' + id).value === 'true',
+    fullName = $('name_' + id)?.value.trim() || '';
   const { data, error } = await db.functions.invoke('admin-user-management', {
-    body: { action: 'set_access', user_id: id, role, active },
+    body: { action: 'set_access', user_id: id, role, active, full_name: fullName },
   });
   if (error || data?.error) return alert(error?.message || data.error);
   await refreshData();
@@ -1383,11 +1706,21 @@ Object.assign(window, {
   submitMorning,
   createTech,
   saveUserAccess,
+  archiveUser,
+  restoreUser,
   resetUserPassword,
   ownerReviewPasswordReset,
   ownerJump,
   ownerOpenReturn,
+  setOwnerDailyDate,
+  moveOwnerDailyDate,
+  ownerDailyToday,
+  renderOwnerTechOverview,
   renderOwnerUnitSearch,
+  renderOwnerEquipment,
+  addInventoryAsset,
+  assignInventoryAsset,
+  setInventoryAssetStatus,
   saveOwnerPrepParts,
   startFresh,
 });
