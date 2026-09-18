@@ -1599,9 +1599,10 @@ function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPre
 function svcForms(card) { return [...card.querySelectorAll('.unitConfirm')]; }
 
 async function serviceSolarContextData(prepId) {
-  const { data, error } = await liveDb.rpc('service_solar_context', { p_prep_id: prepId });
-  if (error) { console.warn('Could not load Service Solar / Helios context', error); return { need_solar:false, need_stand:false, has_helios:false, assignment_id:null }; }
-  return Array.isArray(data) ? (data[0] || { need_solar:false, need_stand:false, has_helios:false, assignment_id:null }) : (data || { need_solar:false, need_stand:false, has_helios:false, assignment_id:null });
+  const { data, error } = await liveDb.rpc('service_solar_context_v2', { p_prep_id: prepId });
+  const empty={ need_solar:false,need_stand:false,has_helios:false,has_ranger:false,solar_spotter_count:0,ranger_count:0,expected_batteries:0,expected_solar_panels:0,assignment_id:null };
+  if (error) { console.warn('Could not load Service Solar / Ranger / Helios context', error); return empty; }
+  return Array.isArray(data) ? (data[0] || empty) : (data || empty);
 }
 async function loadServiceSolarCheck(prepId) {
   const { data, error } = await liveDb.from('service_solar_checks').select('*').eq('prep_ticket_id',prepId).maybeSingle();
@@ -1625,7 +1626,7 @@ function serviceSolarReady(ctx, check, evidence) {
   if (!ctx?.need_solar) return true;
   if (!check?.completed_at) return false;
   if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<1 || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
-  if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
+  if (Number(ctx.expected_batteries || 0)>0 && (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1)) return false;
   if (serviceSolarEvidenceCount(evidence,'mppt','photo')<1) return false;
   if (ctx.has_helios && serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo')<1) return false;
   return true;
@@ -1652,42 +1653,50 @@ function serviceSolarProofPanelHtml(rows, category, title, instruction, requireS
     ${requireSignature ? (sig ? `<div class='wl-saved top8'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || 'Service Tech')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-solar-replace-sign>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign this verification with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-solar-clear>Clear</button><button class='wl-next' data-wl-solar-save-sign>Save Signature</button></div></div>`) : ''}
   </div>`;
 }
+
 function serviceSolarChecklistHtml(ctx, check, evidence) {
-  const expectedPanels=serviceSolarExpectedPanels();
+  const expectedPanels=Number(ctx?.expected_solar_panels || 0);
+  const expectedBatteries=Number(ctx?.expected_batteries || 0);
+  const spotters=Number(ctx?.solar_spotter_count || 0);
+  const rangers=Number(ctx?.ranger_count || 0);
   const standTag=check?.stand_tag || serviceSolarDefaultStandTag();
-  const batteryDefault=check?.battery_count ?? serviceSolarDefaultBatteryCount();
-  const panelDefault=check?.solar_panel_count ?? expectedPanels;
+  const batteryDefault=check?.battery_count ?? (expectedBatteries || '');
+  const panelDefault=check?.solar_panel_count ?? (expectedPanels || '');
   const complete=serviceSolarReady(ctx,check,evidence);
+  const autoBits=[];
+  if (spotters) autoBits.push(`<span><b>${spotters}</b> Solar Spotter${spotters===1?'':'s'} → <b>${spotters}</b> Solar Stand${spotters===1?'':'s'} + <b>${spotters*4}</b> batteries</span>`);
+  if (rangers) autoBits.push(`<span><b>${rangers}</b> Ranger${rangers===1?'':'s'} → <b>${rangers}</b> Solar Panel${rangers===1?'':'s'}</span>`);
   return `<div class='wl-service-solar'>
     <div class='wl-review'>
-      <b>Service Solar / Helios Pre-Trip Verification</b>
-      <div class='small'>Complete this before taking the equipment into the field. The Owner can see who completed the check.</div>
-      ${activeSvcAssignment ? equipmentManifestInlineHtml(activeSvcAssignment) : equipmentManifestInlineHtml(activeSvcPrep)}
+      <b>Service Solar / Ranger / Helios Checkout</b>
+      <div class='small'>This step appears automatically after you finish checking the IT-prepared unit. Complete it before taking the equipment from the shop.</div>
+      ${autoBits.length ? `<div class='wl-auto-service-plan top8'><b>AUTOMATIC SERVICE REQUIREMENTS</b><div class='wl-parts-chips'>${autoBits.join('')}</div></div>` : ''}
     </div>
     <div class='wl-question top10'>
-      ${ctx.need_stand ? `<label>Exact Solar Stand / Solar Pole Tag</label><input id='wlSvcSolarStandTag' value='${esc(standTag)}' placeholder='Enter the exact stand tag / ID'><label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified this is the Solar Stand / Solar Pole assigned to this job.</span></label>` : ''}
-      <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT update / configuration is verified current.</span></label>
-      <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was tested and is working.</span></label>
-      ${ctx.has_helios ? `<label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo update / configuration is verified current.</span></label><label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online / working and verified.</span></label>` : ''}
+      ${ctx.need_stand ? `<div class='wl-auto-required'><b>Solar Stand automatically assigned for checkout</b><div class='small'>Choose the physical stand you are taking and record its exact tag below.</div></div><label>Exact Solar Stand / Solar Pole Tag</label><input id='wlSvcSolarStandTag' value='${esc(standTag)}' placeholder='Enter the exact stand tag / ID'><label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified this is the Solar Stand / Solar Pole I am taking for this job.</span></label>` : ''}
+      <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
+      <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>
+      ${ctx.has_helios ? `<label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo update / configuration is current.</span></label><label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online, communicating, and tested.</span></label>` : ''}
       <div class='grid top10'>
-        <div><label>Solar Panels Physically In Hand${expectedPanels>0 ? ` · expected ${expectedPanels}` : ''}</label><input id='wlSvcSolarPanelCount' type='number' inputmode='numeric' min='0' value='${esc(panelDefault || '')}' placeholder='How many solar panels?'></div>
-        <div><label>Batteries / Battery Boxes Physically In Hand</label><input id='wlSvcSolarBatteryCount' type='number' inputmode='numeric' min='0' value='${esc(batteryDefault || '')}' placeholder='How many batteries?'></div>
+        <div><label>Solar Panels Physically In Hand${expectedPanels>0 ? ` · required ${expectedPanels}` : ' · for charging test'}</label><input id='wlSvcSolarPanelCount' type='number' inputmode='numeric' min='0' value='${esc(panelDefault)}' placeholder='How many solar panels?'></div>
+        ${expectedBatteries>0 ? `<div><label>Batteries / Battery Boxes Physically In Hand · required ${expectedBatteries}</label><input id='wlSvcSolarBatteryCount' type='number' inputmode='numeric' min='0' value='${esc(batteryDefault)}' placeholder='How many batteries?'></div>` : ''}
       </div>
-      <label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the required solar panels.</span></label>
-      <label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I verified the batteries / battery boxes are charged.</span></label>
-      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>With the solar panel connected through the MPPT, I verified the batteries are actively charging.</span></label>
-      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Solar / Helios Checklist</button>
+      <label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the solar panel(s) required for this checkout.</span></label>
+      ${expectedBatteries>0 ? `<label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I physically verified all ${expectedBatteries} required batteries / battery boxes are charged.</span></label>` : ''}
+      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>With the solar panel, battery/battery system, and MPPT connected together, I verified the battery is actively charging.</span></label>
+      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Solar Checkout Checklist</button>
       ${check?.completed_at ? `<div class='ok top8'><b>✓ Checklist verified by ${esc(check.service_tech_name || 'Service Tech')}</b><div class='small'>${new Date(check.completed_at).toLocaleString()}</div></div>` : `<div class='warn top8'>Complete every required verification above, then save the checklist.</div>`}
     </div>
 
-    ${ctx.need_stand ? serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand','Take clear pictures of the exact Solar Stand / Solar Pole being used. The tag / ID and overall condition should be visible.',true) : ''}
-    ${serviceSolarProofPanelHtml(evidence,'batteries','Batteries','Take clear pictures of the batteries / battery boxes you verified are charged.',true)}
-    ${serviceSolarProofPanelHtml(evidence,'mppt','Updated MPPT Working','Take a clear picture showing the updated MPPT powered and working after the charging test.',false)}
+    ${ctx.need_stand ? serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand Tag','Take a clear picture of the exact Solar Stand tag / ID you are taking from the shop.',true) : ''}
+    ${expectedBatteries>0 ? serviceSolarProofPanelHtml(evidence,'batteries','Checkout Batteries','Take clear pictures of the required batteries / battery boxes after you verify they are charged.',true) : ''}
+    ${serviceSolarProofPanelHtml(evidence,'mppt','MPPT / Charging Readings','Upload a picture of the MPPT / charging readings while the solar panel, battery system, and MPPT are connected together and actively charging.',false)}
     ${ctx.has_helios ? serviceSolarProofPanelHtml(evidence,'helios_cerbo_mppt','Helios Cerbo + MPPT','Take pictures showing the Helios Cerbo and MPPT updated, online, and tested.',false) : ''}
 
-    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Solar / Helios pre-trip verification complete':'Solar / Helios verification still needs evidence'}</b><div class='small'>${complete?'Checklist, required photos, and signatures are saved.':'Solar Stand photo + signature, battery photo + signature, MPPT working photo, and Helios Cerbo/MPPT photo when applicable are required.'}</div></div>
+    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Solar checkout complete — equipment may leave the shop':'Solar checkout still needs verification'}</b><div class='small'>${complete?'Checklist, required proof photos, and signatures are saved.':'Complete the automatic stand/battery/panel requirements and upload the required MPPT / charging reading proof.'}</div></div>
   </div>`;
 }
+
 async function saveServiceSolarChecklist() {
   if (!activeSvcPrep?.id) return;
   const ctx=await serviceSolarContextData(activeSvcPrep.id);
@@ -1695,22 +1704,23 @@ async function saveServiceSolarChecklist() {
   const standTag=document.getElementById('wlSvcSolarStandTag')?.value.trim() || '';
   const panelCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarPanelCount')?.value || 0)));
   const batteryCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarBatteryCount')?.value || 0)));
-  const expectedPanels=serviceSolarExpectedPanels();
+  const expectedPanels=Number(ctx.expected_solar_panels || 0);
+  const expectedBatteries=Number(ctx.expected_batteries || 0);
   if (ctx.need_stand && !standTag) return alert('Enter the exact Solar Stand / Solar Pole tag first.');
-  if (ctx.need_stand && !document.getElementById('wlSvcSolarStandVerified')?.checked) return alert('Verify the assigned Solar Stand / Solar Pole.');
+  if (ctx.need_stand && !document.getElementById('wlSvcSolarStandVerified')?.checked) return alert('Verify the Solar Stand / Solar Pole you are taking.');
   if (!document.getElementById('wlSvcMpptUpdated')?.checked) return alert('Verify the MPPT update / configuration.');
   if (!document.getElementById('wlSvcMpptTested')?.checked) return alert('Verify the MPPT was tested and is working.');
   if (ctx.has_helios && !document.getElementById('wlSvcCerboUpdated')?.checked) return alert('Verify the Helios Cerbo update / configuration.');
   if (ctx.has_helios && !document.getElementById('wlSvcCerboOnline')?.checked) return alert('Verify the Helios Cerbo is online and working.');
-  if (panelCount < 1) return alert('Enter how many solar panels you physically have.');
-  if (expectedPanels > 0 && panelCount !== expectedPanels) return alert('This job calls for ' + expectedPanels + ' solar panel' + (expectedPanels===1?'':'s') + '. You entered ' + panelCount + '. Correct the count before continuing.');
-  if (!document.getElementById('wlSvcSolarPanelsVerified')?.checked) return alert('Physically count and verify the solar panels.');
-  if (batteryCount < 1) return alert('Enter how many batteries / battery boxes you physically have.');
-  if (!document.getElementById('wlSvcBatteriesCharged')?.checked) return alert('Verify the batteries are charged.');
-  if (!document.getElementById('wlSvcSolarCharging')?.checked) return alert('Verify the batteries are charging through the solar panel and MPPT.');
+  if (panelCount < 1) return alert('Enter how many solar panels you physically have for the charging test.');
+  if (expectedPanels > 0 && panelCount !== expectedPanels) return alert('This job automatically requires ' + expectedPanels + ' solar panel' + (expectedPanels===1?'':'s') + '. You entered ' + panelCount + '.');
+  if (!document.getElementById('wlSvcSolarPanelsVerified')?.checked) return alert('Physically count and verify the required solar panels.');
+  if (expectedBatteries > 0 && batteryCount !== expectedBatteries) return alert('This job automatically requires ' + expectedBatteries + ' batteries / battery-box items. You entered ' + batteryCount + '.');
+  if (expectedBatteries > 0 && !document.getElementById('wlSvcBatteriesCharged')?.checked) return alert('Verify all required batteries / battery boxes are charged.');
+  if (!document.getElementById('wlSvcSolarCharging')?.checked) return alert('Connect the solar panel, battery system, and MPPT together and verify the battery is actively charging.');
 
   document.body.classList.add('busy');
-  const { error }=await liveDb.rpc('save_my_service_solar_check',{
+  const { error }=await liveDb.rpc('save_my_service_solar_check_v2',{
     p_prep_id:activeSvcPrep.id,
     p_stand_tag:standTag,
     p_stand_verified:Boolean(document.getElementById('wlSvcSolarStandVerified')?.checked),
@@ -1721,7 +1731,7 @@ async function saveServiceSolarChecklist() {
     p_solar_panel_count:panelCount,
     p_solar_panels_verified:Boolean(document.getElementById('wlSvcSolarPanelsVerified')?.checked),
     p_battery_count:batteryCount,
-    p_batteries_charged_ok:Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked),
+    p_batteries_charged_ok:expectedBatteries>0 ? Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked) : true,
     p_solar_charging_ok:Boolean(document.getElementById('wlSvcSolarCharging')?.checked),
   });
   document.body.classList.remove('busy');
