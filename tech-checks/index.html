@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-dashboard-v5" />
+    <link rel="stylesheet" href="./styles.css?v=unit-stand-live-v7" />
   </head>
   <body>
     <div id="app">
@@ -81,7 +81,7 @@
             <div id="syncStatus" class="small">Connected to shared data</div>
           </div>
           <div class="row accountActions">
-            <button class="mini notificationMini" id="notificationSettingsButton" type="button" aria-label="Notifications" title="Notifications">🔔<span id="notificationBadge" class="notificationBadge hidden">0</span></button
+            <button class="mini techMenuMini" id="techMenuButton" type="button" aria-label="Menu" title="Menu">☰ Menu</button
             ><button class="mini" onclick="refreshData()">Refresh</button
             ><button class="mini danger" onclick="logout()">Sign Out</button>
           </div>
@@ -357,8 +357,8 @@
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
-    <script type="module" src="./app.js?v=owner-dashboard-v5"></script>
-    <script type="module" src="./technician-wizard-owner-dashboard-v5.js?v=5"></script>
+    <script type="module" src="./app.js?v=unit-stand-live-v7"></script>
+    <script type="module" src="./technician-wizard-owner-dashboard-v5.js?v=unit-stand-live-v7"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).catch(console.warn));
