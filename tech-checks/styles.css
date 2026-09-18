@@ -2107,3 +2107,11 @@ select {
 .wl-it-flow-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:8px 2px 12px}
 .wl-it-flow-card{flex:0 0:min(92%,560px);scroll-snap-align:start;border:1px solid #cbd8e5;border-radius:12px;padding:14px;background:#fff}
 @media(max-width:768px){.wl-ticket-search-row{grid-template-columns:1fr}.wl-it-flow-card{flex-basis:94%}}
+
+.wl-service-ticket-preview{margin-top:12px;padding:14px;border:1px solid #9fb8cf;border-radius:12px;background:#fff;text-align:left}
+.wl-preview-title{font-size:18px;font-weight:800;margin:4px 0 10px}
+.wl-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wl-preview-grid>div,.wl-preview-section{padding:9px;border:1px solid #dbe4ec;border-radius:8px;background:#f8fafc}
+.wl-preview-grid span,.wl-preview-section>span{display:block;font-size:11px;font-weight:700;color:#66788a;text-transform:uppercase;margin-bottom:3px}
+.wl-preview-confirm{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:10px;border-top:1px solid #dbe4ec}
+@media(max-width:768px){.wl-preview-grid{grid-template-columns:1fr}.wl-preview-confirm{align-items:stretch;flex-direction:column}.wl-preview-confirm button{width:100%}}
