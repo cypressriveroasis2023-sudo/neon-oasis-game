@@ -2490,7 +2490,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>IT + Service Departments</option></select></div>
+        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>Service + IT Departments</option></select></div>
         <div><label>Assign Technician(s)</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small'>Choose one tech, tap +, then add another if needed. Leave blank for the department queue.</div></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
@@ -2548,7 +2548,7 @@ function refreshOwnerAssignmentTechOptions() {
     select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
     select.disabled = false;
     select.innerHTML = ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
-    if (hint) hint.textContent = 'This sends one linked assignment to each department queue. A technician from each department can claim their side.';
+    if (hint) { const wt=document.getElementById('ownerAssignWorkType')?.value || 'service'; hint.textContent = (wt==='pickup'||wt==='swap') ? 'Field return flow: Service handles the pickup / swap first, then the returned units go to IT Intake.' : 'This sends linked work to Service + IT Departments.'; }
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
@@ -2622,7 +2622,7 @@ async function ownerAssignJob() {
 
   document.body.classList.add('busy');
   const targets = role === 'both'
-    ? (assignees.length ? assignees.map(id => { const p=ownerAssignmentProfiles.find(x=>x.user_id===id); return { role:p?.role || 'service', assignee:id }; }) : [{ role:'service', assignee:null }, { role:'it', assignee:null }])
+    ? (assignees.length ? assignees.map(id => { const p=ownerAssignmentProfiles.find(x=>x.user_id===id); return { role:p?.role || 'service', assignee:id }; }) : ((workType==='pickup'||workType==='swap') ? [{ role:'service', assignee:null }, { role:'it', assignee:null }] : [{ role:'it', assignee:null }, { role:'service', assignee:null }]))
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
@@ -2777,7 +2777,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
-  if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); }
+  if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
 
