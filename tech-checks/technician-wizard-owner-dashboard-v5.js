@@ -2381,6 +2381,7 @@ function assignmentNeedsServiceSolar(a, prep) {
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
   const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
   if (a.status === 'completed') return { step:5, label:'DONE', detail: roleLabel + ' task completed' };
+  if (workType === 'pickup' && a.assigned_role === 'it' && a.requires_it_handoff && !prep) return { step:1, label:'WAITING FOR SERVICE CHECK-IN', detail:'Service checks the pickup in first; IT Intake starts after Service returns the unit' };
   if (!a.assignee_user_id && a.assignment_scope === 'department') return { step:1, label:'WAITING FOR ' + roleLabel + ' TECH', detail:'Sent to the ' + (a.assigned_role === 'it' ? 'IT Department' : 'Service Department') + ' queue' };
   if (a.status === 'assigned') return { step:1, label:'SENT', detail:'Waiting for ' + a.assignee_name + ' to start' };
   if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
@@ -2547,7 +2548,7 @@ function refreshOwnerAssignmentTechOptions() {
     select.innerHTML = `<option value=''>Both Department Queues</option>`;
     select.disabled = true;
     const add = document.getElementById('ownerAddTech'); if (add) add.disabled = true;
-    if (hint) hint.textContent = 'This sends one linked assignment to each department queue. A technician from each department can claim their side.';
+    if (hint) { const wt=document.getElementById('ownerAssignWorkType')?.value || 'service'; hint.textContent = wt === 'pickup' ? 'Pickup order: Service checks the equipment back in first → actual units go to IT Intake → IT checks the units into shop inventory.' : 'Delivery / Swap order: IT prepares first → creates the handoff → Service verifies and takes the equipment.'; }
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
@@ -2623,7 +2624,7 @@ async function ownerAssignJob() {
 
   document.body.classList.add('busy');
   const targets = role === 'both'
-    ? [{ role:'it', assignee:null }, { role:'service', assignee:null }]
+    ? (workType === 'pickup' ? [{ role:'service', assignee:null }, { role:'it', assignee:null }] : [{ role:'it', assignee:null }, { role:'service', assignee:null }])
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
@@ -2644,7 +2645,7 @@ async function ownerAssignJob() {
       p_sim_replacement_qty: parts.sim_replacement_qty,
       p_micro_sd_qty: parts.micro_sd_qty,
       p_equipment_manifest: equipmentManifest,
-      p_requires_it_handoff: targetRole === 'service' && rolesToSend.includes('it'),
+      p_requires_it_handoff: workType === 'pickup' ? (targetRole === 'it' && rolesToSend.includes('service')) : (targetRole === 'service' && rolesToSend.includes('it')),
       p_scheduled_for: scheduledFor,
       p_work_type: workType,
     });
@@ -2780,7 +2781,7 @@ document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAddTech') { e.preventDefault(); addOwnerTechPill(); }
   if (e.target?.matches?.('[data-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); }
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
-  if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); }
+  if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); const role=document.getElementById('ownerAssignRole')?.value; if(role==='both') refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
 
