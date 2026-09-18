@@ -1651,12 +1651,13 @@ async function installOwnerAssignments(force = false) {
   let host = document.getElementById('ownerJobAssignments');
   if (host && host.dataset.loaded === '1' && !force) return;
   if (!host) {
-    host = document.createElement('div');
+    host = document.createElement('details');
     host.id = 'ownerJobAssignments';
-    host.className = 'card ownerDispatchCard';
+    host.className = 'card ownerDashSection ownerDispatchCard';
     const view = document.getElementById('view-owner');
     view?.prepend(host);
   }
+  const wasOpen = host.open;
   host.dataset.loaded = '1';
 
   const [{ data: profiles }, { data: assignments }] = await Promise.all([
@@ -1687,45 +1688,45 @@ async function installOwnerAssignments(force = false) {
     </div>`).join('');
 
   host.innerHTML = `
-    <div class='sectiontitle'>
-      <div>
-        <h2>Send Job to Tech</h2>
-        <div class='small'>Create an internal Tech Check assignment using information you manually copy from MHelpDesk.</div>
+    <summary class='ownerDashSummary'>
+      <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
+      <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
+    </summary>
+    <div class='ownerDashBody'>
+      <div class='warn manualReferenceNotice'>
+        <b>MHelpDesk is separate from Tech Check.</b>
+        <div class='small'>Nothing is synced or pulled from MHelpDesk. Enter the reference number, unit/equipment, customer/site, and job description here so your technician sees the same information.</div>
       </div>
-      <span class='pill'>OWNER</span>
-    </div>
-    <div class='warn top8 manualReferenceNotice'>
-      <b>MHelpDesk is separate from Tech Check.</b>
-      <div class='small'>Nothing is synced or pulled from MHelpDesk. Enter the reference number, unit/equipment, customer/site, and job description here so your technician sees the same information.</div>
-    </div>
-    <div class='grid top10'>
-      <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
-      <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
-    </div>
-    <div class='grid top10'>
-      <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
-      <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
-    </div>
-    <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
-      <div class='qtext'>Parts Required for IT</div>
-      <div class='small'>Optional. Enter the quantities shown on the MHelpDesk ticket.</div>
-      ${ticketPartsInputsHtml('ownerPart')}
-    </div>
-    <div class='grid top10'>
-      <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
-      <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
-    </div>
-    <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
-    <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
-    <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Job to Technician</button>
+      <div class='grid top10'>
+        <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
+        <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
+      </div>
+      <div class='grid top10'>
+        <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
+        <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
+      </div>
+      <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
+        <div class='qtext'>Parts Required for IT</div>
+        <div class='small'>Optional. Enter the quantities shown on the MHelpDesk ticket.</div>
+        ${ticketPartsInputsHtml('ownerPart')}
+      </div>
+      <div class='grid top10'>
+        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
+        <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+      </div>
+      <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
+      <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
+      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Job to Technician</button>
 
-    <div class='ownerDispatchSummary'>
-      <span><b>${active.length}</b> active</span>
-      <span><b>${itCount}</b> IT</span>
-      <span><b>${svcCount}</b> Service</span>
-    </div>
-    <div class='ownerActiveLabel'>Active Tech Check Assignments</div>
-    <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>`;
+      <div class='ownerDispatchSummary'>
+        <span><b>${active.length}</b> active</span>
+        <span><b>${itCount}</b> IT</span>
+        <span><b>${svcCount}</b> Service</span>
+      </div>
+      <div class='ownerActiveLabel'>Active Tech Check Assignments</div>
+      <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>
+    </div>`;
+  host.open = wasOpen;
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
@@ -1806,7 +1807,15 @@ async function installOwnerIntake(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerIntakeTracking');
   if (host && host.dataset.loaded === '1' && !force) return;
-  if (!host) { host = document.createElement('div'); host.id = 'ownerIntakeTracking'; host.className = 'card'; const view = document.getElementById('view-owner'); const attention = document.getElementById('ownerAttentionCard'); if (attention) attention.after(host); else if (view) view.prepend(host); }
+  if (!host) {
+    host = document.createElement('details');
+    host.id = 'ownerIntakeTracking';
+    host.className = 'card ownerDashSection ownerIntakeSection';
+    const view = document.getElementById('view-owner');
+    const attention = document.getElementById('ownerAttentionCard');
+    if (attention) attention.after(host); else if (view) view.prepend(host);
+  }
+  const wasOpen = host.open;
   host.dataset.loaded = '1';
   const currentSearch = document.getElementById('ownerReturnSearch')?.value || '';
   const rows = await returnRows();
@@ -1830,9 +1839,23 @@ async function installOwnerIntake(force = false) {
     const searchText = `${r.unit_tag || ''} ${r.equipment_type || ''} ${r.ticket_no || ''} ${r.service_tech_name || ''} ${r.it_tech_name || ''}`;
     return `<details class='ownerFold' data-owner-return='${r.id}' data-owner-search='${esc(searchText)}'><summary><span><b>Unit ${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span>${process}</span><span class='pill ${r.status === 'completed' ? 'delivery' : r.status === 'pending_mhelp_inventory' ? 'amber' : 'swap'}'>${status}</span></summary><div class='ownerFoldBody'>${managerAction}<div class='wl-review top8'><b>Chain of Custody</b><div class='small'><b>Service Tech:</b> ${esc(r.service_tech_name || 'Not recorded')} · Submitted ${r.returned_at ? new Date(r.returned_at).toLocaleString() : '—'}</div><div class='small'><b>IT Tech:</b> ${esc(r.it_tech_name || 'Not assigned')}${r.it_received_at ? ` · Intake completed ${new Date(r.it_received_at).toLocaleString()}` : ''}</div>${r.completed_at ? `<div class='small'><b>Manager confirmed MHelpDesk inventory:</b> ${new Date(r.completed_at).toLocaleString()}</div>` : ''}</div>${r.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(r.return_notes)}</div></div>` : ''}<div class='wl-review top8'><b>IT Intake Checklist — ${answers.filter(v => v === true).length}/${intakeLabels.length} YES</b>${checks}</div>${doc ? `<div class='ok top8'><b>SIM Cancellation Record</b><div class='small'>Date: ${esc(doc.simCanceledDate)} · MHelpDesk #${esc(doc.ticket)} · Unit ${esc(doc.unit)} · IT Tech: ${esc(doc.techName || r.it_tech_name || 'IT')} (${esc(doc.techInitials)})</div></div>` : ''}${record.notes ? `<div class='wl-note top8'><b>IT intake notes</b><div>${esc(record.notes)}</div></div>` : ''}<div class='small top8'><b>Service Return / Site / Damage Photos</b></div><div class='wl-return-gallery' data-owner-service-photos='${r.id}'><div class='wl-note'>Photos load when this record is opened.</div></div><div class='small top8'><b>IT Intake Photo</b></div><div class='wl-return-gallery' data-owner-intake-photos='${r.id}'><div class='wl-note'>Photo loads when this record is opened.</div></div><button class='mini danger top8' data-wl-owner-remove-return='${r.id}' data-wl-unit='${esc(r.unit_tag)}' data-wl-ticket='${esc(r.ticket_no)}'>Remove from Tracking</button></div></details>`;
   };
+
   const activeItems = activeRows.map(renderOwnerReturn);
   const completedItems = completedRows.map(renderOwnerReturn);
-  host.innerHTML = `<div class='sectiontitle'><div><h2>Unit Return & Intake Tracking</h2><div class='small'>Active work stays at the top. Completed returns are kept in history below.</div></div><span class='pill'>OWNER</span></div><div class='ownerWorkTools'><div class='wl-workstrip'><span><b>${waitingCount}</b> waiting IT</span><span><b>${managerCount}</b> need manager</span><span><b>${completedCount}</b> completed</span></div><input id='ownerReturnSearch' value='${esc(currentSearch)}' placeholder='Search unit, MHelpDesk ticket, equipment, or tech'></div><div class='ownerActiveLabel'>Needs Attention / In Progress</div>${activeItems.join('') || '<div class="ok"><b>✓ No active return/intake work.</b></div>'}<details class='ownerHistoryFold'><summary>Completed Return & Intake History <span class='pill'>${completedCount}</span></summary><div>${completedItems.join('') || '<div class="small">No completed return history yet.</div>'}</div></details>`;
+  host.innerHTML = `<summary class='ownerDashSummary'>
+    <div><b>Returns & Intake</b><span>Returned units, IT intake, and manager follow-up</span></div>
+    <span id='ownerIntakeBadge' class='ownerDashBadge ${activeRows.length ? 'alert' : 'neutral'}'>${activeRows.length}</span>
+  </summary>
+  <div class='ownerDashBody'>
+    <div class='ownerWorkTools'>
+      <div class='wl-workstrip'><span><b>${waitingCount}</b> waiting IT</span><span><b>${managerCount}</b> need manager</span><span><b>${completedCount}</b> completed</span></div>
+      <input id='ownerReturnSearch' value='${esc(currentSearch)}' placeholder='Search unit, MHelpDesk ticket, equipment, or tech'>
+    </div>
+    <div class='ownerActiveLabel'>Needs Attention / In Progress</div>
+    ${activeItems.join('') || '<div class="ok"><b>✓ No active return/intake work.</b></div>'}
+    <details class='ownerHistoryFold'><summary>Completed Return & Intake History <span class='pill'>${completedCount}</span></summary><div>${completedItems.join('') || '<div class="small">No completed return history yet.</div>'}</div></details>
+  </div>`;
+  host.open = wasOpen;
   if (currentSearch) filterOwnerReturns(currentSearch);
 }
 
