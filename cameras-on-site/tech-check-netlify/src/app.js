@@ -416,6 +416,16 @@ function setupRealtime() {
     )
     .on(
       'postgres_changes',
+      { event: '*', schema: 'public', table: 'job_assignments' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'morning_checks' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
       { event: '*', schema: 'public', table: 'profiles' },
       scheduleRefreshData
     )
@@ -1702,6 +1712,10 @@ Object.assign(window, {
   ownerReviewPasswordReset,
   ownerJump,
   ownerOpenReturn,
+  setOwnerDailyDate,
+  moveOwnerDailyDate,
+  ownerDailyToday,
+  renderOwnerTechOverview,
   renderOwnerUnitSearch,
   renderOwnerEquipment,
   addInventoryAsset,
