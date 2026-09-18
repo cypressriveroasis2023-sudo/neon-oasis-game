@@ -215,6 +215,53 @@ async function currentTechIdentity() {
 let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
+const TECHCHECK_VAPID_PUBLIC_KEY = 'BAvDfBdTqTbyOxAOYDQ25EfMKregOkdUmOkVW_BlHEQ4CP--otdlOCrDobnj7eVUg-5YMcjVM8sfLHg_qNr2fq0';
+
+function vapidKeyBytes(value) {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+async function pushAlertState() {
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+  if (!supported) return { supported:false, permission:'unsupported', subscribed:false, ready:false };
+  const permission = Notification.permission;
+  let subscribed = false;
+  if (permission === 'granted') {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      subscribed = Boolean(await reg.pushManager.getSubscription());
+    } catch {}
+  }
+  return { supported:true, permission, subscribed, ready:permission === 'granted' && subscribed };
+}
+async function registerPhonePush() {
+  const tech = await currentTechIdentity();
+  const reg = await navigator.serviceWorker.ready;
+  let subscription = await reg.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidKeyBytes(TECHCHECK_VAPID_PUBLIC_KEY),
+    });
+  }
+  const json = subscription.toJSON();
+  const p256dh = json.keys?.p256dh || '';
+  const auth = json.keys?.auth || '';
+  if (!p256dh || !auth) throw new Error('This device did not return a valid push subscription.');
+  const { error } = await liveDb.from('push_subscriptions').upsert({
+    user_id: tech.id,
+    endpoint: subscription.endpoint,
+    p256dh,
+    auth,
+    user_agent: navigator.userAgent,
+    enabled: true,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'endpoint' });
+  if (error) throw error;
+  return subscription;
+}
 
 function currentRoleKey() {
   const role = roleText();
@@ -262,6 +309,12 @@ async function refreshNotificationBadge() {
   const unread = rows.filter(n => !n.read_at).length;
   badge.textContent = String(unread);
   badge.classList.toggle('hidden', unread === 0);
+  try {
+    if ('setAppBadge' in navigator && 'clearAppBadge' in navigator) {
+      if (unread > 0) await navigator.setAppBadge(unread);
+      else await navigator.clearAppBadge();
+    }
+  } catch {}
 }
 function ensureNotificationPanel() {
   let panel = document.getElementById('wlNotificationPanel');
@@ -279,14 +332,19 @@ function notificationToggle(id, label, checked, detail = '') {
 async function openNotificationPanel() {
   const panel = ensureNotificationPanel();
   const body = document.getElementById('wlNotifyBody');
-  const [prefs, rows] = await Promise.all([myNotificationPreferences(), myNotifications(30)]);
+  const [prefs, rows, pushState] = await Promise.all([myNotificationPreferences(), myNotifications(30), pushAlertState()]);
   const role = currentRoleKey();
-  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
-  const browserStatus = permission === 'granted'
-    ? 'iPhone/browser alerts are allowed on this device while Tech Check is active.'
+  const permission = pushState.permission;
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  const browserStatus = pushState.ready
+    ? 'Phone alerts are ON. Tech Check can notify this device even when the app is closed.'
     : permission === 'denied'
-      ? 'Alerts are blocked in this device’s browser settings.'
-      : 'Enable alerts on this device when you want system notifications.';
+      ? 'Alerts are blocked in this device’s notification settings.'
+      : !pushState.supported
+        ? 'Push alerts are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.'
+        : (!standalone && /iPhone|iPad|iPod/i.test(navigator.userAgent))
+          ? 'On iPhone, add Tech Check to the Home Screen first, then open it and enable phone alerts.'
+          : 'Tap Enable to allow Tech Check to notify this phone when work is assigned.';
   const toggles = [
     role !== 'owner' ? notificationToggle('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.') : '',
     role === 'it' ? notificationToggle('wlPrefReturns','Returned units waiting for IT',prefs.returned_units,'When Service sends a unit back for IT Intake.') : '',
@@ -300,9 +358,9 @@ async function openNotificationPanel() {
       ${toggles}
       <div class='wl-notify-system'>
         <div><b>iPhone / Browser Alerts</b><div class='small'>${esc(browserStatus)}</div></div>
-        <button class='mini' data-wl-enable-browser-alerts>${permission === 'granted' ? 'Enabled' : 'Enable'}</button>
+        <button class='mini' data-wl-enable-browser-alerts>${pushState.ready ? 'Enabled' : 'Enable'}</button>
       </div>
-      <div class='small top8'>These settings control Tech Check alerts. Closed-app push delivery requires the separate web-push service; Tech Check will not claim background push until that is connected.</div>
+      <div class='small top8'>Once enabled on this device, new Owner-assigned jobs can appear as phone notifications while Tech Check is closed. The Home Screen app badge also reflects unread Tech Check notifications when supported by the phone.</div>
       <button class='btn' data-wl-save-notify>Save Notification Settings</button>
     </div>
     <div class='wl-notify-section'>
@@ -327,12 +385,24 @@ async function saveNotificationSettings() {
   await openNotificationPanel();
 }
 async function enableBrowserAlerts() {
-  if (typeof Notification === 'undefined') {
-    return alert('System notifications are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.');
+  const state = await pushAlertState();
+  if (!state.supported) {
+    return alert('Phone push notifications are not available here. On iPhone, add Tech Check to the Home Screen, open the installed app, and try again.');
   }
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return alert('Notification permission was not enabled on this device.');
-  await saveNotificationSettings();
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !standalone) {
+    return alert('On iPhone, install Tech Check to your Home Screen first. Then open the Home Screen app and tap Enable again.');
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return alert('Notification permission was not enabled on this device.');
+    await registerPhonePush();
+    await saveNotificationSettings();
+    alert('Phone alerts are enabled for Tech Check on this device.');
+  } catch (error) {
+    console.warn('Could not enable Tech Check push notifications', error);
+    alert(error?.message || 'Could not enable phone alerts on this device.');
+  }
 }
 async function showSystemNotification(row) {
   const prefs = await myNotificationPreferences();
@@ -1753,7 +1823,7 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { error } = await liveDb.rpc('owner_assign_job_v3', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v3', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -1770,12 +1840,28 @@ async function ownerAssignJob() {
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
 
+  let pushMessage = '';
+  if (assignmentId) {
+    try {
+      const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', {
+        body: { assignment_id: assignmentId },
+      });
+      if (pushError) throw pushError;
+      pushMessage = Number(pushResult?.sent || 0) > 0
+        ? ' Phone notification sent.'
+        : ' Tech Check inbox alert created. Phone push will start after this technician enables phone alerts once on their device.';
+    } catch (pushError) {
+      console.warn('Assignment saved but phone push could not be sent', pushError);
+      pushMessage = ' Tech Check inbox alert created; phone push could not be delivered this time.';
+    }
+  }
+
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   fillTicketPartInputs({}, 'ownerPart');
 
   await installOwnerAssignments(true);
-  alert('Sent in Tech Check. This does not change or sync anything in MHelpDesk.');
+  alert('Sent in Tech Check.' + pushMessage + ' This does not change or sync anything in MHelpDesk.');
 }
 async function saveActivePrepParts() {
   if (!activeItPrep?.id) return;
