@@ -2356,8 +2356,10 @@ function wrapCreatePrep() {
 
 function assignmentNeedsServiceSolar(a, prep) {
   if (a?.assigned_role !== 'service') return false;
+  const workType=String(a?.work_type || prep?.work_type || '').toLowerCase();
+  if (workType && workType !== 'delivery') return false;
   const rows=[...normalizedEquipmentManifest(a?.equipment_manifest),...normalizedEquipmentManifest(prep?.equipment_manifest)];
-  return rows.some(row => ['Solar Stand','Solar Pole','Helios'].includes(row.label) && row.qty > 0);
+  return rows.some(row => ['Solar Spotter','Ranger','Solar Stand','Solar Pole','Helios'].includes(row.label) && row.qty > 0);
 }
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
   const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
@@ -2367,8 +2369,8 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
   if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
   if (a.assigned_role === 'service' && prep?.status === 'released' && assignmentNeedsServiceSolar(a,prep)) {
     return solarCheck?.completed_at
-      ? { step:4, label:'SOLAR / HELIOS VERIFIED', detail:'Pre-trip Solar Stand, battery, MPPT' + (normalizedEquipmentManifest(a?.equipment_manifest).some(r=>r.label==='Helios') ? ', and Cerbo' : '') + ' checks completed' }
-      : { step:3, label:'SOLAR / HELIOS CHECK IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' must verify Solar Stand, batteries, MPPT, charging, photos, and signatures' };
+      ? { step:4, label:'SOLAR CHECKOUT VERIFIED', detail:'Automatic Solar Spotter / Ranger / Helios Service checkout completed' }
+      : { step:3, label:'SOLAR CHECKOUT IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' is verifying automatic stands, batteries, panels, MPPT/charging readings, and Cerbo when applicable' };
   }
   if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Prepared and released by IT' };
   if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
@@ -2377,7 +2379,7 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p = ownerAssignmentProgress(a, prep, solarCheck);
   const pct = Math.max(8, Math.min(100, p.step / 5 * 100));
-  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>Units Required:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${a.assigned_role === 'it' ? equipmentManifestInlineHtml(a) + ticketPartsInlineHtml(a) : ''}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.work_type ? `<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>Units Required:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
 }
 function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
@@ -2410,7 +2412,7 @@ async function installOwnerAssignments(force = false) {
   const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
-    liveDb.from('prep_tickets').select('id,ticket_no,status,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
+    liveDb.from('prep_tickets').select('id,ticket_no,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
     liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
     liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at').order('updated_at',{ascending:false}).limit(100),
   ]);
@@ -2534,6 +2536,8 @@ async function ownerAssignJob() {
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
   if (selectedDeviceCount > 0 && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
   if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
+  const autoSolarPlan=automaticServiceSolarPlan(equipmentManifest,workType);
+  if (autoSolarPlan.spotters > 0 && manifestQty(equipmentManifest,'Solar Stand') > 0) return alert('Remove Solar Stand from the IT Stand Area. A Delivery with Solar Spotter automatically assigns the Solar Stand to the Service checkout after IT releases the Solar Spotter.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
