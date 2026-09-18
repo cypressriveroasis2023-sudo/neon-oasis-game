@@ -2046,7 +2046,7 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
-  const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey);
+  const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
   if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); return; }
@@ -2601,9 +2601,15 @@ function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
   return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
 }
-function ownerAINotificationKey(a,s){return 'cos-owner-ai-ack-v1:'+String(a?.id||a?.ticket_no||'')+':'+String(s?.detail||s?.label||'attention');}
-function ownerAIIsAcknowledged(a,s){try{return localStorage.getItem(ownerAINotificationKey(a,s))==='1';}catch{return false;}}
-function ownerAIAcknowledge(id,key){try{localStorage.setItem(key,'1');}catch{}const el=document.querySelector("[data-owner-ai-notice-id='"+CSS.escape(id)+"']");if(el)el.classList.add('acknowledged');const badge=document.getElementById('ownerAINotificationBadge');if(badge)badge.textContent=Math.max(0,Number(badge.textContent||0)-1);}
+function ownerAINotificationKey(a,s){return String(a?.id||a?.ticket_no||'')+':'+String(s?.detail||s?.label||'attention');}
+let ownerAIAckRows=[];
+function ownerAIIsAcknowledged(a,s){const id=String(a?.id||a?.ticket_no||''),key=ownerAINotificationKey(a,s);return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key);}
+async function ownerAIAcknowledge(id,key,detail,ticket){
+  const tech=await currentTechIdentity().catch(()=>null);if(!tech?.id)return alert('Owner/Admin account required.');
+  const {error}=await liveDb.from('owner_ai_alert_acknowledgements').upsert({assignment_id:String(id),alert_key:key,ticket_no:String(ticket||''),alert_detail:String(detail||''),acknowledged_by:tech.id,acknowledged_by_name:tech.name||tech.full_name||tech.username||'Owner',acknowledged_at:new Date().toISOString()},{onConflict:'assignment_id,alert_key'});
+  if(error)return alert(error.message);
+  await installOwnerAssignments(true);
+}
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
@@ -2628,13 +2634,15 @@ async function installOwnerAssignments(force = false) {
   const liveWasOpen = liveHost.open;
   host.dataset.loaded = '1';
 
-  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }] = await Promise.all([
+  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }, { data: aiAcks }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
     liveDb.from('prep_tickets').select('id,ticket_no,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
     liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
     liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at').order('updated_at',{ascending:false}).limit(100),
+    liveDb.from('owner_ai_alert_acknowledgements').select('*').order('acknowledged_at',{ascending:false}).limit(500),
   ]);
+  ownerAIAckRows = aiAcks || [];
   ownerAssignmentProfiles = profiles || [];
   ownerAssignmentAssets = assets || [];
   const all = assignments || [];
@@ -2715,7 +2723,7 @@ async function installOwnerAssignments(force = false) {
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
-      <details class='wl-owner-ai-notifications' ${aiUnread?'open':''}><summary><span>🔔 AI Notifications</span><b id='ownerAINotificationBadge'>${aiUnread}</b></summary><div>${aiNotices.length?aiNotices.map(x=>`<div class='wl-owner-ai-notice ${x.ack?'acknowledged':''}' data-owner-ai-notice-id='${esc(x.a.id||x.a.ticket_no)}'><div><b>MHelpDesk #${esc(x.a.ticket_no||'—')}</b><span>${esc(x.s.detail)}</span></div><button type='button' data-owner-ai-ack='${esc(x.a.id||x.a.ticket_no)}' data-owner-ai-ack-key='${esc(x.key)}'>${x.ack?'Acknowledged':'Acknowledge'}</button></div>`).join(''):`<div class='wl-ai-good'>✓ No AI Attention notifications.</div>`}</div></details>
+      <details class='wl-owner-ai-notifications' ${aiUnread?'open':''}><summary><span>🔔 AI Notifications</span><b id='ownerAINotificationBadge'>${aiUnread}</b></summary><div>${aiNotices.length?aiNotices.map(x=>`<div class='wl-owner-ai-notice ${x.ack?'acknowledged':''}' data-owner-ai-notice-id='${esc(x.a.id||x.a.ticket_no)}'><div><b>MHelpDesk #${esc(x.a.ticket_no||'—')}</b><span>${esc(x.s.detail)}</span></div><button type='button' data-owner-ai-ack='${esc(x.a.id||x.a.ticket_no)}' data-owner-ai-ack-key='${esc(x.key)}' data-owner-ai-ack-detail='${esc(x.s.detail)}' data-owner-ai-ack-ticket='${esc(x.a.ticket_no||'')}'>${x.ack?'Acknowledged':'Acknowledge'}</button></div>`).join(''):`<div class='wl-ai-good'>✓ No AI Attention notifications.</div>`}</div></details>
       <div class='wl-owner-ai-overview'><div class='wl-owner-ai-overview-head'><span>✨ AI Operations Overview</span><b>${aiAttention ? aiAttention+' NEED ATTENTION' : 'NO AI ALERTS'}</b></div><div class='wl-owner-ai-counts'><button type='button' class='attention' data-owner-ai-filter='attention'><b>${aiAttention}</b><span>Need attention</span></button><button type='button' class='waiting' data-owner-ai-filter='waiting'><b>${aiWaiting}</b><span>Waiting normally</span></button><button type='button' class='working' data-owner-ai-filter='working'><b>${aiWorking}</b><span>In progress</span></button><button type='button' class='healthy' data-owner-ai-filter='healthy'><b>${aiOnTrack}</b><span>On track</span></button></div>${aiAttention ? `<div class='wl-ai-warn top8'><b>Owner review recommended:</b><br>${aiStates.filter(x=>x.s.state==='attention').slice(0,4).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>` : `<div class='wl-ai-good top8'>✓ No active jobs have an AI-detected setup conflict.</div>`}</div>
       <div class='ownerDispatchSummary ownerLiveSummary'>
         <span><b>${assignedWaiting.length}</b> assigned / waiting</span>
