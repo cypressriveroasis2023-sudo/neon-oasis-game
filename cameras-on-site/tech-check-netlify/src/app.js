@@ -1147,6 +1147,99 @@ function resetMorningInputs() {
 }
 
 function ownerAgeHours(value) { const time = value ? new Date(value).getTime() : NaN; return Number.isFinite(time) ? Math.max(0,(Date.now()-time)/3600000) : 0; }
+function ownerTechRoleName(profile) {
+  const name = profile?.full_name || profile?.username || 'Technician';
+  return profile?.role === 'it' ? 'IT Tech ' + name : profile?.role === 'service' ? 'Service Tech ' + name : profile?.role === 'owner' ? 'Owner/Admin ' + name : name;
+}
+function ownerActorLabel(report) {
+  const profile=(state.profiles || []).find(p => p.user_id === report?.actor_id);
+  if (profile) return ownerTechRoleName(profile);
+  return report?.actor_name || 'Technician';
+}
+function inspectionSummary(row) {
+  if (!row) return null;
+  const truckValues=Object.values(row.truck_checks || {}).filter(v => typeof v === 'boolean');
+  const trailerValues=Object.values(row.trailer_checks || {}).filter(v => typeof v === 'boolean');
+  const truckFail=truckValues.includes(false);
+  const trailerFail=Boolean(row.taking_trailer) && trailerValues.includes(false);
+  return {
+    failed: truckFail || trailerFail,
+    truck: truckFail ? 'FAILED' : 'PASS',
+    trailer: !row.taking_trailer ? 'Not taking trailer' : trailerFail ? 'FAILED' : 'PASS',
+  };
+}
+function ownerAssignmentStatusLabel(a) {
+  return a.status === 'completed' ? 'DONE' : a.status === 'started' ? 'IN PROCESS' : a.status === 'cancelled' ? 'CANCELLED' : a.assignee_user_id ? 'ASSIGNED' : 'DEPARTMENT QUEUE';
+}
+async function setOwnerDailyDate(value) {
+  const next=String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
+  ownerDailyDate=next;
+  await refreshData();
+}
+async function moveOwnerDailyDate(days) { return setOwnerDailyDate(shiftDateKey(ownerDailyDate,days)); }
+async function ownerDailyToday() { return setOwnerDailyDate(localDateKey(new Date())); }
+function renderOwnerTechOverview() {
+  if (state.profile?.role !== 'owner') return;
+  const host=$('ownerTechOverview');
+  if (!host) return;
+  const today=localDateKey(new Date());
+  const isToday=ownerDailyDate===today;
+  const isPast=ownerDailyDate<today;
+  const techs=(state.profiles || [])
+    .filter(p => p.active && !p.archived_at && (p.role==='it' || p.role==='service'))
+    .sort((a,b) => (a.role===b.role ? String(a.full_name || a.username).localeCompare(String(b.full_name || b.username)) : a.role==='service' ? -1 : 1));
+  const assignments=(state.ownerAssignments || []).filter(a => a.status !== 'cancelled');
+  const inspectionMap=new Map();
+  (state.dailyInspections || []).forEach(row => { if (!inspectionMap.has(row.service_tech_id)) inspectionMap.set(row.service_tech_id,row); });
+  const missingService=techs.filter(t => t.role==='service' && !inspectionMap.has(t.user_id));
+  const queue=assignments.filter(a => !a.assignee_user_id && a.status==='assigned');
+  const badge=$('ownerTechOverviewBadge');
+  if (badge) {
+    badge.textContent=isToday && missingService.length ? missingService.length + ' DUE' : String(techs.length);
+    badge.classList.toggle('alert',isToday && missingService.length>0);
+    badge.classList.toggle('neutral',!(isToday && missingService.length>0));
+  }
+  const techCards=techs.map(tech => {
+    const name=ownerTechRoleName(tech);
+    const jobs=assignments.filter(a => a.assignee_user_id===tech.user_id);
+    const assets=(state.assetInventory || []).filter(a => a.assigned_to===tech.user_id && a.availability_status==='assigned');
+    const inspection=tech.role==='service' ? inspectionMap.get(tech.user_id) : null;
+    const ins=inspectionSummary(inspection);
+    let dailyStatus='';
+    if (tech.role==='service') {
+      if (ins) {
+        dailyStatus=`<div class='ownerDailyCheck ${ins.failed ? 'fail' : 'pass'}'><b>Daily Truck / Trailer Check · ${ins.failed ? 'NEEDS REVIEW' : 'SUBMITTED'}</b><span>Truck: ${esc(ins.truck)} · Trailer: ${esc(ins.trailer)} · ${new Date(inspection.submitted_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div>`;
+      } else {
+        const label=isToday ? 'DUE TODAY' : isPast ? 'NOT SUBMITTED' : 'UPCOMING';
+        dailyStatus=`<div class='ownerDailyCheck ${isToday || isPast ? 'missing' : ''}'><b>Daily Truck / Trailer Check · ${label}</b><span>${isToday ? 'Waiting for this Service Tech to submit the daily inspection.' : isPast ? 'No submitted inspection was found for this date.' : 'Daily inspection will be due on the selected work date.'}</span></div>`;
+      }
+    } else {
+      dailyStatus=`<div class='ownerDailyCheck info'><b>IT Technician</b><span>Track assigned Tech Check jobs and equipment below.</span></div>`;
+    }
+    const jobHtml=jobs.length ? jobs.map(a => `<div class='ownerDailyJob'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><span>${esc(a.site || 'No customer / site')} · ${esc(a.job_description || 'No job description')}</span>${a.requested_unit_count != null ? `<span>${Number(a.requested_unit_count)} unit${Number(a.requested_unit_count)===1?'':'s'} required</span>` : ''}</div><span class='pill ${a.status==='completed'?'green':a.status==='started'?'amber':''}'>${ownerAssignmentStatusLabel(a)}</span></div>`).join('') : `<div class='small ownerDailyEmpty'>No Tech Check tickets assigned to ${esc(name)} for this date.</div>`;
+    const assetHtml=assets.length ? `<div class='ownerDailyAssets'><b>Current Assigned Equipment</b><div>${assets.map(a => `<span>${esc(a.unit_tag)} · ${esc(a.asset_type)}</span>`).join('')}</div></div>` : '';
+    const roleClass=tech.role==='service'?'service':'it';
+    return `<details class='ownerTechDayCard ${roleClass}' open><summary><div><b>${esc(name)}</b><span>${jobs.length} ticket${jobs.length===1?'':'s'} scheduled · ${assets.length} assigned asset${assets.length===1?'':'s'}</span></div><span class='pill roleBadge ${roleClass}'>${tech.role==='service'?'SERVICE':'IT'}</span></summary><div class='ownerTechDayBody'>${dailyStatus}<div class='ownerDailySectionLabel'>Assigned Work</div>${jobHtml}${assetHtml}</div></details>`;
+  }).join('');
+  const queueHtml=queue.length ? `<div class='ownerDepartmentQueue'><b>Unclaimed Department Tasks</b>${queue.map(a => `<div><span><b>${a.assigned_role==='it'?'IT':'SERVICE'} · MHelpDesk #${esc(a.ticket_no)}</b><small>${esc(a.site || '')} · ${esc(a.job_description || '')}</small></span><span class='pill amber'>WAITING TO CLAIM</span></div>`).join('')}</div>` : '';
+  host.innerHTML=`
+    <div class='ownerDailyToolbar'>
+      <button class='mini' onclick="moveOwnerDailyDate(-1)">← Previous</button>
+      <div class='ownerDailyDateCenter'><b>${esc(dateLabel(ownerDailyDate))}</b><input type='date' value='${esc(ownerDailyDate)}' onchange="setOwnerDailyDate(this.value)"></div>
+      <button class='mini' onclick="moveOwnerDailyDate(1)">Next →</button>
+      <button class='mini ownerTodayButton' onclick="ownerDailyToday()">Today</button>
+    </div>
+    <div class='ownerDailySummary'>
+      <span><b>${techs.length}</b> active techs</span>
+      <span><b>${assignments.length}</b> scheduled tickets</span>
+      <span><b>${queue.length}</b> unclaimed</span>
+      <span><b>${missingService.length}</b> Service checks ${isToday ? 'due' : 'missing'}</span>
+    </div>
+    ${queueHtml}
+    <div class='ownerTechDayGrid'>${techCards || '<div class="warn">No active IT or Service technicians.</div>'}</div>`;
+}
+
 function ownerJump(target) {
   const el = target === 'returns'
     ? document.getElementById('ownerIntakeTracking')
