@@ -597,7 +597,8 @@ async function setupNotificationRealtime() {
 }
 async function assignmentGateState(assignment) {
   const workType=String(assignment?.work_type||'').toLowerCase();
-  if(workType==='pickup'){
+  const legacyPickup=!workType && /\bpick[ -]?up\b/i.test(String(assignment?.job_description||''));
+  if(workType==='pickup' || legacyPickup){
     if(assignment.assigned_role==='service') return {ready:true,label:'SERVICE FIRST — PICKUP'};
     const {data}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
     return data?.length ? {ready:true,label:'Service return received',returnId:data[0].id} : {ready:false,label:'WAITING FOR SERVICE RETURN',detail:'Pickup starts with Service. Service must finish the field pickup and check the returned equipment into IT Intake before IT can start.'};
@@ -630,7 +631,7 @@ async function startAssignedJob(id) {
   }
 
   if (assignment.assigned_role === 'it') {
-    if (String(assignment.work_type||'').toLowerCase()==='pickup') {
+    if (String(assignment.work_type||'').toLowerCase()==='pickup' || (!assignment.work_type && /\bpick[ -]?up\b/i.test(String(assignment.job_description||'')))) {
       if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
       const { data: returns } = await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
       if (!returns?.length) return alert('WAITING FOR SERVICE RETURN\n\nPickup starts with Service. IT Intake cannot begin until Service checks the returned equipment in.');
@@ -669,7 +670,7 @@ async function startAssignedJob(id) {
   }
 
   activeSvcAssignment = assignment;
-  if (String(assignment.work_type || '').toLowerCase()==='pickup') {
+  if (String(assignment.work_type || '').toLowerCase()==='pickup' || (!assignment.work_type && /\bpick[ -]?up\b/i.test(String(assignment.job_description||'')))) {
     if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
     serviceReturn={ step:1, ticket:String(assignment.ticket_no||''), unit:'', type:'', notes:'', photo:null, conditionPhotos:[], damagePhotos:[], knownUnits:await rememberedUnitsForTicket(assignment.ticket_no) };
     serviceReturnRecovered=false;
@@ -2665,7 +2666,7 @@ async function ownerAssignJob() {
 
   document.body.classList.add('busy');
   const dualDept = role === 'it_service' || role === 'service_it';
-  const orderedRoles = role === 'service_it' ? ['service','it'] : ['it','service'];
+  const orderedRoles = workType === 'pickup' && dualDept ? ['service','it'] : (role === 'service_it' ? ['service','it'] : ['it','service']);
   const targets = dualDept
     ? orderedRoles.flatMap(r => { const ids=assignees.filter(id => ownerAssignmentProfiles.find(p=>p.user_id===id)?.role===r); if(r==='service' && serviceQueueSelected) return [{role:'service',assignee:null}]; return ids.length ? ids.map(id=>({role:r,assignee:id})) : [{role:r,assignee:null}]; })
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
@@ -2688,7 +2689,7 @@ async function ownerAssignJob() {
       p_sim_replacement_qty: parts.sim_replacement_qty,
       p_micro_sd_qty: parts.micro_sd_qty,
       p_equipment_manifest: equipmentManifest,
-      p_requires_it_handoff: targetRole === 'service' && rolesToSend.includes('it'),
+      p_requires_it_handoff: workType === 'pickup' ? false : (targetRole === 'service' && rolesToSend.includes('it')),
       p_scheduled_for: scheduledFor,
       p_work_type: workType,
     });
@@ -2716,7 +2717,7 @@ async function ownerAssignJob() {
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
-  const target = (role === 'it_service' || role === 'service_it') ? (role === 'service_it' ? 'Service first, then IT Intake' : 'IT first, then Service') : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  const target = (role === 'it_service' || role === 'service_it') ? (workType === 'pickup' || role === 'service_it' ? 'Service first, then IT Intake' : 'IT first, then Service') : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
   alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
