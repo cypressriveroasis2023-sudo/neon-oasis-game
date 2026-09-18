@@ -1594,3 +1594,238 @@ select {
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
 }
+
+
+/* Owner technician daily board */
+#view-owner .ownerTechOverviewCard > .ownerDashSummary {
+  background: #eef6fb;
+  border-left: 6px solid #2b6f9f;
+}
+.ownerDailyToolbar {
+  display: grid;
+  grid-template-columns: auto minmax(240px,1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ownerDailyDateCenter {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #d4dee6;
+  border-radius: 12px;
+  background: #f7f9fb;
+}
+.ownerDailyDateCenter b { color:#153047; }
+.ownerDailyDateCenter input {
+  width: 150px;
+  margin: 0;
+}
+.ownerDailySummary {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ownerDailySummary span {
+  border: 1px solid #d6e0e7;
+  border-radius: 11px;
+  padding: 10px;
+  background: #f8fafb;
+  color: #6a7986;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ownerDailySummary b {
+  display: block;
+  color: #142d42;
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.ownerDepartmentQueue {
+  border: 1px solid #ead39f;
+  border-left: 5px solid #d49a1c;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff9ea;
+  margin-bottom: 12px;
+}
+.ownerDepartmentQueue > b {
+  display: block;
+  margin-bottom: 6px;
+  color: #694d12;
+}
+.ownerDepartmentQueue > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #f0dfb7;
+  padding: 8px 0;
+}
+.ownerDepartmentQueue > div:first-of-type { border-top: 0; }
+.ownerDepartmentQueue span small {
+  display: block;
+  margin-top: 2px;
+  color: #756848;
+}
+.ownerTechDayGrid {
+  display: grid;
+  gap: 10px;
+}
+.ownerTechDayCard {
+  border: 1px solid #d4dee6;
+  border-left: 6px solid #2b6f9f;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+.ownerTechDayCard.service { border-left-color: #1f7a5a; }
+.ownerTechDayCard.it { border-left-color: #315f9a; }
+.ownerTechDayCard > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  background: #f8fafb;
+}
+.ownerTechDayCard > summary::-webkit-details-marker { display:none; }
+.ownerTechDayCard > summary > div b {
+  display: block;
+  color: #12293d;
+  font-size: 17px;
+}
+.ownerTechDayCard > summary > div span {
+  display: block;
+  margin-top: 2px;
+  color: #6b7a87;
+  font-size: 12px;
+}
+.ownerTechDayBody {
+  padding: 13px 14px;
+  border-top: 1px solid #e1e7ec;
+}
+.ownerDailyCheck {
+  border: 1px solid #d8e1e7;
+  border-radius: 11px;
+  padding: 10px 11px;
+  background: #f7f9fb;
+}
+.ownerDailyCheck b,
+.ownerDailyCheck span {
+  display: block;
+}
+.ownerDailyCheck span {
+  margin-top: 3px;
+  color: #61717f;
+  font-size: 12px;
+}
+.ownerDailyCheck.pass {
+  background: #edf9f2;
+  border-color: #b8dfc7;
+}
+.ownerDailyCheck.fail,
+.ownerDailyCheck.missing {
+  background: #fff0ef;
+  border-color: #edbbb7;
+}
+.ownerDailyCheck.info {
+  background: #eef5fb;
+  border-color: #cbddeb;
+}
+.ownerDailySectionLabel {
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 950;
+  color: #687887;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.ownerDailyJob {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid #e7ecef;
+}
+.ownerDailyJob:first-of-type { border-top: 0; }
+.ownerDailyJob > div b,
+.ownerDailyJob > div span {
+  display: block;
+}
+.ownerDailyJob > div span {
+  margin-top: 2px;
+  color: #687887;
+  font-size: 12px;
+}
+.ownerDailyEmpty {
+  padding: 8px 0;
+}
+.ownerDailyAssets {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 11px;
+  background: #f2f6f9;
+  border: 1px solid #d7e1e8;
+}
+.ownerDailyAssets > b {
+  display:block;
+  margin-bottom:6px;
+  color:#18334a;
+}
+.ownerDailyAssets > div {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.ownerDailyAssets > div span {
+  display:inline-block;
+  border:1px solid #d3dde5;
+  border-radius:999px;
+  background:#fff;
+  padding:6px 9px;
+  font-size:12px;
+  color:#566774;
+}
+
+@media (max-width:780px) {
+  .ownerDailyToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ownerDailyDateCenter {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .ownerDailySummary {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width:520px) {
+  .ownerDailyToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ownerDailyDateCenter {
+    grid-template-columns: 1fr;
+  }
+  .ownerDailyDateCenter input {
+    width: 100%;
+  }
+  .ownerDailyToolbar .mini {
+    width: 100%;
+  }
+  .ownerTechDayCard > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ownerDailyJob {
+    flex-direction: column;
+  }
+}
