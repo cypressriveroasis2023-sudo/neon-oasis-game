@@ -351,13 +351,24 @@
               <div id="ownerTeamStats" class="ownerTeamStats"></div>
 
               <details class="ownerInnerSection" open>
-                <summary>Active Team</summary>
+                <summary>Active Team <span id="activeTeamCount" class="pill">0</span></summary>
                 <div class="ownerInnerBody"><div id="userList"></div></div>
               </details>
 
               <details class="ownerInnerSection">
-                <summary>Archived Team <span id="archivedTeamCount" class="pill">0</span></summary>
-                <div class="ownerInnerBody"><div id="archivedUserList"></div></div>
+                <summary>Inactive Team <span id="inactiveTeamCount" class="pill">0</span></summary>
+                <div class="ownerInnerBody">
+                  <div class="small">Disabled users cannot sign in. You can reactivate them or delete them from Techs on File.</div>
+                  <div id="inactiveUserList"></div>
+                </div>
+              </details>
+
+              <details class="ownerInnerSection">
+                <summary>Deleted / Former Team <span id="archivedTeamCount" class="pill">0</span></summary>
+                <div class="ownerInnerBody">
+                  <div class="small">Deleted team members stay out of your active/inactive lists. Their old work history remains attached to their name.</div>
+                  <div id="archivedUserList"></div>
+                </div>
               </details>
 
               <details class="ownerInnerSection">
