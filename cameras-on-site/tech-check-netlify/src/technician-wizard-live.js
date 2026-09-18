@@ -131,6 +131,7 @@ function injectStyles() {
     .wl-next{background:#d20b12!important}.wl-stop a,.wl-red{background:#d20b12!important}
     .wl-ticket{border:1px solid #d8dde2!important;box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .wl-issue-list{display:grid;gap:8px;margin-top:10px}.wl-issue-link{width:100%;border:1px solid #e5aaa6;border-radius:11px;background:#fff;color:#9e2119;padding:11px 12px;text-align:left;font-weight:850;cursor:pointer}.wl-issue-link:hover{background:#fff5f4}.wl-issue-link b{display:block;color:#741b15}.wl-issue-link span{display:block;font-size:12px;margin-top:2px;color:#9e2119}
+    .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -215,6 +216,7 @@ async function currentTechIdentity() {
 let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
+let pendingAssignmentLinkId = null;
 const TECHCHECK_VAPID_PUBLIC_KEY = 'BAvDfBdTqTbyOxAOYDQ25EfMKregOkdUmOkVW_BlHEQ4CP--otdlOCrDobnj7eVUg-5YMcjVM8sfLHg_qNr2fq0';
 
 function vapidKeyBytes(value) {
@@ -278,15 +280,10 @@ function currentRoleKey() {
   return 'it';
 }
 async function myActiveAssignments(role = null) {
-  const tech = await currentTechIdentity();
-  let q = liveDb.from('job_assignments')
-    .select('*')
-    .eq('assignee_user_id', tech.id)
-    .in('status', ['assigned','started'])
-    .order('assigned_at', { ascending: true });
-  if (role) q = q.eq('assigned_role', role);
-  const { data, error } = await q;
-  if (error) return [];
+  const wantedRole = role || currentRoleKey();
+  if (!['it','service'].includes(wantedRole)) return [];
+  const { data, error } = await liveDb.rpc('my_available_assignments', { p_role: wantedRole });
+  if (error) { console.warn('Could not load assignment queue', error); return []; }
   return data || [];
 }
 async function myNotificationPreferences() {
@@ -454,9 +451,21 @@ async function setupNotificationRealtime() {
   refreshNotificationBadge();
 }
 async function startAssignedJob(id) {
-  const { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
-  const assignment = rows?.[0];
+  let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
+  let assignment = rows?.[0];
   if (!assignment) return alert('That assignment is no longer available.');
+
+  if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
+    const { error: claimError } = await liveDb.rpc('claim_my_department_assignment', { p_assignment_id: id });
+    if (claimError) {
+      alert(claimError.message || 'Another technician already claimed this department task.');
+      if (assignment.assigned_role === 'it') showITHome(); else showSvcHome();
+      return;
+    }
+    ({ data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1));
+    assignment = rows?.[0];
+    if (!assignment) return alert('The claimed assignment could not be reopened.');
+  }
 
   if (assignment.assigned_role === 'it') {
     const tech = await currentTechIdentity();
@@ -467,8 +476,14 @@ async function startAssignedJob(id) {
       .eq('created_by', tech.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
-    if (existing?.[0]) return showItPrep(existing[0].id);
+    if (existing?.[0]) {
+      const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: existing[0].id });
+      if (linkError) return alert(linkError.message);
+      pendingAssignmentLinkId = null;
+      return showItPrep(existing[0].id);
+    }
+    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    pendingAssignmentLinkId = id;
     showNewPrep();
     const ticket = document.getElementById('itTicket');
     const site = document.getElementById('itSite');
@@ -483,11 +498,14 @@ async function startAssignedJob(id) {
     .select('id,ticket_no,status')
     .eq('ticket_no', assignment.ticket_no)
     .eq('status', 'released')
+    .order('released_at', { ascending: false })
     .limit(1);
   if (!released?.length) {
-    return alert('This MHelpDesk job is assigned to you, but IT has not released the equipment yet. It will stay under Assigned to Me.');
+    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    return alert('This MHelpDesk job is assigned to you, but IT has not released the equipment yet. It will stay under My Work Today.');
   }
-  await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+  const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: released[0].id });
+  if (linkError) return alert(linkError.message);
   return openServiceTicket(assignment.ticket_no);
 }
 async function openAssignmentFromNotification(id) {
@@ -639,6 +657,11 @@ async function createPrepAndStartChecks() {
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
+  if (pendingAssignmentLinkId) {
+    const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: pendingAssignmentLinkId, p_prep_id: prepId });
+    if (linkError) return alert(linkError.message);
+    pendingAssignmentLinkId = null;
+  }
   document.getElementById('itTicket').value = '';
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
@@ -1726,6 +1749,25 @@ function wrapCreatePrep() {
   };
 }
 
+function ownerAssignmentProgress(a, prep) {
+  const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
+  if (a.status === 'completed') return { step:5, label:'DONE', detail: roleLabel + ' task completed' };
+  if (!a.assignee_user_id && a.assignment_scope === 'department') return { step:1, label:'WAITING FOR ' + roleLabel + ' TECH', detail:'Sent to the ' + (a.assigned_role === 'it' ? 'IT Department' : 'Service Department') + ' queue' };
+  if (a.status === 'assigned') return { step:1, label:'SENT', detail:'Waiting for ' + a.assignee_name + ' to start' };
+  if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
+  if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Prepared and released by IT' };
+  if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
+  return { step:2, label:'CLAIMED / IN PROCESS', detail:a.assignee_name + ' started the task' };
+}
+function ownerAssignmentRowHtml(a, prep) {
+  const p = ownerAssignmentProgress(a, prep);
+  const pct = Math.max(8, Math.min(100, p.step / 5 * 100));
+  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${a.assigned_role === 'it' ? ticketPartsInlineHtml(a) : ''}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+}
+function ownerAssignmentTechOptions(role) {
+  const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
+  return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
+}
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
@@ -1740,42 +1782,31 @@ async function installOwnerAssignments(force = false) {
   const wasOpen = host.open;
   host.dataset.loaded = '1';
 
-  const [{ data: profiles }, { data: assignments }] = await Promise.all([
+  const [{ data: profiles }, { data: assignments }, { data: preps }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active').eq('active', true).in('role', ['it','service']).order('full_name'),
-    liveDb.from('job_assignments').select('*').in('status', ['assigned','started']).order('assigned_at', { ascending: false }),
+    liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
+    liveDb.from('prep_tickets').select('id,ticket_no,status,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
   ]);
   ownerAssignmentProfiles = profiles || [];
-  const active = assignments || [];
-  const techOptions = role => ownerAssignmentProfiles
-    .filter(p => p.role === role)
-    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
-    .join('');
-
+  const all = assignments || [];
+  const prepMap = new Map((preps || []).map(p => [p.id,p]));
+  const now = Date.now();
+  const active = all.filter(a => a.status !== 'completed');
+  const completed = all.filter(a => a.status === 'completed' && now - new Date(a.completed_at || a.updated_at || a.assigned_at).getTime() < 24*60*60*1000);
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
-  const rows = active.map(a => `
-    <div class='wl-assignment-row'>
-      <div class='wl-assignment-main'>
-        <div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div>
-        <div class='small'><b>Assigned to:</b> ${esc(a.assignee_name)} · ${a.status === 'started' ? 'Started' : 'Assigned'}</div>
-        ${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}
-        ${a.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(a.unit_summary)}</div>` : ''}
-        ${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}
-        ${a.assigned_role === 'it' ? ticketPartsInlineHtml(a) : ''}
-        ${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}
-      </div>
-      <button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>
-    </div>`).join('');
+  const rows = active.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
+  const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
 
   host.innerHTML = `
     <summary class='ownerDashSummary'>
-      <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
+      <div><b>Create / Assign Job</b><span>Send work to a department queue or directly to a technician</span></div>
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
-        <div class='small'>Nothing is synced or pulled from MHelpDesk. Enter the reference number, unit/equipment, customer/site, and job description here so your technician sees the same information.</div>
+        <div class='small'>Enter the MHelpDesk reference and job information here. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
       </div>
       <div class='grid top10'>
         <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
@@ -1791,20 +1822,21 @@ async function installOwnerAssignments(force = false) {
         ${ticketPartsInputsHtml('ownerPart')}
       </div>
       <div class='grid top10'>
-        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
-        <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
+        <div><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
-      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Job to Technician</button>
+      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
 
       <div class='ownerDispatchSummary'>
-        <span><b>${active.length}</b> active</span>
+        <span><b>${active.length}</b> live</span>
         <span><b>${itCount}</b> IT</span>
         <span><b>${svcCount}</b> Service</span>
       </div>
-      <div class='ownerActiveLabel'>Active Tech Check Assignments</div>
+      <div class='ownerActiveLabel'>Live Job Progress</div>
       <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>
+      ${doneRows ? `<details class='ownerHistoryFold'><summary>Completed in the last 24 hours <span class='pill'>${completed.length}</span></summary><div>${doneRows}</div></details>` : ''}
     </div>`;
   host.open = wasOpen;
 }
@@ -1812,10 +1844,7 @@ function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
   if (!select) return;
-  select.innerHTML = ownerAssignmentProfiles
-    .filter(p => p.role === role)
-    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
-    .join('');
+  select.innerHTML = ownerAssignmentTechOptions(role);
   document.getElementById('ownerAssignParts')?.classList.toggle('hidden', role !== 'it');
 }
 async function ownerAssignJob() {
@@ -1824,16 +1853,16 @@ async function ownerAssignJob() {
   const units = document.getElementById('ownerAssignUnits')?.value.trim() || '';
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
-  const assignee = document.getElementById('ownerAssignTech')?.value || '';
+  const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const parts = role === 'it' ? readTicketPartInputs('ownerPart') : {
     solar_panel_qty:0,battery_replacement_qty:0,camera_replacement_qty:0,sim_replacement_qty:0,micro_sd_qty:0
   };
-  if (!ticket || !assignee) return alert('Enter the MHelpDesk reference number and choose a technician.');
+  if (!ticket) return alert('Enter the MHelpDesk reference number.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v3', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v4', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -1853,25 +1882,21 @@ async function ownerAssignJob() {
   let pushMessage = '';
   if (assignmentId) {
     try {
-      const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', {
-        body: { assignment_id: assignmentId },
-      });
+      const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', { body: { assignment_id: assignmentId } });
       if (pushError) throw pushError;
-      pushMessage = Number(pushResult?.sent || 0) > 0
-        ? ' Phone notification sent.'
-        : ' Tech Check inbox alert created. Phone push will start after this technician enables phone alerts once on their device.';
+      const sent = Number(pushResult?.sent || 0);
+      pushMessage = sent > 0 ? ` Phone notification${sent === 1 ? '' : 's'} sent to ${sent} device${sent === 1 ? '' : 's'}.` : ' Tech Check inbox alert created. Phone push will appear on devices where technicians have enabled alerts.';
     } catch (pushError) {
       console.warn('Assignment saved but phone push could not be sent', pushError);
       pushMessage = ' Tech Check inbox alert created; phone push could not be delivered this time.';
     }
   }
 
-  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   fillTicketPartInputs({}, 'ownerPart');
-
   await installOwnerAssignments(true);
-  alert('Sent in Tech Check.' + pushMessage + ' This does not change or sync anything in MHelpDesk.');
+  const target = assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
   if (!activeItPrep?.id) return;
