@@ -665,3 +665,96 @@ select {
     font-size: 12px;
   }
 }
+
+
+/* IT mode selector — app-card look instead of split pill. */
+@media (max-width: 680px) {
+  .wl-mode-pills {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+    gap: 10px !important;
+    margin: 4px 0 20px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .wl-mode-pills .wl-mode-card {
+    position: relative;
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 86px !important;
+    padding: 13px 14px !important;
+    border: 1px solid #d6e0e8 !important;
+    border-radius: 16px !important;
+    background: #fff !important;
+    color: #152334 !important;
+    text-align: left !important;
+    box-shadow: 0 4px 12px rgba(18,43,65,.07) !important;
+  }
+
+  .wl-mode-pills .wl-mode-card.on {
+    border: 2px solid #d20b12 !important;
+    background: #fff !important;
+    color: #152334 !important;
+    box-shadow: 0 5px 14px rgba(210,11,18,.09) !important;
+  }
+
+  .wl-mode-pills .wl-mode-card.on::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: -2px;
+    height: 4px;
+    border-radius: 999px 999px 0 0;
+    background: #d20b12;
+  }
+
+  .wl-mode-title {
+    display: block;
+    padding-right: 30px;
+    font-size: 15px;
+    line-height: 1.05;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: .15px;
+  }
+
+  .wl-mode-sub {
+    display: block;
+    margin-top: 7px;
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #738190;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .wl-mode-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: grid;
+    place-items: center;
+    min-width: 27px;
+    height: 27px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #eef2f5;
+    color: #152334;
+    font-size: 12px;
+    font-weight: 950;
+  }
+
+  .wl-mode-card.on .wl-mode-badge {
+    background: #fdebec;
+    color: #b1080e;
+  }
+}
