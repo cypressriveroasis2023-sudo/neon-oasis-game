@@ -2098,3 +2098,12 @@ select {
  .wl-equipment-number-grid{grid-template-columns:minmax(0,1fr);gap:8px}
  .wl-equipment-number-block{padding:10px}
 }
+
+/* Service ticket privacy + IT swipe flow */
+.wl-service-ticket-search{margin:12px 0;padding:14px;border:1px solid #cbd8e5;border-radius:12px;background:#f8fbfe}
+.wl-ticket-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.wl-ticket-search-row input,.wl-ticket-search-row button{min-width:0}
+.wl-it-flow-wrap{margin:12px 0}
+.wl-it-flow-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:8px 2px 12px}
+.wl-it-flow-card{flex:0 0:min(92%,560px);scroll-snap-align:start;border:1px solid #cbd8e5;border-radius:12px;padding:14px;background:#fff}
+@media(max-width:768px){.wl-ticket-search-row{grid-template-columns:1fr}.wl-it-flow-card{flex-basis:94%}}
