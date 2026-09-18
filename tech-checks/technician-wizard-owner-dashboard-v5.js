@@ -2488,10 +2488,16 @@ async function installOwnerAssignments(force = false) {
         <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='swap'>Swap</option><option value='service' selected>Service</option><option value='pickup'>Pickup</option></select></div>
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
       </div>
-      <div class='grid top10'>
-        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>IT + Service Departments</option></select></div>
-        <div><label>Technicians</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='btn' id='ownerAddTech'>＋ Add Tech</button></div><div id='ownerAssignTechHint' class='small'>Add one or more IT technicians. If you add nobody, it goes to the IT Department queue.</div></div>
+      <div class='top10'>
+        <label>Send Ticket To</label>
+        <div class='wl-dept-choice' id='ownerAssignRoleChoices'>
+          <button type='button' class='wl-dept-pill on' data-owner-role='it'>IT Only</button>
+          <button type='button' class='wl-dept-pill' data-owner-role='service'>Service Only</button>
+          <button type='button' class='wl-dept-pill' data-owner-role='both'>Service + IT</button>
+        </div>
+        <input type='hidden' id='ownerAssignRole' value='it'>
       </div>
+      <div class='top10'><label>Assign Techs <span class='small'>(optional)</span></label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><button type='button' class='btn wl-add-tech-launch' id='ownerAddTech'>＋ Add Tech</button><div id='ownerTechPicker' class='wl-tech-picker hidden'></div><div id='ownerAssignTechHint' class='small'>Add specific IT techs, or leave blank for the IT Department queue.</div></div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
       <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
@@ -2528,34 +2534,34 @@ async function installOwnerAssignments(force = false) {
   refreshOwnerAutoServicePlan();
   refreshOwnerWorkTypeLabels();
 }
-function addOwnerTechPill() {
-  const select=document.getElementById('ownerAssignTech'); const pills=document.getElementById('ownerAssignedTechPills');
-  const id=select?.value || ''; if (!id || !pills) return;
-  if (pills.querySelector(`[data-tech-id="${CSS.escape(id)}"]`)) { select.value=''; return; }
-  const label=select.options[select.selectedIndex]?.textContent?.trim() || 'Technician';
-  const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id;
-  pill.innerHTML=`<span>${esc(label)}</span><button type="button" data-remove-tech aria-label="Remove ${esc(label)}">×</button>`;
-  pills.appendChild(pill); select.value='';
+function ownerTechPickerHtml(role) {
+  const roles = role === 'both' ? ['service','it'] : [role];
+  return roles.map(r => {
+    const people=ownerAssignmentProfiles.filter(p=>p.role===r);
+    return `<div class='wl-tech-picker-group'><b>${r==='it'?'IT Techs':'Service Techs'}</b><div class='wl-tech-picker-buttons'>${people.length ? people.map(p=>`<button type='button' class='wl-tech-person' data-add-tech-id='${p.user_id}' data-add-tech-role='${r}'>＋ ${esc(p.full_name||p.username||'Technician')}</button>`).join('') : '<span class="small">No technicians found.</span>'}</div></div>`;
+  }).join('');
+}
+function addOwnerTechPill(id, role) {
+  const pills=document.getElementById('ownerAssignedTechPills'); if(!id||!pills) return;
+  if(pills.querySelector(`[data-tech-id="${CSS.escape(id)}"]`)) return;
+  const p=ownerAssignmentProfiles.find(x=>x.user_id===id); const label=p?.full_name||p?.username||'Technician';
+  const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id; pill.dataset.techRole=role||p?.role||'';
+  pill.innerHTML=`<span class='wl-tech-role-dot'>${(role||p?.role)==='it'?'IT':'SVC'}</span><span>${esc(label)}</span><button type='button' data-remove-tech aria-label='Remove ${esc(label)}'>×</button>`;
+  pills.appendChild(pill);
 }
 function refreshOwnerAssignmentTechOptions() {
-  const role = document.getElementById('ownerAssignRole')?.value || 'it';
-  const select = document.getElementById('ownerAssignTech');
-  const hint = document.getElementById('ownerAssignTechHint');
-  if (!select) return;
-  const pills = document.getElementById('ownerAssignedTechPills');
-  if (pills) pills.innerHTML = '';
-  if (role === 'both') {
-    select.innerHTML = `<option value=''>Both Department Queues</option>`;
-    select.disabled = true;
-    const add = document.getElementById('ownerAddTech'); if (add) add.disabled = true;
-    if (hint) { const wt=document.getElementById('ownerAssignWorkType')?.value || 'service'; hint.textContent = wt === 'pickup' ? 'Pickup order: Service checks the equipment back in first → actual units go to IT Intake → IT checks the units into shop inventory.' : 'Delivery / Swap order: IT prepares first → creates the handoff → Service verifies and takes the equipment.'; }
-  } else {
-    select.disabled = false;
-    select.innerHTML = ownerAssignmentTechOptions(role);
-    const add = document.getElementById('ownerAddTech'); if (add) add.disabled = false;
-    if (hint) hint.textContent = `Add one or more ${role === 'it' ? 'IT' : 'Service'} technicians. If you add nobody, it goes to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
+  const role=document.getElementById('ownerAssignRole')?.value||'it';
+  document.querySelectorAll('[data-owner-role]').forEach(b=>b.classList.toggle('on',b.dataset.ownerRole===role));
+  const pills=document.getElementById('ownerAssignedTechPills');
+  if(pills) pills.querySelectorAll('[data-tech-id]').forEach(el=>{ if(role!=='both' && el.dataset.techRole!==role) el.remove(); });
+  const picker=document.getElementById('ownerTechPicker'); if(picker) picker.innerHTML=ownerTechPickerHtml(role);
+  const hint=document.getElementById('ownerAssignTechHint');
+  if(hint) {
+    const wt=document.getElementById('ownerAssignWorkType')?.value||'service';
+    hint.textContent=role==='both'
+      ? (wt==='pickup' ? 'Service checks the pickup in first → IT completes unit intake. You can add specific Service techs, IT techs, or both.' : 'IT prepares first → Service receives the handoff. You can add specific IT techs, Service techs, or both.')
+      : `Add specific ${role==='it'?'IT':'Service'} techs, or leave blank for the department queue.`;
   }
-  document.getElementById('ownerAssignParts')?.classList.remove('hidden');
   refreshOwnerWorkTypeLabels();
 }
 function refreshOwnerWorkTypeLabels() {
@@ -2604,8 +2610,8 @@ async function ownerAssignJob() {
   const requestedUnitCount = requestedUnitCountRaw === '' || requestedUnitCountRaw == null ? null : Math.max(0, Math.floor(Number(requestedUnitCountRaw || 0)));
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
-  const techSelect = document.getElementById('ownerAssignTech');
-  const assignees = role === 'both' ? [] : [...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')].map(el => el.dataset.techId).filter(Boolean);
+  const techPills = [...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')];
+  const assignees = techPills.map(el => el.dataset.techId).filter(Boolean);
   const assignee = assignees[0] || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
@@ -2623,9 +2629,12 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const targets = role === 'both'
-    ? (workType === 'pickup' ? [{ role:'service', assignee:null }, { role:'it', assignee:null }] : [{ role:'it', assignee:null }, { role:'service', assignee:null }])
-    : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
+  const selectedTargets = techPills.map(el => ({ role:el.dataset.techRole || role, assignee:el.dataset.techId }));
+  const targets = selectedTargets.length
+    ? selectedTargets
+    : role === 'both'
+      ? (workType === 'pickup' ? [{ role:'service', assignee:null }, { role:'it', assignee:null }] : [{ role:'it', assignee:null }, { role:'service', assignee:null }])
+      : [{ role, assignee:null }];
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
   for (const target of targets) {
@@ -2778,7 +2787,9 @@ document.addEventListener('click', async e => {
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
 document.addEventListener('change', e => {
-  if (e.target?.id === 'ownerAddTech') { e.preventDefault(); addOwnerTechPill(); }
+  if (e.target?.id === 'ownerAddTech') { e.preventDefault(); const p=document.getElementById('ownerTechPicker'); if(p){ p.classList.toggle('hidden'); p.innerHTML=ownerTechPickerHtml(document.getElementById('ownerAssignRole')?.value||'it'); } }
+  const roleBtn=e.target?.closest?.('[data-owner-role]'); if(roleBtn){ e.preventDefault(); const input=document.getElementById('ownerAssignRole'); if(input) input.value=roleBtn.dataset.ownerRole; refreshOwnerAssignmentTechOptions(); }
+  const techBtn=e.target?.closest?.('[data-add-tech-id]'); if(techBtn){ e.preventDefault(); addOwnerTechPill(techBtn.dataset.addTechId,techBtn.dataset.addTechRole); }
   if (e.target?.matches?.('[data-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); }
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
   if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); const role=document.getElementById('ownerAssignRole')?.value; if(role==='both') refreshOwnerAssignmentTechOptions(); }
