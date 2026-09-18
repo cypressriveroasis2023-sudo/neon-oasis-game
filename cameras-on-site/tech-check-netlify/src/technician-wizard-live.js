@@ -729,6 +729,7 @@ function ticketPartsInputsHtml(prefix='wlPart', data={}) {
 }
 const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const OWNER_STAND_TYPES = ['110V Stand','Solar Stand','Solar Pole','Pole'];
+function equipmentDisplayLabel(label) { return label === 'Recon 2' ? 'Recon II' : label; }
 function normalizedEquipmentManifest(raw) {
   return (Array.isArray(raw) ? raw : []).map(row => ({
     category: ['device','stand','other'].includes(row?.category) ? row.category : 'other',
@@ -774,7 +775,7 @@ function ownerEquipmentTypeList(category) {
 function ownerEquipmentQtyGrid(category) {
   return ownerEquipmentTypeList(category).map(label => {
     const available = ownerAssignmentAssets.filter(a => a.asset_category === category && a.asset_type === label && a.availability_status === 'shop').length;
-    return `<label class='wl-owner-equipment-qty'><span>${esc(eqLabel(label))}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
@@ -788,7 +789,7 @@ function itEquipmentQtyGrid(category, data=[]) {
   const types=category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
   return types.map(label => {
     const qty=rows.find(row => row.category===category && row.label===label)?.qty || 0;
-    return `<label class='wl-owner-equipment-qty'><span>${esc(eqLabel(label))}</span><input type='number' inputmode='numeric' min='0' step='1' value='${qty}' data-it-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><input type='number' inputmode='numeric' min='0' step='1' value='${qty}' data-it-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
   }).join('');
 }
 function itEquipmentManifestInputsHtml(data=[]) {
@@ -1524,7 +1525,7 @@ function showSvcTicketConfirmation() {
   const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Total equipment items IT is giving you:</b> ${forms.length}</div>${equipmentManifestInlineHtml(activeSvcPrep)}${types.length ? `<div class='small top8'><b>Checked equipment types:</b> ${esc(types.map(eqLabel).join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div><div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
+  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Total equipment items IT is giving you:</b> ${forms.length}</div>${equipmentManifestInlineHtml(activeSvcPrep)}${types.length ? `<div class='small top8'><b>Checked equipment types:</b> ${esc(types.map(equipmentDisplayLabel).join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div><div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
   resetWizardPosition();
 }
 function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPreps > .item.prepared')].find(c => c.textContent.includes(`MHelpDesk Ticket #${ticket}`)); }
