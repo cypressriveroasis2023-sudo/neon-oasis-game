@@ -2547,14 +2547,37 @@ function refreshOwnerAssignmentTechOptions() {
 function refreshOwnerWorkTypeLabels() {
   const type = document.getElementById('ownerAssignWorkType')?.value || 'service';
   const pickup = type === 'pickup';
+  const swap = type === 'swap';
+  const delivery = type === 'delivery';
+  const action = pickup ? 'Being Picked Up' : swap ? 'Being Swapped' : delivery ? 'Being Delivered' : 'Required';
   const countLabel = document.getElementById('ownerAssignUnitCountLabel');
-  if (countLabel) countLabel.textContent = pickup ? 'Units Being Picked Up' : 'Units Required';
+  if (countLabel) countLabel.textContent = `Units ${action}`;
   const unitHeading = document.querySelector('#ownerAssignParts .unitArea .wl-requirement-heading');
-  if (unitHeading) unitHeading.textContent = pickup ? 'UNIT AREA — Units / Devices Being Picked Up' : 'UNIT AREA — Units / Devices Being Sent';
+  if (unitHeading) unitHeading.textContent = `UNIT AREA — Units / Devices ${action}`;
   const unitHelp = document.querySelector('#ownerAssignParts .unitArea .small');
-  if (unitHelp) unitHelp.textContent = pickup ? 'Enter the unit types and quantities being PICKED UP from the customer/site. These are coming back to the shop — they are not shelf inventory.' : 'Choose the unit types and quantities that match the MHelpDesk ticket.';
+  if (unitHelp) unitHelp.textContent = pickup
+    ? 'Enter the unit types and quantities being PICKED UP from the customer/site. These are coming back to the shop — they are not shelf inventory.'
+    : swap
+      ? 'Enter the replacement units going out for the SWAP. Use the stand area below for any solar stands, poles, or panels involved in the swap.'
+      : delivery
+        ? 'Enter the unit types and quantities being DELIVERED. Use the stand area below for solar stands, poles, or panels being delivered.'
+        : 'Choose the unit types and quantities that match the MHelpDesk ticket.';
   const standHeading = document.querySelector('#ownerAssignParts .standArea .wl-requirement-heading');
-  if (standHeading) standHeading.textContent = pickup ? 'STAND AREA — Stands / Poles Being Picked Up' : 'STAND AREA — Manual Stand Requirements';
+  if (standHeading) standHeading.textContent = pickup
+    ? 'STAND AREA — Solar Stands / Poles / Panels Being Picked Up'
+    : swap
+      ? 'STAND AREA — Solar Stands / Poles / Panels Being Swapped'
+      : delivery
+        ? 'STAND AREA — Solar Stands / Poles / Panels Being Delivered'
+        : 'STAND AREA — Manual Stand Requirements';
+  const standHelp = document.querySelector('#ownerAssignParts .standArea .small');
+  if (standHelp) standHelp.textContent = pickup
+    ? 'Enter the solar stands, poles, and removable solar panels being PICKED UP and returned to the shop.'
+    : swap
+      ? 'Enter the solar stands, poles, and removable solar panels being SWAPPED. This is separate from the unit/device count above.'
+      : delivery
+        ? 'Enter any solar stands, poles, and removable solar panels being DELIVERED. Automatic Solar Spotter/Ranger requirements still apply.'
+        : 'Use this only when the MHelpDesk job specifically calls for a stand as part of IT prep.';
   document.querySelectorAll('#ownerAssignParts [data-owner-stock-count]').forEach(el => {
     el.style.display = pickup ? 'none' : '';
   });
