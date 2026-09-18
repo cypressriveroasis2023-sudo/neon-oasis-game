@@ -847,7 +847,7 @@ function draftedUnitCount() {
 function updateUnitCountStatus() {
   const status = document.getElementById('wlUnitCountStatus');
   if (!status) return;
-  const expected = expectedUnitCount();
+  const expected = expectedPrepItemCount();
   const added = draftedUnitCount();
   const remaining = expected - added;
   status.className = remaining === 0 ? 'ok' : remaining > 0 ? 'warn' : 'bad';
@@ -858,7 +858,9 @@ function showNewPrep() {
   if (!p.card) return;
   itCreateStep = 0;
   const totalWrap = ensureTotalUnitsField(p.ticket);
+  const equipmentWrap = ensureITEquipmentManifestFields(p.ticket);
   const partsWrap = ensureTicketPartsFields(p.ticket);
+  if (equipmentWrap && partsWrap && equipmentWrap.nextSibling !== partsWrap) p.ticket.insertBefore(equipmentWrap, partsWrap);
   hideChildren(viewIT(), [p.card]);
   [...p.card.children].forEach(el => el.style.display = 'none');
   let head = document.getElementById('wlCreateHead');
@@ -869,42 +871,51 @@ function showNewPrep() {
   nav.style.display = '';
   if (p.ticket) p.ticket.style.display = 'grid';
   if (totalWrap) totalWrap.style.display = '';
+  if (equipmentWrap) equipmentWrap.style.display = '';
   if (partsWrap) partsWrap.style.display = '';
   head.innerHTML = progress('Job Setup', 'Enter the ticket, units, and parts required', 1, 1);
   let req = document.getElementById('wlAssignedEquipmentReq');
   if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
   req.style.display = pendingAssignmentManifest.length ? '' : 'none';
-  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Requested From Shelf</b><div class='small'>Use this as the equipment list for the assigned MHelpDesk job.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
+  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment</b><div class='small'>The Unit Area and Stand Area above were prefilled from the Owner assignment. They must match before you start the Tech Check.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
 function validateCreateStep() {
   if (!document.getElementById('itTicket')?.value.trim()) { alert('Enter the MHelpDesk ticket number first.'); return false; }
   if (!document.getElementById('itSite')?.value.trim()) { alert('Enter the ticket name / customer / site so Service can verify the same ticket.'); return false; }
-  const total = expectedUnitCount();
-  if (total < 1) { alert('Enter how many total units will be checked for this ticket.'); return false; }
-  itExpectedUnits = total;
+  const manifest = readITEquipmentManifest();
+  const unitCount = equipmentManifestDeviceTotal(manifest);
+  const standCount = equipmentManifestStandTotal(manifest);
+  const totalItems = unitCount + standCount;
+  if (totalItems < 1) { alert('Choose at least one unit/device or stand being sent out.'); return false; }
+  if (expectedUnitCount() !== unitCount) { alert('The Unit Area total does not match the Total Units / Devices field.'); return false; }
+  if (pendingAssignmentManifest.length && equipmentManifestKey(manifest) !== equipmentManifestKey(pendingAssignmentManifest)) {
+    alert('This assigned job must match the Owner’s Unit Area and Stand Area. If the equipment changed, have the Owner update the assignment before continuing.');
+    return false;
+  }
+  itExpectedUnits = totalItems;
   return true;
 }
 async function createPrepAndStartChecks() {
   if (!validateCreateStep()) return;
   const ticket = document.getElementById('itTicket').value.trim();
   const site = document.getElementById('itSite').value.trim();
-  const total = expectedUnitCount();
+  const manifest = readITEquipmentManifest();
+  const requestedUnits = equipmentManifestDeviceTotal(manifest);
+  const totalItems = requestedUnits + equipmentManifestStandTotal(manifest);
   const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v2', {
+  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v3', {
     p_ticket_no: ticket,
     p_site: site,
-    p_expected_unit_count: total,
+    p_requested_unit_count: requestedUnits,
+    p_equipment_manifest: manifest,
     p_solar_panel_qty: parts.solar_panel_qty,
     p_battery_replacement_qty: parts.battery_replacement_qty,
     p_camera_replacement_qty: parts.camera_replacement_qty,
     p_sim_replacement_qty: parts.sim_replacement_qty,
     p_micro_sd_qty: parts.micro_sd_qty,
-    p_equipment_manifest: equipmentManifest,
-    p_requires_it_handoff: false,
-    p_scheduled_for: scheduledFor,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -918,8 +929,9 @@ async function createPrepAndStartChecks() {
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
   if (totalInput) totalInput.value = '';
+  document.querySelectorAll('#wlITEquipmentWrap [data-it-equipment-qty]').forEach(input => { input.value='0'; });
   fillTicketPartInputs({}, 'wlPart');
-  itExpectedUnits = total;
+  itExpectedUnits = totalItems;
   await window.refreshData?.();
   return showItPrep(prepId);
 }
