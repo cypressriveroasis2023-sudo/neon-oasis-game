@@ -595,10 +595,27 @@ async function setupNotificationRealtime() {
     .subscribe();
   refreshNotificationBadge();
 }
+async function assignmentGateState(assignment) {
+  const workType=String(assignment?.work_type||'').toLowerCase();
+  if(workType==='pickup'){
+    if(assignment.assigned_role==='service') return {ready:true,label:'SERVICE FIRST — PICKUP'};
+    const {data}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
+    return data?.length ? {ready:true,label:'Service return received',returnId:data[0].id} : {ready:false,label:'WAITING FOR SERVICE RETURN',detail:'Pickup starts with Service. Service must finish the field pickup and check the returned equipment into IT Intake before IT can start.'};
+  }
+  if (!assignment?.requires_it_handoff) return {ready:true,label:''};
+  if (assignment.assigned_role==='service'){
+    const {data}=await liveDb.from('prep_tickets').select('id,status').eq('ticket_no',assignment.ticket_no).in('status',['released','closed']).order('released_at',{ascending:false}).limit(1);
+    return data?.length ? {ready:true,label:'IT handoff received'} : {ready:false,label:'WAITING FOR IT HANDOFF',detail:'IT must finish its Tech Check and create the Service handoff before Service can start.'};
+  }
+  const {data}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
+  return data?.length ? {ready:true,label:'Service return received',returnId:data[0].id} : {ready:false,label:'WAITING FOR SERVICE RETURN',detail:'Service must finish the field pickup/return and hand the unit to IT Intake before IT can start.'};
+}
 async function startAssignedJob(id) {
   let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
   let assignment = rows?.[0];
   if (!assignment) return alert('That assignment is no longer available.');
+  const gate = await assignmentGateState(assignment);
+  if (!gate.ready) return alert(gate.label + '\n\n' + gate.detail);
 
   if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
     const { error: claimError } = await liveDb.rpc('claim_my_department_assignment', { p_assignment_id: id });
@@ -613,6 +630,12 @@ async function startAssignedJob(id) {
   }
 
   if (assignment.assigned_role === 'it') {
+    if (String(assignment.work_type||'').toLowerCase()==='pickup') {
+      if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
+      const { data: returns } = await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
+      if (!returns?.length) return alert('WAITING FOR SERVICE RETURN\n\nPickup starts with Service. IT Intake cannot begin until Service checks the returned equipment in.');
+      return startITIntake(returns[0].id);
+    }
     const tech = await currentTechIdentity();
     const { data: existing } = await liveDb.from('prep_tickets')
       .select('id,ticket_no,status,created_by')
@@ -646,6 +669,13 @@ async function startAssignedJob(id) {
   }
 
   activeSvcAssignment = assignment;
+  if (String(assignment.work_type || '').toLowerCase()==='pickup') {
+    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
+    serviceReturn={ step:1, ticket:String(assignment.ticket_no||''), unit:'', type:'', notes:'', photo:null, conditionPhotos:[], damagePhotos:[], knownUnits:await rememberedUnitsForTicket(assignment.ticket_no) };
+    serviceReturnRecovered=false;
+    await saveServiceReturnDraft();
+    return renderServiceReturn();
+  }
   const { data: released } = await liveDb.from('prep_tickets')
     .select('id,ticket_no,status')
     .eq('ticket_no', assignment.ticket_no)
