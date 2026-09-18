@@ -162,6 +162,8 @@ function showAuth() {
     preps: [],
     reports: [],
     profiles: [],
+    resetRequests: [],
+    unitRegistry: [],
     assetInventory: [],
     assetHistory: [],
     accessHistory: [],
@@ -392,6 +394,21 @@ function setupRealtime() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'profiles' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'asset_inventory' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'asset_inventory_history' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'team_access_history' },
       scheduleRefreshData
     )
     .on(
