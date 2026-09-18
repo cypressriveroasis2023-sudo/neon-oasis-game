@@ -818,7 +818,7 @@ function ownerEquipmentQtyGrid(category) {
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
-  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Choose any stands or poles going out with this ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Manual Stand Requirements</div><div class='small'>Use this only when the MHelpDesk job specifically calls for a stand as part of IT prep. For a Solar Spotter DELIVERY, Tech Check automatically creates the Service-side Solar Stand checkout, so do not add that automatic stand here.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
 }
 function readOwnerEquipmentManifest() {
   return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
@@ -2466,7 +2466,7 @@ async function installOwnerAssignments(force = false) {
       <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
         <div class='qtext'>Parts Required From This Ticket</div>
-        <div class='small'>Choose the exact units/devices, stands, and extra parts this assignment requires. Service assignments can include a Solar Stand for the pre-trip Solar / Helios verification.</div>
+        <div class='small'>Choose the exact units/devices and any manual stand/part requirements from the MHelpDesk ticket. DELIVERY jobs automatically create the Service-side Solar Spotter/Ranger checkout requirements shown below.</div>
         ${ownerEquipmentManifestInputsHtml()}
         <div id='ownerAutoServicePlan' class='hidden'></div>
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
