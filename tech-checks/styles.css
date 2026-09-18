@@ -2040,3 +2040,7 @@ select {
   display: block;
   color: #173c58;
 }
+
+/* Owner assignment technician pills */
+.wl-tech-add-row{display:flex;gap:8px;align-items:center}.wl-tech-add-row select{flex:1}.wl-tech-add-row .btn{white-space:nowrap}
+.wl-tech-pills{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 8px}.wl-tech-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #b8c5d4;border-radius:999px;background:#f4f7fa;font-weight:700;font-size:12px}.wl-tech-pill button{border:0;background:transparent;font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
