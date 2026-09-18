@@ -1,31 +1,345 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>Tech Checks at Cameras On Site</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#18222d;padding:30px;text-align:center}strong{display:block;margin-top:30vh;font-size:22px}</style>
-</head>
-<body><strong>Loading Tech Checks at Cameras On Site…</strong>
-<script>
-(async()=>{
-  try{
-    const build='20260916-2342';
-    const r=await fetch('../cameras-on-site/shared/index.html?build='+build,{cache:'no-store'});
-    let html=await r.text();
-    html=html.replace('<title>Cameras On Site Technician Readiness</title>','<title>Tech Checks at Cameras On Site</title>')
-             .replaceAll('<div>Technician Readiness</div>','<div>Tech Checks at Cameras On Site</div>')
-             .replace('src="core.js"','src="../cameras-on-site/shared/core.js?build='+build+'"')
-             .replace('src="it.js"','src="../cameras-on-site/shared/it.js?build='+build+'"')
-             .replace('src="service.js"','src="../cameras-on-site/shared/service.js?build='+build+'"')
-             .replace('src="owner.js"','src="../cameras-on-site/shared/owner.js?build='+build+'"')
-             .replace('src="../logo.svg"','src="../cameras-on-site/logo.svg"');
-    document.open();document.write(html);document.close();
-  }catch(e){document.body.innerHTML='<strong>Could not load Tech Checks at Cameras On Site. Please refresh.</strong>'}
-})();
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101820" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Tech Check" />
+    <title>Tech Check by Cameras Onsite</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="authView" class="wrap auth">
+        <div class="hero">
+          <div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div>
+        </div>
+        <div class="card">
+          <h2>Sign In</h2>
+          <label>Username</label
+          ><input
+            id="loginUsername"
+            type="text"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            placeholder="Username"
+          />
+          <label class="top10">Password</label
+          ><input
+            id="loginPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Password"
+          />
+          <button class="btn" onclick="login()">Sign In</button>
+          <button class="mini full top10" type="button" onclick="toggleResetRequestCard()">Forgot password?</button>
+          <div id="loginMessage"></div>
+        </div>
+        <div id="resetRequestCard" class="card hidden">
+          <h3>Password Reset Request</h3>
+          <div class="small">Enter your Tech Check username. The Owner/Admin must approve the request before the system issues a one-time temporary password.</div>
+          <label class="top10">Username</label><input id="resetUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" />
+          <button class="btn" type="button" onclick="requestPasswordReset()">Request Password Reset</button>
+          <button id="resetStatusButton" class="mini full top10 hidden" type="button" onclick="checkPasswordReset()">Check Reset Status</button>
+          <div id="resetRequestMessage"></div>
+          <div id="resetTempBox" class="ok top10 hidden"><b>One-Time Temporary Password</b><div id="resetTemporaryPassword" class="resetTempPassword"></div><div class="small top8">This temporary password works only until you sign in and create your private password.</div><button class="btn top10" type="button" onclick="useTemporaryResetPassword()">Sign In & Create My Private Password</button></div>
+        </div>
+      </div>
+
+      <div id="forcePasswordView" class="wrap auth hidden">
+        <div class="hero"><div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div></div>
+        <div class="card">
+          <h2>Create Your Private Password</h2>
+          <div id="forcePasswordIntro" class="small">Your temporary password worked. Before using Tech Check, create a private password that only you know. This is required one time after account setup or an Owner reset.</div>
+          <label class="top10">New Private Password</label><input id="forcedNewPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+          <label class="top10">Confirm Private Password</label><input id="forcedConfirmPassword" type="password" autocomplete="new-password" placeholder="Type it again" />
+          <button class="btn" type="button" onclick="saveForcedPassword()">Save Private Password & Continue</button>
+          <button class="mini full top10 danger" type="button" onclick="logout()">Sign Out</button>
+          <div id="forcedPasswordMessage"></div>
+        </div>
+      </div>
+
+      <div id="appView" class="wrap hidden">
+        <div id="connectionBanner" class="connectionBanner hidden" role="status" aria-live="polite"></div>
+        <div class="mobileTop">
+        <div class="hero">
+          <div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div>
+        </div>
+        <div class="accountbar">
+          <div>
+            <b id="whoName">Technician</b>
+            <span id="whoRole" class="pill"></span>
+            <div id="syncStatus" class="small">Connected to shared data</div>
+          </div>
+          <div class="row">
+            <button class="mini" onclick="refreshData()">Refresh</button
+            ><button class="mini" onclick="togglePasswordCard()">
+              Change Password</button
+            ><button class="mini danger" onclick="logout()">Sign Out</button>
+          </div>
+        </div>
+        <div id="passwordCard" class="card hidden">
+          <h3>Change My Password</h3>
+          <label>New Password</label
+          ><input
+            id="myNewPassword"
+            type="password"
+            placeholder="At least 8 characters"
+          /><button class="btn" onclick="changeMyPassword()">
+            Update Password
+          </button>
+          <div id="passwordMessage"></div>
+        </div>
+
+        <div class="tabs">
+          <button id="tab-it" onclick="show('it')">IT Technician</button><div id="itWelcome" class="itWelcome" aria-live="polite"><b>Welcome, Technician</b><span id="itWelcomeDateTime"></span></div><div id="itWeather" class="itWeather" aria-live="polite"><b>☁ Katy Weather</b><span id="itWeatherNow">Loading weather…</span></div><button id="tab-svc" onclick="show('svc')">Service Tech</button
+          ><button id="tab-owner" onclick="show('owner')">Owner</button>
+        </div>
+        </div>
+
+        <section id="view-it" class="hidden">
+          <div class="card">
+            <div class="sectiontitle">
+              <h2>Create IT Equipment Prep From MHelpDesk Ticket</h2>
+              <span class="pill">Step 1</span>
+            </div>
+            <p class="small">
+              Read the MHelpDesk ticket first. Add every unit that must be taken
+              as a <b>BACKUP</b>, <b>SWAP</b>, or <b>DELIVERY</b>. DELIVERY
+              equipment requires the full IT readiness checklist before release.
+            </p>
+            <div class="grid">
+              <div>
+                <label>MHelpDesk Ticket #</label
+                ><input
+                  id="itTicket"
+                  inputmode="numeric"
+                  placeholder="Ticket #"
+                />
+              </div>
+              <div>
+                <label>Customer / Site</label
+                ><input id="itSite" placeholder="Site or customer" />
+              </div>
+            </div>
+            <h3>Equipment Required by This Ticket</h3>
+            <div class="grid3">
+              <div>
+                <label>Equipment Type</label
+                ><select id="needType" onchange="toggleReconBatteryInput()">
+                  <option>Sniper</option>
+                  <option>Ranger</option>
+                  <option>Helios</option>
+                  <option>Solar Spotter</option>
+                  <option>Spotter</option>
+                  <option value="Recon 2">Recon II</option>
+                </select>
+              </div>
+              <div>
+                <label>Purpose</label
+                ><select id="needPurpose">
+                  <option value="BACKUP">BACKUP</option>
+                  <option value="SWAP">SWAP</option>
+                  <option value="DELIVERY">DELIVERY</option>
+                </select>
+              </div>
+              <div>
+                <label>Unit Qty from MHelpDesk</label
+                ><input id="needQty" type="number" min="1" value="1" />
+              </div>
+            </div>
+            <div id="reconBatteryWrap" class="hidden top10">
+              <label>Recon II Camera / Battery Count Per Unit</label
+              ><input id="reconBatteryQty" type="number" min="1" value="1" />
+              <div class="small">
+                Enter the camera count called for by the MHelpDesk ticket.
+                Example: bridge with 3 cameras = 3 Recon batteries.
+              </div>
+            </div>
+            <button class="mini full top8" onclick="addNeed()">
+              Add Requirement
+            </button>
+            <div id="needDraft"></div>
+            <button class="btn" onclick="createPrep()">
+              Create IT Equipment Prep
+            </button>
+            <div id="itCreateMessage"></div>
+          </div>
+          <div class="card">
+            <div class="sectiontitle">
+              <h2>IT Equipment Prep</h2>
+              <span id="openPrepCount" class="pill">0 open</span>
+            </div>
+            <div class="small">
+              Verify exact unit tags and battery requirements. DELIVERY items
+              also require SIM, camera app, SD card, recording, charging,
+              monitoring, and MHelpDesk quantity checks before release.
+            </div>
+            <div id="itPreps"></div>
+          </div>
+        </section>
+
+        <section id="view-svc" class="hidden">
+          <div class="card">
+            <div class="sectiontitle">
+              <h2>Service Tech Morning Start</h2>
+              <span class="pill">Step 2</span>
+            </div>
+            <div class="check">
+              <input
+                id="mhelpReviewed"
+                type="checkbox"
+                onchange="updateMorningStatus()"
+              />
+              <div>
+                <b>Reviewed today’s MHelpDesk jobs</b>
+                <div class="small">
+                  Confirm all jobs for today before checking out equipment.
+                </div>
+              </div>
+            </div>
+            <label class="top10"
+              >MHelpDesk Ticket # needing BACKUP / SWAP / DELIVERY
+              equipment</label
+            >
+            <div class="lookup">
+              <input
+                id="svcLookup"
+                inputmode="numeric"
+                placeholder="Enter ticket #"
+              /><button class="mini" onclick="findPrep()">Match Ticket</button>
+            </div>
+            <div id="lookupMessage"></div>
+            <div id="sessionClosed"></div>
+          </div>
+          <div class="card">
+            <h2>Matched IT-Prepared Equipment</h2>
+            <div class="small">
+              Confirm the exact unit tag and physically count the required
+              batteries or battery box before completing equipment checkout
+              verification.
+            </div>
+            <div id="matchedPreps"></div>
+          </div>
+          <div class="card">
+            <h2>Truck Inspection</h2>
+            <div id="truckChecks"></div>
+            <div class="check">
+              <input
+                id="takingTrailer"
+                type="checkbox"
+                onchange="toggleTrailer()"
+              />
+              <div>
+                <b>Taking a trailer today</b>
+                <div class="small">
+                  If selected, trailer inspection becomes required.
+                </div>
+              </div>
+            </div>
+            <div id="trailerArea" class="hidden">
+              <div class="subhead">Trailer Inspection</div>
+              <div id="trailerChecks"></div>
+            </div>
+            <div id="truckStatus"></div>
+            <button class="btn" onclick="submitMorning()">
+              Finish & Submit Morning Check
+            </button>
+            <div id="morningMessage"></div>
+          </div>
+        </section>
+
+        <section id="view-owner" class="hidden">
+          <div id="ownerAttentionCard" class="card ownerAttentionCard">
+            <div class="sectiontitle"><div><h2>Needs Attention</h2><div class="small">Your live control center for work that is waiting, blocked, overdue, or needs an Owner action.</div></div><span id="ownerAttentionBadge" class="pill">0</span></div>
+            <div id="ownerAttention"></div>
+          </div>
+          <div class="card">
+            <div class="sectiontitle"><div><h2>Unit Status & Search</h2><div class="small">Search by unit tag, MHelpDesk ticket, equipment type, current status, or last technician. The app blocks the same unit from being active in conflicting workflows.</div></div><span class="pill">LIVE</span></div>
+            <input id="ownerUnitSearch" type="search" placeholder="Search Unit 008, MHelpDesk #, Helios, deployed…" oninput="renderOwnerUnitSearch()" />
+            <div id="ownerUnitSearchResults"></div>
+          </div>
+          <div class="card">
+            <div class="sectiontitle">
+              <h2>Active Equipment Handoffs</h2>
+              <span class="pill">Owner</span>
+            </div>
+            <div id="ownerPrepSummary"></div><div id="ownerPrepStatus"></div><details class="ownerHistoryFold"><summary>Completed Equipment History <span id="ownerPrepHistoryCount" class="pill">0</span></summary><div id="ownerPrepHistory"></div></details>
+          </div>
+          <div class="card">
+            <h2>Recent Activity</h2>
+            <div class="small">The newest technician activity appears first. Use Show More only when you need older records.</div>
+            <div id="reports"></div>
+            <button id="ownerReportsMore" class="mini top8 hidden" type="button">Show More Activity</button>
+          </div>
+          <div class="card">
+            <h2>Technician Accounts</h2>
+            <div class="small">
+              Only the Owner can create or change technician access. Techs sign
+              in with their own username and password. No company email address
+              is required.
+            </div>
+            <h3>Create Technician</h3>
+            <div class="grid4">
+              <div>
+                <label>Full Name</label
+                ><input id="newTechName" placeholder="Technician name" />
+              </div>
+              <div>
+                <label>Username</label
+                ><input
+                  id="newTechUsername"
+                  type="text"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="Username"
+                />
+              </div>
+              <div>
+                <label>Role</label
+                ><select id="newTechRole">
+                  <option value="service">Service Tech</option>
+                  <option value="it">IT Technician</option>
+                </select>
+              </div>
+              <div>
+                <label>Temporary Password</label
+                ><input
+                  id="newTechPassword"
+                  type="password"
+                  placeholder="8+ characters"
+                />
+              </div>
+            </div>
+            <button class="btn" onclick="createTech()">
+              Create Technician Login
+            </button>
+            <div id="userMessage"></div>
+            <div class="sep"></div>
+            <h3>Password Reset Requests</h3>
+            <div class="small">Techs can request a reset without exposing a private password. Approve a request and the system will issue a one-time temporary password back to the requesting device.</div>
+            <div id="passwordResetRequests"></div>
+            <div class="sep"></div>
+            <h3>Current Users</h3>
+            <div id="userList"></div>
+          </div>
+        </section>
+      </div>
+      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    </div>
+    <script type="module" src="./app.js"></script>
+    <script type="module" src="./technician-wizard-live.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+      }
+    </script>
+  </body>
 </html>
