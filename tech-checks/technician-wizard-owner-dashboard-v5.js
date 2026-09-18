@@ -814,7 +814,7 @@ function ownerEquipmentTypeList(category) {
 function ownerEquipmentQtyGrid(category) {
   return ownerEquipmentTypeList(category).map(label => {
     const available = ownerAssignmentAssets.filter(a => a.asset_category === category && a.asset_type === label && a.availability_status === 'shop').length;
-    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><small data-owner-stock-count>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
@@ -2471,7 +2471,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Units Required <span class='small'>(from MHelpDesk)</span></label><input id='ownerAssignUnitCount' type='number' inputmode='numeric' min='0' step='1' placeholder='Example: 2'></div>
+        <div><label><span id='ownerAssignUnitCountLabel'>Units Required</span> <span class='small'>(from MHelpDesk)</span></label><input id='ownerAssignUnitCount' type='number' inputmode='numeric' min='0' step='1' placeholder='Example: 2'></div>
         <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
       </div>
       <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
@@ -2488,7 +2488,7 @@ async function installOwnerAssignments(force = false) {
       </div>
       <div class='grid top10'>
         <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>IT + Service Departments</option></select></div>
-        <div><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
+        <div><label>Assign Technician(s)</label><select id='ownerAssignTech' multiple size='4'>${ownerAssignmentTechOptions('it')}</select><div id='ownerAssignTechHint' class='small'>Select one or more IT technicians. Leave all unselected to send it to the IT Department queue.</div></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
@@ -2524,19 +2524,39 @@ async function installOwnerAssignments(force = false) {
   host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
   refreshOwnerAutoServicePlan();
+  refreshOwnerWorkTypeLabels();
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
+  const hint = document.getElementById('ownerAssignTechHint');
   if (!select) return;
   if (role === 'both') {
     select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
     select.disabled = true;
+    if (hint) hint.textContent = 'This sends one linked assignment to each department queue. A technician from each department can claim their side.';
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
+    if (hint) hint.textContent = `Select one or more ${role === 'it' ? 'IT' : 'Service'} technicians. Leave all unselected to send it to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
   }
   document.getElementById('ownerAssignParts')?.classList.remove('hidden');
+  refreshOwnerWorkTypeLabels();
+}
+function refreshOwnerWorkTypeLabels() {
+  const type = document.getElementById('ownerAssignWorkType')?.value || 'service';
+  const pickup = type === 'pickup';
+  const countLabel = document.getElementById('ownerAssignUnitCountLabel');
+  if (countLabel) countLabel.textContent = pickup ? 'Units Being Picked Up' : 'Units Required';
+  const unitHeading = document.querySelector('#ownerAssignParts .unitArea .wl-requirement-heading');
+  if (unitHeading) unitHeading.textContent = pickup ? 'UNIT AREA — Units / Devices Being Picked Up' : 'UNIT AREA — Units / Devices Being Sent';
+  const unitHelp = document.querySelector('#ownerAssignParts .unitArea .small');
+  if (unitHelp) unitHelp.textContent = pickup ? 'Enter the unit types and quantities being PICKED UP from the customer/site. These are coming back to the shop — they are not shelf inventory.' : 'Choose the unit types and quantities that match the MHelpDesk ticket.';
+  const standHeading = document.querySelector('#ownerAssignParts .standArea .wl-requirement-heading');
+  if (standHeading) standHeading.textContent = pickup ? 'STAND AREA — Stands / Poles Being Picked Up' : 'STAND AREA — Manual Stand Requirements';
+  document.querySelectorAll('#ownerAssignParts [data-owner-stock-count]').forEach(el => {
+    el.style.display = pickup ? 'none' : '';
+  });
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
@@ -2546,7 +2566,9 @@ async function ownerAssignJob() {
   const requestedUnitCount = requestedUnitCountRaw === '' || requestedUnitCountRaw == null ? null : Math.max(0, Math.floor(Number(requestedUnitCountRaw || 0)));
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
-  const assignee = document.getElementById('ownerAssignTech')?.value || null;
+  const techSelect = document.getElementById('ownerAssignTech');
+  const assignees = role === 'both' ? [] : [...(techSelect?.selectedOptions || [])].map(o => o.value).filter(Boolean);
+  const assignee = assignees[0] || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
   const workType = document.getElementById('ownerAssignWorkType')?.value || 'service';
@@ -2563,14 +2585,18 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const rolesToSend = role === 'both' ? ['it','service'] : [role];
+  const targets = role === 'both'
+    ? [{ role:'it', assignee:null }, { role:'service', assignee:null }]
+    : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
+  const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
-  for (const targetRole of rolesToSend) {
+  for (const target of targets) {
+    const targetRole = target.role;
     const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
       p_ticket_no: ticket,
       p_site: site,
       p_assigned_role: targetRole,
-      p_assignee_user_id: role === 'both' ? null : assignee,
+      p_assignee_user_id: target.assignee,
       p_requested_unit_count: requestedUnitCount,
       p_unit_summary: units,
       p_job_description: description,
@@ -2609,7 +2635,7 @@ async function ownerAssignJob() {
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
-  const target = role === 'both' ? 'both the IT and Service Department queues' : assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  const target = role === 'both' ? 'both the IT and Service Department queues' : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
   alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
@@ -2715,6 +2741,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
+  if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
 
