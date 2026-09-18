@@ -2469,6 +2469,14 @@ async function installOwnerAssignments(force = false) {
         <b>MHelpDesk is separate from Tech Check.</b>
         <div class='small'>Use the current MHelpDesk ticket as the source of truth every time. Enter the MHelpDesk reference, unit count, equipment, and work exactly as shown there. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
       </div>
+      <div class='ownerWorkflowFirst'>
+        <div class='qtext'>1. What kind of MHelpDesk job is this?</div>
+        <div class='grid top8'>
+          <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select></div>
+          <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
+        </div>
+        <div id='ownerFlowHint' class='small top8'>Choose the job type first. The equipment and department flow below will update for that job.</div>
+      </div>
       <div class='grid top10'>
         <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
         <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
@@ -2484,10 +2492,6 @@ async function installOwnerAssignments(force = false) {
         ${ownerEquipmentManifestInputsHtml()}
         <div id='ownerAutoServicePlan' class='hidden'></div>
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
-      </div>
-      <div class='grid top10'>
-        <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='swap'>Swap</option><option value='service' selected>Service</option><option value='pickup'>Pickup</option></select></div>
-        <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
       </div>
       <div class='grid top10'>
         <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
@@ -2564,6 +2568,8 @@ function refreshOwnerWorkTypeLabels() {
   const swap = type === 'swap';
   const delivery = type === 'delivery';
   const action = pickup ? 'Being Picked Up' : swap ? 'Being Swapped' : delivery ? 'Being Delivered' : 'Required';
+  const flowHint=document.getElementById('ownerFlowHint');
+  if(flowHint) flowHint.innerHTML = pickup ? '<b>Pickup:</b> Service goes to the field first → returned equipment goes to IT Intake.' : swap ? '<b>Swap:</b> choose IT + Service for outgoing replacement prep, or Service + IT when the returned unit needs Service first → IT Intake.' : delivery ? '<b>Delivery:</b> IT prepares equipment first → Service receives the handoff and delivers it.' : '<b>Service:</b> choose the department order needed for this service call.';
   const countLabel = document.getElementById('ownerAssignUnitCountLabel');
   if (countLabel) countLabel.textContent = `Units ${action}`;
   const unitHeading = document.querySelector('#ownerAssignParts .unitArea .wl-requirement-heading');
