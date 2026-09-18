@@ -132,6 +132,7 @@ function injectStyles() {
     .wl-ticket{border:1px solid #d8dde2!important;box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .wl-issue-list{display:grid;gap:8px;margin-top:10px}.wl-issue-link{width:100%;border:1px solid #e5aaa6;border-radius:11px;background:#fff;color:#9e2119;padding:11px 12px;text-align:left;font-weight:850;cursor:pointer}.wl-issue-link:hover{background:#fff5f4}.wl-issue-link b{display:block;color:#741b15}.wl-issue-link span{display:block;font-size:12px;margin-top:2px;color:#9e2119}
     .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
+    .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -217,6 +218,10 @@ let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
 let pendingAssignmentLinkId = null;
+let helpWalkthroughStep = 0;
+let helpWalkthroughMode = 'help';
+let walkthroughCheckedUserId = null;
+let walkthroughDismissedSession = false;
 const TECHCHECK_VAPID_PUBLIC_KEY = 'BAvDfBdTqTbyOxAOYDQ25EfMKregOkdUmOkVW_BlHEQ4CP--otdlOCrDobnj7eVUg-5YMcjVM8sfLHg_qNr2fq0';
 
 function vapidKeyBytes(value) {
@@ -279,6 +284,99 @@ function currentRoleKey() {
   if (role.includes('Service Tech')) return 'service';
   return 'it';
 }
+function helpStepsForRole(role = currentRoleKey()) {
+  if (role === 'service') return [
+    { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
+    { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be sent directly to you or to the <b>Service Department queue</b>.</p><p>If it is a department task, tap <b>Claim & Start</b>. Once you claim it, the Owner can see which Service Tech took responsibility for the task.</p>` },
+    { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT releases equipment, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
+    { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
+    { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
+    { kicker:'RETURN TO IT', title:'Send returning units and parts back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
+    { kicker:'DAILY TOOLS', title:'Inspection, alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Use Notifications for assigned work and equipment-ready alerts. Use History to review work that has already been submitted.</p><p>Phone alerts only work after you enable them once on that device.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>SERVICE TECH CLAIMS</b><span>→</span><b>RECEIVE FROM IT</b><span>→</span><b>VERIFY UNITS + PARTS</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
+  ];
+  if (role === 'owner') return [
+    { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
+    { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows <b>Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
+    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p>IT Techs prepare and release equipment. Service Techs receive and verify the handoff, do the field work, and return equipment to IT. Returning equipment goes back through IT Intake before shelf inventory.</p>` },
+    { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
+  ];
+  return [
+    { kicker:'WELCOME', title:'IT Tech · How Tech Check Works', body:`<p>Tech Check is your equipment-prep and intake workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Owner-assigned work is the normal flow, but IT can still create an <b>on-the-fly Equipment Prep</b> when the job requires it.</p>` },
+    { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
+    { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units, and parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
+    { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
+    { kicker:'RELEASE TO SERVICE', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, release the equipment to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
+    { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for units and parts returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
+    { kicker:'ALERTS & HISTORY', title:'Use the app to stay on your work', body:`<p>Notifications tell you about new Owner assignments and returned units. Status & History shows previous IT work. Phone alerts only work after you enable them once on that device.</p>` },
+    { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>IT TECH CLAIMS</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>RELEASE TO SERVICE</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
+  ];
+}
+function ensureHelpOverlay() {
+  let overlay = document.getElementById('wlHelpOverlay');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'wlHelpOverlay';
+  overlay.className = 'wl-help-overlay hidden';
+  overlay.innerHTML = `<div class='wl-help-sheet'><div class='wl-help-head'><div><div class='wl-next-kicker'>CAMERAS ONSITE</div><h2>Help & Training</h2></div><button class='mini' data-wl-help-close>Close</button></div><div id='wlHelpBody'></div></div>`;
+  document.body.append(overlay);
+  return overlay;
+}
+function renderHelpWalkthrough() {
+  const overlay = ensureHelpOverlay();
+  const body = document.getElementById('wlHelpBody');
+  const steps = helpStepsForRole();
+  helpWalkthroughStep = Math.max(0, Math.min(helpWalkthroughStep, steps.length - 1));
+  const step = steps[helpWalkthroughStep];
+  const pct = Math.round((helpWalkthroughStep + 1) / steps.length * 100);
+  const firstTime = helpWalkthroughMode === 'first';
+  const last = helpWalkthroughStep === steps.length - 1;
+  body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div></div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
+  overlay.classList.remove('hidden');
+}
+async function openHelpWalkthrough(firstTime = false) {
+  helpWalkthroughMode = firstTime ? 'first' : 'help';
+  helpWalkthroughStep = 0;
+  if (!firstTime) {
+    const tech = await currentTechIdentity().catch(() => null);
+    if (tech?.id) await liveDb.from('technician_training_state').upsert({ user_id:tech.id, last_help_opened_at:new Date().toISOString(), updated_at:new Date().toISOString() }, { onConflict:'user_id' });
+  }
+  renderHelpWalkthrough();
+}
+async function completeHelpWalkthrough() {
+  if (helpWalkthroughMode !== 'first') { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  const tech = await currentTechIdentity().catch(() => null);
+  if (tech?.id) {
+    const now = new Date().toISOString();
+    const { error } = await liveDb.from('technician_training_state').upsert({ user_id:tech.id, walkthrough_completed_at:now, last_help_opened_at:now, updated_at:now }, { onConflict:'user_id' });
+    if (error) return alert(error.message);
+  }
+  document.getElementById('wlHelpOverlay')?.classList.add('hidden');
+}
+function ensureHelpButton() {
+  if (document.getElementById('helpTrainingButton')) return;
+  const notify = document.getElementById('notificationSettingsButton');
+  if (!notify) return;
+  const btn = document.createElement('button');
+  btn.id = 'helpTrainingButton';
+  btn.type = 'button';
+  btn.className = 'mini helpMini';
+  btn.title = 'Help & Training';
+  btn.setAttribute('aria-label','Help & Training');
+  btn.textContent = '? Help';
+  notify.insertAdjacentElement('afterend', btn);
+}
+async function maybeShowFirstTimeWalkthrough() {
+  if (walkthroughDismissedSession || document.getElementById('appView')?.classList.contains('hidden')) return;
+  const roleLabel = roleText();
+  if (!roleLabel.includes('IT Technician') && !roleLabel.includes('Service Tech')) return;
+  const tech = await currentTechIdentity().catch(() => null);
+  if (!tech?.id || walkthroughCheckedUserId === tech.id) return;
+  walkthroughCheckedUserId = tech.id;
+  const { data } = await liveDb.from('technician_training_state').select('walkthrough_completed_at').eq('user_id',tech.id).maybeSingle();
+  if (!data?.walkthrough_completed_at) openHelpWalkthrough(true);
+}
+
 async function myActiveAssignments(role = null) {
   const wantedRole = role || currentRoleKey();
   if (!['it','service'].includes(wantedRole)) return [];
@@ -2009,6 +2107,11 @@ async function installOwnerIntake(force = false) {
 }
 
 document.addEventListener('click', async e => {
+  if (e.target.closest('#helpTrainingButton')) return openHelpWalkthrough(false);
+  if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
+  if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('#notificationSettingsButton')) return openNotificationPanel();
   if (e.target.closest('[data-wl-notify-close]')) { document.getElementById('wlNotificationPanel')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-save-notify]')) return saveNotificationSettings();
@@ -2042,9 +2145,9 @@ document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
 function boot() {
-  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
+  injectStyles(); installTabs(); ensureHelpButton(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
-  if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); }
+  if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
 let bootQueued = false;
 function scheduleBoot() { if (bootQueued) return; bootQueued = true; requestAnimationFrame(() => { bootQueued = false; boot(); }); }
