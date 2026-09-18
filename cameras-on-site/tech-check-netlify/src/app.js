@@ -1060,8 +1060,30 @@ function resetMorningInputs() {
 }
 
 function ownerAgeHours(value) { const time = value ? new Date(value).getTime() : NaN; return Number.isFinite(time) ? Math.max(0,(Date.now()-time)/3600000) : 0; }
-function ownerJump(target) { const el = target === 'returns' ? document.getElementById('ownerIntakeTracking') : target === 'accounts' ? document.getElementById('passwordResetRequests')?.closest('.card') : target === 'activity' ? document.getElementById('reports')?.closest('.card') : document.getElementById('ownerPrepStatus')?.closest('.card'); if (el) { el.scrollIntoView({behavior:'smooth',block:'start'}); el.classList.add('ownerAttentionFlash'); setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200); } }
-function ownerOpenReturn(id) { const el=[...document.querySelectorAll('details[data-owner-return]')].find(x => x.dataset.ownerReturn===String(id)); if (!el) return ownerJump('returns'); el.open=true; el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('ownerAttentionFlash'); setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200); }
+function ownerJump(target) {
+  const el = target === 'returns'
+    ? document.getElementById('ownerIntakeTracking')
+    : target === 'accounts'
+      ? document.getElementById('ownerAccountsCard')
+      : target === 'activity'
+        ? document.getElementById('ownerActivityCard')
+        : document.getElementById('ownerHandoffsCard');
+  if (!el) return;
+  if (el.tagName === 'DETAILS') el.open = true;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  el.classList.add('ownerAttentionFlash');
+  setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200);
+}
+function ownerOpenReturn(id) {
+  const section = document.getElementById('ownerIntakeTracking');
+  if (section?.tagName === 'DETAILS') section.open = true;
+  const el=[...document.querySelectorAll('details[data-owner-return]')].find(x => x.dataset.ownerReturn===String(id));
+  if (!el) return ownerJump('returns');
+  el.open=true;
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.add('ownerAttentionFlash');
+  setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200);
+}
 function renderOwnerAttention() {
   if (state.profile?.role !== 'owner') return;
   const host = $('ownerAttention'); if (!host) return;
@@ -1079,7 +1101,15 @@ function renderOwnerAttention() {
   const overdueManager = manager.filter(r => ownerAgeHours(r.it_received_at || r.updated_at) >= 24);
   const ownerActions = manager.length + resetPending.length + failedInspections.length;
   const overdueCount = overdueDrafts.length + overdueReleased.length + overdueReturns.length + overdueManager.length;
-  $('ownerAttentionBadge').textContent = String(ownerActions + overdueCount);
+  const attentionCount = ownerActions + overdueCount;
+  const attentionBadge = $('ownerAttentionBadge');
+  if (attentionBadge) {
+    attentionBadge.textContent = String(attentionCount);
+    attentionBadge.classList.toggle('alert', attentionCount > 0);
+    attentionBadge.classList.toggle('neutral', attentionCount === 0);
+  }
+  const attentionCard = $('ownerAttentionCard');
+  if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
   const row = (kind,title,detail,target,urgent=false) => `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini' onclick="ownerJump('${target}')">Open →</button></div>`;
   const nextOwner = manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('activity')">Open Activity →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
@@ -1096,6 +1126,8 @@ function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',i
 function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
 function renderOwnerUnitSearch() {
   if (state.profile?.role !== 'owner') return;
+  const unitBadge = $('ownerUnitStatusBadge');
+  if (unitBadge) unitBadge.textContent = String((state.unitRegistry || []).length);
   const host = $('ownerUnitSearchResults'); if (!host) return;
   const q = String($('ownerUnitSearch')?.value || '').trim().toLowerCase();
   let rows = state.unitRegistry || [];
@@ -1154,6 +1186,14 @@ function renderOwner() {
   const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + ownerPartsEditor(p) + '<div class="top8"><b>Units / Equipment</b><div>' + ((p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '')).join(' · ') || 'No units started yet.') + '</div></div></div></details>';
   const draftCount = activePreps.filter(p => p.status === 'draft').length;
   const serviceCount = activePreps.filter(p => p.status === 'released').length;
+  const handoffBadge = $('ownerHandoffsBadge');
+  if (handoffBadge) {
+    handoffBadge.textContent = String(activePreps.length);
+    handoffBadge.classList.toggle('alert', activePreps.length > 0);
+    handoffBadge.classList.toggle('neutral', activePreps.length === 0);
+  }
+  const activityBadge = $('ownerActivityBadge');
+  if (activityBadge) activityBadge.textContent = String(state.reports.length);
   $('ownerPrepSummary').innerHTML = '<div class="wl-workstrip"><span><b>' + draftCount + '</b> IT preparing</span><span><b>' + serviceCount + '</b> waiting Service</span><span><b>' + activePreps.length + '</b> active tickets</span></div>';
   $('ownerPrepStatus').innerHTML = activePreps.length ? activePreps.slice().reverse().map(prepHtml).join('') : '<div class="ok"><b>✓ No active equipment handoffs.</b></div>';
   $('ownerPrepHistoryCount').textContent = String(completedPreps.length);
@@ -1211,6 +1251,14 @@ async function ownerReviewPasswordReset(id, approve) {
 }
 function renderUsers() {
   if (state.profile?.role !== 'owner') return;
+  const activeTechCount = state.profiles.filter(p => p.active && (p.role === 'it' || p.role === 'service')).length;
+  const resetCount = (state.resetRequests || []).filter(r => r.status === 'pending' && new Date(r.expires_at).getTime() > Date.now()).length;
+  const accountsBadge = $('ownerAccountsBadge');
+  if (accountsBadge) {
+    accountsBadge.textContent = resetCount ? `${resetCount} RESET${resetCount === 1 ? '' : 'S'}` : `${activeTechCount} TECH${activeTechCount === 1 ? '' : 'S'}`;
+    accountsBadge.classList.toggle('alert', resetCount > 0);
+    accountsBadge.classList.toggle('neutral', resetCount === 0);
+  }
   $('userList').innerHTML = state.profiles.length
     ? state.profiles
         .map(
@@ -1270,13 +1318,14 @@ async function resetUserPassword(id) {
 }
 function ensureStartFreshCard() {
   if ($('ownerResetCard')) return;
-  const card = document.createElement('div');
+  const card = document.createElement('details');
   card.id = 'ownerResetCard';
-  card.className = 'card';
+  card.className = 'card ownerDashSection ownerMaintenanceCard';
   card.innerHTML =
-    '<h2>Start Fresh / Clear Test Data</h2><div class="warn"><b>Owner only.</b><div class="small">Clears all equipment prep records, equipment checkout verifications, Owner reports, morning checks, and the operational unit-status registry. Technician accounts, usernames, roles, and passwords are kept.</div></div><button class="btn danger" onclick="startFresh()">Start Fresh — Clear Operational Data</button>';
-  const reportCard = $('reports')?.closest('.card');
-  if (reportCard) reportCard.after(card);
+    '<summary class="ownerDashSummary"><div><b>Maintenance</b><span>Clear test / operational data only when needed</span></div><span class="ownerDashBadge neutral">⚙</span></summary>' +
+    '<div class="ownerDashBody"><div class="warn"><b>Owner only.</b><div class="small">Clears all equipment prep records, equipment checkout verifications, Owner reports, morning checks, and the operational unit-status registry. Technician accounts, usernames, roles, and passwords are kept.</div></div><button class="btn danger" onclick="startFresh()">Start Fresh — Clear Operational Data</button></div>';
+  const accountsCard = $('ownerAccountsCard');
+  if (accountsCard) accountsCard.after(card);
   else $('view-owner')?.appendChild(card);
 }
 async function startFresh() {
