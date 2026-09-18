@@ -904,7 +904,7 @@ select {
 
 @media (max-width: 680px) {
   .accountbar .accountActions {
-    grid-template-columns: 42px auto auto !important;
+    grid-template-columns: auto auto auto !important;
   }
   .wl-notify-overlay {
     padding: 0;
@@ -1199,4 +1199,687 @@ select {
   .ownerDashBody {
     padding: 14px 14px 18px;
   }
+}
+
+
+/* Owner management — clearer hierarchy, team roles, and equipment inventory */
+#view-owner {
+  --owner-panel: #ffffff;
+  --owner-soft: #f4f7f9;
+  --owner-line: #cfd9e2;
+}
+#view-owner .ownerDashSection {
+  background: var(--owner-panel);
+  border: 1px solid #c9d4dd;
+  box-shadow: 0 8px 24px rgba(12,32,49,.08);
+}
+#view-owner .ownerDashSummary {
+  background: #f6f8fa;
+}
+#view-owner .ownerDispatchCard > .ownerDashSummary { background: #eef4f8; border-left: 6px solid #0b2a3f; }
+#view-owner .ownerAttentionCard > .ownerDashSummary { background: #fff2f2; border-left: 6px solid #d20b12; }
+#view-owner #ownerUnitStatusCard > .ownerDashSummary { background: #f0f5fa; border-left: 6px solid #47708f; }
+#view-owner .ownerEquipmentCard > .ownerDashSummary { background: #eef8f4; border-left: 6px solid #237457; }
+#view-owner #ownerHandoffsCard > .ownerDashSummary { background: #f5f1fb; border-left: 6px solid #7350a1; }
+#view-owner #ownerActivityCard > .ownerDashSummary { background: #f4f6f8; border-left: 6px solid #596b7a; }
+#view-owner .ownerTeamCard > .ownerDashSummary { background: #fff7eb; border-left: 6px solid #b76a00; }
+
+.ownerInnerSection {
+  border: 1px solid #d6e0e7;
+  border-radius: 14px;
+  background: #f8fafb;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.ownerInnerSection > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 15px;
+  font-weight: 950;
+  color: #183047;
+  background: #eef3f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ownerInnerSection > summary::-webkit-details-marker { display: none; }
+.ownerInnerSection > summary::after {
+  content: '›';
+  font-size: 22px;
+  color: #637483;
+  transition: transform .15s ease;
+}
+.ownerInnerSection[open] > summary::after { transform: rotate(90deg); }
+.ownerInnerBody {
+  padding: 14px;
+  background: #fff;
+  border-top: 1px solid #dce4ea;
+}
+.ownerTeamIntro,
+.ownerEquipmentIntro {
+  border: 1px solid #cdd9e1;
+  border-radius: 13px;
+  padding: 13px 14px;
+  background: #f6f9fb;
+}
+.ownerTeamIntro > b,
+.ownerEquipmentIntro > b {
+  display: block;
+  color: #10283c;
+  font-size: 16px;
+  margin-bottom: 3px;
+}
+.ownerTeamStats,
+.ownerEquipmentStats {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.ownerEquipmentStats { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.ownerTeamStats span,
+.ownerEquipmentStats span {
+  border: 1px solid #d7e0e7;
+  border-radius: 12px;
+  background: #f7f9fb;
+  padding: 10px;
+  color: #647585;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ownerTeamStats b,
+.ownerEquipmentStats b {
+  display: block;
+  color: #142b3f;
+  font-size: 21px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.teamMemberCard {
+  border: 1px solid #d6e0e7;
+  border-left-width: 6px;
+  border-radius: 13px;
+  overflow: hidden;
+  margin-top: 10px;
+  background: #fff;
+}
+.teamMemberCard.role-it { border-left-color: #315f9a; }
+.teamMemberCard.role-service { border-left-color: #1f7a5a; }
+.teamMemberCard.role-owner { border-left-color: #b76a00; }
+.teamMemberCard.role-pending { border-left-color: #7f8994; }
+.teamMemberCard > summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 13px 14px;
+  background: #f9fbfc;
+}
+.teamMemberCard > summary::-webkit-details-marker { display:none; }
+.teamMemberIdentity { min-width:0; }
+.teamMemberIdentity b {
+  display:block;
+  color:#12283b;
+  font-size:17px;
+}
+.teamMemberIdentity span {
+  display:block;
+  color:#6a7987;
+  font-size:12px;
+  margin-top:2px;
+}
+.teamMemberBadges {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  justify-content:flex-end;
+}
+.roleBadge.it { background:#e8f0fb; color:#28558e; }
+.roleBadge.service { background:#e8f7f0; color:#176344; }
+.roleBadge.owner { background:#fff0d7; color:#8b5100; }
+.roleBadge.pending { background:#edf0f3; color:#596774; }
+.teamMemberBody {
+  padding:14px;
+  border-top:1px solid #e1e7ec;
+}
+.teamEditGrid {
+  display:grid;
+  grid-template-columns:1.3fr 1fr .8fr auto;
+  gap:8px;
+  align-items:end;
+}
+.teamSaveCell .mini { min-height:44px; }
+.accountSecurityFold,
+.equipmentHistoryFold {
+  margin-top:10px;
+  border:1px solid #dce4ea;
+  border-radius:10px;
+  background:#f7f9fb;
+  overflow:hidden;
+}
+.accountSecurityFold > summary,
+.equipmentHistoryFold > summary {
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:850;
+  color:#536575;
+}
+.accountSecurityBody,
+.equipmentHistoryFold > div {
+  padding:11px 12px;
+  border-top:1px solid #e1e7ec;
+  background:#fff;
+}
+.archivedTeamCard {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px;
+  border:1px solid #d9e0e5;
+  border-radius:12px;
+  background:#f5f7f8;
+  margin-top:8px;
+  opacity:.92;
+}
+.teamHistoryRow {
+  padding:10px 0;
+  border-bottom:1px solid #e5eaee;
+}
+.teamHistoryRow:last-child { border-bottom:0; }
+.teamHistoryRow > div:first-child {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+.teamHistoryRow > div:first-child span {
+  font-size:11px;
+  font-weight:900;
+  color:#6a7784;
+}
+
+.ownerEquipmentAdd {
+  display:grid;
+  grid-template-columns:1fr 1.2fr .8fr 1.4fr auto;
+  gap:8px;
+  align-items:end;
+  margin-top:12px;
+  padding:12px;
+  border:1px solid #cfe0d9;
+  border-radius:13px;
+  background:#f4faf7;
+}
+.ownerEquipmentAdd .btn {
+  width:auto;
+  min-width:140px;
+  margin:0;
+}
+.ownerEquipmentFilters {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin:12px 0;
+}
+.ownerEquipmentFilters button {
+  border:1px solid #ccd8e0;
+  border-radius:999px;
+  background:#f2f5f7;
+  color:#5b6b79;
+  padding:8px 12px;
+  font-weight:850;
+  cursor:pointer;
+}
+.ownerEquipmentFilters button.on {
+  background:#0b2a3f;
+  color:#fff;
+  border-color:#0b2a3f;
+}
+.ownerEquipmentList {
+  display:grid;
+  gap:9px;
+}
+.equipmentAssetCard {
+  border:1px solid #d2dde4;
+  border-left:6px solid #39745f;
+  border-radius:13px;
+  background:#fff;
+  overflow:hidden;
+}
+.equipmentAssetCard.stand { border-left-color:#7b5aa6; }
+.equipmentAssetCard > summary {
+  list-style:none;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:13px 14px;
+  cursor:pointer;
+  background:#f8fafb;
+}
+.equipmentAssetCard > summary::-webkit-details-marker { display:none; }
+.equipmentAssetCard > summary > div b {
+  display:block;
+  color:#11283b;
+  font-size:18px;
+}
+.equipmentAssetCard > summary > div span {
+  display:block;
+  color:#687887;
+  font-size:12px;
+  margin-top:2px;
+}
+.equipmentAssetBody {
+  padding:13px 14px;
+  border-top:1px solid #e0e7ec;
+}
+.equipmentHolder {
+  margin-bottom:8px;
+  padding:9px 10px;
+  border-radius:10px;
+  background:#eef4f8;
+  color:#213a4f;
+}
+.equipmentAssignRow,
+.equipmentActionRow {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  margin-top:10px;
+}
+.equipmentActionRow { display:flex; flex-wrap:wrap; }
+.inventoryHistoryRow {
+  display:grid;
+  gap:2px;
+  padding:8px 0;
+  border-bottom:1px solid #edf1f4;
+}
+.inventoryHistoryRow:last-child { border-bottom:0; }
+.inventoryHistoryRow span {
+  font-size:12px;
+  color:#687887;
+}
+
+@media (max-width: 780px) {
+  .teamEditGrid { grid-template-columns:1fr 1fr; }
+  .ownerEquipmentAdd { grid-template-columns:1fr 1fr; }
+  .ownerEquipmentAdd .btn { width:100%; }
+  .ownerEquipmentStats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .ownerTeamStats { grid-template-columns:1fr 1fr 1fr; }
+  .teamMemberCard > summary { align-items:flex-start; flex-direction:column; }
+  .teamMemberBadges { justify-content:flex-start; }
+  .teamEditGrid { grid-template-columns:1fr; }
+  .ownerEquipmentAdd { grid-template-columns:1fr; }
+  .equipmentAssignRow { grid-template-columns:1fr; }
+  .archivedTeamCard { align-items:flex-start; flex-direction:column; }
+  .archivedTeamCard .mini { width:100%; }
+}
+
+
+/* Structured equipment requirements on Owner dispatch and technician assignments */
+.wl-owner-equipment-requirements {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.wl-requirement-section {
+  border-top: 1px solid #dce4e9;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.wl-requirement-section:first-child { margin-top: 0; }
+.wl-requirement-heading {
+  font-size: 13px;
+  font-weight: 950;
+  color: #173047;
+  margin-bottom: 7px;
+}
+.wl-owner-equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 7px;
+}
+.wl-owner-equipment-qty {
+  margin: 0;
+  padding: 9px;
+  border: 1px solid #d6e0e7;
+  border-radius: 10px;
+  background: #fff;
+}
+.wl-owner-equipment-qty span,
+.wl-owner-equipment-qty small {
+  display: block;
+}
+.wl-owner-equipment-qty small {
+  color: #7a8792;
+  font-size: 10px;
+  margin: 2px 0 5px;
+}
+.wl-owner-equipment-qty input {
+  text-align: center;
+  font-weight: 900;
+}
+.wl-equipment-manifest {
+  margin-top: 9px;
+  border: 1px solid #d6e1e8;
+  border-radius: 11px;
+  background: #f8fafb;
+  padding: 10px;
+}
+.wl-manifest-title {
+  font-size: 13px;
+  font-weight: 950;
+  color: #173047;
+}
+.wl-manifest-group { margin-top: 8px; }
+.wl-manifest-group > b {
+  font-size: 11px !important;
+  color: #687887;
+  text-transform: uppercase;
+  letter-spacing: .35px;
+}
+
+.techMenuMini {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+@media (max-width:680px) {
+  .wl-owner-equipment-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+
+
+/* Owner technician daily board */
+#view-owner .ownerTechOverviewCard > .ownerDashSummary {
+  background: #eef6fb;
+  border-left: 6px solid #2b6f9f;
+}
+.ownerDailyToolbar {
+  display: grid;
+  grid-template-columns: auto minmax(240px,1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ownerDailyDateCenter {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #d4dee6;
+  border-radius: 12px;
+  background: #f7f9fb;
+}
+.ownerDailyDateCenter b { color:#153047; }
+.ownerDailyDateCenter input {
+  width: 150px;
+  margin: 0;
+}
+.ownerDailySummary {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ownerDailySummary span {
+  border: 1px solid #d6e0e7;
+  border-radius: 11px;
+  padding: 10px;
+  background: #f8fafb;
+  color: #6a7986;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ownerDailySummary b {
+  display: block;
+  color: #142d42;
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.ownerDepartmentQueue {
+  border: 1px solid #ead39f;
+  border-left: 5px solid #d49a1c;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff9ea;
+  margin-bottom: 12px;
+}
+.ownerDepartmentQueue > b {
+  display: block;
+  margin-bottom: 6px;
+  color: #694d12;
+}
+.ownerDepartmentQueue > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #f0dfb7;
+  padding: 8px 0;
+}
+.ownerDepartmentQueue > div:first-of-type { border-top: 0; }
+.ownerDepartmentQueue span small {
+  display: block;
+  margin-top: 2px;
+  color: #756848;
+}
+.ownerTechDayGrid {
+  display: grid;
+  gap: 10px;
+}
+.ownerTechDayCard {
+  border: 1px solid #d4dee6;
+  border-left: 6px solid #2b6f9f;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+.ownerTechDayCard.service { border-left-color: #1f7a5a; }
+.ownerTechDayCard.it { border-left-color: #315f9a; }
+.ownerTechDayCard > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  background: #f8fafb;
+}
+.ownerTechDayCard > summary::-webkit-details-marker { display:none; }
+.ownerTechDayCard > summary > div b {
+  display: block;
+  color: #12293d;
+  font-size: 17px;
+}
+.ownerTechDayCard > summary > div span {
+  display: block;
+  margin-top: 2px;
+  color: #6b7a87;
+  font-size: 12px;
+}
+.ownerTechDayBody {
+  padding: 13px 14px;
+  border-top: 1px solid #e1e7ec;
+}
+.ownerDailyCheck {
+  border: 1px solid #d8e1e7;
+  border-radius: 11px;
+  padding: 10px 11px;
+  background: #f7f9fb;
+}
+.ownerDailyCheck b,
+.ownerDailyCheck span {
+  display: block;
+}
+.ownerDailyCheck span {
+  margin-top: 3px;
+  color: #61717f;
+  font-size: 12px;
+}
+.ownerDailyCheck.pass {
+  background: #edf9f2;
+  border-color: #b8dfc7;
+}
+.ownerDailyCheck.fail,
+.ownerDailyCheck.missing {
+  background: #fff0ef;
+  border-color: #edbbb7;
+}
+.ownerDailyCheck.info {
+  background: #eef5fb;
+  border-color: #cbddeb;
+}
+.ownerDailySectionLabel {
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 950;
+  color: #687887;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.ownerDailyJob {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid #e7ecef;
+}
+.ownerDailyJob:first-of-type { border-top: 0; }
+.ownerDailyJob > div b,
+.ownerDailyJob > div span {
+  display: block;
+}
+.ownerDailyJob > div span {
+  margin-top: 2px;
+  color: #687887;
+  font-size: 12px;
+}
+.ownerDailyEmpty {
+  padding: 8px 0;
+}
+.ownerDailyAssets {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 11px;
+  background: #f2f6f9;
+  border: 1px solid #d7e1e8;
+}
+.ownerDailyAssets > b {
+  display:block;
+  margin-bottom:6px;
+  color:#18334a;
+}
+.ownerDailyAssets > div {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.ownerDailyAssets > div span {
+  display:inline-block;
+  border:1px solid #d3dde5;
+  border-radius:999px;
+  background:#fff;
+  padding:6px 9px;
+  font-size:12px;
+  color:#566774;
+}
+
+@media (max-width:780px) {
+  .ownerDailyToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ownerDailyDateCenter {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .ownerDailySummary {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width:520px) {
+  .ownerDailyToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ownerDailyDateCenter {
+    grid-template-columns: 1fr;
+  }
+  .ownerDailyDateCenter input {
+    width: 100%;
+  }
+  .ownerDailyToolbar .mini {
+    width: 100%;
+  }
+  .ownerTechDayCard > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ownerDailyJob {
+    flex-direction: column;
+  }
+}
+
+
+/* Distinct Unit / Stand areas for Owner and IT job setup */
+.wl-requirement-section.unitArea {
+  border: 1px solid #c9ddeb;
+  border-left: 5px solid #2b6f9f;
+  border-radius: 13px;
+  padding: 12px;
+  background: #f3f8fc;
+}
+.wl-requirement-section.standArea {
+  border: 1px solid #dacdea;
+  border-left: 5px solid #7350a1;
+  border-radius: 13px;
+  padding: 12px;
+  background: #f8f4fc;
+}
+.wl-requirement-section.unitArea + .wl-requirement-section.standArea {
+  margin-top: 10px;
+}
+.wl-it-equipment-setup {
+  margin-top: 10px;
+}
+.wl-equipment-count-summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #eef3f6;
+  border: 1px solid #d2dde5;
+  color: #526472;
+  font-size: 13px;
+}
+.wl-equipment-count-summary b {
+  color: #142d42;
+  font-size: 17px;
+}
+.wl-count-readonly {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d5dfe6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f7f9fb;
+}
+.wl-count-readonly b {
+  font-size: 22px;
+  color: #122a40;
+}
+.wl-count-readonly span {
+  color: #667684;
+  font-size: 12px;
+  font-weight: 700;
 }
