@@ -2059,3 +2059,5 @@ select {
   #ownerJobAssignments .wl-tech-add-row{display:grid;grid-template-columns:minmax(0,1fr) 40px}
   #ownerJobAssignments .wl-add-tech-plus{width:40px;height:40px}
 }
+
+.ownerWorkflowFirst{margin:10px 0 14px;padding:12px;border:1px solid #b9cbe0;border-radius:10px;background:#f5f9fd}.ownerWorkflowFirst .qtext{font-size:13px;font-weight:800}
