@@ -1636,11 +1636,20 @@ function serviceSolarDefaultStandTag() {
   const item=(activeSvcPrep?.prep_items || []).find(row => ['Solar Stand','Solar Pole'].includes(row.equipment_type));
   return item?.unit_tag || '';
 }
-function serviceSolarDefaultBatteryCount() {
+function serviceSolarDefaultBatteryCount(ctx=null) {
+  if (ctx && Number(ctx.expected_batteries || 0) > 0) return Number(ctx.expected_batteries || 0);
   return (activeSvcPrep?.prep_items || []).filter(row => ['Solar Stand','Solar Pole','Helios'].includes(row.equipment_type)).reduce((sum,row)=>sum+Number(row.battery_count || 0),0);
 }
-function serviceSolarExpectedPanels() {
+function serviceSolarExpectedPanels(ctx=null) {
+  if (ctx && Number(ctx.expected_solar_panels || 0) > 0) return Number(ctx.expected_solar_panels || 0);
   return Math.max(Number(activeSvcAssignment?.solar_panel_qty || 0),Number(activeSvcPrep?.solar_panel_qty || 0));
+}
+function serviceSolarRequiredStandCount(ctx=null) {
+  if (!ctx?.need_stand) return 0;
+  return Math.max(1,Number(ctx.solar_spotter_count || 0));
+}
+function serviceSolarStandTagsValue(check=null) {
+  return String(check?.stand_tag || serviceSolarDefaultStandTag() || '').split(/[,\n]+/).map(v=>v.trim()).filter(Boolean).join('\n');
 }
 function serviceSolarProofPanelHtml(rows, category, title, instruction, requireSignature=false) {
   const photos=(rows || []).filter(row => row.category===category && row.kind==='photo');
@@ -1707,7 +1716,9 @@ async function saveServiceSolarChecklist() {
   const batteryCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarBatteryCount')?.value || 0)));
   const expectedPanels=Number(ctx.expected_solar_panels || 0);
   const expectedBatteries=Number(ctx.expected_batteries || 0);
-  if (ctx.need_stand && !standTag) return alert('Enter the exact Solar Stand / Solar Pole tag first.');
+  const requiredStands=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
+  const standTags=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean);
+  if (ctx.need_stand && standTags.length !== requiredStands) return alert('Enter exactly ' + requiredStands + ' Solar Stand tag' + (requiredStands===1?'':'s') + ', one for each Solar Spotter delivery unit.');
   if (ctx.need_stand && Number(ctx.solar_spotter_count || 0)>0) {
     const tagCount=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean).length;
     if (tagCount !== Number(ctx.solar_spotter_count || 0)) return alert('This delivery automatically requires ' + Number(ctx.solar_spotter_count || 0) + ' Solar Stand tag' + (Number(ctx.solar_spotter_count || 0)===1?'':'s') + '. You entered ' + tagCount + '.');
