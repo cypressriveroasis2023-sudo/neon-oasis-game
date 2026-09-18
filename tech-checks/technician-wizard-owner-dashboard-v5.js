@@ -595,6 +595,27 @@ async function setupNotificationRealtime() {
     .subscribe();
   refreshNotificationBadge();
 }
+function techCheckAIAnalysis(a, role){
+  const type=String(a?.work_type||'service').toLowerCase(), manifest=a?.equipment_manifest||{}, warnings=[], steps=[];
+  const devices=Object.entries(manifest.devices||{}).filter(([,n])=>Number(n)>0);
+  const stands=Object.entries(manifest.stands||{}).filter(([,n])=>Number(n)>0);
+  const equipment=[...devices,...stands].map(([k,n])=>Number(n)+' '+String(k).replace(/_/g,' '));
+  if(type==='pickup'){steps.push('Service performs the field pickup first.','Service checks returned equipment into IT Intake.','IT completes Intake after Service handoff.'); if(role==='it') warnings.push('Do not begin IT Intake until Service has returned/check-in equipment.');}
+  else if(a?.requires_it_handoff){steps.push('IT completes required Tech Check.','IT creates the Service handoff.','Service verifies the handed-off equipment.');}
+  if(!String(a?.ticket_no||'').trim()) warnings.push('MHelpDesk ticket number is missing.');
+  if(!equipment.length) warnings.push('No equipment quantities are listed.');
+  if(Number(a?.requested_unit_count||0)>0 && !devices.length) warnings.push('A unit count exists but no device type is listed.');
+  return {type,equipment,warnings,steps};
+}
+function techCheckAIHtml(a,role){
+  const x=techCheckAIAnalysis(a,role), status=x.warnings.length?'REVIEW NEEDED':'WORKFLOW CHECK';
+  return `<div class='wl-ai-panel'><div class='wl-ai-head'><span>✨ AI Assist</span><b>${status}</b></div>
+    <div class='small'><b>MHelpDesk #${esc(a?.ticket_no||'—')}</b> · ${esc(String(x.type).toUpperCase())}</div>
+    ${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}
+    ${x.steps.length?`<div class='wl-ai-line'><b>Expected flow:</b> ${x.steps.map(esc).join(' → ')}</div>`:''}
+    ${x.warnings.length?`<div class='wl-ai-warn'>${x.warnings.map(w=>'⚠ '+esc(w)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No obvious workflow conflicts found.</div>`}
+    <div class='small top8'>AI Assist is advisory only. It cannot change, claim, complete, or reassign a ticket.</div></div>`;
+}
 async function assignmentGateState(assignment) {
   const workType=String(assignment?.work_type||'').toLowerCase();
   const legacyPickup=!workType && /\bpick[ -]?up\b/i.test(String(assignment?.job_description||''));
@@ -711,7 +732,7 @@ async function showITHome() {
   if (!home) { home = document.createElement('div'); home.id = 'wlItHome'; home.className = 'card wl-home'; viewIT().prepend(home); }
   const [c,r,assignments,phoneAlerts,assignedAssets] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it'), pushAlertState(), myAssignedInventoryAssets()]);
   const assigned = assignments[0] || null;
-  const assignmentCards=assignments.map((a,i)=>`<div class='wl-it-flow-card'><div class='wl-next-kicker'>${i===0?'NEXT IT TASK':'UPCOMING IT TASK'}</div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div><div class='small'><b>${String(a.work_type||'service').toUpperCase()}</b> · ${a.requires_it_handoff?'Waiting on Service / handoff step':'Ready for IT'}</div>${equipmentManifestInlineHtml(a)}<button class='wl-big wl-blue top10' data-wl-start-assignment='${a.id}'>${a.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`).join('');
+  const assignmentCards=assignments.map((a,i)=>`<div class='wl-it-flow-card'><div class='wl-next-kicker'>${i===0?'NEXT IT TASK':'UPCOMING IT TASK'}</div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div><div class='small'><b>${String(a.work_type||'service').toUpperCase()}</b> · ${a.requires_it_handoff?'Waiting on Service / handoff step':'Ready for IT'}</div>${equipmentManifestInlineHtml(a)}${techCheckAIHtml(a,'it')}<button class='wl-big wl-blue top10' data-wl-start-assignment='${a.id}'>${a.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`).join('');
   const alertBanner = phoneAlertBanner(phoneAlerts);
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
   const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.work_type ? `<div class='small'><b>Job Type:</b> ${esc(assigned.work_type.toUpperCase())}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>${String(assigned.work_type || '').toLowerCase() === 'pickup' ? 'Units Being Picked Up' : 'Units Required From MHelpDesk'}:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${automaticServiceSolarPlanHtml(assigned.equipment_manifest,assigned.work_type)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : (!assigned.assignee_user_id && assigned.assignment_scope === 'department' ? 'Enter Ticket # & Claim Job' : 'Open Assigned Job')} →</button></div>` : '';
@@ -1590,7 +1611,7 @@ async function serviceFindJobByTicket(){
   if(!a){if(msg)msg.innerHTML='<span class="bad">No available Service job matches MHelpDesk #'+esc(ticket)+'. Check the ticket number or ask the Owner to assign it.</span>';return;}
   const gate=await assignmentGateState(a);
   const manifest=equipmentManifestInlineHtml(a);
-  const summary=`<div class='wl-service-ticket-preview'>
+  const summary=`<div class='wl-service-ticket-preview'>${techCheckAIHtml(a,'service')}
     <div class='wl-next-kicker'>TICKET FOUND — VERIFY BEFORE TAKING JOB</div>
     <div class='wl-preview-title'>MHelpDesk #${esc(a.ticket_no)}</div>
     <div class='wl-preview-grid'>
