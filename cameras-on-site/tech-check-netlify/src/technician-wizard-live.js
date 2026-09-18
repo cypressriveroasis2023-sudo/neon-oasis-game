@@ -521,10 +521,10 @@ async function saveNotificationSettings() {
   const role = currentRoleKey();
   const browserAllowed = typeof Notification !== 'undefined' && Notification.permission === 'granted';
   const { error } = await liveDb.rpc('save_my_notification_preferences', {
-    p_new_assignments: role === 'owner' ? Boolean(prefs.new_assignments) : Boolean(document.getElementById('wlPrefAssignments')?.checked),
-    p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns')?.checked) : Boolean(prefs.returned_units),
-    p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService')?.checked) : Boolean(prefs.equipment_ready_service),
-    p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner')?.checked) : Boolean(prefs.owner_actions),
+    p_new_assignments: role === 'owner' ? Boolean(prefs.new_assignments) : Boolean(document.getElementById('wlPrefAssignments') ? document.getElementById('wlPrefAssignments').checked : prefs.new_assignments),
+    p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns') ? document.getElementById('wlPrefReturns').checked : prefs.returned_units) : Boolean(prefs.returned_units),
+    p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService') ? document.getElementById('wlPrefService').checked : prefs.equipment_ready_service) : Boolean(prefs.equipment_ready_service),
+    p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner') ? document.getElementById('wlPrefOwner').checked : prefs.owner_actions) : Boolean(prefs.owner_actions),
     p_browser_notifications: browserAllowed,
   });
   if (error) return alert(error.message);
