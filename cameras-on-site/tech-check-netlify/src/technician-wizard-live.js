@@ -1716,6 +1716,7 @@ async function saveServiceSolarChecklist() {
   const batteryCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarBatteryCount')?.value || 0)));
   const expectedPanels=Number(ctx.expected_solar_panels || 0);
   const expectedBatteries=Number(ctx.expected_batteries || 0);
+  const requiredStands=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
   const standTags=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean);
   if (ctx.need_stand && standTags.length !== requiredStands) return alert('Enter exactly ' + requiredStands + ' Solar Stand tag' + (requiredStands===1?'':'s') + ', one for each Solar Spotter delivery unit.');
   if (ctx.need_stand && Number(ctx.solar_spotter_count || 0)>0) {
