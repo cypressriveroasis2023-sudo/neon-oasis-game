@@ -2076,3 +2076,14 @@ select {
   #ownerJobAssignments .ownerWorkflowFirst input{box-sizing:border-box;width:100%;max-width:100%;min-width:0}
   #ownerJobAssignments #ownerFlowHint{box-sizing:border-box;width:100%;max-width:100%;overflow-wrap:anywhere;white-space:normal}
 }
+
+/* v33 unified role tabs on desktop + mobile */
+.techStatusRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.techStatusRow .itWelcome,.techStatusRow .itWeather{min-width:0}
+.mainRoleTabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mainRoleTabs button{width:100%;min-width:0}
+@media(max-width:768px){
+ .techStatusRow{grid-template-columns:1fr 1fr;gap:6px}
+ .mainRoleTabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+ .mainRoleTabs button{font-size:13px;padding-left:5px;padding-right:5px;white-space:nowrap}
+}
