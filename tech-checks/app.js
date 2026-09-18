@@ -675,6 +675,7 @@ function renderIT() {
             '</div></div>' +
             st +
             '</div>' +
+            ownerPartsSummary(p) +
             items +
             action +
             '</div>'
@@ -1103,11 +1104,54 @@ function renderOwnerUnitSearch() {
   const title = q ? `${rows.length} matching unit${rows.length===1?'':'s'}` : 'Recently Updated Units';
   host.innerHTML = `<div class='small top8'><b>${esc(title)}</b></div>${rows.length ? rows.map(r => `<div class='unitStatusRow'><div><b>Unit ${esc(r.unit_tag)}</b><div class='small'>${esc(r.equipment_type || 'Equipment type not recorded')} · MHelpDesk ${r.ticket_no ? '#' + esc(r.ticket_no) : 'not linked'}</div><div class='small'>${esc(r.last_event || 'Status updated')}${r.current_holder_name ? ` · Last tech: ${esc(r.current_holder_name)}` : ''}</div><div class='small'>Updated ${new Date(r.updated_at).toLocaleString()}</div></div><span class='pill ${unitLifecycleClass(r.lifecycle_status)}'>${esc(unitLifecycleLabel(r.lifecycle_status))}</span></div>`).join('') : `<div class='${q ? 'warn' : 'ok'} top8'><b>${q ? 'No unit matched that search.' : 'No units have entered the lifecycle yet.'}</b><div class='small'>Unit status is created automatically as IT starts preparing equipment.</div></div>`}`;
 }
+const OWNER_TICKET_PARTS = [
+  { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
+  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
+  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
+  { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'Micro SD Cards' },
+];
+function ownerCleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
+function ownerPartsRows(p) { return OWNER_TICKET_PARTS.map(part => ({...part, qty:ownerCleanPartQty(p?.[part.key])})); }
+function ownerPartsSummary(p) {
+  const rows=ownerPartsRows(p).filter(row=>row.qty>0);
+  return '<div class="ownerPartsSummary top8"><b>Parts Required</b>' +
+    (rows.length ? '<div class="ownerPartsChips">' + rows.map(row => '<span><b>'+row.qty+'</b> × '+esc(row.label)+'</span>').join('') + '</div>' : '<div class="small">No extra replacement parts listed.</div>') +
+    '</div>';
+}
+function ownerPartsEditor(p) {
+  if (p.status !== 'draft') return ownerPartsSummary(p);
+  return '<div class="ownerPartsEditor top8"><b>Parts Required</b><div class="small">Editable while IT is still preparing this ticket.</div><div class="ownerPartsGrid">' +
+    OWNER_TICKET_PARTS.map(part => '<label><span>'+esc(part.label)+'</span><input id="ownerPart_'+part.id+'_'+p.id+'" type="number" min="0" step="1" inputmode="numeric" value="'+ownerCleanPartQty(p[part.key])+'"></label>').join('') +
+    '</div><button class="mini top8" onclick="saveOwnerPrepParts(\''+p.id+'\')">Save Parts List</button></div>';
+}
+async function saveOwnerPrepParts(prepId) {
+  const p=state.preps.find(row=>row.id===prepId);
+  if (!p || p.status!=='draft') return alert('Only a ticket still in IT Prep can have its parts list changed.');
+  const values={};
+  OWNER_TICKET_PARTS.forEach(part => {
+    values[part.key]=ownerCleanPartQty(document.getElementById('ownerPart_'+part.id+'_'+prepId)?.value);
+  });
+  setBusy(true);
+  const { error }=await db.rpc('set_prep_parts',{
+    p_prep_id:prepId,
+    p_solar_panel_qty:values.solar_panel_qty,
+    p_battery_replacement_qty:values.battery_replacement_qty,
+    p_camera_replacement_qty:values.camera_replacement_qty,
+    p_sim_replacement_qty:values.sim_replacement_qty,
+    p_micro_sd_qty:values.micro_sd_qty,
+  });
+  setBusy(false);
+  if(error) return alert(error.message);
+  await refreshData();
+  alert('Parts list updated.');
+}
+
 function renderOwner() {
   if (state.profile?.role !== 'owner') return;
   const activePreps = state.preps.filter(p => p.status !== 'closed');
   const completedPreps = state.preps.filter(p => p.status === 'closed').slice().reverse();
-  const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + (p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '')).join(' · ') + '</div></details>';
+  const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + ownerPartsEditor(p) + '<div class="top8"><b>Units / Equipment</b><div>' + ((p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '')).join(' · ') || 'No units started yet.') + '</div></div></div></details>';
   const draftCount = activePreps.filter(p => p.status === 'draft').length;
   const serviceCount = activePreps.filter(p => p.status === 'released').length;
   $('ownerPrepSummary').innerHTML = '<div class="wl-workstrip"><span><b>' + draftCount + '</b> IT preparing</span><span><b>' + serviceCount + '</b> waiting Service</span><span><b>' + activePreps.length + '</b> active tickets</span></div>';
@@ -1295,6 +1339,7 @@ Object.assign(window, {
   ownerJump,
   ownerOpenReturn,
   renderOwnerUnitSearch,
+  saveOwnerPrepParts,
   startFresh,
 });
 
