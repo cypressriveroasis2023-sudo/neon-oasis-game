@@ -7,11 +7,11 @@ const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const BATTERY = {
   Sniper: { per: 2, label: '12V 35Ah batteries' },
   Ranger: { per: 1, label: 'Ranger lithium battery' },
-  'Solar Spotter': { per: 4, label: '12V 110Ah batteries' },
+  'Solar Spotter': { per: 0, label: '12V 110Ah batteries — checked by Service with Solar Stand' },
   Helios: { per: 1, label: 'charged Helios battery box' },
   'Recon 2': { dynamic: true, label: 'Recon batteries' },
-  'Solar Stand': { per: 1, label: 'solar stand batteries' },
-  'Solar Pole': { per: 1, label: 'solar pole batteries' },
+  'Solar Stand': { per: 0, label: 'solar stand batteries — checked by Service' },
+  'Solar Pole': { per: 0, label: 'solar pole batteries — checked by Service' },
 };
 const TRUCK = [
   'Fuel level sufficient for today’s route',
