@@ -2040,14 +2040,3 @@ select {
   display: block;
   color: #173c58;
 }
-
-/* Owner assignment technician pills */
-.wl-tech-add-row{display:flex;gap:8px;align-items:center}.wl-tech-add-row select{flex:1}.wl-tech-add-row .btn{white-space:nowrap}
-.wl-tech-pills{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 8px}.wl-tech-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #b8c5d4;border-radius:999px;background:#f4f7fa;font-weight:700;font-size:12px}.wl-tech-pill button{border:0;background:transparent;font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
-
-/* Owner department + tech picker */
-.wl-dept-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.wl-dept-pill{border:1px solid #c8d1dc;background:#fff;border-radius:10px;padding:10px 8px;font-weight:800;cursor:pointer}.wl-dept-pill.on{border:2px solid #d71920;background:#fff5f5}.wl-add-tech-launch{width:100%;margin-top:5px}.wl-tech-picker{margin-top:8px;border:1px solid #d6dee7;border-radius:10px;padding:10px;background:#f8fafc}.wl-tech-picker-group+.wl-tech-picker-group{margin-top:10px}.wl-tech-picker-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.wl-tech-person{border:1px solid #b9c7d7;background:#fff;border-radius:999px;padding:7px 10px;font-weight:700;cursor:pointer}.wl-tech-role-dot{font-size:9px;border-radius:999px;padding:2px 5px;background:#dfe7ef}.wl-tech-pill{padding-left:6px}
-@media(max-width:600px){.wl-dept-choice{grid-template-columns:1fr}.wl-tech-person{width:100%;text-align:left}}
-
-/* Simplified assignment picker */
-#ownerJobAssignments .ownerDashBody{padding-top:10px}.wl-tech-picker{display:block;margin-top:6px;background:transparent;border:0;padding:0}.wl-tech-picker-group{padding:8px 0}.wl-tech-picker-group>b{font-size:11px;text-transform:uppercase}.wl-tech-picker-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px}.wl-tech-person{border-radius:9px;text-align:left;padding:9px 10px}.wl-tech-person:hover{border-color:#d71920}.wl-dept-choice{margin-top:5px}
