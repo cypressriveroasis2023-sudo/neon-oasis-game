@@ -2489,7 +2489,14 @@ async function installOwnerAssignments(force = false) {
         <div class='qtext' id='ownerEquipmentTotalHeading'>Total Equipment Required</div>
         <div class='small' id='ownerEquipmentTotalHelp'>Enter the total quantity of each equipment type for this job. Enter the specific MHelpDesk equipment numbers below.</div>
         ${ownerEquipmentManifestInputsHtml()}
-        <div class='wl-equipment-number-block top10'><div class='wl-requirement-heading'>Equipment Numbers (from MHelpDesk)</div><div class='small'>Enter the actual unit, stand, solar stand, or pole numbers once. No need to repeat them in a description.</div><div class='grid top8'><input id='ownerAssignUnitNumbers' placeholder='Unit #s, e.g. 058, 103'><input id='ownerAssignStandNumbers' placeholder='Stand / Solar Stand / Pole #s, e.g. SS-12, ST-44'></div></div><div id='ownerAutoServicePlan' class='hidden'></div>
+        <div class='wl-equipment-number-block top10'>
+  <div class='wl-requirement-heading'>Equipment Numbers (from MHelpDesk)</div>
+  <div class='small'>Enter the actual unit and stand / solar stand / pole numbers from MHelpDesk once. No need to repeat them in the job description.</div>
+  <div class='wl-equipment-number-grid top8'>
+    <div><label>Unit #s</label><input id='ownerAssignUnitNumbers' placeholder='e.g. 058, 103, 221, 390'></div>
+    <div><label>Stand / Solar Stand / Pole #s</label><input id='ownerAssignStandNumbers' placeholder='e.g. 047, 050, SS-12, SP-4'></div>
+  </div>
+</div><div id='ownerAutoServicePlan' class='hidden'></div>
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
