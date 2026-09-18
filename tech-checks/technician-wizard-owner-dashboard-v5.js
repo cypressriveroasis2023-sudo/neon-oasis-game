@@ -2605,7 +2605,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
         <div><label>Assign Technician(s)</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small'>Choose one tech, tap +, then add another if needed. Leave blank for the department queue.</div></div>
       </div>
-      <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
+      <div id='ownerAIReviewBox' class='wl-ai-panel hidden top10'></div><div class='owner-ai-actions'><button type='button' class='btn wl-ai-review-btn' data-owner-ai-review>✨ AI Review Before Sending</button><button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button></div>
     </div>`;
 
   liveHost.innerHTML = `
@@ -2710,6 +2710,8 @@ function refreshOwnerWorkTypeLabels() {
     el.style.display = pickup ? 'none' : '';
   });
 }
+function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
+function ownerAIReview(){const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');if(!a.site)issues.push('Customer / Site is blank.');if(!a.job_description)issues.push('Job description is missing.');if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Send it to Service or Service + IT.');if(type==='pickup'&&role==='it_service')issues.push('Pickup will be forced to Service first, then IT Intake.');if((role==='it'||dual)&&!x.equipment.length)issues.push('IT is included but no equipment quantity is listed.');const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),sn=(document.getElementById('ownerAssignStandNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),dt=equipmentManifestDeviceTotal(a.equipment_manifest),st=equipmentManifestStandTotal(a.equipment_manifest);if(dt&&un.length&&dt!==un.length)issues.push('Device quantity is '+dt+' but '+un.length+' unit numbers are entered.');if(st&&sn.length&&st!==sn.length)issues.push('Stand quantity is '+st+' but '+sn.length+' stand/pole numbers are entered.');const box=document.getElementById('ownerAIReviewBox');if(!box)return;box.classList.remove('hidden');box.innerHTML=`<div class='wl-ai-head'><span>✨ Owner AI Preflight</span><b>${issues.length?'REVIEW '+issues.length+' ITEM'+(issues.length===1?'':'S'):'READY TO SEND'}</b></div><div class='small'><b>MHelpDesk #${esc(a.ticket_no||'—')}</b> · ${esc(type.toUpperCase())}</div>${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}<div class='wl-ai-line'><b>Expected flow:</b> ${type==='pickup'?'Service → field pickup → IT Intake':role==='it_service'?'IT → Service handoff':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only'}</div>${issues.length?`<div class='wl-ai-warn'>${issues.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Ticket setup looks consistent with the selected workflow.</div>`}<div class='small top8'>AI Preflight is advisory only. It does not change or send the ticket.</div>`;}
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
   const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
@@ -2887,6 +2889,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
+  if (e.target.closest('[data-owner-ai-review]')) return ownerAIReview();
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
   if (e.target.closest('[data-wl-save-prep-parts]')) return saveActivePrepParts();
   const cancelAssignment = e.target.closest('[data-wl-cancel-assignment]');
