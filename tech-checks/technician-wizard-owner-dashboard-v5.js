@@ -2552,17 +2552,30 @@ function ownerLiveAIStatus(a,prep,solarCheck=null){
   return {state:'healthy',label:'ON TRACK',detail:p.detail,flags:[]};
 }
 function ownerLiveAIHtml(a,prep,solarCheck=null){const s=ownerLiveAIStatus(a,prep,solarCheck);return `<div class='wl-owner-ai-status ${s.state}'><span>✨ AI</span><b>${esc(s.label)}</b><small>${esc(s.detail)}</small>${s.flags.length?`<div>${s.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</div>`;}
+function ownerTimelineWhen(v){if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
 function ownerAIJobTimeline(a,prep,solarCheck=null){
   const role=String(a?.assigned_role||''),type=String(a?.work_type||prep?.work_type||'service').toLowerCase(),status=String(a?.status||''),ps=String(prep?.status||'');
-  const steps=type==='pickup'
-    ?[{k:'assigned',t:'Owner assigned'},{k:'service',t:'Service pickup'},{k:'return',t:'Returned to shop'},{k:'intake',t:'IT Intake'},{k:'done',t:'Complete'}]
-    :[{k:'assigned',t:'Owner assigned'},{k:'it',t:'IT Tech Check'},{k:'handoff',t:'IT handoff'},{k:'service',t:'Service verify'},{k:'done',t:'Deployed'}];
-  let idx=0;
+  const assignedWho=a?.assignee_name|| (role==='it'?'IT Department':'Service Department');
+  const normal=[
+    {t:'Owner assigned',who:assignedWho,when:a?.assigned_at},
+    {t:'IT Tech Check',who:role==='it'?assignedWho:(prep?.released_by_name||'IT Tech'),when:a?.started_at||a?.updated_at},
+    {t:'IT handoff',who:prep?.released_by_name||'IT Tech',when:prep?.released_at},
+    {t:'Service verify',who:role==='service'?assignedWho:(prep?.closed_by_name||'Service Tech'),when:solarCheck?.updated_at||a?.updated_at},
+    {t:'Deployed',who:prep?.closed_by_name||'Service Tech',when:prep?.closed_at||a?.completed_at}
+  ];
+  const pickup=[
+    {t:'Owner assigned',who:assignedWho,when:a?.assigned_at},
+    {t:'Service pickup',who:role==='service'?assignedWho:'Service Tech',when:role==='service'?(a?.started_at||a?.updated_at):null},
+    {t:'Returned to shop',who:'Service Tech',when:role==='it'?a?.assigned_at:null},
+    {t:'IT Intake',who:role==='it'?assignedWho:'IT Tech',when:role==='it'?(a?.started_at||a?.updated_at):null},
+    {t:'Complete',who:a?.completed_by_name||assignedWho,when:a?.completed_at}
+  ];
+  const steps=type==='pickup'?pickup:normal;let idx=0;
   if(status==='started')idx=Math.max(idx,1);
   if(type==='pickup'){if(role==='it')idx=Math.max(idx,3);if(status==='completed')idx=4;}
-  else {if(ps==='draft')idx=Math.max(idx,1);if(ps==='released')idx=Math.max(idx,role==='service'?3:2);if(solarCheck?.completed_at)idx=Math.max(idx,3);if(ps==='closed'||status==='completed')idx=4;}
+  else{if(ps==='draft')idx=Math.max(idx,1);if(ps==='released')idx=Math.max(idx,role==='service'?3:2);if(solarCheck?.completed_at)idx=Math.max(idx,3);if(ps==='closed'||status==='completed')idx=4;}
   const ai=ownerLiveAIStatus(a,prep,solarCheck);
-  return `<details class='wl-ai-timeline'><summary>✨ AI Job Timeline <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>`<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b>${i===idx?`<span>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
+  return `<details class='wl-ai-timeline'><summary>✨ AI Job Timeline <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>{const when=ownerTimelineWhen(s.when);return `<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b><span>${esc(s.who||'')}${when?' · '+esc(when):''}</span>${i===idx?`<span class='wl-ai-current-detail'>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`}).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
 }
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p = ownerAssignmentProgress(a, prep, solarCheck);
