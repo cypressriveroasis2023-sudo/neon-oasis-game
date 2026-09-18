@@ -1653,6 +1653,12 @@ async function ownerAssignJob() {
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
+  const ticketInput = document.getElementById('ownerAssignTicket');
+  const siteInput = document.getElementById('ownerAssignSite');
+  const notesInput = document.getElementById('ownerAssignNotes');
+  if (ticketInput) ticketInput.value = '';
+  if (siteInput) siteInput.value = '';
+  if (notesInput) notesInput.value = '';
   await installOwnerAssignments(true);
   alert('Job assigned. It is now on that technician’s My Work Today screen.');
 }
@@ -1743,3 +1749,5 @@ setInterval(scheduleBoot, 5000);
 boot();
 
 // ASSIGNMENT_NOTIFICATION_PUBLISH_STAMP_V1
+
+// OWNER_ASSIGNMENT_TOP_CARD_V2
