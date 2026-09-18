@@ -2139,3 +2139,11 @@ select {
   font-weight:900;box-shadow:0 4px 12px rgba(22,163,74,.3)
 }
 .wl-service-ticket-preview [data-wl-service-take-job]:hover{background:#15803d !important}
+
+/* AI Assist v1 */
+.wl-ai-panel{margin:10px 0;padding:12px;border:2px solid #7c3aed;border-radius:12px;background:linear-gradient(135deg,#faf5ff,#eef2ff);box-shadow:0 5px 16px rgba(124,58,237,.12)}
+.wl-ai-head{display:flex;justify-content:space-between;gap:10px;align-items:center;color:#5b21b6;margin-bottom:7px}
+.wl-ai-head span{font-size:16px;font-weight:900}.wl-ai-head b{font-size:10px;letter-spacing:.05em;background:#ede9fe;padding:4px 7px;border-radius:999px}
+.wl-ai-line{margin-top:6px;font-size:12px}.wl-ai-warn{margin-top:8px;padding:8px;border-radius:8px;background:#fff7ed;color:#9a3412;font-weight:700}
+.wl-ai-good{margin-top:8px;padding:8px;border-radius:8px;background:#ecfdf5;color:#166534;font-weight:800}
+@media(max-width:768px){.wl-ai-head{align-items:flex-start;flex-direction:column}.wl-ai-panel{padding:10px}}
