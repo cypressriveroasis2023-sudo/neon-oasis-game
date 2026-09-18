@@ -1923,6 +1923,15 @@ function serviceAIEquipmentReview(ctx,check,evidence){
   if(ctx?.need_solar&&!check?.completed_at)flags.push('Solar / Helios Service checklist is not completed yet.');
   return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'><span>✨ AI Service Equipment Check</span><b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${spotters*4} batteries</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'}</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks counts and stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
 }
+function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired}){
+  const holds=[];
+  if(!allChecksOk) holds.push('One or more Service equipment checks are NO or incomplete.');
+  if(!proofReady) holds.push('Service evidence is incomplete: '+servicePhotos+' of '+requiredPhotos+' receipt photos plus final signature are required.');
+  if(hasParts&&!partsReady) holds.push('Listed parts have not been physically verified.');
+  if(solarRequired&&!solarReady) holds.push('Solar / Helios pre-trip requirements or evidence are incomplete.');
+  const ready=holds.length===0;
+  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'><span>✨ AI Final Handoff Gate</span><b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
+}
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
   const base = document.getElementById('matchedPreps')?.closest('.card');
@@ -1982,7 +1991,8 @@ async function renderSvcPrep() {
     const partsReady = !hasParts || Boolean(activeSvcPrep.service_parts_confirmed);
     const proofReady = servicePhotos === requiredPhotos && ev.some(x => x.kind === 'signature');
     const ready = proofReady && allChecksOk && partsReady && solarReady;
-    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) +
+    const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
+    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + aiFinal +
       `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and final Service signature saved.' : 'Matching receipt photo count and final signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${solarRequired ? (solarReady ? `<div class='small'>✓ Solar / Helios pre-trip checklist, photos, and required signatures complete.</div>` : `<div class='wl-stop'><b>Solar / Helios pre-trip verification is incomplete.</b><div>Use Back to complete the Solar Stand, battery, MPPT, and Cerbo proof.</div></div>`) : ''}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
