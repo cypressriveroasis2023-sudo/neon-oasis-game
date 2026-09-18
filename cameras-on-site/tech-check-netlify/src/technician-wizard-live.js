@@ -2446,13 +2446,17 @@ async function installOwnerAssignments(force = false) {
         <div class='qtext'>Parts Required From This Ticket</div>
         <div class='small'>Choose the exact units/devices, stands, and extra parts this assignment requires. Service assignments can include a Solar Stand for the pre-trip Solar / Helios verification.</div>
         ${ownerEquipmentManifestInputsHtml()}
+        <div id='ownerAutoServicePlan' class='hidden'></div>
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
+        <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='swap'>Swap</option><option value='service' selected>Service</option><option value='pickup'>Pickup</option></select></div>
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
-        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
       </div>
-      <div class='top10'><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
+      <div class='grid top10'>
+        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
+        <div><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
+      </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
       <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
@@ -2486,6 +2490,7 @@ async function installOwnerAssignments(force = false) {
 
   host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
+  refreshOwnerAutoServicePlan();
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
@@ -2505,6 +2510,7 @@ async function ownerAssignJob() {
   const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
+  const workType = document.getElementById('ownerAssignWorkType')?.value || 'service';
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
@@ -2516,7 +2522,7 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v7', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -2533,6 +2539,7 @@ async function ownerAssignJob() {
     p_equipment_manifest: equipmentManifest,
     p_requires_it_handoff: false,
     p_scheduled_for: scheduledFor,
+    p_work_type: workType,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -2552,6 +2559,7 @@ async function ownerAssignJob() {
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
+  const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
