@@ -2046,6 +2046,7 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  const dayTab=e.target.closest('[data-owner-ai-day]');if(dayTab){const box=dayTab.closest('.wl-owner-ai-daily');box?.querySelectorAll('[data-owner-ai-day]').forEach(b=>b.classList.toggle('selected',b===dayTab));box?.querySelectorAll('[data-owner-ai-day-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.ownerAiDayPanel!==dayTab.dataset.ownerAiDay));return;}
   const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
@@ -2685,6 +2686,10 @@ async function installOwnerAssignments(force = false) {
   const aiAttention=aiStates.filter(x=>x.s.state==='attention').length, aiWaiting=aiStates.filter(x=>x.s.state==='waiting').length, aiWorking=aiStates.filter(x=>x.s.state==='working').length, aiOnTrack=aiStates.filter(x=>x.s.state==='healthy').length;
   const aiNotices=aiStates.filter(x=>x.s.state==='attention').map(x=>({...x,key:ownerAINotificationKey(x.a,x.s),ack:ownerAIIsAcknowledged(x.a,x.s)})); const aiUnread=aiNotices.filter(x=>!x.ack).length;
   const todayKey=techCheckDateKey(new Date());
+  const tomorrowDate=new Date();tomorrowDate.setDate(tomorrowDate.getDate()+1);const tomorrowKey=techCheckDateKey(tomorrowDate);
+  const tomorrowJobs=all.filter(a=>String(a.work_date||'')===tomorrowKey&&a.status!=='completed');
+  const tomorrowStates=tomorrowJobs.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
+
   const completedToday=all.filter(a=>a.status==='completed'&&techCheckDateKey(new Date(a.completed_at||a.updated_at||a.assigned_at))===todayKey);
   const alertsToday=ownerAIAckRows.filter(r=>techCheckDateKey(new Date(r.acknowledged_at))===todayKey);
   const resolvedToday=ownerAIAckRows.filter(r=>r.resolved_at&&techCheckDateKey(new Date(r.resolved_at))===todayKey);
@@ -2748,9 +2753,16 @@ async function installOwnerAssignments(force = false) {
     </summary>
     <div class='ownerDashBody'>
       <details class='wl-owner-ai-daily' open><summary><span>✨ Owner AI Daily Summary</span><span class='pill'>TODAY</span></summary><div class='wl-owner-ai-daily-body'>
+        <div class='wl-owner-ai-day-tabs'><button type='button' class='selected' data-owner-ai-day='today'>Today</button><button type='button' data-owner-ai-day='tomorrow'>Tomorrow <span>${tomorrowJobs.length}</span></button></div>
+        <div data-owner-ai-day-panel='today'>
         <div class='wl-owner-ai-daily-counts'><div><b>${completedToday.length}</b><span>Completed today</span></div><div><b>${active.length}</b><span>Still open</span></div><div><b>${alertsToday.length}</b><span>Alerts acknowledged</span></div><div><b>${resolvedToday.length}</b><span>Alerts resolved</span></div><div class='${outstandingAlerts.length?'attention':''}'><b>${outstandingAlerts.length}</b><span>Outstanding alerts</span></div></div>
         ${unfinishedTechs.length?`<details class='wl-owner-ai-open-jobs'><summary>Who has the unfinished jobs? <span class='pill'>${unfinishedTechs.length}</span></summary><div>${unfinishedTechs.map(x=>`<div><b>#${esc(x.ticket)}</b><span>${esc(x.role)} · ${esc(x.name)}</span></div>`).join('')}</div></details>`:`<div class='wl-ai-good'>✓ No unfinished Tech Check jobs.</div>`}
         ${outstandingAlerts.length?`<div class='wl-ai-warn top8'><b>Still needs attention:</b><br>${outstandingAlerts.slice(0,6).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>`:`<div class='wl-ai-good top8'>✓ No outstanding AI alerts.</div>`}
+        </div>
+        <div class='hidden' data-owner-ai-day-panel='tomorrow'>
+          <div class='wl-owner-ai-daily-counts'><div><b>${tomorrowJobs.length}</b><span>Jobs tomorrow</span></div><div class='${tomorrowStates.filter(x=>x.s.state==='attention').length?'attention':''}'><b>${tomorrowStates.filter(x=>x.s.state==='attention').length}</b><span>Need attention</span></div><div><b>${tomorrowJobs.filter(a=>a.assigned_role==='it').length}</b><span>IT assignments</span></div><div><b>${tomorrowJobs.filter(a=>a.assigned_role==='service').length}</b><span>Service assignments</span></div></div>
+          ${tomorrowJobs.length?`<div class='wl-owner-ai-tomorrow-list'>${tomorrowStates.map(x=>`<div class='${x.s.state==='attention'?'attention':''}'><div><b>#${esc(x.a.ticket_no||'—')} · ${esc(x.a.site||'No site')}</b><span>${esc(x.a.assigned_role==='it'?'IT':'Service')} · ${esc(x.a.assignee_name||x.a.assigned_to_name||(x.a.assignment_scope==='department'?'Department Queue':'Unassigned'))}</span></div><div><b>${x.s.state==='attention'?'⚠ REVIEW':'✓ READY'}</b><span>${esc(x.s.detail||'No setup conflict detected')}</span></div></div>`).join('')}</div>`:`<div class='wl-ai-good top8'>✓ No Tech Check jobs are assigned for tomorrow.</div>`}
+        </div>
       </div></details>
       <details class='wl-owner-ai-notifications' ${aiUnread?'open':''}><summary><span>🔔 AI Notifications</span><b id='ownerAINotificationBadge'>${aiUnread}</b></summary><div>${aiNotices.length?aiNotices.map(x=>`<div class='wl-owner-ai-notice ${x.ack?'acknowledged':''}' data-owner-ai-notice-id='${esc(x.a.id||x.a.ticket_no)}'><div><b>MHelpDesk #${esc(x.a.ticket_no||'—')}</b><span>${esc(x.s.detail)}</span></div><button type='button' data-owner-ai-ack='${esc(x.a.id||x.a.ticket_no)}' data-owner-ai-ack-key='${esc(x.key)}' data-owner-ai-ack-detail='${esc(x.s.detail)}' data-owner-ai-ack-ticket='${esc(x.a.ticket_no||'')}'>${x.ack?'Acknowledged':'Acknowledge'}</button></div>`).join(''):`<div class='wl-ai-good'>✓ No AI Attention notifications.</div>`}</div></details>
       <div class='wl-owner-ai-overview'><div class='wl-owner-ai-overview-head'><span>✨ AI Operations Overview</span><b>${aiAttention ? aiAttention+' NEED ATTENTION' : 'NO AI ALERTS'}</b></div><div class='wl-owner-ai-counts'><button type='button' class='attention' data-owner-ai-filter='attention'><b>${aiAttention}</b><span>Need attention</span></button><button type='button' class='waiting' data-owner-ai-filter='waiting'><b>${aiWaiting}</b><span>Waiting normally</span></button><button type='button' class='working' data-owner-ai-filter='working'><b>${aiWorking}</b><span>In progress</span></button><button type='button' class='healthy' data-owner-ai-filter='healthy'><b>${aiOnTrack}</b><span>On track</span></button></div>${aiAttention ? `<div class='wl-ai-warn top8'><b>Owner review recommended:</b><br>${aiStates.filter(x=>x.s.state==='attention').slice(0,4).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>` : `<div class='wl-ai-good top8'>✓ No active jobs have an AI-detected setup conflict.</div>`}</div>
