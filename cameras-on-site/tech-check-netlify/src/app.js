@@ -265,6 +265,7 @@ function configureTabs() {
   $('tab-it').classList.toggle('hidden', !['it', 'owner'].includes(r));
   $('tab-svc').classList.toggle('hidden', !['service', 'owner'].includes(r));
   $('tab-owner').classList.toggle('hidden', r !== 'owner');
+  $('appView')?.classList.toggle('singleRoleView', r !== 'owner');
   show(r === 'owner' ? 'owner' : r === 'it' ? 'it' : 'svc');
 }
 function show(which) {
