@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./src/styles.css?v=parts-v4" />
+    <link rel="stylesheet" href="./src/styles.css?v=team-equipment-v1" />
   </head>
   <body>
     <div id="app">
@@ -273,6 +273,16 @@
             </div>
           </details>
 
+          <details id="ownerEquipmentCard" class="card ownerDashSection ownerEquipmentCard">
+            <summary class="ownerDashSummary">
+              <div><b>Equipment Inventory</b><span>Devices, stands, shelf status, and technician assignments</span></div>
+              <span id="ownerEquipmentBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div id="ownerEquipmentManager"><div class="small">Loading devices and stands…</div></div>
+            </div>
+          </details>
+
           <details id="ownerHandoffsCard" class="card ownerDashSection">
             <summary class="ownerDashSummary">
               <div><b>Equipment Handoffs</b><span>IT prep, Service checkout, and completed history</span></div>
@@ -297,60 +307,71 @@
             </div>
           </details>
 
-          <details id="ownerAccountsCard" class="card ownerDashSection">
+          <details id="ownerAccountsCard" class="card ownerDashSection ownerTeamCard">
             <summary class="ownerDashSummary">
-              <div><b>Technician Accounts</b><span>Create logins, manage access, and review resets</span></div>
+              <div><b>Team & Access</b><span>IT Techs, Service Techs, Owners/Admins, archived staff, and account security</span></div>
               <span id="ownerAccountsBadge" class="ownerDashBadge neutral">0</span>
             </summary>
             <div class="ownerDashBody">
-              <div class="small">
-                Only the Owner can create or change technician access. Techs sign
-                in with their own username and password. No company email address
-                is required.
+              <div class="ownerTeamIntro">
+                <b>Manage who can use Tech Check.</b>
+                <div class="small">Removing someone from Active Team archives their login instead of erasing their work history. Owners/Admins can manage the app just like you.</div>
               </div>
-              <h3>Create Technician</h3>
-              <div class="grid4">
-                <div>
-                  <label>Full Name</label
-                  ><input id="newTechName" placeholder="Technician name" />
+
+              <details class="ownerInnerSection" open>
+                <summary>Create Team Member</summary>
+                <div class="ownerInnerBody">
+                  <div class="grid4">
+                    <div>
+                      <label>Full Name</label>
+                      <input id="newTechName" placeholder="Team member name" />
+                    </div>
+                    <div>
+                      <label>Username</label>
+                      <input id="newTechUsername" type="text" autocapitalize="none" spellcheck="false" placeholder="Username" />
+                    </div>
+                    <div>
+                      <label>Role</label>
+                      <select id="newTechRole">
+                        <option value="service">Service Tech</option>
+                        <option value="it">IT Technician</option>
+                        <option value="owner">Owner/Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Temporary Password</label>
+                      <input id="newTechPassword" type="password" placeholder="8+ characters" />
+                    </div>
+                  </div>
+                  <button class="btn" onclick="createTech()">Create Team Member Login</button>
+                  <div id="userMessage"></div>
                 </div>
-                <div>
-                  <label>Username</label
-                  ><input
-                    id="newTechUsername"
-                    type="text"
-                    autocapitalize="none"
-                    spellcheck="false"
-                    placeholder="Username"
-                  />
+              </details>
+
+              <div id="ownerTeamStats" class="ownerTeamStats"></div>
+
+              <details class="ownerInnerSection" open>
+                <summary>Active Team</summary>
+                <div class="ownerInnerBody"><div id="userList"></div></div>
+              </details>
+
+              <details class="ownerInnerSection">
+                <summary>Archived Team <span id="archivedTeamCount" class="pill">0</span></summary>
+                <div class="ownerInnerBody"><div id="archivedUserList"></div></div>
+              </details>
+
+              <details class="ownerInnerSection">
+                <summary>Password Reset Requests</summary>
+                <div class="ownerInnerBody">
+                  <div class="small">Approve a reset request and the system will issue a one-time temporary password back to the requesting device.</div>
+                  <div id="passwordResetRequests"></div>
                 </div>
-                <div>
-                  <label>Role</label
-                  ><select id="newTechRole">
-                    <option value="service">Service Tech</option>
-                    <option value="it">IT Technician</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Temporary Password</label
-                  ><input
-                    id="newTechPassword"
-                    type="password"
-                    placeholder="8+ characters"
-                  />
-                </div>
-              </div>
-              <button class="btn" onclick="createTech()">
-                Create Technician Login
-              </button>
-              <div id="userMessage"></div>
-              <div class="sep"></div>
-              <h3>Password Reset Requests</h3>
-              <div class="small">Techs can request a reset without exposing a private password. Approve a request and the system will issue a one-time temporary password back to the requesting device.</div>
-              <div id="passwordResetRequests"></div>
-              <div class="sep"></div>
-              <h3>Current Users</h3>
-              <div id="userList"></div>
+              </details>
+
+              <details class="ownerInnerSection">
+                <summary>Team Access History</summary>
+                <div class="ownerInnerBody"><div id="teamAccessHistory"></div></div>
+              </details>
             </div>
           </details>
         </section>
