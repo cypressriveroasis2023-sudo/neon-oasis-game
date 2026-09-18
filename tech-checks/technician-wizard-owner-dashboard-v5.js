@@ -2423,9 +2423,8 @@ async function installOwnerAssignments(force = false) {
     host.insertAdjacentElement('afterend', liveHost);
   }
 
-  const wasOpen = host.dataset.loaded === '1' ? host.open : true;
+  const wasOpen = true;
   const liveWasOpen = liveHost.open;
-  host.dataset.loaded = '1';
 
   const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
@@ -2436,6 +2435,7 @@ async function installOwnerAssignments(force = false) {
   ]);
   ownerAssignmentProfiles = profiles || [];
   ownerAssignmentAssets = assets || [];
+  host.dataset.loaded = '1';
   const all = assignments || [];
   const prepMap = new Map((preps || []).map(p => [p.id,p]));
   const solarCheckMap = new Map((solarChecks || []).map(row => [row.prep_ticket_id,row]));
