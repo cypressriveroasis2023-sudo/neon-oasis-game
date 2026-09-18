@@ -2490,7 +2490,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>Service + IT Departments</option></select></div>
+        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
         <div><label>Assign Technician(s)</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small'>Choose one tech, tap +, then add another if needed. Leave blank for the department queue.</div></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
@@ -2544,11 +2544,11 @@ function refreshOwnerAssignmentTechOptions() {
   const hint = document.getElementById('ownerAssignTechHint');
   if (!select) return;
   const pills=document.getElementById('ownerAssignedTechPills'); if(pills) pills.innerHTML='';
-  if (role === 'both') {
+  if (role === 'it_service' || role === 'service_it') {
     select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
     select.disabled = false;
     select.innerHTML = ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
-    if (hint) { const wt=document.getElementById('ownerAssignWorkType')?.value || 'service'; hint.textContent = (wt==='pickup'||wt==='swap') ? 'Field return flow: Service handles the pickup / swap first, then the returned units go to IT Intake.' : 'This sends linked work to Service + IT Departments.'; }
+    if (hint) hint.textContent = role === 'service_it' ? 'Service first → returned units go to IT Intake.' : 'IT first → Service receives the prepared equipment.';
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
@@ -2621,8 +2621,10 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const targets = role === 'both'
-    ? (assignees.length ? assignees.map(id => { const p=ownerAssignmentProfiles.find(x=>x.user_id===id); return { role:p?.role || 'service', assignee:id }; }) : ((workType==='pickup'||workType==='swap') ? [{ role:'service', assignee:null }, { role:'it', assignee:null }] : [{ role:'it', assignee:null }, { role:'service', assignee:null }]))
+  const dualDept = role === 'it_service' || role === 'service_it';
+  const orderedRoles = role === 'service_it' ? ['service','it'] : ['it','service'];
+  const targets = dualDept
+    ? orderedRoles.flatMap(r => { const ids=assignees.filter(id => ownerAssignmentProfiles.find(p=>p.user_id===id)?.role===r); return ids.length ? ids.map(id=>({role:r,assignee:id})) : [{role:r,assignee:null}]; })
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
@@ -2671,7 +2673,7 @@ async function ownerAssignJob() {
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
-  const target = role === 'both' ? 'both the IT and Service Department queues' : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  const target = (role === 'it_service' || role === 'service_it') ? (role === 'service_it' ? 'Service first, then IT Intake' : 'IT first, then Service') : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
   alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
