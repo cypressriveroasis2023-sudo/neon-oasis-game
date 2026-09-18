@@ -426,7 +426,7 @@ async function showITHome() {
   const [c,r,assignments] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it')]);
   const assigned = assignments[0] || null;
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}${assigned.notes ? ' · ' + esc(assigned.notes) : ''}</div><button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
   home.innerHTML = `<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div><div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
@@ -1060,7 +1060,7 @@ async function showSvcHome() {
   const readyForService = work.released.length;
   const nextReleased = work.released[0] || null;
   const nextDeployed = work.deployed[0] || null;
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}${assigned.notes ? ' · ' + esc(assigned.notes) : ''}</div><button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`);
   home.innerHTML = `<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div><div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
   hideChildren(viewSvc(), [home]); resetWizardPosition();
@@ -1600,9 +1600,8 @@ async function installOwnerAssignments(force = false) {
   if (!host) {
     host = document.createElement('div');
     host.id = 'ownerJobAssignments';
-    host.className = 'card';
+    host.className = 'card ownerDispatchCard';
     const view = document.getElementById('view-owner');
-    const attention = document.getElementById('ownerAttentionCard');
     view?.prepend(host);
   }
   host.dataset.loaded = '1';
@@ -1613,57 +1612,103 @@ async function installOwnerAssignments(force = false) {
   ]);
   ownerAssignmentProfiles = profiles || [];
   const active = assignments || [];
-  const techOptions = role => ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
-  const rows = active.map(a => `<div class='wl-assignment-row'><div><b>MHelpDesk #${esc(a.ticket_no)} · ${a.assigned_role === 'it' ? 'IT' : 'Service'}</b><div class='small'>${esc(a.assignee_name)}${a.site ? ' · ' + esc(a.site) : ''} · ${a.status === 'started' ? 'Started' : 'Assigned'}</div>${a.notes ? `<div class='small'>${esc(a.notes)}</div>` : ''}</div><button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button></div>`).join('');
+  const techOptions = role => ownerAssignmentProfiles
+    .filter(p => p.role === role)
+    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
+    .join('');
+
+  const itCount = active.filter(a => a.assigned_role === 'it').length;
+  const svcCount = active.filter(a => a.assigned_role === 'service').length;
+  const rows = active.map(a => `
+    <div class='wl-assignment-row'>
+      <div class='wl-assignment-main'>
+        <div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div>
+        <div class='small'><b>Assigned to:</b> ${esc(a.assignee_name)} · ${a.status === 'started' ? 'Started' : 'Assigned'}</div>
+        ${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}
+        ${a.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(a.unit_summary)}</div>` : ''}
+        ${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}
+        ${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}
+      </div>
+      <button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>
+    </div>`).join('');
+
   host.innerHTML = `
-    <div class='sectiontitle'><div><h2>Assign MHelpDesk Job</h2><div class='small'>Send a job directly to a technician’s My Work Today screen.</div></div><span class='pill'>OWNER</span></div>
+    <div class='sectiontitle'>
+      <div>
+        <h2>Send Job to Tech</h2>
+        <div class='small'>Create an internal Tech Check assignment using information you manually copy from MHelpDesk.</div>
+      </div>
+      <span class='pill'>OWNER</span>
+    </div>
+    <div class='warn top8 manualReferenceNotice'>
+      <b>MHelpDesk is separate from Tech Check.</b>
+      <div class='small'>Nothing is synced or pulled from MHelpDesk. Enter the reference number, unit/equipment, customer/site, and job description here so your technician sees the same information.</div>
+    </div>
     <div class='grid top10'>
-      <div><label>MHelpDesk Ticket #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Ticket #'></div>
+      <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
       <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
     </div>
     <div class='grid top10'>
-      <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
-      <div><label>Assign To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+      <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
+      <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
     </div>
-    <label class='top10'>Owner Notes</label><input id='ownerAssignNotes' placeholder='Optional instructions'>
-    <button class='btn' data-wl-owner-assign>Assign Job Directly</button>
-    <div class='ownerActiveLabel'>Active Assignments</div>
+    <div class='grid top10'>
+      <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
+      <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+    </div>
+    <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
+    <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
+    <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Job to Technician</button>
+
+    <div class='ownerDispatchSummary'>
+      <span><b>${active.length}</b> active</span>
+      <span><b>${itCount}</b> IT</span>
+      <span><b>${svcCount}</b> Service</span>
+    </div>
+    <div class='ownerActiveLabel'>Active Tech Check Assignments</div>
     <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>`;
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
   if (!select) return;
-  select.innerHTML = ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
+  select.innerHTML = ownerAssignmentProfiles
+    .filter(p => p.role === role)
+    .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
+    .join('');
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
   const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
+  const units = document.getElementById('ownerAssignUnits')?.value.trim() || '';
+  const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const assignee = document.getElementById('ownerAssignTech')?.value || '';
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
-  if (!ticket || !assignee) return alert('Enter the MHelpDesk ticket number and choose a technician.');
+  if (!ticket || !assignee) return alert('Enter the MHelpDesk reference number and choose a technician.');
+  if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
+
   document.body.classList.add('busy');
-  const { error } = await liveDb.rpc('owner_assign_job', {
+  const { error } = await liveDb.rpc('owner_assign_job_v2', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
     p_assignee_user_id: assignee,
+    p_unit_summary: units,
+    p_job_description: description,
     p_notes: notes,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
-  const ticketInput = document.getElementById('ownerAssignTicket');
-  const siteInput = document.getElementById('ownerAssignSite');
-  const notesInput = document.getElementById('ownerAssignNotes');
-  if (ticketInput) ticketInput.value = '';
-  if (siteInput) siteInput.value = '';
-  if (notesInput) notesInput.value = '';
+
+  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
   await installOwnerAssignments(true);
-  alert('Job assigned. It is now on that technician’s My Work Today screen.');
+  alert('Sent in Tech Check. This does not change or sync anything in MHelpDesk.');
 }
 async function ownerCancelAssignment(id) {
-  if (!confirm('Cancel this technician assignment?')) return;
+  if (!confirm('Cancel this Tech Check assignment?')) return;
   const { error } = await liveDb.rpc('owner_cancel_job_assignment', { p_assignment_id: id });
   if (error) return alert(error.message);
   await installOwnerAssignments(true);
@@ -1747,5 +1792,7 @@ bootObserver.observe(document.body, { childList:true, subtree:true, attributes:t
 window.addEventListener('focus', scheduleBoot);
 setInterval(scheduleBoot, 5000);
 boot();
+
+// ASSIGNMENT_NOTIFICATION_PUBLISH_STAMP_V1
 
 // OWNER_ASSIGNMENT_TOP_CARD_V2
