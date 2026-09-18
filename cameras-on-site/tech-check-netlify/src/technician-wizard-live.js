@@ -838,6 +838,8 @@ async function createPrepAndStartChecks() {
     p_camera_replacement_qty: parts.camera_replacement_qty,
     p_sim_replacement_qty: parts.sim_replacement_qty,
     p_micro_sd_qty: parts.micro_sd_qty,
+    p_equipment_manifest: equipmentManifest,
+    p_requires_it_handoff: false,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -2069,6 +2071,7 @@ async function ownerAssignJob() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
+  const equipmentManifest = role === 'it' ? readOwnerEquipmentManifest() : [];
   const parts = role === 'it' ? readTicketPartInputs('ownerPart') : {
     solar_panel_qty:0,battery_replacement_qty:0,camera_replacement_qty:0,sim_replacement_qty:0,micro_sd_qty:0
   };
@@ -2076,7 +2079,7 @@ async function ownerAssignJob() {
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v4', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v5', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -2108,6 +2111,7 @@ async function ownerAssignJob() {
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   fillTicketPartInputs({}, 'ownerPart');
+  document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
   const target = assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
   alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
