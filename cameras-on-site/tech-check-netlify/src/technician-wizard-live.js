@@ -211,14 +211,218 @@ async function currentTechIdentity() {
   if (!user?.id) throw new Error('Please sign in again.');
   return { id: user.id, name: document.getElementById('whoName')?.textContent?.trim() || 'Technician' };
 }
+
+let notificationRealtimeChannel = null;
+let notificationRealtimeUserId = null;
+let ownerAssignmentProfiles = [];
+
+function currentRoleKey() {
+  const role = roleText();
+  if (role.includes('Owner/Admin')) return 'owner';
+  if (role.includes('Service Tech')) return 'service';
+  return 'it';
+}
+async function myActiveAssignments(role = null) {
+  const tech = await currentTechIdentity();
+  let q = liveDb.from('job_assignments')
+    .select('*')
+    .eq('assignee_user_id', tech.id)
+    .in('status', ['assigned','started'])
+    .order('assigned_at', { ascending: true });
+  if (role) q = q.eq('assigned_role', role);
+  const { data, error } = await q;
+  if (error) return [];
+  return data || [];
+}
+async function myNotificationPreferences() {
+  const tech = await currentTechIdentity();
+  const { data } = await liveDb.from('notification_preferences').select('*').eq('user_id', tech.id).maybeSingle();
+  return data || {
+    new_assignments: true,
+    returned_units: true,
+    equipment_ready_service: true,
+    owner_actions: true,
+    browser_notifications: false,
+  };
+}
+async function myNotifications(limit = 30) {
+  const tech = await currentTechIdentity();
+  const { data, error } = await liveDb.from('app_notifications')
+    .select('*')
+    .eq('recipient_user_id', tech.id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return data || [];
+}
+async function refreshNotificationBadge() {
+  const badge = document.getElementById('notificationBadge');
+  if (!badge || document.getElementById('appView')?.classList.contains('hidden')) return;
+  const rows = await myNotifications(50);
+  const unread = rows.filter(n => !n.read_at).length;
+  badge.textContent = String(unread);
+  badge.classList.toggle('hidden', unread === 0);
+}
+function ensureNotificationPanel() {
+  let panel = document.getElementById('wlNotificationPanel');
+  if (panel) return panel;
+  panel = document.createElement('div');
+  panel.id = 'wlNotificationPanel';
+  panel.className = 'wl-notify-overlay hidden';
+  panel.innerHTML = `<div class='wl-notify-sheet'><div class='wl-notify-head'><div><div class='wl-next-kicker'>TECH CHECK</div><h2>Notifications</h2></div><button class='mini' data-wl-notify-close>Close</button></div><div id='wlNotifyBody'></div></div>`;
+  document.body.append(panel);
+  return panel;
+}
+function notificationToggle(id, label, checked, detail = '') {
+  return `<label class='wl-notify-toggle'><span><b>${esc(label)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span><input id='${id}' type='checkbox' ${checked ? 'checked' : ''}></label>`;
+}
+async function openNotificationPanel() {
+  const panel = ensureNotificationPanel();
+  const body = document.getElementById('wlNotifyBody');
+  const [prefs, rows] = await Promise.all([myNotificationPreferences(), myNotifications(30)]);
+  const role = currentRoleKey();
+  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+  const browserStatus = permission === 'granted'
+    ? 'iPhone/browser alerts are allowed on this device while Tech Check is active.'
+    : permission === 'denied'
+      ? 'Alerts are blocked in this device’s browser settings.'
+      : 'Enable alerts on this device when you want system notifications.';
+  const toggles = [
+    notificationToggle('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.'),
+    role === 'it' ? notificationToggle('wlPrefReturns','Returned units waiting for IT',prefs.returned_units,'When Service sends a unit back for IT Intake.') : '',
+    role === 'service' ? notificationToggle('wlPrefService','Equipment ready for Service',prefs.equipment_ready_service,'When IT releases equipment for Service checkout.') : '',
+    role === 'owner' ? notificationToggle('wlPrefOwner','Owner actions',prefs.owner_actions,'When IT finishes intake and MHelpDesk inventory confirmation is needed.') : '',
+  ].join('');
+  const inbox = rows.map(n => `<button class='wl-notify-item ${n.read_at ? '' : 'unread'}' data-wl-notification-id='${n.id}' ${n.assignment_id ? `data-wl-notification-assignment='${n.assignment_id}'` : ''}><span class='wl-notify-dot'></span><span><b>${esc(n.title)}</b><small>${esc(n.body)}</small><em>${new Date(n.created_at).toLocaleString()}</em></span></button>`).join('');
+  body.innerHTML = `
+    <div class='wl-notify-section'>
+      <h3>Alert Settings</h3>
+      ${toggles}
+      <div class='wl-notify-system'>
+        <div><b>iPhone / Browser Alerts</b><div class='small'>${esc(browserStatus)}</div></div>
+        <button class='mini' data-wl-enable-browser-alerts>${permission === 'granted' ? 'Enabled' : 'Enable'}</button>
+      </div>
+      <div class='small top8'>These settings control Tech Check alerts. Closed-app push delivery requires the separate web-push service; Tech Check will not claim background push until that is connected.</div>
+      <button class='btn' data-wl-save-notify>Save Notification Settings</button>
+    </div>
+    <div class='wl-notify-section'>
+      <div class='sectiontitle'><h3>Notification Inbox</h3><button class='mini' data-wl-notify-read-all>Mark all read</button></div>
+      <div class='wl-notify-list'>${inbox || "<div class='ok'><b>✓ No notifications yet.</b></div>"}</div>
+    </div>`;
+  panel.classList.remove('hidden');
+}
+async function saveNotificationSettings() {
+  const prefs = await myNotificationPreferences();
+  const role = currentRoleKey();
+  const browserAllowed = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  const { error } = await liveDb.rpc('save_my_notification_preferences', {
+    p_new_assignments: Boolean(document.getElementById('wlPrefAssignments')?.checked),
+    p_returned_units: role === 'it' ? Boolean(document.getElementById('wlPrefReturns')?.checked) : Boolean(prefs.returned_units),
+    p_equipment_ready_service: role === 'service' ? Boolean(document.getElementById('wlPrefService')?.checked) : Boolean(prefs.equipment_ready_service),
+    p_owner_actions: role === 'owner' ? Boolean(document.getElementById('wlPrefOwner')?.checked) : Boolean(prefs.owner_actions),
+    p_browser_notifications: browserAllowed,
+  });
+  if (error) return alert(error.message);
+  alert('Notification settings saved.');
+  await openNotificationPanel();
+}
+async function enableBrowserAlerts() {
+  if (typeof Notification === 'undefined') {
+    return alert('System notifications are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.');
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return alert('Notification permission was not enabled on this device.');
+  await saveNotificationSettings();
+}
+async function showSystemNotification(row) {
+  const prefs = await myNotificationPreferences();
+  if (!prefs.browser_notifications || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(row.title, {
+        body: row.body,
+        tag: 'techcheck-' + row.id,
+        data: { url: location.href },
+        icon: './icon-192.png',
+        badge: './favicon-32x32.png',
+      });
+    } else {
+      new Notification(row.title, { body: row.body });
+    }
+  } catch {}
+}
+async function setupNotificationRealtime() {
+  if (document.getElementById('appView')?.classList.contains('hidden')) return;
+  const tech = await currentTechIdentity().catch(() => null);
+  if (!tech?.id || notificationRealtimeUserId === tech.id) return;
+  if (notificationRealtimeChannel) {
+    try { await liveDb.removeChannel(notificationRealtimeChannel); } catch {}
+  }
+  notificationRealtimeUserId = tech.id;
+  notificationRealtimeChannel = liveDb
+    .channel('tech-check-notifications-' + tech.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications', filter: 'recipient_user_id=eq.' + tech.id }, payload => {
+      refreshNotificationBadge();
+      showSystemNotification(payload.new);
+    })
+    .subscribe();
+  refreshNotificationBadge();
+}
+async function startAssignedJob(id) {
+  const { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
+  const assignment = rows?.[0];
+  if (!assignment) return alert('That assignment is no longer available.');
+
+  if (assignment.assigned_role === 'it') {
+    const tech = await currentTechIdentity();
+    const { data: existing } = await liveDb.from('prep_tickets')
+      .select('id,ticket_no,status,created_by')
+      .eq('ticket_no', assignment.ticket_no)
+      .eq('status', 'draft')
+      .eq('created_by', tech.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    if (existing?.[0]) return showItPrep(existing[0].id);
+    showNewPrep();
+    const ticket = document.getElementById('itTicket');
+    const site = document.getElementById('itSite');
+    if (ticket) ticket.value = assignment.ticket_no || '';
+    if (site) site.value = assignment.site || '';
+    document.getElementById('wlTotalUnits')?.focus();
+    return;
+  }
+
+  const { data: released } = await liveDb.from('prep_tickets')
+    .select('id,ticket_no,status')
+    .eq('ticket_no', assignment.ticket_no)
+    .eq('status', 'released')
+    .limit(1);
+  if (!released?.length) {
+    return alert('This MHelpDesk job is assigned to you, but IT has not released the equipment yet. It will stay under Assigned to Me.');
+  }
+  await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+  return openServiceTicket(assignment.ticket_no);
+}
+async function openAssignmentFromNotification(id) {
+  const { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
+  const assignment = rows?.[0];
+  if (!assignment) return;
+  document.getElementById('wlNotificationPanel')?.classList.add('hidden');
+  return startAssignedJob(id);
+}
+
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
   let home = document.getElementById('wlItHome');
   if (!home) { home = document.createElement('div'); home.id = 'wlItHome'; home.className = 'card wl-home'; viewIT().prepend(home); }
-  const [c,r] = await Promise.all([prepCounts(), returnCounts()]);
+  const [c,r,assignments] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it')]);
+  const assigned = assignments[0] || null;
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const nextAction = r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`;
-  home.innerHTML = `<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Open the next job directly, or use the full menu below.</div>${nextAction}<div class='wl-workstrip'><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span><span><b>${c.released}</b> waiting Service</span></div><div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}${assigned.notes ? ' · ' + esc(assigned.notes) : ''}</div><button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
+  home.innerHTML = `<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div><div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
   resetWizardPosition();
 }
@@ -845,12 +1049,14 @@ async function showITStatus() {
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
   let home = document.getElementById('wlSvcHome'); if (!home) { home = document.createElement('div'); home.id = 'wlSvcHome'; home.className = 'card wl-home'; viewSvc().prepend(home); }
-  const [r, work] = await Promise.all([myReturnCounts(), serviceWorkData()]);
+  const [r, work, assignments] = await Promise.all([myReturnCounts(), serviceWorkData(), myActiveAssignments('service')]);
+  const assigned = assignments[0] || null;
   const readyForService = work.released.length;
   const nextReleased = work.released[0] || null;
   const nextDeployed = work.deployed[0] || null;
-  const nextAction = nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`;
-  home.innerHTML = `<div class='wl-title'>My Work Today</div><div class='wl-sub'>Open the next job directly, or use the full menu below.</div>${nextAction}<div class='wl-workstrip'><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> my returns waiting IT</span><span><b>${r.inventory}</b> my returns pending manager</span></div><div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}${assigned.notes ? ' · ' + esc(assigned.notes) : ''}</div><button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const nextAction = assignmentAction || (nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`);
+  home.innerHTML = `<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div><div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
   hideChildren(viewSvc(), [home]); resetWizardPosition();
 }
 async function showReceiveLookup() {
@@ -1380,6 +1586,78 @@ function wrapCreatePrep() {
     await showItPrep(prep.id);
   };
 }
+
+async function installOwnerAssignments(force = false) {
+  if (!roleText().includes('Owner/Admin')) return;
+  let host = document.getElementById('ownerJobAssignments');
+  if (host && host.dataset.loaded === '1' && !force) return;
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'ownerJobAssignments';
+    host.className = 'card';
+    const view = document.getElementById('view-owner');
+    const attention = document.getElementById('ownerAttentionCard');
+    if (attention) attention.after(host);
+    else view?.prepend(host);
+  }
+  host.dataset.loaded = '1';
+
+  const [{ data: profiles }, { data: assignments }] = await Promise.all([
+    liveDb.from('profiles').select('user_id,full_name,username,role,active').eq('active', true).in('role', ['it','service']).order('full_name'),
+    liveDb.from('job_assignments').select('*').in('status', ['assigned','started']).order('assigned_at', { ascending: false }),
+  ]);
+  ownerAssignmentProfiles = profiles || [];
+  const active = assignments || [];
+  const techOptions = role => ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
+  const rows = active.map(a => `<div class='wl-assignment-row'><div><b>MHelpDesk #${esc(a.ticket_no)} · ${a.assigned_role === 'it' ? 'IT' : 'Service'}</b><div class='small'>${esc(a.assignee_name)}${a.site ? ' · ' + esc(a.site) : ''} · ${a.status === 'started' ? 'Started' : 'Assigned'}</div>${a.notes ? `<div class='small'>${esc(a.notes)}</div>` : ''}</div><button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button></div>`).join('');
+  host.innerHTML = `
+    <div class='sectiontitle'><div><h2>Assign MHelpDesk Job</h2><div class='small'>Send a job directly to a technician’s My Work Today screen.</div></div><span class='pill'>OWNER</span></div>
+    <div class='grid top10'>
+      <div><label>MHelpDesk Ticket #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Ticket #'></div>
+      <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
+    </div>
+    <div class='grid top10'>
+      <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
+      <div><label>Assign To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
+    </div>
+    <label class='top10'>Owner Notes</label><input id='ownerAssignNotes' placeholder='Optional instructions'>
+    <button class='btn' data-wl-owner-assign>Assign Job Directly</button>
+    <div class='ownerActiveLabel'>Active Assignments</div>
+    <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>`;
+}
+function refreshOwnerAssignmentTechOptions() {
+  const role = document.getElementById('ownerAssignRole')?.value || 'it';
+  const select = document.getElementById('ownerAssignTech');
+  if (!select) return;
+  select.innerHTML = ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
+}
+async function ownerAssignJob() {
+  const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
+  const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
+  const role = document.getElementById('ownerAssignRole')?.value || 'it';
+  const assignee = document.getElementById('ownerAssignTech')?.value || '';
+  const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
+  if (!ticket || !assignee) return alert('Enter the MHelpDesk ticket number and choose a technician.');
+  document.body.classList.add('busy');
+  const { error } = await liveDb.rpc('owner_assign_job', {
+    p_ticket_no: ticket,
+    p_site: site,
+    p_assigned_role: role,
+    p_assignee_user_id: assignee,
+    p_notes: notes,
+  });
+  document.body.classList.remove('busy');
+  if (error) return alert(error.message);
+  await installOwnerAssignments(true);
+  alert('Job assigned. It is now on that technician’s My Work Today screen.');
+}
+async function ownerCancelAssignment(id) {
+  if (!confirm('Cancel this technician assignment?')) return;
+  const { error } = await liveDb.rpc('owner_cancel_job_assignment', { p_assignment_id: id });
+  if (error) return alert(error.message);
+  await installOwnerAssignments(true);
+}
+
 async function installOwnerIntake(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerIntakeTracking');
@@ -1413,13 +1691,41 @@ async function installOwnerIntake(force = false) {
   host.innerHTML = `<div class='sectiontitle'><div><h2>Unit Return & Intake Tracking</h2><div class='small'>Active work stays at the top. Completed returns are kept in history below.</div></div><span class='pill'>OWNER</span></div><div class='ownerWorkTools'><div class='wl-workstrip'><span><b>${waitingCount}</b> waiting IT</span><span><b>${managerCount}</b> need manager</span><span><b>${completedCount}</b> completed</span></div><input id='ownerReturnSearch' value='${esc(currentSearch)}' placeholder='Search unit, MHelpDesk ticket, equipment, or tech'></div><div class='ownerActiveLabel'>Needs Attention / In Progress</div>${activeItems.join('') || '<div class="ok"><b>✓ No active return/intake work.</b></div>'}<details class='ownerHistoryFold'><summary>Completed Return & Intake History <span class='pill'>${completedCount}</span></summary><div>${completedItems.join('') || '<div class="small">No completed return history yet.</div>'}</div></details>`;
   if (currentSearch) filterOwnerReturns(currentSearch);
 }
+
+document.addEventListener('click', async e => {
+  if (e.target.closest('#notificationSettingsButton')) return openNotificationPanel();
+  if (e.target.closest('[data-wl-notify-close]')) { document.getElementById('wlNotificationPanel')?.classList.add('hidden'); return; }
+  if (e.target.closest('[data-wl-save-notify]')) return saveNotificationSettings();
+  if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
+  if (e.target.closest('[data-wl-notify-read-all]')) {
+    await liveDb.rpc('mark_all_my_notifications_read');
+    await refreshNotificationBadge();
+    return openNotificationPanel();
+  }
+  const notificationItem = e.target.closest('[data-wl-notification-id]');
+  if (notificationItem) {
+    await liveDb.rpc('mark_my_notification_read', { p_notification_id: notificationItem.dataset.wlNotificationId });
+    await refreshNotificationBadge();
+    if (notificationItem.dataset.wlNotificationAssignment) return openAssignmentFromNotification(notificationItem.dataset.wlNotificationAssignment);
+    return openNotificationPanel();
+  }
+  const assigned = e.target.closest('[data-wl-start-assignment]');
+  if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
+  if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
+  const cancelAssignment = e.target.closest('[data-wl-cancel-assignment]');
+  if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
+});
+document.addEventListener('change', e => {
+  if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
+});
+
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
-window.refreshOwnerIntake = () => installOwnerIntake(true);
+window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
 function boot() {
-  injectStyles(); installTabs(); installOwnerIntake();
+  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); refreshNotificationBadge();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); }
 }
