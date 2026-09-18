@@ -454,13 +454,8 @@ async function myNotifications(limit = 30) {
 }
 async function refreshNotificationBadge() {
   if (document.getElementById('appView')?.classList.contains('hidden')) return;
-  const rows = await myNotifications(50);
-  const unread = rows.filter(n => !n.read_at).length;
   try {
-    if ('setAppBadge' in navigator && 'clearAppBadge' in navigator) {
-      if (unread > 0) await navigator.setAppBadge(unread);
-      else await navigator.clearAppBadge();
-    }
+    if ('clearAppBadge' in navigator) await navigator.clearAppBadge();
   } catch {}
 }
 function ensureNotificationPanel() {
