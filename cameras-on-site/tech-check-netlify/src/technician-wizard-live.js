@@ -2080,12 +2080,20 @@ document.addEventListener('click', async e => {
     const card = findSvcCard(activeSvcPrep.ticket_no);
     const forms = svcForms(card);
     const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
+    const solarRequired = Boolean(solarCtx?.need_solar);
     const partStep = forms.length;
-    const proofStep = forms.length + (hasParts ? 1 : 0);
+    const solarStep = forms.length + (hasParts ? 1 : 0);
+    const proofStep = solarStep + (solarRequired ? 1 : 0);
     const photoStep = proofStep + 1;
     const signStep = proofStep + 2;
     if (svcUnitIndex < forms.length) return advanceSvcVerification();
     if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
+    if (solarRequired && svcUnitIndex === solarStep) {
+      const check=await loadServiceSolarCheck(activeSvcPrep.id);
+      const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+      if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
+    }
     if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
     if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
     svcUnitIndex++; return renderSvcPrep();
@@ -2110,6 +2118,61 @@ document.addEventListener('click', async e => {
     return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-service-parts-mismatch]')) return alert('Do not accept the handoff. Compare the parts with IT and the MHelpDesk ticket, then correct the mismatch before continuing.');
+  if (e.target.closest('[data-wl-save-service-solar]')) return saveServiceSolarChecklist();
+
+  const solarUpload=e.target.closest('[data-wl-solar-upload]');
+  if (solarUpload) {
+    const panel=solarUpload.closest('.wl-solar-proof');
+    const category=panel?.dataset.solarCategory;
+    const files=[...(panel?.querySelector('.wl-solar-file')?.files || [])];
+    if (!category || !files.length) return alert('Take or select at least one photo first.');
+    solarUpload.disabled=true;
+    solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
+    try {
+      for (const file of files) await uploadServiceSolarEvidence(activeSvcPrep.id,category,'photo',file);
+      return renderSvcPrep();
+    } catch (err) {
+      solarUpload.disabled=false;
+      solarUpload.textContent='Save Photo(s)';
+      return alert(err.message || 'Could not save the Solar / Helios photo.');
+    }
+  }
+
+  const solarClear=e.target.closest('[data-wl-solar-clear]');
+  if (solarClear) {
+    const canvas=solarClear.closest('.wl-sign')?.querySelector('canvas');
+    if (canvas) { canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height); canvas.dataset.ink=''; }
+    return;
+  }
+
+  const solarSign=e.target.closest('[data-wl-solar-save-sign]');
+  if (solarSign) {
+    const panel=solarSign.closest('.wl-solar-proof');
+    const category=panel?.dataset.solarCategory;
+    const canvas=panel?.querySelector('canvas');
+    if (!category || !canvas?.dataset.ink) return alert('Sign in the box first.');
+    try {
+      const blob=await blobFromCanvas(canvas);
+      await uploadServiceSolarEvidence(activeSvcPrep.id,category,'signature',blob);
+      return renderSvcPrep();
+    } catch (err) {
+      return alert(err.message || 'Could not save the verification signature.');
+    }
+  }
+
+  const solarReplace=e.target.closest('[data-wl-solar-replace-sign]');
+  if (solarReplace) {
+    const panel=solarReplace.closest('.wl-solar-proof');
+    panel?.querySelector('.wl-saved')?.remove();
+    solarReplace.remove();
+    const d=document.createElement('div');
+    d.className='wl-sign top8';
+    d.innerHTML=`<b>Sign this verification with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-solar-clear>Clear</button><button class='wl-next' data-wl-solar-save-sign>Save Signature</button></div>`;
+    panel?.append(d);
+    wireCanvas(d.querySelector('canvas'));
+    return;
+  }
+
   if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) { const panel = upload.closest('.wl-proof'); const input = panel.querySelector('.wl-file'); const files = [...(input.files || [])]; if (!files.length) return alert('Take or select at least one photo.'); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const expected = Number(panel.dataset.expected || 0) || null; if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.'); if (panel.dataset.stage === 'service' && expected) { const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length; if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`); } upload.disabled = true; upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…'; try { const optimized = await Promise.all(files.map(optimizeEvidencePhoto)); upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…'; await Promise.all(optimized.map((f, i) => { const original = f.name || files[i].name; const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original; return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId); })); if (panel.dataset.stage === 'it' && unitNo && activeItPrep) { activeItPrep = await getPrep(activeItPrep.id); return renderItUnitStep(); } await refreshProofPanel(panel); } catch (err) { upload.disabled = false; upload.textContent = 'Save Photo(s)'; alert(err.message || 'Upload failed.'); } return; }
   const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
