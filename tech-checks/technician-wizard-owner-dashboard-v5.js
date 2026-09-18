@@ -2487,7 +2487,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
       </div>
       <div class='grid top10'>
-        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
+        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>IT + Service Departments</option></select></div>
         <div><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
@@ -2529,7 +2529,13 @@ function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
   if (!select) return;
-  select.innerHTML = ownerAssignmentTechOptions(role);
+  if (role === 'both') {
+    select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
+    select.disabled = true;
+  } else {
+    select.disabled = false;
+    select.innerHTML = ownerAssignmentTechOptions(role);
+  }
   document.getElementById('ownerAssignParts')?.classList.remove('hidden');
 }
 async function ownerAssignJob() {
@@ -2551,46 +2557,51 @@ async function ownerAssignJob() {
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
   if (selectedDeviceCount > 0 && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
-  if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
+  if ((role === 'it' || role === 'both') && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this job to IT.');
   const autoSolarPlan=automaticServiceSolarPlan(equipmentManifest,workType);
   if (autoSolarPlan.spotters > 0 && manifestQty(equipmentManifest,'Solar Stand') > 0) return alert('Remove Solar Stand from the IT Stand Area. A Delivery with Solar Spotter automatically assigns the Solar Stand to the Service checkout after IT releases the Solar Spotter.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
-    p_ticket_no: ticket,
-    p_site: site,
-    p_assigned_role: role,
-    p_assignee_user_id: assignee,
-    p_requested_unit_count: requestedUnitCount,
-    p_unit_summary: units,
-    p_job_description: description,
-    p_notes: notes,
-    p_solar_panel_qty: parts.solar_panel_qty,
-    p_battery_replacement_qty: parts.battery_replacement_qty,
-    p_camera_replacement_qty: parts.camera_replacement_qty,
-    p_sim_replacement_qty: parts.sim_replacement_qty,
-    p_micro_sd_qty: parts.micro_sd_qty,
-    p_equipment_manifest: equipmentManifest,
-    p_requires_it_handoff: false,
-    p_scheduled_for: scheduledFor,
-    p_work_type: workType,
-  });
+  const rolesToSend = role === 'both' ? ['it','service'] : [role];
+  const assignmentIds = [];
+  for (const targetRole of rolesToSend) {
+    const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
+      p_ticket_no: ticket,
+      p_site: site,
+      p_assigned_role: targetRole,
+      p_assignee_user_id: role === 'both' ? null : assignee,
+      p_requested_unit_count: requestedUnitCount,
+      p_unit_summary: units,
+      p_job_description: description,
+      p_notes: notes,
+      p_solar_panel_qty: parts.solar_panel_qty,
+      p_battery_replacement_qty: parts.battery_replacement_qty,
+      p_camera_replacement_qty: parts.camera_replacement_qty,
+      p_sim_replacement_qty: parts.sim_replacement_qty,
+      p_micro_sd_qty: parts.micro_sd_qty,
+      p_equipment_manifest: equipmentManifest,
+      p_requires_it_handoff: targetRole === 'service' && rolesToSend.includes('it'),
+      p_scheduled_for: scheduledFor,
+      p_work_type: workType,
+    });
+    if (error) { document.body.classList.remove('busy'); return alert(error.message); }
+    if (assignmentId) assignmentIds.push(assignmentId);
+  }
   document.body.classList.remove('busy');
-  if (error) return alert(error.message);
 
   let pushMessage = '';
-  if (assignmentId) {
+  let pushed = 0;
+  for (const assignmentId of assignmentIds) {
     try {
       const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', { body: { assignment_id: assignmentId } });
       if (pushError) throw pushError;
-      const sent = Number(pushResult?.sent || 0);
-      pushMessage = sent > 0 ? ` Phone notification${sent === 1 ? '' : 's'} sent to ${sent} device${sent === 1 ? '' : 's'}.` : ' Tech Check inbox alert created. Phone push will appear on devices where technicians have enabled alerts.';
+      pushed += Number(pushResult?.sent || 0);
     } catch (pushError) {
       console.warn('Assignment saved but phone push could not be sent', pushError);
-      pushMessage = ' Tech Check inbox alert created; phone push could not be delivered this time.';
     }
   }
+  pushMessage = pushed > 0 ? ` Phone notifications sent to ${pushed} device${pushed === 1 ? '' : 's'}.` : ' Tech Check inbox alert created.';
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
@@ -2598,7 +2609,7 @@ async function ownerAssignJob() {
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
-  const target = assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  const target = role === 'both' ? 'both the IT and Service Department queues' : assignee ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
   alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
