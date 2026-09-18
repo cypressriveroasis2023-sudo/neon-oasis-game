@@ -84,13 +84,28 @@ function hideChildren(view, keep = []) {
 function resetWizardPosition(anchor = null) {
   const active = document.activeElement;
   if (active instanceof HTMLElement) active.blur();
-  const ids = ['wlItWizardOnly','wlSvcWizardOnly','wlInspection','wlCreateHead','wlPendingList','wlItStatus','wlItHome','wlSvcLookup','wlSvcHistory','wlSvcHome'];
+
+  const homeIds = new Set(['wlItHome','wlItIntake','wlSvcHome']);
+  const ids = ['wlItWizardOnly','wlSvcWizardOnly','wlInspection','wlCreateHead','wlPendingList','wlItStatus','wlItHome','wlItIntake','wlSvcLookup','wlSvcHistory','wlSvcHome'];
+
   const findTarget = () => anchor || ids.map(id => document.getElementById(id)).find(el => el && el.offsetParent !== null);
+
   const snap = () => {
     const target = findTarget();
-    if (target?.scrollIntoView) target.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
-    else window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+    // Home screens must keep the Cameras Onsite / Tech Check banner below the
+    // iPhone status area. Scrolling the home card itself to block:start pushes
+    // the banner behind the Dynamic Island.
+    if (!target || homeIds.has(target.id)) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      return;
+    }
+
+    if (target.scrollIntoView) {
+      target.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+    }
   };
+
   snap();
   requestAnimationFrame(() => { snap(); requestAnimationFrame(snap); });
 }
