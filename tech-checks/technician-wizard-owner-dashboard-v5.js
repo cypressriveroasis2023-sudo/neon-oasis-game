@@ -292,7 +292,7 @@ function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be sent directly to you or to the <b>Service Department queue</b>.</p><p>If it is a department task, tap <b>Claim & Start</b>. Once you claim it, the Owner can see which Service Tech took responsibility for the task.</p>` },
-    { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT releases equipment, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
+    { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand and four batteries per Solar Spotter</b>. Enter the stand tag, verify the MPPT update/test, verify the batteries are charged, connect the solar panel + batteries + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios still requires Cerbo + MPPT verification.</p>` },
     { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
@@ -303,7 +303,7 @@ function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
     { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows <b>Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
-    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p>IT Techs prepare and release equipment. Service Techs receive and verify the handoff, do the field work, and return equipment to IT. Returning equipment goes back through IT Intake before shelf inventory.</p>` },
+    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p>IT Techs prepare equipment and create the handoff. Service Techs receive and verify the handoff, do the field work, and return equipment to IT. Returning equipment goes back through IT Intake before shelf inventory.</p>` },
     { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
   ];
   return [
@@ -311,10 +311,10 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units, and parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
-    { kicker:'RELEASE TO SERVICE', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, release the equipment to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
+    { kicker:'RELEASE TO SERVICE', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, create the handoff to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for units and parts returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help & Training</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
-    { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>IT TECH CLAIMS</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>RELEASE TO SERVICE</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
+    { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>IT TECH CLAIMS</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>HAND OFF TO SERVICE</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
   ];
 }
 function ensureHelpOverlay() {
@@ -1402,11 +1402,11 @@ async function releaseItPrepUnitByUnit() {
   const evidence = await evidenceRows(activeItPrep.id, 'it');
   const expected = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
   const ready = items.length === expected && items.every((item, index) => itUnitIssues(item, evidence, index + 1).length === 0);
-  if (!ready) return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before sending to Service.`);
+  if (!ready) return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
   const button = document.querySelector('[data-wl-send-it]');
   const msg = document.getElementById('wlSendItMsg');
-  if (button) { button.disabled = true; button.textContent = 'Sending to Service…'; }
-  if (msg) msg.innerHTML = `<div class='warn top10'><b>Sending ticket to Service…</b></div>`;
+  if (button) { button.disabled = true; button.textContent = 'Creating Service handoff…'; }
+  if (msg) msg.innerHTML = `<div class='warn top10'><b>Creating Service handoff…</b></div>`;
   document.body.classList.add('busy');
   try {
     const ticketNo = activeItPrep.ticket_no;
@@ -1428,8 +1428,8 @@ async function releaseItPrepUnitByUnit() {
     await showITHome();
     alert(`MHelpDesk Ticket #${ticketNo} was sent to Service.`);
   } catch (error) {
-    if (button) { button.disabled = false; button.textContent = 'Send to Service Tech →'; }
-    if (msg) msg.innerHTML = `<div class='bad top10'><b>Could not send to Service.</b><div>${esc(error?.message || 'Please try again.')}</div></div>`;
+    if (button) { button.disabled = false; button.textContent = 'Hand Off to Service Tech →'; }
+    if (msg) msg.innerHTML = `<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message || 'Please try again.')}</div></div>`;
   } finally {
     document.body.classList.remove('busy');
   }
@@ -1483,7 +1483,7 @@ async function renderItUnitStep() {
   if (itUnitIndex >= totalUnits || itUnitPhase === 'final') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const ready = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
-    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Send this ticket to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div><div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to send this ticket to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>SEND TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div><div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to hand this equipment off to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -1522,8 +1522,8 @@ async function showITStatus() {
   let card = document.getElementById('wlItStatus'); if (!card) { card = document.createElement('div'); card.id = 'wlItStatus'; card.className = 'card wl-history'; viewIT().append(card); }
   const rows = (data || []).map(r => {
     const cls = r.status === 'draft' ? 'wl-status-pending' : r.status === 'released' ? 'wl-status-waiting' : 'wl-status-complete';
-    const label = r.status === 'draft' ? '🔴 PENDING IT' : r.status === 'released' ? '🟠 SENT — WAITING FOR SERVICE' : '🟢 COMPLETED / DEPLOYED';
-    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}${equipmentManifestInlineHtml(r)}${ticketPartsInlineHtml(r)}<div class='small top8'>Prepared by: ${esc(r.released_by_name || 'Not sent yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
+    const label = r.status === 'draft' ? '🔴 PENDING IT' : r.status === 'released' ? '🟠 HANDOFF — WAITING FOR SERVICE' : '🟢 COMPLETED / DEPLOYED';
+    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}${equipmentManifestInlineHtml(r)}${ticketPartsInlineHtml(r)}<div class='small top8'>Prepared / handed off by: ${esc(r.released_by_name || 'Not handed off yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
   }).join('');
   card.innerHTML = `${progress('Status & History', 'Equipment handoff history', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows || '<div class="warn">No history yet.</div>'}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
@@ -2388,7 +2388,7 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
       ? { step:4, label:'SOLAR CHECKOUT VERIFIED', detail:'Automatic Solar Spotter / Ranger / Helios Service checkout completed' }
       : { step:3, label:'SOLAR CHECKOUT IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' is verifying automatic stands, batteries, panels, MPPT/charging readings, and Cerbo when applicable' };
   }
-  if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Prepared and released by IT' };
+  if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Handoff created by IT' };
   if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
   return { step:2, label:'CLAIMED / IN PROCESS', detail:a.assignee_name + ' started the task' };
 }
