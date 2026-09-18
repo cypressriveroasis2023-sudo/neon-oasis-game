@@ -1250,20 +1250,21 @@ function itUnitStepsData(item, unitNo) {
   const identity = itItemIdentity(item, unitNo);
   const steps = [{ kind: 'tag', field: 'unit_tag', label: support ? `Enter the exact tag / ID for ${item.equipment_type}` : `Enter the exact unit tag for ${item.equipment_type}` }];
   if (isSolarSupport(item.equipment_type)) {
-    steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries are prepared with ${identity}?` });
-    steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
-    steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
-    steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With the PV cable and solar panels connected to ${identity}, did you verify the batteries are charging through the MPPT?` });
-    steps.push({ kind: 'bool', field: 'solar_panels_match_ok', label: `Are the correct solar panels that fit ${identity} included?` });
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} listed on the MHelpDesk ticket?` });
+    steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} physically ready for Service to perform the Solar Stand checkout?` });
     return steps;
   }
   if (isSimpleSupport(item.equipment_type)) {
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} what the customer requested and what is listed on the MHelpDesk ticket?` });
     return steps;
   }
-  if (Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
+  if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
   steps.push({ kind: 'bool', field: 'power_ok', label: `Does ${identity} power on correctly?` });
+  if (item.equipment_type === 'Ranger') {
+    steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
+    steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
+    steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
+  }
 
   if (item.purpose === 'DELIVERY') {
     if (item.equipment_type === 'Helios') {
@@ -1280,7 +1281,7 @@ function itUnitStepsData(item, unitNo) {
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Before formatting the SD cards, did you verify ${identity} is recording footage correctly?` });
     } else {
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
-      steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
+      if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     }
 
     steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
@@ -1306,13 +1307,14 @@ function itUnitStepsData(item, unitNo) {
 }
 function itUnitReady(item) {
   if (!item?.unit_tag) return false;
-  if (isSolarSupport(item.equipment_type)) return Number(item.battery_count || 0) >= 1 && Boolean(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.ticket_item_match_ok);
-  if (isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok);
+  if (isSolarSupport(item.equipment_type) || isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok && (isSimpleSupport(item.equipment_type) || item.safe_ok));
   if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
-  if (Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
+  if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
+  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
   if (item.purpose !== 'DELIVERY') return true;
   if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok)) return false;
-  return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && item.delivery_batteries_charged_ok && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
+  const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
+  return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
 }
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
