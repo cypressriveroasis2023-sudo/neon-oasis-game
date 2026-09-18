@@ -172,6 +172,37 @@ Deno.serve(async (req) => {
       }).eq('user_id', userId)
       if (profileError) throw profileError
 
+      let returnedAssignments = 0
+      if (target.role === 'it' || target.role === 'service') {
+        const departmentName = target.role === 'it' ? 'IT Department' : 'Service Department'
+        const { data: moved, error: moveError } = await admin
+          .from('job_assignments')
+          .update({
+            assignee_user_id: null,
+            assignee_name: departmentName,
+            assignment_scope: 'department',
+            status: 'assigned',
+            started_at: null,
+            claimed_at: null,
+            updated_at: now,
+          })
+          .eq('assignee_user_id', userId)
+          .in('status', ['assigned','started'])
+          .select('id')
+        if (moveError) throw moveError
+        returnedAssignments = moved?.length || 0
+      }
+
+      await admin.from('push_subscriptions').update({
+        enabled: false,
+        updated_at: now,
+      }).eq('user_id', userId)
+
+      const historyDetail = [
+        reason || 'Removed from Active Team. Historical work retained.',
+        returnedAssignments ? returnedAssignments + ' active assignment' + (returnedAssignments === 1 ? '' : 's') + ' returned to the department queue.' : ''
+      ].filter(Boolean).join(' ')
+
       await writeHistory({
         user_id: userId,
         user_name: target.full_name || target.username || 'Team Member',
@@ -180,10 +211,10 @@ Deno.serve(async (req) => {
         new_role: target.role,
         old_active: target.active,
         new_active: false,
-        detail: reason || 'Removed from Active Team. Historical work retained.',
+        detail: historyDetail,
       })
 
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: cors })
+      return new Response(JSON.stringify({ ok: true, returned_assignments: returnedAssignments }), { status: 200, headers: cors })
     }
 
     if (action === 'restore') {
