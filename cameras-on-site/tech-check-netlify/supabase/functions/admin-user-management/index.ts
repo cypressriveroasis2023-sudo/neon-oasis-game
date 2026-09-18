@@ -105,8 +105,15 @@ Deno.serve(async (req) => {
       const role = String(body.role || '')
       const active = Boolean(body.active)
       const fullName = body.full_name == null ? null : String(body.full_name).trim()
+      const notificationEmail = body.notification_email == null ? null : String(body.notification_email).trim().toLowerCase()
+      const emailJobAssignments = body.email_job_assignments == null ? true : Boolean(body.email_job_assignments)
+      const emailHandoffUpdates = body.email_handoff_updates == null ? true : Boolean(body.email_handoff_updates)
+      const emailOwnerCopies = role === 'owner' && Boolean(body.email_owner_copies)
       if (!userId || !['it','service','owner','pending'].includes(role)) {
         return new Response(JSON.stringify({ error: 'Invalid user or role' }), { status: 400, headers: cors })
+      }
+      if (notificationEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) {
+        return new Response(JSON.stringify({ error: 'Enter a valid notification email address.' }), { status: 400, headers: cors })
       }
 
       const { data: target, error: targetError } = await admin
@@ -124,7 +131,15 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'At least one active Owner/Admin must remain.' }), { status: 400, headers: cors })
       }
 
-      const patch: Record<string, unknown> = { role, active, updated_at: new Date().toISOString() }
+      const patch: Record<string, unknown> = {
+        role,
+        active,
+        notification_email: notificationEmail,
+        email_job_assignments: emailJobAssignments,
+        email_handoff_updates: emailHandoffUpdates,
+        email_owner_copies: emailOwnerCopies,
+        updated_at: new Date().toISOString()
+      }
       if (fullName !== null) patch.full_name = fullName
       const { error: profileError } = await admin.from('profiles').update(patch).eq('user_id', userId)
       if (profileError) throw profileError
@@ -140,7 +155,7 @@ Deno.serve(async (req) => {
         new_role: role,
         old_active: target.active,
         new_active: active,
-        detail: 'Role or active access changed.',
+        detail: notificationEmail ? 'Role, access, or notification email settings changed.' : 'Role or access changed.',
       })
 
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: cors })
