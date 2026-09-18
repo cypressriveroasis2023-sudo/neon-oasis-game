@@ -556,3 +556,21 @@ select {
     text-align: center;
   }
 }
+
+
+/* Do not pin the entire mobile header over technician work. */
+@media (max-width: 680px) {
+  #appView > .mobileTop {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    background: transparent !important;
+  }
+
+  #appView > .mobileTop > .tabs {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    box-shadow: none !important;
+  }
+}
