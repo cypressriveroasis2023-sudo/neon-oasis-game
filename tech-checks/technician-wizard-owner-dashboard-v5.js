@@ -819,7 +819,7 @@ function ownerEquipmentQtyGrid(category) {
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
-  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Manual Stand Requirements</div><div class='small'>Use this only when the MHelpDesk job specifically calls for a stand as part of IT prep. For a Solar Spotter DELIVERY, Tech Check automatically creates the Service-side Solar Stand checkout, so do not add that automatic stand here.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STANDS / SOLAR STANDS — Count + MHelpDesk Tag / Unit #</div><div class='small'>Use this for stands, solar stands, poles, or solar poles being picked up, delivered, or swapped. Enter the count below and the exact tag / unit numbers from MHelpDesk here.</div><input id='ownerAssignStandNumbers' class='top8' placeholder='Stand / solar stand tag #s from MHelpDesk, e.g. SS-12, ST-44'><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
 }
 function readOwnerEquipmentManifest() {
   return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
@@ -2482,7 +2482,7 @@ async function installOwnerAssignments(force = false) {
         <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
       </div>
       <div class='grid top10'>
-        <div><label><span id='ownerAssignUnitCountLabel'>Units Required</span> <span class='small'>(from MHelpDesk)</span></label><input id='ownerAssignUnitCount' type='number' inputmode='numeric' min='0' step='1' placeholder='Example: 2'></div>
+        <div><label><span id='ownerAssignUnitCountLabel'>Units Required</span> <span class='small'>(from MHelpDesk)</span></label><div class='wl-count-tag-row'><input id='ownerAssignUnitCount' type='number' inputmode='numeric' min='0' step='1' placeholder='Count'><input id='ownerAssignUnitNumbers' placeholder='Unit #s from MHelpDesk, e.g. 058, 103'></div></div>
         <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
       </div>
       <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
@@ -2606,6 +2606,8 @@ async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
   const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
   const units = document.getElementById('ownerAssignUnits')?.value.trim() || '';
+  const unitNumbers = document.getElementById('ownerAssignUnitNumbers')?.value.trim() || '';
+  const standNumbers = document.getElementById('ownerAssignStandNumbers')?.value.trim() || '';
   const requestedUnitCountRaw = document.getElementById('ownerAssignUnitCount')?.value;
   const requestedUnitCount = requestedUnitCountRaw === '' || requestedUnitCountRaw == null ? null : Math.max(0, Math.floor(Number(requestedUnitCountRaw || 0)));
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
@@ -2644,7 +2646,7 @@ async function ownerAssignJob() {
       p_assigned_role: targetRole,
       p_assignee_user_id: target.assignee,
       p_requested_unit_count: requestedUnitCount,
-      p_unit_summary: units,
+      p_unit_summary: [units, unitNumbers ? 'Unit #s: '+unitNumbers : '', standNumbers ? 'Stand / Solar Stand #s: '+standNumbers : ''].filter(Boolean).join(' | '),
       p_job_description: description,
       p_notes: notes,
       p_solar_panel_qty: parts.solar_panel_qty,
@@ -2675,7 +2677,7 @@ async function ownerAssignJob() {
   }
   pushMessage = pushed > 0 ? ` Phone notifications sent to ${pushed} device${pushed === 1 ? '' : 's'}.` : ' Tech Check inbox alert created.';
 
-  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnitNumbers','ownerAssignStandNumbers','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
   const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
   fillTicketPartInputs({}, 'ownerPart');
