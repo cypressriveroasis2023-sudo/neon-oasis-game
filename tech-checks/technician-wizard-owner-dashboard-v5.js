@@ -2547,7 +2547,7 @@ function refreshOwnerAssignmentTechOptions() {
   if (role === 'it_service' || role === 'service_it') {
     select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
     select.disabled = false;
-    select.innerHTML = ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
+    select.innerHTML = `<option value=''>${role === 'service_it' ? 'Service Department Queue — any Service Tech can claim' : 'IT Department Queue — any IT Tech can claim'}</option>` + ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
     if (hint) hint.textContent = role === 'service_it' ? 'Service first → returned units go to IT Intake.' : 'IT first → Service receives the prepared equipment.';
   } else {
     select.disabled = false;
