@@ -396,6 +396,7 @@ async function startAssignedJob(id) {
     const site = document.getElementById('itSite');
     if (ticket) ticket.value = assignment.ticket_no || '';
     if (site) site.value = assignment.site || '';
+    fillTicketPartInputs(assignment, 'wlPart');
     document.getElementById('wlTotalUnits')?.focus();
     return;
   }
@@ -426,7 +427,7 @@ async function showITHome() {
   const [c,r,assignments] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it')]);
   const assigned = assignments[0] || null;
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.assigned_role === 'it' ? ticketPartsInlineHtml(assigned) : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
   home.innerHTML = `<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div><div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
@@ -454,6 +455,48 @@ function ensureTotalUnitsField(ticketGrid) {
 function expectedUnitCount() {
   return Math.max(0, Math.floor(Number(document.getElementById('wlTotalUnits')?.value || 0)));
 }
+const TICKET_PARTS = [
+  { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
+  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
+  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
+  { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'Micro SD Cards' },
+];
+function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
+function readTicketPartInputs(prefix='wlPart') {
+  const out = {};
+  TICKET_PARTS.forEach(part => { out[part.key] = cleanPartQty(document.getElementById(prefix + part.id)?.value); });
+  return out;
+}
+function ticketPartsRows(data) {
+  return TICKET_PARTS.map(part => ({ ...part, qty: cleanPartQty(data?.[part.key]) }));
+}
+function ticketPartsInlineHtml(data) {
+  const rows = ticketPartsRows(data).filter(row => row.qty > 0);
+  return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>No extra replacement parts listed.</div></div>`;
+}
+function ticketPartsInputsHtml(prefix='wlPart', data={}) {
+  return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
+}
+function ensureTicketPartsFields(ticketGrid) {
+  if (!ticketGrid) return null;
+  let wrap = document.getElementById('wlTicketPartsWrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'wlTicketPartsWrap';
+    wrap.className = 'wl-ticket-parts-setup';
+    wrap.style.gridColumn = '1 / -1';
+    wrap.innerHTML = `<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Enter 0 when a part is not needed. These quantities are separate from the unit count.</div>${ticketPartsInputsHtml('wlPart')}`;
+    ticketGrid.append(wrap);
+  }
+  return wrap;
+}
+function fillTicketPartInputs(data, prefix='wlPart') {
+  TICKET_PARTS.forEach(part => {
+    const el = document.getElementById(prefix + part.id);
+    if (el) el.value = String(cleanPartQty(data?.[part.key]));
+  });
+}
 function draftedUnitCount() {
   return [...document.querySelectorAll('#needDraft .item b')].reduce((sum, el) => {
     const match = el.textContent.match(/(\d+)\s*[×x]/i);
@@ -474,6 +517,7 @@ function showNewPrep() {
   if (!p.card) return;
   itCreateStep = 0;
   const totalWrap = ensureTotalUnitsField(p.ticket);
+  const partsWrap = ensureTicketPartsFields(p.ticket);
   hideChildren(viewIT(), [p.card]);
   [...p.card.children].forEach(el => el.style.display = 'none');
   let head = document.getElementById('wlCreateHead');
@@ -484,7 +528,8 @@ function showNewPrep() {
   nav.style.display = '';
   if (p.ticket) p.ticket.style.display = 'grid';
   if (totalWrap) totalWrap.style.display = '';
-  head.innerHTML = progress('Job Setup', 'Enter the ticket and total number of units', 1, 1);
+  if (partsWrap) partsWrap.style.display = '';
+  head.innerHTML = progress('Job Setup', 'Enter the ticket, units, and parts required', 1, 1);
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
@@ -501,11 +546,17 @@ async function createPrepAndStartChecks() {
   const ticket = document.getElementById('itTicket').value.trim();
   const site = document.getElementById('itSite').value.trim();
   const total = expectedUnitCount();
+  const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell', {
+  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v2', {
     p_ticket_no: ticket,
     p_site: site,
     p_expected_unit_count: total,
+    p_solar_panel_qty: parts.solar_panel_qty,
+    p_battery_replacement_qty: parts.battery_replacement_qty,
+    p_camera_replacement_qty: parts.camera_replacement_qty,
+    p_sim_replacement_qty: parts.sim_replacement_qty,
+    p_micro_sd_qty: parts.micro_sd_qty,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -513,6 +564,7 @@ async function createPrepAndStartChecks() {
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
   if (totalInput) totalInput.value = '';
+  fillTicketPartInputs({}, 'wlPart');
   itExpectedUnits = total;
   await window.refreshData?.();
   return showItPrep(prepId);
@@ -918,7 +970,8 @@ function itUnitReviewHtml(item, evidence, unitNo) {
 }
 function itTicketSummaryHtml(items, evidence) {
   const units = items.map((item, index) => { const unitNo = index + 1; const photos = unitEvidence(evidence, unitNo, 'photo'); const sig = unitSignature(evidence, unitNo); const issues = itIssueLinksHtml(item, evidence, unitNo); return `<div class='wl-ticket'><b>Unit ${unitNo} — ${esc(item.equipment_type)}</b><div>${esc(item.purpose)} · Unit ${esc(item.unit_tag || '')}</div><div>📷 ${photos.length} photo${photos.length === 1 ? '' : 's'}</div><div>✍️ ${sig ? `Signed by ${esc(sig.created_by_name || 'IT Technician')} · ${new Date(sig.created_at).toLocaleString()}` : 'Signature missing'}</div>${issues}</div>`; }).join('');
-  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div>${items.length} total unit${items.length === 1 ? '' : 's'}</div></div>${units}`;
+  const partsEditor = activeItPrep?.status === 'draft' ? `<div class='wl-question top10'><div class='qtext'>Parts Required</div><div class='small'>Update these only if the MHelpDesk ticket changes before release.</div>${ticketPartsInputsHtml('wlEditPart', activeItPrep)}<button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-prep-parts>Save Parts List</button></div>` : ticketPartsInlineHtml(activeItPrep);
+  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div>${items.length} total unit${items.length === 1 ? '' : 's'}</div></div>${partsEditor}${units}`;
 }
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
@@ -1042,12 +1095,12 @@ async function renderItUnitStep() {
   resetWizardPosition();
 }
 async function showITStatus() {
-  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending: false }).limit(50);
+  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_by_name,released_at,closed_by_name,closed_at,solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty').order('created_at', { ascending: false }).limit(50);
   let card = document.getElementById('wlItStatus'); if (!card) { card = document.createElement('div'); card.id = 'wlItStatus'; card.className = 'card wl-history'; viewIT().append(card); }
   const rows = (data || []).map(r => {
     const cls = r.status === 'draft' ? 'wl-status-pending' : r.status === 'released' ? 'wl-status-waiting' : 'wl-status-complete';
     const label = r.status === 'draft' ? '🔴 PENDING IT' : r.status === 'released' ? '🟠 SENT — WAITING FOR SERVICE' : '🟢 COMPLETED / DEPLOYED';
-    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}<div class='small top8'>Prepared by: ${esc(r.released_by_name || 'Not sent yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
+    return `<details class='${cls}'><summary>#${esc(r.ticket_no)} · ${label}</summary><div class='body'>${esc(r.site || '')}${ticketPartsInlineHtml(r)}<div class='small top8'>Prepared by: ${esc(r.released_by_name || 'Not sent yet')}${r.released_at ? ' · ' + new Date(r.released_at).toLocaleString() : ''}</div>${r.closed_at ? `<div class='small'>Received by: ${esc(r.closed_by_name || 'Service')} · ${new Date(r.closed_at).toLocaleString()}</div>` : ''}</div></details>`;
   }).join('');
   card.innerHTML = `${progress('Status & History', 'Equipment handoff history', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows || '<div class="warn">No history yet.</div>'}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
@@ -1627,6 +1680,7 @@ async function installOwnerAssignments(force = false) {
         ${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}
         ${a.unit_summary ? `<div class='small'><b>Unit(s) / Equipment:</b> ${esc(a.unit_summary)}</div>` : ''}
         ${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}
+        ${a.assigned_role === 'it' ? ticketPartsInlineHtml(a) : ''}
         ${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}
       </div>
       <button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>
@@ -1652,6 +1706,11 @@ async function installOwnerAssignments(force = false) {
       <div><label>Unit(s) / Equipment</label><input id='ownerAssignUnits' placeholder='Example: Unit 058 · Helios'></div>
       <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
     </div>
+    <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
+      <div class='qtext'>Parts Required for IT</div>
+      <div class='small'>Optional. Enter the quantities shown on the MHelpDesk ticket.</div>
+      ${ticketPartsInputsHtml('ownerPart')}
+    </div>
     <div class='grid top10'>
       <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Technician</option><option value='service'>Service Tech</option></select></div>
       <div><label>Send To</label><select id='ownerAssignTech'>${techOptions('it')}</select></div>
@@ -1676,6 +1735,7 @@ function refreshOwnerAssignmentTechOptions() {
     .filter(p => p.role === role)
     .map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`)
     .join('');
+  document.getElementById('ownerAssignParts')?.classList.toggle('hidden', role !== 'it');
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
@@ -1685,11 +1745,14 @@ async function ownerAssignJob() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const assignee = document.getElementById('ownerAssignTech')?.value || '';
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
+  const parts = role === 'it' ? readTicketPartInputs('ownerPart') : {
+    solar_panel_qty:0,battery_replacement_qty:0,camera_replacement_qty:0,sim_replacement_qty:0,micro_sd_qty:0
+  };
   if (!ticket || !assignee) return alert('Enter the MHelpDesk reference number and choose a technician.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { error } = await liveDb.rpc('owner_assign_job_v2', {
+  const { error } = await liveDb.rpc('owner_assign_job_v3', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -1697,15 +1760,40 @@ async function ownerAssignJob() {
     p_unit_summary: units,
     p_job_description: description,
     p_notes: notes,
+    p_solar_panel_qty: parts.solar_panel_qty,
+    p_battery_replacement_qty: parts.battery_replacement_qty,
+    p_camera_replacement_qty: parts.camera_replacement_qty,
+    p_sim_replacement_qty: parts.sim_replacement_qty,
+    p_micro_sd_qty: parts.micro_sd_qty,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  fillTicketPartInputs({}, 'ownerPart');
 
   await installOwnerAssignments(true);
   alert('Sent in Tech Check. This does not change or sync anything in MHelpDesk.');
+}
+async function saveActivePrepParts() {
+  if (!activeItPrep?.id) return;
+  const parts = readTicketPartInputs('wlEditPart');
+  document.body.classList.add('busy');
+  const { error } = await liveDb.rpc('set_prep_parts', {
+    p_prep_id: activeItPrep.id,
+    p_solar_panel_qty: parts.solar_panel_qty,
+    p_battery_replacement_qty: parts.battery_replacement_qty,
+    p_camera_replacement_qty: parts.camera_replacement_qty,
+    p_sim_replacement_qty: parts.sim_replacement_qty,
+    p_micro_sd_qty: parts.micro_sd_qty,
+  });
+  document.body.classList.remove('busy');
+  if (error) return alert(error.message);
+  activeItPrep = await getPrep(activeItPrep.id);
+  await window.refreshData?.();
+  await renderItUnitStep();
+  alert('Parts list updated.');
 }
 async function ownerCancelAssignment(id) {
   if (!confirm('Cancel this Tech Check assignment?')) return;
@@ -1768,6 +1856,7 @@ document.addEventListener('click', async e => {
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
+  if (e.target.closest('[data-wl-save-prep-parts]')) return saveActivePrepParts();
   const cancelAssignment = e.target.closest('[data-wl-cancel-assignment]');
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
