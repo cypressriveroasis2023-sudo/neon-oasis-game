@@ -824,23 +824,13 @@ function ensureITEquipmentManifestFields(ticketGrid) {
     wrap.style.gridColumn='1 / -1';
     ticketGrid.append(wrap);
   }
-  wrap.innerHTML=`<div class='qtext'>Equipment Going Out</div><div class='small'>Select the exact units/devices and stands being sent for this ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div>`;
+  wrap.innerHTML=`<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Choose the exact units/devices, stands, and extra parts being sent for this MHelpDesk ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div><div class='wl-requirement-section partsArea'><div class='wl-requirement-heading'>PARTS / SUPPLIES</div>${ticketPartsInputsHtml('wlPart')}</div>`;
   wrap.querySelectorAll('[data-it-equipment-qty]').forEach(input => input.addEventListener('input', syncITEquipmentCounts));
   syncITEquipmentCounts();
   return wrap;
 }
 function ensureTicketPartsFields(ticketGrid) {
-  if (!ticketGrid) return null;
-  let wrap = document.getElementById('wlTicketPartsWrap');
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'wlTicketPartsWrap';
-    wrap.className = 'wl-ticket-parts-setup';
-    wrap.style.gridColumn = '1 / -1';
-    wrap.innerHTML = `<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Enter 0 when a part is not needed. These quantities are separate from the unit count.</div>${ticketPartsInputsHtml('wlPart')}`;
-    ticketGrid.append(wrap);
-  }
-  return wrap;
+  return document.getElementById('wlITEquipmentWrap');
 }
 function fillTicketPartInputs(data, prefix='wlPart') {
   TICKET_PARTS.forEach(part => {
@@ -870,7 +860,6 @@ function showNewPrep() {
   const totalWrap = ensureTotalUnitsField(p.ticket);
   const equipmentWrap = ensureITEquipmentManifestFields(p.ticket);
   const partsWrap = ensureTicketPartsFields(p.ticket);
-  if (equipmentWrap && partsWrap && equipmentWrap.nextSibling !== partsWrap) p.ticket.insertBefore(equipmentWrap, partsWrap);
   hideChildren(viewIT(), [p.card]);
   [...p.card.children].forEach(el => el.style.display = 'none');
   let head = document.getElementById('wlCreateHead');
@@ -2121,8 +2110,8 @@ async function installOwnerAssignments(force = false) {
       </div>
       <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
-        <div class='qtext'>Equipment & Parts Required for IT</div>
-        <div class='small'>Choose how many units/devices, stands, and extra parts IT needs to pull from the shelf for this MHelpDesk job.</div>
+        <div class='qtext'>Parts Required From This Ticket</div>
+        <div class='small'>Choose the exact units/devices, stands, and extra parts IT needs to pull from the shelf for this MHelpDesk job.</div>
         ${ownerEquipmentManifestInputsHtml()}
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
