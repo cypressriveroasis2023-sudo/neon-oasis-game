@@ -983,3 +983,29 @@ select {
     text-align: center;
   }
 }
+
+
+/* Tech Check eye icon — matches the iPhone Home Screen icon. */
+.brandTarget {
+  width: 58px !important;
+  height: 58px !important;
+  flex: 0 0 58px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: url('./techcheck-eye-192.png?v=1') center / cover no-repeat !important;
+  overflow: hidden !important;
+}
+.brandTarget::before,
+.brandTarget::after,
+.brandTarget span {
+  display: none !important;
+}
+@media (max-width: 680px) {
+  .brandTarget {
+    width: 48px !important;
+    height: 48px !important;
+    flex-basis: 48px !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+  }
+}
