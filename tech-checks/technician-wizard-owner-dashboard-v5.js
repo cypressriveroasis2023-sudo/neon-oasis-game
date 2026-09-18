@@ -2539,8 +2539,21 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
   if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
   return { step:2, label:'CLAIMED / IN PROCESS', detail:a.assignee_name + ' started the task' };
 }
+function ownerAIElapsed(v){if(!v)return null;const t=new Date(v).getTime();return Number.isFinite(t)?Math.max(0,Date.now()-t):null;}
+function ownerAIElapsedText(ms){if(ms==null)return '';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h '+(m%60)+'m';return Math.floor(h/24)+'d '+(h%24)+'h';}
+function ownerAIStallCheck(a,prep,solarCheck=null){
+  const p=ownerAssignmentProgress(a,prep,solarCheck), role=String(a?.assigned_role||''), flags=[];let since=a?.assigned_at,label='assigned';
+  if(a?.status==='started'){since=a?.started_at||a?.updated_at||a?.assigned_at;label='in progress';}
+  if(prep?.status==='draft'){since=a?.started_at||prep?.updated_at||a?.updated_at||a?.assigned_at;label='IT Tech Check';}
+  if(prep?.status==='released'&&role==='service'){since=prep?.released_at||a?.updated_at;label='waiting for Service';}
+  const elapsed=ownerAIElapsed(since);
+  if(a?.status==='assigned'&&elapsed!=null&&elapsed>4*60*60*1000)flags.push('Assigned '+ownerAIElapsedText(elapsed)+' ago and has not been started.');
+  if(prep?.status==='draft'&&elapsed!=null&&elapsed>4*60*60*1000)flags.push('IT Tech Check has been open about '+ownerAIElapsedText(elapsed)+'.');
+  if(prep?.status==='released'&&role==='service'&&elapsed!=null&&elapsed>2*60*60*1000)flags.push('IT handoff has been waiting for Service about '+ownerAIElapsedText(elapsed)+'.');
+  return {flags,elapsed,label,p};
+}
 function ownerLiveAIStatus(a,prep,solarCheck=null){
-  const p=ownerAssignmentProgress(a,prep,solarCheck), flags=[], type=String(a?.work_type||prep?.work_type||'service').toLowerCase();
+  const p=ownerAssignmentProgress(a,prep,solarCheck), flags=[], type=String(a?.work_type||prep?.work_type||'service').toLowerCase(), stall=ownerAIStallCheck(a,prep,solarCheck); flags.push(...stall.flags);
   if(!String(a?.ticket_no||'').trim())flags.push('Missing MHelpDesk reference.');
   if(!String(a?.site||'').trim())flags.push('Customer / Site is missing.');
   if(!String(a?.job_description||'').trim())flags.push('Work description is missing.');
