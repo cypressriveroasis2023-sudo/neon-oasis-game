@@ -80,24 +80,10 @@
             <span id="whoRole" class="pill"></span>
             <div id="syncStatus" class="small">Connected to shared data</div>
           </div>
-          <div class="row">
+          <div class="row accountActions">
             <button class="mini" onclick="refreshData()">Refresh</button
-            ><button class="mini" onclick="togglePasswordCard()">
-              Change Password</button
             ><button class="mini danger" onclick="logout()">Sign Out</button>
           </div>
-        </div>
-        <div id="passwordCard" class="card hidden">
-          <h3>Change My Password</h3>
-          <label>New Password</label
-          ><input
-            id="myNewPassword"
-            type="password"
-            placeholder="At least 8 characters"
-          /><button class="btn" onclick="changeMyPassword()">
-            Update Password
-          </button>
-          <div id="passwordMessage"></div>
         </div>
 
         <div class="tabs">
