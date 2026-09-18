@@ -1724,6 +1724,7 @@ function svcWizardCard() {
   return wizard;
 }
 async function advanceSvcVerification() { const card = findSvcCard(activeSvcPrep?.ticket_no); if (!card) return; const forms = svcForms(card); if (svcUnitIndex >= forms.length) return; const questions = svcQuestions(forms[svcUnitIndex]); const q = questions[svcQuestionIndex]; if (q?.kind === 'bool' && q.input.dataset.wlAnswered !== '1') return alert('Choose YES or NO first.'); if (q?.kind === 'number') { const value = document.getElementById('wlSvcCount')?.value ?? ''; if (value === '') return alert('Enter the physical count first.'); q.input.value = value; } if (svcQuestionIndex < questions.length - 1) svcQuestionIndex++; else { svcUnitIndex++; svcQuestionIndex = 0; } return renderSvcPrep(); }
+
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
   const base = document.getElementById('matchedPreps')?.closest('.card');
@@ -1733,21 +1734,38 @@ async function renderSvcPrep() {
   const wizard = svcWizardCard();
   const partsTotal = ticketPartsTotal(activeSvcPrep);
   const hasParts = partsTotal > 0;
+  const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
+  const solarRequired = Boolean(solarCtx?.need_solar);
+  const solarCheck = solarRequired ? await loadServiceSolarCheck(activeSvcPrep.id) : null;
+  const solarEvidence = solarRequired ? await serviceSolarEvidenceRows(activeSvcPrep.id) : [];
+  const solarReady = serviceSolarReady(solarCtx,solarCheck,solarEvidence);
+
   const partStep = forms.length;
-  const proofStep = forms.length + (hasParts ? 1 : 0);
+  const solarStep = forms.length + (hasParts ? 1 : 0);
+  const proofStep = solarStep + (solarRequired ? 1 : 0);
   const photoStep = proofStep + 1;
   const signStep = proofStep + 2;
   const finalStep = proofStep + 3;
   const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
+
   if (svcUnitIndex < forms.length) {
     const questions = svcQuestions(forms[svcUnitIndex]);
     const q = questions[svcQuestionIndex];
-    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) + (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? (hasParts ? 'Verify Parts →' : 'Compare IT Photos →') : 'Next Unit →') : 'Next →'}</button></div>`;
+    const afterLast = hasParts ? 'Verify Parts →' : solarRequired ? 'Solar / Helios Check →' : 'Compare IT Photos →';
+    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) +
+      (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) +
+      `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? afterLast : 'Next Unit →') : 'Next →'}</button></div>`;
   } else if (hasParts && svcUnitIndex === partStep) {
     const confirmed = Boolean(activeSvcPrep.service_parts_confirmed);
-    wizard.innerHTML = progress('Parts Handoff', `Verify parts from IT Tech ${preparedBy}`, 1, 1) + `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
+    wizard.innerHTML = progress('Parts Handoff', `Verify parts from IT Tech ${preparedBy}`, 1, 1) +
+      `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>${solarRequired ? 'Solar / Helios Check →' : 'Compare IT Photos →'}</button></div>`;
+  } else if (solarRequired && svcUnitIndex === solarStep) {
+    wizard.innerHTML = progress('Solar / Helios Pre-Trip', 'Verify Solar Stand, charging, MPPT, batteries, and Helios Cerbo', 1, 1) +
+      serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence) +
+      `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${solarReady ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
+    wizard.querySelectorAll('canvas').forEach(wireCanvas);
   } else if (svcUnitIndex === proofStep) {
     wizard.innerHTML = progress('Compare', `Look at IT Tech ${preparedBy}’s handoff photos`, 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   } else if (svcUnitIndex === photoStep) {
@@ -1765,8 +1783,9 @@ async function renderSvcPrep() {
     const allChecksOk = forms.every(form => svcQuestions(form).every(q => q.kind === 'number' ? q.input.value !== '' : q.input.checked));
     const partsReady = !hasParts || Boolean(activeSvcPrep.service_parts_confirmed);
     const proofReady = servicePhotos === requiredPhotos && ev.some(x => x.kind === 'signature');
-    const ready = proofReady && allChecksOk && partsReady;
-    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and Service signature saved.' : 'Matching photo count and signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const ready = proofReady && allChecksOk && partsReady && solarReady;
+    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) +
+      `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and final Service signature saved.' : 'Matching receipt photo count and final signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${solarRequired ? (solarReady ? `<div class='small'>✓ Solar / Helios pre-trip checklist, photos, and required signatures complete.</div>` : `<div class='wl-stop'><b>Solar / Helios pre-trip verification is incomplete.</b><div>Use Back to complete the Solar Stand, battery, MPPT, and Cerbo proof.</div></div>`) : ''}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
