@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v3';
+const CACHE_NAME = 'tech-check-field-shell-v4';
 const APP_SHELL = './';
 
 self.addEventListener('install', event => {
@@ -45,12 +45,35 @@ self.addEventListener('fetch', event => {
   })());
 });
 
+self.addEventListener('push', event => {
+  let payload = {};
+  try { payload = event.data?.json() || {}; }
+  catch { payload = { body: event.data?.text() || '' }; }
+
+  const title = payload.title || 'Tech Check';
+  const assignmentId = payload.assignment_id || '';
+  const target = payload.url || './';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body || 'You have a new Tech Check notification.',
+      icon: './techcheck-eye-192.png',
+      badge: './techcheck-eye-favicon-32.png',
+      tag: assignmentId ? 'techcheck-assignment-' + assignmentId : 'techcheck-alert',
+      renotify: true,
+      data: { url: target, assignment_id: assignmentId },
+    })
+  );
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const target = event.notification?.data?.url || './';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      const same = list.find(client => client.url && client.url.includes('/tech-checks/'));
+      const same = list.find(client => {
+        try { return new URL(client.url).origin === self.location.origin; }
+        catch { return false; }
+      });
       if (same) {
         same.focus();
         return same.navigate(target);
