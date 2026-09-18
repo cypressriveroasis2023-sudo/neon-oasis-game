@@ -223,6 +223,7 @@ let ownerAssignmentProfiles = [];
 let ownerAssignmentAssets = [];
 let pendingAssignmentLinkId = null;
 let pendingAssignmentManifest = [];
+let pendingAssignmentWorkType = 'service';
 let helpWalkthroughStep = 0;
 let helpWalkthroughMode = 'help';
 let walkthroughCheckedUserId = null;
@@ -752,6 +753,7 @@ function equipmentManifestDeviceTotal(raw) {
 function equipmentManifestText(raw) {
   return normalizedEquipmentManifest(raw).map(row => row.qty + ' × ' + row.label).join(' · ');
 }
+
 function equipmentManifestExpanded(raw) {
   const out=[];
   normalizedEquipmentManifest(raw).forEach(row => {
@@ -760,6 +762,39 @@ function equipmentManifestExpanded(raw) {
   });
   return out;
 }
+function manifestQty(raw,label) {
+  return normalizedEquipmentManifest(raw).filter(row => row.label===label).reduce((sum,row)=>sum+row.qty,0);
+}
+function prepPurposeFromWorkType(workType) {
+  const type=String(workType || '').toLowerCase();
+  if (type==='delivery') return 'DELIVERY';
+  if (type==='swap') return 'SWAP';
+  return '';
+}
+function automaticServiceSolarPlan(raw,workType='service') {
+  const delivery=String(workType || '').toLowerCase()==='delivery';
+  if (!delivery) return { spotters:0,rangers:0,stands:0,batteries:0,panels:0 };
+  const spotters=manifestQty(raw,'Solar Spotter');
+  const rangers=manifestQty(raw,'Ranger');
+  return { spotters,rangers,stands:spotters,batteries:spotters*4,panels:rangers };
+}
+function automaticServiceSolarPlanHtml(raw,workType='service') {
+  const plan=automaticServiceSolarPlan(raw,workType);
+  if (!plan.spotters && !plan.rangers) return '';
+  const chips=[];
+  if (plan.stands) chips.push(`<span><b>${plan.stands}</b> × Solar Stand automatically required for Service</span>`);
+  if (plan.batteries) chips.push(`<span><b>${plan.batteries}</b> × batteries automatically required for Service (${plan.spotters} Solar Spotter${plan.spotters===1?'':'s'} × 4)</span>`);
+  if (plan.panels) chips.push(`<span><b>${plan.panels}</b> × Solar Panel automatically required for Service (${plan.rangers} Ranger${plan.rangers===1?'':'s'})</span>`);
+  return `<div class='wl-auto-service-plan'><b>AUTO SERVICE CHECKOUT</b><div class='small'>These Service-side requirements are generated automatically from the Delivery equipment above. Do not add the automatic Solar Stand to the IT prep list.</div><div class='wl-parts-chips'>${chips.join('')}</div></div>`;
+}
+function refreshOwnerAutoServicePlan() {
+  const host=document.getElementById('ownerAutoServicePlan');
+  if (!host) return;
+  const type=document.getElementById('ownerAssignWorkType')?.value || 'service';
+  host.innerHTML=automaticServiceSolarPlanHtml(readOwnerEquipmentManifest(),type);
+  host.classList.toggle('hidden',!host.innerHTML);
+}
+
 
 function equipmentManifestInlineHtml(data) {
   const rows = normalizedEquipmentManifest(data?.equipment_manifest || data);
