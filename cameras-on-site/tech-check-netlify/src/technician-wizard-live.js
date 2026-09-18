@@ -36,6 +36,7 @@ let itAnswered = new Set();
 const itDraftAnswers = new Map();
 let createPrepWrapped = false;
 let activeSvcPrep = null;
+let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
@@ -1494,7 +1495,7 @@ async function showSvcHome() {
   const readyForService = work.released.length;
   const nextReleased = work.released[0] || null;
   const nextDeployed = work.deployed[0] || null;
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`);
   home.innerHTML = `${alertBanner}<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
   hideChildren(viewSvc(), [home]); resetWizardPosition();
@@ -2147,7 +2148,7 @@ async function installOwnerAssignments(force = false) {
       <div class='top10'><label>Specific Unit / Equipment Notes <span class='small'>(optional)</span></label><input id='ownerAssignUnits' placeholder='Example: Use spare Unit 058, or pick up Unit 103'></div>
       <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
         <div class='qtext'>Parts Required From This Ticket</div>
-        <div class='small'>Choose the exact units/devices, stands, and extra parts IT needs to pull from the shelf for this MHelpDesk job.</div>
+        <div class='small'>Choose the exact units/devices, stands, and extra parts this assignment requires. Service assignments can include a Solar Stand for the pre-trip Solar / Helios verification.</div>
         ${ownerEquipmentManifestInputsHtml()}
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
@@ -2195,7 +2196,7 @@ function refreshOwnerAssignmentTechOptions() {
   const select = document.getElementById('ownerAssignTech');
   if (!select) return;
   select.innerHTML = ownerAssignmentTechOptions(role);
-  document.getElementById('ownerAssignParts')?.classList.toggle('hidden', role !== 'it');
+  document.getElementById('ownerAssignParts')?.classList.remove('hidden');
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
@@ -2208,15 +2209,13 @@ async function ownerAssignJob() {
   const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
-  const equipmentManifest = role === 'it' ? readOwnerEquipmentManifest() : [];
-  const parts = role === 'it' ? readTicketPartInputs('ownerPart') : {
-    solar_panel_qty:0,battery_replacement_qty:0,camera_replacement_qty:0,sim_replacement_qty:0,micro_sd_qty:0
-  };
+  const equipmentManifest = readOwnerEquipmentManifest();
+  const parts = readTicketPartInputs('ownerPart');
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
   if (requestedUnitCount === null) return alert('Enter how many units are listed on the MHelpDesk ticket. Use 0 if this job has no unit/device.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
-  if (role === 'it' && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
+  if (selectedDeviceCount > 0 && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
   if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
