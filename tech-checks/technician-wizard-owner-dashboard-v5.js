@@ -2046,6 +2046,7 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
   if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); return; }
@@ -2600,6 +2601,9 @@ function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
   return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
 }
+function ownerAINotificationKey(a,s){return 'cos-owner-ai-ack-v1:'+String(a?.id||a?.ticket_no||'')+':'+String(s?.detail||s?.label||'attention');}
+function ownerAIIsAcknowledged(a,s){try{return localStorage.getItem(ownerAINotificationKey(a,s))==='1';}catch{return false;}}
+function ownerAIAcknowledge(id,key){try{localStorage.setItem(key,'1');}catch{}const el=document.querySelector("[data-owner-ai-notice-id='"+CSS.escape(id)+"']");if(el)el.classList.add('acknowledged');const badge=document.getElementById('ownerAINotificationBadge');if(badge)badge.textContent=Math.max(0,Number(badge.textContent||0)-1);}
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
@@ -2653,6 +2657,7 @@ async function installOwnerAssignments(force = false) {
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
   const aiStates=active.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
   const aiAttention=aiStates.filter(x=>x.s.state==='attention').length, aiWaiting=aiStates.filter(x=>x.s.state==='waiting').length, aiWorking=aiStates.filter(x=>x.s.state==='working').length, aiOnTrack=aiStates.filter(x=>x.s.state==='healthy').length;
+  const aiNotices=aiStates.filter(x=>x.s.state==='attention').map(x=>({...x,key:ownerAINotificationKey(x.a,x.s),ack:ownerAIIsAcknowledged(x.a,x.s)})); const aiUnread=aiNotices.filter(x=>!x.ack).length;
   const assignedRows = assignedWaiting.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const progressRows = inProgress.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
@@ -2710,6 +2715,7 @@ async function installOwnerAssignments(force = false) {
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
+      <details class='wl-owner-ai-notifications' ${aiUnread?'open':''}><summary><span>🔔 AI Notifications</span><b id='ownerAINotificationBadge'>${aiUnread}</b></summary><div>${aiNotices.length?aiNotices.map(x=>`<div class='wl-owner-ai-notice ${x.ack?'acknowledged':''}' data-owner-ai-notice-id='${esc(x.a.id||x.a.ticket_no)}'><div><b>MHelpDesk #${esc(x.a.ticket_no||'—')}</b><span>${esc(x.s.detail)}</span></div><button type='button' data-owner-ai-ack='${esc(x.a.id||x.a.ticket_no)}' data-owner-ai-ack-key='${esc(x.key)}'>${x.ack?'Acknowledged':'Acknowledge'}</button></div>`).join(''):`<div class='wl-ai-good'>✓ No AI Attention notifications.</div>`}</div></details>
       <div class='wl-owner-ai-overview'><div class='wl-owner-ai-overview-head'><span>✨ AI Operations Overview</span><b>${aiAttention ? aiAttention+' NEED ATTENTION' : 'NO AI ALERTS'}</b></div><div class='wl-owner-ai-counts'><button type='button' class='attention' data-owner-ai-filter='attention'><b>${aiAttention}</b><span>Need attention</span></button><button type='button' class='waiting' data-owner-ai-filter='waiting'><b>${aiWaiting}</b><span>Waiting normally</span></button><button type='button' class='working' data-owner-ai-filter='working'><b>${aiWorking}</b><span>In progress</span></button><button type='button' class='healthy' data-owner-ai-filter='healthy'><b>${aiOnTrack}</b><span>On track</span></button></div>${aiAttention ? `<div class='wl-ai-warn top8'><b>Owner review recommended:</b><br>${aiStates.filter(x=>x.s.state==='attention').slice(0,4).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>` : `<div class='wl-ai-good top8'>✓ No active jobs have an AI-detected setup conflict.</div>`}</div>
       <div class='ownerDispatchSummary ownerLiveSummary'>
         <span><b>${assignedWaiting.length}</b> assigned / waiting</span>
