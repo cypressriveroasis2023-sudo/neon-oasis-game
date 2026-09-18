@@ -2011,3 +2011,32 @@ select {
   border-left-color: #237457;
   background: #f3faf7;
 }
+
+
+/* Automatic Service solar checkout requirements */
+.wl-auto-service-plan {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid #e0c98f;
+  border-left: 5px solid #d49a1c;
+  border-radius: 12px;
+  background: #fff9e9;
+}
+.wl-auto-service-plan > b {
+  display: block;
+  color: #6f5112;
+  margin-bottom: 5px;
+  font-size: 12px;
+  letter-spacing: .35px;
+}
+.wl-auto-required {
+  margin-bottom: 10px;
+  padding: 10px 11px;
+  border-radius: 11px;
+  border: 1px solid #cbddeb;
+  background: #eef6fb;
+}
+.wl-auto-required b {
+  display: block;
+  color: #173c58;
+}
