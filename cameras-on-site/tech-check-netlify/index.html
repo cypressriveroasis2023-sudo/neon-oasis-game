@@ -254,6 +254,16 @@
             <div class="ownerDashBody"><div class="small">Loading active technicians and assignments…</div></div>
           </details>
 
+          <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
+            <summary class="ownerDashSummary">
+              <div><b>Technician Daily Board</b><span>Active technicians, daily checks, scheduled tickets, and assigned equipment</span></div>
+              <span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div id="ownerTechOverview"><div class="small">Loading technician day overview…</div></div>
+            </div>
+          </details>
+
           <details id="ownerAttentionCard" class="card ownerDashSection ownerAttentionCard">
             <summary class="ownerDashSummary">
               <div><b>Needs Attention</b><span>Owner actions, blocked work, and overdue items</span></div>
@@ -389,7 +399,7 @@
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
-    <script type="module" src="./src/main.ts?v=unit-count-v4"></script>
+    <script type="module" src="./src/main.ts?v=daily-board-v5"></script>
   </body>
 <!-- techcheckcos deploy sync -->
 </html>
