@@ -223,6 +223,7 @@ let ownerAssignmentProfiles = [];
 let ownerAssignmentAssets = [];
 let pendingAssignmentLinkId = null;
 let pendingAssignmentManifest = [];
+let pendingAssignmentWorkType = 'service';
 let helpWalkthroughStep = 0;
 let helpWalkthroughMode = 'help';
 let walkthroughCheckedUserId = null;
@@ -293,11 +294,11 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be sent directly to you or to the <b>Service Department queue</b>.</p><p>If it is a department task, tap <b>Claim & Start</b>. Once you claim it, the Owner can see which Service Tech took responsibility for the task.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT releases equipment, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
-    { kicker:'SOLAR / HELIOS PRE-TRIP', title:'Check the Solar Stand before taking the unit', body:`<p>If the Owner assigned a <b>Solar Stand / Solar Pole</b>, Tech Check requires the Service Tech to verify the exact stand, the MPPT update and test, the solar-panel count, battery count/charge, and that the batteries are actually charging through the solar panel and MPPT.</p><p>For a <b>Helios</b>, also verify the Cerbo update/configuration and that the Cerbo is online and working. Required proof includes Solar Stand photos + signature, battery photos + signature, an updated MPPT-working photo, and a Helios Cerbo + MPPT photo when applicable.</p>` },
+    { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand and four batteries per Solar Spotter</b>. Enter the stand tag, verify the MPPT update/test, verify the batteries are charged, connect the solar panel + batteries + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios still requires Cerbo + MPPT verification.</p>` },
     { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
     { kicker:'RETURN TO IT', title:'Send returning units and parts back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
-    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>SERVICE TECH CLAIMS</b><span>→</span><b>RECEIVE FROM IT</b><span>→</span><b>VERIFY UNITS + PARTS</b><span>→</span><b>SOLAR / HELIOS PRE-TRIP</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>SERVICE TECH CLAIMS</b><span>→</span><b>RECEIVE FROM IT</b><span>→</span><b>VERIFY UNITS + PARTS</b><span>→</span><b>AUTO SOLAR CHECKOUT</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
   ];
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
@@ -629,6 +630,7 @@ async function startAssignedJob(id) {
     if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
     pendingAssignmentLinkId = id;
     pendingAssignmentManifest = normalizedEquipmentManifest(assignment.equipment_manifest);
+    pendingAssignmentWorkType = assignment.work_type || 'service';
     showNewPrep();
     const ticket = document.getElementById('itTicket');
     const site = document.getElementById('itSite');
@@ -674,7 +676,7 @@ async function showITHome() {
   const assigned = assignments[0] || null;
   const alertBanner = phoneAlertBanner(phoneAlerts);
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${assigned.assigned_role === 'it' ? equipmentManifestInlineHtml(assigned) + ticketPartsInlineHtml(assigned) : ''}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.work_type ? `<div class='small'><b>Job Type:</b> ${esc(assigned.work_type.toUpperCase())}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${automaticServiceSolarPlanHtml(assigned.equipment_manifest,assigned.work_type)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
   home.innerHTML = `${alertBanner}<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & release equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
@@ -752,6 +754,7 @@ function equipmentManifestDeviceTotal(raw) {
 function equipmentManifestText(raw) {
   return normalizedEquipmentManifest(raw).map(row => row.qty + ' × ' + row.label).join(' · ');
 }
+
 function equipmentManifestExpanded(raw) {
   const out=[];
   normalizedEquipmentManifest(raw).forEach(row => {
@@ -760,6 +763,39 @@ function equipmentManifestExpanded(raw) {
   });
   return out;
 }
+function manifestQty(raw,label) {
+  return normalizedEquipmentManifest(raw).filter(row => row.label===label).reduce((sum,row)=>sum+row.qty,0);
+}
+function prepPurposeFromWorkType(workType) {
+  const type=String(workType || '').toLowerCase();
+  if (type==='delivery') return 'DELIVERY';
+  if (type==='swap') return 'SWAP';
+  return '';
+}
+function automaticServiceSolarPlan(raw,workType='service') {
+  const delivery=String(workType || '').toLowerCase()==='delivery';
+  if (!delivery) return { spotters:0,rangers:0,stands:0,batteries:0,panels:0 };
+  const spotters=manifestQty(raw,'Solar Spotter');
+  const rangers=manifestQty(raw,'Ranger');
+  return { spotters,rangers,stands:spotters,batteries:spotters*4,panels:rangers };
+}
+function automaticServiceSolarPlanHtml(raw,workType='service') {
+  const plan=automaticServiceSolarPlan(raw,workType);
+  if (!plan.spotters && !plan.rangers) return '';
+  const chips=[];
+  if (plan.stands) chips.push(`<span><b>${plan.stands}</b> × Solar Stand automatically required for Service</span>`);
+  if (plan.batteries) chips.push(`<span><b>${plan.batteries}</b> × batteries automatically required for Service (${plan.spotters} Solar Spotter${plan.spotters===1?'':'s'} × 4)</span>`);
+  if (plan.panels) chips.push(`<span><b>${plan.panels}</b> × Solar Panel automatically required for Service (${plan.rangers} Ranger${plan.rangers===1?'':'s'})</span>`);
+  return `<div class='wl-auto-service-plan'><b>AUTO SERVICE CHECKOUT</b><div class='small'>These Service-side requirements are generated automatically from the Delivery equipment above. Do not add the automatic Solar Stand to the IT prep list.</div><div class='wl-parts-chips'>${chips.join('')}</div></div>`;
+}
+function refreshOwnerAutoServicePlan() {
+  const host=document.getElementById('ownerAutoServicePlan');
+  if (!host) return;
+  const type=document.getElementById('ownerAssignWorkType')?.value || 'service';
+  host.innerHTML=automaticServiceSolarPlanHtml(readOwnerEquipmentManifest(),type);
+  host.classList.toggle('hidden',!host.innerHTML);
+}
+
 
 function equipmentManifestInlineHtml(data) {
   const rows = normalizedEquipmentManifest(data?.equipment_manifest || data);
@@ -879,7 +915,7 @@ function showNewPrep() {
   let req = document.getElementById('wlAssignedEquipmentReq');
   if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
   req.style.display = pendingAssignmentManifest.length ? '' : 'none';
-  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment</b><div class='small'>The Unit Area and Stand Area above were prefilled from the Owner assignment. They must match before you start the Tech Check.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}</div>` : '';
+  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment · ${esc(String(pendingAssignmentWorkType || 'service').toUpperCase())}</b><div class='small'>The IT equipment above was prefilled from the Owner assignment. Solar Spotter Delivery support (Solar Stand + 4 batteries per Spotter) and Ranger solar panels are handled automatically on the Service side.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}${automaticServiceSolarPlanHtml(pendingAssignmentManifest,pendingAssignmentWorkType)}</div>` : '';
   nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
   resetWizardPosition();
 }
@@ -908,7 +944,7 @@ async function createPrepAndStartChecks() {
   const totalItems = requestedUnits + equipmentManifestStandTotal(manifest);
   const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v3', {
+  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v4', {
     p_ticket_no: ticket,
     p_site: site,
     p_requested_unit_count: requestedUnits,
@@ -918,6 +954,7 @@ async function createPrepAndStartChecks() {
     p_camera_replacement_qty: parts.camera_replacement_qty,
     p_sim_replacement_qty: parts.sim_replacement_qty,
     p_micro_sd_qty: parts.micro_sd_qty,
+    p_work_type: pendingAssignmentWorkType || 'service',
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -927,6 +964,7 @@ async function createPrepAndStartChecks() {
     pendingAssignmentLinkId = null;
   }
   pendingAssignmentManifest = [];
+  pendingAssignmentWorkType = 'service';
   document.getElementById('itTicket').value = '';
   document.getElementById('itSite').value = '';
   const totalInput = document.getElementById('wlTotalUnits');
@@ -1212,20 +1250,21 @@ function itUnitStepsData(item, unitNo) {
   const identity = itItemIdentity(item, unitNo);
   const steps = [{ kind: 'tag', field: 'unit_tag', label: support ? `Enter the exact tag / ID for ${item.equipment_type}` : `Enter the exact unit tag for ${item.equipment_type}` }];
   if (isSolarSupport(item.equipment_type)) {
-    steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries are prepared with ${identity}?` });
-    steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
-    steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
-    steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With the PV cable and solar panels connected to ${identity}, did you verify the batteries are charging through the MPPT?` });
-    steps.push({ kind: 'bool', field: 'solar_panels_match_ok', label: `Are the correct solar panels that fit ${identity} included?` });
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} listed on the MHelpDesk ticket?` });
+    steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} physically ready for Service to perform the Solar Stand checkout?` });
     return steps;
   }
   if (isSimpleSupport(item.equipment_type)) {
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} what the customer requested and what is listed on the MHelpDesk ticket?` });
     return steps;
   }
-  if (Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
+  if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
   steps.push({ kind: 'bool', field: 'power_ok', label: `Does ${identity} power on correctly?` });
+  if (item.equipment_type === 'Ranger') {
+    steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
+    steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
+    steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
+  }
 
   if (item.purpose === 'DELIVERY') {
     if (item.equipment_type === 'Helios') {
@@ -1242,7 +1281,7 @@ function itUnitStepsData(item, unitNo) {
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Before formatting the SD cards, did you verify ${identity} is recording footage correctly?` });
     } else {
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
-      steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
+      if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     }
 
     steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
@@ -1268,13 +1307,14 @@ function itUnitStepsData(item, unitNo) {
 }
 function itUnitReady(item) {
   if (!item?.unit_tag) return false;
-  if (isSolarSupport(item.equipment_type)) return Number(item.battery_count || 0) >= 1 && Boolean(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.ticket_item_match_ok);
-  if (isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok);
+  if (isSolarSupport(item.equipment_type) || isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok && (isSimpleSupport(item.equipment_type) || item.safe_ok));
   if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
-  if (Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
+  if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
+  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
   if (item.purpose !== 'DELIVERY') return true;
   if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok)) return false;
-  return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && item.delivery_batteries_charged_ok && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
+  const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
+  return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
 }
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
@@ -1415,7 +1455,7 @@ async function showItPrep(prepId) {
   } else if (itUnitIndex >= items.length) {
     itUnitPhase = 'type';
     itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
-    itPurposeChoice = '';
+    itPurposeChoice = prepPurposeFromWorkType(activeItPrep.work_type) || '';
     itReconRequired = 1;
   } else {
     const item = items[itUnitIndex];
@@ -1423,7 +1463,7 @@ async function showItPrep(prepId) {
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
     itReconRequired = Number(item.required_battery_count || 1);
-    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || ''; }
+    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || ''; }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
       if (!issues.length) itUnitPhase = 'review';
@@ -1497,7 +1537,7 @@ async function showSvcHome() {
   const readyForService = work.released.length;
   const nextReleased = work.released[0] || null;
   const nextDeployed = work.deployed[0] || null;
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
+  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.work_type ? `<div class='small'><b>Job Type:</b> ${esc(assigned.work_type.toUpperCase())}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>Units Required From MHelpDesk:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${automaticServiceSolarPlanHtml(assigned.equipment_manifest,assigned.work_type)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : 'Open Assigned Job'} →</button></div>` : '';
   const nextAction = assignmentAction || (nextReleased ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Receive Equipment · MHelpDesk #${esc(nextReleased.ticket_no)}</b><div class='small'>${esc(nextReleased.site || 'Equipment released by IT')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-receive='${esc(nextReleased.ticket_no)}'>Receive This Equipment →</button></div>` : !work.inspectionDone ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Complete Today’s Truck / Trailer Inspection</b><div class='small'>No morning inspection has been submitted from your account today.</div><button class='wl-big wl-blue top10' data-wl-next-svc-inspect>Start Inspection →</button></div>` : nextDeployed ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Field Unit · ${esc(nextDeployed.unit_tag)}</b><div class='small'>MHelpDesk #${esc(nextDeployed.ticket_no)} · ${esc(nextDeployed.equipment_type || 'Deployed equipment')}</div><button class='wl-big wl-blue top10' data-wl-next-svc-return data-ticket='${esc(nextDeployed.ticket_no)}' data-unit='${esc(nextDeployed.unit_tag)}' data-type='${esc(nextDeployed.equipment_type || '')}'>Return This Unit When It Comes Back →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service action is currently waiting.</b><div class='small'>Your active handoffs and today’s inspection are caught up.</div></div>`);
   home.innerHTML = `${alertBanner}<div class='wl-title'>My Work Today</div><div class='wl-sub'>Owner-assigned jobs appear here first, followed by the next workflow action.</div>${nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> assigned to me</span><span><b>${readyForService}</b> waiting from IT</span><span><b>${r.waiting}</b> returns waiting IT</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-svc='receive'>① Receive Equipment From IT <span class='wl-count'>${readyForService}</span></button><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting + r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>② Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
   hideChildren(viewSvc(), [home]); resetWizardPosition();
@@ -1559,9 +1599,10 @@ function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPre
 function svcForms(card) { return [...card.querySelectorAll('.unitConfirm')]; }
 
 async function serviceSolarContextData(prepId) {
-  const { data, error } = await liveDb.rpc('service_solar_context', { p_prep_id: prepId });
-  if (error) { console.warn('Could not load Service Solar / Helios context', error); return { need_solar:false, need_stand:false, has_helios:false, assignment_id:null }; }
-  return Array.isArray(data) ? (data[0] || { need_solar:false, need_stand:false, has_helios:false, assignment_id:null }) : (data || { need_solar:false, need_stand:false, has_helios:false, assignment_id:null });
+  const { data, error } = await liveDb.rpc('service_solar_context_v2', { p_prep_id: prepId });
+  const empty={ need_solar:false,need_stand:false,has_helios:false,has_ranger:false,solar_spotter_count:0,ranger_count:0,expected_batteries:0,expected_solar_panels:0,assignment_id:null };
+  if (error) { console.warn('Could not load Service Solar / Ranger / Helios context', error); return empty; }
+  return Array.isArray(data) ? (data[0] || empty) : (data || empty);
 }
 async function loadServiceSolarCheck(prepId) {
   const { data, error } = await liveDb.from('service_solar_checks').select('*').eq('prep_ticket_id',prepId).maybeSingle();
@@ -1584,8 +1625,9 @@ function serviceSolarEvidenceCount(rows, category, kind) {
 function serviceSolarReady(ctx, check, evidence) {
   if (!ctx?.need_solar) return true;
   if (!check?.completed_at) return false;
-  if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<1 || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
-  if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
+  const requiredStandPhotos=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
+  if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<requiredStandPhotos || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
+  if (Number(ctx.expected_batteries || 0)>0 && (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1)) return false;
   if (serviceSolarEvidenceCount(evidence,'mppt','photo')<1) return false;
   if (ctx.has_helios && serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo')<1) return false;
   return true;
@@ -1612,42 +1654,50 @@ function serviceSolarProofPanelHtml(rows, category, title, instruction, requireS
     ${requireSignature ? (sig ? `<div class='wl-saved top8'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || 'Service Tech')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-solar-replace-sign>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign this verification with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-solar-clear>Clear</button><button class='wl-next' data-wl-solar-save-sign>Save Signature</button></div></div>`) : ''}
   </div>`;
 }
+
 function serviceSolarChecklistHtml(ctx, check, evidence) {
-  const expectedPanels=serviceSolarExpectedPanels();
+  const expectedPanels=Number(ctx?.expected_solar_panels || 0);
+  const expectedBatteries=Number(ctx?.expected_batteries || 0);
+  const spotters=Number(ctx?.solar_spotter_count || 0);
+  const rangers=Number(ctx?.ranger_count || 0);
   const standTag=check?.stand_tag || serviceSolarDefaultStandTag();
-  const batteryDefault=check?.battery_count ?? serviceSolarDefaultBatteryCount();
-  const panelDefault=check?.solar_panel_count ?? expectedPanels;
+  const batteryDefault=check?.battery_count ?? (expectedBatteries || '');
+  const panelDefault=check?.solar_panel_count ?? (expectedPanels || '');
   const complete=serviceSolarReady(ctx,check,evidence);
+  const autoBits=[];
+  if (spotters) autoBits.push(`<span><b>${spotters}</b> Solar Spotter${spotters===1?'':'s'} → <b>${spotters}</b> Solar Stand${spotters===1?'':'s'} + <b>${spotters*4}</b> batteries</span>`);
+  if (rangers) autoBits.push(`<span><b>${rangers}</b> Ranger${rangers===1?'':'s'} → <b>${rangers}</b> Solar Panel${rangers===1?'':'s'}</span>`);
   return `<div class='wl-service-solar'>
     <div class='wl-review'>
-      <b>Service Solar / Helios Pre-Trip Verification</b>
-      <div class='small'>Complete this before taking the equipment into the field. The Owner can see who completed the check.</div>
-      ${activeSvcAssignment ? equipmentManifestInlineHtml(activeSvcAssignment) : equipmentManifestInlineHtml(activeSvcPrep)}
+      <b>Service Solar / Ranger / Helios Checkout</b>
+      <div class='small'>This step appears automatically after you finish checking the IT-prepared unit. Complete it before taking the equipment from the shop.</div>
+      ${autoBits.length ? `<div class='wl-auto-service-plan top8'><b>AUTOMATIC SERVICE REQUIREMENTS</b><div class='wl-parts-chips'>${autoBits.join('')}</div></div>` : ''}
     </div>
     <div class='wl-question top10'>
-      ${ctx.need_stand ? `<label>Exact Solar Stand / Solar Pole Tag</label><input id='wlSvcSolarStandTag' value='${esc(standTag)}' placeholder='Enter the exact stand tag / ID'><label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified this is the Solar Stand / Solar Pole assigned to this job.</span></label>` : ''}
-      <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT update / configuration is verified current.</span></label>
-      <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was tested and is working.</span></label>
-      ${ctx.has_helios ? `<label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo update / configuration is verified current.</span></label><label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online / working and verified.</span></label>` : ''}
+      ${ctx.need_stand ? `<div class='wl-auto-required'><b>${spotters > 1 ? `${spotters} Solar Stands automatically assigned for checkout` : 'Solar Stand automatically assigned for checkout'}</b><div class='small'>Choose the physical stand${spotters>1?'s':''} you are taking and record ${spotters>1?'one exact tag per line or separated by commas':'the exact tag'} below.</div></div><label>Exact Solar Stand / Solar Pole Tag${spotters>1?'s':''}${spotters>0 ? ` · required ${spotters}` : ''}</label>${spotters>1 ? `<textarea id='wlSvcSolarStandTag' rows='3' placeholder='One stand tag per line or comma separated'>${esc(standTag)}</textarea>` : `<input id='wlSvcSolarStandTag' value='${esc(standTag)}' placeholder='Enter the exact stand tag / ID'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified ${spotters>1?'these are the exact Solar Stands / Solar Poles':'this is the exact Solar Stand / Solar Pole'} I am taking for this job.</span></label>` : ''}
+      <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
+      <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>
+      ${ctx.has_helios ? `<label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo update / configuration is current.</span></label><label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online, communicating, and tested.</span></label>` : ''}
       <div class='grid top10'>
-        <div><label>Solar Panels Physically In Hand${expectedPanels>0 ? ` · expected ${expectedPanels}` : ''}</label><input id='wlSvcSolarPanelCount' type='number' inputmode='numeric' min='0' value='${esc(panelDefault || '')}' placeholder='How many solar panels?'></div>
-        <div><label>Batteries / Battery Boxes Physically In Hand</label><input id='wlSvcSolarBatteryCount' type='number' inputmode='numeric' min='0' value='${esc(batteryDefault || '')}' placeholder='How many batteries?'></div>
+        <div><label>Solar Panels Physically In Hand${expectedPanels>0 ? ` · required ${expectedPanels}` : ' · for charging test'}</label><input id='wlSvcSolarPanelCount' type='number' inputmode='numeric' min='0' value='${esc(panelDefault)}' placeholder='How many solar panels?'></div>
+        ${expectedBatteries>0 ? `<div><label>Batteries / Battery Boxes Physically In Hand · required ${expectedBatteries}</label><input id='wlSvcSolarBatteryCount' type='number' inputmode='numeric' min='0' value='${esc(batteryDefault)}' placeholder='How many batteries?'></div>` : ''}
       </div>
-      <label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the required solar panels.</span></label>
-      <label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I verified the batteries / battery boxes are charged.</span></label>
-      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>With the solar panel connected through the MPPT, I verified the batteries are actively charging.</span></label>
-      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Solar / Helios Checklist</button>
+      <label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the solar panel(s) required for this checkout.</span></label>
+      ${expectedBatteries>0 ? `<label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I physically verified all ${expectedBatteries} required batteries / battery boxes are charged.</span></label>` : ''}
+      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>With the solar panel, battery/battery system, and MPPT connected together, I verified the battery is actively charging.</span></label>
+      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Solar Checkout Checklist</button>
       ${check?.completed_at ? `<div class='ok top8'><b>✓ Checklist verified by ${esc(check.service_tech_name || 'Service Tech')}</b><div class='small'>${new Date(check.completed_at).toLocaleString()}</div></div>` : `<div class='warn top8'>Complete every required verification above, then save the checklist.</div>`}
     </div>
 
-    ${ctx.need_stand ? serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand','Take clear pictures of the exact Solar Stand / Solar Pole being used. The tag / ID and overall condition should be visible.',true) : ''}
-    ${serviceSolarProofPanelHtml(evidence,'batteries','Batteries','Take clear pictures of the batteries / battery boxes you verified are charged.',true)}
-    ${serviceSolarProofPanelHtml(evidence,'mppt','Updated MPPT Working','Take a clear picture showing the updated MPPT powered and working after the charging test.',false)}
+    ${ctx.need_stand ? serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand Tag',spotters>1 ? `Take at least ${spotters} clear tag photos — one for each Solar Stand you are taking.` : 'Take a clear picture of the exact Solar Stand tag / ID you are taking from the shop.',true) : ''}
+    ${expectedBatteries>0 ? serviceSolarProofPanelHtml(evidence,'batteries','Checkout Batteries','Take clear pictures of the required batteries / battery boxes after you verify they are charged.',true) : ''}
+    ${serviceSolarProofPanelHtml(evidence,'mppt','MPPT / Charging Readings','Upload a picture of the MPPT / charging readings while the solar panel, battery system, and MPPT are connected together and actively charging.',false)}
     ${ctx.has_helios ? serviceSolarProofPanelHtml(evidence,'helios_cerbo_mppt','Helios Cerbo + MPPT','Take pictures showing the Helios Cerbo and MPPT updated, online, and tested.',false) : ''}
 
-    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Solar / Helios pre-trip verification complete':'Solar / Helios verification still needs evidence'}</b><div class='small'>${complete?'Checklist, required photos, and signatures are saved.':'Solar Stand photo + signature, battery photo + signature, MPPT working photo, and Helios Cerbo/MPPT photo when applicable are required.'}</div></div>
+    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Solar checkout complete — equipment may leave the shop':'Solar checkout still needs verification'}</b><div class='small'>${complete?'Checklist, required proof photos, and signatures are saved.':'Complete the automatic stand/battery/panel requirements and upload the required MPPT / charging reading proof.'}</div></div>
   </div>`;
 }
+
 async function saveServiceSolarChecklist() {
   if (!activeSvcPrep?.id) return;
   const ctx=await serviceSolarContextData(activeSvcPrep.id);
@@ -1655,22 +1705,27 @@ async function saveServiceSolarChecklist() {
   const standTag=document.getElementById('wlSvcSolarStandTag')?.value.trim() || '';
   const panelCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarPanelCount')?.value || 0)));
   const batteryCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarBatteryCount')?.value || 0)));
-  const expectedPanels=serviceSolarExpectedPanels();
+  const expectedPanels=Number(ctx.expected_solar_panels || 0);
+  const expectedBatteries=Number(ctx.expected_batteries || 0);
   if (ctx.need_stand && !standTag) return alert('Enter the exact Solar Stand / Solar Pole tag first.');
-  if (ctx.need_stand && !document.getElementById('wlSvcSolarStandVerified')?.checked) return alert('Verify the assigned Solar Stand / Solar Pole.');
+  if (ctx.need_stand && Number(ctx.solar_spotter_count || 0)>0) {
+    const tagCount=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean).length;
+    if (tagCount !== Number(ctx.solar_spotter_count || 0)) return alert('This delivery automatically requires ' + Number(ctx.solar_spotter_count || 0) + ' Solar Stand tag' + (Number(ctx.solar_spotter_count || 0)===1?'':'s') + '. You entered ' + tagCount + '.');
+  }
+  if (ctx.need_stand && !document.getElementById('wlSvcSolarStandVerified')?.checked) return alert('Verify the Solar Stand / Solar Pole you are taking.');
   if (!document.getElementById('wlSvcMpptUpdated')?.checked) return alert('Verify the MPPT update / configuration.');
   if (!document.getElementById('wlSvcMpptTested')?.checked) return alert('Verify the MPPT was tested and is working.');
   if (ctx.has_helios && !document.getElementById('wlSvcCerboUpdated')?.checked) return alert('Verify the Helios Cerbo update / configuration.');
   if (ctx.has_helios && !document.getElementById('wlSvcCerboOnline')?.checked) return alert('Verify the Helios Cerbo is online and working.');
-  if (panelCount < 1) return alert('Enter how many solar panels you physically have.');
-  if (expectedPanels > 0 && panelCount !== expectedPanels) return alert('This job calls for ' + expectedPanels + ' solar panel' + (expectedPanels===1?'':'s') + '. You entered ' + panelCount + '. Correct the count before continuing.');
-  if (!document.getElementById('wlSvcSolarPanelsVerified')?.checked) return alert('Physically count and verify the solar panels.');
-  if (batteryCount < 1) return alert('Enter how many batteries / battery boxes you physically have.');
-  if (!document.getElementById('wlSvcBatteriesCharged')?.checked) return alert('Verify the batteries are charged.');
-  if (!document.getElementById('wlSvcSolarCharging')?.checked) return alert('Verify the batteries are charging through the solar panel and MPPT.');
+  if (panelCount < 1) return alert('Enter how many solar panels you physically have for the charging test.');
+  if (expectedPanels > 0 && panelCount !== expectedPanels) return alert('This job automatically requires ' + expectedPanels + ' solar panel' + (expectedPanels===1?'':'s') + '. You entered ' + panelCount + '.');
+  if (!document.getElementById('wlSvcSolarPanelsVerified')?.checked) return alert('Physically count and verify the required solar panels.');
+  if (expectedBatteries > 0 && batteryCount !== expectedBatteries) return alert('This job automatically requires ' + expectedBatteries + ' batteries / battery-box items. You entered ' + batteryCount + '.');
+  if (expectedBatteries > 0 && !document.getElementById('wlSvcBatteriesCharged')?.checked) return alert('Verify all required batteries / battery boxes are charged.');
+  if (!document.getElementById('wlSvcSolarCharging')?.checked) return alert('Connect the solar panel, battery system, and MPPT together and verify the battery is actively charging.');
 
   document.body.classList.add('busy');
-  const { error }=await liveDb.rpc('save_my_service_solar_check',{
+  const { error }=await liveDb.rpc('save_my_service_solar_check_v2',{
     p_prep_id:activeSvcPrep.id,
     p_stand_tag:standTag,
     p_stand_verified:Boolean(document.getElementById('wlSvcSolarStandVerified')?.checked),
@@ -1681,7 +1736,7 @@ async function saveServiceSolarChecklist() {
     p_solar_panel_count:panelCount,
     p_solar_panels_verified:Boolean(document.getElementById('wlSvcSolarPanelsVerified')?.checked),
     p_battery_count:batteryCount,
-    p_batteries_charged_ok:Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked),
+    p_batteries_charged_ok:expectedBatteries>0 ? Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked) : true,
     p_solar_charging_ok:Boolean(document.getElementById('wlSvcSolarCharging')?.checked),
   });
   document.body.classList.remove('busy');
@@ -1907,9 +1962,9 @@ document.addEventListener('click', async e => {
     if (typeof window.refreshData === 'function') await window.refreshData();
     return;
   }
-  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
+  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; pendingAssignmentWorkType='service'; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
   if (e.target.closest("[data-wl-home='it']")) return showITHome(); if (e.target.closest("[data-wl-home='svc']")) return showSvcHome();
-  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
+  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; pendingAssignmentWorkType='service'; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
   const openIt = e.target.closest('[data-wl-open-it]'); if (openIt) return showItPrep(openIt.dataset.wlOpenIt);
   const countMinus = e.target.closest('[data-wl-count-minus]'); if (countMinus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) - 1)); return; }
   const countPlus = e.target.closest('[data-wl-count-plus]'); if (countPlus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) + 1)); return; }
@@ -2306,8 +2361,10 @@ function wrapCreatePrep() {
 
 function assignmentNeedsServiceSolar(a, prep) {
   if (a?.assigned_role !== 'service') return false;
+  const workType=String(a?.work_type || prep?.work_type || '').toLowerCase();
+  if (workType && workType !== 'delivery') return false;
   const rows=[...normalizedEquipmentManifest(a?.equipment_manifest),...normalizedEquipmentManifest(prep?.equipment_manifest)];
-  return rows.some(row => ['Solar Stand','Solar Pole','Helios'].includes(row.label) && row.qty > 0);
+  return rows.some(row => ['Solar Spotter','Ranger','Solar Stand','Solar Pole','Helios'].includes(row.label) && row.qty > 0);
 }
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
   const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
@@ -2317,8 +2374,8 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
   if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
   if (a.assigned_role === 'service' && prep?.status === 'released' && assignmentNeedsServiceSolar(a,prep)) {
     return solarCheck?.completed_at
-      ? { step:4, label:'SOLAR / HELIOS VERIFIED', detail:'Pre-trip Solar Stand, battery, MPPT' + (normalizedEquipmentManifest(a?.equipment_manifest).some(r=>r.label==='Helios') ? ', and Cerbo' : '') + ' checks completed' }
-      : { step:3, label:'SOLAR / HELIOS CHECK IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' must verify Solar Stand, batteries, MPPT, charging, photos, and signatures' };
+      ? { step:4, label:'SOLAR CHECKOUT VERIFIED', detail:'Automatic Solar Spotter / Ranger / Helios Service checkout completed' }
+      : { step:3, label:'SOLAR CHECKOUT IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' is verifying automatic stands, batteries, panels, MPPT/charging readings, and Cerbo when applicable' };
   }
   if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Prepared and released by IT' };
   if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
@@ -2327,7 +2384,7 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p = ownerAssignmentProgress(a, prep, solarCheck);
   const pct = Math.max(8, Math.min(100, p.step / 5 * 100));
-  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>Units Required:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${a.assigned_role === 'it' ? equipmentManifestInlineHtml(a) + ticketPartsInlineHtml(a) : ''}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+  return `<div class='wl-assignment-row'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.work_type ? `<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>Units Required:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
 }
 function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
@@ -2360,7 +2417,7 @@ async function installOwnerAssignments(force = false) {
   const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
-    liveDb.from('prep_tickets').select('id,ticket_no,status,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
+    liveDb.from('prep_tickets').select('id,ticket_no,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
     liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
     liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at').order('updated_at',{ascending:false}).limit(100),
   ]);
@@ -2411,13 +2468,17 @@ async function installOwnerAssignments(force = false) {
         <div class='qtext'>Parts Required From This Ticket</div>
         <div class='small'>Choose the exact units/devices, stands, and extra parts this assignment requires. Service assignments can include a Solar Stand for the pre-trip Solar / Helios verification.</div>
         ${ownerEquipmentManifestInputsHtml()}
+        <div id='ownerAutoServicePlan' class='hidden'></div>
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
+        <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='swap'>Swap</option><option value='service' selected>Service</option><option value='pickup'>Pickup</option></select></div>
         <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
-        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
       </div>
-      <div class='top10'><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
+      <div class='grid top10'>
+        <div><label>Team</label><select id='ownerAssignRole'><option value='it'>IT Department</option><option value='service'>Service Department</option></select></div>
+        <div><label>Send To</label><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select></div>
+      </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
       <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
@@ -2451,6 +2512,7 @@ async function installOwnerAssignments(force = false) {
 
   host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
+  refreshOwnerAutoServicePlan();
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
@@ -2470,6 +2532,7 @@ async function ownerAssignJob() {
   const assignee = document.getElementById('ownerAssignTech')?.value || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
+  const workType = document.getElementById('ownerAssignWorkType')?.value || 'service';
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
@@ -2478,10 +2541,12 @@ async function ownerAssignJob() {
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
   if (selectedDeviceCount > 0 && selectedDeviceCount !== requestedUnitCount) return alert('The MHelpDesk unit count is ' + requestedUnitCount + ', but the Unit Area adds up to ' + selectedDeviceCount + '. Make them match before sending the job.');
   if (role === 'it' && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area before sending this IT job.');
+  const autoSolarPlan=automaticServiceSolarPlan(equipmentManifest,workType);
+  if (autoSolarPlan.spotters > 0 && manifestQty(equipmentManifest,'Solar Stand') > 0) return alert('Remove Solar Stand from the IT Stand Area. A Delivery with Solar Spotter automatically assigns the Solar Stand to the Service checkout after IT releases the Solar Spotter.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
 
   document.body.classList.add('busy');
-  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v7', {
+  const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
     p_ticket_no: ticket,
     p_site: site,
     p_assigned_role: role,
@@ -2498,6 +2563,7 @@ async function ownerAssignJob() {
     p_equipment_manifest: equipmentManifest,
     p_requires_it_handoff: false,
     p_scheduled_for: scheduledFor,
+    p_work_type: workType,
   });
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
@@ -2517,6 +2583,7 @@ async function ownerAssignJob() {
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitCount','ownerAssignUnits','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
+  const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   await installOwnerAssignments(true);
@@ -2626,9 +2693,10 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
+  if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
 
-document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
