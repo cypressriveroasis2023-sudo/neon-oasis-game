@@ -2087,3 +2087,14 @@ select {
  .mainRoleTabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
  .mainRoleTabs button{font-size:13px;padding-left:5px;padding-right:5px;white-space:nowrap}
 }
+
+/* v33 Equipment Numbers: explicit desktop + mobile layout */
+.wl-equipment-number-block{box-sizing:border-box;width:100%;max-width:100%;overflow:hidden}
+.wl-equipment-number-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;width:100%;max-width:100%}
+.wl-equipment-number-grid>div{min-width:0}
+.wl-equipment-number-grid label{display:block;margin-bottom:4px;font-weight:700}
+.wl-equipment-number-grid input{box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+@media(max-width:768px){
+ .wl-equipment-number-grid{grid-template-columns:minmax(0,1fr);gap:8px}
+ .wl-equipment-number-block{padding:10px}
+}
