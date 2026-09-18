@@ -2063,3 +2063,5 @@ select {
 .ownerWorkflowFirst{margin:10px 0 14px;padding:12px;border:1px solid #b9cbe0;border-radius:10px;background:#f5f9fd}.ownerWorkflowFirst .qtext{font-size:13px;font-weight:800}
 
 .wl-count-tag-row{display:grid;grid-template-columns:110px minmax(0,1fr);gap:7px}.wl-count-tag-row input{min-width:0}@media(max-width:768px){.wl-count-tag-row{grid-template-columns:90px minmax(0,1fr)}}
+
+.wl-equipment-number-block{padding:10px;border:1px solid #c8d8e8;border-radius:9px;background:#f7fbff}.wl-equipment-number-block .grid{grid-template-columns:1fr 1fr}@media(max-width:768px){.wl-equipment-number-block .grid{grid-template-columns:1fr}}
