@@ -1914,6 +1914,15 @@ function svcWizardCard() {
 }
 async function advanceSvcVerification() { const card = findSvcCard(activeSvcPrep?.ticket_no); if (!card) return; const forms = svcForms(card); if (svcUnitIndex >= forms.length) return; const questions = svcQuestions(forms[svcUnitIndex]); const q = questions[svcQuestionIndex]; if (q?.kind === 'bool' && q.input.dataset.wlAnswered !== '1') return alert('Choose YES or NO first.'); if (q?.kind === 'number') { const value = document.getElementById('wlSvcCount')?.value ?? ''; if (value === '') return alert('Enter the physical count first.'); q.input.value = value; } if (svcQuestionIndex < questions.length - 1) svcQuestionIndex++; else { svcUnitIndex++; svcQuestionIndex = 0; } return renderSvcPrep(); }
 
+function serviceAIEquipmentReview(ctx,check,evidence){
+  const flags=[], spotters=Number(ctx?.solar_spotter_count||0), rangers=Number(ctx?.ranger_count||0), batteries=Number(ctx?.expected_batteries||0), panels=Number(ctx?.expected_solar_panels||0);
+  const standPhotos=serviceSolarEvidenceCount(evidence,'solar_stand','photo'), batteryPhotos=serviceSolarEvidenceCount(evidence,'batteries','photo'), mpptPhotos=serviceSolarEvidenceCount(evidence,'mppt','photo'), heliosPhotos=serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo');
+  if(spotters){const expected=spotters*4;if(batteries!==expected)flags.push('Solar Spotter plan expects '+expected+' batteries ('+spotters+' × 4), but this ticket currently expects '+batteries+'.');if(Number(ctx?.need_stand)&&standPhotos<Math.max(1,spotters))flags.push('Solar Stand tag/photo proof is incomplete.');if(batteryPhotos<1)flags.push('Battery photo proof is missing.');if(mpptPhotos<1)flags.push('MPPT / live solar charging reading photo is missing.');}
+  if(rangers){if(panels<rangers)flags.push('Ranger plan expects at least '+rangers+' solar panel'+(rangers===1?'':'s')+' — one per Ranger.');if(mpptPhotos<1)flags.push('Ranger MPPT / charging proof photo is missing.');}
+  if(ctx?.has_helios&&heliosPhotos<1)flags.push('Helios Cerbo / MPPT proof photo is missing.');
+  if(ctx?.need_solar&&!check?.completed_at)flags.push('Solar / Helios Service checklist is not completed yet.');
+  return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'><span>✨ AI Service Equipment Check</span><b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${spotters*4} batteries</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'}</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks counts and stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
+}
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
   const base = document.getElementById('matchedPreps')?.closest('.card');
@@ -1952,7 +1961,7 @@ async function renderSvcPrep() {
       `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>${solarRequired ? 'Solar / Helios Check →' : 'Compare IT Photos →'}</button></div>`;
   } else if (solarRequired && svcUnitIndex === solarStep) {
     wizard.innerHTML = progress('Solar / Helios Pre-Trip', 'Verify Solar Stand, charging, MPPT, batteries, and Helios Cerbo', 1, 1) +
-      serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence) +
+      serviceAIEquipmentReview(solarCtx,solarCheck,solarEvidence) + serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence) +
       `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${solarReady ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
     wizard.querySelectorAll('canvas').forEach(wireCanvas);
   } else if (svcUnitIndex === proofStep) {
