@@ -2532,6 +2532,7 @@ async function installOwnerAssignments(force = false) {
 function addOwnerTechPill() {
   const select=document.getElementById('ownerAssignTech'); const pills=document.getElementById('ownerAssignedTechPills');
   const id=select?.value || ''; if(!id||!pills) return;
+  if(id==='__service_queue__'){ const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.queueRole='service'; pill.innerHTML=`<span>Service Department Queue — any Service Tech can claim</span><button type='button' data-owner-remove-tech aria-label='Remove Service Department Queue'>×</button>`; if(!pills.querySelector('[data-queue-role="service"]')) pills.appendChild(pill); select.value=''; return; }
   if(pills.querySelector(`[data-tech-id="${CSS.escape(id)}"]`)){ select.value=''; return; }
   const label=select.options[select.selectedIndex]?.textContent?.trim() || 'Technician';
   const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id;
@@ -2547,7 +2548,7 @@ function refreshOwnerAssignmentTechOptions() {
   if (role === 'it_service' || role === 'service_it') {
     select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
     select.disabled = false;
-    select.innerHTML = `<option value=''>${role === 'service_it' ? 'Service Department Queue — any Service Tech can claim' : 'IT Department Queue — any IT Tech can claim'}</option>` + ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
+    select.innerHTML = `<option value=''>${role === 'service_it' ? 'Service Department Queue — any Service Tech can claim' : 'IT Department Queue — any IT Tech can claim'}</option><option value='__service_queue__'>Service Department Queue — any Service Tech can claim</option>` + ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
     if (hint) hint.textContent = role === 'service_it' ? 'Service first → returned units go to IT Intake.' : 'IT first → Service receives the prepared equipment.';
   } else {
     select.disabled = false;
@@ -2604,6 +2605,7 @@ async function ownerAssignJob() {
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const assignees = [...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')].map(el => el.dataset.techId).filter(Boolean);
+  const serviceQueueSelected = !!document.querySelector('#ownerAssignedTechPills [data-queue-role="service"]');
   const assignee = assignees[0] || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
@@ -2624,7 +2626,7 @@ async function ownerAssignJob() {
   const dualDept = role === 'it_service' || role === 'service_it';
   const orderedRoles = role === 'service_it' ? ['service','it'] : ['it','service'];
   const targets = dualDept
-    ? orderedRoles.flatMap(r => { const ids=assignees.filter(id => ownerAssignmentProfiles.find(p=>p.user_id===id)?.role===r); return ids.length ? ids.map(id=>({role:r,assignee:id})) : [{role:r,assignee:null}]; })
+    ? orderedRoles.flatMap(r => { const ids=assignees.filter(id => ownerAssignmentProfiles.find(p=>p.user_id===id)?.role===r); if(r==='service' && serviceQueueSelected) return [{role:'service',assignee:null}]; return ids.length ? ids.map(id=>({role:r,assignee:id})) : [{role:r,assignee:null}]; })
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
