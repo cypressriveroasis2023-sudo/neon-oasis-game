@@ -219,7 +219,9 @@ async function currentTechIdentity() {
 let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
+let ownerAssignmentAssets = [];
 let pendingAssignmentLinkId = null;
+let pendingAssignmentManifest = [];
 let helpWalkthroughStep = 0;
 let helpWalkthroughMode = 'help';
 let walkthroughCheckedUserId = null;
@@ -697,7 +699,7 @@ const TICKET_PARTS = [
   { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
   { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
   { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'Micro SD Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'SD / Micro SD Cards' },
 ];
 function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function readTicketPartInputs(prefix='wlPart') {
@@ -715,6 +717,47 @@ function ticketPartsInlineHtml(data) {
 }
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
+}
+const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon II'];
+const OWNER_STAND_TYPES = ['110V Stand','Solar Stand','Solar Pole','Pole'];
+function normalizedEquipmentManifest(raw) {
+  return (Array.isArray(raw) ? raw : []).map(row => ({
+    category: ['device','stand','other'].includes(row?.category) ? row.category : 'other',
+    label: String(row?.label || '').trim(),
+    qty: Math.max(1, Math.floor(Number(row?.qty || 1))),
+  })).filter(row => row.label);
+}
+function equipmentManifestTotal(raw) {
+  return normalizedEquipmentManifest(raw).filter(row => row.category === 'device' || row.category === 'stand').reduce((sum,row) => sum + row.qty, 0);
+}
+function equipmentManifestText(raw) {
+  return normalizedEquipmentManifest(raw).map(row => row.qty + ' × ' + row.label).join(' · ');
+}
+function equipmentManifestInlineHtml(data) {
+  const rows = normalizedEquipmentManifest(data?.equipment_manifest || data);
+  if (!rows.length) return '';
+  const devices = rows.filter(r => r.category === 'device');
+  const stands = rows.filter(r => r.category === 'stand');
+  const other = rows.filter(r => r.category === 'other');
+  const group = (title,list) => list.length ? `<div class='wl-manifest-group'><b>${esc(title)}</b><div class='wl-parts-chips'>${list.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : '';
+  return `<div class='wl-equipment-manifest'><div class='wl-manifest-title'>Equipment Required From Shelf</div>${group('Units / Devices',devices)}${group('Stands',stands)}${group('Other Equipment',other)}</div>`;
+}
+function ownerEquipmentTypeList(category) {
+  const defaults = category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
+  const fromInventory = ownerAssignmentAssets.filter(a => a.asset_category === category && a.availability_status !== 'retired').map(a => a.asset_type);
+  return [...new Set([...defaults,...fromInventory].filter(Boolean))];
+}
+function ownerEquipmentQtyGrid(category) {
+  return ownerEquipmentTypeList(category).map(label => {
+    const available = ownerAssignmentAssets.filter(a => a.asset_category === category && a.asset_type === label && a.availability_status === 'shop').length;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(label)}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+  }).join('');
+}
+function ownerEquipmentManifestInputsHtml() {
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section'><div class='wl-requirement-heading'>Units / Devices</div><div class='wl-owner-equipment-grid'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section'><div class='wl-requirement-heading'>Stands</div><div class='wl-owner-equipment-grid'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+}
+function readOwnerEquipmentManifest() {
+  return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
 }
 function ensureTicketPartsFields(ticketGrid) {
   if (!ticketGrid) return null;
