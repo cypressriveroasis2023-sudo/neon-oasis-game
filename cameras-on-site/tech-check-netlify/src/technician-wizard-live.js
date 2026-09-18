@@ -1223,6 +1223,7 @@ function itUnitStepsData(item, unitNo) {
   }
   if (Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
   steps.push({ kind: 'bool', field: 'power_ok', label: `Does ${identity} power on correctly?` });
+
   if (item.purpose === 'DELIVERY') {
     if (item.equipment_type === 'Helios') {
       steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Is the Cerbo for ${identity} online and visible in the VRM portal?` });
@@ -1231,19 +1232,33 @@ function itUnitStepsData(item, unitNo) {
       steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `Is the battery box charging when ${identity} is hooked up to the Helios tower solar panels?` });
     }
     steps.push({ kind: 'bool', field: 'delivery_sim_ok', label: `Is the SIM card for ${identity} active and installed in the router?` });
-    steps.push({ kind: 'bool', field: 'delivery_camera_app_ok', label: `Is ${identity} visible in the camera app?` }); steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
+    steps.push({ kind: 'bool', field: 'delivery_camera_app_ok', label: `Is ${identity} visible in the camera app?` });
+
     if (item.equipment_type === 'Helios') {
       steps.push({ kind: 'bool', field: 'solar_panels_match_ok', label: `Does ${identity} have all 3 required 1TB SD cards installed?` });
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Before formatting the SD cards, did you verify ${identity} is recording footage correctly?` });
-      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `After confirming recording, are all 3 of the 1TB SD cards in ${identity} formatted and ready?` });
     } else {
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
-      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
+      steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     }
-    if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
+
     steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
     if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
+
+    // General readiness checks come before the two final deployment checks.
+    steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
+    steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
+
+    // Keep these as the final two checks by request.
+    if (item.equipment_type === 'Helios') {
+      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `After confirming recording, are all 3 of the 1TB SD cards in ${identity} formatted and ready?` });
+    } else {
+      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
+    }
+    steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
+    return steps;
   }
+
   steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
   steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
   return steps;
@@ -2069,7 +2084,17 @@ async function installOwnerAssignments(force = false) {
     const view = document.getElementById('view-owner');
     view?.prepend(host);
   }
+
+  let liveHost = document.getElementById('ownerLiveJobProgress');
+  if (!liveHost) {
+    liveHost = document.createElement('details');
+    liveHost.id = 'ownerLiveJobProgress';
+    liveHost.className = 'card ownerDashSection ownerLiveJobsCard';
+    host.insertAdjacentElement('afterend', liveHost);
+  }
+
   const wasOpen = host.open;
+  const liveWasOpen = liveHost.open;
   host.dataset.loaded = '1';
 
   const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }] = await Promise.all([
@@ -2085,15 +2110,26 @@ async function installOwnerAssignments(force = false) {
   const now = Date.now();
   const active = all.filter(a => a.status !== 'completed');
   const completed = all.filter(a => a.status === 'completed' && now - new Date(a.completed_at || a.updated_at || a.assigned_at).getTime() < 24*60*60*1000);
+
+  const assignedWaiting = active.filter(a => {
+    const p = ownerAssignmentProgress(a, prepMap.get(a.prep_ticket_id));
+    return p.step <= 1;
+  });
+  const inProgress = active.filter(a => {
+    const p = ownerAssignmentProgress(a, prepMap.get(a.prep_ticket_id));
+    return p.step >= 2 && p.step < 5;
+  });
+
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
-  const rows = active.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
+  const assignedRows = assignedWaiting.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
+  const progressRows = inProgress.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
   const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id))).join('');
 
   host.innerHTML = `
     <summary class='ownerDashSummary'>
-      <div><b>Create / Assign Job</b><span>Send work to a department queue or directly to a technician</span></div>
-      <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
+      <div><b>Create / Assign Job</b><span>Create a new Tech Check assignment from the current MHelpDesk ticket</span></div>
+      <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
       <div class='warn manualReferenceNotice'>
@@ -2123,17 +2159,36 @@ async function installOwnerAssignments(force = false) {
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
       <button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button>
+    </div>`;
 
-      <div class='ownerDispatchSummary'>
-        <span><b>${active.length}</b> live</span>
+  liveHost.innerHTML = `
+    <summary class='ownerDashSummary'>
+      <div><b>Live Job Progress</b><span>See what is assigned, who has it, and what is currently being worked</span></div>
+      <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
+    </summary>
+    <div class='ownerDashBody'>
+      <div class='ownerDispatchSummary ownerLiveSummary'>
+        <span><b>${assignedWaiting.length}</b> assigned / waiting</span>
+        <span><b>${inProgress.length}</b> in progress</span>
         <span><b>${itCount}</b> IT</span>
         <span><b>${svcCount}</b> Service</span>
       </div>
-      <div class='ownerActiveLabel'>Live Job Progress</div>
-      <div id='ownerAssignmentList'>${rows || "<div class='ok'><b>✓ No active assignments.</b></div>"}</div>
+
+      <div class='ownerJobStatusSection assigned'>
+        <div class='ownerActiveLabel'>Assigned / Waiting to Start</div>
+        <div id='ownerAssignedWaitingList'>${assignedRows || "<div class='ok'><b>✓ No jobs waiting to start.</b></div>"}</div>
+      </div>
+
+      <div class='ownerJobStatusSection progress'>
+        <div class='ownerActiveLabel'>In Progress</div>
+        <div id='ownerInProgressList'>${progressRows || "<div class='ok'><b>✓ No jobs currently in progress.</b></div>"}</div>
+      </div>
+
       ${doneRows ? `<details class='ownerHistoryFold'><summary>Completed in the last 24 hours <span class='pill'>${completed.length}</span></summary><div>${doneRows}</div></details>` : ''}
     </div>`;
+
   host.open = wasOpen;
+  liveHost.open = liveWasOpen || active.length > 0;
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
