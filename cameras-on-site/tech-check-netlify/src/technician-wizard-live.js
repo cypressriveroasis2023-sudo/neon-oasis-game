@@ -691,13 +691,17 @@ function ensureTotalUnitsField(ticketGrid) {
   if (!wrap) {
     wrap = document.createElement('div');
     wrap.id = 'wlTotalUnitsWrap';
-    wrap.innerHTML = `<label>Total Units for This Ticket</label><input id='wlTotalUnits' type='number' inputmode='numeric' min='1' placeholder='How many units total?'>`;
+    wrap.innerHTML = `<label>Total Units / Devices for This Ticket</label><input id='wlTotalUnits' type='number' inputmode='numeric' min='0' readonly placeholder='Choose units below'><div class='small'>Auto-calculated from the Unit Area below. Stands are separate.</div>`;
     ticketGrid.append(wrap);
   }
   return wrap;
 }
 function expectedUnitCount() {
   return Math.max(0, Math.floor(Number(document.getElementById('wlTotalUnits')?.value || 0)));
+}
+function expectedPrepItemCount() {
+  const manifest=readITEquipmentManifest();
+  return equipmentManifestDeviceTotal(manifest) + equipmentManifestStandTotal(manifest);
 }
 const TICKET_PARTS = [
   { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
@@ -723,12 +727,12 @@ function ticketPartsInlineHtml(data) {
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
 }
-const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon II'];
+const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const OWNER_STAND_TYPES = ['110V Stand','Solar Stand','Solar Pole','Pole'];
 function normalizedEquipmentManifest(raw) {
   return (Array.isArray(raw) ? raw : []).map(row => ({
     category: ['device','stand','other'].includes(row?.category) ? row.category : 'other',
-    label: String(row?.label || '').trim(),
+    label: String(row?.label || '').trim() === 'Recon II' ? 'Recon 2' : String(row?.label || '').trim(),
     qty: Math.max(1, Math.floor(Number(row?.qty || 1))),
   })).filter(row => row.label);
 }
@@ -761,14 +765,59 @@ function ownerEquipmentTypeList(category) {
 function ownerEquipmentQtyGrid(category) {
   return ownerEquipmentTypeList(category).map(label => {
     const available = ownerAssignmentAssets.filter(a => a.asset_category === category && a.asset_type === label && a.availability_status === 'shop').length;
-    return `<label class='wl-owner-equipment-qty'><span>${esc(label)}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(eqLabel(label))}</span><small>${available} in shop</small><input type='number' inputmode='numeric' min='0' step='1' value='0' data-owner-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
-  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section'><div class='wl-requirement-heading'>Units / Devices</div><div class='wl-owner-equipment-grid'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section'><div class='wl-requirement-heading'>Stands</div><div class='wl-owner-equipment-grid'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Choose any stands or poles going out with this ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
 }
 function readOwnerEquipmentManifest() {
   return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
+}
+function itEquipmentQtyGrid(category, data=[]) {
+  const rows=normalizedEquipmentManifest(data);
+  const types=category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
+  return types.map(label => {
+    const qty=rows.find(row => row.category===category && row.label===label)?.qty || 0;
+    return `<label class='wl-owner-equipment-qty'><span>${esc(eqLabel(label))}</span><input type='number' inputmode='numeric' min='0' step='1' value='${qty}' data-it-equipment-qty data-category='${category}' data-label='${esc(label)}'></label>`;
+  }).join('');
+}
+function itEquipmentManifestInputsHtml(data=[]) {
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose exactly what is going out for this MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('device',data)}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Stands are counted separately from the unit/device count.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('stand',data)}</div></div></div>`;
+}
+function readITEquipmentManifest() {
+  return [...document.querySelectorAll('#wlITEquipmentWrap [data-it-equipment-qty]')].map(input => ({
+    category: input.dataset.category || 'other',
+    label: input.dataset.label || '',
+    qty: cleanPartQty(input.value),
+  })).filter(row => row.label && row.qty > 0);
+}
+function equipmentManifestKey(raw) {
+  return normalizedEquipmentManifest(raw).map(row => row.category+'|'+row.label+'|'+row.qty).sort().join('||');
+}
+function syncITEquipmentCounts() {
+  const manifest=readITEquipmentManifest();
+  const unitCount=equipmentManifestDeviceTotal(manifest);
+  const standCount=equipmentManifestStandTotal(manifest);
+  const total=document.getElementById('wlTotalUnits');
+  if (total) total.value=String(unitCount);
+  const summary=document.getElementById('wlITEquipmentCountSummary');
+  if (summary) summary.innerHTML=`<b>${unitCount}</b> unit/device${unitCount===1?'':'s'} · <b>${standCount}</b> stand/pole${standCount===1?'':'s'} · <b>${unitCount+standCount}</b> total equipment item${unitCount+standCount===1?'':'s'}`;
+}
+function ensureITEquipmentManifestFields(ticketGrid) {
+  if (!ticketGrid) return null;
+  let wrap=document.getElementById('wlITEquipmentWrap');
+  if (!wrap) {
+    wrap=document.createElement('div');
+    wrap.id='wlITEquipmentWrap';
+    wrap.className='wl-ticket-parts-setup wl-it-equipment-setup';
+    wrap.style.gridColumn='1 / -1';
+    ticketGrid.append(wrap);
+  }
+  wrap.innerHTML=`<div class='qtext'>Equipment Going Out</div><div class='small'>Select the exact units/devices and stands being sent for this ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div>`;
+  wrap.querySelectorAll('[data-it-equipment-qty]').forEach(input => input.addEventListener('input', syncITEquipmentCounts));
+  syncITEquipmentCounts();
+  return wrap;
 }
 function ensureTicketPartsFields(ticketGrid) {
   if (!ticketGrid) return null;
