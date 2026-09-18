@@ -2609,6 +2609,29 @@ function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
   return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
 }
+function ownerAIMorningReadiness(a,prep=null){
+  const m=a?.equipment_manifest||prep?.equipment_manifest||{},dev=m.devices||{},stands=m.stands||{},parts=m.parts||{};
+  const count=(obj,key)=>Number(obj?.[key]||0), issues=[], checks=[];
+  const spotters=count(dev,'solar_spotter'),rangers=count(dev,'ranger'),helios=count(dev,'helios');
+  const standQty=Object.entries(stands).filter(([k])=>/solar.?stand/i.test(k)).reduce((n,[,v])=>n+Number(v||0),0);
+  const batteries=Number(a?.battery_replacement_qty||prep?.battery_replacement_qty||parts.battery_replacement||0);
+  const panels=Number(a?.solar_panel_qty||prep?.solar_panel_qty||parts.solar_panel||0);
+  checks.push({ok:!!String(a?.ticket_no||'').trim(),t:'MHelpDesk reference'});
+  checks.push({ok:!!String(a?.site||'').trim(),t:'Customer / site'});
+  if(spotters){checks.push({ok:standQty>=spotters,t:spotters+' Solar Spotter → '+spotters+' Solar Stand required'});checks.push({ok:batteries>=spotters*4,t:(spotters*4)+' batteries required for Solar Spotter stand checkout'});}
+  if(rangers)checks.push({ok:panels>=rangers,t:rangers+' Ranger → at least '+rangers+' solar panel required'});
+  if(helios)checks.push({ok:true,t:helios+' Helios → verify Cerbo/MPPT Service proof + IT camera/modem/ports flow'});
+  const dual=['it_service','service_it'].includes(String(a?.assignment_flow||a?.department_flow||a?.assigned_department||''));
+  if(String(a?.work_type||'').toLowerCase()==='pickup')checks.push({ok:a?.assigned_role==='service'||dual,t:'Pickup begins with Service, then IT Intake'});
+  else if(a?.requires_it_handoff)checks.push({ok:true,t:'IT handoff required before Service verification'});
+  checks.forEach(x=>{if(!x.ok)issues.push(x.t)});
+  return {checks,issues,ready:issues.length===0};
+}
+function ownerAIMorningReadinessHtml(states){
+  if(!states.length)return "<div class='wl-ai-good top8'>✓ No jobs scheduled for tomorrow.</div>";
+  const rows=states.map(({a})=>{const x=ownerAIMorningReadiness(a);return `<details class='wl-morning-job ${x.ready?'ready':'attention'}'><summary><span>#${esc(a.ticket_no||'—')} · ${esc(a.site||'No site')}</span><b>${x.ready?'✓ READY':'⚠ '+x.issues.length+' CHECK'}</b></summary><div>${x.checks.map(v=>`<div class='${v.ok?'ok':'bad'}'>${v.ok?'✓':'⚠'} ${esc(v.t)}</div>`).join('')}</div></details>`}).join('');
+  return `<details class='wl-morning-readiness' open><summary><span>🌅 Morning Readiness Check</span><span class='pill'>${states.filter(x=>!ownerAIMorningReadiness(x.a).ready).length} NEED REVIEW</span></summary><div><div class='small'>Preparation check for tomorrow's MHelpDesk jobs. This is advisory; technicians still physically verify equipment.</div>${rows}</div></details>`;
+}
 function ownerAINotificationKey(a,s){return String(a?.id||a?.ticket_no||'')+':'+String(s?.detail||s?.label||'attention');}
 let ownerAIAckRows=[];
 function ownerAIIsAcknowledged(a,s){const id=String(a?.id||a?.ticket_no||''),key=ownerAINotificationKey(a,s);return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key);}
@@ -2760,6 +2783,7 @@ async function installOwnerAssignments(force = false) {
         ${outstandingAlerts.length?`<div class='wl-ai-warn top8'><b>Still needs attention:</b><br>${outstandingAlerts.slice(0,6).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>`:`<div class='wl-ai-good top8'>✓ No outstanding AI alerts.</div>`}
         </div>
         <div class='hidden' data-owner-ai-day-panel='tomorrow'>
+          ${ownerAIMorningReadinessHtml(tomorrowStates)}
           <div class='wl-owner-ai-daily-counts'><div><b>${tomorrowJobs.length}</b><span>Jobs tomorrow</span></div><div class='${tomorrowStates.filter(x=>x.s.state==='attention').length?'attention':''}'><b>${tomorrowStates.filter(x=>x.s.state==='attention').length}</b><span>Need attention</span></div><div><b>${tomorrowJobs.filter(a=>a.assigned_role==='it').length}</b><span>IT assignments</span></div><div><b>${tomorrowJobs.filter(a=>a.assigned_role==='service').length}</b><span>Service assignments</span></div></div>
           ${tomorrowJobs.length?`<div class='wl-owner-ai-tomorrow-list'>${tomorrowStates.map(x=>`<div class='${x.s.state==='attention'?'attention':''}'><div><b>#${esc(x.a.ticket_no||'—')} · ${esc(x.a.site||'No site')}</b><span>${esc(x.a.assigned_role==='it'?'IT':'Service')} · ${esc(x.a.assignee_name||x.a.assigned_to_name||(x.a.assignment_scope==='department'?'Department Queue':'Unassigned'))}</span></div><div><b>${x.s.state==='attention'?'⚠ REVIEW':'✓ READY'}</b><span>${esc(x.s.detail||'No setup conflict detected')}</span></div></div>`).join('')}</div>`:`<div class='wl-ai-good top8'>✓ No Tech Check jobs are assigned for tomorrow.</div>`}
         </div>
