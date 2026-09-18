@@ -2611,6 +2611,8 @@ async function installOwnerAssignments(force = false) {
 
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
+  const aiStates=active.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
+  const aiAttention=aiStates.filter(x=>x.s.state==='attention').length, aiWaiting=aiStates.filter(x=>x.s.state==='waiting').length, aiWorking=aiStates.filter(x=>x.s.state==='working').length, aiOnTrack=aiStates.filter(x=>x.s.state==='healthy').length;
   const assignedRows = assignedWaiting.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const progressRows = inProgress.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
@@ -2668,6 +2670,7 @@ async function installOwnerAssignments(force = false) {
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
+      <div class='wl-owner-ai-overview'><div class='wl-owner-ai-overview-head'><span>✨ AI Operations Overview</span><b>${aiAttention ? aiAttention+' NEED ATTENTION' : 'NO AI ALERTS'}</b></div><div class='wl-owner-ai-counts'><div class='attention'><b>${aiAttention}</b><span>Need attention</span></div><div class='waiting'><b>${aiWaiting}</b><span>Waiting normally</span></div><div class='working'><b>${aiWorking}</b><span>In progress</span></div><div class='healthy'><b>${aiOnTrack}</b><span>On track</span></div></div>${aiAttention ? `<div class='wl-ai-warn top8'><b>Owner review recommended:</b><br>${aiStates.filter(x=>x.s.state==='attention').slice(0,4).map(x=>'#'+esc(x.a.ticket_no||'—')+' — '+esc(x.s.detail)).join('<br>')}</div>` : `<div class='wl-ai-good top8'>✓ No active jobs have an AI-detected setup conflict.</div>`}</div>
       <div class='ownerDispatchSummary ownerLiveSummary'>
         <span><b>${assignedWaiting.length}</b> assigned / waiting</span>
         <span><b>${inProgress.length}</b> in progress</span>
