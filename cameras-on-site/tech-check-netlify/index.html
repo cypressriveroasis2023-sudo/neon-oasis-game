@@ -246,83 +246,113 @@
         </section>
 
         <section id="view-owner" class="hidden">
-          <div id="ownerJobAssignments" class="card">
-            <div class="sectiontitle"><div><h2>Send Job to Tech</h2><div class="small">Send an internal Tech Check assignment to an IT or Service technician using MHelpDesk details you enter manually. MHelpDesk remains separate.</div></div><span class="pill">OWNER</span></div>
-            <div class="small top8">Loading active technicians and assignments…</div>
-          </div>
-          <div id="ownerAttentionCard" class="card ownerAttentionCard">
-            <div class="sectiontitle"><div><h2>Needs Attention</h2><div class="small">Your live control center for work that is waiting, blocked, overdue, or needs an Owner action.</div></div><span id="ownerAttentionBadge" class="pill">0</span></div>
-            <div id="ownerAttention"></div>
-          </div>
-          <div class="card">
-            <div class="sectiontitle"><div><h2>Unit Status & Search</h2><div class="small">Search by unit tag, MHelpDesk ticket, equipment type, current status, or last technician. The app blocks the same unit from being active in conflicting workflows.</div></div><span class="pill">LIVE</span></div>
-            <input id="ownerUnitSearch" type="search" placeholder="Search Unit 008, MHelpDesk #, Helios, deployed…" oninput="renderOwnerUnitSearch()" />
-            <div id="ownerUnitSearchResults"></div>
-          </div>
-          <div class="card">
-            <div class="sectiontitle">
-              <h2>Active Equipment Handoffs</h2>
-              <span class="pill">Owner</span>
+          <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
+            <summary class="ownerDashSummary">
+              <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
+              <span id="ownerAssignmentBadge" class="ownerDashBadge">0</span>
+            </summary>
+            <div class="ownerDashBody"><div class="small">Loading active technicians and assignments…</div></div>
+          </details>
+
+          <details id="ownerAttentionCard" class="card ownerDashSection ownerAttentionCard">
+            <summary class="ownerDashSummary">
+              <div><b>Needs Attention</b><span>Owner actions, blocked work, and overdue items</span></div>
+              <span id="ownerAttentionBadge" class="ownerDashBadge">0</span>
+            </summary>
+            <div class="ownerDashBody"><div id="ownerAttention"></div></div>
+          </details>
+
+          <details id="ownerUnitStatusCard" class="card ownerDashSection">
+            <summary class="ownerDashSummary">
+              <div><b>Unit Status & Search</b><span>Find a unit, ticket, status, or last technician</span></div>
+              <span id="ownerUnitStatusBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <input id="ownerUnitSearch" type="search" placeholder="Search Unit 008, MHelpDesk #, Helios, deployed…" oninput="renderOwnerUnitSearch()" />
+              <div id="ownerUnitSearchResults"></div>
             </div>
-            <div id="ownerPrepSummary"></div><div id="ownerPrepStatus"></div><details class="ownerHistoryFold"><summary>Completed Equipment History <span id="ownerPrepHistoryCount" class="pill">0</span></summary><div id="ownerPrepHistory"></div></details>
-          </div>
-          <div class="card">
-            <h2>Recent Activity</h2>
-            <div class="small">The newest technician activity appears first. Use Show More only when you need older records.</div>
-            <div id="reports"></div>
-            <button id="ownerReportsMore" class="mini top8 hidden" type="button">Show More Activity</button>
-          </div>
-          <div class="card">
-            <h2>Technician Accounts</h2>
-            <div class="small">
-              Only the Owner can create or change technician access. Techs sign
-              in with their own username and password. No company email address
-              is required.
+          </details>
+
+          <details id="ownerHandoffsCard" class="card ownerDashSection">
+            <summary class="ownerDashSummary">
+              <div><b>Equipment Handoffs</b><span>IT prep, Service checkout, and completed history</span></div>
+              <span id="ownerHandoffsBadge" class="ownerDashBadge">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div id="ownerPrepSummary"></div>
+              <div id="ownerPrepStatus"></div>
+              <details class="ownerHistoryFold"><summary>Completed Equipment History <span id="ownerPrepHistoryCount" class="pill">0</span></summary><div id="ownerPrepHistory"></div></details>
             </div>
-            <h3>Create Technician</h3>
-            <div class="grid4">
-              <div>
-                <label>Full Name</label
-                ><input id="newTechName" placeholder="Technician name" />
-              </div>
-              <div>
-                <label>Username</label
-                ><input
-                  id="newTechUsername"
-                  type="text"
-                  autocapitalize="none"
-                  spellcheck="false"
-                  placeholder="Username"
-                />
-              </div>
-              <div>
-                <label>Role</label
-                ><select id="newTechRole">
-                  <option value="service">Service Tech</option>
-                  <option value="it">IT Technician</option>
-                </select>
-              </div>
-              <div>
-                <label>Temporary Password</label
-                ><input
-                  id="newTechPassword"
-                  type="password"
-                  placeholder="8+ characters"
-                />
-              </div>
+          </details>
+
+          <details id="ownerActivityCard" class="card ownerDashSection">
+            <summary class="ownerDashSummary">
+              <div><b>Recent Activity</b><span>Newest technician activity and reports</span></div>
+              <span id="ownerActivityBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div class="small">The newest technician activity appears first. Use Show More only when you need older records.</div>
+              <div id="reports"></div>
+              <button id="ownerReportsMore" class="mini top8 hidden" type="button">Show More Activity</button>
             </div>
-            <button class="btn" onclick="createTech()">
-              Create Technician Login
-            </button>
-            <div id="userMessage"></div>
-            <div class="sep"></div>
-            <h3>Password Reset Requests</h3>
-            <div class="small">Techs can request a reset without exposing a private password. Approve a request and the system will issue a one-time temporary password back to the requesting device.</div>
-            <div id="passwordResetRequests"></div>
-            <div class="sep"></div>
-            <h3>Current Users</h3>
-            <div id="userList"></div>
-          </div>
+          </details>
+
+          <details id="ownerAccountsCard" class="card ownerDashSection">
+            <summary class="ownerDashSummary">
+              <div><b>Technician Accounts</b><span>Create logins, manage access, and review resets</span></div>
+              <span id="ownerAccountsBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div class="small">
+                Only the Owner can create or change technician access. Techs sign
+                in with their own username and password. No company email address
+                is required.
+              </div>
+              <h3>Create Technician</h3>
+              <div class="grid4">
+                <div>
+                  <label>Full Name</label
+                  ><input id="newTechName" placeholder="Technician name" />
+                </div>
+                <div>
+                  <label>Username</label
+                  ><input
+                    id="newTechUsername"
+                    type="text"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    placeholder="Username"
+                  />
+                </div>
+                <div>
+                  <label>Role</label
+                  ><select id="newTechRole">
+                    <option value="service">Service Tech</option>
+                    <option value="it">IT Technician</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Temporary Password</label
+                  ><input
+                    id="newTechPassword"
+                    type="password"
+                    placeholder="8+ characters"
+                  />
+                </div>
+              </div>
+              <button class="btn" onclick="createTech()">
+                Create Technician Login
+              </button>
+              <div id="userMessage"></div>
+              <div class="sep"></div>
+              <h3>Password Reset Requests</h3>
+              <div class="small">Techs can request a reset without exposing a private password. Approve a request and the system will issue a one-time temporary password back to the requesting device.</div>
+              <div id="passwordResetRequests"></div>
+              <div class="sep"></div>
+              <h3>Current Users</h3>
+              <div id="userList"></div>
+            </div>
+          </details>
         </section>
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
