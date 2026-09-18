@@ -764,7 +764,7 @@ function equipmentManifestInlineHtml(data) {
   const devices = rows.filter(r => r.category === 'device');
   const stands = rows.filter(r => r.category === 'stand');
   const other = rows.filter(r => r.category === 'other');
-  const group = (title,list) => list.length ? `<div class='wl-manifest-group'><b>${esc(title)}</b><div class='wl-parts-chips'>${list.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : '';
+  const group = (title,list) => list.length ? `<div class='wl-manifest-group'><b>${esc(title)}</b><div class='wl-parts-chips'>${list.map(row => `<span><b>${row.qty}</b> × ${esc(equipmentDisplayLabel(row.label))}</span>`).join('')}</div></div>` : '';
   return `<div class='wl-equipment-manifest'><div class='wl-manifest-title'>Equipment Required From Shelf</div>${group('Units / Devices',devices)}${group('Stands',stands)}${group('Other Equipment',other)}</div>`;
 }
 function ownerEquipmentTypeList(category) {
@@ -1716,9 +1716,9 @@ document.addEventListener('click', async e => {
     if (typeof window.refreshData === 'function') await window.refreshData();
     return;
   }
-  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') showNewPrep(0); if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
+  const it = e.target.closest('[data-wl-it]'); if (it) { if (it.dataset.wlIt === 'new') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; const t=document.getElementById('itTicket'); const s=document.getElementById('itSite'); if(t)t.value=''; if(s)s.value=''; fillTicketPartInputs({},'wlPart'); showNewPrep(0); } if (it.dataset.wlIt === 'pending') showPendingList(); if (it.dataset.wlIt === 'history') showITStatus(); return; }
   if (e.target.closest("[data-wl-home='it']")) return showITHome(); if (e.target.closest("[data-wl-home='svc']")) return showSvcHome();
-  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') showITHome(); else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
+  const cr = e.target.closest('[data-wl-create]'); if (cr) { if (cr.dataset.wlCreate === 'prev') { pendingAssignmentLinkId=null; pendingAssignmentManifest=[]; showITHome(); } else if (validateCreateStep()) await createPrepAndStartChecks(); return; }
   const openIt = e.target.closest('[data-wl-open-it]'); if (openIt) return showItPrep(openIt.dataset.wlOpenIt);
   const countMinus = e.target.closest('[data-wl-count-minus]'); if (countMinus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) - 1)); return; }
   const countPlus = e.target.closest('[data-wl-count-plus]'); if (countPlus) { const input = document.getElementById('wlUnitCountEdit'); if (input) input.value = String(Math.max(1, Number(input.value || 1) + 1)); return; }
