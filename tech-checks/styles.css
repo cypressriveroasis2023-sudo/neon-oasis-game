@@ -922,3 +922,64 @@ select {
     width: 100%;
   }
 }
+
+
+/* Owner dispatch / manual MHelpDesk reference polish */
+.ownerDispatchCard {
+  border-color: #cfd9e2;
+}
+.manualReferenceNotice {
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.ownerDispatchButton {
+  margin-top: 12px;
+  width: 100%;
+}
+.ownerDispatchSummary {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.ownerDispatchSummary span {
+  display: block;
+  border: 1px solid #dbe3ea;
+  border-radius: 12px;
+  background: #f8fafb;
+  padding: 10px;
+  color: #657483;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ownerDispatchSummary b {
+  display: block;
+  color: #152334;
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.wl-assignment-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.wl-assignment-main .row {
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.wl-assignment-main .small {
+  margin-top: 3px;
+}
+@media (max-width: 680px) {
+  .ownerDispatchCard .grid {
+    gap: 8px;
+  }
+  .ownerDispatchSummary {
+    grid-template-columns: repeat(3,minmax(0,1fr));
+  }
+  .ownerDispatchSummary span {
+    padding: 9px 7px;
+    text-align: center;
+  }
+}
