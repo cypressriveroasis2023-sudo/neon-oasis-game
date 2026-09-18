@@ -1588,12 +1588,38 @@ async function serviceFindJobByTicket(){
   if(error)return alert(error.message);
   let a=(data||[]).find(x=>x.assignee_user_id===tech.id)||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
   if(!a){if(msg)msg.innerHTML='<span class="bad">No available Service job matches MHelpDesk #'+esc(ticket)+'. Check the ticket number or ask the Owner to assign it.</span>';return;}
-  const gate=await assignmentGateState(a); if(!gate.ready){if(msg)msg.innerHTML='<span class="warn"><b>'+esc(gate.label)+'</b><br>'+esc(gate.detail)+'</span>';return;}
+  const gate=await assignmentGateState(a);
+  const manifest=equipmentManifestInlineHtml(a);
+  const summary=`<div class='wl-service-ticket-preview'>
+    <div class='wl-next-kicker'>TICKET FOUND — VERIFY BEFORE TAKING JOB</div>
+    <div class='wl-preview-title'>MHelpDesk #${esc(a.ticket_no)}</div>
+    <div class='wl-preview-grid'>
+      <div><span>Customer / Site</span><b>${esc(a.site||'Not listed')}</b></div>
+      <div><span>Job Type</span><b>${esc(String(a.work_type||'Service').toUpperCase())}</b></div>
+      <div><span>Work Date</span><b>${esc(a.work_date||'Not listed')}</b></div>
+      <div><span>Status</span><b>${gate.ready?'Ready for Service':esc(gate.label)}</b></div>
+    </div>
+    ${a.job_description?`<div class='wl-preview-section'><span>What is being done</span><b>${esc(a.job_description)}</b></div>`:''}
+    ${a.owner_notes?`<div class='wl-preview-section'><span>Owner Notes</span><div>${esc(a.owner_notes)}</div></div>`:''}
+    ${manifest||''}
+    ${!gate.ready?`<div class='warn top10'><b>${esc(gate.label)}</b><br>${esc(gate.detail)}</div>`:''}
+    <div class='wl-preview-confirm top10'><div><b>Is this the correct MHelpDesk job?</b><div class='small'>Nothing is claimed or changed until you choose Take This Job.</div></div>
+    <button class='wl-blue' data-wl-service-take-job='${a.id}' ${gate.ready?'':'disabled'}>✓ Take This Job</button></div>
+  </div>`;
+  if(msg)msg.innerHTML=summary;
+  return;
+}
+async function serviceTakeVerifiedJob(id){
+  const {data:rows,error}=await liveDb.from('job_assignments').select('*').eq('id',id).eq('assigned_role','service').limit(1);
+  if(error)return alert(error.message); const a=rows?.[0]; if(!a)return alert('This Service job is no longer available.');
+  const gate=await assignmentGateState(a); if(!gate.ready)return alert(gate.label+'\n\n'+gate.detail);
+  const tech=await currentTechIdentity().catch(()=>null); if(!tech?.id)return alert('Active Service Tech account required.');
+  if(a.assignee_user_id&&a.assignee_user_id!==tech.id)return alert('This ticket has already been assigned to another Service Tech.');
   if(!a.assignee_user_id&&a.assignment_scope==='department'){
-    const {error:claimError}=await liveDb.rpc('claim_my_department_assignment',{p_assignment_id:a.id});
+    const {error:claimError}=await liveDb.rpc('claim_my_department_assignment',{p_assignment_id:id});
     if(claimError)return alert(claimError.message||'Another Service Tech already claimed this ticket.');
   }
-  return startAssignedJob(a.id);
+  return startAssignedJob(id);
 }
 async function showReceiveLookup() {
   let card = document.getElementById('wlSvcLookup'); if (!card) { card = document.createElement('div'); card.id = 'wlSvcLookup'; card.className = 'card'; viewSvc().append(card); }
@@ -2185,6 +2211,8 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-find-job]')) return serviceFindJobByTicket();
+  const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
+  if(takeServiceJob) return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob);
   if (e.target.closest('[data-wl-match]')) return matchSvcTicket();
   const svcTicket = e.target.closest('[data-wl-svc-ticket]');
   if (svcTicket) { if (svcTicket.dataset.wlSvcTicket === 'wrong') { activeSvcPrep = null; return showReceiveLookup(); } return renderSvcPrep(); }
