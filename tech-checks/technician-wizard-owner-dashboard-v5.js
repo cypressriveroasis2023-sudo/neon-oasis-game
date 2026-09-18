@@ -2489,7 +2489,7 @@ async function installOwnerAssignments(force = false) {
       </div>
       <div class='grid top10'>
         <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='both'>IT + Service Departments</option></select></div>
-        <div><label>Assign Technician(s)</label><select id='ownerAssignTech' multiple size='4'>${ownerAssignmentTechOptions('it')}</select><div id='ownerAssignTechHint' class='small'>Select one or more IT technicians. Leave all unselected to send it to the IT Department queue.</div></div>
+        <div><label>Technicians</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='btn' id='ownerAddTech'>＋ Add Tech</button></div><div id='ownerAssignTechHint' class='small'>Add one or more IT technicians. If you add nobody, it goes to the IT Department queue.</div></div>
       </div>
       <label class='top10'>Owner Notes <span class='small'>(optional)</span></label>
       <input id='ownerAssignNotes' placeholder='Anything else the tech should know'>
@@ -2527,19 +2527,32 @@ async function installOwnerAssignments(force = false) {
   refreshOwnerAutoServicePlan();
   refreshOwnerWorkTypeLabels();
 }
+function addOwnerTechPill() {
+  const select=document.getElementById('ownerAssignTech'); const pills=document.getElementById('ownerAssignedTechPills');
+  const id=select?.value || ''; if (!id || !pills) return;
+  if (pills.querySelector(`[data-tech-id="${CSS.escape(id)}"]`)) { select.value=''; return; }
+  const label=select.options[select.selectedIndex]?.textContent?.trim() || 'Technician';
+  const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id;
+  pill.innerHTML=`<span>${esc(label)}</span><button type="button" data-remove-tech aria-label="Remove ${esc(label)}">×</button>`;
+  pills.appendChild(pill); select.value='';
+}
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const select = document.getElementById('ownerAssignTech');
   const hint = document.getElementById('ownerAssignTechHint');
   if (!select) return;
+  const pills = document.getElementById('ownerAssignedTechPills');
+  if (pills) pills.innerHTML = '';
   if (role === 'both') {
-    select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
+    select.innerHTML = `<option value=''>Both Department Queues</option>`;
     select.disabled = true;
+    const add = document.getElementById('ownerAddTech'); if (add) add.disabled = true;
     if (hint) hint.textContent = 'This sends one linked assignment to each department queue. A technician from each department can claim their side.';
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
-    if (hint) hint.textContent = `Select one or more ${role === 'it' ? 'IT' : 'Service'} technicians. Leave all unselected to send it to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
+    const add = document.getElementById('ownerAddTech'); if (add) add.disabled = false;
+    if (hint) hint.textContent = `Add one or more ${role === 'it' ? 'IT' : 'Service'} technicians. If you add nobody, it goes to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
   }
   document.getElementById('ownerAssignParts')?.classList.remove('hidden');
   refreshOwnerWorkTypeLabels();
@@ -2591,7 +2604,7 @@ async function ownerAssignJob() {
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
   const techSelect = document.getElementById('ownerAssignTech');
-  const assignees = role === 'both' ? [] : [...(techSelect?.selectedOptions || [])].map(o => o.value).filter(Boolean);
+  const assignees = role === 'both' ? [] : [...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')].map(el => el.dataset.techId).filter(Boolean);
   const assignee = assignees[0] || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
@@ -2764,6 +2777,8 @@ document.addEventListener('click', async e => {
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
 document.addEventListener('change', e => {
+  if (e.target?.id === 'ownerAddTech') { e.preventDefault(); addOwnerTechPill(); }
+  if (e.target?.matches?.('[data-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); }
   if (e.target?.id === 'ownerAssignRole') refreshOwnerAssignmentTechOptions();
   if (e.target?.id === 'ownerAssignWorkType') { refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
