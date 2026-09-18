@@ -1829,3 +1829,57 @@ select {
     flex-direction: column;
   }
 }
+
+
+/* Distinct Unit / Stand areas for Owner and IT job setup */
+.wl-requirement-section.unitArea {
+  border: 1px solid #c9ddeb;
+  border-left: 5px solid #2b6f9f;
+  border-radius: 13px;
+  padding: 12px;
+  background: #f3f8fc;
+}
+.wl-requirement-section.standArea {
+  border: 1px solid #dacdea;
+  border-left: 5px solid #7350a1;
+  border-radius: 13px;
+  padding: 12px;
+  background: #f8f4fc;
+}
+.wl-requirement-section.unitArea + .wl-requirement-section.standArea {
+  margin-top: 10px;
+}
+.wl-it-equipment-setup {
+  margin-top: 10px;
+}
+.wl-equipment-count-summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #eef3f6;
+  border: 1px solid #d2dde5;
+  color: #526472;
+  font-size: 13px;
+}
+.wl-equipment-count-summary b {
+  color: #142d42;
+  font-size: 17px;
+}
+.wl-count-readonly {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d5dfe6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f7f9fb;
+}
+.wl-count-readonly b {
+  font-size: 22px;
+  color: #122a40;
+}
+.wl-count-readonly span {
+  color: #667684;
+  font-size: 12px;
+  font-weight: 700;
+}
