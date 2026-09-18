@@ -1200,3 +1200,322 @@ select {
     padding: 14px 14px 18px;
   }
 }
+
+
+/* Owner management — clearer hierarchy, team roles, and equipment inventory */
+#view-owner {
+  --owner-panel: #ffffff;
+  --owner-soft: #f4f7f9;
+  --owner-line: #cfd9e2;
+}
+#view-owner .ownerDashSection {
+  background: var(--owner-panel);
+  border: 1px solid #c9d4dd;
+  box-shadow: 0 8px 24px rgba(12,32,49,.08);
+}
+#view-owner .ownerDashSummary {
+  background: #f6f8fa;
+}
+#view-owner .ownerDispatchCard > .ownerDashSummary { background: #eef4f8; border-left: 6px solid #0b2a3f; }
+#view-owner .ownerAttentionCard > .ownerDashSummary { background: #fff2f2; border-left: 6px solid #d20b12; }
+#view-owner #ownerUnitStatusCard > .ownerDashSummary { background: #f0f5fa; border-left: 6px solid #47708f; }
+#view-owner .ownerEquipmentCard > .ownerDashSummary { background: #eef8f4; border-left: 6px solid #237457; }
+#view-owner #ownerHandoffsCard > .ownerDashSummary { background: #f5f1fb; border-left: 6px solid #7350a1; }
+#view-owner #ownerActivityCard > .ownerDashSummary { background: #f4f6f8; border-left: 6px solid #596b7a; }
+#view-owner .ownerTeamCard > .ownerDashSummary { background: #fff7eb; border-left: 6px solid #b76a00; }
+
+.ownerInnerSection {
+  border: 1px solid #d6e0e7;
+  border-radius: 14px;
+  background: #f8fafb;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.ownerInnerSection > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 15px;
+  font-weight: 950;
+  color: #183047;
+  background: #eef3f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ownerInnerSection > summary::-webkit-details-marker { display: none; }
+.ownerInnerSection > summary::after {
+  content: '›';
+  font-size: 22px;
+  color: #637483;
+  transition: transform .15s ease;
+}
+.ownerInnerSection[open] > summary::after { transform: rotate(90deg); }
+.ownerInnerBody {
+  padding: 14px;
+  background: #fff;
+  border-top: 1px solid #dce4ea;
+}
+.ownerTeamIntro,
+.ownerEquipmentIntro {
+  border: 1px solid #cdd9e1;
+  border-radius: 13px;
+  padding: 13px 14px;
+  background: #f6f9fb;
+}
+.ownerTeamIntro > b,
+.ownerEquipmentIntro > b {
+  display: block;
+  color: #10283c;
+  font-size: 16px;
+  margin-bottom: 3px;
+}
+.ownerTeamStats,
+.ownerEquipmentStats {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.ownerEquipmentStats { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.ownerTeamStats span,
+.ownerEquipmentStats span {
+  border: 1px solid #d7e0e7;
+  border-radius: 12px;
+  background: #f7f9fb;
+  padding: 10px;
+  color: #647585;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ownerTeamStats b,
+.ownerEquipmentStats b {
+  display: block;
+  color: #142b3f;
+  font-size: 21px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.teamMemberCard {
+  border: 1px solid #d6e0e7;
+  border-left-width: 6px;
+  border-radius: 13px;
+  overflow: hidden;
+  margin-top: 10px;
+  background: #fff;
+}
+.teamMemberCard.role-it { border-left-color: #315f9a; }
+.teamMemberCard.role-service { border-left-color: #1f7a5a; }
+.teamMemberCard.role-owner { border-left-color: #b76a00; }
+.teamMemberCard.role-pending { border-left-color: #7f8994; }
+.teamMemberCard > summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 13px 14px;
+  background: #f9fbfc;
+}
+.teamMemberCard > summary::-webkit-details-marker { display:none; }
+.teamMemberIdentity { min-width:0; }
+.teamMemberIdentity b {
+  display:block;
+  color:#12283b;
+  font-size:17px;
+}
+.teamMemberIdentity span {
+  display:block;
+  color:#6a7987;
+  font-size:12px;
+  margin-top:2px;
+}
+.teamMemberBadges {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  justify-content:flex-end;
+}
+.roleBadge.it { background:#e8f0fb; color:#28558e; }
+.roleBadge.service { background:#e8f7f0; color:#176344; }
+.roleBadge.owner { background:#fff0d7; color:#8b5100; }
+.roleBadge.pending { background:#edf0f3; color:#596774; }
+.teamMemberBody {
+  padding:14px;
+  border-top:1px solid #e1e7ec;
+}
+.teamEditGrid {
+  display:grid;
+  grid-template-columns:1.3fr 1fr .8fr auto;
+  gap:8px;
+  align-items:end;
+}
+.teamSaveCell .mini { min-height:44px; }
+.accountSecurityFold,
+.equipmentHistoryFold {
+  margin-top:10px;
+  border:1px solid #dce4ea;
+  border-radius:10px;
+  background:#f7f9fb;
+  overflow:hidden;
+}
+.accountSecurityFold > summary,
+.equipmentHistoryFold > summary {
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:850;
+  color:#536575;
+}
+.accountSecurityBody,
+.equipmentHistoryFold > div {
+  padding:11px 12px;
+  border-top:1px solid #e1e7ec;
+  background:#fff;
+}
+.archivedTeamCard {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px;
+  border:1px solid #d9e0e5;
+  border-radius:12px;
+  background:#f5f7f8;
+  margin-top:8px;
+  opacity:.92;
+}
+.teamHistoryRow {
+  padding:10px 0;
+  border-bottom:1px solid #e5eaee;
+}
+.teamHistoryRow:last-child { border-bottom:0; }
+.teamHistoryRow > div:first-child {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+.teamHistoryRow > div:first-child span {
+  font-size:11px;
+  font-weight:900;
+  color:#6a7784;
+}
+
+.ownerEquipmentAdd {
+  display:grid;
+  grid-template-columns:1fr 1.2fr .8fr 1.4fr auto;
+  gap:8px;
+  align-items:end;
+  margin-top:12px;
+  padding:12px;
+  border:1px solid #cfe0d9;
+  border-radius:13px;
+  background:#f4faf7;
+}
+.ownerEquipmentAdd .btn {
+  width:auto;
+  min-width:140px;
+  margin:0;
+}
+.ownerEquipmentFilters {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin:12px 0;
+}
+.ownerEquipmentFilters button {
+  border:1px solid #ccd8e0;
+  border-radius:999px;
+  background:#f2f5f7;
+  color:#5b6b79;
+  padding:8px 12px;
+  font-weight:850;
+  cursor:pointer;
+}
+.ownerEquipmentFilters button.on {
+  background:#0b2a3f;
+  color:#fff;
+  border-color:#0b2a3f;
+}
+.ownerEquipmentList {
+  display:grid;
+  gap:9px;
+}
+.equipmentAssetCard {
+  border:1px solid #d2dde4;
+  border-left:6px solid #39745f;
+  border-radius:13px;
+  background:#fff;
+  overflow:hidden;
+}
+.equipmentAssetCard.stand { border-left-color:#7b5aa6; }
+.equipmentAssetCard > summary {
+  list-style:none;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:13px 14px;
+  cursor:pointer;
+  background:#f8fafb;
+}
+.equipmentAssetCard > summary::-webkit-details-marker { display:none; }
+.equipmentAssetCard > summary > div b {
+  display:block;
+  color:#11283b;
+  font-size:18px;
+}
+.equipmentAssetCard > summary > div span {
+  display:block;
+  color:#687887;
+  font-size:12px;
+  margin-top:2px;
+}
+.equipmentAssetBody {
+  padding:13px 14px;
+  border-top:1px solid #e0e7ec;
+}
+.equipmentHolder {
+  margin-bottom:8px;
+  padding:9px 10px;
+  border-radius:10px;
+  background:#eef4f8;
+  color:#213a4f;
+}
+.equipmentAssignRow,
+.equipmentActionRow {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  margin-top:10px;
+}
+.equipmentActionRow { display:flex; flex-wrap:wrap; }
+.inventoryHistoryRow {
+  display:grid;
+  gap:2px;
+  padding:8px 0;
+  border-bottom:1px solid #edf1f4;
+}
+.inventoryHistoryRow:last-child { border-bottom:0; }
+.inventoryHistoryRow span {
+  font-size:12px;
+  color:#687887;
+}
+
+@media (max-width: 780px) {
+  .teamEditGrid { grid-template-columns:1fr 1fr; }
+  .ownerEquipmentAdd { grid-template-columns:1fr 1fr; }
+  .ownerEquipmentAdd .btn { width:100%; }
+  .ownerEquipmentStats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .ownerTeamStats { grid-template-columns:1fr 1fr 1fr; }
+  .teamMemberCard > summary { align-items:flex-start; flex-direction:column; }
+  .teamMemberBadges { justify-content:flex-start; }
+  .teamEditGrid { grid-template-columns:1fr; }
+  .ownerEquipmentAdd { grid-template-columns:1fr; }
+  .equipmentAssignRow { grid-template-columns:1fr; }
+  .archivedTeamCard { align-items:flex-start; flex-direction:column; }
+  .archivedTeamCard .mini { width:100%; }
+}
