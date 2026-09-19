@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v118",
-  "service_worker": "v74",
-  "generated_for": "OnSite Vision knowledge + live context + server agent + actions + persistent conversations and managed knowledge",
+  "runtime_version": "release-qa-v120",
+  "service_worker": "v76",
+  "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -1545,7 +1545,124 @@
         "Write operations require owner-gated RPCs",
         "Anonymous users cannot execute the RPCs"
       ]
+    },
+    {
+      "id": "RULE-PARITY-01",
+      "area": "Shared Tech Check Rules",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Main Tech Check and OnSite Vision load the same shared rules before workflow code",
+      "steps": [
+        "Inspect index.html load order",
+        "Inspect onsite-vision.html load order",
+        "Inspect service-worker cache"
+      ],
+      "expected": [
+        "tech-check-rules.js rules-v2 loads before app.js",
+        "tech-check-rules.js rules-v2 loads before Company Knowledge and Workflow Engine",
+        "SW v76 caches the same rules-v2 URL"
+      ]
+    },
+    {
+      "id": "RULE-PARITY-02",
+      "area": "IT Technician",
+      "role": "it",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "IT equipment checklist and readiness use shared product rules",
+      "steps": [
+        "Open Helios Delivery IT prep",
+        "Open Ranger Delivery IT prep",
+        "Open Solar Spotter prep",
+        "Inspect checklist source"
+      ],
+      "expected": [
+        "Helios Delivery renders 31 shared IT checks",
+        "Helios ports remain Camera1 81/554/1400, Camera2 81/554/1500, PTZ 81/554/1600, Speaker 81/554/1700",
+        "Ranger includes MPPT updated, MPPT tested, and PV charging checks",
+        "Solar Spotter has no IT battery checkout requirement",
+        "Technician readiness delegates to TechCheckRules.itReady"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "RULE-PARITY-03",
+      "area": "Service Technician",
+      "role": "service",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Automatic solar checkout and evidence requirements use shared rules",
+      "steps": [
+        "Create/read a Delivery with Solar Spotter and Ranger",
+        "Open Service pre-trip",
+        "Inspect evidence requirements"
+      ],
+      "expected": [
+        "Each Solar Spotter derives one Solar Stand",
+        "Each Ranger derives one removable Solar Panel",
+        "Solar Spotter battery choice remains 4 × AGM 12V 110Ah OR 1 × 12V 350Ah per stand",
+        "Stand photo/signature, battery proof, MPPT proof, and Helios yard proof requirements come from TechCheckRules"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "RULE-PARITY-04",
+      "area": "Helios Field Install",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Helios field checklist is shared with Vision and matches live RPC contract",
+      "steps": [
+        "Inspect TechCheckRules.heliosFieldChecklist",
+        "Compare Company Knowledge shared field checklist",
+        "Compare save_my_helios_field_install_v1 pg_proc argument names"
+      ],
+      "expected": [
+        "Shared checklist contains 13 field-install checks",
+        "Vision knowledge exposes the same 13 checks",
+        "Every shared rpc_param matches a live RPC argument",
+        "Photos, Service signature, Swap OLD UNIT RETURNING requirements, and Owner final verification remain database-gated"
+      ]
+    },
+    {
+      "id": "RULE-PARITY-05",
+      "area": "IT Intake",
+      "role": "it",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "IT Intake uses the shared return-to-inventory checklist",
+      "steps": [
+        "Open returned unit in IT Intake",
+        "Inspect rendered questions",
+        "Compare Vision knowledge shared intake list"
+      ],
+      "expected": [
+        "Technician UI renders all 15 shared IT Intake checks",
+        "Vision knowledge exposes the same 15 questions",
+        "Existing return photos, damage notes, current intake photo, SIM cancellation documentation, and inventory flow remain intact"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "RULE-PARITY-06",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "edge+source",
+      "destructive": false,
+      "scenario": "Browser and deployed server agent use byte-identical shared rules/knowledge/workflow bundles",
+      "steps": [
+        "Compare GitHub content SHAs for browser and Edge Function bundle",
+        "Inspect deployed onsite-vision-agent"
+      ],
+      "expected": [
+        "tech-check-rules.js content SHA matches",
+        "Company Knowledge content SHA matches",
+        "Workflow Engine content SHA matches",
+        "Edge Function v5 is ACTIVE with JWT verification",
+        "Agent status reports shared rules version from TechCheckRules"
+      ]
     }
   ],
-  "last_release_qa_note": "Phase 5: Owner-private persistent Vision conversations, cross-device draft/context sync, Teach Vision managed knowledge with Draft/Approved/Retired lifecycle and version history, server agent v3 managed-knowledge grounding, Vision v14, SW v74."
+  "last_release_qa_note": "Phase 6: shared TechCheckRules v2 now drives technician equipment normalization, IT checklists/readiness, Solar Spotter/Ranger automatic Service plan, Service evidence requirements, Helios field install, and IT Intake; Vision Company Knowledge v3 and Workflow Engine v3 consume the same runtime; agent v5 carries byte-identical bundles; release v120 / Vision v16 / SW v76."
 }
