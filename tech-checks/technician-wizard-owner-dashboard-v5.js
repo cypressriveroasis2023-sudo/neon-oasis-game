@@ -4118,27 +4118,35 @@ function wrapCreatePrep() {
   };
 }
 
+function prepHasHeliosField(prep){
+  return (prep?.prep_items||[]).some(i=>i.equipment_type==='Helios'&&['DELIVERY','SWAP'].includes(i.purpose));
+}
 function assignmentNeedsServiceSolar(a, prep) {
   if (a?.assigned_role !== 'service') return false;
   const workType=String(a?.work_type || prep?.work_type || '').toLowerCase();
-  if (workType && workType !== 'delivery') return false;
   const rows=[...normalizedEquipmentManifest(a?.equipment_manifest),...normalizedEquipmentManifest(prep?.equipment_manifest)];
-  return rows.some(row => ['Solar Spotter','Ranger','Solar Stand','Solar Pole','Helios'].includes(row.label) && row.qty > 0);
+  const hasHelios=rows.some(row=>row.label==='Helios'&&row.qty>0)||prepHasHeliosField(prep);
+  if(workType==='swap') return hasHelios;
+  if(workType&&workType!=='delivery') return false;
+  return rows.some(row=>['Solar Spotter','Ranger','Solar Stand','Solar Pole','Helios'].includes(row.label)&&row.qty>0);
 }
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
-  const roleLabel = a.assigned_role === 'it' ? 'IT' : 'SERVICE';
-  if (a.status === 'completed') return { step:5, label:'DONE', detail: roleLabel + ' task completed' };
-  if (!a.assignee_user_id && a.assignment_scope === 'department') return { step:1, label:'WAITING FOR ' + roleLabel + ' TECH', detail:'Sent to the ' + (a.assigned_role === 'it' ? 'IT Department' : 'Service Department') + ' queue' };
-  if (a.status === 'assigned') return { step:1, label:'SENT', detail:'Waiting for ' + a.assignee_name + ' to start' };
-  if (prep?.status === 'closed') return { step:5, label:'DONE', detail:'Equipment accepted by Service / deployed' };
-  if (a.assigned_role === 'service' && prep?.status === 'released' && assignmentNeedsServiceSolar(a,prep)) {
-    return solarCheck?.completed_at
-      ? { step:4, label:'SOLAR CHECKOUT VERIFIED', detail:'Automatic Solar Spotter / Ranger / Helios Service checkout completed' }
-      : { step:3, label:'SOLAR CHECKOUT IN PROGRESS', detail:(a.assignee_name || 'Service Tech') + ' is verifying automatic stands, batteries, panels, MPPT/charging readings, and Cerbo when applicable' };
+  const roleLabel=a.assigned_role==='it'?'IT':'SERVICE';
+  if(a.status==='completed'||prep?.status==='closed')return {step:5,label:'DONE',detail:roleLabel+' task completed'};
+  if(!a.assignee_user_id&&a.assignment_scope==='department')return {step:1,label:'WAITING FOR '+roleLabel+' TECH',detail:'Sent to the '+(a.assigned_role==='it'?'IT Department':'Service Department')+' queue'};
+  if(a.status==='assigned')return {step:1,label:'SENT',detail:'Waiting for '+a.assignee_name+' to start'};
+  if(a.assigned_role==='service'&&prep?.status==='released'&&prepHasHeliosField(prep)){
+    if(solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at)return {step:4,label:'WAITING OWNER FINAL VERIFY',detail:'Service submitted the Helios field installation, photos, and signature'};
+    if(solarCheck?.handoff_accepted_at)return {step:4,label:'HELIOS FIELD INSTALL IN PROGRESS',detail:'Service accepted the IT handoff; field installation is still open'};
+    if(solarCheck?.completed_at)return {step:3,label:'HELIOS YARD TEST COMPLETE',detail:'Yard solar/Victron test is complete; Service still must accept the handoff'};
+    return {step:3,label:'HELIOS PRE-TRIP IN PROGRESS',detail:'Service is completing the yard solar/Victron test before leaving'};
   }
-  if (prep?.status === 'released') return { step:4, label:'READY FOR SERVICE', detail:'Handoff created by IT' };
-  if (prep?.status === 'draft') return { step:3, label:'TECH CHECK IN PROGRESS', detail:'Equipment prep is active' };
-  return { step:2, label:'CLAIMED / IN PROCESS', detail:a.assignee_name + ' started the task' };
+  if(a.assigned_role==='service'&&prep?.status==='released'&&assignmentNeedsServiceSolar(a,prep)){
+    return solarCheck?.completed_at?{step:4,label:'SOLAR CHECKOUT VERIFIED',detail:'Automatic Solar / Ranger Service checkout completed'}:{step:3,label:'SOLAR CHECKOUT IN PROGRESS',detail:(a.assignee_name||'Service Tech')+' is verifying charging equipment and proof'};
+  }
+  if(prep?.status==='released')return {step:4,label:'READY FOR SERVICE',detail:'Handoff created by IT'};
+  if(prep?.status==='draft')return {step:3,label:'TECH CHECK IN PROGRESS',detail:'Equipment prep is active'};
+  return {step:2,label:'CLAIMED / IN PROCESS',detail:a.assignee_name+' started the task'};
 }
 function ownerAIElapsed(v){if(!v)return null;const t=new Date(v).getTime();return Number.isFinite(t)?Math.max(0,Date.now()-t):null;}
 function ownerAIElapsedText(ms){if(ms==null)return '';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h '+(m%60)+'m';return Math.floor(h/24)+'d '+(h%24)+'h';}
@@ -4198,11 +4206,41 @@ function ownerAIAlertHistoryHtml(a,prep,solarCheck=null){
   const unacked=current.state==='attention'&&!ownerAIIsAcknowledged(a,current)?`<div class='wl-ai-history-row active'><div><b>🔴 ACTIVE · NOT ACKNOWLEDGED</b><span>${esc(current.detail)}</span></div></div>`:'';
   return `<details class='wl-ai-alert-history'><summary>🔔 AI Alert History <span class='pill'>${rows.length+(unacked?1:0)}</span></summary><div>${unacked}${items||"<div class='small'>No acknowledged alerts yet.</div>"}</div></details>`;
 }
+async function ownerOpenHeliosFinalReview(prepId){
+  const prep=await getPrep(prepId),check=await loadServiceSolarCheck(prepId),evidence=await serviceSolarEvidenceRows(prepId),returns=await loadHeliosSwapReturns(prep?.ticket_no),units=heliosFieldItems(prep);
+  let host=document.getElementById('ownerHeliosFinalReview');
+  if(!host){host=document.createElement('div');host.id='ownerHeliosFinalReview';host.className='card';document.getElementById('view-owner')?.prepend(host);}
+  const fields=[
+    ['Box mounted','helios_field_box_mounted_ok'],['PV connected','helios_field_pv_connected_ok'],['PTZ secured','helios_field_ptz_secured_ok'],
+    ['Switch on PV','helios_field_switch_pv_ok'],['Unit + battery on','helios_field_unit_battery_on_ok'],['IT verified online','helios_field_it_online_verified_ok'],
+    ['Cameras aimed/focused','helios_field_cameras_aimed_ok'],['Recording verified','helios_field_recording_ok'],['Tower ~20 ft','helios_field_tower_20ft_ok'],
+    ['Mast locking bolt','helios_field_mast_lock_bolt_ok'],['Panel ~45°','helios_field_panel_45deg_ok'],['Panel bolt secured','helios_field_panel_bolt_ok'],['4 sandbags','helios_field_4_sandbags_ok']
+  ];
+  const install=evidence.filter(r=>r.category==='helios_install'),sig=[...install].reverse().find(r=>r.kind==='signature');
+  host.innerHTML=`<button class='wl-back' data-wl-owner-helios-close>← Back to Owner Dashboard</button>${progress('Owner Final Verification','Helios field installation review',1,1)}
+    <div class='wl-review'><b>MHelpDesk #${esc(prep?.ticket_no||'')}</b>${prep?.site?`<div>${esc(prep.site)}</div>`:''}</div>
+    <div class='ok top10'><b>NEW UNIT OUT</b>${units.map(u=>`<div class='small'>${esc(u.unit_tag||'Tag missing')} · ${esc(u.purpose)}</div>`).join('')}</div>
+    ${units.some(u=>u.purpose==='SWAP')?`<div class='wl-stop top10'><b>OLD UNIT RETURNING</b>${returns.map(r=>`<div class='small'><b>${esc(r.unit_tag)}</b> · ${esc(r.status||'')}<br>${esc(r.return_notes||'')}${r.tag_scan_status?`<br>Tag scan: ${esc(String(r.tag_scan_status).toUpperCase())}`:''}</div>`).join('')||'<div class="small">No Helios Service Return found yet.</div>'}</div>`:''}
+    <div class='wl-review top10'><b>Field checklist</b>${fields.map(([label,key])=>`<div class='small'>${check?.[key]?'✓':'✕'} ${esc(label)}</div>`).join('')}</div>
+    <div class='wl-review top10'><b>Final installation photos</b>${install.filter(r=>r.kind==='photo').length?`<div class='wl-gallery top8'>${install.filter(r=>r.kind==='photo').map(p=>`<img src='${esc(p.url)}' alt='Helios final installation'>`).join('')}</div>`:'<div class="warn">No final installation photos found.</div>'}${sig?`<div class='ok top8'><b>✓ Service signature</b><div class='small'>${signatureStamp(sig.created_by_name||check?.helios_field_completed_by_name||'Service Tech',sig.created_at||check?.helios_field_completed_at)}</div></div>`:'<div class="warn top8">Service installation signature missing.</div>'}</div>
+    <div class='warn top10'><b>Owner final verification</b><div>Confirm only after reviewing the completed field checklist, final photos, Service signature, and OLD UNIT RETURNING documentation for any swap.</div></div>
+    <button class='wl-big wl-green top10' data-wl-owner-helios-verify='${esc(prepId)}'>Owner Final Verify Helios →</button>`;
+  host.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function ownerVerifyHeliosFinal(prepId){
+  if(!confirm('Final verify this Helios deployment?\n\nThis closes the Tech Check only after the field checklist, photos, Service signature, and any OLD UNIT RETURNING documentation pass the database checks.'))return;
+  const {error}=await liveDb.rpc('owner_verify_helios_install_v1',{p_prep_id:prepId});
+  if(error)return alert(error.message);
+  document.getElementById('ownerHeliosFinalReview')?.remove();
+  await installOwnerAssignments(true);
+  if(typeof window.refreshData==='function')await window.refreshData();
+  alert('Helios deployment final verified and Tech Check closed.');
+}
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
-  const p = ownerAssignmentProgress(a, prep, solarCheck);
-  const aiState=ownerLiveAIStatus(a,prep,solarCheck).state;
-  const pct = Math.max(8, Math.min(100, p.step / 5 * 100));
-  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role === 'it' ? 'IT' : 'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id ? 'Assigned to:' : 'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site ? `<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>` : ''}${a.work_type ? `<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>` : ''}${a.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${a.requested_unit_count != null ? `<div class='small'><b>${String(a.work_type || '').toLowerCase() === 'pickup' ? 'Units Being Picked Up' : 'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>` : ''}${a.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>` : ''}${a.job_description ? `<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>` : ''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${a.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>` : ''}</div>${a.status === 'completed' ? '' : `<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+  const p=ownerAssignmentProgress(a,prep,solarCheck),aiState=ownerLiveAIStatus(a,prep,solarCheck).state,pct=Math.max(8,Math.min(100,p.step/5*100));
+  const heliosFinal=prepHasHeliosField(prep)&&prep?.status==='released'&&solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at
+    ? `<div class='warn top10'><b>HELIOS FIELD INSTALL SUBMITTED</b><div class='small'>${signatureStamp(solarCheck.helios_field_completed_by_name||'Service Tech',solarCheck.helios_field_completed_at)}</div><button class='mini top8' data-wl-owner-helios-review='${esc(prep.id)}'>Review & Final Verify Helios</button></div>`:'';
+  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role==='it'?'IT':'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id?'Assigned to:':'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site?`<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>`:''}${a.work_type?`<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>`:''}${a.scheduled_for?`<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for+'T12:00:00').toLocaleDateString()}</div>`:''}${a.requested_unit_count!=null?`<div class='small'><b>${String(a.work_type||'').toLowerCase()==='pickup'?'Units Being Picked Up':'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>`:''}${a.unit_summary?`<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>`:''}${a.job_description?`<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>`:''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${heliosFinal}${a.notes?`<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}</div>${a.status==='completed'?'':`<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
 }
 function ownerAssignmentTechOptions(role) {
   const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
@@ -4279,9 +4317,9 @@ async function installOwnerAssignments(force = false) {
   const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }, { data: aiAcks }] = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
-    liveDb.from('prep_tickets').select('id,ticket_no,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at').order('created_at', { ascending:false }).limit(100),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at,prep_items(equipment_type,purpose,unit_tag)').order('created_at', { ascending:false }).limit(100),
     liveDb.from('asset_inventory').select('unit_tag,asset_type,asset_category,availability_status').neq('availability_status','retired').order('asset_type'),
-    liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at').order('updated_at',{ascending:false}).limit(100),
+    liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at,handoff_accepted_at,handoff_accepted_by_name,helios_field_completed_at,helios_field_completed_by_name,helios_owner_verified_at,helios_owner_verified_by_name').order('updated_at',{ascending:false}).limit(100),
     liveDb.from('owner_ai_alert_acknowledgements').select('*').order('acknowledged_at',{ascending:false}).limit(500),
   ]);
   ownerAIAckRows = aiAcks || [];
@@ -5197,6 +5235,9 @@ document.addEventListener('click', async e => {
     return renderHelpWalkthrough();
   }
   if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); document.getElementById('wlHelpCoachToast')?.classList.remove('show'); return; }
+  const heliosReview=e.target.closest('[data-wl-owner-helios-review]'); if(heliosReview) return ownerOpenHeliosFinalReview(heliosReview.dataset.wlOwnerHeliosReview);
+  const heliosVerify=e.target.closest('[data-wl-owner-helios-verify]'); if(heliosVerify) return ownerVerifyHeliosFinal(heliosVerify.dataset.wlOwnerHeliosVerify);
+  if(e.target.closest('[data-wl-owner-helios-close]')) { document.getElementById('ownerHeliosFinalReview')?.remove(); return; }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
