@@ -4399,9 +4399,11 @@ async function installOwnerAssignments(force = false) {
           <span class='wl-ai-state draft'>ASK / CREATE</span>
         </div>
         <div class='wl-ai-lead'><b>Talk to OnSite Vision like you talk to me.</b> Ask something, then keep asking follow-up questions. Your conversation stays together below. If you want Vision to change or create something, just say it naturally.</div>
+        <div class='wl-ai-chat-head'><span>Conversation</span><button type='button' data-owner-ai-new-chat>New chat</button></div>
+        <div id='ownerAIConversation' class='wl-ai-chat-thread'>${ownerAIConversationMarkup()}</div>
         <div class='wl-ai-prompt-box'>
-          <label for='ownerAIDispatchPrompt'>Ask or tell OnSite Vision what you need</label>
-          <textarea id='ownerAIDispatchPrompt' rows='3' placeholder="Message OnSite Vision…"></textarea>
+          <label for='ownerAIDispatchPrompt'>Message OnSite Vision</label>
+          <textarea id='ownerAIDispatchPrompt' rows='3' placeholder="Ask a question or tell Vision what you want changed…"></textarea>
           <div class='wl-ai-prompt-chips' aria-label='Quick AI prompts'>
             <button type='button' data-owner-ai-chip="Show me Monday's jobs">Monday's jobs</button>
             <button type='button' data-owner-ai-chip='What needs attention today?'>Needs attention</button>
@@ -4414,8 +4416,6 @@ async function installOwnerAssignments(force = false) {
           <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Send <span>→</span></button>
         </div>
         <div id='ownerAIDispatchVoiceStatus' class='wl-ai-voice-status'></div>
-        <div class='wl-ai-chat-head'><span>Conversation</span><button type='button' data-owner-ai-new-chat>New chat</button></div>
-        <div id='ownerAIConversation' class='wl-ai-chat-thread'>${ownerAIConversationMarkup()}</div>
         <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10' aria-hidden='true'></div>
       </section>
       <div class='warn manualReferenceNotice'>
