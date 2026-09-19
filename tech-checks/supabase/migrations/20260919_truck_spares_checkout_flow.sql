@@ -1490,3 +1490,474 @@ begin
   );
 end;
 $function$;
+
+
+-- ============================================================
+-- 20260919043238  require_it_truck_spare_checkout
+-- ============================================================
+
+alter table public.prep_items
+  add column if not exists spare_it_checked_out_at timestamptz,
+  add column if not exists spare_it_checked_out_by uuid,
+  add column if not exists spare_it_checked_out_by_name text;
+
+alter table public.truck_spare_batteries
+  add column if not exists it_checked_out_at timestamptz,
+  add column if not exists it_checked_out_by uuid,
+  add column if not exists it_checked_out_by_name text;
+
+create or replace function public.it_checkout_truck_spare_unit(p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path to 'public','pg_temp'
+as $function$
+declare
+  v_item public.prep_items%rowtype;
+  v_prep public.prep_tickets%rowtype;
+  v_name text;
+  v_photo_count integer;
+  v_sig_count integer;
+  v_key text;
+  v_asset public.asset_inventory%rowtype;
+begin
+  perform public.require_role(array['it'::public.app_role,'owner'::public.app_role]);
+
+  select i.* into v_item
+  from public.prep_items i
+  where i.id=p_item_id
+  for update;
+  if not found then raise exception 'Truck spare unit not found'; end if;
+  if v_item.purpose<>'BACKUP'::public.prep_purpose then
+    raise exception 'Only a BACKUP unit can be checked out as a truck spare';
+  end if;
+
+  select * into v_prep
+  from public.prep_tickets
+  where id=v_item.prep_ticket_id
+  for update;
+  if not found or v_prep.status<>'draft'::public.prep_status then
+    raise exception 'Truck spare checkout must happen while IT is still preparing the ticket';
+  end if;
+
+  if v_item.verified_at is null then
+    raise exception 'Finish all required IT checks before checking out this spare';
+  end if;
+  if not coalesce(v_item.photo_tag_match_ok,false) then
+    raise exception 'Confirm the spare photo clearly shows the matching unit tag before checkout';
+  end if;
+
+  select count(*) filter(where kind='photo'),
+         count(*) filter(where kind='signature')
+  into v_photo_count,v_sig_count
+  from public.handoff_evidence
+  where prep_ticket_id=v_item.prep_ticket_id
+    and prep_item_id=v_item.id
+    and stage='it';
+
+  if v_photo_count<>1 then
+    raise exception 'This spare requires exactly one IT photo before checkout';
+  end if;
+  if v_sig_count<1 then
+    raise exception 'This spare requires the IT signature before checkout';
+  end if;
+
+  if v_item.spare_it_checked_out_at is not null then
+    return;
+  end if;
+
+  v_name:=public.actor_display_name();
+
+  update public.prep_items
+  set spare_it_checked_out_at=now(),
+      spare_it_checked_out_by=auth.uid(),
+      spare_it_checked_out_by_name=v_name
+  where id=p_item_id;
+
+  v_key:=public.normalize_unit_key(v_item.unit_tag);
+
+  update public.unit_registry
+  set lifecycle_status='assigned_to_tech',
+      current_holder_id=auth.uid(),
+      current_holder_name=v_name,
+      ticket_no=v_prep.ticket_no,
+      prep_ticket_id=v_prep.id,
+      prep_item_id=v_item.id,
+      last_event='Truck spare checked out by IT Tech '||v_name||' for MHelpDesk #'||v_prep.ticket_no,
+      updated_at=now()
+  where unit_key=v_key;
+
+  select * into v_asset
+  from public.asset_inventory
+  where unit_key=v_key
+  for update;
+
+  if found then
+    if v_asset.availability_status='assigned'
+       and v_asset.assigned_to is distinct from auth.uid() then
+      raise exception 'This spare is already assigned to another technician';
+    end if;
+    if v_asset.availability_status in ('maintenance','retired') then
+      raise exception 'This spare is not available for truck checkout';
+    end if;
+
+    insert into public.asset_inventory_history(
+      unit_key,unit_tag,action,from_status,to_status,
+      from_user_id,from_user_name,to_user_id,to_user_name,
+      actor_id,actor_name,notes
+    ) values(
+      v_asset.unit_key,v_asset.unit_tag,'it_truck_spare_checkout',
+      v_asset.availability_status,'assigned',
+      v_asset.assigned_to,v_asset.assigned_to_name,
+      auth.uid(),v_name,
+      auth.uid(),v_name,
+      'IT checked out truck spare for MHelpDesk #'||v_prep.ticket_no
+    );
+
+    update public.asset_inventory
+    set availability_status='assigned',
+        assigned_to=auth.uid(),
+        assigned_to_name=v_name,
+        last_event='IT truck spare checkout for MHelpDesk #'||v_prep.ticket_no,
+        updated_at=now()
+    where unit_key=v_key;
+  end if;
+
+  insert into public.reports(kind,actor_id,actor_name,ticket_no,text)
+  values(
+    'IT TRUCK SPARE CHECKOUT',
+    auth.uid(),v_name,v_prep.ticket_no,
+    'IT Tech '||v_name||' checked out BACKUP '||v_item.equipment_type||' '||coalesce(v_item.unit_tag,'')||
+    ' before the Service handoff.'
+  );
+end;
+$function$;
+
+revoke all on function public.it_checkout_truck_spare_unit(uuid) from public,anon;
+grant execute on function public.it_checkout_truck_spare_unit(uuid) to authenticated;
+
+create or replace function public.it_checkout_truck_spare_battery(p_spare_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path to 'public','pg_temp'
+as $function$
+declare
+  v_row public.truck_spare_batteries%rowtype;
+  v_status public.prep_status;
+  v_name text;
+begin
+  perform public.require_role(array['it'::public.app_role,'owner'::public.app_role]);
+
+  select * into v_row
+  from public.truck_spare_batteries
+  where id=p_spare_id
+  for update;
+  if not found then raise exception 'Spare battery batch not found'; end if;
+
+  select status into v_status
+  from public.prep_tickets
+  where id=v_row.prep_ticket_id
+  for update;
+
+  if v_status<>'draft'::public.prep_status or v_row.status<>'prepared' then
+    raise exception 'Spare battery checkout must happen while IT is preparing the ticket';
+  end if;
+  if not coalesce(v_row.ready_ok,false) then
+    raise exception 'Mark the spare battery batch physically present, charged, and READY before checkout';
+  end if;
+
+  if v_row.it_checked_out_at is not null then
+    return;
+  end if;
+
+  v_name:=public.actor_display_name();
+
+  update public.truck_spare_batteries
+  set it_checked_out_at=now(),
+      it_checked_out_by=auth.uid(),
+      it_checked_out_by_name=v_name,
+      updated_at=now()
+  where id=p_spare_id;
+
+  insert into public.reports(kind,actor_id,actor_name,ticket_no,text)
+  values(
+    'IT TRUCK SPARE BATTERY CHECKOUT',
+    auth.uid(),v_name,v_row.ticket_no,
+    'IT Tech '||v_name||' checked out '||v_row.qty_prepared||' × '||v_row.battery_type||
+    ' as truck spare batteries for '||v_row.equipment_type||'.'
+  );
+end;
+$function$;
+
+revoke all on function public.it_checkout_truck_spare_battery(uuid) from public,anon;
+grant execute on function public.it_checkout_truck_spare_battery(uuid) to authenticated;
+
+create or replace function public.enforce_truck_spares_before_release()
+returns trigger
+language plpgsql
+set search_path to 'public','pg_temp'
+as $function$
+begin
+  if new.status='released'::public.prep_status
+     and old.status is distinct from 'released'::public.prep_status
+  then
+    if exists(
+      select 1
+      from public.prep_items i
+      where i.prep_ticket_id=new.id
+        and i.purpose='BACKUP'::public.prep_purpose
+        and i.spare_it_checked_out_at is null
+    ) then
+      raise exception 'IT must CHECK OUT every truck spare unit before creating the Service handoff';
+    end if;
+
+    if exists(
+      select 1
+      from public.truck_spare_batteries b
+      where b.prep_ticket_id=new.id
+        and b.qty_prepared>0
+        and (
+          not b.ready_ok
+          or b.it_checked_out_at is null
+        )
+    ) then
+      raise exception 'Every spare battery batch must be READY and CHECKED OUT by IT before the Service handoff';
+    end if;
+  end if;
+  return new;
+end;
+$function$;
+
+create or replace function public.activate_truck_spares_on_close()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public','pg_temp'
+as $function$
+declare
+  v_item record;
+  v_key text;
+  v_asset public.asset_inventory%rowtype;
+begin
+  if new.status<>'closed'::public.prep_status or old.status='closed'::public.prep_status then return new; end if;
+
+  if exists(
+    select 1 from public.prep_items
+    where prep_ticket_id=new.id
+      and purpose='BACKUP'::public.prep_purpose
+      and spare_it_checked_out_at is null
+  ) then
+    raise exception 'Service cannot take a truck spare that IT did not check out';
+  end if;
+
+  if exists(
+    select 1 from public.truck_spare_batteries
+    where prep_ticket_id=new.id
+      and status='prepared'
+      and it_checked_out_at is null
+  ) then
+    raise exception 'Service cannot take spare batteries that IT did not check out';
+  end if;
+
+  update public.truck_spare_batteries
+  set service_tech_id=new.closed_by,
+      service_tech_name=new.closed_by_name,
+      status='in_truck',
+      accepted_at=now(),
+      updated_at=now()
+  where prep_ticket_id=new.id
+    and status='prepared'
+    and it_checked_out_at is not null;
+
+  update public.prep_items
+  set spare_checked_out_at=now(),
+      spare_checked_out_to=new.closed_by,
+      spare_checked_out_to_name=new.closed_by_name
+  where prep_ticket_id=new.id
+    and purpose='BACKUP'::public.prep_purpose
+    and spare_it_checked_out_at is not null
+    and spare_checked_out_at is null;
+
+  for v_item in
+    select id,unit_tag,equipment_type
+    from public.prep_items
+    where prep_ticket_id=new.id
+      and purpose='BACKUP'::public.prep_purpose
+      and spare_it_checked_out_at is not null
+  loop
+    v_key:=public.normalize_unit_key(v_item.unit_tag);
+
+    update public.unit_registry
+    set lifecycle_status='deployed',
+        current_holder_id=new.closed_by,
+        current_holder_name=new.closed_by_name,
+        last_event='IT checkout accepted by Service Tech '||coalesce(new.closed_by_name,'Service Tech')||
+          ' for truck spare on MHelpDesk #'||new.ticket_no,
+        updated_at=now()
+    where unit_key=v_key;
+
+    select * into v_asset
+    from public.asset_inventory
+    where unit_key=v_key
+    for update;
+
+    if found then
+      insert into public.asset_inventory_history(
+        unit_key,unit_tag,action,from_status,to_status,
+        from_user_id,from_user_name,to_user_id,to_user_name,
+        actor_id,actor_name,notes
+      ) values(
+        v_asset.unit_key,v_asset.unit_tag,'service_accepts_it_spare_checkout',
+        v_asset.availability_status,'assigned',
+        v_asset.assigned_to,v_asset.assigned_to_name,
+        new.closed_by,new.closed_by_name,
+        new.closed_by,new.closed_by_name,
+        'Service accepted IT-checked-out truck spare for MHelpDesk #'||new.ticket_no
+      );
+
+      update public.asset_inventory
+      set availability_status='assigned',
+          assigned_to=new.closed_by,
+          assigned_to_name=new.closed_by_name,
+          last_event='Service accepted IT truck spare checkout for MHelpDesk #'||new.ticket_no,
+          updated_at=now()
+      where unit_key=v_key;
+    end if;
+  end loop;
+
+  return new;
+end;
+$function$;
+
+
+-- ============================================================
+-- 20260919043359  lock_it_checked_out_truck_spares
+-- ============================================================
+
+create or replace function public.lock_checked_out_truck_spare_prep()
+returns trigger
+language plpgsql
+set search_path to 'public','pg_temp'
+as $function$
+begin
+  if old.purpose='BACKUP'::public.prep_purpose
+     and old.spare_it_checked_out_at is not null
+     and (
+       new.unit_tag is distinct from old.unit_tag
+       or new.equipment_type is distinct from old.equipment_type
+       or new.purpose is distinct from old.purpose
+       or new.required_battery_count is distinct from old.required_battery_count
+       or new.battery_count is distinct from old.battery_count
+       or new.power_ok is distinct from old.power_ok
+       or new.functions_ok is distinct from old.functions_ok
+       or new.safe_ok is distinct from old.safe_ok
+       or new.delivery_sim_ok is distinct from old.delivery_sim_ok
+       or new.delivery_camera_app_ok is distinct from old.delivery_camera_app_ok
+       or new.delivery_customer_email_app_ok is distinct from old.delivery_customer_email_app_ok
+       or new.delivery_batteries_charged_ok is distinct from old.delivery_batteries_charged_ok
+       or new.delivery_monitoring_ok is distinct from old.delivery_monitoring_ok
+       or new.delivery_ticket_count_ok is distinct from old.delivery_ticket_count_ok
+       or new.delivery_sd_formatted_ok is distinct from old.delivery_sd_formatted_ok
+       or new.delivery_recording_ok is distinct from old.delivery_recording_ok
+       or new.solar_mppt_updated_ok is distinct from old.solar_mppt_updated_ok
+       or new.solar_mppt_tested_ok is distinct from old.solar_mppt_tested_ok
+       or new.solar_pv_charging_ok is distinct from old.solar_pv_charging_ok
+       or new.solar_panels_match_ok is distinct from old.solar_panels_match_ok
+       or new.ticket_item_match_ok is distinct from old.ticket_item_match_ok
+       or new.helios_camera1_ports_ok is distinct from old.helios_camera1_ports_ok
+       or new.helios_camera2_ports_ok is distinct from old.helios_camera2_ports_ok
+       or new.helios_ptz_ports_ok is distinct from old.helios_ptz_ports_ok
+       or new.helios_speaker_ports_ok is distinct from old.helios_speaker_ports_ok
+       or new.photo_tag_match_ok is distinct from old.photo_tag_match_ok
+       or new.verified_at is distinct from old.verified_at
+       or new.verified_by is distinct from old.verified_by
+     )
+  then
+    raise exception 'This truck spare has already been checked out by IT. Return/cancel the checkout before changing its prep details.';
+  end if;
+  return new;
+end;
+$function$;
+
+drop trigger if exists lock_checked_out_truck_spare_prep_trigger on public.prep_items;
+create trigger lock_checked_out_truck_spare_prep_trigger
+before update on public.prep_items
+for each row execute function public.lock_checked_out_truck_spare_prep();
+
+create or replace function public.save_it_truck_spare_battery(
+  p_prep_id uuid,
+  p_equipment_type text,
+  p_battery_type text,
+  p_qty integer,
+  p_ready_ok boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path to 'public','pg_temp'
+as $function$
+declare
+  v_status public.prep_status;
+  v_ticket text;
+  v_qty integer:=greatest(coalesce(p_qty,0),0);
+  v_type text:=btrim(coalesce(p_equipment_type,''));
+  v_battery text:=btrim(coalesce(p_battery_type,''));
+  v_existing public.truck_spare_batteries%rowtype;
+begin
+  perform public.require_role(array['it'::public.app_role,'owner'::public.app_role]);
+
+  select status,ticket_no into v_status,v_ticket
+  from public.prep_tickets where id=p_prep_id for update;
+  if not found then raise exception 'Equipment prep not found'; end if;
+  if v_status<>'draft'::public.prep_status then
+    raise exception 'Spare batteries can only be changed before the Service handoff';
+  end if;
+
+  if not (
+    (v_type='Solar Spotter' and v_battery in ('AGM 12V 110Ah','12V 350Ah'))
+    or (v_type='Ranger' and v_battery='LiTime 12V 110Ah')
+    or (v_type='Helios' and v_battery='Helios Battery Box')
+    or (v_type='Recon 2' and v_battery='Recon II Battery')
+  ) then
+    raise exception 'That spare battery type does not match the selected equipment';
+  end if;
+
+  select * into v_existing
+  from public.truck_spare_batteries
+  where prep_ticket_id=p_prep_id
+    and equipment_type=v_type
+    and battery_type=v_battery
+  for update;
+
+  if found and v_existing.it_checked_out_at is not null then
+    raise exception 'This spare battery batch has already been checked out by IT and is locked';
+  end if;
+
+  if v_qty=0 then
+    delete from public.truck_spare_batteries
+    where prep_ticket_id=p_prep_id
+      and equipment_type=v_type
+      and battery_type=v_battery
+      and status='prepared'
+      and it_checked_out_at is null;
+    return;
+  end if;
+
+  insert into public.truck_spare_batteries(
+    prep_ticket_id,ticket_no,equipment_type,battery_type,qty_prepared,ready_ok,
+    prepared_by,prepared_by_name,status,updated_at
+  )
+  values(
+    p_prep_id,v_ticket,v_type,v_battery,v_qty,coalesce(p_ready_ok,false),
+    auth.uid(),public.actor_display_name(),'prepared',now()
+  )
+  on conflict(prep_ticket_id,equipment_type,battery_type)
+  do update set
+    qty_prepared=excluded.qty_prepared,
+    ready_ok=excluded.ready_ok,
+    prepared_by=excluded.prepared_by,
+    prepared_by_name=excluded.prepared_by_name,
+    updated_at=now();
+end;
+$function$;
