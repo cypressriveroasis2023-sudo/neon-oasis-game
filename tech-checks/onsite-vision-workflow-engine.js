@@ -1,5 +1,5 @@
 /* Cameras On Site — OnSite Vision Workflow Engine
- * Version: workflow-engine-v4
+ * Version: workflow-engine-v5
  * Pure/read-only decision layer. It does not mutate Supabase.
  */
 (function(root){
@@ -234,6 +234,57 @@
       blockers.push({code:'SERVICE_UNASSIGNED',message:'IT handoff is ready, but there is no active Service assignment.',certainty:'VERIFIED DATABASE FACT'});
     }
 
+    const cameraFamily=items.filter(i=>['Spotter','Recon 2','Ranger'].includes(i.equipment_type) && ['DELIVERY','SWAP','BACKUP'].includes(i.purpose));
+    for(const item of cameraFamily){
+      const missing=[];
+      if(!bool(item.camera_port_81_ok)) missing.push('camera_port_81_ok');
+      if(!bool(item.camera_port_554_ok)) missing.push('camera_port_554_ok');
+      if(item.equipment_type!=='Ranger' && !bool(item.unit_programmed_ok)) missing.push('unit_programmed_ok');
+      if(item.equipment_type==='Recon 2' && Number(item.recon_camera_count||0)<1) missing.push('recon_camera_count');
+      if(item.purpose==='SWAP'){
+        const deploy=['delivery_sim_ok','delivery_camera_app_ok','delivery_customer_email_app_ok','delivery_monitoring_ok','delivery_ticket_count_ok','delivery_sd_formatted_ok','delivery_recording_ok'];
+        if(item.equipment_type!=='Spotter') deploy.push('delivery_batteries_charged_ok');
+        for(const key of deploy) if(!bool(item[key])) missing.push(key);
+      }
+      if(missing.length){
+        blockers.push({
+          code:'CAMERA_FAMILY_IT_INCOMPLETE',
+          message:`${item.equipment_type} ${item.unit_tag||''} still has ${missing.length} required deployment check(s) incomplete.`,
+          fields:missing,
+          certainty:'VERIFIED DATABASE FACT'
+        });
+      }
+    }
+
+    if(prep.status==='released' && svc){
+      const rangerField=items.filter(i=>i.equipment_type==='Ranger' && ['DELIVERY','SWAP'].includes(i.purpose));
+      for(const item of rangerField){
+        if(!bool(item.ranger_field_victron_updated_ok)){
+          blockers.push({
+            code:'RANGER_FIELD_VICTRON_REQUIRED',
+            message:`Ranger ${item.unit_tag||''} still requires the Service field Victron Bluetooth update/verification before close.`,
+            certainty:'VERIFIED DATABASE FACT'
+          });
+        }
+      }
+
+      for(const equipmentType of ['Sniper','Spotter','Recon 2']){
+        const required=items.filter(i=>i.equipment_type===equipmentType && i.purpose==='SWAP').length;
+        if(!required) continue;
+        const returned=returns.filter(r=>r.equipment_type===equipmentType).length;
+        if(returned<required){
+          blockers.push({
+            code:'STANDARD_SWAP_RETURN_REQUIRED',
+            message:`${equipmentType} SWAP requires ${required} replaced field unit return(s) through Service Return → IT Intake before close; ${returned} recorded.`,
+            equipment_type:equipmentType,
+            required_returns:required,
+            recorded_returns:returned,
+            certainty:'VERIFIED DATABASE FACT'
+          });
+        }
+      }
+    }
+
     const helios=items.filter(i=>i.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(i.purpose));
     if(helios.length){
       for(const item of helios){
@@ -289,6 +340,21 @@
         if(!serviceCheck?.helios_field_completed_at) return {stage:'field_install',next:'Service completes the Helios field installation, photos, and dated signature.',blockers};
         if(!serviceCheck?.helios_owner_verified_at) return {stage:'owner_final_verify',next:'Owner reviews the final Helios installation and verifies completion.',blockers};
       }
+
+      const rangerField=(j.items||prep.prep_items||[]).filter(i=>i.equipment_type==='Ranger'&&['DELIVERY','SWAP'].includes(i.purpose));
+      if(rangerField.some(i=>!bool(i.ranger_field_victron_updated_ok))){
+        return {stage:'ranger_field_victron',next:'Service completes the Ranger field work and verifies the Ranger is up to date in the Victron Bluetooth app before close.',blockers};
+      }
+
+      for(const equipmentType of ['Sniper','Spotter','Recon 2']){
+        const required=(j.items||prep.prep_items||[]).filter(i=>i.equipment_type===equipmentType&&i.purpose==='SWAP').length;
+        if(!required) continue;
+        const returned=returns.filter(r=>r.equipment_type===equipmentType).length;
+        if(returned<required){
+          return {stage:'swap_return',next:`Service completes the ${equipmentType} SWAP and returns the replaced field unit through Service Return → IT Intake before close.`,blockers};
+        }
+      }
+
       return {stage:'service_work',next:'Service opens the same MHelpDesk ticket, verifies the IT handoff, and completes the required Service work.',blockers};
     }
     if(prep.status==='closed' || assignments.every(a=>['completed','cancelled'].includes(a.status))) return {stage:'complete',next:'The Tech Check workflow is complete.',blockers:[]};
@@ -296,7 +362,7 @@
   }
 
   root.OnSiteVisionWorkflowEngine=Object.freeze({
-    version:'workflow-engine-v4',
+    version:'workflow-engine-v5',
     normalizeWorkType,
     normalizeEquipmentType,
     getEquipmentDefinition,
