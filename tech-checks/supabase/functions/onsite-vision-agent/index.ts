@@ -357,6 +357,7 @@ Deno.serve(async (req) => {
         knowledge_version: KNOWLEDGE?.version || 'unknown',
         workflow_engine_version: ENGINE?.version || 'unknown',
         write_tools_enabled: false,
+        managed_knowledge_enabled: true,
       })
     }
 
@@ -486,7 +487,26 @@ Deno.serve(async (req) => {
       }
 
       if (name === 'get_company_knowledge') {
-        return knowledgeForTopic(clean(args.topic)) as Json
+        const topic=clean(args.topic)
+        const baseline=knowledgeForTopic(topic)
+        const managed=await userClient.rpc('vision_search_knowledge_v1',{
+          p_query:topic,
+          p_equipment_type:'',
+          p_workflow_type:'',
+          p_limit:12,
+        })
+        if(managed.error) throw managed.error
+        return {
+          authority_order:[
+            'LIVE DATABASE / SERVER ENFORCEMENT',
+            'APPROVED MANAGED COMPANY KNOWLEDGE',
+            'CODE BASELINE KNOWLEDGE',
+            'AI INFERENCE'
+          ],
+          baseline,
+          approved_managed_knowledge:Array.isArray(managed.data)?managed.data:[],
+          note:'Draft and retired knowledge are excluded. If approved managed knowledge conflicts with a live database rule, the database rule remains authoritative. If approved managed knowledge conflicts with the code baseline, report the conflict so Tech Check can be brought into parity rather than silently guessing.'
+        } as Json
       }
 
       throw new Error('Unknown agent tool: ' + name)
@@ -504,6 +524,8 @@ Deno.serve(async (req) => {
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
       '- If company knowledge marks something partial/unknown, say what is missing instead of inventing an answer.',
+      '- get_company_knowledge may return owner-approved managed knowledge in addition to the code baseline. Draft and retired entries are never company truth.',
+      '- Live database enforcement outranks editable knowledge. If approved managed knowledge conflicts with the code baseline, call out the conflict instead of silently choosing one.',
       '- Distinguish VERIFIED DATABASE FACT, COMPANY RULE, AI INFERENCE, and MISSING INFORMATION.',
       '- Historical raw work_type can be stale. Prefer summary.effective_work_type from live job context.',
       '- MHelpDesk is separate from Tech Check; never claim you changed MHelpDesk.',
