@@ -1941,7 +1941,7 @@ function unitQuestionHtml(q, index, total) {
   const answered = q.input.dataset.wlAnswered === '1';
   const yes = answered && q.input.checked;
   const no = answered && !q.input.checked;
-  return `<div class='wl-question'><div class='qnum'>Check ${index + 1} of ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>NO recorded.</b><div>You may continue documenting the remaining checks, but this unit cannot be sent to Service until this answer is corrected to YES.</div></div>` : ''}</div>`;
+  return `<div class='wl-question'><div class='qnum'>Check ${index + 1} of ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>NO recorded.</b><div>You may continue documenting the remaining checks, but this unit cannot be handed off to Service until this answer is corrected to YES.</div></div>` : ''}</div>`;
 }
 function itUnitSteps(form) {
   const steps = [];
@@ -3511,22 +3511,22 @@ function ownerAssignmentTechOptions(role) {
   return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
 }
 function ownerAIMorningReadiness(a,prep=null){
-  const m=a?.equipment_manifest||prep?.equipment_manifest||{},dev=m.devices||{},stands=m.stands||{},parts=m.parts||{};
-  const count=(obj,key)=>Number(obj?.[key]||0), issues=[], checks=[];
-  const spotters=count(dev,'solar_spotter'),rangers=count(dev,'ranger'),helios=count(dev,'helios');
-  const standQty=Object.entries(stands).filter(([k])=>/solar.?stand/i.test(k)).reduce((n,[,v])=>n+Number(v||0),0);
-  const panels=Number(a?.solar_panel_qty||prep?.solar_panel_qty||parts.solar_panel||0);
+  const manifest=normalizedEquipmentManifest(a?.equipment_manifest || prep?.equipment_manifest || []);
+  const issues=[], checks=[];
+  const spotters=manifestQty(manifest,'Solar Spotter');
+  const rangers=manifestQty(manifest,'Ranger');
+  const helios=manifestQty(manifest,'Helios');
   checks.push({ok:!!String(a?.ticket_no||'').trim(),t:'MHelpDesk reference'});
   checks.push({ok:!!String(a?.site||'').trim(),t:'Customer / site'});
   if(spotters){
-    checks.push({ok:standQty>=spotters,t:spotters+' Solar Spotter → '+spotters+' Solar Stand required'});
-    checks.push({ok:true,t:'Solar Spotter battery setup is selected and physically verified during Service checkout'});
+    checks.push({ok:true,t:spotters+' Solar Spotter → '+spotters+' Solar Stand automatically required in Service'});
+    checks.push({ok:true,t:'Service selects and physically verifies the installed Solar Spotter battery setup'});
   }
-  if(rangers)checks.push({ok:panels>=rangers,t:rangers+' Ranger → at least '+rangers+' solar panel required'});
-  if(helios)checks.push({ok:true,t:helios+' Helios → verify battery box + Cerbo/MPPT Service proof + IT camera/modem/ports flow'});
+  if(rangers)checks.push({ok:true,t:rangers+' Ranger → '+rangers+' solar panel + LiTime 12V 110Ah battery automatically required in Service'});
+  if(helios)checks.push({ok:true,t:helios+' Helios → battery box + Cerbo/MPPT Service proof and IT camera/modem/port checks required'});
   const dual=['it_service','service_it'].includes(String(a?.assignment_flow||a?.department_flow||a?.assigned_department||''));
   if(String(a?.work_type||'').toLowerCase()==='pickup')checks.push({ok:a?.assigned_role==='service'||dual,t:'Pickup begins with Service, then IT Intake'});
-  else if(a?.requires_it_handoff)checks.push({ok:true,t:'IT handoff required before Service verification'});
+  else if(a?.requires_it_handoff)checks.push({ok:true,t:'Required cross-department handoff is enforced before the next department starts'});
   checks.forEach(x=>{if(!x.ok)issues.push(x.t)});
   return {checks,issues,ready:issues.length===0};
 }
