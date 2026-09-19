@@ -2824,7 +2824,7 @@ async function installOwnerAssignments(force = false) {
         <div class='qtext'>1. What kind of MHelpDesk job is this?</div>
         <div class='grid top8'>
           <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select></div>
-          <div><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
+          <div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;-webkit-appearance:none;appearance:none;'></div>
         </div>
         <div id='ownerFlowHint' class='small top8'>Choose the job type first. The equipment and department flow below will update for that job.</div>
       </div>
