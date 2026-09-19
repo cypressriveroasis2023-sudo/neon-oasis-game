@@ -241,6 +241,25 @@
     return Math.max(1,Number(ctx.solar_spotter_count||0));
   }
 
+  function serviceSolarEvidenceRequirements(ctx){
+    if(!ctx?.need_solar)return[];
+    const requirements=[];
+    const standCount=serviceSolarRequiredStandCount(ctx);
+    if(ctx.need_stand){
+      requirements.push({category:'solar_stand',kind:'photo',minimum:standCount,label:standCount+' Solar Stand tag photo'+(standCount===1?'':'s')});
+      requirements.push({category:'solar_stand',kind:'signature',minimum:1,label:'Solar Stand verification signature'});
+    }
+    requirements.push({category:'batteries',kind:'photo',minimum:1,label:'Battery proof photo'});
+    requirements.push({category:'batteries',kind:'signature',minimum:1,label:'Battery verification signature'});
+    requirements.push({category:'mppt',kind:'photo',minimum:1,label:'MPPT / charging readings photo'});
+    if(ctx.has_helios){
+      requirements.push({category:'helios_cerbo_mppt',kind:'photo',minimum:1,label:'Helios Cerbo / MPPT proof photo'});
+      requirements.push({category:'helios_yard',kind:'photo',minimum:1,label:'Helios yard-test photo'});
+      requirements.push({category:'helios_yard',kind:'signature',minimum:1,label:'Helios yard-test signature'});
+    }
+    return requirements;
+  }
+
   function serviceSolarBatteryPlan(ctx,check=null,heliosCount=0){
     const spotters=Number(ctx?.solar_spotter_count||0);
     const rangers=Number(ctx?.ranger_count||0);
@@ -283,6 +302,7 @@
     itChecklist,
     itReady,
     serviceSolarRequiredStandCount,
+    serviceSolarEvidenceRequirements,
     serviceSolarBatteryPlan
   });
 
