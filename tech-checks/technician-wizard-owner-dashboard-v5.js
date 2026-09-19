@@ -3027,7 +3027,7 @@ let ownerAIDispatchLastParse = null;
 let ownerAIDispatchRecognition = null;
 
 function ownerAIEscapeRegExp(v) {
-  return String(v || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\function ownerAIDraft(){");
+  return String(v || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 function ownerAINumberWords(text) {
   const map = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10 };
