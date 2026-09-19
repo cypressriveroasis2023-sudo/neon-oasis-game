@@ -3613,3 +3613,78 @@ select {
     font-size:12px;
   }
 }
+
+
+/* Dedicated OnSite Vision launcher v116 */
+#view-owner .ownerVisionLaunchCard{
+  padding:0!important;
+  overflow:hidden;
+  border-top-color:#d20b12!important;
+}
+#view-owner .ownerVisionLaunchLink{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:13px;
+  min-height:92px;
+  padding:15px;
+  color:#172839;
+  text-decoration:none;
+  background:linear-gradient(135deg,#fff 0%,#f7f9fb 100%);
+}
+#view-owner .ownerVisionLaunchCopy{min-width:0}
+#view-owner .ownerVisionLaunchCopy small{
+  display:block;
+  color:#d20b12;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.15em;
+}
+#view-owner .ownerVisionLaunchCopy>b{
+  display:block;
+  margin-top:3px;
+  color:#101820;
+  font-size:18px;
+  font-weight:950;
+}
+#view-owner .ownerVisionLaunchCopy>span{
+  display:block;
+  margin-top:4px;
+  color:#657585;
+  font-size:10px;
+  line-height:1.4;
+  font-weight:650;
+}
+#view-owner .ownerVisionLaunchLink>strong{
+  align-self:center;
+  border-radius:10px;
+  background:#101820;
+  color:#fff;
+  padding:11px 12px;
+  font-size:10px;
+  white-space:nowrap;
+}
+#view-owner .ownerVisionRowAction{margin-top:10px}
+#view-owner .ownerVisionTicketLink{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  min-height:38px;
+  padding:0 11px!important;
+  border:1px solid #101820!important;
+  border-radius:9px!important;
+  background:#101820!important;
+  color:#fff!important;
+  text-decoration:none!important;
+  font-weight:900!important;
+}
+@media(max-width:680px){
+  #view-owner .ownerVisionLaunchLink{
+    grid-template-columns:auto minmax(0,1fr);
+  }
+  #view-owner .ownerVisionLaunchLink>strong{
+    grid-column:1/-1;
+    width:100%;
+    text-align:center;
+  }
+}
