@@ -4748,6 +4748,11 @@ function ownerAIConversationMarkup() {
     return "<div class='wl-ai-chat-turn assistant'><div class='wl-ai-chat-label'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''> ONSITE VISION</div><div class='wl-ai-chat-bubble'>"+String(turn.html||'')+"</div></div>";
   }).join('');
 }
+function ownerAIConversationScroll() {
+  const host=document.getElementById('ownerAIConversation');
+  if(!host)return;
+  requestAnimationFrame(()=>{host.scrollTop=host.scrollHeight;});
+}
 function ownerAIConversationAppendUser(text) {
   const host=document.getElementById('ownerAIConversation');
   if(!host)return;
@@ -4757,6 +4762,7 @@ function ownerAIConversationAppendUser(text) {
   turn.className='wl-ai-chat-turn user';
   turn.innerHTML="<div class='wl-ai-chat-label'>YOU</div><div class='wl-ai-chat-bubble'>"+esc(text)+"</div>";
   host.append(turn);
+  ownerAIConversationScroll();
 }
 function ownerAIConversationBeginAssistant() {
   const host=document.getElementById('ownerAIConversation');
@@ -4766,13 +4772,13 @@ function ownerAIConversationBeginAssistant() {
   turn.className='wl-ai-chat-turn assistant';
   turn.innerHTML="<div class='wl-ai-chat-label'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''> ONSITE VISION</div><div class='wl-ai-chat-bubble'><div class='wl-ai-assistant-working'><span class='wl-ai-scan-spinner'></span><div><b>Thinking through Tech Check…</b><span>Looking at the conversation and current records.</span></div></div></div>";
   host.append(turn);
+  ownerAIConversationScroll();
   return turn.querySelector('.wl-ai-chat-bubble');
 }
 function ownerAIConversationFinishAssistant(box) {
   if(!box)return;
   ownerAIConversationTurns.push({role:'assistant',html:box.innerHTML});
-  const turn=box.closest('.wl-ai-chat-turn');
-  turn?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+  ownerAIConversationScroll();
 }
 function ownerAIResponseBox() {
   return ownerAIActiveResponseBox || document.getElementById('ownerAIDispatchResult');
@@ -4967,10 +4973,16 @@ function ownerAIParseDispatch(text) {
   const sm=raw.match(/\b(?:site|customer)\s*(?:is|:|=|-)\s*([^,.;\n]+)/i) || raw.match(/\bat\s+([^,.;\n]+?)(?=\s+(?:tomorrow|today|on\s+\d|for\s+(?:delivery|pickup|swap|service)|send\s+to|assign\s+to|with\s+\d)|[,.;\n]|$)/i);
   if (sm) parsed.site=String(sm[1]||"").trim();
 
+  const serviceRoleContext=/\bservice\s+(?:department|dept|team|tech|technician|queue)\b|\b(?:assigned?|task(?:ed)?|sent?)\s+(?:to\s+)?(?:anyone\s+in\s+)?(?:the\s+)?service\b|\banyone\s+in\s+(?:the\s+)?service\b/i.test(raw);
   if (/\b(pickup|pick\s+up|collect|retrieve)\b/.test(lower)) parsed.work_type="pickup";
   else if (/\b(delivery|deliver|deploy|drop\s+off)\b/.test(lower)) parsed.work_type="delivery";
   else if (/\b(swap|swapping)\b/.test(lower)) parsed.work_type="swap";
-  else if (/\b(service|repair|troubleshoot|troubleshooting|check\s+on|fix)\b/.test(lower)) parsed.work_type="service";
+  else if (
+    /\b(repair|troubleshoot|troubleshooting|check\s+on|fix)\b/.test(lower)
+    || /\bservice\s+(?:job|call|ticket|work)\b/.test(lower)
+    || /\b(?:job|work|type)\s*(?:is|:|=)?\s*service\b/.test(lower)
+    || (!serviceRoleContext && /\bfor\s+service\b/.test(lower))
+  ) parsed.work_type="service";
 
   parsed.scheduled_for=ownerAIDateFromText(raw);
   parsed.scheduled_time=ownerAITimeFromText(raw);
@@ -5202,6 +5214,41 @@ function ownerAIAssistantNextStep(a,prep,solar) {
   if(p.label==='SENT') return 'The assigned technician needs to start the job.';
   return p.detail || 'Open the job and continue the current Tech Check step.';
 }
+function ownerAIAssignmentQuestion(raw) {
+  const text=String(raw||'');
+  const asks=/\b(assign(?:ed|ment)?|task(?:ed)?|who\s+(?:has|is\s+handling|is\s+assigned)|who(?:'s|\s+is)\s+(?:got|handling)|anyone\s+(?:in|on)|department\s+queue|who\s+has\s+it)\b/i.test(text);
+  if(!asks)return null;
+  let role='';
+  if(/\bservice\s+(?:department|dept|team|tech|technician|queue)\b|\b(?:to|in|on)\s+(?:the\s+)?service\b/i.test(text)) role='service';
+  else if(/\bit\s+(?:department|dept|team|tech|technician|queue)\b|\b(?:to|in|on)\s+(?:the\s+)?it\b/i.test(text)) role='it';
+  return {role};
+}
+function ownerAIAssignmentAnswerHtml(rows,question) {
+  const active=(rows||[]).filter(r=>r.status!=='completed');
+  const wanted=question?.role||'';
+  const scoped=wanted ? active.filter(r=>String(r.assigned_role||'')===wanted) : active;
+  const ticket=String(rows?.[0]?.ticket_no||'—');
+  const roleName=wanted==='service'?'Service':wanted==='it'?'IT':'';
+  if(wanted && !scoped.length){
+    const other=active.map(r=>String(r.assigned_role||'').toUpperCase()+' — '+String(r.assignee_name||r.assigned_to_name||(r.assignment_scope==='department'?'Department queue':'Unassigned'))).join(' · ');
+    return "<div class='wl-ai-direct-answer no'><b>No active "+esc(roleName)+" assignment is showing for MHelpDesk #"+esc(ticket)+".</b>"
+      +(other?"<span>Current assignment: "+esc(other)+".</span>":"<span>No active technician assignment is showing right now.</span>")+"</div>";
+  }
+  if(!wanted && !scoped.length){
+    return "<div class='wl-ai-direct-answer no'><b>No active technician assignment is showing for MHelpDesk #"+esc(ticket)+".</b></div>";
+  }
+  const lines=scoped.map(r=>{
+    const role=String(r.assigned_role||'').toUpperCase()||'ASSIGNMENT';
+    const who=r.assignee_name||r.assigned_to_name||(r.assignment_scope==='department'?(role==='SERVICE'?'Service department queue':'IT department queue'):'Unassigned');
+    const queue=!r.assignee_name&&!r.assigned_to_name&&r.assignment_scope==='department' ? ' · not claimed by an individual technician yet' : '';
+    return "<span><b>"+esc(role)+":</b> "+esc(who)+esc(queue)+"</span>";
+  }).join('');
+  const lead=wanted
+    ? "Yes — MHelpDesk #"+esc(ticket)+" has an active "+esc(roleName)+" assignment."
+    : "Here is who currently has MHelpDesk #"+esc(ticket)+".";
+  return "<div class='wl-ai-direct-answer yes'><b>"+lead+"</b>"+lines+"</div>";
+}
+
 async function ownerAIAssistantAnswer(raw) {
   const box=ownerAIResponseBox(); if(!box)return;
   const parsed=ownerAIParseDispatch(raw), intent=ownerAIAssistantIntent(raw);
@@ -5304,6 +5351,8 @@ async function ownerAIAssistantAnswer(raw) {
   ownerAIAssistantLastJobs=matches.slice(0,12);
   const groups=new Map();
   matches.forEach(a=>{const key=String(a.prep_ticket_id||a.ticket_no||a.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(a);});
+  const assignmentQuestion=ownerAIAssignmentQuestion(raw);
+  const assignmentAnswer=assignmentQuestion ? [...groups.values()].slice(0,8).map(rows=>ownerAIAssignmentAnswerHtml(rows,assignmentQuestion)).join('') : '';
   const cards=[...groups.values()].slice(0,8).map(rows=>{
     const a=rows[0], prep=rows.map(r=>prepMap.get(r.prep_ticket_id)).find(Boolean)||null, solar=prep?solarMap.get(prep.id):null;
     const manifest=(a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[];
@@ -5319,7 +5368,8 @@ async function ownerAIAssistantAnswer(raw) {
   }).join('');
   box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>"+(wantsAttention?'Needs Attention':'Tech Check Answer')+"</b></span></div><span class='wl-ai-state ready'>"+groups.size+" FOUND</span></div>"
     +(scheduleMismatch?"<div class='wl-ai-warn'><b>I found the exact equipment/ticket, but its saved date does not match the date you mentioned.</b><br>I am showing the likely match instead of pretending there is no ticket.</div>":"")
-    +"<div class='wl-ai-answer-intro'>I found the matching Tech Check record"+(groups.size===1?'':'s')+". Here is the schedule, current status, and what should happen next.</div>"+cards;
+    +assignmentAnswer
+    +"<div class='wl-ai-answer-intro'>"+(assignmentQuestion?"I also pulled the job details into this conversation so you can see exactly what Vision is referring to.":"I found the matching Tech Check record"+(groups.size===1?'':'s')+". Here is the schedule, current status, and what should happen next.")+"</div>"+cards;
 }
 async function ownerAIDispatchBuild() {
   const input=document.getElementById('ownerAIDispatchPrompt');
