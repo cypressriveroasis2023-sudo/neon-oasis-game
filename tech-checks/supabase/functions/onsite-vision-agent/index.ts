@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import './tech-check-rules.js'
 import './company-knowledge.js'
 import './workflow-engine.js'
 
@@ -351,11 +352,12 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v3',
+        agent_version: 'onsite-vision-agent-v4',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
         workflow_engine_version: ENGINE?.version || 'unknown',
+        shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
         write_tools_enabled: false,
         managed_knowledge_enabled: true,
       })
@@ -522,6 +524,7 @@ Deno.serve(async (req) => {
       'GROUNDING RULES:',
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
+      '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
       '- If company knowledge marks something partial/unknown, say what is missing instead of inventing an answer.',
       '- get_company_knowledge may return owner-approved managed knowledge in addition to the code baseline. Draft and retired entries are never company truth.',
@@ -638,7 +641,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v3',
+      agent_version: 'onsite-vision-agent-v4',
       model,
       tool_trace: toolTrace,
       ...parsed,
