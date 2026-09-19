@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v124",
-  "service_worker": "v84",
+  "service_worker": "v85",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v11, company-knowledge-v7, workflow-engine-v4 and rules-v6"
+        "Agent reports onsite-vision-agent-v12, company-knowledge-v7, workflow-engine-v5 and rules-v6"
       ]
     },
     {
@@ -1995,7 +1995,78 @@
         "If multiple profile records share the name, Vision shows each active/inactive state instead of guessing",
         "The deterministic browser fallback answers person questions even when the model is unavailable"
       ]
+    },
+    {
+      "id": "VISION-FLOW-CAMERA-SWAP-RETURN-01",
+      "area": "OnSite Vision · Standard camera SWAP",
+      "role": "owner+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Vision explains the same Sniper/Spotter/Recon II SWAP return gate enforced by the database",
+      "steps": [
+        "Analyze a released SWAP with an active Service assignment and no old-unit return",
+        "Add the matching Service Return → IT Intake record in the test context",
+        "Re-analyze"
+      ],
+      "expected": [
+        "Missing old-unit return produces STANDARD_SWAP_RETURN_REQUIRED",
+        "Next stage is swap_return",
+        "A matching returned unit clears the blocker"
+      ]
+    },
+    {
+      "id": "VISION-FLOW-RANGER-FIELD-01",
+      "area": "OnSite Vision · Ranger field",
+      "role": "owner+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Vision explains the Ranger field Victron close gate",
+      "steps": [
+        "Analyze released Ranger Delivery/SWAP with Service assigned before field Victron verification",
+        "Mark the field verification true in the test context",
+        "Re-analyze"
+      ],
+      "expected": [
+        "Missing verification produces RANGER_FIELD_VICTRON_REQUIRED",
+        "Next stage is ranger_field_victron",
+        "Completed verification clears the blocker"
+      ]
+    },
+    {
+      "id": "VISION-FLOW-CAMERA-IT-GATE-01",
+      "area": "OnSite Vision · Camera-family IT readiness",
+      "role": "it+owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Vision surfaces Spotter/Recon II/Ranger release-readiness fields before handoff",
+      "steps": [
+        "Analyze an incomplete camera-family draft",
+        "Inspect required ports/programming/camera-count fields"
+      ],
+      "expected": [
+        "Missing port 81/554 checks are surfaced",
+        "Spotter/Recon II require programming verification",
+        "Recon II requires camera count",
+        "Vision does not invent undocumented battery specifications"
+      ]
+    },
+    {
+      "id": "VISION-FLOW-22712-REGRESSION-01",
+      "area": "OnSite Vision · Live regression",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Current live Helios ticket 22712 still resolves to Service assignment after workflow-engine v5",
+      "steps": [
+        "Load live job context for 22712",
+        "Evaluate effective workflow and active assignments"
+      ],
+      "expected": [
+        "Effective work type remains Delivery",
+        "IT prep remains released",
+        "No active Service assignment means next stage is service_assignment"
+      ]
     }
   ],
-  "last_release_qa_note": "Full non-destructive release QA pass: source syntax/parity, production DB contracts, ticket 22712 live flow, profile lookup/RLS, Vision persistence/action tables, release/close triggers, mobile Vision fixes, and current Edge deployment checked. Stale PHASE7-AGENT expected version corrected to v11. Public GitHub Pages serving could not be independently fetched from tool network/DNS. Vision v20 / Edge v11 / SW84."
+  "last_release_qa_note": "Full release QA found and fixed a Vision workflow parity gap: workflow-engine v5 now mirrors the database Ranger field Victron and Sniper/Spotter/Recon II SWAP-return close gates, while preserving ticket 22712 Helios next-step behavior. Edge v12 / SW85."
 }
