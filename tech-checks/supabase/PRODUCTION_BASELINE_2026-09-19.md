@@ -513,3 +513,14 @@ Regression checks passed for JavaScript syntax, browser/server bundle parity, de
 - Owner Live Job Progress now receives a real summary/body immediately, before live data finishes loading. If an empty legacy Live Job Progress element is found, it is rehydrated rather than skipped, preventing Safari from displaying its browser-generated `Details` row.
 - Release identifiers: technician `release-qa-v124`, loader `startup-fast-v38`, Vision `vision-workspace-v17`, service worker `tech-check-field-shell-v81`.
 - Regression QA count: 100.
+
+
+## Vision iPhone keyboard + conversation reset correction (2026-09-19)
+
+- On iPhone, focusing the Vision prompt no longer resizes the entire app to the visual viewport height. The main Vision shell stays fixed to the full layout viewport; only the composer tracks the keyboard obstruction.
+- The conversation thread remains its own vertical scroll region while the keyboard is open.
+- Starting a New Chat explicitly saves the conversation being left through the Vision persistence layer when available, then starts a blank conversation.
+- Previous conversations remain visible under Recent conversations in the side menu and can be reopened.
+- New Chat clears and blurs the prompt so it does not force the keyboard open.
+- Release identifiers: Vision `vision-workspace-v18`, service worker `tech-check-field-shell-v82`.
+- Regression QA count: 102.
