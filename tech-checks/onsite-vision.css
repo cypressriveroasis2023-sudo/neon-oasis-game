@@ -12,7 +12,7 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-loading{min-height:100dvh;display:grid;place-items:center;align-content:center;gap:12px;background:radial-gradient(circle at 50% 38%,rgba(210,11,18,.12),transparent 30%),linear-gradient(180deg,#0a141f,#061019)}
 .vision-loading img{width:72px;height:72px;border-radius:22px;box-shadow:var(--shadow)}.vision-loading b{font-size:23px}.vision-loading span{color:var(--muted);font-size:13px}
 
-.vision-app{height:var(--vision-viewport-height,100dvh);min-height:0;overflow:hidden;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr) 0;background:radial-gradient(circle at 52% -12%,rgba(210,11,18,.075),transparent 30%),linear-gradient(180deg,#0a141e,#071019);transition:grid-template-columns .22s ease}
+.vision-app{height:100dvh;min-height:0;overflow:hidden;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr) 0;background:radial-gradient(circle at 52% -12%,rgba(210,11,18,.075),transparent 30%),linear-gradient(180deg,#0a141e,#071019);transition:grid-template-columns .22s ease}
 .vision-app.has-order{grid-template-columns:var(--sidebar) minmax(0,1fr) var(--order)}
 .vision-sidebar,.vision-order-panel{background:rgba(9,17,26,.96);border-color:var(--line);border-style:solid;backdrop-filter:blur(18px)}
 .vision-sidebar{border-width:0 1px 0 0;padding:max(20px,env(safe-area-inset-top)) 14px max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;min-width:0}
@@ -82,7 +82,7 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-shade{display:none}.vision-mobile-only{display:none}
 @media(max-width:1180px){:root{--sidebar:230px;--order:305px}}
 @media(max-width:900px){
-  body{overflow:hidden}.vision-app,.vision-app.has-order{grid-template-columns:1fr}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none} body{position:fixed;inset:0;width:100%}.vision-app,.vision-app.has-order{position:fixed;inset:0;height:auto;min-height:0;grid-template-columns:1fr}
   .vision-sidebar,.vision-order-panel{position:fixed;top:0;bottom:0;width:min(88vw,350px);z-index:30;transition:transform .22s ease,opacity .18s ease;box-shadow:0 0 52px rgba(0,0,0,.42);opacity:1;pointer-events:auto}
   .vision-sidebar{left:0;transform:translateX(-104%)}.vision-order-panel{right:0;transform:translateX(104%)}
   .vision-app.sidebar-open .vision-sidebar{transform:translateX(0)}.vision-app.order-open .vision-order-panel{transform:translateX(0)}
