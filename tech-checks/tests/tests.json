@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v106",
-  "service_worker": "v52",
+  "runtime_version": "release-qa-v107",
+  "service_worker": "v53",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,9 +658,9 @@
         "Background and reopen"
       ],
       "expected": [
-        "v52 cached shell loads without AccessDenied",
-        "release-qa-v106 tag-scan UI appears when solar tag photos are taken",
-        "OCR library remains off the startup path"
+        "v53 cached shell loads without AccessDenied",
+        "release-qa-v107 AI-assisted solar tag verification appears on supported unit/return photos",
+        "Tesseract/OCR remains lazy-loaded and does not block startup"
       ],
       "manual_device": true
     },
@@ -1128,5 +1128,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "AI-assisted OCR tag verification added for solar equipment photos and returned solar-unit tag photos. MATCH/MISMATCH/UNREADABLE is saved; clear mismatch blocks approval; human confirmation remains required; OCR loads only on demand."
+  "last_release_qa_note": "Finalized AI-assisted solar tag verification: scan state resets if unit/type changes, Help explains MATCH/MISMATCH/UNREADABLE behavior, clear mismatch cannot be manually approved, and OCR remains lazy-loaded."
 }
