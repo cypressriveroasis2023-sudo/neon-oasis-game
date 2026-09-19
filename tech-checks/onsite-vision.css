@@ -59,6 +59,10 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-direct{padding:12px 13px;border:1px solid #2d4358;border-radius:12px;background:#0f1b27;margin:10px 0;color:#c7d3dc}.vision-direct.good{border-color:rgba(85,200,135,.42);background:rgba(85,200,135,.075)}.vision-direct.warn{border-color:rgba(226,184,90,.46);background:rgba(226,184,90,.075)}.vision-direct b{display:block;color:#fff;margin-bottom:4px}
 .vision-action-card{margin-top:12px;border:1px solid #354d62;border-radius:14px;background:linear-gradient(145deg,#13212e,#0f1a25);padding:13px}.vision-action-card small{display:block;color:#8092a3;font-weight:900;text-transform:uppercase;letter-spacing:.09em;font-size:8px}.vision-action-card b{display:block;margin:5px 0;color:#fff;font-size:14px}.vision-action-card p{margin:0;color:#9bacbb;font-size:10px;line-height:1.5}
 .vision-action-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.vision-action-buttons button{min-height:38px;border-radius:9px;padding:0 12px;font-size:10px;font-weight:950}.vision-confirm{border:1px solid var(--red);background:var(--red);color:#fff}.vision-cancel{border:1px solid #384d61;background:#182635;color:#c7d2db}
+
+.vision-tech-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.vision-tech-choice-grid button{min-height:40px;border:1px solid #3a5269;border-radius:10px;background:#172737;color:#eef3f7;font-size:10px;font-weight:900;text-align:left;padding:0 11px}
+.vision-tech-choice-grid button:hover{border-color:#607890;background:#1c3043}
 .vision-system-note{color:#667b8e;font-size:9px;margin-top:8px}.vision-typing{display:flex;align-items:center;gap:8px;color:#7f92a3}.vision-dots{display:flex;gap:4px}.vision-dots i{width:6px;height:6px;border-radius:50%;background:#96a8b8;animation:visionPulse 1.1s infinite}.vision-dots i:nth-child(2){animation-delay:.16s}.vision-dots i:nth-child(3){animation-delay:.32s}@keyframes visionPulse{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 
 .vision-composer-wrap{padding:12px clamp(18px,6vw,76px) max(14px,env(safe-area-inset-bottom));background:linear-gradient(0deg,#071019 72%,rgba(7,16,25,0));z-index:6}
@@ -94,8 +98,18 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   .vision-welcome h1{font-size:clamp(31px,9vw,43px);max-width:530px}.vision-welcome p{font-size:14px;line-height:1.55;max-width:540px}
   .vision-quick-grid{gap:7px;margin-top:22px}.vision-quick-grid button{min-height:38px;padding:0 12px;font-size:10px}
   .vision-turn{margin-bottom:24px}.vision-turn.user .vision-bubble{max-width:88%;font-size:14px}.vision-turn.assistant{padding-right:0}.vision-turn.assistant .vision-bubble{font-size:13px}
-  .vision-composer-wrap{padding:9px 10px max(10px,env(safe-area-inset-bottom));background:linear-gradient(0deg,#071019 82%,rgba(7,16,25,0))}
+  .vision-thread{padding-bottom:132px}
+  .vision-composer-wrap{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:var(--vision-visual-bottom,0px);
+    padding:9px 10px max(10px,env(safe-area-inset-bottom));
+    background:linear-gradient(0deg,#071019 86%,rgba(7,16,25,.96) 72%,rgba(7,16,25,0));
+    z-index:20;
+  }
   .vision-composer{border-radius:17px}.vision-compose-note{display:none}
+  .vision-new-header{display:inline-grid!important;width:36px;min-width:36px;padding:0;font-size:20px;place-items:center}
 }
 @media(max-width:560px){
   .vision-top-title .vision-logo.small{display:none}.vision-top-title b{max-width:50vw}
@@ -103,5 +117,6 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   .vision-quick-grid{display:grid;grid-template-columns:1fr 1fr;max-width:100%}.vision-quick-grid button{border-radius:12px;text-align:center;padding:8px 10px;min-height:44px}
   .vision-job-head b{font-size:14px}.vision-context-grid{grid-template-columns:1fr 1fr}
   .vision-composer{grid-template-columns:38px minmax(0,1fr) 38px;padding:7px}.vision-compose-icon,.vision-send{width:38px;height:38px;border-radius:11px}
+  .vision-tech-choice-grid{grid-template-columns:1fr}
   .vision-composer textarea{min-height:38px;padding:8px 4px}
 }
