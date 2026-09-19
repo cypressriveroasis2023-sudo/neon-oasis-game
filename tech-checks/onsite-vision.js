@@ -57,6 +57,29 @@ function agentHistory(currentText=''){
   if(rows.length&&rows[rows.length-1].role==='user'&&rows[rows.length-1].content===String(currentText||'').trim())rows.pop();
   return rows.slice(-10);
 }
+async function checkAgentStatus(){
+  if(!db)return null;
+  try{
+    const result=await db.functions.invoke('onsite-vision-agent',{body:{mode:'status'}});
+    if(result.error||!result.data?.ok){
+      state.agentStatus='unknown';
+      if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
+      return null;
+    }
+    state.agentStatus=result.data.model_configured?'online':'unavailable';
+    if($('visionLiveStatus')){
+      $('visionLiveStatus').textContent=result.data.model_configured?'AI LIVE':'DATA LIVE';
+      $('visionLiveStatus').title=result.data.model_configured
+        ?'OnSite Vision server AI '+String(result.data.model||'')+' is connected to live Tech Check data.'
+        :'Live Tech Check data is connected. The server AI model credential is not configured, so Vision is using deterministic fallback behavior.';
+    }
+    return result.data;
+  }catch(error){
+    state.agentStatus='unknown';
+    if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
+    return null;
+  }
+}
 async function callVisionAgent(text){
   if(state.agentStatus==='unavailable'||!db)return null;
   try{
@@ -146,6 +169,7 @@ async function init(){
   if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){location.replace('./');return;}
   state.profile=p;$('visionOwnerName').textContent=(p.full_name||p.username||'Owner')+' - Owner/Admin';
   await loadData();
+  await checkAgentStatus();
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
   const q=new URLSearchParams(location.search).get('ticket');
   if(q){
@@ -789,7 +813,7 @@ document.addEventListener('click',async e=>{
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){state.pending.delete(cancel.dataset.cancelAction);addMessage('assistant','', '<div class="vision-system-note">No changes were made.</div>');renderThread();return;}
   if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
-  if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();await loadData();renderOrder();}catch(error){console.warn(error);}return;}
+  if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();state.agentStatus='unknown';await loadData();await checkAgentStatus();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
