@@ -1,6 +1,6 @@
 const LIVE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const LIVE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
-const liveDb = supabase.createClient(LIVE_URL, LIVE_KEY);
+const liveDb = window.TechCheckDB || supabase.createClient(LIVE_URL, LIVE_KEY);
 const EVIDENCE_BUCKET = 'handoff-evidence';
 const OPS_TEL = '+13463149208';
 const OPS_DISPLAY = '(346) 314-9208';
@@ -4949,9 +4949,9 @@ function boot() {
   injectStyles();
   installTabs();
   setupNotificationRealtime();
-  setupServiceSolarRealtime();
+  if (roleText().includes('Owner/Admin')) setupServiceSolarRealtime();
   refreshNotificationBadge();
-  organizeOwnerDashboard();
+  if (roleText().includes('Owner/Admin')) organizeOwnerDashboard();
 
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (!appVisible) return;
