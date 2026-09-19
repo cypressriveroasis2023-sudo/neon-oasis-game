@@ -1,5 +1,5 @@
 /* Cameras On Site — Shared Tech Check Rules
- * Version: rules-v5
+ * Version: rules-v6
  * Pure rule definitions shared by Owner/IT/Service UI and OnSite Vision.
  * Supabase RPCs/triggers remain the final authority for production transitions.
  */
@@ -74,7 +74,7 @@
     batteries:0,
     platform:'Alibi app',
     built_state:'Spotter units are already built and are normally already programmed.',
-    top_component:'A built-in top-mounted component is present; exact component name is not yet confirmed.',
+    antenna:'Antenna on top of the Spotter.',
     delivery_support:'Delivery uses the pole or stand specified by the Service order; Service physically grabs/verifies that support equipment.',
     swap_support:'SWAP takes the replacement Spotter only — no additional pole or stand.',
     swap_return:'The replaced field Spotter must return through Service Return → IT Intake.',
@@ -465,7 +465,7 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v5',
+    version:'rules-v6',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
