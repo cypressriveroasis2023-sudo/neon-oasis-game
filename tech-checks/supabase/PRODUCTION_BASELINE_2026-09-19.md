@@ -396,3 +396,62 @@ Release identifiers after this Phase 7 pass:
 - Edge agent: v7
 - Service-worker cache: v77
 
+
+
+## Phase 7 Sniper Owner teaching pass
+
+Owner instruction captured on 2026-09-19 completes the core Sniper operating flow without inventing the still-undocumented port/programming details.
+
+### Verified Sniper product knowledge
+
+- Hardware: Avigilon ES appliance, 2 × Avigilon bullet cameras, InHand router, and 2 × 12V 35Ah batteries.
+- Platform: Avigilon Unity.
+- Network: deployable Snipers use an active SIM in the InHand router.
+- IT DELIVERY preparation: pull the assigned Sniper from the shelf, plug it into 120V, verify the ES appliance is reachable through the public IP recorded for that exact unit in the 2026 Unit Tracker, confirm Unity/video/recording/storage readiness, send required information to the Monitoring Center, verify monitoring-side setup, and confirm customer Unity app access.
+- IT SWAP preparation: the replacement Sniper follows the same customer-deployment readiness flow as DELIVERY before the IT → Service handoff.
+- Service field flow: physically verify the two batteries, install the unit on the pole or stand specified by the Service order, call IT to focus/adjust both cameras and verify signal, upload field photos showing the installed unit and unit number/tag, then submit for finalization/completion so the Owner can review it.
+- SWAP return: the replaced field Sniper follows Service Return → IT Intake.
+- BACKUP/truck spare: remains hardware-ready rather than customer-specific. IT checkout is required. Unused spare returns directly to Shop Inventory and is removed from the Service truck; if used for a swap, the replaced field unit follows Service Return → IT Intake.
+- No standalone Sniper spare-battery batch was added; the existing server mapping remains authoritative.
+
+The connected Google Drive search did not surface an accessible file titled 2026 Unit Tracker, so the Unit Tracker/public-IP step is stored as an Owner-approved Cameras On Site procedure rather than as independently connector-verified sheet content.
+
+### Sniper SWAP parity fix
+
+Migration 78 (`sniper_delivery_swap_parity`) records the production function changes. No table or column changes were made.
+
+- `save_it_prep_item_draft` persists and evaluates the customer-deployment readiness fields for Sniper SWAP.
+- The 9-argument `verify_delivery_item_checks` accepts Sniper SWAP and requires the full customer-deployment checks.
+- `release_prep` blocks the Service handoff if a Sniper SWAP is missing any of those checks.
+- `enforce_tech_check_transition_v108` independently blocks a draft → released transition for an incomplete Sniper SWAP.
+- Existing Helios, Ranger, Solar Spotter, support-equipment, photo/signature, truck-spare, return/intake, and Owner-verification gates were preserved.
+
+### Remaining Sniper knowledge gaps
+
+Sniper remains intentionally marked `COMPANY RULE — PARTIAL` only for:
+- exact camera/router port map and port-forwarding values;
+- any deeper Avigilon Unity enrollment/programming sequence beyond the verified operational checks;
+- the exact Monitoring Center field/package contents if individual-field validation is desired;
+- exact ES appliance / bullet-camera model numbers only if model-specific procedures differ;
+- approved Sniper troubleshooting procedures.
+
+### QA / release state
+
+- Shared rules: `rules-v4`
+- Company Knowledge: `company-knowledge-v5`
+- Workflow Engine: `workflow-engine-v4`
+- Tech Check technician workflow: `release-qa-v122`
+- Main loader: `startup-fast-v36`
+- OnSite Vision workspace: `vision-workspace-v16`
+- Edge agent: `onsite-vision-agent-v8` — ACTIVE, JWT verification enabled
+- Service worker: `tech-check-field-shell-v78`
+- Database migrations: 78
+- QA tests: 95
+
+Final source/deployment checks for this pass:
+- browser and Edge copies of shared rules, Company Knowledge, and Workflow Engine are byte-identical;
+- deployed Edge index/rules/knowledge/workflow files match the GitHub function bundle;
+- JavaScript syntax checks passed for shared rules, knowledge, workflow engine, technician wizard, app loader, and service worker;
+- `tests.json` parses successfully;
+- Sniper SWAP release and persistence gates are present in the live database;
+- Tesseract/OCR is not present in the service-worker startup cache.
