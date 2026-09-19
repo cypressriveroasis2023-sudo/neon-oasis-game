@@ -427,9 +427,13 @@
         "physically ready for Service"
       ],
       "unknowns": [
-        "Detailed product-specific field installation SOP"
+        "Detailed product-specific field installation SOP",
+        "Purpose parity: shared rules document DELIVERY/SWAP, while current add/configure RPCs do not explicitly reject BACKUP",
+        "Standalone Solar Pole Service-close enforcement: service_solar_context_v2 can surface solar checkout, but enforce_service_solar_check_before_close only hard-gates Solar Spotter, Ranger, and Helios"
       ],
       "teaching_needed": [
+        "Confirm whether Solar Pole BACKUP should be allowed or explicitly prohibited so shared rules and server behavior can be brought into parity.",
+        "Confirm the intended Service checkout/close requirements for a standalone Solar Pole delivery before adding product-specific mandatory evidence.",
         "List every Solar Pole component/accessory that must travel with it.",
         "Document the Solar Pole Service field-install/removal SOP.",
         "Document any Solar Pole battery, MPPT, PV/charging, positioning, anchoring, or safety rules that apply.",
@@ -482,9 +486,11 @@
         "matches requested/MHelpDesk equipment"
       ],
       "unknowns": [
-        "Detailed product-specific field installation SOP"
+        "Detailed product-specific field installation SOP",
+        "Purpose parity: shared rules document DELIVERY/SWAP, while current add/configure RPCs do not explicitly reject BACKUP"
       ],
       "teaching_needed": [
+        "Confirm whether Pole BACKUP should be allowed or explicitly prohibited so shared rules and server behavior can be brought into parity.",
         "List every Pole component/accessory that must travel with it.",
         "Document the Pole Delivery/Swap installation and removal SOP.",
         "Document any company mounting, anchoring, height, positioning, or safety rules that apply.",
@@ -550,9 +556,9 @@
       "Sniper": "Internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
       "Spotter": "Internal components, battery applicability/specification, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
       "Recon 2": "Exact battery model/specification, internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
-      "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, and troubleshooting still need Owner-approved documentation.",
+      "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, troubleshooting, BACKUP-purpose parity, and standalone Service-close behavior still need Owner-approved documentation.",
       "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
-      "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, and troubleshooting still need Owner-approved documentation."
+      "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
     "truck_spares": [
       "Confirm whether Sniper should support a standalone spare-battery batch and, if so, its exact battery label/specification.",
