@@ -1,5 +1,5 @@
 /* Cameras On Site — Shared Tech Check Rules
- * Version: rules-v4
+ * Version: rules-v5
  * Pure rule definitions shared by Owner/IT/Service UI and OnSite Vision.
  * Supabase RPCs/triggers remain the final authority for production transitions.
  */
@@ -65,6 +65,37 @@
       'Exact Monitoring Center data fields/package beyond sending all required monitoring information.',
       'Approved Sniper troubleshooting tree.'
     ])
+  });
+
+  const STANDARD_CAMERA_PORTS=Object.freeze([81,554]);
+  const SPOTTER_PROFILE=Object.freeze({
+    cameras:4,
+    router:'internal router',
+    batteries:0,
+    platform:'Alibi app',
+    built_state:'Spotter units are already built and are normally already programmed.',
+    top_component:'A built-in top-mounted component is present; exact component name is not yet confirmed.',
+    delivery_support:'Delivery uses the pole or stand specified by the Service order; Service physically grabs/verifies that support equipment.',
+    swap_support:'SWAP takes the replacement Spotter only — no additional pole or stand.',
+    swap_return:'The replaced field Spotter must return through Service Return → IT Intake.',
+    ports:STANDARD_CAMERA_PORTS
+  });
+  const RECON2_PROFILE=Object.freeze({
+    platform:'Reconeyez app',
+    built_state:'Older Recon II units may already be programmed; IT must verify the actual unit is programmed before deployment.',
+    camera_count_rule:'Record the number of cameras going on this Recon II separately from the battery quantity.',
+    battery_rule:'IT prepares the actual battery quantity after the unit is programmed and ready; database minimum remains one until an exact battery specification/rule is taught.',
+    delivery_support:'Delivery uses the pole or stand specified by the Service order.',
+    swap_return:'The replaced field Recon II must return through Service Return → IT Intake.',
+    ports:STANDARD_CAMERA_PORTS
+  });
+  const RANGER_PROFILE=Object.freeze({
+    battery:'1 × LiTime 12V 110Ah',
+    ports:STANDARD_CAMERA_PORTS,
+    shop_test:'IT tests the Ranger with its battery attached and verifies charging through the MPPT.',
+    storage_sequence:'Verify the camera records first, then format the internal SD card and leave it ready.',
+    monitoring:'Send all required information to Central Station and confirm customer shared-email access.',
+    service_field:'In the field, Service verifies the Ranger is up to date in the Victron Bluetooth app before the Tech Check can close.'
   });
 
   const DEVICE_TYPES=Object.freeze(Object.keys(EQUIPMENT).filter(k=>EQUIPMENT[k].category==='device'));
@@ -206,7 +237,7 @@
     }
 
     const batteryCount=requiredBatteryCount(item);
-    if(type!=='Solar Spotter'&&batteryCount>0){
+    if(type!=='Solar Spotter'&&type!=='Spotter'&&batteryCount>0){
       steps.push({
         kind:'number',field:'battery_count',
         label:type==='Helios'
@@ -215,7 +246,7 @@
       });
     }
 
-    steps.push({kind:'bool',field:'power_ok',label:type==='Sniper' ? 'With '+unit+' plugged into 120V, does the Sniper power on correctly?' : 'Does '+unit+' power on correctly?'});
+    steps.push({kind:'bool',field:'power_ok',label:type==='Sniper' ? 'With '+unit+' plugged into 120V, does the Sniper power on correctly?' : type==='Spotter' ? 'With '+unit+' plugged in, does the Spotter power on correctly?' : 'Does '+unit+' power on correctly?'});
 
     if(type==='Sniper'&&['DELIVERY','SWAP','BACKUP'].includes(purpose)){
       steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is an active SIM installed in the InHand router for '+unit+' and is the router online?'});
@@ -229,6 +260,43 @@
         steps.push({kind:'bool',field:'delivery_customer_email_app_ok',label:'Was customer access to the Avigilon Unity app confirmed for '+unit+'?'});
       }
       steps.push({kind:'bool',field:'functions_ok',label:'Were the Avigilon ES appliance, both bullet cameras, InHand router, and required Sniper functions tested and working?'});
+      steps.push({kind:'bool',field:'safe_ok',label:'Is '+unit+' ready for the IT → Service handoff?'});
+      return steps;
+    }
+
+    if(type==='Spotter'&&['DELIVERY','SWAP','BACKUP'].includes(purpose)){
+      steps.push({kind:'bool',field:'unit_programmed_ok',label:'Is '+unit+' already programmed and verified in the Alibi app?'});
+      steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is the internal router / cellular connection for '+unit+' online and ready?'});
+      steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Does '+unit+' come up correctly in the Alibi app?'});
+      steps.push({kind:'bool',field:'camera_port_81_ok',label:'Is port 81 available/configured in the router for '+unit+' so Central Station can reach it?'});
+      steps.push({kind:'bool',field:'camera_port_554_ok',label:'Is port 554 available/configured in the router for '+unit+' so Central Station can reach it?'});
+      steps.push({kind:'bool',field:'delivery_recording_ok',label:'Did you verify all 4 Spotter cameras work and that recording works on the NVR or SD-card storage?'});
+      steps.push({kind:'bool',field:'delivery_sd_formatted_ok',label:'Is the NVR or SD-card storage formatted and ready for deployment?'});
+      if(purpose!=='BACKUP'){
+        steps.push({kind:'bool',field:'delivery_monitoring_ok',label:'Was the required paperwork/information sent and can Central Station see '+unit+'?'});
+        steps.push({kind:'bool',field:'delivery_ticket_count_ok',label:purpose==='SWAP'?'Does the Service order correctly identify this Spotter SWAP replacement (no additional pole/stand)?':'Does the Service order correctly identify this Spotter and whether Service needs a pole or stand?'});
+        steps.push({kind:'bool',field:'delivery_customer_email_app_ok',label:'Were the customer-provided email address(es) added so the customer has access to '+unit+'?'});
+      }
+      steps.push({kind:'bool',field:'functions_ok',label:'Were the internal router and all 4 Spotter cameras tested and working?'});
+      steps.push({kind:'bool',field:'safe_ok',label:'Is '+unit+' ready for the IT → Service handoff?'});
+      return steps;
+    }
+
+    if(type==='Recon 2'&&['DELIVERY','SWAP','BACKUP'].includes(purpose)){
+      steps.push({kind:'bool',field:'unit_programmed_ok',label:'Is '+unit+' programmed and visible in the Reconeyez app?'});
+      steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is the Recon II network / cellular connection online and ready?'});
+      steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Can you see the prepared Recon II in the Reconeyez app?'});
+      steps.push({kind:'bool',field:'camera_port_81_ok',label:'Is port 81 available/configured in the router for '+unit+' so Central Station can reach it?'});
+      steps.push({kind:'bool',field:'camera_port_554_ok',label:'Is port 554 available/configured in the router for '+unit+' so Central Station can reach it?'});
+      steps.push({kind:'bool',field:'delivery_recording_ok',label:'Did you verify the configured Recon II camera set is working and recording?'});
+      steps.push({kind:'bool',field:'delivery_batteries_charged_ok',label:'Are the actual Recon II batteries prepared for this unit charged and ready?'});
+      steps.push({kind:'bool',field:'delivery_sd_formatted_ok',label:'Is the Recon II storage / recording setup ready for deployment?'});
+      if(purpose!=='BACKUP'){
+        steps.push({kind:'bool',field:'delivery_monitoring_ok',label:'Was all required information sent to Central Station and is monitoring ready?'});
+        steps.push({kind:'bool',field:'delivery_ticket_count_ok',label:purpose==='SWAP'?'Does the Service order correctly identify this Recon II SWAP replacement?':'Does the Service order correctly identify the Recon II camera count and whether Service needs a pole or stand?'});
+        steps.push({kind:'bool',field:'delivery_customer_email_app_ok',label:'Was the required customer access / shared account information completed for this Recon II deployment?'});
+      }
+      steps.push({kind:'bool',field:'functions_ok',label:'Were the configured Recon II cameras and unit functions tested and working?'});
       steps.push({kind:'bool',field:'safe_ok',label:'Is '+unit+' ready for the IT → Service handoff?'});
       return steps;
     }
@@ -272,14 +340,31 @@
     if(type==='Ranger'){
       steps.push({kind:'bool',field:'solar_mppt_updated_ok',label:'Is the MPPT firmware / configuration on '+unit+' updated?'});
       steps.push({kind:'bool',field:'solar_mppt_tested_ok',label:'Was the MPPT on '+unit+' tested and working correctly?'});
-      steps.push({kind:'bool',field:'solar_pv_charging_ok',label:'With a solar panel connected to '+unit+', did you verify the Ranger battery is charging through the MPPT?'});
+      steps.push({kind:'bool',field:'solar_pv_charging_ok',label:'With the LiTime 12V 110Ah battery attached and a solar panel connected to '+unit+', did you verify the battery is charging through the MPPT?'});
+      if(['DELIVERY','SWAP','BACKUP'].includes(purpose)){
+        steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is the Ranger network / SIM connection online and ready?'});
+        steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Is the Ranger camera visible and working in the camera app?'});
+        steps.push({kind:'bool',field:'camera_port_81_ok',label:'Is port 81 available/configured in the Ranger router so Central Station can reach the camera?'});
+        steps.push({kind:'bool',field:'camera_port_554_ok',label:'Is port 554 available/configured in the Ranger router so Central Station can reach the camera?'});
+        steps.push({kind:'bool',field:'delivery_recording_ok',label:'Before formatting, did you verify the Ranger camera records correctly to its SD card?'});
+        steps.push({kind:'bool',field:'delivery_sd_formatted_ok',label:'After recording verification, is the Ranger SD card formatted and ready?'});
+        steps.push({kind:'bool',field:'delivery_batteries_charged_ok',label:'Is the required LiTime 12V 110Ah battery charged and ready with this Ranger?'});
+        if(purpose!=='BACKUP'){
+          steps.push({kind:'bool',field:'delivery_monitoring_ok',label:'Was all required Ranger information sent to Central Station and is monitoring ready?'});
+          steps.push({kind:'bool',field:'delivery_ticket_count_ok',label:'Is this Ranger correctly listed on the current Service order / MHelpDesk ticket?'});
+          steps.push({kind:'bool',field:'delivery_customer_email_app_ok',label:'Was the customer shared email / camera access completed for this Ranger?'});
+        }
+        steps.push({kind:'bool',field:'functions_ok',label:'Were the Ranger camera, MPPT, router, battery charging, and required functions tested and working?'});
+        steps.push({kind:'bool',field:'safe_ok',label:'Is '+unit+' ready for the IT → Service handoff?'});
+        return steps;
+      }
     }
 
     if(['DELIVERY','BACKUP'].includes(purpose)){
       steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is the SIM card for '+unit+' active and installed in the router?'});
       steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Is '+unit+' visible in the camera app?'});
       steps.push({kind:'bool',field:'delivery_recording_ok',label:'Was recording footage confirmed for '+unit+'?'});
-      if(type!=='Solar Spotter')steps.push({kind:'bool',field:'delivery_batteries_charged_ok',label:'Are the batteries / battery box for '+unit+' charged and ready?'});
+      if(!['Solar Spotter','Spotter'].includes(type))steps.push({kind:'bool',field:'delivery_batteries_charged_ok',label:'Are the batteries / battery box for '+unit+' charged and ready?'});
       if(purpose==='DELIVERY'){
         steps.push({kind:'bool',field:'delivery_monitoring_ok',label:'Was Central Station monitoring for '+unit+' created and sent in?'});
         steps.push({kind:'bool',field:'delivery_ticket_count_ok',label:'Is '+unit+' included in the equipment type and quantity on the MHelpDesk ticket?'});
@@ -323,10 +408,12 @@
       return purpose==='BACKUP'?true:Boolean(item.delivery_customer_email_app_ok&&item.delivery_monitoring_ok);
     }
 
-    if(type==='Ranger'&&!(item.solar_mppt_updated_ok&&item.solar_mppt_tested_ok&&item.solar_pv_charging_ok))return false;
-    const sniperSwap=type==='Sniper'&&purpose==='SWAP';
-    if(!['DELIVERY','BACKUP'].includes(purpose)&&!sniperSwap)return true;
-    const batteryReady=type==='Solar Spotter'||item.delivery_batteries_charged_ok;
+    if(type==='Spotter'&&!(item.unit_programmed_ok&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
+    if(type==='Recon 2'&&!(item.unit_programmed_ok&&Number(item.recon_camera_count||0)>=1&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
+    if(type==='Ranger'&&!(item.solar_mppt_updated_ok&&item.solar_mppt_tested_ok&&item.solar_pv_charging_ok&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
+    const customerSwap=['Sniper','Spotter','Recon 2','Ranger'].includes(type)&&purpose==='SWAP';
+    if(!['DELIVERY','BACKUP'].includes(purpose)&&!customerSwap)return true;
+    const batteryReady=['Solar Spotter','Spotter'].includes(type)||item.delivery_batteries_charged_ok;
     const hardwareReady=Boolean(item.delivery_sim_ok&&item.delivery_camera_app_ok&&item.delivery_sd_formatted_ok&&item.delivery_recording_ok&&batteryReady);
     if(purpose==='BACKUP')return hardwareReady;
     return Boolean(hardwareReady&&item.delivery_customer_email_app_ok&&item.delivery_monitoring_ok&&item.delivery_ticket_count_ok);
@@ -378,13 +465,17 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v4',
+    version:'rules-v5',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
     standTypes:STAND_TYPES,
     heliosPorts:HELIOS_PORTS,
+    standardCameraPorts:STANDARD_CAMERA_PORTS,
     sniperProfile:SNIPER_PROFILE,
+    spotterProfile:SPOTTER_PROFILE,
+    recon2Profile:RECON2_PROFILE,
+    rangerProfile:RANGER_PROFILE,
     truckSpareBatteryOptions:TRUCK_SPARE_BATTERY_OPTIONS,
     truckSpareRules:TRUCK_SPARE_RULES,
     heliosFieldChecklist:HELIOS_FIELD_CHECKLIST,
