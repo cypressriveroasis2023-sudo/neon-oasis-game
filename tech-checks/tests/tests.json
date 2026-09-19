@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v105",
-  "service_worker": "v51",
+  "runtime_version": "release-qa-v106",
+  "service_worker": "v52",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,9 +658,9 @@
         "Background and reopen"
       ],
       "expected": [
-        "v51 cached shell loads without AccessDenied",
-        "release-qa-v105 final IT review is separated from Parts and Truck Spares",
-        "No stale v104 blended Ticket Summary after refresh/background cycle"
+        "v52 cached shell loads without AccessDenied",
+        "release-qa-v106 tag-scan UI appears when solar tag photos are taken",
+        "OCR library remains off the startup path"
       ],
       "manual_device": true
     },
@@ -1057,7 +1057,76 @@
         "Help tells IT to use Manage Truck Spares from Ticket Summary",
         "Show Me remains non-destructive"
       ]
+    },
+    {
+      "id": "IT-17",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "AI-assisted solar unit tag scan",
+      "steps": [
+        "Take a Helios/Ranger/Solar Spotter/Solar Stand/Solar Pole unit photo",
+        "Save photo"
+      ],
+      "expected": [
+        "OCR loads only at photo time",
+        "Expected unit tag comes from current prep item",
+        "MATCH/MISMATCH/UNREADABLE is saved to prep_items",
+        "Manual technician confirmation is still required"
+      ]
+    },
+    {
+      "id": "IT-18",
+      "area": "IT",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "AI mismatch cannot be manually approved",
+      "steps": [
+        "Scan a solar-unit photo that reads a different tag",
+        "Attempt YES — TAG MATCHES"
+      ],
+      "expected": [
+        "Mismatch is shown in red",
+        "YES approval is disabled/blocked",
+        "Tech must retake the tag photo"
+      ]
+    },
+    {
+      "id": "SERVICE-14",
+      "area": "Service",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Returned solar unit tag scan",
+      "steps": [
+        "Select old Helios/solar unit for return",
+        "Take unit-tag photo"
+      ],
+      "expected": [
+        "Photo is scanned against selected returned unit tag",
+        "Different tag blocks continuing",
+        "Unreadable scan requires manual visual confirmation",
+        "Saved return row carries scan result for IT/Owner"
+      ]
+    },
+    {
+      "id": "STARTUP-06",
+      "area": "Startup",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "OCR scanner does not slow app startup",
+      "steps": [
+        "Inspect static index/app/SW startup assets"
+      ],
+      "expected": [
+        "Tesseract is not statically loaded in index",
+        "Tesseract is not service-worker precached",
+        "OCR module is dynamically imported only by tag-photo scan helper"
+      ]
     }
   ],
-  "last_release_qa_note": "IT final review is now a dedicated Ticket Summary screen. Parts and Truck Spares open as separate subpages and return to review; generic user-facing part labels use Additional rather than Replacement."
+  "last_release_qa_note": "AI-assisted OCR tag verification added for solar equipment photos and returned solar-unit tag photos. MATCH/MISMATCH/UNREADABLE is saved; clear mismatch blocks approval; human confirmation remains required; OCR loads only on demand."
 }
