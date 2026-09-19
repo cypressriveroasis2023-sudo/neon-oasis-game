@@ -252,7 +252,11 @@ async function enterApp(session) {
   updateItWeather();
   configureTabs();
   setupRealtime();
-  await refreshData();
+
+  // Make the app responsive immediately. Shared data refreshes just after first paint.
+  window.dispatchEvent(new CustomEvent('techcheck:app-ready', { detail:{ role:profile.role } }));
+  const startInitialRefresh = () => refreshData().catch(error => console.warn('Initial Tech Check refresh failed', error));
+  requestAnimationFrame(() => setTimeout(startInitialRefresh, 0));
 }
 function showForcedPasswordChange(profile) {
   $('authView').classList.add('hidden');
@@ -318,7 +322,7 @@ function show(which) {
     $('view-' + n).classList.toggle('hidden', n !== which);
     $('tab-' + n).classList.toggle('on', n === which);
   });
-  if (which === 'owner' && typeof window.refreshOwnerIntake === 'function') window.refreshOwnerIntake();
+  window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
   await db.auth.signOut();
