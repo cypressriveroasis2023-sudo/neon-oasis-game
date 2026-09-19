@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v55';
+const CACHE_NAME = 'tech-check-field-shell-v56';
 const APP_SHELL = './';
 
 self.addEventListener('install', event => {
@@ -7,10 +7,10 @@ self.addEventListener('install', event => {
     // Shell first so install is resilient; performance assets are best-effort.
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
-      cache.add(new Request('./app.js?v=startup-fast-v23', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v109', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=startup-fast-v24', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v110', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
-      cache.add(new Request('./styles.css?v=onsite-vision-v109', { cache:'reload' }))
+      cache.add(new Request('./styles.css?v=owner-assistant-v110', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
