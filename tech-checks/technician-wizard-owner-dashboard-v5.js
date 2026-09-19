@@ -42,7 +42,7 @@ let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
-let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', photo: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
+let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
 const FIELD_DRAFT_TTL = 24 * 60 * 60 * 1000;
@@ -2137,6 +2137,82 @@ async function optimizeEvidencePhoto(file) {
     URL.revokeObjectURL(url);
   }
 }
+let tagScannerModulePromise=null;
+function shouldScanUnitTag(type) {
+  return ['Helios','Ranger','Solar Spotter','Solar Stand','Solar Pole'].includes(String(type||''));
+}
+function normalizeScannedTag(value) {
+  return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+async function loadTagScanner() {
+  if (!tagScannerModulePromise) {
+    tagScannerModulePromise=import('https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.esm.min.js')
+      .catch(error => { tagScannerModulePromise=null; throw error; });
+  }
+  return tagScannerModulePromise;
+}
+async function scanUnitTagPhoto(file,expectedTag) {
+  const expected=normalizeScannedTag(expectedTag);
+  if (!file || !expected) return {status:'unreadable',detected:'',confidence:null,engine:'tesseract.js-7.0.0'};
+  let worker=null;
+  try {
+    const mod=await loadTagScanner();
+    worker=await mod.createWorker('eng');
+    await worker.setParameters({ tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_' });
+    const result=await worker.recognize(file);
+    const raw=String(result?.data?.text||'').trim();
+    const full=normalizeScannedTag(raw);
+    const confidence=Number.isFinite(Number(result?.data?.confidence)) ? Math.round(Number(result.data.confidence)*10)/10 : null;
+    if (full.includes(expected)) return {status:'match',detected:expectedTag,confidence,engine:'tesseract.js-7.0.0',raw};
+    const tokens=raw.toUpperCase().split(/\s+/).map(normalizeScannedTag).filter(Boolean)
+      .filter(token=>token.length>=Math.max(2,expected.length-2) && token.length<=expected.length+4);
+    const candidate=tokens.sort((a,b)=>Math.abs(a.length-expected.length)-Math.abs(b.length-expected.length))[0]||'';
+    return candidate
+      ? {status:'mismatch',detected:candidate,confidence,engine:'tesseract.js-7.0.0',raw}
+      : {status:'unreadable',detected:raw.slice(0,80),confidence,engine:'tesseract.js-7.0.0',raw};
+  } catch(error) {
+    console.warn('AI/OCR tag scan unavailable',error);
+    return {status:'unreadable',detected:'',confidence:null,engine:'tesseract.js-7.0.0'};
+  } finally {
+    try { await worker?.terminate?.(); } catch {}
+  }
+}
+function tagScanStatusHtml(scan,expectedTag) {
+  if (!scan?.status) return '';
+  const confidence=scan.confidence!=null ? ` · ${Math.round(Number(scan.confidence))}% OCR confidence` : '';
+  if (scan.status==='match') return `<div class='ok top8'><b>✓ AI TAG MATCH</b><div class='small'>Photo scan found ${esc(expectedTag)}${confidence}. Technician visual confirmation is still required.</div></div>`;
+  if (scan.status==='mismatch') return `<div class='wl-stop top8'><b>✕ AI TAG MISMATCH</b><div class='small'>Expected <b>${esc(expectedTag)}</b>, but the scan read <b>${esc(scan.detected||'a different tag')}</b>${confidence}. Retake the photo before approving it.</div></div>`;
+  return `<div class='warn top8'><b>AI COULD NOT READ THE TAG</b><div class='small'>Expected <b>${esc(expectedTag)}</b>. Retake a clearer photo or visually verify the tag yourself.</div></div>`;
+}
+function itemTagScan(item) {
+  return item?.ai_tag_scan_status ? {
+    status:item.ai_tag_scan_status,
+    detected:item.ai_tag_scan_detected||'',
+    expected:item.ai_tag_scan_expected||item.unit_tag||'',
+    confidence:item.ai_tag_scan_confidence,
+    engine:item.ai_tag_scan_engine||''
+  } : null;
+}
+function returnTagScan(row) {
+  return row?.tag_scan_status ? {
+    status:row.tag_scan_status,
+    detected:row.tag_scan_detected||'',
+    expected:row.tag_scan_expected||row.unit_tag||'',
+    confidence:row.tag_scan_confidence,
+    engine:row.tag_scan_engine||''
+  } : null;
+}
+async function saveItTagScan(itemId,scan) {
+  const { error }=await liveDb.rpc('record_it_unit_ai_tag_scan',{
+    p_item_id:itemId,
+    p_status:scan.status,
+    p_detected:scan.detected||null,
+    p_confidence:scan.confidence==null?null:Number(scan.confidence),
+    p_engine:scan.engine||'tesseract.js-7.0.0'
+  });
+  if (error) throw error;
+}
+
 async function uploadEvidence(prepId, stage, kind, file, name, itemId = null) {
   const { data: { session } } = await liveDb.auth.getSession();
   if (!session?.user?.id) throw new Error('Please sign in again.');
@@ -2210,7 +2286,10 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
   const instruction = unitNo ? (stage === 'it' && tag ? `Take exactly 1 clear photo of ${identity}. Make sure unit tag ${tag} is clearly visible and readable in the photo.` : `Take exactly 1 clear photo for Unit ${unitNo}.`) : stage === 'service' ? `IT supplied ${required} photo${required === 1 ? '' : 's'}. Take exactly ${required} Service receipt photo${required === 1 ? '' : 's'} so the photo counts match.` : 'Photograph exactly what is leaving the shop.';
   const complete = photos.length === required;
   const input = complete && !unitNo ? '' : `<input class='wl-file top8' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}><button class='mini full top8' data-wl-upload='${stage}'>${unitNo && photos.length ? 'Replace Unit Photo' : 'Save Photo(s)'}</button>`;
-  const tagConfirm = stage === 'it' && unitNo && photos.length ? `<div class='wl-question top8'><div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes'>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Tag confirmation required before continuing.</b></div>`}</div>` : '';
+  const aiScan = stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? itemTagScan(item) : null;
+  const aiScanHtml = aiScan ? tagScanStatusHtml(aiScan,tag) : (stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? `<div class='warn top8'><b>AI tag scan pending.</b><div class='small'>Retake/save the unit photo if the scan did not run.</div></div>` : '');
+  const aiMismatch = aiScan?.status === 'mismatch';
+  const tagConfirm = stage === 'it' && unitNo && photos.length ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
   return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'><b>${stage === 'it' && unitNo ? `${esc(identity)} Photo` : unitNo ? `Unit ${unitNo} Photo` : 'Photo Proof'}</b><div class='wl-note'>${instruction}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div><div class='${complete ? 'ok' : 'warn'} top8'><b>${complete ? '✓' : ''} ${photos.length} of ${required} photo${required === 1 ? '' : 's'} saved</b></div>` : `<div class='warn top8'>0 of ${required} photos saved.</div>`}${tagConfirm}${input}</div>`;
 }
 async function signatureOnlyHtml(prepId, stage, unitNo = null) {
@@ -3331,7 +3410,20 @@ async function refreshProofPanel(panel) {
   next?.querySelectorAll('canvas').forEach(wireCanvas);
 }
 document.addEventListener('change', async e => {
-  if (e.target.id === 'wlReturnPhoto') { const file = e.target.files?.[0]; if (!file) return; serviceReturn.photo = file; saveServiceReturnDraft(); return renderServiceReturn(); }
+  if (e.target.id === 'wlReturnPhoto') {
+    const file=e.target.files?.[0];
+    if (!file) return;
+    serviceReturn.photo=await optimizeEvidencePhoto(file);
+    serviceReturn.tagScan={status:'scanning',detected:'',confidence:null,engine:'tesseract.js-7.0.0'};
+    renderServiceReturn();
+    if (shouldScanUnitTag(serviceReturn.type) && serviceReturn.unit) {
+      serviceReturn.tagScan=await scanUnitTagPhoto(serviceReturn.photo,serviceReturn.unit);
+    } else {
+      serviceReturn.tagScan=null;
+    }
+    saveServiceReturnDraft();
+    return renderServiceReturn();
+  }
   if (e.target.id === 'wlReturnConditionPhotos') { serviceReturn.conditionPhotos = await prepareReturnPreviewPhotos([...(e.target.files || [])]); return renderServiceReturn(); }
   if (e.target.id === 'wlReturnDamagePhotos') { serviceReturn.damagePhotos = await prepareReturnPreviewPhotos([...(e.target.files || [])]); return renderServiceReturn(); }
   if (e.target.id === 'wlIntakePhoto') {
@@ -3443,6 +3535,7 @@ document.addEventListener('click', async e => {
     const item = currentItItem();
     if (!item) return;
     const matches = photoTag.dataset.wlPhotoTag === 'yes';
+    if (matches && item.ai_tag_scan_status==='mismatch') return alert(`AI read a different tag than ${item.unit_tag}. Retake a clear tag photo before approving this unit.`);
     const { error } = await liveDb.rpc('confirm_it_unit_photo_tag', { p_item_id: item.id, p_matches: matches });
     if (error) return alert(error.message);
     activeItPrep = await getPrep(activeItPrep.id);
@@ -3755,7 +3848,48 @@ document.addEventListener('click', async e => {
   }
 
   if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
-  const upload = e.target.closest('[data-wl-upload]'); if (upload) { const panel = upload.closest('.wl-proof'); const input = panel.querySelector('.wl-file'); const files = [...(input.files || [])]; if (!files.length) return alert('Take or select at least one photo.'); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const expected = Number(panel.dataset.expected || 0) || null; if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.'); if (panel.dataset.stage === 'service' && expected) { const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length; if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`); } upload.disabled = true; upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…'; try { const optimized = await Promise.all(files.map(optimizeEvidencePhoto)); upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…'; await Promise.all(optimized.map((f, i) => { const original = f.name || files[i].name; const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original; return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId); })); if (panel.dataset.stage === 'it' && unitNo && activeItPrep) { activeItPrep = await getPrep(activeItPrep.id); return renderItUnitStep(); } await refreshProofPanel(panel); } catch (err) { upload.disabled = false; upload.textContent = 'Save Photo(s)'; alert(err.message || 'Upload failed.'); } return; }
+  const upload = e.target.closest('[data-wl-upload]'); if (upload) {
+    const panel = upload.closest('.wl-proof');
+    const input = panel.querySelector('.wl-file');
+    const files = [...(input.files || [])];
+    if (!files.length) return alert('Take or select at least one photo.');
+    const unitNo = Number(panel.dataset.unit || 0) || null;
+    const item = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
+    const itemId = item?.id || null;
+    const expected = Number(panel.dataset.expected || 0) || null;
+    if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.');
+    if (panel.dataset.stage === 'service' && expected) {
+      const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length;
+      if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`);
+    }
+    upload.disabled = true;
+    upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…';
+    try {
+      const optimized = await Promise.all(files.map(optimizeEvidencePhoto));
+      let tagScan=null;
+      if (panel.dataset.stage==='it' && unitNo && item && shouldScanUnitTag(item.equipment_type) && item.unit_tag) {
+        upload.textContent='AI scanning unit tag…';
+        tagScan=await scanUnitTagPhoto(optimized[0],item.unit_tag);
+      }
+      upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…';
+      await Promise.all(optimized.map((f, i) => {
+        const original = f.name || files[i].name;
+        const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original;
+        return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId);
+      }));
+      if (tagScan && itemId) await saveItTagScan(itemId,tagScan);
+      if (panel.dataset.stage === 'it' && unitNo && activeItPrep) {
+        activeItPrep = await getPrep(activeItPrep.id);
+        return renderItUnitStep();
+      }
+      await refreshProofPanel(panel);
+    } catch (err) {
+      upload.disabled = false;
+      upload.textContent = 'Save Photo(s)';
+      alert(err.message || 'Upload failed.');
+    }
+    return;
+  }
   const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
   const save = e.target.closest('[data-wl-save-sign]'); if (save) { const panel = save.closest('.wl-proof'); const canvas = panel.querySelector('canvas'); if (!canvas?.dataset.ink) return alert('Sign in the box first.'); const blob = await blobFromCanvas(canvas); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const signatureName = unitNo ? `unit-${unitNo}-signature.png` : 'signature.png'; await uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'signature', blob, signatureName, itemId); if (panel.dataset.stage === 'it' && panel.dataset.mode === 'signature' && activeItPrep) return renderItUnitStep(); await refreshProofPanel(panel); return; }
   const replace = e.target.closest('[data-wl-replace]'); if (replace) { const panel = replace.closest('.wl-proof'); const saved = panel.querySelector('.wl-saved'); const btn = replace; saved?.remove(); btn.remove(); const d = document.createElement('div'); d.className = 'wl-sign top8'; d.innerHTML = `<b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${panel.dataset.stage}'>Save Signature</button></div>`; panel.append(d); wireCanvas(d.querySelector('canvas')); return; }
@@ -3818,8 +3952,14 @@ function renderServiceReturn() {
   if (step === 0) card.innerHTML = `${progress('Return Unit · Step 1 of 5', 'Enter the MHelpDesk ticket number', 1, 5)}<div class='wl-question'><div class='qtext'>What MHelpDesk ticket is this unit coming back from?</div><input id='wlReturnTicket' inputmode='numeric' value='${esc(serviceReturn.ticket)}' placeholder='Ticket #'></div><div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`;
   else if (step === 1) { const remembered = serviceReturn.knownUnits || []; const choices = remembered.map(item => `<button class='wl-unit-choice ${norm(serviceReturn.unit) === norm(item.unit_tag) ? 'on' : ''}' data-wl-return-unit='${esc(item.unit_tag)}' data-wl-return-type='${esc(item.equipment_type || '')}'><b>${esc(item.unit_tag)}</b><span>${esc(item.equipment_type || 'Known unit')} · remembered from MHelpDesk #${esc(serviceReturn.ticket)}</span></button>`).join(''); card.innerHTML = `${progress('Return Unit · Step 2 of 5', 'Choose the exact unit IT will receive', 2, 5)}<div class='wl-question'><div class='qtext'>Which unit is coming back from MHelpDesk #${esc(serviceReturn.ticket)}?</div>${choices ? `<div class='wl-note'>These units are already remembered from this ticket. Tap the unit coming back.</div><div class='wl-unit-choices'>${choices}</div><div class='wl-divider'>OR ENTER A UNIT TAG</div>` : `<div class='wl-note'>No remembered unit tags were found for this ticket yet. Enter the exact tag below.</div>`}<input id='wlReturnUnit' value='${esc(serviceReturn.unit)}' placeholder='Exact unit tag'></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`; }
   else if (step === 2) { const options = [...CAMERA_UNIT_TYPES, ...STAND_POLE_TYPES].map(type => `<option value='${esc(type)}' ${serviceReturn.type === type ? 'selected' : ''}>${esc(type)}</option>`).join(''); card.innerHTML = `${progress('Return Unit · Step 3 of 5', 'Choose the equipment type', 3, 5)}<div class='wl-question'><div class='qtext'>What type of unit is ${esc(serviceReturn.unit)}?</div><select id='wlReturnType'><option value=''>Choose type…</option>${options}<option value='Other' ${serviceReturn.type === 'Other' ? 'selected' : ''}>Other</option></select></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Photo →</button></div>`; }
-  else if (step === 3) card.innerHTML = `${progress('Return Unit · Step 4 of 5', `Photograph unit tag ${serviceReturn.unit}`, 4, 5)}<div class='wl-question'><div class='qtext'>Take a clear photo of the UNIT TAG showing ${esc(serviceReturn.unit)}.</div><div class='wl-stop'><b>Required photo proof</b><div>The tag number <b>${esc(serviceReturn.unit)}</b> must be readable in the picture. This photo will be saved to this exact returned unit and MHelpDesk #${esc(serviceReturn.ticket)}.</div></div><label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE UNIT TAG PHOTO</label><input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'><div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected unit tag photo'><div class='ok'><b>✓ Photo selected for unit ${esc(serviceReturn.unit)}</b><div>Confirm ${esc(serviceReturn.unit)} is readable before continuing.</div></div>` : ''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Review →</button></div>`;
-  else { const conditionPreview = (serviceReturn.conditionPhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Site condition photo'>`).join(''); const damagePreview = (serviceReturn.damagePhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Damage photo'>`).join(''); card.innerHTML = `${progress('Return Unit · Step 5 of 5', 'Document how the unit looked at the site', 5, 5)}<div class='wl-review'><b>${esc(serviceReturn.unit)} · ${esc(serviceReturn.type)}</b><div><b>MHelpDesk #${esc(serviceReturn.ticket)}</b></div><div>📷 Unit tag photo ready</div><div class='small top8'>Add photos showing the camera/unit as it looked at the site. If there is damage, add close-up damage photos and describe it below. IT Intake will see all of this before checking the unit.</div></div><div class='wl-question top10'><div class='qtext'>Site condition photos</div><div class='wl-note'>Take pictures showing the overall camera/unit condition before it leaves the site. Add as many as needed to verify it still looks good.</div><label class='wl-photo-button' for='wlReturnConditionPhotos'>📷 ADD SITE CONDITION PHOTOS</label><input id='wlReturnConditionPhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${conditionPreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${conditionPreview}</div><div class='ok'>✓ ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'} selected</div></div></div><div class='wl-question top10'><div class='qtext'>Damage photos, if damage is found</div><div class='wl-note'>Take close-up pictures of scratches, broken parts, dents, missing pieces, camera damage, or anything else IT needs to inspect.</div><label class='wl-photo-button wl-damage-photo' for='wlReturnDamagePhotos'>⚠️ ADD DAMAGE PHOTOS</label><input id='wlReturnDamagePhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${damagePreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${damagePreview}</div><div class='warn'>⚠ ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'} selected — describe the damage below.</div></div></div><label>Return notes / damage noticed</label><textarea id='wlReturnNotes' rows='5' placeholder='Describe damage, missing parts, site condition, reason for return, or other notes'>${esc(serviceReturn.notes)}</textarea><div class='ok top10'><b>✓ SERVICE RETURN READY</b><div>All photos and these notes will follow unit ${esc(serviceReturn.unit)} into IT Intake.</div></div><button class='wl-big wl-red top10' data-wl-return-submit>SEND THIS UNIT TO IT INTAKE →</button><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><span></span></div>`; }
+  else if (step === 3) {
+    const scan=serviceReturn.tagScan;
+    const scanHtml=scan?.status==='scanning'
+      ? `<div class='warn top8'><b>AI scanning tag…</b><div class='small'>Checking this photo against ${esc(serviceReturn.unit)}.</div></div>`
+      : (scan ? tagScanStatusHtml(scan,serviceReturn.unit) : '');
+    card.innerHTML = `${progress('Return Unit · Step 4 of 5', `Photograph unit tag ${serviceReturn.unit}`, 4, 5)}<div class='wl-question'><div class='qtext'>Take a clear photo of the UNIT TAG showing ${esc(serviceReturn.unit)}.</div><div class='wl-stop'><b>Required photo proof</b><div>The tag number <b>${esc(serviceReturn.unit)}</b> must be readable in the picture. For solar equipment, the app also scans the photo and compares it to the expected tag.</div></div><label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE UNIT TAG PHOTO</label><input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'><div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected unit tag photo'>${scanHtml}<div class='small top8'>Expected tag: <b>${esc(serviceReturn.unit)}</b></div>` : ''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next ${scan?.status==='scanning'?'disabled':''}>Next: Review →</button></div>`;
+  }
+  else { const conditionPreview = (serviceReturn.conditionPhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Site condition photo'>`).join(''); const damagePreview = (serviceReturn.damagePhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Damage photo'>`).join(''); card.innerHTML = `${progress('Return Unit · Step 5 of 5', 'Document how the unit looked at the site', 5, 5)}<div class='wl-review'><b>${esc(serviceReturn.unit)} · ${esc(serviceReturn.type)}</b><div><b>MHelpDesk #${esc(serviceReturn.ticket)}</b></div><div>📷 Unit tag photo ready</div>${serviceReturn.tagScan && serviceReturn.tagScan.status!=='scanning' ? tagScanStatusHtml(serviceReturn.tagScan,serviceReturn.unit) : ''}<div class='small top8'>Add photos showing the camera/unit as it looked at the site. If there is damage, add close-up damage photos and describe it below. IT Intake will see all of this before checking the unit.</div></div><div class='wl-question top10'><div class='qtext'>Site condition photos</div><div class='wl-note'>Take pictures showing the overall camera/unit condition before it leaves the site. Add as many as needed to verify it still looks good.</div><label class='wl-photo-button' for='wlReturnConditionPhotos'>📷 ADD SITE CONDITION PHOTOS</label><input id='wlReturnConditionPhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${conditionPreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${conditionPreview}</div><div class='ok'>✓ ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'} selected</div></div></div><div class='wl-question top10'><div class='qtext'>Damage photos, if damage is found</div><div class='wl-note'>Take close-up pictures of scratches, broken parts, dents, missing pieces, camera damage, or anything else IT needs to inspect.</div><label class='wl-photo-button wl-damage-photo' for='wlReturnDamagePhotos'>⚠️ ADD DAMAGE PHOTOS</label><input id='wlReturnDamagePhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${damagePreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${damagePreview}</div><div class='warn'>⚠ ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'} selected — describe the damage below.</div></div></div><label>Return notes / damage noticed</label><textarea id='wlReturnNotes' rows='5' placeholder='Describe damage, missing parts, site condition, reason for return, or other notes'>${esc(serviceReturn.notes)}</textarea><div class='ok top10'><b>✓ SERVICE RETURN READY</b><div>All photos and these notes will follow unit ${esc(serviceReturn.unit)} into IT Intake.</div></div><button class='wl-big wl-red top10' data-wl-return-submit>SEND THIS UNIT TO IT INTAKE →</button><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><span></span></div>`; }
   if (serviceReturnRecovered && !card.querySelector('.wl-draft-recovered')) card.insertAdjacentHTML('afterbegin', `<div class='warn wl-draft-recovered'><b>Recovered unsent Service Return from this device.</b><div class='small'>Ticket, unit, equipment type, and notes were restored. Photos are never treated as saved until they upload successfully, so reselect/retake the required photo if Safari reloaded.</div></div>`);
   hideChildren(viewSvc(), [card]);
   resetWizardPosition();
@@ -3828,7 +3968,14 @@ async function serviceReturnNext() {
   if (serviceReturn.step === 0) { const value = document.getElementById('wlReturnTicket')?.value.trim() || ''; if (!value) return alert('Enter the MHelpDesk ticket number first.'); serviceReturn.ticket = value; serviceReturn.knownUnits = await rememberedUnitsForTicket(value); }
   else if (serviceReturn.step === 1) { const value = document.getElementById('wlReturnUnit')?.value.trim() || serviceReturn.unit || ''; if (!value) return alert('Choose or enter the exact unit tag / unit number first.'); serviceReturn.unit = value; const known = (serviceReturn.knownUnits || []).find(item => norm(item.unit_tag) === norm(value)); if (known?.equipment_type) serviceReturn.type = known.equipment_type; }
   else if (serviceReturn.step === 2) { const value = document.getElementById('wlReturnType')?.value || ''; if (!value) return alert('Choose the equipment type first.'); serviceReturn.type = value; }
-  else if (serviceReturn.step === 3) { const file = document.getElementById('wlReturnPhoto')?.files?.[0]; if (!file && !serviceReturn.photo) return alert(`Take or choose a clear photo of the unit tag showing ${serviceReturn.unit} first.`); if (file) serviceReturn.photo = file; if (!confirm(`Can you clearly read unit tag ${serviceReturn.unit} in this photo?`)) return; }
+  else if (serviceReturn.step === 3) {
+    const file=document.getElementById('wlReturnPhoto')?.files?.[0];
+    if (!file && !serviceReturn.photo) return alert(`Take or choose a clear photo of the unit tag showing ${serviceReturn.unit} first.`);
+    if (serviceReturn.tagScan?.status==='scanning') return alert('Wait for the AI tag scan to finish.');
+    if (serviceReturn.tagScan?.status==='mismatch') return alert(`The photo scan read ${serviceReturn.tagScan.detected||'a different tag'}, not ${serviceReturn.unit}. Retake the tag photo before continuing.`);
+    if (serviceReturn.tagScan?.status==='unreadable' && !confirm(`AI could not read unit tag ${serviceReturn.unit}. Can you clearly read and visually verify ${serviceReturn.unit} in this photo?`)) return;
+    if (!serviceReturn.tagScan && !confirm(`Can you clearly read unit tag ${serviceReturn.unit} in this photo?`)) return;
+  }
   serviceReturn.step = Math.min(4, serviceReturn.step + 1);
   await saveServiceReturnDraft();
   return renderServiceReturn();
@@ -3852,7 +3999,23 @@ async function submitServiceReturn() {
     const conditionPhotos=(serviceReturn.conditionPhotos || []).map((file,index) => new File([file],`unit-${safeUnit}-site-condition-${index + 1}-${file.name || 'photo.jpg'}`,{type:file.type || 'image/jpeg'}));
     const damagePhotos=(serviceReturn.damagePhotos || []).map((file,index) => new File([file],`unit-${safeUnit}-DAMAGE-${index + 1}-${file.name || 'photo.jpg'}`,{type:file.type || 'image/jpeg'}));
     uploadedPaths=await uploadReturnPhotos([taggedPhoto,...conditionPhotos,...damagePhotos],returnId,`service/unit-${safeUnit}`);
-    const { error }=await liveDb.from('unit_returns').insert({ id:returnId, ticket_no:serviceReturn.ticket, unit_tag:serviceReturn.unit, equipment_type:serviceReturn.type, service_tech_id:tech.id, service_tech_name:tech.name, return_notes:serviceReturn.notes, return_photo_paths:uploadedPaths });
+    const scan=serviceReturn.tagScan && ['match','mismatch','unreadable'].includes(serviceReturn.tagScan.status) ? serviceReturn.tagScan : null;
+    const { error }=await liveDb.from('unit_returns').insert({
+      id:returnId,
+      ticket_no:serviceReturn.ticket,
+      unit_tag:serviceReturn.unit,
+      equipment_type:serviceReturn.type,
+      service_tech_id:tech.id,
+      service_tech_name:tech.name,
+      return_notes:serviceReturn.notes,
+      return_photo_paths:uploadedPaths,
+      tag_scan_status:scan?.status||null,
+      tag_scan_detected:scan?.detected||null,
+      tag_scan_expected:scan?serviceReturn.unit:null,
+      tag_scan_confidence:scan?.confidence==null?null:Number(scan.confidence),
+      tag_scan_engine:scan?.engine||null,
+      tag_scan_at:scan?new Date().toISOString():null
+    });
     if (error) throw error;
     const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
@@ -4908,13 +5071,15 @@ async function installOwnerIntake(force = false) {
     const checks = intakeLabels.map((label, i) => `<div class='small' style='padding:4px 0;border-bottom:1px solid #edf1f4'><b>${answers[i] === true ? '✓ YES' : answers[i] === false ? '✕ NO' : '— PENDING'}</b> · ${esc(label)}</div>`).join('');
     const doc = record.meta?.cancellationDoc;
     const status = r.status === 'waiting_it' ? 'WAITING FOR IT INTAKE' : r.status === 'pending_mhelp_inventory' ? 'PENDING MHELP INVENTORY' : 'COMPLETED — SHOP INVENTORY';
+    const savedTagScan=returnTagScan(r);
+    const savedTagScanHtml=savedTagScan ? tagScanStatusHtml(savedTagScan,r.unit_tag) : '';
     const serviceDone = true;
     const itDone = r.status === 'pending_mhelp_inventory' || r.status === 'completed';
     const managerDone = r.status === 'completed';
     const process = `<div class='ownerProcess'><span class='processStep done'>✓ Service Return</span><span class='processArrow'>→</span><span class='processStep ${itDone ? 'done' : 'current'}'>${itDone ? '✓' : '•'} IT Intake</span><span class='processArrow'>→</span><span class='processStep ${managerDone ? 'done' : itDone ? 'current' : ''}'>${managerDone ? '✓' : '•'} Manager / MHelpDesk</span></div>`;
     const managerAction = r.status === 'pending_mhelp_inventory' ? `<div class='warn top8'><b>Manager action required</b><div class='small'>IT intake is finished. You now add Unit ${esc(r.unit_tag)} back to Shop Inventory in MHelpDesk.</div><button class='mini top8' data-wl-owner-mhelp-done='${r.id}'>Confirm I Added It to MHelpDesk Inventory</button></div>` : '';
     const searchText = `${r.unit_tag || ''} ${r.equipment_type || ''} ${r.ticket_no || ''} ${r.service_tech_name || ''} ${r.it_tech_name || ''}`;
-    return `<details class='ownerFold' data-owner-return='${r.id}' data-owner-search='${esc(searchText)}'><summary><span><b>Unit ${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span>${process}</span><span class='pill ${r.status === 'completed' ? 'delivery' : r.status === 'pending_mhelp_inventory' ? 'amber' : 'swap'}'>${status}</span></summary><div class='ownerFoldBody'>${managerAction}<div class='wl-review top8'><b>Chain of Custody</b><div class='small'><b>Service Tech:</b> ${esc(r.service_tech_name || 'Not recorded')} · Submitted ${r.returned_at ? new Date(r.returned_at).toLocaleString() : '—'}</div><div class='small'><b>IT Tech:</b> ${esc(r.it_tech_name || 'Not assigned')}${r.it_received_at ? ` · Intake completed ${new Date(r.it_received_at).toLocaleString()}` : ''}</div>${r.completed_at ? `<div class='small'><b>Manager confirmed MHelpDesk inventory:</b> ${new Date(r.completed_at).toLocaleString()}</div>` : ''}</div>${r.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(r.return_notes)}</div></div>` : ''}<div class='wl-review top8'><b>IT Intake Checklist — ${answers.filter(v => v === true).length}/${intakeLabels.length} YES</b>${checks}</div>${doc ? `<div class='ok top8'><b>SIM Cancellation Record</b><div class='small'>Date: ${esc(doc.simCanceledDate)} · MHelpDesk #${esc(doc.ticket)} · Unit ${esc(doc.unit)} · IT Tech: ${esc(doc.techName || r.it_tech_name || 'IT')} (${esc(doc.techInitials)})</div></div>` : ''}${record.notes ? `<div class='wl-note top8'><b>IT intake notes</b><div>${esc(record.notes)}</div></div>` : ''}<div class='small top8'><b>Service Return / Site / Damage Photos</b></div><div class='wl-return-gallery' data-owner-service-photos='${r.id}'><div class='wl-note'>Photos load when this record is opened.</div></div><div class='small top8'><b>IT Intake Photo</b></div><div class='wl-return-gallery' data-owner-intake-photos='${r.id}'><div class='wl-note'>Photo loads when this record is opened.</div></div><button class='mini danger top8' data-wl-owner-remove-return='${r.id}' data-wl-unit='${esc(r.unit_tag)}' data-wl-ticket='${esc(r.ticket_no)}'>Remove from Tracking</button></div></details>`;
+    return `<details class='ownerFold' data-owner-return='${r.id}' data-owner-search='${esc(searchText)}'><summary><span><b>Unit ${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span>${process}</span><span class='pill ${r.status === 'completed' ? 'delivery' : r.status === 'pending_mhelp_inventory' ? 'amber' : 'swap'}'>${status}</span></summary><div class='ownerFoldBody'>${managerAction}${savedTagScanHtml}<div class='wl-review top8'><b>Chain of Custody</b><div class='small'><b>Service Tech:</b> ${esc(r.service_tech_name || 'Not recorded')} · Submitted ${r.returned_at ? new Date(r.returned_at).toLocaleString() : '—'}</div><div class='small'><b>IT Tech:</b> ${esc(r.it_tech_name || 'Not assigned')}${r.it_received_at ? ` · Intake completed ${new Date(r.it_received_at).toLocaleString()}` : ''}</div>${r.completed_at ? `<div class='small'><b>Manager confirmed MHelpDesk inventory:</b> ${new Date(r.completed_at).toLocaleString()}</div>` : ''}</div>${r.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(r.return_notes)}</div></div>` : ''}<div class='wl-review top8'><b>IT Intake Checklist — ${answers.filter(v => v === true).length}/${intakeLabels.length} YES</b>${checks}</div>${doc ? `<div class='ok top8'><b>SIM Cancellation Record</b><div class='small'>Date: ${esc(doc.simCanceledDate)} · MHelpDesk #${esc(doc.ticket)} · Unit ${esc(doc.unit)} · IT Tech: ${esc(doc.techName || r.it_tech_name || 'IT')} (${esc(doc.techInitials)})</div></div>` : ''}${record.notes ? `<div class='wl-note top8'><b>IT intake notes</b><div>${esc(record.notes)}</div></div>` : ''}<div class='small top8'><b>Service Return / Site / Damage Photos</b></div><div class='wl-return-gallery' data-owner-service-photos='${r.id}'><div class='wl-note'>Photos load when this record is opened.</div></div><div class='small top8'><b>IT Intake Photo</b></div><div class='wl-return-gallery' data-owner-intake-photos='${r.id}'><div class='wl-note'>Photo loads when this record is opened.</div></div><button class='mini danger top8' data-wl-owner-remove-return='${r.id}' data-wl-unit='${esc(r.unit_tag)}' data-wl-ticket='${esc(r.ticket_no)}'>Remove from Tracking</button></div></details>`;
   };
 
   const activeItems = activeRows.map(renderOwnerReturn);
