@@ -533,3 +533,15 @@ Regression checks passed for JavaScript syntax, browser/server bundle parity, de
 - Focusing the Vision prompt automatically closes the Service Order so the user can immediately ask another question.
 - Release identifiers: Vision `vision-workspace-v19`, service worker `tech-check-field-shell-v83`.
 - Regression QA count: 103.
+
+
+## Vision company people lookup correction (2026-09-19)
+
+- Natural questions such as "Who is Mike?", "Who is Mike Monsive?", and "Tell me about Teddy Hopper" now resolve against live Tech Check profile records instead of falling into the generic Vision help response.
+- People lookup is separate from the assignable-technician list and includes Owner, IT, and Service profile records, including inactive or archived records.
+- If multiple profile records match the same name, Vision reports each record and its active/inactive/archived state rather than guessing identity.
+- Browser deterministic fallback performs the live profile lookup even if the AI model path is unavailable.
+- Server agent adds the `find_people` read-only tool and explicit grounding rules for named-person questions.
+- Current Mike Monsive data includes one active Owner/Admin profile and one inactive Service profile; no active Tech Check assignments are currently recorded under that name.
+- Release identifiers: Vision `vision-workspace-v20`, Edge agent `onsite-vision-agent-v11`, service worker `tech-check-field-shell-v84`.
+- Regression QA count: 104.
