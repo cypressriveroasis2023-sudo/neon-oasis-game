@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v122",
-  "service_worker": "v78",
+  "runtime_version": "release-qa-v123",
+  "service_worker": "v79",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v8, company-knowledge-v5, workflow-engine-v4 and rules-v4"
+        "Agent reports onsite-vision-agent-v9, company-knowledge-v6, workflow-engine-v4 and rules-v5"
       ]
     },
     {
@@ -1820,7 +1820,68 @@
         "If the spare is used for a swap, the replaced field Sniper follows Service Return → IT Intake",
         "No standalone Sniper spare-battery batch is invented or accepted"
       ]
+    },
+    {
+      "id": "PHASE7-SPOTTER-01",
+      "area": "IT/Service · Spotter",
+      "role": "it+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Spotter uses the Owner-taught 4-camera, no-battery Alibi workflow",
+      "steps": [
+        "Open Spotter DELIVERY and SWAP IT checks",
+        "Inspect release and close database gates",
+        "Inspect Service swap return flow"
+      ],
+      "expected": [
+        "Spotter has 4 cameras, an internal router, and zero batteries",
+        "IT verifies Alibi visibility, ports 81 and 554, all four cameras, recording, NVR-or-SD storage, Central Station, and customer email access",
+        "DELIVERY identifies whether Service needs a pole or stand",
+        "SWAP does not add another pole or stand",
+        "A replaced Spotter must be returned through Service Return → IT Intake before close"
+      ]
+    },
+    {
+      "id": "PHASE7-RECON-01",
+      "area": "IT/Service · Recon II",
+      "role": "it+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Recon II separates camera count from battery quantity",
+      "steps": [
+        "Create/open a Recon II DELIVERY",
+        "Record the camera count",
+        "Run IT deployment checks",
+        "Inspect SWAP return enforcement"
+      ],
+      "expected": [
+        "Camera count is stored separately from battery quantity",
+        "Recon II is verified in the Reconeyez app",
+        "Ports 81 and 554 are required for Central Station access",
+        "The database still uses a minimum of one Recon II battery until the exact battery specification/rule is taught",
+        "A replaced Recon II must be returned through Service Return → IT Intake before close"
+      ]
+    },
+    {
+      "id": "PHASE7-RANGER-02",
+      "area": "IT/Service · Ranger",
+      "role": "it+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Ranger shop and field checks match the Owner-taught solar workflow",
+      "steps": [
+        "Open Ranger DELIVERY/SWAP IT checks",
+        "Verify shop charging and recording/storage sequence",
+        "Open Service Ranger field verification"
+      ],
+      "expected": [
+        "Ranger uses one LiTime 12V 110Ah battery",
+        "IT verifies MPPT charging with the battery attached and ports 81/554",
+        "IT verifies recording before formatting the SD card",
+        "Customer deployment includes Central Station information and shared-email access",
+        "Service must verify the Ranger is up to date in the Victron Bluetooth app in the field before close"
+      ]
     }
   ],
-  "last_release_qa_note": "Phase 7 Sniper teaching pass: TechCheckRules v4 documents the Avigilon ES + 2 bullet-camera + InHand/Unity Sniper workflow; Sniper SWAP now uses the same customer-deployment readiness gate as DELIVERY in technician UI and live database functions; Company Knowledge v5 preserves only the still-unknown ports/deeper programming/Monitoring Center field list/model-specific details/troubleshooting; Edge agent v8 is active with JWT; release v122 / loader v36 / Vision v16 / SW v78 / DB migration 78."
+  "last_release_qa_note": "Phase 7 camera-family teaching pass: Spotter, Recon II, and Ranger Owner rules captured. Spotter is 4-camera/internal-router/Alibi with no batteries; Recon II camera count is separate from battery quantity; Spotter/Recon II/Ranger require router ports 81/554; Ranger requires field Victron Bluetooth verification; Sniper/Spotter/Recon II swap returns are gated before close. Edge v9 active with JWT; rules v5 / knowledge v6 / technician v123 / loader v37 / SW79 / DB migration 79."
 }
