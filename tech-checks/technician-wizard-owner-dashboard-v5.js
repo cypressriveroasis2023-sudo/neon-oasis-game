@@ -4603,25 +4603,23 @@ function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner');
   if(!view || !roleText().includes('Owner/Admin')) return;
 
-  let visionCard=document.getElementById('ownerVisionWorkspaceCard');
-  if(!visionCard){
-    visionCard=document.createElement('a');
-    visionCard.id='ownerVisionWorkspaceCard';
-    visionCard.className='card ownerDashSection ownerVisionTopCard';
-    visionCard.href='./onsite-vision.html';
-    visionCard.innerHTML=`
-      <span class='ownerVisionTopIcon'><img src='./techcheck-eye-192.png?v=1' alt=''></span>
-      <span class='ownerVisionTopCopy'>
-        <small>ONSITE VISION</small>
-        <b>AI Service Order Workspace</b>
-        <span>Open your dedicated AI workspace to talk through jobs, assign techs, change schedules, and work a service order together.</span>
-      </span>
-      <span class='ownerVisionTopGo'>Open →</span>
-    `;
+  document.getElementById('ownerVisionWorkspaceCard')?.remove();
+
+  let visionButton=document.getElementById('ownerVisionHeaderButton');
+  if(!visionButton){
+    visionButton=document.createElement('a');
+    visionButton.id='ownerVisionHeaderButton';
+    visionButton.className='mini ownerVisionHeaderButton';
+    visionButton.href='./onsite-vision.html';
+    visionButton.innerHTML="<img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span>OnSite Vision</span>";
+  }
+  const accountActions=document.querySelector('.accountActions');
+  if(accountActions && visionButton.parentElement!==accountActions){
+    const refresh=[...accountActions.querySelectorAll('button')].find(btn=>String(btn.textContent||'').trim()==='Refresh');
+    accountActions.insertBefore(visionButton,refresh||accountActions.firstChild);
   }
 
   const order=[
-    'ownerVisionWorkspaceCard',
     'ownerJobAssignments',
     'ownerLiveJobProgress',
     'ownerAttentionCard',
