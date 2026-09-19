@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v75';
+const CACHE_NAME = 'tech-check-field-shell-v76';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -9,19 +9,19 @@ self.addEventListener('install', event => {
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
-      cache.add(new Request('./tech-check-rules.js?v=rules-v1', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=startup-fast-v33', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v119', { cache:'reload' })),
+      cache.add(new Request('./tech-check-rules.js?v=rules-v2', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=startup-fast-v34', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v120', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=onsite-chat-v118', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision.css?v=vision-workspace-v15', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision-company-knowledge.js?v=company-knowledge-v2', { cache:'reload' })),
+      cache.add(new Request('./onsite-vision.css?v=vision-workspace-v16', { cache:'reload' })),
+      cache.add(new Request('./onsite-vision-company-knowledge.js?v=company-knowledge-v3', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-workflow-engine.js?v=workflow-engine-v3', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-live-data.js?v=live-data-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-actions.js?v=action-layer-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-persistence.js?v=persistence-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v15', { cache:'reload' }))
+      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v16', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
