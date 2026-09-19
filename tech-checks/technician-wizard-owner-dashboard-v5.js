@@ -3019,7 +3019,7 @@ async function serviceFindJobByTicket(){
     <div class='wl-preview-grid'>
       <div><span>Customer / Site</span><b>${esc(a.site||'Not listed')}</b></div>
       <div><span>Job Type</span><b>${esc(String(a.work_type||'Service').toUpperCase())}</b></div>
-      <div><span>Work Date</span><b>${esc(a.work_date||'Not listed')}</b></div>
+      <div><span>Work Date / Time</span><b>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</b></div>
       <div><span>Status</span><b>${gate.ready?'Ready for Service':esc(gate.label)}</b></div>
     </div>
     ${a.job_description?`<div class='wl-preview-section'><span>What is being done</span><b>${esc(a.job_description)}</b></div>`:''}
@@ -4365,7 +4365,7 @@ async function installOwnerAssignments(force = false) {
   const aiNotices=aiStates.filter(x=>x.s.state==='attention').map(x=>({...x,key:ownerAINotificationKey(x.a,x.s),ack:ownerAIIsAcknowledged(x.a,x.s)})); const aiUnread=aiNotices.filter(x=>!x.ack).length;
   const todayKey=techCheckDateKey(new Date());
   const tomorrowDate=new Date();tomorrowDate.setDate(tomorrowDate.getDate()+1);const tomorrowKey=techCheckDateKey(tomorrowDate);
-  const tomorrowJobs=all.filter(a=>String(a.work_date||'')===tomorrowKey&&a.status!=='completed');
+  const tomorrowJobs=all.filter(a=>String(a.scheduled_for||'')===tomorrowKey&&a.status!=='completed');
   const tomorrowStates=tomorrowJobs.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
 
   const completedToday=all.filter(a=>a.status==='completed'&&techCheckDateKey(new Date(a.completed_at||a.updated_at||a.assigned_at))===todayKey);
@@ -4417,7 +4417,7 @@ async function installOwnerAssignments(force = false) {
         <div class='qtext'>1. What kind of MHelpDesk job is this?</div>
         <div class='grid top8'>
           <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select></div>
-          <div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;-webkit-appearance:none;appearance:none;'></div>
+          <div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;-webkit-appearance:none;appearance:none;'><label class='top8'>Work Time <span class='small'>(optional)</span></label><input id='ownerAssignTime' type='time' step='900' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;'></div>
         </div>
         <div id='ownerFlowHint' class='small top8'>Choose the job type first. The equipment and department flow below will update for that job.</div>
       </div>
@@ -4771,11 +4771,69 @@ function ownerAIDateFromText(text) {
   }
   return "";
 }
+function ownerAITimeFromText(text) {
+  const raw=String(text||'');
+  let m=raw.match(/\b(?:at|for)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
+  if(!m) m=raw.match(/\b(?:at|for)\s*(\d{1,2}):(\d{2})\b/i);
+  if(!m) return '';
+  let h=Number(m[1]||0), min=Number(m[2]||0);
+  const mer=String(m[3]||'').toLowerCase().replace(/\./g,'');
+  if(mer==='pm' && h<12) h+=12;
+  if(mer==='am' && h===12) h=0;
+  if(h<0||h>23||min<0||min>59) return '';
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+function ownerAINormalizeUnitTag(v) {
+  const s=String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(/^\d+$/.test(s)) return String(Number(s));
+  return s.replace(/^0+(?=\d)/,'');
+}
+function ownerAIUnitReference(text) {
+  const raw=ownerAINumberWords(text);
+  const defs=[
+    {type:'Helios',re:/\bhelio(?:s)?\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i},
+    {type:'Ranger',re:/\branger\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i},
+    {type:'Solar Spotter',re:/\bsolar\s+spotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i},
+    {type:'Spotter',re:/\bspotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i},
+    {type:'Sniper',re:/\bsniper\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i},
+    {type:'Recon 2',re:/\brecon\s*(?:2|ii|two)?\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i}
+  ];
+  for(const d of defs){
+    const m=raw.match(d.re);
+    if(m) return {type:d.type,tag:String(m[1]).padStart(d.type==='Helios'?3:1,'0')};
+  }
+  const generic=raw.match(/\bunit\s*(?:#|number|no\.?)?\s*(\d{1,4})\b/i);
+  return generic ? {type:'',tag:String(generic[1])} : null;
+}
+function ownerAIEffectiveWorkType(a,prep) {
+  const purpose=(prep?.prep_items||[]).map(x=>String(x?.purpose||'').toUpperCase()).find(v=>v==='DELIVERY'||v==='SWAP');
+  return purpose ? purpose.toLowerCase() : String(a?.work_type||prep?.work_type||'service').toLowerCase();
+}
+function ownerAIUnitMatches(a,prep,hint) {
+  if(!hint?.tag) return true;
+  const want=ownerAINormalizeUnitTag(hint.tag);
+  const rows=prep?.prep_items||[];
+  if(rows.some(x=>(!hint.type||String(x?.equipment_type||'').toLowerCase()===String(hint.type).toLowerCase()) && ownerAINormalizeUnitTag(x?.unit_tag)===want)) return true;
+  const summary=String(a?.unit_summary||'');
+  return summary && ownerAINormalizeUnitTag(summary).includes(want);
+}
+function ownerAIScheduleText(date,time) {
+  if(!date) return time ? time : 'No date set';
+  let label=String(date);
+  const d=new Date(String(date)+'T12:00:00');
+  if(!Number.isNaN(d.getTime())) label=d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  if(time){
+    const parts=String(time).split(':').map(Number);
+    const t=new Date(2000,0,1,parts[0]||0,parts[1]||0);
+    label+=' · '+t.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  }
+  return label;
+}
 function ownerAIParseEquipment(text) {
   const rows = [
     {category:"device",label:"Solar Spotter",aliases:["solar spotter","solar spotters"]},
     {category:"device",label:"Recon 2",aliases:["recon 2","recon ii","recon two","recon 2s"]},
-    {category:"device",label:"Helios",aliases:["helios"]},
+    {category:"device",label:"Helios",aliases:["helios","helio"]},
     {category:"device",label:"Ranger",aliases:["ranger","rangers"]},
     {category:"device",label:"Sniper",aliases:["sniper","snipers"]},
     {category:"device",label:"Spotter",aliases:["spotter","spotters"]},
@@ -4798,7 +4856,7 @@ function ownerAIParseEquipment(text) {
 }
 function ownerAIParseDispatch(text) {
   const raw=String(text || "").trim(), lower=raw.toLowerCase();
-  const parsed={raw,ticket_no:"",site:"",work_type:"",scheduled_for:"",role:"",assignee_ids:[],manifest:[],mentionedWithoutQty:[],parts:{},unit_numbers:"",stand_numbers:"",description:"",descriptionExplicit:false,notes:"",warnings:[]};
+  const parsed={raw,ticket_no:"",site:"",work_type:"",scheduled_for:"",scheduled_time:"",unit_hint:null,role:"",assignee_ids:[],manifest:[],mentionedWithoutQty:[],parts:{},unit_numbers:"",stand_numbers:"",description:"",descriptionExplicit:false,notes:"",warnings:[]};
   const tm=raw.match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i) || raw.match(/#(\d{3,})\b/);
   if (tm) parsed.ticket_no=tm[1];
 
@@ -4811,6 +4869,8 @@ function ownerAIParseDispatch(text) {
   else if (/\b(service|repair|troubleshoot|troubleshooting|check\s+on|fix)\b/.test(lower)) parsed.work_type="service";
 
   parsed.scheduled_for=ownerAIDateFromText(raw);
+  parsed.scheduled_time=ownerAITimeFromText(raw);
+  parsed.unit_hint=ownerAIUnitReference(raw);
 
   const hasIT=/\b(?:it\s+department|it\s+tech|it\s+technician|send\s+to\s+it|assign\s+to\s+it)\b/i.test(raw);
   const hasService=/\b(?:service\s+department|service\s+tech|service\s+technician|send\s+to\s+service|assign\s+to\s+service)\b/i.test(raw);
@@ -4899,6 +4959,10 @@ function ownerAIDispatchApply(parsed) {
     const dateEl=document.getElementById("ownerAssignDate");
     if (dateEl) { dateEl.value=parsed.scheduled_for; dateEl.dataset.aiSet="1"; }
   }
+  if (parsed.scheduled_time) {
+    const timeEl=document.getElementById("ownerAssignTime");
+    if (timeEl) { timeEl.value=parsed.scheduled_time; timeEl.dataset.aiSet="1"; }
+  }
   const description=document.getElementById("ownerAssignDescription");
   if (description && parsed.description && (parsed.descriptionExplicit || !description.value.trim())) description.value=parsed.description;
   set("ownerAssignNotes",parsed.notes);
@@ -4956,7 +5020,7 @@ function ownerAIDispatchSummary(parsed) {
   const a=ownerAIDraft(), techIds=[...document.querySelectorAll("#ownerAssignedTechPills [data-tech-id]")].map(el=>el.dataset.techId), techs=techIds.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
   const eq=normalizedEquipmentManifest(a.equipment_manifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ");
   const flow=a.role==="it_service"?"IT → Service":a.role==="service_it"?"Service → IT":a.role==="it"?"IT only":"Service only";
-  return {ticket:a.ticket_no||"—",site:a.site||"—",date:document.getElementById("ownerAssignDate")?.value||"—",type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
+  return {ticket:a.ticket_no||"—",site:a.site||"—",date:ownerAIScheduleText(document.getElementById("ownerAssignDate")?.value||"",document.getElementById("ownerAssignTime")?.value||""),type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
 }
 function ownerAIDispatchRender(parsed) {
   const box=document.getElementById("ownerAIDispatchResult"); if(!box)return;
@@ -4971,7 +5035,7 @@ function ownerAIDispatchRender(parsed) {
       +"<div><span>MHelpDesk</span><b>#"+esc(s.ticket)+"</b></div>"
       +"<div><span>Job type</span><b>"+esc(s.type)+"</b></div>"
       +"<div><span>Site</span><b>"+esc(s.site)+"</b></div>"
-      +"<div><span>Work date</span><b>"+esc(s.date)+"</b></div>"
+      +"<div><span>Work date / time</span><b>"+esc(s.date)+"</b></div>"
       +"<div><span>Flow</span><b>"+esc(s.flow)+"</b></div>"
       +"<div><span>Assigned</span><b>"+esc(s.techs)+"</b></div>"
     +"</div>"
@@ -5050,7 +5114,7 @@ async function ownerAIAssistantAnswer(raw) {
   const equipmentNames=[...(parsed.manifest||[]).map(r=>r.label),...(parsed.mentionedWithoutQty||[])].filter(v=>OWNER_DEVICE_TYPES.includes(v)||OWNER_STAND_TYPES.includes(v));
   let matches=[...jobs];
   if(parsed.ticket_no)matches=matches.filter(a=>String(a.ticket_no||'')===String(parsed.ticket_no));
-  if(parsed.scheduled_for)matches=matches.filter(a=>String(a.work_date||'')===String(parsed.scheduled_for));
+  if(parsed.scheduled_for)matches=matches.filter(a=>String(a.scheduled_for||'')===String(parsed.scheduled_for));
   if(parsed.work_type)matches=matches.filter(a=>String(a.work_type||'').toLowerCase()===String(parsed.work_type).toLowerCase());
   if(equipmentNames.length)matches=matches.filter(a=>{
     const prep=prepMap.get(a.prep_ticket_id), rows=normalizedEquipmentManifest((a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[]);
@@ -5084,7 +5148,7 @@ async function ownerAIAssistantAnswer(raw) {
     const target=active.find(r=>ownerLiveAIStatus(r,prep,solar).state==='attention')||active.find(r=>r.assigned_role==='it')||active[0]||rows[0];
     const ai=ownerLiveAIStatus(target,prep,solar);
     return "<div class='wl-ai-job-answer "+(ai.state==='attention'?'attention':'')+"'><div class='wl-ai-job-answer-head'><b>#"+esc(a.ticket_no||'—')+" · "+esc(a.site||prep?.site||'No site')+"</b><span>"+esc(String(a.work_type||prep?.work_type||'service').toUpperCase())+"</span></div>"
-      +"<div class='wl-ai-job-meta'><span>"+esc(a.work_date||'No work date')+"</span><span>"+esc(equipmentManifestText(manifest)||'No equipment listed')+"</span></div>"
+      +"<div class='wl-ai-job-meta'><span>"+esc(a.scheduled_for||'No work date')+"</span><span>"+esc(equipmentManifestText(manifest)||'No equipment listed')+"</span></div>"
       +"<div class='wl-ai-job-status'>"+statuses+"</div>"
       +"<div class='wl-ai-next'><b>Next:</b> "+esc(ownerAIAssistantNextStep(target,prep,solar))+"</div></div>";
   }).join('');
@@ -5137,7 +5201,7 @@ async function openOwnerAIDispatch() {
   const host=document.getElementById('ownerJobAssignments');if(host)host.open=true;
   document.querySelector('.ownerAIDispatchPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 }
-function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
+function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',scheduled_for:document.getElementById('ownerAssignDate')?.value||'',scheduled_time:document.getElementById('ownerAssignTime')?.value||'',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
 function ownerAIReview(){
   const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
@@ -5171,6 +5235,7 @@ async function ownerAssignJob() {
   const assignee = assignees[0] || null;
   const notes = document.getElementById('ownerAssignNotes')?.value.trim() || '';
   const scheduledFor = document.getElementById('ownerAssignDate')?.value || techCheckDateKey(new Date());
+  const scheduledTime = document.getElementById('ownerAssignTime')?.value || '';
   const workType = document.getElementById('ownerAssignWorkType')?.value || 'service';
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
@@ -5192,7 +5257,7 @@ async function ownerAssignJob() {
     const eq=normalizedEquipmentManifest(equipmentManifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ") || "No equipment";
     const flow=role==="it_service"?"IT → Service":role==="service_it"?"Service → IT":role==="it"?"IT only":"Service only";
     const techNames=assignees.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
-    const confirmText="AI DISPATCH CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date: "+scheduledFor+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nSend this Tech Check job?";
+    const confirmText="ONSITE VISION CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date/time: "+ownerAIScheduleText(scheduledFor,scheduledTime)+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nSend this Tech Check job?";
     if (!confirm(confirmText)) return;
   }
 
@@ -5228,6 +5293,10 @@ async function ownerAssignJob() {
       p_work_type: workType,
     });
     if (error) { document.body.classList.remove('busy'); return alert(error.message); }
+    if (assignmentId && scheduledTime) {
+      const { error: timeError } = await liveDb.from('job_assignments').update({ scheduled_time: scheduledTime, updated_at:new Date().toISOString() }).eq('id', assignmentId);
+      if (timeError) { document.body.classList.remove('busy'); return alert(timeError.message); }
+    }
     if (assignmentId) assignmentIds.push(assignmentId);
   }
   document.body.classList.remove('busy');
@@ -5247,6 +5316,7 @@ async function ownerAssignJob() {
 
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitNumbers','ownerAssignStandNumbers','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
+  const timeInput=document.getElementById('ownerAssignTime'); if (timeInput) timeInput.value='';
   const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
@@ -5404,6 +5474,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignRole') { e.target.dataset.ownerConfirmed='1'; refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
+  if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
