@@ -387,12 +387,37 @@ function renderHistory(){
   }).join(''):'<div class="vision-system-note">No conversations yet.</div>';
   if($('visionConversationTitle'))$('visionConversationTitle').textContent=chat()?.title||'New conversation';
 }
+function sanitizeAssistantHtml(value){
+  const template=document.createElement('template');
+  template.innerHTML=String(value||'');
+  template.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form').forEach(node=>node.remove());
+  template.content.querySelectorAll('*').forEach(node=>{
+    [...node.attributes].forEach(attr=>{
+      const name=attr.name.toLowerCase(),val=String(attr.value||'').trim();
+      if(name.startsWith('on')||name==='srcdoc'||name==='style')node.removeAttribute(attr.name);
+      else if((name==='href'||name==='src'||name==='xlink:href')&&/^(?:javascript|data:text\/html)/i.test(val))node.removeAttribute(attr.name);
+    });
+    const confirm=node.getAttribute?.('data-confirm-action');
+    const cancel=node.getAttribute?.('data-cancel-action');
+    if((confirm&&!state.pending.has(confirm))||(cancel&&!state.pending.has(cancel))){
+      node.removeAttribute('data-confirm-action');
+      node.removeAttribute('data-cancel-action');
+      if(node.tagName==='BUTTON'){
+        node.disabled=true;
+        node.textContent='Expired — ask Vision again';
+        node.title='This confirmation belonged to an earlier session. Ask Vision to prepare the action again.';
+      }
+    }
+  });
+  return template.innerHTML;
+}
+
 function welcome(){
   return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Ask about a job, assign a technician, change the schedule, or work through the next step with Vision. The service order stays in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
-  return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div>'+(m.html||esc(m.text))+'</div></div>';
+  return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
 }
 function renderThread(){
   const h=$('visionThread');if(!h)return;const c=chat();
