@@ -595,6 +595,25 @@ async function setupNotificationRealtime() {
     .subscribe();
   refreshNotificationBadge();
 }
+let equipmentMemoryCache=new Map();
+async function loadEquipmentMemory(tags=[]){
+  const clean=[...new Set(tags.map(v=>String(v||'').trim()).filter(Boolean))];if(!clean.length)return new Map();
+  const missing=clean.filter(t=>!equipmentMemoryCache.has(t));
+  if(missing.length){
+    const {data}=await liveDb.from('unit_returns').select('unit_tag,equipment_type,ticket_no,status,service_tech_name,returned_at,it_tech_name,it_received_at,completed_at,damage_notes,return_notes').in('unit_tag',missing).order('created_at',{ascending:false}).limit(200);
+    missing.forEach(t=>equipmentMemoryCache.set(t,[]));(data||[]).forEach(x=>equipmentMemoryCache.set(String(x.unit_tag),(equipmentMemoryCache.get(String(x.unit_tag))||[]).concat(x)));
+  }
+  return new Map(clean.map(t=>[t,equipmentMemoryCache.get(t)||[]]));
+}
+function equipmentMemoryHtml(tag,rows=[]){
+  if(!rows.length)return `<div class='wl-equipment-memory'><b>🧠 Equipment Memory · ${esc(tag)}</b><span>No prior Tech Check return/intake history found. History will build as this equipment moves through the app.</span></div>`;
+  const last=rows[0], issues=rows.filter(r=>String(r.damage_notes||r.return_notes||'').trim()).length;
+  return `<details class='wl-equipment-memory'><summary><span>🧠 Equipment Memory · ${esc(tag)}</span><span class='pill'>${rows.length} HISTORY</span></summary><div><div class='small'><b>Last MHelpDesk:</b> #${esc(last.ticket_no||'—')} · ${esc(last.equipment_type||'Equipment')} · ${esc(last.status||'Recorded')}</div>${last.completed_at?`<div class='small'><b>Last intake completed:</b> ${esc(ownerTimelineWhen(last.completed_at))}${last.it_tech_name?' · '+esc(last.it_tech_name):''}</div>`:''}${issues?`<div class='wl-ai-warn top8'>⚠ ${issues} prior history record${issues===1?'':'s'} include notes/issues. Review before sending this equipment back to the field.</div>`:`<div class='wl-ai-good top8'>✓ No prior return/intake notes are recorded in the available history.</div>`}<details class='top8'><summary>Previous Tech Check records</summary>${rows.slice(0,6).map(r=>`<div class='small top8'><b>#${esc(r.ticket_no||'—')}</b> · ${esc(r.status||'Recorded')}${r.completed_at?' · '+esc(ownerTimelineWhen(r.completed_at)):''}${r.damage_notes||r.return_notes?'<br>Notes: '+esc(r.damage_notes||r.return_notes):''}</div>`).join('')}</details></div></details>`;
+}
+async function injectEquipmentMemory(root=document){
+  const nodes=[...root.querySelectorAll('[data-unit-tag]')];const tags=nodes.map(n=>n.dataset.unitTag).filter(Boolean);if(!tags.length)return;
+  const mem=await loadEquipmentMemory(tags);nodes.forEach(n=>{if(n.querySelector('.wl-equipment-memory'))return;n.insertAdjacentHTML('beforeend',equipmentMemoryHtml(n.dataset.unitTag,mem.get(n.dataset.unitTag)||[]));});
+}
 function techCheckAIAnalysis(a, role){
   const type=String(a?.work_type||'service').toLowerCase(), manifest=a?.equipment_manifest||{}, warnings=[], steps=[];
   const devices=Object.entries(manifest.devices||{}).filter(([,n])=>Number(n)>0);
