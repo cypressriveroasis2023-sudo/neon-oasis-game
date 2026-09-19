@@ -31,6 +31,24 @@
   const DEVICE_TYPES=Object.freeze(Object.keys(EQUIPMENT).filter(k=>EQUIPMENT[k].category==='device'));
   const STAND_TYPES=Object.freeze(Object.keys(EQUIPMENT).filter(k=>EQUIPMENT[k].category==='stand'));
 
+  const HELIOS_FIELD_CHECKLIST=Object.freeze([
+    {key:'helios_field_box_mounted_ok',rpc_param:'p_box_mounted_ok',label:'Helios box installed and secured on the tower.'},
+    {key:'helios_field_pv_connected_ok',rpc_param:'p_pv_connected_ok',label:'PV cables connected.'},
+    {key:'helios_field_ptz_secured_ok',rpc_param:'p_ptz_secured_ok',label:'PTZ reinstalled and secured on the removable front plate.'},
+    {key:'helios_field_switch_pv_ok',rpc_param:'p_switch_pv_ok',label:'Internal switch flipped to PV.'},
+    {key:'helios_field_unit_battery_on_ok',rpc_param:'p_unit_battery_on_ok',label:'Helios unit and battery turned on.'},
+    {key:'helios_field_it_online_verified_ok',rpc_param:'p_it_online_verified_ok',label:'Called IT and IT verified the Helios is online.'},
+    {key:'helios_field_cameras_aimed_ok',rpc_param:'p_cameras_aimed_ok',label:'Camera aim / focus completed with IT.'},
+    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Recording verified after final aim.'},
+    {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Tower cranked to approximately 20 feet.'},
+    {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Separate tower mast locking bolt inserted and secured.'},
+    {key:'helios_field_panel_45deg_ok',rpc_param:'p_panel_45deg_ok',label:'Solar panel set to approximately 45°.'},
+    {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Separate panel angle/locking bolt installed and secured.'},
+    {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'4 bags of sand placed on the tower base.'}
+  ]);
+  const IT_INTAKE_CHECKLIST=Object.freeze([
+    'Is the returned unit tag / number correct?','Did you review the Service Tech site / damage photos and verify any damage found?','Are the returned accessories / equipment accounted for?','Are the batteries / battery box accounted for?','Are the SD cards / storage accounted for where applicable?','Did you power the unit and verify it comes online / functions correctly?','Were the SD cards formatted and made ready for the next deployment?','Was the SIM card turned off / canceled for this returned unit?','Was monitoring canceled for this returned unit?','Was this unit removed from Alibi?','Was the unit cleaned and made physically ready for reuse?','Was the unit added back to the 2026 Unit Tracker as Shop Inventory?','Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?','Is the unit back on the shelf and ready for a future deployment?','Was this returned unit removed from the customer email account in the camera app?'
+  ]);
   const HELIOS_PORTS=Object.freeze({
     camera1:Object.freeze([81,554,1400]),
     camera2:Object.freeze([81,554,1500]),
@@ -282,12 +300,14 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v1',
+    version:'rules-v2',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
     standTypes:STAND_TYPES,
     heliosPorts:HELIOS_PORTS,
+    heliosFieldChecklist:HELIOS_FIELD_CHECKLIST,
+    itIntakeChecklist:IT_INTAKE_CHECKLIST,
     normalizeEquipmentType,
     displayEquipmentType,
     equipmentDefinition,
