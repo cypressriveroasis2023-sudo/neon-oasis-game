@@ -135,6 +135,61 @@ function injectStyles() {
     .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
     .wl-assigned-inventory{margin:12px 0;padding:12px;border:1px solid #cfdce5;border-radius:13px;background:#f3f7fa}.wl-assigned-inventory-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.wl-assigned-inventory-list span{display:inline-block;border:1px solid #d4dee6;border-radius:999px;background:#fff;padding:7px 9px;font-size:12px;color:#526472}.wl-assigned-inventory-list b{color:#102a40}
     .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
+    /* Tech Check Help Center v91 */
+    .wl-help-sheet{background:#f5f7f9!important;color:#172839!important}
+    .wl-help-head{background:#f5f7f9!important;border-bottom:1px solid #e1e7ec!important;margin:0 -2px 12px!important;padding:13px 2px 11px!important}
+    .wl-help-brand{display:flex;align-items:center;gap:9px;min-width:0}
+    .wl-help-brand-icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;background:#101820}
+    .wl-help-brand-icon img{width:25px;height:25px;object-fit:contain}
+    .wl-help-head .wl-next-kicker{color:#d20b12!important;font-size:8px!important;letter-spacing:.14em!important}
+    .wl-help-head h2{margin:2px 0 0!important;color:#101820!important;font-size:21px!important;line-height:1.05!important}
+    .wl-help-close-btn{width:38px;height:38px;min-width:38px;margin:0;padding:0;border:0;border-radius:999px;background:#e8edf1;color:#334757;display:grid;place-items:center;font-size:23px;font-weight:700;line-height:1}
+    .wl-help-home-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px;border:1px solid #d6dee5;border-left:4px solid #d20b12;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(16,24,32,.04)}
+    .wl-help-home-hero>div>span{display:block;color:#d20b12;font-size:8px;font-weight:950;letter-spacing:.12em}
+    .wl-help-home-hero h3{margin:3px 0 4px;color:#101820;font-size:20px;line-height:1.05}
+    .wl-help-home-hero p{margin:0;color:#657583;font-size:10px;line-height:1.4;font-weight:600}
+    .wl-help-safe{flex:none;padding:5px 7px;border:1px solid #b7d8c5;border-radius:999px;background:#edf9f1;color:#16653d;font-size:7px!important;letter-spacing:.07em!important;white-space:nowrap}
+    .wl-help-role-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
+    .wl-help-role-tabs button{min-height:54px;margin:0;padding:7px;border:1px solid #d2dbe2;border-radius:12px;background:#fff;color:#647482;font:inherit}
+    .wl-help-role-tabs button b{width:25px;height:25px;margin:0 auto 3px;display:grid;place-items:center;border-radius:8px;background:#edf1f4;color:#253a4b;font-size:9px;font-weight:950}
+    .wl-help-role-tabs button span{display:block;font-size:9px;font-weight:850}
+    .wl-help-role-tabs button.selected{border-color:#d20b12;background:#fff7f7;color:#a90e14;box-shadow:inset 0 -3px 0 #d20b12}
+    .wl-help-role-tabs button.selected b{background:#101820;color:#fff}
+    .wl-help-start-card{margin-top:10px;padding:11px;border:1px solid #d6dee5;border-radius:14px;background:#101820;color:#fff}
+    .wl-help-start-card>div{display:flex;align-items:center;gap:9px}
+    .wl-help-start-icon{width:36px;height:36px;flex:none;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:#1b2832}
+    .wl-help-start-icon img{width:23px;height:23px}
+    .wl-help-start-card b,.wl-help-start-card small{display:block}
+    .wl-help-start-card b{font-size:12px;line-height:1.2}.wl-help-start-card small{margin-top:2px;color:#c4ced6;font-size:8px;line-height:1.25}
+    .wl-help-start-card button{width:100%;min-height:40px;margin:9px 0 0;border:0;border-radius:10px;background:#d20b12;color:#fff;font:inherit;font-size:10px;font-weight:900}
+    .wl-help-flow-section,.wl-help-status-section,.wl-help-topics{margin-top:12px}
+    .wl-help-section-title{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 1px 7px}
+    .wl-help-section-title b{color:#172839;font-size:12px;font-weight:900}.wl-help-section-title span{color:#7a8793;font-size:7px;font-weight:900;letter-spacing:.09em}
+    .wl-help-flow-map{display:flex;align-items:center;gap:5px;overflow-x:auto;padding:10px;border:1px solid #d9e1e7;border-radius:12px;background:#fff;-webkit-overflow-scrolling:touch}
+    .wl-help-flow-map span{flex:none;padding:6px 8px;border-radius:8px;background:#edf2f5;color:#263a49;font-size:7px;font-weight:900;white-space:nowrap}
+    .wl-help-flow-map i{flex:none;color:#d20b12;font-style:normal;font-weight:950}
+    .wl-help-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+    .wl-help-status-grid>div{min-width:0;padding:8px;border:1px solid #d8e0e6;border-radius:11px;background:#fff;display:grid;grid-template-columns:11px minmax(0,1fr);gap:7px;align-items:start}
+    .wl-help-status-grid i{width:10px;height:10px;margin-top:2px;border-radius:999px;background:#a5afb8}
+    .wl-help-status-grid .ready i{background:#16844a}.wl-help-status-grid .pending i{background:#d8a516}.wl-help-status-grid .stop i{background:#d20b12}
+    .wl-help-status-grid b,.wl-help-status-grid small{display:block}.wl-help-status-grid b{font-size:9px}.wl-help-status-grid small{margin-top:2px;color:#72808c;font-size:7px;line-height:1.25}
+    .wl-help-topic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+    .wl-help-topic-grid button{min-width:0;min-height:73px;margin:0;padding:9px;display:grid;grid-template-columns:31px minmax(0,1fr) auto;gap:7px;align-items:center;border:1px solid #d7dfe6;border-radius:12px;background:#fff;color:#172839;text-align:left;font:inherit}
+    .wl-help-topic-icon{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:9px;background:#101820;color:#fff;font-size:9px;font-weight:950}
+    .wl-help-topic-grid button>span:nth-child(2){min-width:0}.wl-help-topic-grid b,.wl-help-topic-grid small{display:block}.wl-help-topic-grid b{font-size:9px;line-height:1.15;font-weight:900}.wl-help-topic-grid small{margin-top:3px;color:#72808d;font-size:7px;line-height:1.25}.wl-help-topic-grid strong{color:#7c8994;font-size:18px}
+    .wl-help-rule-card{margin-top:12px;padding:10px 11px;border:1px solid #e2bd71;border-radius:11px;background:#fff8e9;color:#654713}
+    .wl-help-rule-card b,.wl-help-rule-card span{display:block}.wl-help-rule-card b{font-size:10px}.wl-help-rule-card span{margin-top:3px;font-size:8px;line-height:1.35;font-weight:650}
+    .wl-help-back{min-height:37px;margin:0 0 8px;padding:7px 10px;border:1px solid #d3dce3;border-radius:10px;background:#fff;color:#35495a;font:inherit;font-size:9px;font-weight:850}
+    .wl-help-topic-detail{border:1px solid #d6dee5;border-top:4px solid #d20b12;border-radius:14px;background:#fff;overflow:hidden}
+    .wl-help-topic-detail-head{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;align-items:center;padding:13px;border-bottom:1px solid #e5eaee}
+    .wl-help-topic-icon.large{width:40px;height:40px;border-radius:11px;font-size:11px}
+    .wl-help-topic-detail-head>div>span{display:block;color:#d20b12;font-size:7px;font-weight:950;letter-spacing:.1em}.wl-help-topic-detail-head h3{margin:2px 0;color:#101820;font-size:18px;line-height:1.1}.wl-help-topic-detail-head p{margin:3px 0 0;color:#6a7986;font-size:9px;line-height:1.3}
+    .wl-help-topic-copy{padding:13px;color:#263847;font-size:11px;line-height:1.5}.wl-help-topic-copy p{margin:0 0 10px}.wl-help-topic-copy p:last-child{margin-bottom:0}
+    .wl-help-topic-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.wl-help-topic-actions button{min-height:43px;margin:0;border-radius:10px;font:inherit;font-size:8px;font-weight:900}.wl-help-topic-actions button:first-child{border:1px solid #d20b12;background:#d20b12;color:#fff}.wl-help-topic-actions button:last-child{border:1px solid #d3dce3;background:#fff;color:#35495a}
+    .wl-help-progress{height:6px!important}.wl-help-step-count{font-size:9px!important}.wl-help-card{padding:14px!important}.wl-help-card h2{font-size:20px!important}.wl-help-copy{font-size:12px!important;line-height:1.5!important}.wl-help-nav button{min-height:44px!important;font-size:10px!important}
+    @media(min-width:800px){.wl-help-overlay{align-items:center!important}.wl-help-sheet{border-radius:20px!important;max-height:88vh!important}}
+    @media(max-width:430px){.wl-help-sheet{padding:14px!important}.wl-help-head{top:-14px!important}.wl-help-topic-grid{grid-template-columns:1fr}.wl-help-home-hero{padding:11px}.wl-help-status-grid{gap:6px}.wl-help-topic-actions{grid-template-columns:1fr}}
+
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
 
 
@@ -531,24 +586,162 @@ function ensureHelpOverlay() {
   overlay = document.createElement('div');
   overlay.id = 'wlHelpOverlay';
   overlay.className = 'wl-help-overlay hidden';
-  overlay.innerHTML = `<div class='wl-help-sheet'><div class='wl-help-head'><div><div class='wl-next-kicker'>CAMERAS ONSITE</div><h2>Help & Training</h2></div><button class='mini' data-wl-help-close>Close</button></div><div id='wlHelpBody'></div></div>`;
+  overlay.innerHTML = `<div class='wl-help-sheet'>
+    <div class='wl-help-head'>
+      <div class='wl-help-brand'>
+        <span class='wl-help-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
+        <div><div class='wl-next-kicker'>TECH CHECK</div><h2 id='wlHelpTitle'>Help Center</h2></div>
+      </div>
+      <button class='wl-help-close-btn' data-wl-help-close aria-label='Close help'>×</button>
+    </div>
+    <div id='wlHelpBody'></div>
+  </div>`;
   document.body.append(overlay);
   return overlay;
 }
+
+let helpCenterRole = null;
+let helpWalkthroughRole = null;
+
+function helpRoleName(role){
+  return role==='owner' ? 'Owner / Admin' : role==='service' ? 'Service Tech' : 'IT Technician';
+}
+function helpRoleIcon(role){
+  return role==='owner' ? 'O' : role==='service' ? 'S' : 'IT';
+}
+function helpFlowHtml(role){
+  if(role==='owner') return "<div class='wl-help-flow-map'><span>OWNER ASSIGNS</span><i>→</i><span>IT PREP</span><i>→</i><span>SERVICE VERIFY</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RETURN / COMPLETE</span></div>";
+  if(role==='service') return "<div class='wl-help-flow-map'><span>OPEN MHELP TICKET</span><i>→</i><span>VERIFY IT HANDOFF</span><i>→</i><span>SERVICE CHECKOUT</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RETURN TO IT</span></div>";
+  return "<div class='wl-help-flow-map'><span>ASSIGNED / CLAIM</span><i>→</i><span>PULL EQUIPMENT</span><i>→</i><span>TECH CHECK</span><i>→</i><span>PHOTO + SIGN</span><i>→</i><span>CREATE HANDOFF</span></div>";
+}
+function helpTopicsForRole(role){
+  if(role==='owner') return [
+    {id:'assign',icon:'+',title:'Assign a new job',desc:'MHelpDesk reference, equipment, department flow, and technician assignment.',body:"<p>Use the <b>current MHelpDesk ticket</b> as the source of truth. Enter the reference, site, work date, job description, equipment quantities/numbers, parts, and department flow.</p><p>You can assign directly to a named technician or leave it in the department queue. AI Dispatch can prepare the draft, but <b>you still review and send it</b>.</p>"},
+    {id:'progress',icon:'◎',title:'Track live jobs',desc:'See who owns the work, the handoff stage, and what is still open.',body:"<p><b>Live Job Progress</b> shows assigned/waiting work and jobs already in progress. Once a department-queue job is claimed, the technician's name becomes visible to the Owner.</p><p>Use the AI status as an advisory signal: green is on track, yellow is waiting/pending, and red needs Owner attention.</p>"},
+    {id:'handoff',icon:'⇄',title:'Understand IT → Service handoff',desc:'What IT finishes and what Service must verify.',body:"<p>IT completes the required unit checks, photos, signature, and readiness items, then creates the <b>Service handoff</b>. Service opens the same MHelpDesk reference and physically verifies the handed-off equipment before continuing.</p>"},
+    {id:'returns',icon:'↩',title:'Returns & IT Intake',desc:'Follow equipment from Service back to shelf inventory.',body:"<p>Service records the returning unit, condition, notes, and photos. IT Intake receives it and completes the intake checklist. The Owner/Manager completes the final inventory confirmation before the unit returns to shelf inventory.</p>"},
+    {id:'team',icon:'👥',title:'Technicians & activity',desc:'Accounts, activity, resets, and accountability.',body:"<p>Use <b>Technician Accounts</b> for logins/access and <b>Recent Activity</b> to review submitted work. Tech Check keeps the named technician attached to work they claimed, prepared, verified, or returned.</p>"},
+    {id:'ai',icon:'AI',title:'Use Tech Check AI',desc:'Dispatch drafts, preflight review, alerts, and workflow health.',body:"<p>AI tools are advisory. AI Dispatch can build a job draft from your wording. AI Preflight can flag setup inconsistencies. The AI Control Center can highlight waiting, on-track, or attention states.</p><p><b>AI never sends a job by itself.</b></p>"}
+  ];
+  if(role==='service') return [
+    {id:'find',icon:'⌕',title:'Open the correct Service job',desc:'Use the exact current MHelpDesk ticket number.',body:"<p>Service jobs stay hidden until you enter the <b>exact current MHelpDesk reference</b>. This prevents the wrong job from being opened just because the same unit was used on an older ticket.</p>"},
+    {id:'handoff',icon:'⇄',title:'Verify the IT handoff',desc:'Confirm the named IT Tech, exact units, parts, and quantities.',body:"<p>Before accepting the handoff, physically match the unit tags and listed parts to Tech Check. Do not accept a mismatch. The record shows which IT Tech prepared the equipment.</p>"},
+    {id:'solar',icon:'☀',title:'Solar / Helios checkout',desc:'Solar Stand, batteries, MPPT, charging proof, Ranger, and Helios.',body:"<p><b>Solar Spotter delivery:</b> Service verifies the assigned Solar Stand, required batteries, MPPT update/test, and active charging with the solar panel + batteries + MPPT connected. Upload the stand tag and charging/reading proof.</p><p><b>Ranger:</b> verify the required solar panel and charging. <b>Helios:</b> complete the required Service-side Cerbo/MPPT verification.</p>"},
+    {id:'field',icon:'→',title:'Complete the field work',desc:'Delivery, service, swap, or pickup using the current ticket.',body:"<p>Work from the current MHelpDesk job. The MHelpDesk ticket changes from job to job, but the unit number remains universal inside Tech Check so history follows the equipment.</p>"},
+    {id:'return',icon:'↩',title:'Return a unit to IT',desc:'Record the ticket, unit, condition, notes, and photos.',body:"<p>Use <b>Return Unit to IT Intake</b> when equipment comes back from the field. The return is recorded under your Service Tech name, then IT receives it through Intake.</p>"},
+    {id:'inspection',icon:'✓',title:'Truck / Trailer Inspection',desc:'Complete your inspection from your own account.',body:"<p>Complete the inspection from your own Service account so the record reflects the correct technician. Submitted inspections remain available in History.</p>"},
+    {id:'alerts',icon:'!',title:'Phone alerts & history',desc:'Enable alerts once and review completed work.',body:"<p>Open <b>Menu → Phone Alerts</b> on your device to enable assignment alerts. Use History to review previously submitted Service work.</p>"}
+  ];
+  return [
+    {id:'assigned',icon:'1',title:'Start assigned IT work',desc:'Direct assignments and department-queue jobs.',body:"<p>Owner-assigned jobs appear in <b>My Work Today</b>. Direct jobs are already assigned to you. Department-queue jobs can be claimed by an IT Tech; once claimed, the Owner sees who took responsibility.</p>"},
+    {id:'prep',icon:'+',title:'Start Equipment Prep',desc:'Use Owner assignment or start an on-the-fly prep when needed.',body:"<p>For an unexpected need, <b>Start New Equipment Prep</b> using the current MHelpDesk reference. This creates the Tech Check workflow only; it does not create or edit the MHelpDesk ticket.</p>"},
+    {id:'deployment',icon:'✓',title:'Complete deployment checks',desc:'Pull the exact equipment and finish every required check.',body:"<p>Enter the exact unit tags and complete the required equipment-specific checks one unit at a time. Required photos, tag confirmation, signature, and readiness checks must be complete before handoff.</p>"},
+    {id:'helios',icon:'H',title:'Helios checks',desc:'Cameras, router ports, speaker, Cerbo, MPPT, SD cards, and readiness.',body:"<p>Helios requires the full equipment-specific IT checklist. Camera 1 uses ports <b>81 / 554 / 1400</b>, Camera 2 <b>81 / 554 / 1500</b>, PTZ <b>81 / 554 / 1600</b>, and IP Speaker <b>81 / 554 / 1700</b>. Verify the device and router configuration where required.</p><p>Also complete the Cerbo/VRM, MPPT, battery box, recording-before-format, three 1TB SD cards, monitoring, customer email, and final readiness checks.</p>"},
+    {id:'handoff',icon:'⇄',title:'Create the Service handoff',desc:'Finish IT and hand the verified equipment to Service.',body:"<p>After all required IT checks, photos, signatures, and readiness items pass, create the <b>Service handoff</b>. Service must open the same MHelpDesk ticket and verify the exact handed-off equipment.</p>"},
+    {id:'intake',icon:'↩',title:'IT Intake & returns',desc:'Receive equipment returning from Service.',body:"<p>IT Intake shows the Service Tech, ticket, unit tag, notes, and photos. Complete every intake check, document the unit, and move it to the Owner/Manager confirmation step before shelf inventory.</p>"},
+    {id:'alerts',icon:'!',title:'Phone alerts & history',desc:'Enable alerts once and review previous IT work.',body:"<p>Open <b>Menu → Phone Alerts</b> on your device to receive new-assignment alerts. Use Status & History to review prior IT work.</p>"}
+  ];
+}
+function renderHelpCenter(roleOverride=null){
+  const overlay=ensureHelpOverlay();
+  const body=document.getElementById('wlHelpBody');
+  const title=document.getElementById('wlHelpTitle');
+  helpCenterRole=roleOverride||helpCenterRole||currentRoleKey()||'it';
+  if(!['owner','it','service'].includes(helpCenterRole)) helpCenterRole='it';
+  if(title) title.textContent='Help Center';
+  const topics=helpTopicsForRole(helpCenterRole);
+  const steps=helpStepsForRole(helpCenterRole);
+  body.innerHTML=`
+    <section class='wl-help-home-hero'>
+      <div>
+        <span>TRAINING CENTER</span>
+        <h3>${esc(helpRoleName(helpCenterRole))}</h3>
+        <p>Quick answers, role workflows, and step-by-step training. Help mode does not change live Tech Check jobs.</p>
+      </div>
+      <span class='wl-help-safe'>TRAINING ONLY</span>
+    </section>
+    <div class='wl-help-role-tabs'>
+      <button type='button' data-wl-help-role='owner' class='${helpCenterRole==='owner'?'selected':''}'><b>O</b><span>Owner</span></button>
+      <button type='button' data-wl-help-role='it' class='${helpCenterRole==='it'?'selected':''}'><b>IT</b><span>IT Tech</span></button>
+      <button type='button' data-wl-help-role='service' class='${helpCenterRole==='service'?'selected':''}'><b>S</b><span>Service</span></button>
+    </div>
+    <section class='wl-help-start-card'>
+      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${steps.length}-step ${esc(helpRoleName(helpCenterRole))} walkthrough</b><small>Best for new team members or a full refresher.</small></div></div>
+      <button type='button' data-wl-help-walkthrough>Start Walkthrough →</button>
+    </section>
+    <section class='wl-help-flow-section'>
+      <div class='wl-help-section-title'><b>Role workflow</b><span>THE BIG PICTURE</span></div>
+      ${helpFlowHtml(helpCenterRole)}
+    </section>
+    <section class='wl-help-status-section'>
+      <div class='wl-help-section-title'><b>Status colors</b><span>WHAT THEY MEAN</span></div>
+      <div class='wl-help-status-grid'>
+        <div class='ready'><i></i><span><b>Green</b><small>Ready, started, working, or on track</small></span></div>
+        <div class='pending'><i></i><span><b>Yellow</b><small>Pending, waiting, or review needed</small></span></div>
+        <div class='stop'><i></i><span><b>Red</b><small>Stop, blocked, missing, or action required</small></span></div>
+        <div class='neutral'><i></i><span><b>Gray</b><small>Draft, neutral, or inactive</small></span></div>
+      </div>
+    </section>
+    <section class='wl-help-topics'>
+      <div class='wl-help-section-title'><b>How do I…?</b><span>QUICK HELP</span></div>
+      <div class='wl-help-topic-grid'>
+        ${topics.map(t=>`<button type='button' data-wl-help-topic='${esc(t.id)}'><span class='wl-help-topic-icon'>${esc(t.icon)}</span><span><b>${esc(t.title)}</b><small>${esc(t.desc)}</small></span><strong>›</strong></button>`).join('')}
+      </div>
+    </section>
+    <section class='wl-help-rule-card'>
+      <b>MHelpDesk and Tech Check are separate.</b>
+      <span>Always use the current MHelpDesk ticket as the job source of truth. Tech Check records the workflow, evidence, handoffs, returns, and universal unit history.</span>
+    </section>
+  `;
+  overlay.classList.remove('hidden');
+}
+function renderHelpTopic(topicId){
+  const body=document.getElementById('wlHelpBody');
+  const title=document.getElementById('wlHelpTitle');
+  const role=helpCenterRole||currentRoleKey()||'it';
+  const topic=helpTopicsForRole(role).find(t=>t.id===topicId);
+  if(!body||!topic) return renderHelpCenter(role);
+  if(title) title.textContent='Quick Help';
+  body.innerHTML=`
+    <button type='button' class='wl-help-back' data-wl-help-center>← Help Center</button>
+    <section class='wl-help-topic-detail'>
+      <div class='wl-help-topic-detail-head'>
+        <span class='wl-help-topic-icon large'>${esc(topic.icon)}</span>
+        <div><span>${esc(helpRoleName(role)).toUpperCase()}</span><h3>${esc(topic.title)}</h3><p>${esc(topic.desc)}</p></div>
+      </div>
+      <div class='wl-help-topic-copy'>${topic.body}</div>
+    </section>
+    <div class='wl-help-topic-actions'>
+      <button type='button' data-wl-help-walkthrough>Replay Full ${esc(helpRoleName(role))} Walkthrough</button>
+      <button type='button' data-wl-help-center>Back to Help Center</button>
+    </div>
+  `;
+}
+async function openHelpCenter(roleOverride=null){
+  document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
+  helpWalkthroughMode='help-center';
+  helpCenterRole=roleOverride||currentRoleKey()||'it';
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(tech?.id) liveDb.from('technician_training_state').upsert({user_id:tech.id,last_help_opened_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:'user_id'}).then(()=>{}).catch(()=>{});
+  renderHelpCenter(helpCenterRole);
+}
+
 function renderHelpWalkthrough() {
   const overlay = ensureHelpOverlay();
   const body = document.getElementById('wlHelpBody');
-  const steps = helpStepsForRole();
+  const steps = helpStepsForRole(helpWalkthroughRole || currentRoleKey());
   helpWalkthroughStep = Math.max(0, Math.min(helpWalkthroughStep, steps.length - 1));
   const step = steps[helpWalkthroughStep];
+  const helpTitle=document.getElementById('wlHelpTitle'); if(helpTitle) helpTitle.textContent='Step-by-Step Training';
   const pct = Math.round((helpWalkthroughStep + 1) / steps.length * 100);
   const firstTime = helpWalkthroughMode === 'first';
   const last = helpWalkthroughStep === steps.length - 1;
   body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div></div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
   overlay.classList.remove('hidden');
 }
-async function openHelpWalkthrough(firstTime = false) {
+async function openHelpWalkthrough(firstTime = false, roleOverride = null) {
   helpWalkthroughMode = firstTime ? 'first' : 'help';
+  helpWalkthroughRole = firstTime ? null : (roleOverride || helpCenterRole || currentRoleKey());
   helpWalkthroughStep = 0;
   if (!firstTime) {
     const tech = await currentTechIdentity().catch(() => null);
@@ -557,7 +750,7 @@ async function openHelpWalkthrough(firstTime = false) {
   renderHelpWalkthrough();
 }
 async function completeHelpWalkthrough() {
-  if (helpWalkthroughMode !== 'first') { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if (helpWalkthroughMode !== 'first') { helpWalkthroughMode='help-center'; return renderHelpCenter(helpWalkthroughRole || helpCenterRole || currentRoleKey()); }
   const tech = await currentTechIdentity().catch(() => null);
   if (tech?.id) {
     const now = new Date().toISOString();
@@ -606,7 +799,7 @@ async function openTechMenu() {
       <div class='wl-owner-menu-utilities'>
         <button class='wl-owner-menu-util' data-wl-menu-help>
           <span class='wl-owner-menu-util-icon'>?</span>
-          <span><b>Help & Training</b><small>Owner walkthrough</small></span>
+          <span><b>Help Center</b><small>Guides, walkthroughs & quick answers</small></span>
         </button>
         <button class='wl-owner-menu-util' data-wl-menu-refresh>
           <span class='wl-owner-menu-util-icon'>↻</span>
@@ -624,7 +817,7 @@ async function openTechMenu() {
     <div class='wl-app-menu-list'>
       <button class='wl-app-menu-item' data-wl-menu-help>
         <span class='wl-app-menu-icon'>?</span>
-        <span><b>Help & Training</b><small>Replay the full ${role === 'it' ? 'IT Technician' : 'Service Tech'} walkthrough.</small></span>
+        <span><b>Help Center</b><small>Guides, walkthroughs & quick answers.</small></span>
         <strong>›</strong>
       </button>
       <button class='wl-app-menu-item' data-wl-menu-phone-alerts>
@@ -3959,15 +4152,19 @@ document.addEventListener('click', async e => {
   }
   if (e.target.closest('#techMenuButton')) return openTechMenu();
   if (e.target.closest('[data-wl-menu-close]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return; }
-  if (e.target.closest('[data-wl-menu-help]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return openHelpWalkthrough(false); }
+  if (e.target.closest('[data-wl-menu-help]')) return openHelpCenter();
   if (e.target.closest('[data-wl-menu-phone-alerts]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return enableBrowserAlerts(); }
   if (e.target.closest('[data-wl-menu-refresh]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); await window.refreshData?.(); return; }
   if (e.target.closest('[data-wl-menu-ai-dispatch]')) return openOwnerAIDispatch();
-  if (e.target.closest('#helpTrainingButton')) return openHelpWalkthrough(false);
+  if (e.target.closest('#helpTrainingButton')) return openHelpCenter();
+  const helpRole=e.target.closest('[data-wl-help-role]'); if(helpRole) return renderHelpCenter(helpRole.dataset.wlHelpRole);
+  const helpTopic=e.target.closest('[data-wl-help-topic]'); if(helpTopic) return renderHelpTopic(helpTopic.dataset.wlHelpTopic);
+  if(e.target.closest('[data-wl-help-center]')) return renderHelpCenter(helpCenterRole);
+  if(e.target.closest('[data-wl-help-walkthrough]')) return openHelpWalkthrough(false,helpCenterRole);
   if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
-  if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
+  if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
