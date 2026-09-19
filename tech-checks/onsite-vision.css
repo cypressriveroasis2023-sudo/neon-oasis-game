@@ -256,3 +256,35 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
     line-height:1.25;
   }
 }
+
+
+/* Server agent response grounding v12 */
+.vision-agent-answer{
+  color:#dce5ec;
+  font-size:14px;
+  line-height:1.62;
+}
+.vision-agent-facts{
+  display:grid;
+  gap:7px;
+  margin-top:12px;
+}
+.vision-agent-facts>div{
+  display:grid;
+  gap:3px;
+  border-left:2px solid #344c62;
+  padding:7px 9px;
+  background:#0f1b26;
+  border-radius:0 9px 9px 0;
+}
+.vision-agent-facts small{
+  color:#778b9e;
+  font-size:7px;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.vision-agent-facts span{
+  color:#c7d2db;
+  font-size:10px;
+  line-height:1.45;
+}
