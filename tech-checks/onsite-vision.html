@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1118">
+  <title>OnSite Vision · Tech Check</title>
+  <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
+  <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v1">
+</head>
+<body>
+  <div id="visionLoading" class="vision-loading">
+    <img src="./techcheck-eye-192.png?v=1" alt="">
+    <b>OnSite Vision</b>
+    <span>Opening your Tech Check workspace…</span>
+  </div>
+  <div id="visionApp" class="vision-app hidden">
+    <aside id="visionSidebar" class="vision-sidebar">
+      <div class="vision-brand">
+        <span class="vision-logo"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
+        <span><small>CAMERAS ONSITE</small><b>OnSite Vision</b></span>
+      </div>
+      <button id="visionNewChat" class="vision-new-chat" type="button"><span>＋</span> New chat</button>
+      <div class="vision-side-section">
+        <div class="vision-side-label">Recent conversations</div>
+        <div id="visionHistory" class="vision-history"></div>
+      </div>
+      <div class="vision-side-footer">
+        <a href="./" class="vision-back-link">← Back to Tech Check</a>
+        <div id="visionOwnerName" class="vision-owner-name"></div>
+      </div>
+    </aside>
+    <main class="vision-main">
+      <header class="vision-topbar">
+        <button id="visionMenuButton" class="vision-icon-button vision-mobile-only" type="button" aria-label="Open conversations">☰</button>
+        <div class="vision-top-title">
+          <span class="vision-logo small"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
+          <div><small>ONSITE VISION</small><b id="visionConversationTitle">New conversation</b></div>
+        </div>
+        <div class="vision-top-actions">
+          <span id="visionLiveStatus" class="vision-live-status">LIVE</span>
+          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
+          <button id="visionRefreshButton" class="vision-icon-button" type="button" aria-label="Refresh data">↻</button>
+        </div>
+      </header>
+      <section id="visionThread" class="vision-thread"></section>
+      <footer class="vision-composer-wrap">
+        <div class="vision-composer">
+          <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision">🎙</button>
+          <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision anything about Tech Check…" enterkeyhint="send"></textarea>
+          <button id="visionSendButton" class="vision-send" type="button" aria-label="Send">➜</button>
+        </div>
+        <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
+      </footer>
+    </main>
+    <aside id="visionOrderPanel" class="vision-order-panel">
+      <div class="vision-order-head">
+        <div><small>SERVICE ORDER</small><b id="visionOrderTitle">No job selected</b></div>
+        <button id="visionOrderClose" class="vision-mobile-only vision-icon-button" type="button">Close</button>
+      </div>
+      <div id="visionOrderBody" class="vision-order-body"></div>
+    </aside>
+    <div id="visionShade" class="vision-shade"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v1" defer></script>
+</body>
+</html>
