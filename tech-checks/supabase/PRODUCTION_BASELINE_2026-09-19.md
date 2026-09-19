@@ -11,7 +11,7 @@ It is documentation, not a migration. Existing production RPCs, RLS policies, tr
 - Public functions/RPCs/triggers functions: see generated types
 - Public trigger events: see live database
 - RLS policies: see live database
-- Recorded migrations in production: 73
+- Recorded migrations in production: 74
 - Edge Functions: 5
 
 ## Important architectural rule
@@ -130,7 +130,7 @@ OnSite Vision must **not** replace server-side validation with browser logic. Th
 
 ## Schema drift note
 
-At the start of this refactor, production had 73 recorded migrations while the repository contained only a small subset of migration SQL files. The generated `database.types.ts` and this baseline are now checked into the repository so future work has a source-controlled reference.
+At the start of this refactor, production had 73 recorded migrations at the start of the refactor while the repository contained only a small subset of migration SQL files. The generated `database.types.ts` and this baseline are now checked into the repository so future work has a source-controlled reference.
 
 This baseline does **not** pretend to reconstruct the missing historical SQL. Future schema changes should be added to `tech-checks/supabase/migrations/` and applied through named migrations.
 
@@ -151,3 +151,18 @@ This baseline does **not** pretend to reconstruct the missing historical SQL. Fu
 ## Next architecture step
 
 The new Company Knowledge Layer and Workflow Engine should consume these production facts while gradually replacing duplicated front-end business-rule implementations. No database gate should be removed until parity testing proves the shared engine is equivalent or stricter.
+
+## Phase 2 live job context
+
+Migration `onsite_vision_job_context_v1` added the read-only RPC `get_tech_check_job_context_v1(text)`.
+
+Safety characteristics:
+
+- `SECURITY INVOKER` — caller RLS remains in effect.
+- Stable/read-only function; it does not mutate Tech Check records.
+- EXECUTE granted to `authenticated` only.
+- EXECUTE revoked from `anon` and `public`.
+- Returns one structured context object containing assignments, the preferred prep ticket, prep items, Service solar state, handoff evidence, solar evidence, returns, unit lifecycle, inventory context, truck spares, and workflow checkpoints visible to the caller.
+- Derives `summary.effective_work_type` from actual prep-item purpose first, preventing older `job_assignments.work_type` values from overriding a DELIVERY or SWAP prep workflow.
+
+Production migration count after Phase 2: **74**.
