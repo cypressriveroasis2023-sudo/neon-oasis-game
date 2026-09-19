@@ -1115,6 +1115,9 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
 document.addEventListener('change',e=>{if(e.target?.id==='visionKnowledgeFilter')loadKnowledgeEntries();});
+document.addEventListener('focusin',e=>{
+  if(e.target?.id==='visionPrompt') $('visionApp')?.classList.remove('order-open');
+});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!$('visionKnowledgeModal')?.classList.contains('hidden')){closeKnowledgeManager();return;}
   if(e.target?.id==='visionPrompt'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
