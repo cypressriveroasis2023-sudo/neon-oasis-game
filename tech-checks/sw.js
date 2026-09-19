@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v60';
+const CACHE_NAME = 'tech-check-field-shell-v61';
 const APP_SHELL = './';
 
 self.addEventListener('install', event => {
@@ -7,10 +7,10 @@ self.addEventListener('install', event => {
     // Shell first so install is resilient; performance assets are best-effort.
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
-      cache.add(new Request('./app.js?v=startup-fast-v28', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v114', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=startup-fast-v29', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v115', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
-      cache.add(new Request('./styles.css?v=onsite-chat-v112', { cache:'reload' }))
+      cache.add(new Request('./styles.css?v=onsite-chat-v115', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
@@ -32,24 +32,16 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       const cachedShell = await caches.match(APP_SHELL, { ignoreSearch: true });
-      const network = fetch(request)
-        .then(async response => {
-          if (response.ok) {
-            const cache=await caches.open(CACHE_NAME);
-            cache.put(APP_SHELL,response.clone()).catch(() => {});
-          }
+      try {
+        const freshRequest = new Request(request, { cache:'reload' });
+        const response = await fetch(freshRequest);
+        if (response?.ok) {
+          const cache=await caches.open(CACHE_NAME);
+          cache.put(APP_SHELL,response.clone()).catch(() => {});
           return response;
-        })
-        .catch(() => null);
-
-      // Installed/Home Screen launches should paint from cache immediately.
-      if (cachedShell) {
-        event.waitUntil(network);
-        return cachedShell;
-      }
-
-      const response = await network;
-      if (response) return response;
+        }
+      } catch {}
+      if (cachedShell) return cachedShell;
       return fetch(APP_SHELL, { cache:'reload' });
     })());
     return;
