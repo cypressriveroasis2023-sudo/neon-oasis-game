@@ -218,6 +218,32 @@ function injectStyles() {
       .ownerCompactAIStatus>summary{grid-template-columns:28px minmax(0,1fr) auto;gap:7px;padding:6px 8px}
       .ownerCompactAIStatus>summary strong{max-width:82px;overflow:hidden;text-overflow:ellipsis}
     }
+
+    /* Owner IT/Service shared-home layout v81 */
+    #view-owner>.ownerCompactShell.wl-home{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+    #view-owner .ownerHomeMain{display:block}
+    #view-owner .ownerHomeMain.hidden{display:none!important}
+    #view-owner .ownerHomeModes{margin-top:0!important}
+    #view-owner .ownerHomeModes .wl-mode-card{min-height:96px!important}
+    #view-owner .ownerHomeModes .wl-mode-card.on{border-color:#d20b12!important}
+    #view-owner .ownerHomeWorkstrip{margin:12px 0!important}
+    #view-owner .ownerHomeMenu{margin-top:12px!important}
+    #view-owner .ownerCompactGroup{display:none!important;margin:0!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive{display:block!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupSummary{display:grid!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupBody{display:block!important}
+    #view-owner .ownerPanelBack{margin:0 0 8px!important}
+    #view-owner .ownerCompactGroupSummary{min-height:68px!important}
+    #view-owner .ownerCompactGroupBody{padding:8px!important}
+    #view-owner .ownerCompactSecondary{margin:7px 0!important}
+    #view-owner .ownerCompactAssignForm:not([open]),#view-owner .ownerCompactAttentionDetail:not([open]){display:none!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive .ownerCompactAssignForm[open],
+    #view-owner .ownerCompactGroup.ownerPanelActive .ownerCompactAttentionDetail[open]{display:block!important}
+    @media(max-width:560px){
+      #view-owner .ownerHomeModes{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:10px!important;margin-bottom:18px!important}
+      #view-owner .ownerHomeModes .wl-mode-card{min-height:86px!important}
+      #view-owner .ownerHomeMenu{gap:10px!important}
+    }
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -3174,27 +3200,79 @@ function refreshOwnerWorkTypeLabels() {
 }
 
 let ownerCompactJumpWrapped=false;
+function ownerBadgeNumber(id){
+  const direct=document.getElementById(id);
+  const txt=String(direct?.textContent||'');
+  return Number((txt.match(/\d+/)||['0'])[0])||0;
+}
+function ownerCardBadgeNumber(id){
+  const txt=String(document.querySelector('#'+id+' .ownerDashBadge')?.textContent||'');
+  return Number((txt.match(/\d+/)||['0'])[0])||0;
+}
 function ownerCompactOpenGroup(name){
+  return ownerShowGroup(name);
+}
+function ownerShowHome(){
+  const shell=document.getElementById('ownerCompactShell');
+  if(!shell) return;
+  shell.querySelector('.ownerHomeMain')?.classList.remove('hidden');
+  shell.querySelectorAll('.ownerCompactGroup').forEach(g=>{g.classList.remove('ownerPanelActive');g.open=false;});
+  syncOwnerCompactDashboard();
+  resetWizardPosition();
+}
+function ownerShowGroup(name){
+  const shell=document.getElementById('ownerCompactShell');
   const group=document.getElementById('ownerCompact'+name);
-  if(group?.tagName==='DETAILS') group.open=true;
+  if(!shell||!group) return group;
+  shell.querySelector('.ownerHomeMain')?.classList.add('hidden');
+  shell.querySelectorAll('.ownerCompactGroup').forEach(g=>{g.classList.remove('ownerPanelActive');g.open=false;});
+  group.classList.add('ownerPanelActive');
+  group.open=true;
+  const body=group.querySelector('.ownerCompactGroupBody');
+  if(body && !body.querySelector('[data-owner-compact-home]')){
+    const back=document.createElement('button');
+    back.type='button';
+    back.className='wl-back ownerPanelBack';
+    back.dataset.ownerCompactHome='1';
+    back.textContent='← Owner Home';
+    body.prepend(back);
+  }
+  resetWizardPosition(group);
   return group;
 }
 function syncOwnerCompactDashboard(){
-  const copy=(from,to,fallback='0')=>{
-    const src=document.getElementById(from),dst=document.getElementById(to);
-    if(dst) dst.textContent=String(src?.textContent?.trim()||fallback);
-  };
-  copy('ownerAssignmentBadge','ownerCompactJobsBadge','0');
-  copy('ownerAccountsBadge','ownerCompactTeamBadge','TEAM');
-  const attSrc=document.getElementById('ownerAttentionBadge');
-  const att=document.getElementById('ownerCompactAttentionCount');
-  const strip=document.getElementById('ownerCompactAttention');
-  const count=Number(String(attSrc?.textContent||'0').replace(/[^0-9]/g,''))||0;
-  if(att) att.textContent=String(count);
-  if(strip){
-    strip.classList.toggle('has-attention',count>0);
-    const copyEl=strip.querySelector('[data-owner-attention-copy]');
-    if(copyEl) copyEl.textContent=count>0 ? count+' item'+(count===1?'':'s')+' need review' : 'Nothing needs your attention';
+  const active=ownerBadgeNumber('ownerAssignmentBadge');
+  const attention=ownerBadgeNumber('ownerAttentionBadge');
+  const intake=ownerBadgeNumber('ownerIntakeBadge');
+  const handoffs=ownerCardBadgeNumber('ownerHandoffsCard');
+  const team=ownerBadgeNumber('ownerAccountsBadge');
+  const activity=ownerCardBadgeNumber('ownerActivityCard');
+  const equipment=Math.max(0,intake+handoffs);
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value);};
+  set('ownerHomeOperationsBadge',active);
+  set('ownerHomeAdminBadge',team);
+  set('ownerHomeActiveJobs',active);
+  set('ownerHomeAttention',attention);
+  set('ownerHomeReturns',intake);
+  set('ownerHomeJobsCount',active);
+  set('ownerHomeEquipmentCount',equipment);
+  set('ownerHomeTeamCount',team);
+  set('ownerHomeActivityCount',activity);
+  set('ownerCompactJobsBadge',active);
+  set('ownerCompactEquipmentBadge',equipment);
+  set('ownerCompactTeamBadge',team||'TEAM');
+  const next=document.getElementById('ownerHomeNextAction');
+  if(next){
+    next.classList.toggle('clear',attention===0);
+    if(attention>0){
+      next.innerHTML="<div class='wl-next-kicker'>NEXT ACTION</div><b>"+attention+" item"+(attention===1?'':'s')+" need Owner review.</b><div class='small'>Open Needs Attention to review blocked work, overdue items, or Owner actions.</div><button class='wl-big wl-red top10' data-owner-compact-attention>Review Needs Attention →</button>";
+    }else if(intake>0){
+      next.innerHTML="<div class='wl-next-kicker'>NEXT ACTION</div><b>"+intake+" return / intake item"+(intake===1?'':'s')+" need follow-up.</b><div class='small'>Review returned equipment, IT intake, and manager inventory follow-up.</div><button class='wl-big wl-blue top10' data-owner-home-panel='Equipment'>Open Equipment →</button>";
+    }else if(active>0){
+      next.innerHTML="<div class='wl-next-kicker'>NEXT ACTION</div><b>"+active+" live Tech Check job"+(active===1?' is':'s are')+" currently active.</b><div class='small'>See who has each job, its handoff stage, and what is still open.</div><button class='wl-big wl-blue top10' data-owner-home-panel='Jobs'>View Live Jobs →</button>";
+    }else{
+      next.innerHTML="<div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No urgent Owner actions right now.</b><div class='small'>Assign a new job when the next MHelpDesk ticket is ready.</div>";
+    }
   }
 }
 function organizeOwnerDashboard(){
@@ -3204,16 +3282,30 @@ function organizeOwnerDashboard(){
   if(!shell){
     shell=document.createElement('div');
     shell.id='ownerCompactShell';
-    shell.className='ownerCompactShell';
+    shell.className='ownerCompactShell wl-home';
     shell.innerHTML=[
-      "<div class='ownerCompactTopbar'>",
-      "<button type='button' class='ownerCompactAssign' data-owner-compact-assign><span>＋</span><b>Assign Job</b></button>",
-      "<button type='button' id='ownerCompactAttention' class='ownerCompactAttention' data-owner-compact-attention><span class='ownerCompactAlertIcon'>!</span><span><b>Needs Attention</b><small data-owner-attention-copy>Nothing needs your attention</small></span><strong id='ownerCompactAttentionCount'>0</strong></button>",
+      "<div class='ownerHomeMain'>",
+      "<div class='wl-mode-pills ownerHomeModes'>",
+      "<button type='button' class='on wl-mode-card' data-owner-home-panel='Jobs'><span class='wl-mode-title'>Operations</span><span class='wl-mode-sub'>Jobs, progress & handoffs</span><span id='ownerHomeOperationsBadge' class='wl-mode-badge'>0</span></button>",
+      "<button type='button' class='wl-mode-card' data-owner-home-panel='Team'><span class='wl-mode-title'>Team & Admin</span><span class='wl-mode-sub'>People, activity & controls</span><span id='ownerHomeAdminBadge' class='wl-mode-badge'>0</span></button>",
       "</div>",
-      "<details id='ownerCompactJobs' class='card ownerCompactGroup jobs' open><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>J</span><span><b>Jobs</b><small>Live work, progress, and new assignments</small></span><strong id='ownerCompactJobsBadge'>0</strong></summary><div id='ownerCompactJobsBody' class='ownerCompactGroupBody'></div></details>",
-      "<details id='ownerCompactEquipment' class='card ownerCompactGroup equipment'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>E</span><span><b>Equipment</b><small>Returns, unit search, and handoffs</small></span><strong>3</strong></summary><div id='ownerCompactEquipmentBody' class='ownerCompactGroupBody'></div></details>",
-      "<details id='ownerCompactTeam' class='card ownerCompactGroup team'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>T</span><span><b>Team</b><small>Technicians and recent activity</small></span><strong id='ownerCompactTeamBadge'>TEAM</strong></summary><div id='ownerCompactTeamBody' class='ownerCompactGroupBody'></div></details>",
-      "<details id='ownerCompactMore' class='card ownerCompactGroup more'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>•••</span><span><b>More</b><small>Maintenance and admin tools</small></span><strong>›</strong></summary><div id='ownerCompactMoreBody' class='ownerCompactGroupBody'></div></details>"
+      "<div class='wl-title'>My Work Today</div>",
+      "<div class='wl-sub'>Monitor every Tech Check workflow, assign work, manage equipment, and handle Owner-only actions.</div>",
+      "<div id='ownerHomeNextAction' class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ Loading Owner status…</b></div>",
+      "<div class='wl-workstrip ownerHomeWorkstrip'><span><b id='ownerHomeActiveJobs'>0</b> active jobs</span><span><b id='ownerHomeAttention'>0</b> need attention</span><span><b id='ownerHomeReturns'>0</b> returns / intake</span></div>",
+      "<div class='wl-menu ownerHomeMenu'>",
+      "<button class='wl-blue' data-owner-compact-assign>＋ Assign New Job</button>",
+      "<button class='wl-gray' data-owner-home-panel='Jobs'>▶ Live Jobs & AI <span id='ownerHomeJobsCount' class='wl-count'>0</span></button>",
+      "<button class='wl-gray' data-owner-home-panel='Equipment'>Equipment & Returns <span id='ownerHomeEquipmentCount' class='wl-count'>0</span></button>",
+      "<button class='wl-gray' data-owner-home-panel='Team'>Team & Activity <span id='ownerHomeTeamCount' class='wl-count'>0</span></button>",
+      "<button class='wl-gray' data-wl-menu-ai-dispatch>✨ Owner AI Dispatch <span id='ownerHomeActivityCount' class='wl-count'>0</span></button>",
+      "<button class='wl-gray' data-owner-home-panel='More'>☰ More / Maintenance</button>",
+      "</div>",
+      "</div>",
+      "<details id='ownerCompactJobs' class='card ownerCompactGroup jobs'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>J</span><span><b>Jobs & Operations</b><small>Live work, AI status, and assignments</small></span><strong id='ownerCompactJobsBadge'>0</strong></summary><div id='ownerCompactJobsBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactEquipment' class='card ownerCompactGroup equipment'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>E</span><span><b>Equipment & Returns</b><small>Unit search, intake, and handoffs</small></span><strong id='ownerCompactEquipmentBadge'>0</strong></summary><div id='ownerCompactEquipmentBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactTeam' class='card ownerCompactGroup team'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>T</span><span><b>Team & Activity</b><small>Technicians, access, and recent work</small></span><strong id='ownerCompactTeamBadge'>TEAM</strong></summary><div id='ownerCompactTeamBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactMore' class='card ownerCompactGroup more'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>•••</span><span><b>More / Maintenance</b><small>Maintenance and Owner admin tools</small></span><strong>›</strong></summary><div id='ownerCompactMoreBody' class='ownerCompactGroupBody'></div></details>"
     ].join('');
     view.prepend(shell);
   }
@@ -3225,26 +3317,18 @@ function organizeOwnerDashboard(){
   move('ownerLiveJobProgress',jobs);
   move('ownerJobAssignments',jobs);
   move('ownerAttentionCard',jobs);
-
   const live=document.getElementById('ownerLiveJobProgress');
   const liveBody=live?.querySelector('.ownerDashBody');
-  if(live){
-    live.open=true;
-    live.classList.add('ownerCompactLivePrimary');
-  }
-
-  // Unit history/search belongs with Equipment, not Jobs.
+  if(live){live.open=true;live.classList.add('ownerCompactLivePrimary');}
   const freshLookup=live?.querySelector('.wl-owner-unit-lookup');
-  if(freshLookup && equipment){
+  if(freshLookup&&equipment){
     const oldLookup=equipment.querySelector('.wl-owner-unit-lookup');
-    if(oldLookup && oldLookup!==freshLookup) oldLookup.remove();
+    if(oldLookup&&oldLookup!==freshLookup)oldLookup.remove();
     freshLookup.classList.add('ownerCompactEquipmentLookup');
     equipment.prepend(freshLookup);
   }
-
-  // Turn the large AI dashboard into one compact expandable status row.
   const ai=live?.querySelector('.wl-owner-ai-control-center');
-  if(ai && liveBody){
+  if(ai&&liveBody){
     let aiWrap=liveBody.querySelector('.ownerCompactAIStatus');
     if(!aiWrap){
       aiWrap=document.createElement('details');
@@ -3252,13 +3336,11 @@ function organizeOwnerDashboard(){
       const aiState=ai.querySelector('.wl-owner-ai-master-status');
       const aiAttention=aiState?.classList.contains('attention');
       const aiText=String(aiState?.textContent||'ALL CLEAR').trim();
-      aiWrap.innerHTML="<summary><span class='ownerCompactAIIcon'>✨</span><span><b>AI Status</b><small>Workflow health, alerts, and tomorrow readiness</small></span><strong class='"+(aiAttention?"attention":"")+"'>"+aiText+"</strong></summary>";
+      aiWrap.innerHTML="<summary><span class='ownerCompactAIIcon'>✨</span><span><b>AI Status</b><small>Workflow health, alerts, and tomorrow readiness</small></span><strong class='"+(aiAttention?'attention':'')+"'>"+aiText+"</strong></summary>";
       ai.before(aiWrap);
       aiWrap.appendChild(ai);
     }
   }
-
-  // Jobs should show actual work first. AI is secondary and stays collapsed below it.
   if(liveBody){
     const snapshot=liveBody.querySelector('.ownerLiveSummary');
     const waiting=liveBody.querySelector('.ownerJobStatusSection.assigned');
@@ -3267,7 +3349,6 @@ function organizeOwnerDashboard(){
     const aiWrap=liveBody.querySelector('.ownerCompactAIStatus');
     [snapshot,waiting,progress,history,aiWrap].filter(Boolean).forEach(el=>liveBody.appendChild(el));
   }
-
   move('ownerIntakeTracking',equipment);
   move('ownerUnitStatusCard',equipment);
   move('ownerHandoffsCard',equipment);
@@ -3275,21 +3356,21 @@ function organizeOwnerDashboard(){
   move('ownerAccountsCard',team);
   move('ownerResetCard',more);
   const assign=document.getElementById('ownerJobAssignments');
-  if(assign) assign.classList.add('ownerCompactSecondary','ownerCompactAssignForm');
-  const attention=document.getElementById('ownerAttentionCard');
-  if(attention) attention.classList.add('ownerCompactSecondary','ownerCompactAttentionDetail');
+  if(assign)assign.classList.add('ownerCompactSecondary','ownerCompactAssignForm');
+  const attentionCard=document.getElementById('ownerAttentionCard');
+  if(attentionCard)attentionCard.classList.add('ownerCompactSecondary','ownerCompactAttentionDetail');
   ['ownerLiveJobProgress','ownerIntakeTracking','ownerUnitStatusCard','ownerHandoffsCard','ownerActivityCard','ownerAccountsCard','ownerResetCard'].forEach(id=>document.getElementById(id)?.classList.add('ownerCompactSecondary'));
-  if(!ownerCompactJumpWrapped && typeof window.ownerJump==='function'){
+  if(!ownerCompactJumpWrapped&&typeof window.ownerJump==='function'){
     ownerCompactJumpWrapped=true;
     const originalJump=window.ownerJump;
-    const originalReturn=typeof window.ownerOpenReturn==='function' ? window.ownerOpenReturn : null;
+    const originalReturn=typeof window.ownerOpenReturn==='function'?window.ownerOpenReturn:null;
     window.ownerJump=(target)=>{
-      if(target==='returns'||target==='prep') ownerCompactOpenGroup('Equipment');
-      else if(target==='accounts'||target==='activity'||target==='daily') ownerCompactOpenGroup('Team');
-      else ownerCompactOpenGroup('Jobs');
+      if(target==='returns'||target==='prep')ownerShowGroup('Equipment');
+      else if(target==='accounts'||target==='activity'||target==='daily')ownerShowGroup('Team');
+      else ownerShowGroup('Jobs');
       requestAnimationFrame(()=>originalJump(target));
     };
-    if(originalReturn){window.ownerOpenReturn=(id)=>{ownerCompactOpenGroup('Equipment');requestAnimationFrame(()=>originalReturn(id));};}
+    if(originalReturn){window.ownerOpenReturn=(id)=>{ownerShowGroup('Equipment');requestAnimationFrame(()=>originalReturn(id));};}
   }
   syncOwnerCompactDashboard();
 }
@@ -3774,7 +3855,11 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
-  if (e.target.closest('[data-owner-compact-assign]')) {
+  const ownerHome=e.target.closest('[data-owner-compact-home]');
+    if(ownerHome){ownerShowHome();return;}
+    const ownerPanel=e.target.closest('[data-owner-home-panel]');
+    if(ownerPanel){ownerShowGroup(ownerPanel.dataset.ownerHomePanel);return;}
+    if (e.target.closest('[data-owner-compact-assign]')) {
       ownerCompactOpenGroup('Jobs');
       const form=document.getElementById('ownerJobAssignments');
       if(form){form.open=true;form.scrollIntoView({behavior:'smooth',block:'start'});}
