@@ -81,11 +81,15 @@ async function init(){
 }
 function renderHistory(){
   const h=$('visionHistory');if(!h)return;
-  h.innerHTML=state.chats.length?state.chats.slice(0,14).map(c=>'<button type="button" class="'+(c.id===state.chatId?'active':'')+'" data-chat-id="'+esc(c.id)+'">'+esc(c.title||'Conversation')+'</button>').join(''):'<div class="vision-system-note">No conversations yet.</div>';
+  h.innerHTML=state.chats.length?state.chats.slice(0,14).map(c=>{
+    const when=c.updatedAt?new Date(c.updatedAt):null;
+    const stamp=when&&!Number.isNaN(when.getTime())?when.toLocaleDateString([], {month:'short',day:'numeric'}):'';
+    return '<button type="button" class="'+(c.id===state.chatId?'active':'')+'" data-chat-id="'+esc(c.id)+'">'+esc(c.title||'Conversation')+(stamp?'<small>'+esc(stamp)+(c.ticket?' · #'+esc(c.ticket):'')+'</small>':'')+'</button>';
+  }).join(''):'<div class="vision-system-note">No conversations yet.</div>';
   if($('visionConversationTitle'))$('visionConversationTitle').textContent=chat()?.title||'New conversation';
 }
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Where Tech Check comes together.</h1><p>Ask about a ticket, unit, technician, schedule, or what should happen next. When you want to change something, Vision prepares the action and lets you confirm it.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Ask about a job, assign a technician, change the schedule, or work through the next step with Vision. The service order stays in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -137,8 +141,9 @@ function ticketAnswer(ticket,intro=''){
   return '<div class="vision-answer-title">MHelpDesk #'+esc(ticket)+'</div>'+(intro?'<div class="vision-answer-copy">'+esc(intro)+'</div>':'')+jobCard(ticket);
 }
 function renderOrder(){
-  const t=$('visionOrderTitle'),h=$('visionOrderBody');if(!t||!h)return;const ticket=state.currentTicket;
-  if(!ticket){t.textContent='No job selected';h.innerHTML='<div class="vision-empty-order"><span>o</span><b>Talk about a job</b><p>When Vision finds a ticket or unit, its Tech Check status stays here while you continue the conversation.</p></div>';return;}
+  const t=$('visionOrderTitle'),h=$('visionOrderBody'),app=$('visionApp');if(!t||!h)return;const ticket=state.currentTicket;
+  app?.classList.toggle('has-order',Boolean(ticket));
+  if(!ticket){t.textContent='No job selected';h.innerHTML='<div class="vision-empty-order"><span>◎</span><b>No service order open</b><p>Ask Vision about a ticket or unit and the live order context will appear here automatically.</p></div>';return;}
   const rows=group(ticket),open=rows.filter(x=>x.status!=='completed'),p=prep(ticket),a=open[0]||rows[0];
   if(!a&&!p){t.textContent='#'+ticket;h.innerHTML='<div class="vision-direct warn"><b>Job not found</b>This ticket is not in the loaded Tech Check records.</div>';return;}
   t.textContent='#'+ticket;
