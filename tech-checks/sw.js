@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v45';
+const CACHE_NAME = 'tech-check-field-shell-v46';
 const APP_SHELL = './';
 
 self.addEventListener('install', event => {
