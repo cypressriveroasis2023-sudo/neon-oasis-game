@@ -1723,10 +1723,11 @@ function ticketPartsInlineHtml(data) {
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
 }
-const OWNER_DEVICE_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
-const OWNER_STAND_TYPES = ['110V Stand','Solar Stand','Solar Pole','Pole'];
+const OWNER_DEVICE_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
+const OWNER_STAND_TYPES = window.TechCheckRules?.standTypes || ['110V Stand','Solar Stand','Solar Pole','Pole'];
 function equipmentDisplayLabel(label) { return label === 'Recon 2' ? 'Recon II' : label; }
 function normalizedEquipmentManifest(raw) {
+  if (window.TechCheckRules?.normalizeManifest) return window.TechCheckRules.normalizeManifest(raw);
   return (Array.isArray(raw) ? raw : []).map(row => ({
     category: ['device','stand','other'].includes(row?.category) ? row.category : 'other',
     label: String(row?.label || '').trim() === 'Recon II' ? 'Recon 2' : String(row?.label || '').trim(),
@@ -1755,6 +1756,7 @@ function equipmentManifestExpanded(raw) {
   return out;
 }
 function manifestQty(raw,label) {
+  if (window.TechCheckRules?.manifestQty) return window.TechCheckRules.manifestQty(raw,label);
   return normalizedEquipmentManifest(raw).filter(row => row.label===label).reduce((sum,row)=>sum+row.qty,0);
 }
 function prepPurposeFromWorkType(workType) {
@@ -1764,6 +1766,7 @@ function prepPurposeFromWorkType(workType) {
   return '';
 }
 function automaticServiceSolarPlan(raw,workType='service') {
+  if (window.TechCheckRules?.automaticServiceSolarPlan) return window.TechCheckRules.automaticServiceSolarPlan(raw,workType);
   const delivery=String(workType || '').toLowerCase()==='delivery';
   if (!delivery) return { spotters:0,rangers:0,stands:0,panels:0 };
   const spotters=manifestQty(raw,'Solar Spotter');
@@ -2332,11 +2335,11 @@ function itSummaryHtml(forms, evidence) {
   }).join('');
   return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b>${activeItPrep.site ? `<div>Ticket Name / Site: <b>${esc(activeItPrep.site)}</b></div>` : ''}<div>Total units checked: <b>${forms.length}</b></div></div>${units}<div class='wl-review'><div>📷 <b>${photos.length} photo${photos.length === 1 ? '' : 's'} saved</b></div><div class='small'>Review these unit checks and photo proof. Your final signature comes next.</div></div>`;
 }
-const CAMERA_UNIT_TYPES = ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
-const STAND_POLE_TYPES = ['Solar Stand','Solar Pole','110V Stand','Pole'];
-function isSolarSupport(type) { return ['Solar Stand','Solar Pole'].includes(type); }
-function isSimpleSupport(type) { return ['110V Stand','Pole'].includes(type); }
-function isSupport(type) { return isSolarSupport(type) || isSimpleSupport(type); }
+const CAMERA_UNIT_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
+const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','Solar Pole','110V Stand','Pole'];
+function isSolarSupport(type) { return window.TechCheckRules?.isSolarSupport ? window.TechCheckRules.isSolarSupport(type) : ['Solar Stand','Solar Pole'].includes(type); }
+function isSimpleSupport(type) { return window.TechCheckRules?.isSimpleSupport ? window.TechCheckRules.isSimpleSupport(type) : ['110V Stand','Pole'].includes(type); }
+function isSupport(type) { return window.TechCheckRules?.isSupport ? window.TechCheckRules.isSupport(type) : (isSolarSupport(type) || isSimpleSupport(type)); }
 function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
 function currentItItem() { return itItems()[itUnitIndex] || null; }
 function itAllowedPurposes(type) { if (type === '110V Stand') return ['SWAP']; if (type === 'Solar Stand') return ['SWAP','DELIVERY']; return ['SWAP','DELIVERY']; }
@@ -2347,9 +2350,10 @@ function itItemIdentity(item, unitNo) {
   return tag ? `${item.equipment_type} ${tag}` : `Unit ${unitNo}`;
 }
 function isHeliosDeploy(item){
-  return item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose);
+  return window.TechCheckRules?.isHeliosDeploy ? window.TechCheckRules.isHeliosDeploy(item) : (item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose));
 }
 function itUnitStepsData(item, unitNo) {
+  if (window.TechCheckRules?.itChecklist) return window.TechCheckRules.itChecklist(item, unitNo);
   const support = isSupport(item.equipment_type);
   const identity = itItemIdentity(item, unitNo);
   const steps = [{ kind: 'tag', field: 'unit_tag', label: support ? `Enter the exact tag / ID for ${item.equipment_type}` : `Enter the exact unit tag for ${item.equipment_type}` }];
@@ -2428,6 +2432,7 @@ function itUnitStepsData(item, unitNo) {
   return steps;
 }
 function itUnitReady(item) {
+  if (window.TechCheckRules?.itReady) return window.TechCheckRules.itReady(item);
   if (!item?.unit_tag) return false;
   if (isSolarSupport(item.equipment_type) || isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok && (isSimpleSupport(item.equipment_type) || item.safe_ok));
   if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
@@ -3168,6 +3173,7 @@ function serviceSolarExpectedPanels(ctx=null) {
   return Math.max(Number(activeSvcAssignment?.solar_panel_qty || 0),Number(activeSvcPrep?.solar_panel_qty || 0));
 }
 function serviceSolarRequiredStandCount(ctx=null) {
+  if (window.TechCheckRules?.serviceSolarRequiredStandCount) return window.TechCheckRules.serviceSolarRequiredStandCount(ctx);
   if (!ctx?.need_stand) return 0;
   return Math.max(1,Number(ctx.solar_spotter_count || 0));
 }
@@ -3186,6 +3192,7 @@ function serviceSolarHeliosCount() {
   return (activeSvcPrep?.prep_items || []).filter(row => row.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(row.purpose)).length;
 }
 function serviceSolarBatteryPlan(ctx,check=null) {
+  if (window.TechCheckRules?.serviceSolarBatteryPlan) return window.TechCheckRules.serviceSolarBatteryPlan(ctx,check,serviceSolarHeliosCount());
   const spotters=Number(ctx?.solar_spotter_count || 0);
   const rangers=Number(ctx?.ranger_count || 0);
   const helios=serviceSolarHeliosCount();
