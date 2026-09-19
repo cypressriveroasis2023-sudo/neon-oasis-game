@@ -100,7 +100,10 @@ function renderThread(){
   h.innerHTML=!c||!c.messages.length?welcome():c.messages.map(message).join('');setTimeout(()=>bottom(false),0);
 }
 function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
-function bottom(smooth=true){const h=$('visionThread');if(h)h.scrollTo({top:h.scrollHeight,behavior:smooth?'smooth':'auto'});}
+function bottom(smooth=true){
+  const h=$('visionThread');if(!h)return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>h.scrollTo({top:h.scrollHeight,behavior:smooth?'smooth':'auto'})));
+}
 function prep(ticket){return state.preps.find(p=>String(p.ticket_no||'')===String(ticket))||null;}
 function group(ticket){return state.jobs.filter(j=>String(j.ticket_no||'')===String(ticket));}
 function active(ticket){return group(ticket).filter(j=>j.status!=='completed');}
@@ -547,6 +550,8 @@ function grow(el){if(!el)return;el.style.height='auto';el.style.height=Math.min(
 function syncVisualViewport(){
   const vv=window.visualViewport;
   const root=document.documentElement;
+  const composer=document.querySelector('.vision-composer-wrap');
+  root.style.setProperty('--vision-composer-space',Math.ceil(composer?.getBoundingClientRect().height||92)+'px');
   if(!vv){root.style.setProperty('--vision-visual-bottom','0px');return;}
   const layoutH=document.documentElement.clientHeight||window.innerHeight||vv.height;
   const offset=Math.max(0,layoutH-vv.height-vv.offsetTop);
@@ -556,6 +561,10 @@ window.visualViewport?.addEventListener('resize',syncVisualViewport);
 window.visualViewport?.addEventListener('scroll',syncVisualViewport);
 window.addEventListener('resize',syncVisualViewport);
 syncVisualViewport();
+if(window.ResizeObserver){
+  const composer=document.querySelector('.vision-composer-wrap');
+  if(composer)new ResizeObserver(()=>syncVisualViewport()).observe(composer);
+}
 function closeDrawers(){$('visionApp')?.classList.remove('sidebar-open','order-open');}
 function voice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addMessage('assistant','', '<div class="vision-system-note">Use the iPhone keyboard microphone for voice dictation on this device.</div>');renderThread();return;}
