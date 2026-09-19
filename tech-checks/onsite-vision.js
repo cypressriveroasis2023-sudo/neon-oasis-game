@@ -299,6 +299,7 @@ function draftPartsParse(text){
   return parts;
 }
 function draftPartsText(d){
+  if(!d.parts_answered)return'Not answered';
   const p=d.parts||{},rows=[];
   if(Number(p.solar_panel_qty||0)>0)rows.push(p.solar_panel_qty+' solar panel'+(Number(p.solar_panel_qty)===1?'':'s'));
   if(Number(p.battery_replacement_qty||0)>0)rows.push(p.battery_replacement_qty+' replacement batter'+(Number(p.battery_replacement_qty)===1?'y':'ies'));
@@ -316,6 +317,7 @@ function draftMatchedTechs(text){
   return hits;
 }
 function draftAssignmentText(d){
+  if(!d.assignment_answered)return'Not answered';
   const out=[];
   for(const role of ['it','service']){
     const id=d.assignees?.[role],tech=id?state.techs.find(t=>t.user_id===id):null;
@@ -375,7 +377,7 @@ function draftQuestion(key,d){
   return'';
 }
 function draftSummaryHtml(d){
-  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.scheduled_time?' · '+d.scheduled_time:' · no exact time')):'—';
+  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+d.scheduled_time:' · no exact time'):' · time not answered')):'—';
   return '<div class="vision-draft-card"><div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
     +'<div class="vision-draft-grid"><div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div><div><span>Site</span><b>'+esc(d.site||'—')+'</b></div><div><span>Schedule</span><b>'+esc(when)+'</b></div><div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div><div><span>Assignment</span><b>'+esc(draftAssignmentText(d))+'</b></div><div><span>Parts</span><b>'+esc(draftPartsText(d))+'</b></div></div>'
     +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
@@ -393,7 +395,7 @@ function draftApplyInput(d,text,initial=false){
   if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
   const equipment=draftEquipmentParse(raw);
   if(equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
-  if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;}
+  if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;d.equipment_numbers_answered=true;}
   const unitMatch=raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
   if(unitMatch){d.unit_numbers=unitMatch[1].trim();d.equipment_numbers_answered=true;}
   const standMatch=raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
