@@ -3324,8 +3324,6 @@ function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner');
   if(!view || !roleText().includes('Owner/Admin')) return;
 
-  // If a newer custom Owner shell exists, first return every original card to the Owner view.
-  const shell=document.getElementById('ownerCompactShell');
   const order=[
     'ownerJobAssignments',
     'ownerLiveJobProgress',
@@ -3337,23 +3335,24 @@ function organizeOwnerDashboard(){
     'ownerAccountsCard',
     'ownerResetCard'
   ];
-  order.forEach(id=>{
-    const card=document.getElementById(id);
-    if(card){
-      card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');
-      view.appendChild(card);
-      if(!card.dataset.ownerClassicInitialized){
-        if(card.tagName==='DETAILS') card.open=false;
-        card.dataset.ownerClassicInitialized='1';
-      }
-    }
-  });
-  shell?.remove();
 
-  // Remove only wrappers introduced by the abandoned compact Owner redesign.
+  // Repair abandoned custom Owner shells only when one actually exists.
+  const shell=document.getElementById('ownerCompactShell');
+  if(shell){
+    order.forEach(id=>{
+      const card=document.getElementById(id);
+      if(card && card.parentElement!==view){
+        card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');
+        view.appendChild(card);
+      }
+    });
+    shell.remove();
+  }
+
+  // Remove abandoned custom wrappers only if they survived a hot reload.
   view.querySelectorAll('.ownerFeaturePage,.ownerHomeMain').forEach(el=>el.remove());
 
-  // Restore the original Live Job Progress content if an older compact wrapper is present.
+  // Restore Live Job Progress content only if the old compact wrapper still exists.
   const live=document.getElementById('ownerLiveJobProgress');
   const liveBody=live?.querySelector('.ownerDashBody');
   const aiWrap=liveBody?.querySelector('.ownerCompactAIStatus');
@@ -3362,15 +3361,23 @@ function organizeOwnerDashboard(){
     if(ai) aiWrap.before(ai);
     aiWrap.remove();
   }
-  const equipment=document.getElementById('ownerHandoffsCard');
   const misplacedLookup=view.querySelector('.ownerCompactEquipmentLookup');
   if(misplacedLookup && liveBody){
     misplacedLookup.classList.remove('ownerCompactEquipmentLookup');
     liveBody.prepend(misplacedLookup);
   }
 
-  // Keep the visible order exactly like the original Owner dashboard.
-  order.forEach(id=>{const card=document.getElementById(id);if(card)view.appendChild(card);});
+  // Do not re-append cards that are already on the Owner page.
+  // This keeps the dashboard stable and prevents the mutation/boot loop.
+  order.forEach(id=>{
+    const card=document.getElementById(id);
+    if(!card) return;
+    card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');
+    if(card.parentElement!==view) view.appendChild(card);
+    if(!card.dataset.ownerClassicInitialized){
+      card.dataset.ownerClassicInitialized='1';
+    }
+  });
 }
 let ownerAIDispatchPrepared = false;
 let ownerAIDispatchLastParse = null;
@@ -3839,6 +3846,15 @@ async function installOwnerIntake(force = false) {
 }
 
 document.addEventListener('click', async e => {
+  const ownerSummary=e.target.closest('#view-owner summary.ownerDashSummary');
+  if(ownerSummary){
+    const details=ownerSummary.parentElement;
+    if(details?.tagName==='DETAILS'){
+      e.preventDefault();
+      details.open=!details.open;
+      return;
+    }
+  }
   if (e.target.closest('#techMenuButton')) return openTechMenu();
   if (e.target.closest('[data-wl-menu-close]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-menu-help]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return openHelpWalkthrough(false); }
@@ -3903,7 +3919,7 @@ function setupServiceSolarRealtime() {
     .subscribe();
 }
 function boot() {
-  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge(); organizeOwnerDashboard(); setTimeout(organizeOwnerDashboard,120); setTimeout(organizeOwnerDashboard,500);
+  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge(); organizeOwnerDashboard();
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
