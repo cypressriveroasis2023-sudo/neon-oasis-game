@@ -489,7 +489,7 @@ async function refreshData() {
     const dayStart = new Date(); dayStart.setHours(0,0,0,0);
     const selectedStart = dateFromKey(ownerDailyDate); selectedStart.setHours(0,0,0,0);
     const selectedEnd = new Date(selectedStart); selectedEnd.setDate(selectedEnd.getDate()+1);
-    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory] = await Promise.all([
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, truckSpareBatteries] = await Promise.all([
       db.from('reports').select('*').order('created_at', { ascending: false }),
       db.from('profiles').select('*').order('created_at', { ascending: true }),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(50),
@@ -500,7 +500,8 @@ async function refreshData() {
       db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(500),
       db.from('asset_inventory').select('*').order('asset_category',{ascending:true}).order('unit_tag',{ascending:true}),
       db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(300),
-      db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(100)
+      db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(100),
+      db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true})
     ]);
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
@@ -513,6 +514,7 @@ async function refreshData() {
     if (!assets.error) state.assetInventory = assets.data || [];
     if (!assetHistory.error) state.assetHistory = assetHistory.data || [];
     if (!accessHistory.error) state.accessHistory = accessHistory.data || [];
+    if (!truckSpareBatteries.error) state.truckSpareBatteries = truckSpareBatteries.data || [];
     renderOwner();
     renderOwnerUnitSearch();
     renderOwnerEquipment();
@@ -616,7 +618,7 @@ async function createPrep() {
 function deliveryReady(item) {
   if (['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item?.equipment_type)) return true;
   return (
-    item.purpose !== 'DELIVERY' ||
+    !['DELIVERY','BACKUP'].includes(item.purpose) ||
     (item.delivery_sim_ok &&
       item.delivery_camera_app_ok && item.delivery_customer_email_app_ok &&
       item.delivery_batteries_charged_ok &&
@@ -633,9 +635,9 @@ function checked(v) {
   return v ? ' checked' : '';
 }
 function deliveryChecklist(item) {
-  if (item.purpose !== 'DELIVERY' || ['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item.equipment_type)) return '';
+  if (!['DELIVERY','BACKUP'].includes(item.purpose) || ['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item.equipment_type)) return '';
   return (
-    '<div class="deliveryChecks"><div class="subhead">DELIVERY Readiness</div><div class="small">All eight checks are required before this delivery equipment can be released.</div>' +
+    '<div class="deliveryChecks"><div class="subhead">DEPLOY-READY Checks</div><div class="small">All eight checks are required before DELIVERY or BACKUP equipment can leave with Service.</div>' +
     '<div class="check"><input id="sim_' +
     item.id +
     '" type="checkbox"' +
@@ -688,8 +690,8 @@ function itemForm(item) {
       (req > 0
         ? ' · Prepared: ' + item.battery_count + ' × ' + esc(b.label)
         : '') +
-      (item.purpose === 'DELIVERY'
-        ? ' · All delivery readiness checks complete'
+      (['DELIVERY','BACKUP'].includes(item.purpose)
+        ? ' · All deploy-ready checks complete'
         : '') +
       '</div></div>'
     );
@@ -831,7 +833,7 @@ async function saveAndRelease(prepId) {
       await refreshData();
       return alert(error.message);
     }
-    if (item.purpose === 'DELIVERY') {
+    if (['DELIVERY','BACKUP'].includes(item.purpose)) {
       const sim = $('sim_' + item.id)?.checked || false,
         cam = $('cam_' + item.id)?.checked || false, customerEmail = $('customeremail_' + item.id)?.checked || false,
         sd = $('sd_' + item.id)?.checked || false,
@@ -843,7 +845,7 @@ async function saveAndRelease(prepId) {
         setBusy(false);
         await refreshData();
         return alert(
-          'Complete all eight DELIVERY readiness checks for ' +
+          'Complete all eight deploy-ready checks for ' +
             eqLabel(item.equipment_type) +
             ' ' +
             tag +
@@ -936,8 +938,8 @@ function serviceItem(item) {
     ' — exact unit ' +
     esc(item.unit_tag) +
     '</b></div>' +
-    (item.purpose === 'DELIVERY'
-      ? '<div class="small">IT completed the DELIVERY readiness checks before release.</div>'
+    (['DELIVERY','BACKUP'].includes(item.purpose)
+      ? '<div class="small">IT completed the deploy-ready checks before release.</div>'
       : '') +
     '<div class="check"><input id="' +
     exactId(item) +
@@ -1490,19 +1492,30 @@ function renderOwner() {
   if (state.profile?.role !== 'owner') return;
   const activePreps = state.preps.filter(p => p.status !== 'closed');
   const completedPreps = state.preps.filter(p => p.status === 'closed').slice().reverse();
+  const unresolvedSpareUnits = completedPreps.flatMap(p => (p.prep_items || [])
+    .filter(i => i.purpose === 'BACKUP' && i.spare_checked_out_at && !i.spare_outcome)
+    .map(i => ({...i,ticket_no:p.ticket_no,site:p.site,closed_by_name:p.closed_by_name})));
+  const unresolvedSpareBatteries = state.truckSpareBatteries || [];
+  const unresolvedTruckSpareCount = unresolvedSpareUnits.length + unresolvedSpareBatteries.length;
+  const truckSpareOwnerHtml = unresolvedTruckSpareCount
+    ? '<div class="warn"><b>Truck Spares Still Out · ' + unresolvedTruckSpareCount + '</b><div class="small">Service must resolve these as USED or RETURNED UNUSED. Unused backup units return directly to Shop Inventory.</div>' +
+      unresolvedSpareUnits.map(i => '<div class="small top8"><b>' + esc(i.equipment_type) + ' ' + esc(i.unit_tag || '') + '</b> · MHelpDesk #' + esc(i.ticket_no) + ' · ' + esc(i.spare_checked_out_to_name || i.closed_by_name || 'Service Tech') + '</div>').join('') +
+      unresolvedSpareBatteries.map(b => '<div class="small top8"><b>' + Number(b.qty_prepared || 0) + ' × ' + esc(b.battery_type) + '</b> · MHelpDesk #' + esc(b.ticket_no) + ' · ' + esc(b.service_tech_name || 'Service Tech') + '</div>').join('') +
+      '</div>'
+    : '';
   const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + ownerPartsEditor(p) + '<div class="top8"><b>Units / Equipment</b><div>' + ((p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '')).join(' · ') || 'No units started yet.') + '</div></div></div></details>';
   const draftCount = activePreps.filter(p => p.status === 'draft').length;
   const serviceCount = activePreps.filter(p => p.status === 'released').length;
   const handoffBadge = $('ownerHandoffsBadge');
   if (handoffBadge) {
-    handoffBadge.textContent = String(activePreps.length);
-    handoffBadge.classList.toggle('alert', activePreps.length > 0);
-    handoffBadge.classList.toggle('neutral', activePreps.length === 0);
+    handoffBadge.textContent = String(activePreps.length + unresolvedTruckSpareCount);
+    handoffBadge.classList.toggle('alert', activePreps.length + unresolvedTruckSpareCount > 0);
+    handoffBadge.classList.toggle('neutral', activePreps.length + unresolvedTruckSpareCount === 0);
   }
   const activityBadge = $('ownerActivityBadge');
   if (activityBadge) activityBadge.textContent = String(state.reports.length);
-  $('ownerPrepSummary').innerHTML = '<div class="wl-workstrip"><span><b>' + draftCount + '</b> IT preparing</span><span><b>' + serviceCount + '</b> waiting Service</span><span><b>' + activePreps.length + '</b> active tickets</span></div>';
-  $('ownerPrepStatus').innerHTML = activePreps.length ? activePreps.slice().reverse().map(prepHtml).join('') : '<div class="ok"><b>✓ No active equipment handoffs.</b></div>';
+  $('ownerPrepSummary').innerHTML = '<div class="wl-workstrip"><span><b>' + draftCount + '</b> IT preparing</span><span><b>' + serviceCount + '</b> waiting Service</span><span><b>' + unresolvedTruckSpareCount + '</b> truck spares out</span><span><b>' + activePreps.length + '</b> active tickets</span></div>';
+  $('ownerPrepStatus').innerHTML = truckSpareOwnerHtml + (activePreps.length ? activePreps.slice().reverse().map(prepHtml).join('') : (unresolvedTruckSpareCount ? '' : '<div class="ok"><b>✓ No active equipment handoffs.</b></div>'));
   $('ownerPrepHistoryCount').textContent = String(completedPreps.length);
   $('ownerPrepHistory').innerHTML = completedPreps.length ? completedPreps.map(prepHtml).join('') : '<div class="small">No completed equipment history yet.</div>';
   const recentReports = state.reports.slice().sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, ownerReportLimit);
