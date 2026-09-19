@@ -179,6 +179,25 @@ function liveEvidenceHtml(context){
   return '<div class="vision-answer-title">'+total+' evidence item'+(total===1?'':'s')+' recorded</div><div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>'+rows.map(e=>'<div>'+esc(e.label)+' · '+esc(e.who||'Unknown signer/uploader')+(e.at?' · '+esc(new Date(e.at).toLocaleString()):'')+'</div>').join('')+(returnCount?'<div>'+returnCount+' return/intake photo record'+(returnCount===1?'':'s')+'</div>':'')+'</div>';
 }
 
+async function refreshLiveOrderPanel(ticket){
+  const context=await liveContext(ticket,false);
+  if(String(state.currentTicket||'')!==String(ticket)||!context?.found)return;
+  const t=$('visionOrderTitle'),h=$('visionOrderBody');if(!t||!h)return;
+  const engine=visionWorkflowEngine(),wc=liveEngineContext(context),step=engine?.getWorkflowNextStep?.(wc),blockers=engine?.getWorkflowBlockers?.(wc)||[];
+  const s=context.summary||{},assignments=(context.assignments||[]).filter(a=>!['completed','cancelled'].includes(a.status));
+  const list=assignments.map(a=>'<div class="vision-context-row"><b>'+esc(String(a.assigned_role||'').toUpperCase())+' - '+esc(a.assignee_name||((a.assignment_scope==='department')?'Department queue':'Unassigned'))+'</b><span>'+esc(String(a.status||'').toUpperCase())+'</span></div>').join('');
+  t.textContent='#'+ticket;
+  h.innerHTML='<div class="vision-context-block"><h3>'+esc(s.site||context.prep?.site||'No site')+'</h3><div class="vision-context-grid">'
+    +'<div><span>Workflow</span><b>'+esc(String(s.effective_work_type||'service').toUpperCase())+'</b></div>'
+    +'<div><span>Schedule</span><b>'+esc(liveScheduleText(context))+'</b></div>'
+    +'<div><span>Equipment</span><b>'+esc(liveEquipmentText(context))+'</b></div>'
+    +'<div><span>Prep</span><b>'+esc(String(s.prep_status||'Not linked').toUpperCase())+'</b></div></div></div>'
+    +'<div class="vision-context-block"><h3>Assignments</h3><div class="vision-context-list">'+(list||'<div class="vision-system-note">No active Service / IT assignment.</div>')+'</div></div>'
+    +'<div class="vision-context-block"><h3>What happens next</h3><div class="vision-answer-copy">'+esc(step?.next||'Continue the active Tech Check workflow.')+'</div>'
+    +(blockers.length?'<div class="vision-system-note">'+esc(blockers.length+' blocker'+(blockers.length===1?'':'s')+' detected from live context')+'</div>':'')
+    +'<div class="vision-order-actions"><button class="primary" type="button" data-order-prompt="Who has this job?">Ask who has it</button><button type="button" data-order-prompt="What is holding this job up?">Show blockers</button><button type="button" data-order-prompt="What still needs to be done on this job?">Show remaining work</button></div></div>';
+}
+
 function workType(rows,p){
   const purpose=(p?.prep_items||[]).map(x=>String(x.purpose||'').toUpperCase()).find(x=>x==='DELIVERY'||x==='SWAP');
   return String(purpose?purpose.toLowerCase():(rows[0]?.work_type||p?.work_type||'service')).toLowerCase();
@@ -220,10 +239,11 @@ function renderOrder(){
   app?.classList.toggle('has-order',Boolean(ticket));
   if(!ticket){t.textContent='No job selected';h.innerHTML='<div class="vision-empty-order"><span>◎</span><b>No service order open</b><p>Ask Vision about a ticket or unit and the live order context will appear here automatically.</p></div>';return;}
   const rows=group(ticket),open=rows.filter(x=>x.status!=='completed'),p=prep(ticket),a=open[0]||rows[0];
-  if(!a&&!p){t.textContent='#'+ticket;h.innerHTML='<div class="vision-direct warn"><b>Job not found</b>This ticket is not in the loaded Tech Check records.</div>';return;}
+  if(!a&&!p){t.textContent='#'+ticket;h.innerHTML='<div class="vision-system-note">Loading live Tech Check context…</div>';refreshLiveOrderPanel(ticket).catch(()=>{h.innerHTML='<div class="vision-direct warn"><b>Job not found</b>This ticket is not visible in the current Tech Check records.</div>';});return;}
   t.textContent='#'+ticket;
   const list=(open.length?open:rows).map(r=>'<div class="vision-context-row"><b>'+esc(String(r.assigned_role||'').toUpperCase())+' - '+esc(assignee(r))+'</b><span>'+esc(String(r.status||'').toUpperCase())+(r.requires_it_handoff?' - handoff-gated':'')+'</span></div>').join('');
   h.innerHTML='<div class="vision-context-block"><h3>'+esc(a?.site||p?.site||'No site')+'</h3><div class="vision-context-grid"><div><span>Job</span><b>'+esc(workType(rows,p).toUpperCase())+'</b></div><div><span>Schedule</span><b>'+esc(schedule(a))+'</b></div><div><span>Equipment</span><b>'+esc(units(p,a))+'</b></div><div><span>Prep</span><b>'+esc(String(p?.status||'Not linked').toUpperCase())+'</b></div></div></div><div class="vision-context-block"><h3>Assignments</h3><div class="vision-context-list">'+(list||'<div class="vision-system-note">No active assignments.</div>')+'</div></div><div class="vision-context-block"><h3>What happens next</h3><div class="vision-answer-copy">'+esc(next(ticket))+'</div><div class="vision-order-actions"><button class="primary" type="button" data-order-prompt="Who has this job?">Ask who has it</button><button type="button" data-order-prompt="Assign a Service Tech to this job">Assign Service</button><button type="button" data-order-prompt="What still needs to be done on this job?">Show remaining work</button></div></div>';
+  refreshLiveOrderPanel(ticket).catch(()=>{});
 }
 function ticketFrom(text){const m=String(text||'').match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i)||String(text||'').match(/#(\d{3,})\b/);return m?.[1]||'';}
 function numberWords(text){const m={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};return String(text||'').replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,x=>String(m[x.toLowerCase()]||x));}
