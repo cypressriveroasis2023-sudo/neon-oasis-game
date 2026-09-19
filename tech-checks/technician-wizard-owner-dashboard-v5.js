@@ -52,7 +52,7 @@ async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); i
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
 function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer] }); }
 function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes }); }
-const intakeLabels = ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
+const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
 let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
 let ownerReturnRows = new Map();
 let serviceReturnRows = new Map();
@@ -3385,20 +3385,29 @@ async function startHeliosOldUnitReturn(){
   serviceReturn={step:1,ticket:String(activeSvcPrep.ticket_no),unit:'',type:'Helios',notes:'',photo:null,conditionPhotos:[],damagePhotos:[],knownUnits:[]};
   serviceReturnRecovered=false; await saveServiceReturnDraft(); return renderServiceReturn();
 }
+function heliosFieldRuleList(){
+  return window.TechCheckRules?.heliosFieldChecklist || [
+    {key:'helios_field_box_mounted_ok',rpc_param:'p_box_mounted_ok',label:'Helios box installed and secured on the tower.'},
+    {key:'helios_field_pv_connected_ok',rpc_param:'p_pv_connected_ok',label:'PV cables connected.'},
+    {key:'helios_field_ptz_secured_ok',rpc_param:'p_ptz_secured_ok',label:'PTZ reinstalled and secured on the removable front plate.'},
+    {key:'helios_field_switch_pv_ok',rpc_param:'p_switch_pv_ok',label:'Internal switch flipped to PV.'},
+    {key:'helios_field_unit_battery_on_ok',rpc_param:'p_unit_battery_on_ok',label:'Helios unit and battery turned on.'},
+    {key:'helios_field_it_online_verified_ok',rpc_param:'p_it_online_verified_ok',label:'Called IT and IT verified the Helios is online.'},
+    {key:'helios_field_cameras_aimed_ok',rpc_param:'p_cameras_aimed_ok',label:'Camera aim / focus completed with IT.'},
+    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Recording verified after final aim.'},
+    {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Tower cranked to approximately 20 feet.'},
+    {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Separate tower mast locking bolt inserted and secured.'},
+    {key:'helios_field_panel_45deg_ok',rpc_param:'p_panel_45deg_ok',label:'Solar panel set to approximately 45°.'},
+    {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Separate panel angle/locking bolt installed and secured.'},
+    {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'4 bags of sand placed on the tower base.'}
+  ];
+}
 function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const units=heliosFieldItems(prep), swaps=units.filter(x=>x.purpose==='SWAP'), installPhotos=serviceSolarEvidenceCount(evidence,'helios_install','photo');
   const installSig=[...(evidence||[])].reverse().find(row=>row.category==='helios_install'&&row.kind==='signature'), submitted=Boolean(check?.helios_field_completed_at), ownerDone=Boolean(check?.helios_owner_verified_at);
   const returnRows=(returns||[]).filter(r=>r.equipment_type==='Helios');
-  const allChecks=[
-    ['wlHeliosFieldBox','helios_field_box_mounted_ok','Helios box installed and secured on the tower.'],['wlHeliosFieldPv','helios_field_pv_connected_ok','PV cables connected.'],
-    ['wlHeliosFieldPtz','helios_field_ptz_secured_ok','PTZ reinstalled and secured on the removable front plate.'],['wlHeliosFieldSwitch','helios_field_switch_pv_ok','Internal switch flipped to PV.'],
-    ['wlHeliosFieldPower','helios_field_unit_battery_on_ok','Helios unit and battery turned on.'],['wlHeliosFieldOnline','helios_field_it_online_verified_ok','Called IT and IT verified the Helios is online.'],
-    ['wlHeliosFieldAim','helios_field_cameras_aimed_ok','Camera aim / focus completed with IT.'],['wlHeliosFieldRecording','helios_field_recording_ok','Recording verified after final aim.'],
-    ['wlHeliosField20ft','helios_field_tower_20ft_ok','Tower cranked to approximately 20 feet.'],['wlHeliosFieldMastBolt','helios_field_mast_lock_bolt_ok','Separate tower mast locking bolt inserted and secured.'],
-    ['wlHeliosField45','helios_field_panel_45deg_ok','Solar panel set to approximately 45°.'],['wlHeliosFieldPanelBolt','helios_field_panel_bolt_ok','Separate panel angle/locking bolt installed and secured.'],
-    ['wlHeliosFieldSand','helios_field_4_sandbags_ok','4 bags of sand placed on the tower base.']
-  ];
-  const checklist=allChecks.map(([id,key,label])=>`<label class='check top8'><input id='${id}' type='checkbox' ${check?.[key]?'checked':''} ${submitted?'disabled':''}><span>${esc(label)}</span></label>`).join('');
+  const allChecks=heliosFieldRuleList();
+  const checklist=allChecks.map((rule,index)=>`<label class='check top8'><input id='wlHeliosFieldRule${index}' data-wl-helios-field-key='${esc(rule.key)}' type='checkbox' ${check?.[rule.key]?'checked':''} ${submitted?'disabled':''}><span>${esc(rule.label)}</span></label>`).join('');
   const newUnits=units.map(x=>`<div class='ok top8'><b>NEW UNIT OUT · ${esc(x.unit_tag||'Tag missing')}</b><div class='small'>${esc(x.purpose)} Helios${check?.handoff_accepted_at?` · ${signatureStamp(check.handoff_accepted_by_name||'Service Tech',check.handoff_accepted_at)}`:''}</div></div>`).join('');
   const oldBlock=swaps.length?`<div class='wl-stop top10'><b>OLD UNIT RETURNING · ${returnRows.length} of ${swaps.length} recorded</b><div>The old Helios is NOT an unused spare. Photograph the old unit and tag, document why it is being swapped, damage/issues/symptoms/repair needed, then Service Return → IT Intake.</div>${returnRows.map(r=>`<div class='wl-review top8'><b>OLD UNIT ${esc(r.unit_tag)}</b><div class='small'>${esc(r.status||'waiting_it')} · ${r.returned_at?esc(new Date(r.returned_at).toLocaleString()):''}</div><div class='small'>${esc(r.return_notes||'No return notes')}</div>${r.tag_scan_status?`<div class='small'>Tag scan: <b>${esc(String(r.tag_scan_status).toUpperCase())}</b></div>`:''}</div>`).join('')}<button class='wl-big wl-red top10' data-wl-helios-old-return>Document OLD UNIT RETURNING →</button></div>`:'';
   const state=ownerDone?`<div class='ok top10'><b>✓ OWNER FINAL VERIFIED</b><div class='small'>${signatureStamp(check.helios_owner_verified_by_name||'Owner',check.helios_owner_verified_at)}</div></div>`:submitted?`<div class='warn top10'><b>FIELD INSTALL SUBMITTED — WAITING FOR OWNER FINAL VERIFICATION</b><div class='small'>${signatureStamp(check.helios_field_completed_by_name||'Service Tech',check.helios_field_completed_at)}</div></div>`:`<button class='wl-big wl-green top10' data-wl-submit-helios-field>Submit Helios Field Install to Owner →</button>`;
@@ -3411,9 +3420,11 @@ async function submitHeliosFieldInstall(){
   if(swaps.length&&returns.length<swaps.length)return alert('Document every OLD UNIT RETURNING through Service Return → IT Intake first.');
   if(serviceSolarEvidenceCount(evidence,'helios_install','photo')<units.length)return alert('Upload at least one final installation photo for each Helios.');
   if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return alert('Save the timestamped Service installation signature.');
-  const ids=['wlHeliosFieldBox','wlHeliosFieldPv','wlHeliosFieldPtz','wlHeliosFieldSwitch','wlHeliosFieldPower','wlHeliosFieldOnline','wlHeliosFieldAim','wlHeliosFieldRecording','wlHeliosField20ft','wlHeliosFieldMastBolt','wlHeliosField45','wlHeliosFieldPanelBolt','wlHeliosFieldSand'];
-  if(ids.some(id=>!document.getElementById(id)?.checked))return alert('Complete every Helios field installation check.');
-  const {error}=await liveDb.rpc('save_my_helios_field_install_v1',{p_prep_id:activeSvcPrep.id,p_box_mounted_ok:true,p_pv_connected_ok:true,p_ptz_secured_ok:true,p_switch_pv_ok:true,p_unit_battery_on_ok:true,p_it_online_verified_ok:true,p_cameras_aimed_ok:true,p_recording_ok:true,p_tower_20ft_ok:true,p_mast_lock_bolt_ok:true,p_panel_45deg_ok:true,p_panel_bolt_ok:true,p_4_sandbags_ok:true});
+  const fieldRules=heliosFieldRuleList();
+  if(fieldRules.some(rule=>!document.querySelector(`[data-wl-helios-field-key="${rule.key}"]`)?.checked))return alert('Complete every Helios field installation check.');
+  const fieldPayload={p_prep_id:activeSvcPrep.id};
+  fieldRules.forEach(rule=>{fieldPayload[rule.rpc_param]=true;});
+  const {error}=await liveDb.rpc('save_my_helios_field_install_v1',fieldPayload);
   if(error)return alert(error.message);
   activeSvcPrep=await getPrep(activeSvcPrep.id); alert('Helios field installation submitted to the Owner for final verification.'); return renderSvcPrep();
 }
