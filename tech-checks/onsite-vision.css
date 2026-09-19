@@ -204,3 +204,55 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   .vision-draft-card{padding:11px}
   .vision-draft-head b{font-size:15px}
 }
+
+
+/* Guided work-order interview v8 */
+.vision-draft-question small{
+  display:block;
+  margin-bottom:5px;
+  color:#72869a;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.1em;
+}
+.vision-draft-choices{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:11px;
+}
+.vision-draft-choices button{
+  min-height:36px;
+  border:1px solid #3a5269;
+  border-radius:999px;
+  background:#172737;
+  color:#eef3f7;
+  padding:0 11px;
+  font-size:10px;
+  font-weight:900;
+}
+.vision-draft-choices button:hover{
+  border-color:#607890;
+  background:#1d3144;
+}
+@media(max-width:900px){
+  .vision-thread{
+    overflow-y:scroll!important;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y;
+    padding-bottom:calc(var(--vision-composer-space,112px) + 44px)!important;
+  }
+}
+@media(max-width:560px){
+  .vision-draft-choices{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .vision-draft-choices button{
+    min-height:40px;
+    border-radius:10px;
+    padding:7px 9px;
+    line-height:1.25;
+  }
+}
