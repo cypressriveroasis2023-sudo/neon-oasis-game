@@ -930,6 +930,39 @@ function actionCard(a,ticket){
 function who(ticket){
   const rows=active(ticket);return rows.length?'<div class="vision-direct good"><b>Here is who currently has MHelpDesk #'+esc(ticket)+'.</b>'+rows.map(r=>'<div>'+esc(String(r.assigned_role||'').toUpperCase())+': '+esc(assignee(r))+'</div>').join('')+'</div>'+jobCard(ticket):'<div class="vision-direct warn"><b>No active assignment is showing.</b>MHelpDesk #'+esc(ticket)+' has no active IT or Service assignment in Tech Check.</div>';
 }
+function personLookupName(raw){
+  const text=String(raw||'').trim();
+  if(/\b(assigned|assignment|handling|has\s+it|has\s+this|service\s+order|ticket)\b/i.test(text))return'';
+  const match=text.match(/^(?:who(?:'s|\s+is)|tell\s+me\s+about|what\s+does)\s+(.+?)(?:\s+do)?[?.!]*$/i);
+  return match?String(match[1]||'').replace(/\b(?:at|for)\s+cameras\s+on\s+site\b.*$/i,'').trim():'';
+}
+function personRoleLabel(role){
+  if(role==='owner')return'Owner/Admin';
+  if(role==='it')return'IT Technician';
+  if(role==='service')return'Service Technician';
+  return String(role||'Company profile');
+}
+async function personLookupHtml(raw){
+  const wanted=personLookupName(raw);if(!wanted)return'';
+  const result=await db.from('profiles').select('user_id,full_name,username,role,active,archived_at').order('full_name').limit(250);
+  if(result.error)throw result.error;
+  const terms=wanted.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches=(result.data||[]).filter(p=>{
+    const hay=(String(p.full_name||'')+' '+String(p.username||'')).toLowerCase();
+    return terms.every(t=>hay.includes(t));
+  }).slice(0,12);
+  if(!matches.length)return '<div class="vision-answer-title">I could not find '+esc(wanted)+' in Tech Check.</div><div class="vision-answer-copy">No Owner, IT, or Service profile matched that name in the live profile records.</div>';
+  const exact=matches.filter(p=>String(p.full_name||'').trim().toLowerCase()===wanted.toLowerCase());
+  const rows=exact.length?exact:matches;
+  const activeJobsFor=p=>state.jobs.filter(j=>j.status!=='completed'&&(String(j.assignee_user_id||'')===String(p.user_id||'')||String(j.assignee_name||'').trim().toLowerCase()===String(p.full_name||'').trim().toLowerCase()));
+  const cards=rows.map(p=>{
+    const activeState=p.archived_at?'Archived':p.active===false?'Inactive':'Active';
+    const jobs=activeJobsFor(p);
+    return '<div class="vision-context-block"><h3>'+esc(p.full_name||p.username||wanted)+'</h3><div class="vision-context-grid"><div><span>ROLE</span><b>'+esc(personRoleLabel(p.role))+'</b></div><div><span>PROFILE</span><b>'+esc(activeState)+'</b></div></div>'+(p.username?'<div class="vision-system-note">Username: '+esc(p.username)+'</div>':'')+(jobs.length?'<div class="vision-system-note">Current Tech Check work: '+jobs.slice(0,4).map(j=>'#'+esc(j.ticket_no||'—')+' · '+esc(j.site||'No site')).join(' · ')+'</div>':'')+'</div>';
+  }).join('');
+  const note=rows.length>1?'<div class="vision-answer-copy">I found '+rows.length+' profile records with that name, so I am showing each one instead of guessing which account you meant.</div>':'<div class="vision-answer-copy">This is from the live Tech Check profile record.</div>';
+  return '<div class="vision-answer-title">'+esc(rows[0].full_name||wanted)+'</div>'+note+cards;
+}
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   const current=chat();
@@ -942,6 +975,9 @@ async function answer(text){
     return continueDraft(raw);
   }
   if(isCreateRequest(raw))return startDraft(raw);
+
+  const personReply=await personLookupHtml(raw);
+  if(personReply)return personReply;
 
   const agentReply=await serverAgentAnswer(raw);
   if(agentReply)return agentReply;
