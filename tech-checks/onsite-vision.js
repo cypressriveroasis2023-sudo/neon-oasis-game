@@ -1,7 +1,9 @@
 (() => {
 'use strict';
 let db=null;
-const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown'};
+const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown',knowledgeEntries:[],knowledgeEditingId:''};
+let conversationSyncTimer=null;
+let persistenceReady=false;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -19,8 +21,45 @@ async function techCheckDb(){
   if(!url||!key)throw new Error('Tech Check connection settings were not found.');
   return supabase.createClient(url[1],key[1]);
 }
+function visionPersistence(){return window.OnSiteVisionPersistence||null;}
+function visionKnowledgeAdmin(){return window.OnSiteVisionKnowledgeAdmin||null;}
 function loadChats(){try{const x=JSON.parse(localStorage.getItem(STORE)||'[]');state.chats=Array.isArray(x)?x.slice(0,20):[];}catch{state.chats=[];}}
-function saveChats(){try{localStorage.setItem(STORE,JSON.stringify(state.chats.slice(0,20)));}catch{}}
+function queueConversationSync(){
+  if(!persistenceReady||!db)return;
+  clearTimeout(conversationSyncTimer);
+  conversationSyncTimer=setTimeout(async()=>{
+    const current=chat();
+    if(!current)return;
+    try{await visionPersistence()?.save?.(current);}
+    catch(error){console.warn('Vision conversation cloud sync',error);}
+  },350);
+}
+function saveChats(){
+  try{localStorage.setItem(STORE,JSON.stringify(state.chats.slice(0,20)));}catch{}
+  queueConversationSync();
+}
+async function hydratePersistentChats(){
+  const layer=visionPersistence();
+  if(!layer?.load){persistenceReady=false;return;}
+  try{
+    const remote=await layer.load(20);
+    const merged=new Map();
+    for(const row of [...state.chats,...remote]){
+      if(!row?.id)continue;
+      const existing=merged.get(row.id);
+      const a=existing?.updatedAt?new Date(existing.updatedAt).getTime():0;
+      const b=row.updatedAt?new Date(row.updatedAt).getTime():0;
+      if(!existing||b>=a)merged.set(row.id,row);
+    }
+    state.chats=[...merged.values()].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)).slice(0,20);
+    persistenceReady=true;
+    await layer.saveAll?.(state.chats,20);
+    try{localStorage.setItem(STORE,JSON.stringify(state.chats));}catch{}
+  }catch(error){
+    persistenceReady=false;
+    console.warn('Vision persistent conversation load',error);
+  }
+}
 function chat(){return state.chats.find(x=>x.id===state.chatId)||null;}
 function ensureChat(){
   let c=chat();if(c)return c;
@@ -37,7 +76,7 @@ function openChat(chatId){
   state.chatId=chatId;state.currentTicket=c.ticket||'';renderHistory();renderThread();renderOrder();closeDrawers();
 }
 function addMessage(role,text='',html=''){
-  const c=ensureChat();c.messages.push({role,text:String(text),html:String(html),at:now()});
+  const c=ensureChat();c.messages.push({id:id(),role,text:String(text),html:String(html),at:now()});
   c.updatedAt=now();c.ticket=state.currentTicket||c.ticket||'';saveChats();renderHistory();
 }
 function titleFrom(text){
@@ -108,6 +147,109 @@ function agentProposalHtml(p){
   if(!p||p.type==='none')return'';
   return '<div class="vision-action-card"><small>PROPOSED ACTION</small><b>'+esc(p.summary||String(p.type||'').replaceAll('_',' '))+'</b><p>Vision has not changed Tech Check yet.</p></div>';
 }
+function knowledgeValue(id){return String($(id)?.value||'').trim();}
+function resetKnowledgeForm(){
+  state.knowledgeEditingId='';
+  if($('visionKnowledgeEntryId'))$('visionKnowledgeEntryId').value='';
+  if($('visionKnowledgeEntryTitle'))$('visionKnowledgeEntryTitle').value='';
+  if($('visionKnowledgeDomain'))$('visionKnowledgeDomain').value='technical';
+  if($('visionKnowledgeEquipment'))$('visionKnowledgeEquipment').value='';
+  if($('visionKnowledgeWorkflow'))$('visionKnowledgeWorkflow').value='';
+  if($('visionKnowledgeTopic'))$('visionKnowledgeTopic').value='';
+  if($('visionKnowledgeContent'))$('visionKnowledgeContent').value='';
+  if($('visionKnowledgeSourceKind'))$('visionKnowledgeSourceKind').value='owner';
+  if($('visionKnowledgeSourceRef'))$('visionKnowledgeSourceRef').value='';
+  if($('visionKnowledgeTags'))$('visionKnowledgeTags').value='';
+  if($('visionKnowledgeEditorTitle'))$('visionKnowledgeEditorTitle').textContent='New knowledge';
+  $('visionKnowledgeRetire')?.classList.add('hidden');
+  $('visionKnowledgeSaveStatus')?.classList.add('hidden');
+  renderKnowledgeList();
+}
+function fillKnowledgeForm(entry){
+  if(!entry)return resetKnowledgeForm();
+  state.knowledgeEditingId=String(entry.id||'');
+  if($('visionKnowledgeEntryId'))$('visionKnowledgeEntryId').value=state.knowledgeEditingId;
+  if($('visionKnowledgeEntryTitle'))$('visionKnowledgeEntryTitle').value=entry.title||'';
+  if($('visionKnowledgeDomain'))$('visionKnowledgeDomain').value=entry.domain||'technical';
+  if($('visionKnowledgeEquipment'))$('visionKnowledgeEquipment').value=entry.equipment_type||'';
+  if($('visionKnowledgeWorkflow'))$('visionKnowledgeWorkflow').value=entry.workflow_type||'';
+  if($('visionKnowledgeTopic'))$('visionKnowledgeTopic').value=entry.topic||'';
+  if($('visionKnowledgeContent'))$('visionKnowledgeContent').value=entry.content||'';
+  if($('visionKnowledgeSourceKind'))$('visionKnowledgeSourceKind').value=entry.source_kind||'owner';
+  if($('visionKnowledgeSourceRef'))$('visionKnowledgeSourceRef').value=entry.source_ref||'';
+  if($('visionKnowledgeTags'))$('visionKnowledgeTags').value=(entry.tags||[]).join(', ');
+  if($('visionKnowledgeEditorTitle'))$('visionKnowledgeEditorTitle').textContent=(entry.status==='approved'?'Approved':'Edit')+' · v'+String(entry.version||1);
+  $('visionKnowledgeRetire')?.classList.toggle('hidden',entry.status==='retired');
+  $('visionKnowledgeSaveStatus')?.classList.add('hidden');
+  renderKnowledgeList();
+}
+function renderKnowledgeList(){
+  const host=$('visionKnowledgeList');if(!host)return;
+  if(!state.knowledgeEntries.length){
+    host.innerHTML='<div class="vision-system-note">No saved knowledge matches this filter.</div>';
+    return;
+  }
+  host.innerHTML=state.knowledgeEntries.map(entry=>{
+    const meta=[entry.domain,entry.equipment_type,entry.workflow_type?'Workflow: '+entry.workflow_type:'','v'+String(entry.version||1)].filter(Boolean);
+    return '<button type="button" class="vision-knowledge-item '+(String(entry.id)===state.knowledgeEditingId?'active':'')+'" data-knowledge-id="'+esc(entry.id)+'">'
+      +'<span class="vision-knowledge-item-head"><b>'+esc(entry.title)+'</b><span class="vision-knowledge-status '+esc(entry.status)+'">'+esc(String(entry.status||'').toUpperCase())+'</span></span>'
+      +'<p>'+esc(entry.content||'')+'</p><span class="vision-knowledge-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</span></button>';
+  }).join('');
+}
+async function loadKnowledgeEntries(){
+  const admin=visionKnowledgeAdmin();if(!admin?.list)return;
+  const filter=knowledgeValue('visionKnowledgeFilter');
+  const host=$('visionKnowledgeList');if(host)host.innerHTML='<div class="vision-system-note">Loading company knowledge…</div>';
+  try{
+    state.knowledgeEntries=await admin.list(filter,150);
+    renderKnowledgeList();
+  }catch(error){
+    if(host)host.innerHTML='<div class="vision-direct warn"><b>Knowledge could not load.</b>'+esc(error?.message||'Please try again.')+'</div>';
+  }
+}
+function readKnowledgeForm(status){
+  return{
+    id:state.knowledgeEditingId||null,
+    title:knowledgeValue('visionKnowledgeEntryTitle'),
+    domain:knowledgeValue('visionKnowledgeDomain')||'technical',
+    equipment_type:knowledgeValue('visionKnowledgeEquipment'),
+    workflow_type:knowledgeValue('visionKnowledgeWorkflow'),
+    topic:knowledgeValue('visionKnowledgeTopic'),
+    content:knowledgeValue('visionKnowledgeContent'),
+    status,
+    source_kind:knowledgeValue('visionKnowledgeSourceKind')||'owner',
+    source_ref:knowledgeValue('visionKnowledgeSourceRef'),
+    tags:knowledgeValue('visionKnowledgeTags').split(',').map(x=>x.trim()).filter(Boolean)
+  };
+}
+async function saveKnowledgeEntry(status){
+  const admin=visionKnowledgeAdmin();if(!admin?.save)throw new Error('Vision knowledge manager is unavailable.');
+  const entry=readKnowledgeForm(status);
+  if(!entry.title)throw new Error('Give this knowledge entry a title.');
+  if(!entry.content)throw new Error('Tell Vision what it should know.');
+  const note=$('visionKnowledgeSaveStatus');
+  if(note){note.classList.remove('hidden');note.textContent=status==='approved'?'Approving company knowledge…':'Saving knowledge…';}
+  const saved=await admin.save(entry);
+  state.knowledgeEditingId=String(saved.id||'');
+  if(note)note.textContent=status==='approved'?'Approved. Vision can now use this as company knowledge.':'Draft saved. Vision will not use it as company truth until approved.';
+  await loadKnowledgeEntries();
+  const current=state.knowledgeEntries.find(x=>String(x.id)===state.knowledgeEditingId)||saved;
+  fillKnowledgeForm(current);
+  if(note){note.classList.remove('hidden');note.textContent=status==='approved'?'Approved. Vision can now use this as company knowledge.':'Draft saved. Vision will not use it as company truth until approved.';}
+}
+async function openKnowledgeManager(){
+  const modal=$('visionKnowledgeModal');if(!modal)return;
+  modal.classList.remove('hidden');modal.setAttribute('aria-hidden','false');
+  document.body.classList.add('vision-modal-open');
+  await loadKnowledgeEntries();
+  if(!state.knowledgeEditingId)resetKnowledgeForm();
+}
+function closeKnowledgeManager(){
+  const modal=$('visionKnowledgeModal');if(!modal)return;
+  modal.classList.add('hidden');modal.setAttribute('aria-hidden','true');
+  document.body.classList.remove('vision-modal-open');
+}
+
 function visionActions(){return window.OnSiteVisionActions||null;}
 function legacyActionPayload(a,ticket){
   if(!a)return null;
@@ -206,7 +348,12 @@ async function loadData(){
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='LIVE';
 }
 async function init(){
-  db=await techCheckDb();window.OnSiteVisionLiveData?.configure?.(db);window.OnSiteVisionActions?.configure?.(db);loadChats();
+  db=await techCheckDb();
+  window.OnSiteVisionLiveData?.configure?.(db);
+  window.OnSiteVisionActions?.configure?.(db);
+  window.OnSiteVisionPersistence?.configure?.(db);
+  window.OnSiteVisionKnowledgeAdmin?.configure?.(db);
+  loadChats();
   const session=(await db.auth.getSession()).data.session;
   if(!session){location.replace('./');return;}
   state.session=session;
@@ -214,6 +361,7 @@ async function init(){
   const p=profileResult.data;
   if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){location.replace('./');return;}
   state.profile=p;$('visionOwnerName').textContent=(p.full_name||p.username||'Owner')+' - Owner/Admin';
+  await hydratePersistentChats();
   await loadData();
   await checkAgentStatus();
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
@@ -910,11 +1058,33 @@ document.addEventListener('click',async e=>{
     state.pending.delete(cancel.dataset.cancelAction);
     addMessage('assistant','', '<div class="vision-system-note">No changes were made. The proposed Vision action was cancelled.</div>');renderThread();return;
   }
+  const knowledgeItem=e.target.closest('[data-knowledge-id]');
+  if(knowledgeItem){
+    const entry=state.knowledgeEntries.find(x=>String(x.id)===String(knowledgeItem.dataset.knowledgeId));
+    if(entry)fillKnowledgeForm(entry);
+    return;
+  }
+  if(e.target.closest('#visionTeachButton')){await openKnowledgeManager();return;}
+  if(e.target.closest('#visionKnowledgeClose')){closeKnowledgeManager();return;}
+  if(e.target.closest('#visionKnowledgeNew')){resetKnowledgeForm();return;}
+  if(e.target.closest('#visionKnowledgeSaveDraft')){
+    try{await saveKnowledgeEntry('draft');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not save draft.';}}return;
+  }
+  if(e.target.closest('#visionKnowledgeApprove')){
+    try{await saveKnowledgeEntry('approved');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not approve knowledge.';}}return;
+  }
+  if(e.target.closest('#visionKnowledgeRetire')){
+    try{await saveKnowledgeEntry('retired');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not retire knowledge.';}}return;
+  }
   if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
   if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();state.agentStatus='unknown';await loadData();await checkAgentStatus();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
-document.addEventListener('keydown',e=>{if(e.target?.id==='visionPrompt'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+document.addEventListener('change',e=>{if(e.target?.id==='visionKnowledgeFilter')loadKnowledgeEntries();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!$('visionKnowledgeModal')?.classList.contains('hidden')){closeKnowledgeManager();return;}
+  if(e.target?.id==='visionPrompt'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
+});
 init().catch(error=>{$('visionLoading').innerHTML='<b>OnSite Vision could not open.</b><span>'+esc(error?.message||'Return to Tech Check and try again.')+'</span>';});
 })();
