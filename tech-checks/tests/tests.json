@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v101",
-  "service_worker": "v47",
+  "runtime_version": "release-qa-v102",
+  "service_worker": "v48",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,12 +658,184 @@
         "Background and reopen"
       ],
       "expected": [
-        "v45 shell loads without AccessDenied",
-        "Latest controls/help wording appear",
-        "No stale v98/v44 UI after refresh cycle"
+        "v48 cached shell loads without AccessDenied",
+        "release-qa-v102 controls and Help wording appear",
+        "Truck Spares / Backups UI is not stale after refresh/background cycle"
       ],
       "manual_device": true
+    },
+    {
+      "id": "HELP-03",
+      "area": "Help",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Truck spare Help matches live controls",
+      "steps": [
+        "Open Owner, IT, and Service Help",
+        "Review Truck Spares guidance",
+        "Use Show me in the app"
+      ],
+      "expected": [
+        "IT Help points to Truck Spares / Backups",
+        "Service Help explains USED vs RETURN UNUSED",
+        "Owner Help points to Equipment Handoffs",
+        "Show me only navigates/highlights and does not mutate records"
+      ]
+    },
+    {
+      "id": "OWNER-06",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Outstanding truck spare visibility",
+      "steps": [
+        "Load Owner Equipment Handoffs",
+        "Inspect unresolved checked-out backup units and in-truck spare battery batches"
+      ],
+      "expected": [
+        "Outstanding truck spares contribute to Handoffs badge",
+        "Owner sees Service Tech, MHelpDesk ticket and spare description",
+        "Resolved spares disappear from outstanding view"
+      ]
+    },
+    {
+      "id": "IT-09",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Add truck spare without changing job manifest",
+      "steps": [
+        "Complete required job equipment",
+        "At Ticket Summary add a Truck Spare unit",
+        "Inspect prep expected count and equipment manifest"
+      ],
+      "expected": [
+        "Spare is inserted as purpose BACKUP",
+        "Total prepared item count increases",
+        "Customer/job equipment_manifest remains unchanged",
+        "Manifest release validation ignores BACKUP when matching required job equipment"
+      ]
+    },
+    {
+      "id": "IT-10",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "BACKUP hardware-ready checks",
+      "steps": [
+        "Add a BACKUP unit",
+        "Complete IT checks"
+      ],
+      "expected": [
+        "BACKUP requires SIM/camera visibility/storage/recording/battery readiness plus equipment-specific Ranger/Helios checks",
+        "BACKUP does not falsely require customer-email assignment, Central Station monitoring, or MHelpDesk quantity confirmation",
+        "Photo, matching tag and IT signature are still required"
+      ]
+    },
+    {
+      "id": "IT-11",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Truck spare battery plan gate",
+      "steps": [
+        "Enter spare battery quantity for supported equipment",
+        "Save without READY then attempt handoff",
+        "Mark physically present/charged/READY and retry"
+      ],
+      "expected": [
+        "Supported battery types include Solar Spotter AGM/350Ah, Ranger LiTime, Helios battery box, Recon II battery",
+        "Release trigger blocks a saved spare battery batch that is not READY",
+        "Ready batches can proceed to Service handoff"
+      ]
+    },
+    {
+      "id": "SERVICE-10",
+      "area": "Service",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Return unused truck spare directly to shop",
+      "steps": [
+        "Accept handoff containing BACKUP",
+        "Complete field call without using spare",
+        "Open Truck Spares to Resolve",
+        "Choose RETURN UNUSED TO SHOP"
+      ],
+      "expected": [
+        "Unused BACKUP is marked returned_unused",
+        "Unit registry returns to shop_inventory",
+        "Unused BACKUP does not create a unit_returns / IT Intake record",
+        "It disappears from Service unresolved-spare card"
+      ]
+    },
+    {
+      "id": "SERVICE-11",
+      "area": "Service",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Use truck spare for swap",
+      "steps": [
+        "Accept handoff containing BACKUP",
+        "Use spare in field",
+        "Choose USED FOR SWAP",
+        "Return failed/replaced field unit through normal Return Unit to IT Intake"
+      ],
+      "expected": [
+        "BACKUP is marked used and remains deployed",
+        "Used BACKUP becomes eligible for normal future field-return tracking",
+        "Failed/replaced unit uses normal Service→IT Intake flow",
+        "Unresolved BACKUP cannot appear as a normal return option before it is marked used"
+      ]
+    },
+    {
+      "id": "SERVICE-12",
+      "area": "Service",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Resolve spare battery quantities",
+      "steps": [
+        "Accept spare battery batch",
+        "After field call enter quantity used",
+        "Check in battery spares"
+      ],
+      "expected": [
+        "Used quantity cannot exceed prepared quantity",
+        "Returned quantity equals prepared minus used",
+        "Batch status becomes resolved",
+        "Unused remainder no longer appears as in-truck spare"
+      ]
+    },
+    {
+      "id": "XROLE-H",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Truck spare end-to-end",
+      "steps": [
+        "Owner assigns QA service ticket with IT→Service handoff",
+        "IT completes job equipment",
+        "IT adds BACKUP unit and optional spare battery batch",
+        "Service accepts exact-ticket handoff",
+        "Resolve one spare unused or used",
+        "Verify Owner outstanding-spare view updates"
+      ],
+      "expected": [
+        "Job manifest remains job equipment only",
+        "Truck spare travels under same MHelpDesk reference",
+        "Service must explicitly resolve spare after call",
+        "Owner can see outstanding spare until resolution",
+        "Unused spare bypasses IT Intake; used/replaced field equipment follows normal return chain"
+      ]
     }
   ],
-  "last_release_qa_note": "Helios release trigger hardened in production and documented; Help return wording aligned to tagged-equipment return records."
+  "last_release_qa_note": "Truck spare workflow added: IT BACKUP units and spare batteries are ticket-linked, Service resolves USED vs RETURN UNUSED, Owner sees outstanding spares, BACKUP hardware readiness is separated from customer-specific DELIVERY setup."
 }
