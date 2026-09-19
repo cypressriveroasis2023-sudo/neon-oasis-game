@@ -189,6 +189,25 @@ function injectStyles() {
     .wl-help-progress{height:6px!important}.wl-help-step-count{font-size:9px!important}.wl-help-card{padding:14px!important}.wl-help-card h2{font-size:20px!important}.wl-help-copy{font-size:12px!important;line-height:1.5!important}.wl-help-nav button{min-height:44px!important;font-size:10px!important}
     @media(min-width:800px){.wl-help-overlay{align-items:center!important}.wl-help-sheet{border-radius:20px!important;max-height:88vh!important}}
     @media(max-width:430px){.wl-help-sheet{padding:14px!important}.wl-help-head{top:-14px!important}.wl-help-topic-grid{grid-template-columns:1fr}.wl-help-home-hero{padding:11px}.wl-help-status-grid{gap:6px}.wl-help-topic-actions{grid-template-columns:1fr}}
+    /* Walkthrough coaching v92 */
+    .wl-help-howto{margin-top:13px;padding:11px;border:1px solid #cfd9e1;border-left:4px solid #d20b12;border-radius:12px;background:#f8fafb}
+    .wl-help-howto-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+    .wl-help-howto-head span{color:#d20b12;font-size:8px;font-weight:950;letter-spacing:.11em}
+    .wl-help-howto-head b{padding:4px 7px;border-radius:999px;background:#e9eef2;color:#4f5f6d;font-size:7px;font-weight:900}
+    .wl-help-howto ol{margin:0;padding:0;list-style:none;counter-reset:helpstep;display:grid;gap:7px}
+    .wl-help-howto li{counter-increment:helpstep;display:grid;grid-template-columns:23px minmax(0,1fr);gap:7px;align-items:start;color:#263847;font-size:10px;line-height:1.4;font-weight:650}
+    .wl-help-howto li:before{content:counter(helpstep);width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:#101820;color:#fff;font-size:8px;font-weight:950}
+    .wl-help-howto>button{width:100%;min-height:40px;margin:10px 0 0;border:1px solid #d20b12;border-radius:10px;background:#d20b12;color:#fff;font:inherit;font-size:9px;font-weight:900}
+    .wl-help-howto>small{display:block;margin-top:7px;color:#788591;font-size:7px;line-height:1.35;font-weight:650}
+    .wl-help-live-highlight{position:relative!important;z-index:10012!important;outline:4px solid #f1b918!important;outline-offset:4px!important;box-shadow:0 0 0 8px rgba(241,185,24,.20),0 10px 30px rgba(0,0,0,.18)!important;animation:wlHelpPulse .8s ease-in-out 3}
+    @keyframes wlHelpPulse{0%,100%{outline-color:#f1b918}50%{outline-color:#d20b12}}
+    .wl-help-coach-toast{position:fixed;left:50%;bottom:18px;z-index:10050;width:min(440px,calc(100% - 28px));transform:translate(-50%,140%);opacity:0;pointer-events:none;box-sizing:border-box;padding:10px 11px;border:1px solid #d3dce3;border-top:4px solid #d20b12;border-radius:13px;background:#fff;color:#172839;box-shadow:0 12px 38px rgba(0,0,0,.24);transition:transform .22s ease,opacity .22s ease}
+    .wl-help-coach-toast.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+    .wl-help-coach-toast b,.wl-help-coach-toast span{display:block}.wl-help-coach-toast b{font-size:11px}.wl-help-coach-toast span{margin-top:2px;color:#687885;font-size:8px;line-height:1.3}
+    .wl-help-coach-toast button{width:100%;min-height:36px;margin:8px 0 0;border:0;border-radius:9px;background:#101820;color:#fff;font:inherit;font-size:8px;font-weight:900}
+    .wl-help-show-note{margin:0 0 8px;padding:9px;border:1px solid #e7c76a;border-radius:9px;background:#fff8df;color:#725000;font-size:9px;font-weight:750;line-height:1.35}
+    @media(max-width:430px){.wl-help-howto{padding:9px}.wl-help-howto li{font-size:9px}.wl-help-coach-toast{bottom:12px}}
+
 
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
 
@@ -726,6 +745,279 @@ async function openHelpCenter(roleOverride=null){
   renderHelpCenter(helpCenterRole);
 }
 
+
+function helpStepGuide(role, step){
+  const key=(role||'it')+':'+String(step?.kicker||'').toUpperCase();
+  const guides={
+    'owner:OWNER HELP':{
+      steps:[
+        'Tap Create / Assign Job.',
+        'Copy the current MHelpDesk reference, customer/site, work date, and job description.',
+        'Enter the exact equipment quantities and unit / stand numbers from MHelpDesk.',
+        'Choose the department flow and technician assignment.',
+        'Review the draft or AI Preflight, then send the Tech Check job yourself.'
+      ],
+      selector:'#ownerJobAssignments > summary, #ownerJobAssignments'
+    },
+    'owner:LIVE PROGRESS':{
+      steps:[
+        'Tap Live Job Progress.',
+        'Open the active MHelpDesk job you want to review.',
+        'Read the current stage, assigned technician, and handoff status.',
+        'Use the AI status and timeline as an advisory check for waiting or attention items.',
+        'Follow up only when the job shows a real blocked or Owner-action state.'
+      ],
+      selector:'#ownerLiveJobProgress > summary, #ownerLiveJobProgress'
+    },
+    'owner:ROLE SEPARATION':{
+      steps:[
+        'Send IT work to IT when equipment prep is required.',
+        'IT completes the unit checks and creates the Service handoff.',
+        'Service opens the same MHelpDesk ticket and verifies the handed-off equipment.',
+        'Service completes field work and returns equipment to IT when needed.',
+        'IT Intake and Owner / Manager inventory confirmation finish the return flow.'
+      ],
+      selector:'#tab-it'
+    },
+    'owner:UNIT HISTORY':{
+      steps:[
+        'Tap Unit Status & Search.',
+        'Enter the permanent Tech Check unit number.',
+        'Search to see the unit’s current status and prior Tech Check history.',
+        'Use the unit number for history even when the old MHelpDesk ticket has already closed.'
+      ],
+      selector:'#ownerUnitStatusCard > summary, #ownerUnitStatusCard'
+    },
+
+    'service:WELCOME':{
+      steps:[
+        'Open the Service Tech tab.',
+        'Work from the current MHelpDesk ticket for today’s job.',
+        'Use Tech Check for the technician workflow; do not treat it as a replacement for MHelpDesk.',
+        'Use the permanent unit number to recognize equipment across different MHelpDesk jobs.'
+      ],
+      selector:'#tab-svc'
+    },
+    'service:MY WORK TODAY':{
+      steps:[
+        'Open Field Work on the Service Tech home.',
+        'Enter the exact current MHelpDesk ticket number.',
+        'Tap Open Service Job / Find Job.',
+        'If the job is in the Service department queue, claim it before continuing.',
+        'Confirm the customer/site and equipment match the ticket you are actually working.'
+      ],
+      selector:'#wlSvcHome'
+    },
+    'service:RECEIVE FROM IT':{
+      steps:[
+        'Open the exact MHelpDesk Service job.',
+        'Read the IT handoff information and the name of the IT Tech who prepared it.',
+        'Physically locate every listed unit and part before accepting anything.',
+        'Do not continue if the ticket, unit tag, or quantities do not match.'
+      ],
+      selector:'#wlSvcHome'
+    },
+    'service:VERIFY THE HANDOFF':{
+      steps:[
+        'Compare each physical unit tag to the handed-off unit shown in Tech Check.',
+        'Verify required batteries / battery boxes and every listed replacement part.',
+        'Review the IT evidence that belongs to the handed-off equipment.',
+        'Answer each Service verification step truthfully.',
+        'Stop and correct a mismatch before you accept the handoff.'
+      ],
+      selector:'#wlSvcLookup'
+    },
+    'service:SOLAR DELIVERY CHECKOUT':{
+      steps:[
+        'Finish the handed-off Solar Spotter / Ranger / Helios verification first.',
+        'Enter the assigned Solar Stand tag when a Solar Spotter requires one.',
+        'Verify MPPT update / test and the required batteries.',
+        'Connect the solar panel + batteries + MPPT and confirm active charging.',
+        'Upload the stand-tag photo and MPPT / charging readings before Service sign-off.'
+      ],
+      selector:'#wlSvcSolarStandTag'
+    },
+    'service:FIELD WORK':{
+      steps:[
+        'Keep the current MHelpDesk reference tied to the work you are doing today.',
+        'Complete the required Service Tech Check before equipment leaves the shop.',
+        'Perform the delivery, service call, pickup, or swap.',
+        'If equipment returns from the field, start Return Unit to IT Intake.'
+      ],
+      selector:'#wlSvcHome'
+    },
+    'service:RETURN TO IT':{
+      steps:[
+        'Tap Return Unit to IT Intake.',
+        'Enter the current MHelpDesk reference and exact unit tag.',
+        'Record the unit condition and return notes.',
+        'Take / upload the required return photos.',
+        'Submit the return so IT can receive it through Intake.'
+      ],
+      selector:"[data-wl-svc='returns']"
+    },
+    'service:DAILY TOOLS':{
+      steps:[
+        'Tap Truck / Trailer Inspection from your own Service account.',
+        'Complete every required inspection item and submit it under your name.',
+        'Use History to review previously submitted Service work.',
+        'Enable Menu → Phone Alerts once on your phone if you want assignment notifications.'
+      ],
+      selector:"[data-wl-svc='inspect']"
+    },
+    'service:SERVICE FLOW':{
+      steps:[
+        'Open / claim the correct Service job.',
+        'Receive and verify the IT handoff when IT prep is involved.',
+        'Complete any required Solar / Helios Service checkout.',
+        'Perform the field work.',
+        'Return equipment to IT Intake when equipment comes back.'
+      ],
+      selector:'#wlSvcHome'
+    },
+
+    'it:WELCOME':{
+      steps:[
+        'Open the IT Technician tab.',
+        'Check My Work Today for Owner-assigned or department-queue work.',
+        'Use the current MHelpDesk reference for the job you are preparing.',
+        'Use Tech Check for equipment prep / intake while MHelpDesk remains separate.'
+      ],
+      selector:'#tab-it'
+    },
+    'it:MY WORK TODAY':{
+      steps:[
+        'Look at My Work Today first.',
+        'Open a direct assignment, or claim an IT department-queue job.',
+        'Confirm the MHelpDesk reference, site, equipment, and Owner notes.',
+        'Then begin the required equipment prep.'
+      ],
+      selector:'#wlItHome'
+    },
+    'it:ON THE FLY':{
+      steps:[
+        'Tap Start New Equipment Prep.',
+        'Enter the current MHelpDesk reference and customer/site.',
+        'Choose the exact units / devices, stands, and parts required.',
+        'Create the IT Equipment Prep and begin the one-unit-at-a-time checks.'
+      ],
+      selector:"[data-wl-it='new']"
+    },
+    'it:DEPLOYMENT':{
+      steps:[
+        'Read the requested equipment and parts before pulling anything from the shelf.',
+        'Pull the actual unit and enter its permanent unit tag.',
+        'Complete each required equipment-specific question in order.',
+        'Take the required photo and confirm the visible tag matches.',
+        'Sign the unit check and review readiness before handoff.'
+      ],
+      selector:"[data-wl-it='new']"
+    },
+    'it:RELEASE TO SERVICE':{
+      steps:[
+        'Finish every required IT equipment check.',
+        'Confirm required photos, visible tag match, and IT signature are complete.',
+        'Resolve every readiness issue shown by Tech Check.',
+        'Create the Service handoff only after the unit is ready.',
+        'Physically hand Service the exact equipment and parts listed on the same ticket.'
+      ],
+      selector:'#wlItWizardOnly'
+    },
+    'it:INTAKE & RETURNS':{
+      steps:[
+        'Open Intake & Returns.',
+        'Choose the returned unit waiting for IT.',
+        'Review the Service Tech name, MHelpDesk reference, notes, and return photos.',
+        'Complete every IT Intake check and add the required Intake photo.',
+        'Send the completed intake to Owner / Manager for final MHelpDesk inventory confirmation.'
+      ],
+      selector:"[data-wl-mode='intake']"
+    },
+    'it:MENU & HISTORY':{
+      steps:[
+        'Use Status & History to review prior IT prep work.',
+        'Use Menu → Help Center whenever you need these training steps again.',
+        'Use Menu → Phone Alerts once on your phone if you want new-assignment notifications.'
+      ],
+      selector:"[data-wl-it='history']"
+    },
+    'it:IT FLOW':{
+      steps:[
+        'Open or claim the IT job.',
+        'Pull the exact equipment from shelf inventory.',
+        'Complete the full Tech Check for each unit.',
+        'Finish photo, signature, and readiness review.',
+        'Create the Service handoff when Service is the next department.'
+      ],
+      selector:'#wlItHome'
+    }
+  };
+  return guides[key] || {
+    steps:[
+      'Read the Tech Check instruction shown on this step.',
+      'Confirm you are working from the correct current MHelpDesk ticket.',
+      'Complete the matching action in Tech Check before moving forward.',
+      'If anything does not match the physical equipment or current ticket, stop and correct it first.'
+    ],
+    selector:null
+  };
+}
+function helpStepHowToHtml(role, step){
+  const guide=helpStepGuide(role,step);
+  const canShow=Boolean(guide.selector) && (currentRoleKey()===role || currentRoleKey()==='owner');
+  return `
+    <div class='wl-help-howto'>
+      <div class='wl-help-howto-head'><span>HOW TO DO IT</span><b>${guide.steps.length} steps</b></div>
+      <ol>${guide.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+      ${canShow ? "<button type='button' data-wl-help-show-step>Show me in the app →</button>" : ''}
+      <small>Training guidance only. “Show me” highlights the control but never submits or changes a live job.</small>
+    </div>
+  `;
+}
+function showHelpStepInApp(){
+  const role=helpWalkthroughRole || currentRoleKey();
+  const steps=helpStepsForRole(role);
+  const step=steps[Math.max(0,Math.min(helpWalkthroughStep,steps.length-1))];
+  const guide=helpStepGuide(role,step);
+  if(!guide.selector) return;
+
+  const overlay=document.getElementById('wlHelpOverlay');
+  overlay?.classList.add('hidden');
+
+  // Owners can preview the matching Owner / IT / Service surface without changing any records.
+  if(currentRoleKey()==='owner'){
+    const tabId=role==='owner' ? 'tab-owner' : role==='service' ? 'tab-svc' : 'tab-it';
+    document.getElementById(tabId)?.click();
+  }
+
+  setTimeout(()=>{
+    const target=document.querySelector(guide.selector);
+    if(!target){
+      renderHelpWalkthrough();
+      const body=document.getElementById('wlHelpBody');
+      if(body){
+        const note=document.createElement('div');
+        note.className='wl-help-show-note';
+        note.textContent='Open the matching job or workflow first, then tap “Show me in the app” again.';
+        body.prepend(note);
+      }
+      return;
+    }
+    target.scrollIntoView({behavior:'smooth',block:'center'});
+    target.classList.add('wl-help-live-highlight');
+    let toast=document.getElementById('wlHelpCoachToast');
+    if(!toast){
+      toast=document.createElement('div');
+      toast.id='wlHelpCoachToast';
+      toast.className='wl-help-coach-toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML="<b>Training pointer</b><span>This is the control for the step you just read.</span><button type='button' data-wl-help-coach-return>Back to Help</button>";
+    toast.classList.add('show');
+    setTimeout(()=>target.classList.remove('wl-help-live-highlight'),3200);
+  },320);
+}
+
 function renderHelpWalkthrough() {
   const overlay = ensureHelpOverlay();
   const body = document.getElementById('wlHelpBody');
@@ -736,7 +1028,8 @@ function renderHelpWalkthrough() {
   const pct = Math.round((helpWalkthroughStep + 1) / steps.length * 100);
   const firstTime = helpWalkthroughMode === 'first';
   const last = helpWalkthroughStep === steps.length - 1;
-  body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div></div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
+  const walkthroughRole=helpWalkthroughRole || currentRoleKey();
+  body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div>${helpStepHowToHtml(walkthroughRole,step)}</div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
   overlay.classList.remove('hidden');
 }
 async function openHelpWalkthrough(firstTime = false, roleOverride = null) {
@@ -4161,7 +4454,12 @@ document.addEventListener('click', async e => {
   const helpTopic=e.target.closest('[data-wl-help-topic]'); if(helpTopic) return renderHelpTopic(helpTopic.dataset.wlHelpTopic);
   if(e.target.closest('[data-wl-help-center]')) return renderHelpCenter(helpCenterRole);
   if(e.target.closest('[data-wl-help-walkthrough]')) return openHelpWalkthrough(false,helpCenterRole);
-  if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
+  if(e.target.closest('[data-wl-help-show-step]')) return showHelpStepInApp();
+  if(e.target.closest('[data-wl-help-coach-return]')){
+    document.getElementById('wlHelpCoachToast')?.classList.remove('show');
+    return renderHelpWalkthrough();
+  }
+  if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); document.getElementById('wlHelpCoachToast')?.classList.remove('show'); return; }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
