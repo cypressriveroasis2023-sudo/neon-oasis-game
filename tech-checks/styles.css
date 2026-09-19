@@ -3399,3 +3399,163 @@ select {
   #view-owner .ownerAIDispatchPanel .wl-ai-dictate,
   #view-owner .ownerAIDispatchPanel .wl-ai-build{font-size:11px!important}
 }
+
+/* OnSite Vision Conversation v112 */
+#view-owner .ownerAIDispatchPanel{
+  overflow:hidden;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:14px;
+  padding:0 2px 7px;
+  border-bottom:1px solid #e3e8ed;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-head>span{
+  color:#101820;
+  font-size:11px;
+  font-weight:950;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-head button{
+  margin:0;
+  padding:6px 9px;
+  min-height:30px;
+  border:1px solid #d5dde4;
+  border-radius:999px;
+  background:#fff;
+  color:#526373;
+  font:inherit;
+  font-size:9px;
+  font-weight:850;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-thread{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin:0 0 12px;
+  padding:12px 2px 4px;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-empty{
+  padding:15px;
+  border:1px dashed #cbd5dd;
+  border-radius:14px;
+  background:#f8fafb;
+  text-align:center;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-empty b{
+  display:block;
+  color:#101820;
+  font-size:12px;
+  font-weight:950;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-empty span{
+  display:block;
+  max-width:520px;
+  margin:5px auto 0;
+  color:#687887;
+  font-size:10px;
+  font-weight:650;
+  line-height:1.4;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-turn{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.user{
+  align-items:flex-end;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.assistant{
+  align-items:flex-start;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-label{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  margin:0 5px 4px;
+  color:#788794;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.09em;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-label img{
+  width:17px;
+  height:17px;
+  border-radius:5px;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-bubble{
+  box-sizing:border-box;
+  max-width:92%;
+  padding:11px 12px;
+  border-radius:16px;
+  font-size:12px;
+  line-height:1.45;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.user .wl-ai-chat-bubble{
+  max-width:86%;
+  border:1px solid #101820;
+  border-bottom-right-radius:5px;
+  background:#101820;
+  color:#fff;
+  font-weight:750;
+  white-space:pre-wrap;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.assistant .wl-ai-chat-bubble{
+  width:min(100%,680px);
+  border:1px solid #d9e0e6;
+  border-left:4px solid #d20b12;
+  border-bottom-left-radius:5px;
+  background:#fff;
+  color:#172839;
+  box-shadow:0 3px 10px rgba(16,24,32,.05);
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-bubble .wl-ai-result-head{
+  margin-bottom:9px;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-bubble .wl-ai-job-answer{
+  background:#f8fafb;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-chat-bubble .wl-ai-result-grid{
+  gap:6px;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-prompt-box{
+  margin-top:8px;
+  border-top:1px solid #e3e8ed;
+  background:#f7f9fb;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-prompt-box>label{
+  color:#5f6f7e!important;
+}
+#view-owner .ownerAIDispatchPanel #ownerAIDispatchPrompt{
+  min-height:82px!important;
+  border:1px solid #aebbc6!important;
+  border-radius:14px!important;
+  background:#fff!important;
+}
+#view-owner .ownerAIDispatchPanel #ownerAIDispatchPrompt::placeholder{
+  color:#8b98a4;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-build{
+  background:#d20b12!important;
+  border-color:#d20b12!important;
+  color:#fff!important;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-dictate{
+  background:#fff!important;
+  border-color:#bfcbd4!important;
+  color:#172839!important;
+}
+#view-owner .ownerAIDispatchPanel #ownerAIDispatchResult[aria-hidden='true']{
+  display:none!important;
+}
+@media(max-width:680px){
+  #view-owner .ownerAIDispatchPanel .wl-ai-chat-bubble{max-width:94%;font-size:12px}
+  #view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.user .wl-ai-chat-bubble{max-width:88%}
+  #view-owner .ownerAIDispatchPanel .wl-ai-chat-turn.assistant .wl-ai-chat-bubble{width:96%}
+  #view-owner .ownerAIDispatchPanel .wl-ai-prompt-chips{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
+  #view-owner .ownerAIDispatchPanel .wl-ai-prompt-chips button{flex:none}
+}
