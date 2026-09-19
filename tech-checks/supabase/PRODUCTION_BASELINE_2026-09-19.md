@@ -389,7 +389,7 @@ Release identifiers after this Phase 7 pass:
 
 - Tech Check technician workflow: `release-qa-v121`
 - Main loader: `startup-fast-v35`
-- OnSite Vision workspace: `vision-workspace-v16` (workspace UI unchanged)
+- OnSite Vision workspace: `vision-workspace-v17` (workspace UI unchanged)
 - Shared rules: `rules-v3`
 - Company Knowledge: `company-knowledge-v4`
 - Workflow Engine: `workflow-engine-v4`
@@ -494,14 +494,22 @@ Current release:
 - shared rules: `rules-v6`
 - Company Knowledge: `company-knowledge-v7`
 - Workflow Engine: `workflow-engine-v4`
-- technician: `release-qa-v123`
-- loader: `startup-fast-v37`
+- technician: `release-qa-v124`
+- loader: `startup-fast-v38`
 - OnSite Vision workspace: `vision-workspace-v16`
 - Edge agent: `onsite-vision-agent-v10` ACTIVE with JWT verification
-- service worker: `tech-check-field-shell-v80`
+- service worker: `tech-check-field-shell-v81`
 - database migrations: 79
-- QA tests: 98
+- QA tests: 100
 
 Regression checks passed for JavaScript syntax, browser/server bundle parity, deployed Edge parity, live database columns/triggers, cache versions, and absence of Tesseract/OCR from the startup cache. Supabase advisors reported existing project-wide warnings plus the new Ranger verifier foreign-key index as a performance advisory; no new anonymous-execution warning was introduced for the two new RPCs.
 
 - Spotter antenna correction: the Owner clarified the component is the antenna on top, not an unidentified top-mounted component.
+
+
+## Mobile UI correction (2026-09-19)
+
+- OnSite Vision now constrains the main conversation grid to the actual iPhone visual viewport height. The conversation thread owns vertical scrolling and remains scrollable above the fixed composer.
+- Owner Live Job Progress now receives a real summary/body immediately, before live data finishes loading. If an empty legacy Live Job Progress element is found, it is rehydrated rather than skipped, preventing Safari from displaying its browser-generated `Details` row.
+- Release identifiers: technician `release-qa-v124`, loader `startup-fast-v38`, Vision `vision-workspace-v17`, service worker `tech-check-field-shell-v81`.
+- Regression QA count: 100.
