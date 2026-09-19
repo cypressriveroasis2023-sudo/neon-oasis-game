@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v107",
-  "service_worker": "v53",
-  "generated_for": "Monday release readiness",
+  "runtime_version": "release-qa-v118",
+  "service_worker": "v70",
+  "generated_for": "OnSite Vision company knowledge/workflow engine foundation",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -658,8 +658,8 @@
         "Background and reopen"
       ],
       "expected": [
-        "v53 cached shell loads without AccessDenied",
-        "release-qa-v107 AI-assisted solar tag verification appears on supported unit/return photos",
+        "v70 cached shell loads without AccessDenied",
+        "release-qa-v118 AI-assisted solar tag verification appears on supported unit/return photos",
         "Tesseract/OCR remains lazy-loaded and does not block startup"
       ],
       "manual_device": true
@@ -983,7 +983,7 @@
         "Inspect cache version and precache requests"
       ],
       "expected": [
-        "v50 caches shell",
+        "v70 caches shell",
         "Core app module is pre-cached",
         "Deferred workflow module is pre-cached",
         "Owner email settings and styles are best-effort pre-cached"
@@ -1126,7 +1126,64 @@
         "Tesseract is not service-worker precached",
         "OCR module is dynamically imported only by tag-photo scan helper"
       ]
+    },
+    {
+      "id": "VISION-ARCH-01",
+      "area": "OnSite Vision Architecture",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Shared Company Knowledge Layer is loaded before Vision",
+      "steps": [
+        "Inspect onsite-vision.html script order",
+        "Inspect onsite-vision-company-knowledge.js",
+        "Verify existing database triggers/RPCs remain authoritative"
+      ],
+      "expected": [
+        "Company Knowledge loads before Workflow Engine and Vision workspace",
+        "Known equipment definitions include Helios, Solar Spotter, Ranger, Sniper, Spotter, Recon II and support stands/poles",
+        "Partially documented products explicitly list unknowns rather than inventing technical details",
+        "Knowledge module has no Supabase write operations"
+      ]
+    },
+    {
+      "id": "VISION-ARCH-02",
+      "area": "OnSite Vision Architecture",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Guided work-order questions use shared Workflow Engine",
+      "steps": [
+        "Inspect draftStepKeys, draftMissingKey and draftQuestion in onsite-vision.js",
+        "Inspect onsite-vision-workflow-engine.js",
+        "Create a non-submitted sample Delivery draft"
+      ],
+      "expected": [
+        "Question order comes from shared engine when available",
+        "Fallback remains available if engine fails to load",
+        "Draft validation blocks create when required fields or known workflow rules are invalid",
+        "No production job is created during this source/manual test"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-ARCH-03",
+      "area": "OnSite Vision Architecture",
+      "role": "all",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Production backend baseline is source controlled",
+      "steps": [
+        "Inspect tech-checks/supabase/database.types.ts",
+        "Inspect PRODUCTION_BASELINE_2026-09-19.md",
+        "Compare critical live RPC/trigger names used by Helios, solar checkout, returns and spares"
+      ],
+      "expected": [
+        "Generated database types reflect live Supabase tables/RPCs",
+        "Baseline records production migration count and critical server-side safeguards",
+        "No database gate was removed or weakened by the knowledge-engine foundation"
+      ]
     }
   ],
-  "last_release_qa_note": "Finalized AI-assisted solar tag verification: scan state resets if unit/type changes, Help explains MATCH/MISMATCH/UNREADABLE behavior, clear mismatch cannot be manually approved, and OCR remains lazy-loaded."
+  "last_release_qa_note": "Phase 1 foundation: source-controlled live Supabase baseline, Company Knowledge Layer v1, Workflow Engine v1, Vision guided drafts now consume the shared engine with fallback, and SW v70 precaches the new modules. No production database gate was removed."
 }
