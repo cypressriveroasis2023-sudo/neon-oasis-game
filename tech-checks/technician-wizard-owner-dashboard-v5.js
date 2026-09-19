@@ -632,7 +632,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
-    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>At the Ticket Summary, use <b>Truck Spares / Backups</b> when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Add any spare Solar Spotter, Ranger, Helios, or Recon II batteries and mark them physically present, charged, and READY before handoff.</p>` },
+    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>At the Ticket Summary, use <b>Truck Spares / Backups</b> when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete hardware/deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Add any spare Solar Spotter, Ranger, Helios, or Recon II batteries and mark them physically present, charged, and READY before handoff.</p>` },
     { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, create the handoff to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for tagged equipment returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help Center</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
@@ -2271,15 +2271,17 @@ function itUnitStepsData(item, unitNo) {
       if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     }
 
-    steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
-    if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
+    if (item.purpose === 'DELIVERY') {
+      steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
+      if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
+    }
 
     if (item.equipment_type === 'Helios') {
       steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `After confirming recording, are all 3 of the 1TB SD cards in ${identity} formatted and ready?` });
     } else {
       steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
     }
-    steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
+    if (item.purpose === 'DELIVERY') steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
 
     // Keep these as the final two IT checks before photo, signature, and review.
     steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
@@ -2300,7 +2302,9 @@ function itUnitReady(item) {
   if (!['DELIVERY','BACKUP'].includes(item.purpose)) return true;
   if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok && item.helios_ptz_ports_ok && item.helios_speaker_ports_ok)) return false;
   const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
-  return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
+  const hardwareReady = Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady);
+  if (item.purpose === 'BACKUP') return hardwareReady;
+  return Boolean(hardwareReady && item.delivery_customer_email_app_ok && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
 }
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
@@ -2429,7 +2433,7 @@ function truckSpareITPanelHtml(rows,items) {
   return `<div class='wl-question top10' data-wl-truck-spares-it>
     <div class='qnum'>TRUCK SPARES / BACKUPS</div>
     <div class='qtext'>Contingency equipment for this Service call</div>
-    <div class='small'>These are <b>not</b> extra customer/job requirements. They ride in the truck in case Service needs an emergency swap. BACKUP units receive full deploy-ready IT checks, photo and signature. Service must resolve every spare after the call.</div>
+    <div class='small'>These are <b>not</b> extra customer/job requirements. They ride in the truck in case Service needs an emergency swap. BACKUP units receive full hardware/deploy-ready IT checks, photo and signature. Service must resolve every spare after the call.</div>
     <div class='top10'><b>Spare Units</b></div>
     ${backupHtml}
     <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II battery/camera sets<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
