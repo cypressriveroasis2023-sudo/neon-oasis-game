@@ -438,8 +438,12 @@ async function openTechMenu() {
         <span><b>Refresh Tech Check</b><small>Reload the latest assignments, equipment, and workflow status.</small></span>
         <strong>›</strong>
       </button>
+      ${role === 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-ai-dispatch>
+        <span class='wl-app-menu-icon'>✨</span>
+        <span><b>Owner AI Dispatch</b><small>Type or dictate a job, build the Tech Check draft, then review before sending.</small></span>
+        <strong>›</strong>
+      </button>` : ''}
     </div>
-    ${role === 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-ai-dispatch><span><b>✨ Owner AI Dispatch</b><small>Type or dictate a job, build the Tech Check draft, then review before sending.</small></span></button>` : ''}
   `;
   panel.classList.remove('hidden');
 }
