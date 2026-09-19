@@ -838,7 +838,7 @@ function helpStepGuide(role, step){
         'Connect the solar panel + batteries + MPPT and confirm active charging.',
         'Upload the stand-tag photo and MPPT / charging readings before Service sign-off.'
       ],
-      selector:'#wlSvcSolarStandTag'
+      selector:"[data-wl-save-service-solar]"
     },
     'service:FIELD WORK':{
       steps:[
@@ -857,7 +857,7 @@ function helpStepGuide(role, step){
         'Take / upload the required return photos.',
         'Submit the return so IT can receive it through Intake.'
       ],
-      selector:"[data-wl-svc='returns']"
+      selector:"[data-wl-service-return]"
     },
     'service:DAILY TOOLS':{
       steps:[
