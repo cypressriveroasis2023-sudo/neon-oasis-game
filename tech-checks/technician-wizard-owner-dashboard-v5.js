@@ -4780,10 +4780,22 @@ function ownerAIResponseBox() {
 function ownerAIConversationClear() {
   ownerAIConversationTurns=[];
   ownerAIAssistantLastJobs=[];
+  ownerAIDispatchPrepared=false;
+  ownerAIDispatchLastParse=null;
+  ownerAIActiveResponseBox=null;
   const host=document.getElementById('ownerAIConversation');
   if(host) host.innerHTML=ownerAIConversationMarkup();
   const input=document.getElementById('ownerAIDispatchPrompt');
   if(input) input.value='';
+}
+function ownerAIShouldApplyDraftCorrection(raw) {
+  if(!ownerAIDispatchPrepared)return false;
+  const parsed=ownerAIParseDispatch(raw);
+  const explicitDraft=/\b(draft|new\s+(?:ticket|job)|this\s+(?:draft|ticket|job)|that\s+(?:draft|ticket|job))\b/i.test(raw);
+  const discussingExisting=ownerAIAssistantLastJobs.length>0;
+  const directExisting=Boolean(parsed.ticket_no||parsed.unit_hint);
+  if(!explicitDraft && (directExisting||discussingExisting)) return false;
+  return true;
 }
 function ownerAIConversationDraftCorrection(raw) {
   if(!ownerAIDispatchPrepared)return null;
@@ -5316,7 +5328,8 @@ async function ownerAIDispatchBuild() {
   const status=document.getElementById('ownerAIDispatchVoiceStatus');
   if(status)status.textContent='';
   try{
-    const correction=ownerAIConversationDraftCorrection(raw);
+    const intent=ownerAIAssistantIntent(raw);
+    const correction=ownerAIShouldApplyDraftCorrection(raw) ? ownerAIConversationDraftCorrection(raw) : null;
     if(correction){
       response.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Got it — I changed the draft</b></span></div><span class='wl-ai-state ready'>UPDATED</span></div>"
         +"<div class='wl-ai-good'><b>✓ "+esc(correction.join(' · '))+"</b></div>"
@@ -5327,7 +5340,7 @@ async function ownerAIDispatchBuild() {
       ownerAIDispatchRender(ownerAIDispatchLastParse||{warnings:[]});
       ownerAIReview();
       ownerAIActiveResponseBox=response;
-    } else if(ownerAIAssistantIntent(raw)==='draft'){
+    } else if(intent==='draft'){
       const parsed=ownerAIParseDispatch(raw);
       ownerAIDispatchApply(parsed);
       ownerAIDispatchPrepared=true;
