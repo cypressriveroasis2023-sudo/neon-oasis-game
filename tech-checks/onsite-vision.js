@@ -66,10 +66,18 @@ function ensureChat(){
   c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',messages:[]};
   state.chats.unshift(c);state.chatId=c.id;saveChats();renderHistory();return c;
 }
-function newChat(){
+async function newChat(){
+  const previous=chat();
+  clearTimeout(conversationSyncTimer);
+  if(previous&&persistenceReady&&db){
+    try{await visionPersistence()?.save?.(previous);}
+    catch(error){console.warn('Vision previous conversation save',error);}
+  }
   state.currentTicket='';
   const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',messages:[]};
-  state.chats.unshift(c);state.chatId=c.id;saveChats();renderHistory();renderThread();renderOrder();closeDrawers();$('visionPrompt')?.focus();
+  state.chats.unshift(c);state.chats=state.chats.slice(0,20);state.chatId=c.id;
+  saveChats();renderHistory();renderThread();renderOrder();closeDrawers();
+  const prompt=$('visionPrompt');if(prompt){prompt.value='';grow(prompt);}
 }
 function openChat(chatId){
   const c=state.chats.find(x=>x.id===chatId);if(!c)return;
@@ -1055,7 +1063,6 @@ function syncVisualViewport(){
   const root=document.documentElement;
   const composer=document.querySelector('.vision-composer-wrap');
   root.style.setProperty('--vision-composer-space',Math.ceil(composer?.getBoundingClientRect().height||92)+'px');
-  root.style.setProperty('--vision-viewport-height',Math.max(1,Math.round(vv?.height||window.innerHeight||document.documentElement.clientHeight))+'px');
   if(!vv){root.style.setProperty('--vision-visual-bottom','0px');return;}
   const layoutH=document.documentElement.clientHeight||window.innerHeight||vv.height;
   const offset=Math.max(0,layoutH-vv.height-vv.offsetTop);
