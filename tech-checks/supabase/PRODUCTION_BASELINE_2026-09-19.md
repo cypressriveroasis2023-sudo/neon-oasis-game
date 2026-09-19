@@ -186,3 +186,40 @@ Security and behavior:
 - The client shows **AI LIVE** only when the authenticated agent status endpoint confirms model configuration; otherwise it shows **DATA LIVE**.
 
 This phase does not add autonomous writes.
+
+
+## Phase 4 confirmed action + audit layer
+
+Production now has **76 recorded migrations**.
+
+New table:
+
+- `vision_action_audit`
+
+New owner-gated RPCs:
+
+- `vision_prepare_action_v1`
+- `vision_execute_action_v1`
+- `vision_cancel_action_v1`
+
+Action safety contract:
+
+- The AI model still has **no write tool**.
+- AI/user intent is first canonicalized into a proposed action.
+- Preparing an action records the request, canonical payload, validation result, and a before-state snapshot.
+- Supported one-click execution currently covers assignment/reassignment, schedule changes, cancellation of one unambiguous active assignment, and Owner final Helios verification.
+- Execution occurs only after explicit Owner confirmation.
+- Successful execution records the after-state.
+- Failed execution records the authoritative database error and leaves the job gated by the existing workflow rules.
+- Handoff, return, check-in, checkout, generic completion, and verification requests remain guided workflows when required evidence/checklist detail is not already sufficient.
+- `vision_action_audit` has RLS enabled.
+- Authenticated users have direct **SELECT only** on the audit table; all mutations are restricted to the owner-gated RPCs.
+- Anonymous users cannot execute the action RPCs.
+
+Production QA verified that attempting Owner final approval on MHelpDesk #22712 was rejected by the existing Helios rule with:
+
+`Service has not submitted the Helios field installation`
+
+The action was recorded as `failed`, the before-state was preserved, and the operational job remained unchanged.
+
+A second QA proposal for assigning #22712 to the Service department was successfully canonicalized and then cancelled before execution, proving prepare/cancel behavior without changing the operational assignment.
