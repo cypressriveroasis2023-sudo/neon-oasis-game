@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v33';
+const CACHE_NAME = 'tech-check-field-shell-v34';
 const APP_SHELL = './';
 
 self.addEventListener('install', event => {
@@ -24,13 +24,26 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        if (response.ok) { const cache=await caches.open(CACHE_NAME); cache.put(APP_SHELL,response.clone()).catch(() => {}); return response; }
-      } catch (error) { console.warn('Navigation network request failed; using cached Tech Check shell', error); }
       const cachedShell = await caches.match(APP_SHELL, { ignoreSearch: true });
-      if (cachedShell) return cachedShell;
-      return fetch(APP_SHELL, { cache: 'reload' });
+      const network = fetch(request)
+        .then(async response => {
+          if (response.ok) {
+            const cache=await caches.open(CACHE_NAME);
+            cache.put(APP_SHELL,response.clone()).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => null);
+
+      // Installed/Home Screen launches should paint from cache immediately.
+      if (cachedShell) {
+        event.waitUntil(network);
+        return cachedShell;
+      }
+
+      const response = await network;
+      if (response) return response;
+      return fetch(APP_SHELL, { cache:'reload' });
     })());
     return;
   }
