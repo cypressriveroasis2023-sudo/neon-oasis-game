@@ -4877,7 +4877,8 @@ function ownerAIDateFromText(text) {
 function ownerAITimeFromText(text) {
   const raw=String(text||'');
   let m=raw.match(/\b(?:at|for)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
-  if(!m) m=raw.match(/\b(?:at|for)\s*(\d{1,2}):(\d{2})\b/i);
+  if(!m) m=raw.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
+  if(!m) m=raw.match(/\b(?:at|for|to)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i);
   if(!m) return '';
   let h=Number(m[1]||0), min=Number(m[2]||0);
   const mer=String(m[3]||'').toLowerCase().replace(/\./g,'');
@@ -5153,7 +5154,10 @@ function ownerAIDispatchRender(parsed) {
 function ownerAIAssistantIntent(text) {
   const raw=String(text||'').trim();
   const hasScheduleValue=Boolean(ownerAIDateFromText(raw)||ownerAITimeFromText(raw));
-  const scheduleChange=hasScheduleValue && /\b(put|set|change|update|move|reschedule|schedule|make)\b[\s\S]{0,60}\b(date|time|delivery|pickup|swap|service|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow)\b/i.test(raw);
+  const scheduleVerb=/\b(put|set|change|update|move|reschedule|schedule|make)\b/i.test(raw);
+  const explicitScheduleWord=/\b(date|time|delivery|pickup|swap|service|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow)\b/i.test(raw);
+  const conversationalSchedule=/\b(?:put|set|change|update|move|make)\s+(?:it|that|this)(?:\s+(?:to|for))?\b/i.test(raw);
+  const scheduleChange=hasScheduleValue && scheduleVerb && (explicitScheduleWord||conversationalSchedule);
   if(scheduleChange) return 'schedule';
   const explicitCreate=/\b(create|make|start|set\s*up|setup|add|prepare|build)\b[\s\S]{0,40}\b(?:new\s+)?(?:tech\s*check|ticket|job|assignment)\b/i.test(raw)
     || /\b(create|make|start|set\s*up|setup)\b[\s\S]{0,30}\b(delivery|pickup|swap|service)\b/i.test(raw)
