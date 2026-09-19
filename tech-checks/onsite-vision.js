@@ -327,7 +327,15 @@ function draftAssignmentText(d){
   }
   return out.join(' · ')||'—';
 }
-function draftStepKeys(){return ['work_type','ticket_no','site','scheduled_for','scheduled_time','equipment_manifest','equipment_numbers','job_description','parts','assignment','notes'];}
+function visionWorkflowEngine(){return window.OnSiteVisionWorkflowEngine||null;}
+function draftStepKeys(d={}){
+  const engine=visionWorkflowEngine();
+  if(engine?.getRequiredFields){
+    const fields=engine.getRequiredFields(d.work_type,d.equipment_manifest);
+    if(Array.isArray(fields)&&fields.length)return fields;
+  }
+  return ['work_type','ticket_no','site','scheduled_for','scheduled_time','equipment_manifest','equipment_numbers','job_description','parts','assignment','notes'];
+}
 function draftChoiceHtml(key,d){
   if(key==='work_type')return '<div class="vision-draft-choices">'+['Delivery','Pickup','Swap','Service'].map(v=>'<button type="button" data-vision-prompt="'+v+'">'+v+'</button>').join('')+'</div>';
   if(key==='scheduled_for')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="Today">Today</button><button type="button" data-vision-prompt="Tomorrow">Tomorrow</button><button type="button" data-vision-prompt="Monday">Monday</button><button type="button" data-vision-prompt="Tuesday">Tuesday</button></div>';
@@ -347,6 +355,11 @@ function draftChoiceHtml(key,d){
 }
 
 function draftMissingKey(d){
+  const engine=visionWorkflowEngine();
+  if(engine?.getMissingFields){
+    const missing=engine.getMissingFields(d||{});
+    if(Array.isArray(missing))return missing[0]||'';
+  }
   if(!d.work_type)return'work_type';
   if(!d.ticket_no)return'ticket_no';
   if(!d.site)return'site';
@@ -363,6 +376,11 @@ function draftMissingKey(d){
   return'';
 }
 function draftQuestion(key,d){
+  const engine=visionWorkflowEngine();
+  if(engine?.getNextBestQuestion){
+    const q=engine.getNextBestQuestion(d||{});
+    if(q?.key===key&&q?.prompt)return q.prompt;
+  }
   if(key==='work_type')return'What kind of work order are we creating?';
   if(key==='ticket_no')return'What is the MHelpDesk ticket number?';
   if(key==='site')return'What customer or site is listed on the MHelpDesk ticket?';
@@ -450,6 +468,12 @@ function continueDraft(text){
   return draftResponseHtml(d,false);
 }
 async function createDraftJob(d){
+  const engine=visionWorkflowEngine();
+  if(engine?.validateDraft){
+    const check=engine.validateDraft(d||{});
+    if(check?.errors?.length)throw new Error(check.errors.join(' '));
+    if(check?.missing?.length)throw new Error('The work order is missing required information: '+check.missing.join(', ')+'.');
+  }
   const duplicate=state.jobs.find(j=>j.status!=='completed'&&String(j.ticket_no||'')===String(d.ticket_no));
   if(duplicate){state.currentTicket=String(d.ticket_no);const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();return '<div class="vision-direct warn"><b>That Tech Check job already exists.</b>I did not create a duplicate. I opened the existing MHelpDesk #'+esc(d.ticket_no)+' job instead.</div>'+jobCard(d.ticket_no);}
   const roles=d.role==='it_service'?['it','service']:d.role==='service_it'?['service','it']:d.role?[d.role]:[d.work_type==='service'?'service':'it'],ids=[],parts=d.parts||{};
