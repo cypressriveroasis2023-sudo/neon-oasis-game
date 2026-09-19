@@ -767,6 +767,9 @@
     data.shared_it_intake_checklist=shared.itIntakeChecklist?[...shared.itIntakeChecklist]:[];
     if(data.equipment.Helios)data.equipment.Helios.shared_field_install_checklist=data.shared_helios_field_install;
     if(data.workflows?.intake)data.workflows.intake.shared_checklist=data.shared_it_intake_checklist;
+    if(data.truck_spares&&shared.truckSpareRules){
+      data.truck_spares.shared_rules=shared.truckSpareRules;
+    }
     data.shared_service_rules={
       solar_spotter_delivery:shared.automaticServiceSolarPlan
         ? shared.automaticServiceSolarPlan([{category:'device',label:'Solar Spotter',qty:1}],'delivery')
