@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v104",
-  "service_worker": "v50",
+  "runtime_version": "release-qa-v105",
+  "service_worker": "v51",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,9 +658,9 @@
         "Background and reopen"
       ],
       "expected": [
-        "v50 cached shell loads without AccessDenied",
-        "release-qa-v104 loads core UI before the large workflow module",
-        "No stale v103 workflow after refresh/background cycle"
+        "v51 cached shell loads without AccessDenied",
+        "release-qa-v105 final IT review is separated from Parts and Truck Spares",
+        "No stale v104 blended Ticket Summary after refresh/background cycle"
       ],
       "manual_device": true
     },
@@ -988,7 +988,76 @@
         "Deferred workflow module is pre-cached",
         "Owner email settings and styles are best-effort pre-cached"
       ]
+    },
+    {
+      "id": "IT-14",
+      "area": "IT",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Final Ticket Summary is a clean review page",
+      "steps": [
+        "Finish the last required IT unit",
+        "Open Ticket Summary"
+      ],
+      "expected": [
+        "Ticket Summary shows ticket/customer, required equipment and completed unit cards",
+        "Parts inputs are not rendered directly on the review page",
+        "Truck-spare quantity forms are not rendered directly on the review page",
+        "Handoff action remains on the review page"
+      ]
+    },
+    {
+      "id": "IT-15",
+      "area": "IT",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Adjust Parts opens a separate page and returns to review",
+      "steps": [
+        "From Ticket Summary tap Adjust Parts",
+        "Edit/save additional loose parts"
+      ],
+      "expected": [
+        "Additional-parts inputs render on their own page",
+        "Save returns to Ticket Summary",
+        "Normal unit components are described as belonging in the unit checklist",
+        "No user-facing Replacement labels appear in this flow"
+      ]
+    },
+    {
+      "id": "IT-16",
+      "area": "IT",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Manage Truck Spares opens a separate page",
+      "steps": [
+        "From Ticket Summary tap Manage Truck Spares",
+        "Add/check out spare as needed",
+        "Tap Ticket Summary"
+      ],
+      "expected": [
+        "Truck-spare controls render on their own page",
+        "Main required-equipment summary is not mixed into the spare form",
+        "Returning to Ticket Summary restores the clean review page"
+      ]
+    },
+    {
+      "id": "HELP-04",
+      "area": "Help",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Help matches separated final review flow",
+      "steps": [
+        "Open IT Help for Truck Spares"
+      ],
+      "expected": [
+        "Help tells IT to use Manage Truck Spares from Ticket Summary",
+        "Show Me remains non-destructive"
+      ]
     }
   ],
-  "last_release_qa_note": "Startup performance release: heavy workflow module lazy-loads after first paint, workflow reuses the core Supabase client, initial data hydration is bounded/coalesced, and SW v50 pre-caches deferred assets."
+  "last_release_qa_note": "IT final review is now a dedicated Ticket Summary screen. Parts and Truck Spares open as separate subpages and return to review; generic user-facing part labels use Additional rather than Replacement."
 }
