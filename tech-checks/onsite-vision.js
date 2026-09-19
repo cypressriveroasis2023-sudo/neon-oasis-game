@@ -68,8 +68,14 @@ async function init(){
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
   const q=new URLSearchParams(location.search).get('ticket');
   if(q){
-    const c=ensureChat();state.currentTicket=String(q);c.ticket=state.currentTicket;
-    if(!c.messages.length){c.title='MHelpDesk #'+q;c.messages.push({role:'assistant',text:'',html:ticketAnswer(q,'I opened this service order for you. Ask who has it, what happens next, or tell me what you want changed.'),at:now()});saveChats();}
+    let c=state.chats.find(row=>String(row.ticket||'')===String(q));
+    if(!c){
+      c={id:id(),title:'MHelpDesk #'+q,createdAt:now(),updatedAt:now(),ticket:String(q),messages:[]};
+      state.chats.unshift(c);
+    }
+    state.chatId=c.id;state.currentTicket=String(q);c.ticket=state.currentTicket;
+    if(!c.messages.length)c.messages.push({role:'assistant',text:'',html:ticketAnswer(q,'I opened this service order for you. Ask who has it, what happens next, or tell me what you want changed.'),at:now()});
+    saveChats();
   }else state.currentTicket=chat()?.ticket||'';
   renderHistory();renderThread();renderOrder();$('visionLoading').classList.add('hidden');$('visionApp').classList.remove('hidden');state.loaded=true;setTimeout(()=>bottom(false),30);
 }
@@ -79,7 +85,7 @@ function renderHistory(){
   if($('visionConversationTitle'))$('visionConversationTitle').textContent=chat()?.title||'New conversation';
 }
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Where Tech Check comes together.</h1><p>Ask about a ticket, unit, technician, schedule, or what should happen next. When you want to change something, Vision prepares the action and lets you confirm it.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me ticket 22712">Open ticket 22712</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Where Tech Check comes together.</h1><p>Ask about a ticket, unit, technician, schedule, or what should happen next. When you want to change something, Vision prepares the action and lets you confirm it.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -188,6 +194,10 @@ async function answer(text){
   if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
   const d=dateFrom(raw);
   if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return dateJobs(d);
+  if(/\b(active jobs?|open jobs?|show me my active jobs?|current jobs?)\b/i.test(lower)){
+    const all=[...new Set(state.jobs.filter(j=>j.status!=='completed').map(j=>String(j.ticket_no||'')))].filter(Boolean);
+    return all.length?'<div class="vision-answer-title">'+all.length+' active Tech Check job'+(all.length===1?'':'s')+'</div>'+all.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No active Tech Check jobs are open right now.</div>';
+  }
   if(/\b(needs? attention|attention|stuck|overdue|problem jobs?)\b/i.test(lower)){
     const all=[...new Set(state.jobs.filter(j=>j.status!=='completed').map(j=>String(j.ticket_no||'')))].filter(Boolean),flag=all.filter(t=>{const p=prep(t),a=active(t);return a.some(x=>x.requires_it_handoff)&&(!p||!['released','closed'].includes(p.status));});
     return flag.length?'<div class="vision-answer-title">'+flag.length+' job'+(flag.length===1?'':'s')+' need workflow attention</div>'+flag.slice(0,10).map(jobCard).join(''):'<div class="vision-answer-title">No handoff blockers are showing right now.</div>';
