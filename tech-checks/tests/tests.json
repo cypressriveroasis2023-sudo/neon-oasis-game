@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v118",
-  "service_worker": "v71",
-  "generated_for": "OnSite Vision company knowledge + live job context foundation",
+  "service_worker": "v72",
+  "generated_for": "OnSite Vision knowledge + live context + protected server agent foundation",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -1245,7 +1245,87 @@
         "Write actions still require the existing confirmation/action paths"
       ],
       "manual_device": true
+    },
+    {
+      "id": "VISION-AGENT-01",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "source+edge",
+      "destructive": false,
+      "scenario": "Protected read-only agent Edge Function is deployed",
+      "steps": [
+        "Inspect onsite-vision-agent deployment",
+        "Confirm verify_jwt=true",
+        "Inspect source tools and action safety instructions"
+      ],
+      "expected": [
+        "Edge Function is ACTIVE",
+        "JWT verification is enabled",
+        "Agent has read-only tools only",
+        "No SQL or mutation tool is exposed to the model",
+        "Write requests return proposed_action rather than executing production changes"
+      ]
+    },
+    {
+      "id": "VISION-AGENT-02",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Client prefers server AI and safely falls back",
+      "steps": [
+        "Open OnSite Vision as Owner",
+        "Inspect AI/data status badge",
+        "Ask a natural operational question",
+        "Temporarily verify behavior when agent model is unavailable"
+      ],
+      "expected": [
+        "AI LIVE appears only when server reports a configured model credential",
+        "DATA LIVE appears when Tech Check data is live but model is not configured",
+        "Agent failure does not break the conversation",
+        "Existing deterministic Vision logic remains the fallback"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-AGENT-03",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Natural technical questions are grounded in company knowledge",
+      "steps": [
+        "Ask: What ports should be open on a Helios PTZ?",
+        "Ask: What batteries go with a Solar Spotter?",
+        "Ask about an undocumented technical detail for a partially documented product"
+      ],
+      "expected": [
+        "Agent calls company knowledge tool before answering",
+        "Helios PTZ answer is grounded in Cameras On Site rules",
+        "Solar Spotter answer uses the documented Service battery configurations",
+        "Undocumented details are labeled MISSING INFORMATION rather than invented"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-AGENT-04",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Natural write request becomes a proposed action",
+      "steps": [
+        "Open a known service order",
+        "Ask naturally to assign or reschedule it",
+        "Inspect the proposed action"
+      ],
+      "expected": [
+        "Server agent does not mutate the database",
+        "Client converts supported assignment/schedule proposals into existing confirmation cards",
+        "No success claim occurs before the approved write path confirms database success"
+      ],
+      "manual_device": true
     }
   ],
-  "last_release_qa_note": "Phase 2: live read-only get_tech_check_job_context_v1 RPC, Live Data Layer v1, Workflow Engine v2, Vision v11, SW v71. Existing write confirmations and database gates remain unchanged."
+  "last_release_qa_note": "Phase 3: authenticated read-only onsite-vision-agent Edge Function v2, GPT-5.6 Sol default when OPENAI_API_KEY is configured, strict tool calling/structured output, client AI-first with deterministic fallback, Vision v12, SW v72."
 }
