@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 let db=null;
-const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false};
+const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown'};
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -44,6 +44,87 @@ function titleFrom(text){
   const c=ensureChat();if(c.title!=='New conversation')return;
   const clean=String(text||'').replace(/\s+/g,' ').trim();c.title=clean.length>42?clean.slice(0,39)+'...':clean;saveChats();
 }
+function plainHtml(html){
+  if(!html)return'';
+  const node=document.createElement('div');node.innerHTML=String(html);
+  return String(node.textContent||node.innerText||'').replace(/\s+/g,' ').trim();
+}
+function agentHistory(currentText=''){
+  const rows=(chat()?.messages||[]).slice(-12).map(m=>({
+    role:m.role,
+    content:m.role==='assistant'?plainHtml(m.html||m.text):String(m.text||'').trim()
+  })).filter(m=>m.content);
+  if(rows.length&&rows[rows.length-1].role==='user'&&rows[rows.length-1].content===String(currentText||'').trim())rows.pop();
+  return rows.slice(-10);
+}
+async function callVisionAgent(text){
+  if(state.agentStatus==='unavailable'||!db)return null;
+  try{
+    const result=await db.functions.invoke('onsite-vision-agent',{body:{
+      message:String(text||'').trim(),
+      active_ticket:state.currentTicket||'',
+      history:agentHistory(text)
+    }});
+    if(result.error||!result.data?.ok){
+      const code=result.data?.code||'';
+      if(code==='OPENAI_API_KEY_MISSING')state.agentStatus='unavailable';
+      return null;
+    }
+    state.agentStatus='online';
+    return result.data;
+  }catch(error){
+    console.warn('OnSite Vision server agent fallback',error);
+    return null;
+  }
+}
+function agentFactsHtml(facts=[]){
+  if(!Array.isArray(facts)||!facts.length)return'';
+  return '<div class="vision-agent-facts">'+facts.slice(0,8).map(f=>'<div><small>'+esc(f.certainty||'')+'</small><span>'+esc(f.statement||'')+'</span></div>').join('')+'</div>';
+}
+function agentProposalHtml(p){
+  if(!p||p.type==='none')return'';
+  return '<div class="vision-action-card"><small>PROPOSED ACTION</small><b>'+esc(p.summary||String(p.type||'').replaceAll('_',' '))+'</b><p>Vision has not changed Tech Check yet.</p></div>';
+}
+async function serverAgentAnswer(raw){
+  const result=await callVisionAgent(raw);
+  if(!result)return null;
+
+  if(result.active_ticket){
+    state.currentTicket=String(result.active_ticket);
+    const current=ensureChat();current.ticket=state.currentTicket;saveChats();renderOrder();
+  }
+
+  const p=result.proposed_action||{type:'none'};
+  if(p.type==='create_job'){
+    const seeded=[p.work_type||'',raw].filter(Boolean).join(' ');
+    return startDraft(seeded);
+  }
+
+  let html='<div class="vision-agent-answer">'+esc(result.answer||'').replace(/\n/g,'<br>')+'</div>'+agentFactsHtml(result.facts||[]);
+  const ticket=String(p.ticket_no||result.active_ticket||state.currentTicket||'');
+
+  if(p.type==='assign'&&ticket){
+    const role=String(p.role||'').toLowerCase();
+    const normalizedRole=role.includes('service')?'service':role.includes('it')?'it':'';
+    const techName=String(p.technician_name||'').trim();
+    if(normalizedRole){
+      const tech=techName?findTech(techName,normalizedRole):null;
+      if(techName&&tech)html+='<div class="vision-answer-title">I prepared the assignment.</div>'+actionCard({kind:'assign-tech',role:normalizedRole,tech},ticket);
+      else if(techName&&!tech)html+='<div class="vision-direct warn"><b>MISSING INFORMATION</b>I understood the requested technician as '+esc(techName)+', but I could not match that name to an active '+esc(normalizedRole.toUpperCase())+' technician.</div>'+actionCard({kind:'choose-tech',role:normalizedRole},ticket);
+      else html+=actionCard({kind:'choose-tech',role:normalizedRole},ticket);
+      return html;
+    }
+  }
+
+  if(p.type==='schedule'&&ticket&&(p.date||p.time)){
+    html+='<div class="vision-answer-title">I prepared the schedule change.</div>'+actionCard({kind:'schedule',date:p.date||'',time:p.time||''},ticket);
+    return html;
+  }
+
+  if(p.type!=='none')html+=agentProposalHtml(p);
+  return html;
+}
+
 async function loadData(){
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='SYNC';
   const [jobs,preps,techs]=await Promise.all([
@@ -601,8 +682,18 @@ function who(ticket){
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   const current=chat();
-  if(current?.draft)return continueDraft(raw);
+  if(current?.draft){
+    const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
+    if(sideQuestion){
+      const side=await serverAgentAnswer(raw);
+      if(side)return side;
+    }
+    return continueDraft(raw);
+  }
   if(isCreateRequest(raw))return startDraft(raw);
+
+  const agentReply=await serverAgentAnswer(raw);
+  if(agentReply)return agentReply;
 
   const hint=unitHint(raw);let ticket=ticketFrom(raw)||ticketByUnit(hint);
   if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
