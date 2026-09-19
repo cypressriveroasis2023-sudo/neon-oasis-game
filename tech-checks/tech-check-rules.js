@@ -1,5 +1,5 @@
 /* Cameras On Site — Shared Tech Check Rules
- * Version: rules-v1
+ * Version: rules-v3
  * Pure rule definitions shared by Owner/IT/Service UI and OnSite Vision.
  * Supabase RPCs/triggers remain the final authority for production transitions.
  */
@@ -7,7 +7,7 @@
   'use strict';
 
   const EQUIPMENT=Object.freeze({
-    'Sniper':Object.freeze({category:'device',required_batteries:2,purposes:['DELIVERY','SWAP','BACKUP']}),
+    'Sniper':Object.freeze({category:'device',required_batteries:2,battery_label:'12V 35Ah batteries',purposes:['DELIVERY','SWAP','BACKUP']}),
     'Ranger':Object.freeze({category:'device',required_batteries:1,battery_label:'LiTime 12V 110Ah',purposes:['DELIVERY','SWAP','BACKUP']}),
     'Helios':Object.freeze({category:'device',required_batteries:1,battery_label:'single internal Helios battery box',purposes:['DELIVERY','SWAP','BACKUP']}),
     'Solar Spotter':Object.freeze({category:'device',required_batteries:0,purposes:['DELIVERY','SWAP','BACKUP']}),
@@ -54,6 +54,28 @@
     camera2:Object.freeze([81,554,1500]),
     ptz:Object.freeze([81,554,1600]),
     speaker:Object.freeze([81,554,1700])
+  });
+
+  const TRUCK_SPARE_BATTERY_OPTIONS=Object.freeze([
+    Object.freeze({key:'spotter-agm',equipment_type:'Solar Spotter',battery_type:'AGM 12V 110Ah',label:'Solar Spotter · AGM 12V 110Ah'}),
+    Object.freeze({key:'spotter-350',equipment_type:'Solar Spotter',battery_type:'12V 350Ah',label:'Solar Spotter · 12V 350Ah'}),
+    Object.freeze({key:'ranger-litime',equipment_type:'Ranger',battery_type:'LiTime 12V 110Ah',label:'Ranger · LiTime 12V 110Ah'}),
+    Object.freeze({key:'helios-box',equipment_type:'Helios',battery_type:'Helios Battery Box',label:'Helios · Battery Box'}),
+    Object.freeze({key:'recon-battery',equipment_type:'Recon 2',battery_type:'Recon II Battery',label:'Recon II · Spare Battery'})
+  ]);
+  const TRUCK_SPARE_RULES=Object.freeze({
+    unit_types:DEVICE_TYPES,
+    unit_purpose:'BACKUP',
+    battery_options:TRUCK_SPARE_BATTERY_OPTIONS,
+    battery_batch_statuses:Object.freeze(['prepared','in_truck','resolved']),
+    unit_outcomes:Object.freeze(['used','returned_unused']),
+    it_unit_checkout_required:true,
+    battery_ready_required:true,
+    it_battery_checkout_required:true,
+    manifest_rule:'Truck spares stay separate from the customer/job equipment manifest.',
+    unused_unit_rule:'Unused truck spare units return directly to Shop Inventory and do not create an IT Intake return.',
+    used_unit_rule:'If a spare unit is used for a swap, return the failed/replaced field unit through the normal Service Return → IT Intake flow.',
+    battery_resolution_rule:'Service records the quantity used; any remainder is returned unused.'
   });
 
   function text(v){return String(v??'').trim();}
@@ -300,12 +322,14 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v2',
+    version:'rules-v3',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
     standTypes:STAND_TYPES,
     heliosPorts:HELIOS_PORTS,
+    truckSpareBatteryOptions:TRUCK_SPARE_BATTERY_OPTIONS,
+    truckSpareRules:TRUCK_SPARE_RULES,
     heliosFieldChecklist:HELIOS_FIELD_CHECKLIST,
     itIntakeChecklist:IT_INTAKE_CHECKLIST,
     normalizeEquipmentType,
