@@ -636,43 +636,22 @@ function checked(v) {
 }
 function deliveryChecklist(item) {
   if (!['DELIVERY','BACKUP'].includes(item.purpose) || ['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item.equipment_type)) return '';
+  const delivery=item.purpose==='DELIVERY';
   return (
-    '<div class="deliveryChecks"><div class="subhead">DEPLOY-READY Checks</div><div class="small">All eight checks are required before DELIVERY or BACKUP equipment can leave with Service.</div>' +
-    '<div class="check"><input id="sim_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_sim_ok) +
-    '><div><b>SIM card active and installed in router</b></div></div>' +
-    '<div class="check"><input id="cam_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_camera_app_ok) +
-    '><div><b>Camera is visible in the camera app</b></div></div>' + '<div class="check"><input id="customeremail_' + item.id + '" type="checkbox"' + checked(item.delivery_customer_email_app_ok) + '><div><b>Unit/app added under the customer email account in the camera app</b></div></div>' +
-    '<div class="check"><input id="sd_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_sd_formatted_ok) +
-    '><div><b>SD card / NVR storage formatted and ready</b></div></div>' +
-    '<div class="check"><input id="recording_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_recording_ok) +
-    '><div><b>Recording footage confirmed</b></div></div>' +
-    '<div class="check"><input id="charged_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_batteries_charged_ok) +
-    '><div><b>Batteries / battery box charged and ready</b></div></div>' +
-    '<div class="check"><input id="monitor_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_monitoring_ok) +
-    '><div><b>Central Station monitoring created and sent in</b></div></div>' +
-    '<div class="check"><input id="count_' +
-    item.id +
-    '" type="checkbox"' +
-    checked(item.delivery_ticket_count_ok) +
-    '><div><b>This unit is included in the equipment type and quantity listed on the MHelpDesk ticket</b></div></div></div>'
+    '<div class="deliveryChecks"><div class="subhead">' + (delivery ? 'DELIVERY Readiness' : 'BACKUP Hardware Readiness') + '</div><div class="small">' +
+      (delivery ? 'Customer-specific delivery setup plus hardware readiness is required.' : 'This truck spare must be hardware-ready. Customer email, Central Station monitoring, and MHelpDesk quantity are not falsely assigned unless the spare is actually used.') +
+    '</div>' +
+    '<div class="check"><input id="sim_' + item.id + '" type="checkbox"' + checked(item.delivery_sim_ok) + '><div><b>SIM card active and installed in router</b></div></div>' +
+    '<div class="check"><input id="cam_' + item.id + '" type="checkbox"' + checked(item.delivery_camera_app_ok) + '><div><b>Camera is visible in the camera app</b></div></div>' +
+    '<div class="check"><input id="sd_' + item.id + '" type="checkbox"' + checked(item.delivery_sd_formatted_ok) + '><div><b>SD card / NVR storage formatted and ready</b></div></div>' +
+    '<div class="check"><input id="recording_' + item.id + '" type="checkbox"' + checked(item.delivery_recording_ok) + '><div><b>Recording footage confirmed</b></div></div>' +
+    '<div class="check"><input id="charged_' + item.id + '" type="checkbox"' + checked(item.delivery_batteries_charged_ok) + '><div><b>Batteries / battery box charged and ready</b></div></div>' +
+    (delivery
+      ? '<div class="check"><input id="customeremail_' + item.id + '" type="checkbox"' + checked(item.delivery_customer_email_app_ok) + '><div><b>Unit/app added under the customer email account in the camera app</b></div></div>' +
+        '<div class="check"><input id="monitor_' + item.id + '" type="checkbox"' + checked(item.delivery_monitoring_ok) + '><div><b>Central Station monitoring created and sent in</b></div></div>' +
+        '<div class="check"><input id="count_' + item.id + '" type="checkbox"' + checked(item.delivery_ticket_count_ok) + '><div><b>This unit is included in the equipment type and quantity listed on the MHelpDesk ticket</b></div></div>'
+      : '') +
+    '</div>'
   );
 }
 function itemForm(item) {
@@ -834,18 +813,21 @@ async function saveAndRelease(prepId) {
       return alert(error.message);
     }
     if (['DELIVERY','BACKUP'].includes(item.purpose)) {
+      const delivery=item.purpose==='DELIVERY';
       const sim = $('sim_' + item.id)?.checked || false,
-        cam = $('cam_' + item.id)?.checked || false, customerEmail = $('customeremail_' + item.id)?.checked || false,
+        cam = $('cam_' + item.id)?.checked || false,
+        customerEmail = delivery ? ($('customeremail_' + item.id)?.checked || false) : false,
         sd = $('sd_' + item.id)?.checked || false,
         recording = $('recording_' + item.id)?.checked || false,
         charged = $('charged_' + item.id)?.checked || false,
-        monitor = $('monitor_' + item.id)?.checked || false,
-        count = $('count_' + item.id)?.checked || false;
-      if (!sim || !cam || !customerEmail || !sd || !recording || !charged || !monitor || !count) {
+        monitor = delivery ? ($('monitor_' + item.id)?.checked || false) : false,
+        count = delivery ? ($('count_' + item.id)?.checked || false) : false;
+      const ready = sim && cam && sd && recording && charged && (!delivery || (customerEmail && monitor && count));
+      if (!ready) {
         setBusy(false);
         await refreshData();
         return alert(
-          'Complete all eight deploy-ready checks for ' +
+          'Complete all required ' + (delivery ? 'DELIVERY' : 'BACKUP hardware') + ' readiness checks for ' +
             eqLabel(item.equipment_type) +
             ' ' +
             tag +
