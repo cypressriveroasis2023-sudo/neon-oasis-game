@@ -2052,7 +2052,7 @@ async function editItPrepUnitCount(nextValue) {
   return;
 }
 function unitCountEditor(totalUnits) {
-  return `<div class='wl-count-editor wl-count-readonly' aria-label='Total equipment items'><b>${Number(totalUnits || 0)}</b><span>Total equipment items from the Unit Area + Stand Area</span></div>`;
+  return `<div class='wl-count-editor wl-count-readonly' aria-label='Total prepared equipment items'><b>${Number(totalUnits || 0)}</b><span>Total prepared items: job equipment + any Truck Spares</span></div>`;
 }
 async function getPrep(id) {
   const { data } = await liveDb.from('prep_tickets').select('*,prep_items(*)').eq('id', id).single(); return data;
@@ -2233,7 +2233,7 @@ function isSimpleSupport(type) { return ['110V Stand','Pole'].includes(type); }
 function isSupport(type) { return isSolarSupport(type) || isSimpleSupport(type); }
 function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
 function currentItItem() { return itItems()[itUnitIndex] || null; }
-function itAllowedPurposes(type) { if (type === '110V Stand') return ['SWAP']; if (type === 'Solar Stand') return ['SWAP','DELIVERY']; return ['BACKUP','SWAP','DELIVERY']; }
+function itAllowedPurposes(type) { if (type === '110V Stand') return ['SWAP']; if (type === 'Solar Stand') return ['SWAP','DELIVERY']; return ['SWAP','DELIVERY']; }
 function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; return rows.filter(r => r.kind === kind && String(r.original_name || '').startsWith(prefix)); }
 function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
 function itItemIdentity(item, unitNo) {
@@ -2613,7 +2613,7 @@ async function renderItUnitStep() {
     wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, `What type of equipment is Item ${unitNo}?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Equipment Plan</div>${equipmentManifestInlineHtml(activeItPrep)}${unitCountEditor(totalUnits)}</div><div class='wl-question top10'><div class='qtext'>Choose the equipment type</div><select id='wlItUnitType'><option value=''>Choose type…</option><optgroup label='Camera / Unit Types'>${cameraOptions}</optgroup><optgroup label='Stand / Pole Types'>${supportOptions}</optgroup></select></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'purpose') {
     const purposes = itAllowedPurposes(itTypeChoice);
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `What is Unit ${unitNo} for?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Choose BACKUP, SWAP, or DELIVERY</div><div class='wl-options'>${purposes.map(p => `<button class='${itPurposeChoice === p ? 'pass on' : 'pass'}' data-wl-unit-purpose='${p}'>${p}</button>`).join('')}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `What is Unit ${unitNo} for?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Choose SWAP or DELIVERY</div><div class='wl-options'>${purposes.map(p => `<button class='${itPurposeChoice === p ? 'pass on' : 'pass'}' data-wl-unit-purpose='${p}'>${p}</button>`).join('')}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'recon') {
     wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, 'Recon II requirement', 1, 1) + `<div class='wl-question'><div class='qtext'>How many Recon II camera / battery sets are required for this unit?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${Math.max(1, Number(itReconRequired || 1))}'></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'checks') {
