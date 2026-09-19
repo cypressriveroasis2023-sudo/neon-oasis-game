@@ -686,7 +686,7 @@ function helpTopicsForRole(role){
   ];
   if(role==='service') return [
     {id:'find',icon:'⌕',title:'Open the correct Service job',desc:'Use the exact current MHelpDesk ticket number.',body:"<p>Service jobs stay hidden until you enter the <b>exact current MHelpDesk reference</b>. This prevents the wrong job from being opened just because the same unit was used on an older ticket.</p>"},
-    {id:'handoff',icon:'⇄',title:'Verify the IT handoff',desc:'Confirm the named IT Tech, exact units, parts, and quantities.',body:"<p>Before accepting the handoff, physically match the unit tags and listed parts to Tech Check. Do not accept a mismatch. The record shows which IT Tech prepared the equipment.</p>"},
+    {id:'handoff',icon:'⇄',title:'Verify the IT handoff',desc:'Confirm the named IT Tech, exact units, checked-out spares, parts, and quantities.',body:"<p>Before accepting the handoff, physically match the unit tags and listed parts to Tech Check. Any Truck Spare must show <b>IT CHECKED OUT</b> before you take it. Spare battery batches also show the IT checkout quantity and technician. Do not accept a mismatch.</p>"},
     {id:'solar',icon:'☀',title:'Solar / Helios checkout',desc:'Solar Stand, batteries, MPPT, charging proof, Ranger, and Helios.',body:"<p><b>Solar Spotter delivery:</b> Service verifies the assigned Solar Stand, required batteries, MPPT update/test, and active charging with the solar panel + batteries + MPPT connected. Upload the stand tag and charging/reading proof.</p><p><b>Ranger:</b> verify the required solar panel and charging. <b>Helios:</b> physically verify the required battery box, then complete the Service-side Cerbo/MPPT verification and proof photos.</p>"},
     {id:'field',icon:'→',title:'Complete the field work',desc:'Delivery, service, swap, or pickup using the current ticket.',body:"<p>Work from the current MHelpDesk job. The MHelpDesk ticket changes from job to job, but the unit number remains universal inside Tech Check so history follows the equipment.</p>"},
     {id:'return',icon:'↩',title:'Return a unit to IT',desc:'Record the ticket, unit, condition, notes, and photos.',body:"<p>Use <b>Return Unit to IT Intake</b> when equipment comes back from the field. The return is recorded under your Service Tech name, then IT receives it through Intake.</p>"},
@@ -873,7 +873,8 @@ function helpStepGuide(role, step){
     'service:VERIFY THE HANDOFF':{
       steps:[
         'Compare each physical unit tag to the handed-off unit shown in Tech Check.',
-        'Verify required batteries / battery boxes and every listed replacement part.',
+        'For a Truck Spare, confirm it shows IT CHECKED OUT before taking it.',
+        'Verify required batteries / battery boxes, checked-out spare batteries, and every listed replacement part.',
         'Review the IT evidence that belongs to the handed-off equipment.',
         'Answer each Service verification step truthfully.',
         'Stop and correct a mismatch before you accept the handoff.'
@@ -2871,7 +2872,7 @@ async function matchSvcTicket() {
   svcQuestionIndex = 0;
   showSvcTicketConfirmation();
 }
-function showSvcTicketConfirmation() {
+async function showSvcTicketConfirmation() {
   if (!activeSvcPrep) return;
   const base = document.getElementById('matchedPreps')?.closest('.card');
   const card = findSvcCard(activeSvcPrep.ticket_no);
@@ -2880,9 +2881,18 @@ function showSvcTicketConfirmation() {
   const types = [...new Set((activeSvcPrep.prep_items || []).map(item => item.equipment_type).filter(Boolean))];
   const wizard = svcWizardCard();
   const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
+  const spareUnits=(activeSvcPrep.prep_items || []).filter(item=>item.purpose==='BACKUP');
+  const spareBatteries=await loadTruckSpareBatteries(activeSvcPrep.id).catch(()=>[]);
+  const spareCheckoutHtml=(spareUnits.length || spareBatteries.length)
+    ? `<div class='wl-question top10'><div class='qnum'>IT TRUCK SPARE CHECKOUT</div><div class='qtext'>These spares were checked out by IT before this handoff</div>${
+        spareUnits.map(item=>`<div class='ok top8'><b>✓ ${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><div class='small'>IT CHECKED OUT · ${esc(item.spare_it_checked_out_by_name||preparedBy)}${item.spare_it_checked_out_at?' · '+new Date(item.spare_it_checked_out_at).toLocaleString():''}</div></div>`).join('')
+      }${
+        spareBatteries.map(row=>`<div class='ok top8'><b>✓ ${Number(row.qty_prepared||0)} × ${esc(row.battery_type)}</b><div class='small'>${esc(row.equipment_type)} spare batteries · IT CHECKED OUT · ${esc(row.it_checked_out_by_name||preparedBy)}${row.it_checked_out_at?' · '+new Date(row.it_checked_out_at).toLocaleString():''}</div></div>`).join('')
+      }<div class='small top8'>Physically verify these checked-out spares before taking them from the shop.</div></div>`
+    : '';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Total equipment items IT is giving you:</b> ${forms.length}</div>${equipmentManifestInlineHtml(activeSvcPrep)}${types.length ? `<div class='small top8'><b>Checked equipment types:</b> ${esc(types.map(equipmentDisplayLabel).join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div><div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
+  wizard.innerHTML = progress('Verify Ticket', 'Does this match your MHelpDesk ticket?', 2, 6) + `<div class='wl-review'><div><b>MHelpDesk Ticket #</b></div><div style='font-size:28px;font-weight:950'>#${esc(activeSvcPrep.ticket_no)}</div><div class='top10'><b>Ticket Name / Customer / Site</b></div><div style='font-size:21px;font-weight:900'>${esc(activeSvcPrep.site || 'No ticket name entered')}</div><div class='top10'><b>Prepared by:</b> IT Tech ${esc(preparedBy)}</div><div class='top10'><b>Total equipment items IT is giving you:</b> ${forms.length}</div>${equipmentManifestInlineHtml(activeSvcPrep)}${types.length ? `<div class='small top8'><b>Checked equipment types:</b> ${esc(types.map(equipmentDisplayLabel).join(', '))}</div>` : ''}${ticketPartsInlineHtml(activeSvcPrep)}</div>${spareCheckoutHtml}<div class='wl-question'><div class='qtext'>Does this ticket number, site, equipment, truck spares, and work match your MHelpDesk ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG TICKET</button><button class='pass' data-wl-svc-ticket='match'>YES — IT MATCHES</button></div></div>`;
   resetWizardPosition();
 }
 function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPreps > .item.prepared')].find(c => c.textContent.includes(`MHelpDesk Ticket #${ticket}`)); }
