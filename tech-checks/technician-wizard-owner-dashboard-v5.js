@@ -3114,9 +3114,14 @@ function ownerAIParseDispatch(text) {
   const hasService=/\b(?:service\s+department|service\s+tech|service\s+technician|send\s+to\s+service|assign\s+to\s+service)\b/i.test(raw);
   const serviceFirst=/\bservice\b[\s\S]{0,30}\b(?:then|first|before)\b[\s\S]{0,30}\bit\b/i.test(raw) || /\bservice\s*(?:→|->)\s*it\b/i.test(raw);
   const itFirst=/\bit\b[\s\S]{0,30}\b(?:then|first|before)\b[\s\S]{0,30}\bservice\b/i.test(raw) || /\bit\s*(?:→|->)\s*service\b/i.test(raw);
-  if (serviceFirst) parsed.role="service_it";
-  else if (itFirst) parsed.role="it_service";
-  else if (hasIT && hasService) parsed.role=lower.indexOf("service") < lower.indexOf("it") ? "service_it" : "it_service";
+  const servicePlusIT=/\bservice\s*(?:and|&|\+|\/)\s*it\b/i.test(raw);
+  const itPlusService=/\bit\s*(?:and|&|\+|\/)\s*service\b/i.test(raw);
+  if (serviceFirst || servicePlusIT) parsed.role="service_it";
+  else if (itFirst || itPlusService) parsed.role="it_service";
+  else if (hasIT && hasService) {
+    const iIT=lower.search(/\bit\b/), iSvc=lower.search(/\bservice\b/);
+    parsed.role=(iSvc>=0 && iIT>=0 && iSvc<iIT) ? "service_it" : "it_service";
+  }
   else if (hasIT) parsed.role="it";
   else if (hasService) parsed.role="service";
 
@@ -3188,7 +3193,10 @@ function ownerAIDispatchApply(parsed) {
   const set=(id,value)=>{const el=document.getElementById(id);if(el && value)el.value=value;};
   set("ownerAssignTicket",parsed.ticket_no);
   set("ownerAssignSite",parsed.site);
-  set("ownerAssignDate",parsed.scheduled_for);
+  if (parsed.scheduled_for) {
+    const dateEl=document.getElementById("ownerAssignDate");
+    if (dateEl) { dateEl.value=parsed.scheduled_for; dateEl.dataset.aiSet="1"; }
+  }
   const description=document.getElementById("ownerAssignDescription");
   if (description && parsed.description && (parsed.descriptionExplicit || !description.value.trim())) description.value=parsed.description;
   set("ownerAssignNotes",parsed.notes);
@@ -3225,14 +3233,20 @@ function ownerAIDispatchMissing(parsed) {
   if (!current.job_description) missing.push("job description");
   const work=document.getElementById("ownerAssignWorkType");
   if (!parsed?.work_type && !work?.dataset?.aiSet && !work?.dataset?.ownerConfirmed) missing.push("job type (Delivery, Pickup, Swap, or Service)");
+  const date=document.getElementById("ownerAssignDate");
+  if (!parsed?.scheduled_for && !date?.dataset?.aiSet && !date?.dataset?.ownerConfirmed) missing.push("work date");
   const role=document.getElementById("ownerAssignRole");
   if (!parsed?.role && !role?.dataset?.aiSet && !role?.dataset?.ownerConfirmed) missing.push("department flow (IT, Service, IT → Service, or Service → IT)");
   const manifest=readOwnerEquipmentManifest();
   const roleValue=role?.value||"";
   if ((roleValue==="it" || roleValue==="it_service" || roleValue==="service_it") && !manifest.length) missing.push("equipment type and quantity");
   (parsed?.mentionedWithoutQty||[]).forEach(label=>{
-    const hasManifest=manifest.some(r=>String(r.label||"").toLowerCase()===String(label).toLowerCase() && Number(r.qty||0)>0);
-    if (!hasManifest && !missing.includes("quantity for "+label)) missing.push("quantity for "+label);
+    const low=String(label||"").toLowerCase();
+    const hasManifest=manifest.some(r=>String(r.label||"").toLowerCase()===low && Number(r.qty||0)>0);
+    const partKey=low==="solar panel"?"solar_panel_qty":low==="battery replacement"?"battery_replacement_qty":low==="camera replacement"?"camera_replacement_qty":low==="sim replacement"?"sim_replacement_qty":low==="micro sd replacement"?"micro_sd_qty":"";
+    const part=partKey ? TICKET_PARTS.find(p=>p.key===partKey) : null;
+    const hasPart=part ? Number(document.getElementById("ownerPart"+part.id)?.value||0)>0 : false;
+    if (!hasManifest && !hasPart && !missing.includes("quantity for "+label)) missing.push("quantity for "+label);
   });
   return [...new Set(missing)];
 }
@@ -3240,7 +3254,7 @@ function ownerAIDispatchSummary(parsed) {
   const a=ownerAIDraft(), techIds=[...document.querySelectorAll("#ownerAssignedTechPills [data-tech-id]")].map(el=>el.dataset.techId), techs=techIds.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
   const eq=normalizedEquipmentManifest(a.equipment_manifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ");
   const flow=a.role==="it_service"?"IT → Service":a.role==="service_it"?"Service → IT":a.role==="it"?"IT only":"Service only";
-  return {ticket:a.ticket_no||"—",site:a.site||"—",type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
+  return {ticket:a.ticket_no||"—",site:a.site||"—",date:document.getElementById("ownerAssignDate")?.value||"—",type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
 }
 function ownerAIDispatchRender(parsed) {
   const box=document.getElementById("ownerAIDispatchResult"); if(!box)return;
@@ -3249,7 +3263,7 @@ function ownerAIDispatchRender(parsed) {
   const warningHtml=(parsed.warnings||[]).length ? "<div class='wl-ai-warn top8'>"+parsed.warnings.map(v=>"⚠ "+esc(v)).join("<br>")+"</div>" : "";
   box.innerHTML="<div class='wl-ai-head'><span>✨ AI Dispatch Draft</span><b>"+(missing.length?"NEEDS "+missing.length+" DETAIL"+(missing.length===1?"":"S"):"READY FOR REVIEW")+"</b></div>"
     +"<div class='wl-ai-line'><b>MHelpDesk:</b> #"+esc(s.ticket)+" · <b>"+esc(s.type)+"</b></div>"
-    +"<div class='wl-ai-line'><b>Site:</b> "+esc(s.site)+"</div>"
+    +"<div class='wl-ai-line'><b>Site:</b> "+esc(s.site)+" · <b>Work date:</b> "+esc(s.date)+"</div>"
     +"<div class='wl-ai-line'><b>Flow:</b> "+esc(s.flow)+" · <b>Assigned:</b> "+esc(s.techs)+"</div>"
     +"<div class='wl-ai-line'><b>Equipment:</b> "+esc(s.equipment)+"</div>"
     +warningHtml
@@ -3329,7 +3343,7 @@ async function ownerAssignJob() {
     const eq=normalizedEquipmentManifest(equipmentManifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ") || "No equipment";
     const flow=role==="it_service"?"IT → Service":role==="service_it"?"Service → IT":role==="it"?"IT only":"Service only";
     const techNames=assignees.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
-    const confirmText="AI DISPATCH CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nSend this Tech Check job?";
+    const confirmText="AI DISPATCH CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date: "+scheduledFor+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nSend this Tech Check job?";
     if (!confirm(confirmText)) return;
   }
 
@@ -3498,6 +3512,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignRole') { e.target.dataset.ownerConfirmed='1'; refreshOwnerAssignmentTechOptions(); }
+  if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
