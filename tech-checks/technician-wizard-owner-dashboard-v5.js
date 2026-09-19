@@ -4263,56 +4263,10 @@ function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p=ownerAssignmentProgress(a,prep,solarCheck),aiState=ownerLiveAIStatus(a,prep,solarCheck).state,pct=Math.max(8,Math.min(100,p.step/5*100));
   const heliosFinal=prepHasHeliosField(prep)&&prep?.status==='released'&&solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at
     ? `<div class='warn top10'><b>HELIOS FIELD INSTALL SUBMITTED</b><div class='small'>${signatureStamp(solarCheck.helios_field_completed_by_name||'Service Tech',solarCheck.helios_field_completed_at)}</div><button class='mini top8' data-wl-owner-helios-review='${esc(prep.id)}'>Review & Final Verify Helios</button></div>`:'';
-  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role==='it'?'IT':'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id?'Assigned to:':'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site?`<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>`:''}${a.work_type?`<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>`:''}${a.scheduled_for?`<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for+'T12:00:00').toLocaleDateString()}</div>`:''}${a.requested_unit_count!=null?`<div class='small'><b>${String(a.work_type||'').toLowerCase()==='pickup'?'Units Being Picked Up':'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>`:''}${a.unit_summary?`<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>`:''}${a.job_description?`<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>`:''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${heliosFinal}${a.notes?`<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}</div>${a.status==='completed'?'':`<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+  const visionUrl='./onsite-vision.html?ticket='+encodeURIComponent(String(a.ticket_no||''));
+  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role==='it'?'IT':'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id?'Assigned to:':'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site?`<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>`:''}${a.work_type?`<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>`:''}${a.scheduled_for?`<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for+'T12:00:00').toLocaleDateString()}</div>`:''}${a.requested_unit_count!=null?`<div class='small'><b>${String(a.work_type||'').toLowerCase()==='pickup'?'Units Being Picked Up':'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>`:''}${a.unit_summary?`<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>`:''}${a.job_description?`<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>`:''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${heliosFinal}${a.notes?`<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}<div class='ownerVisionRowAction'><a class='mini ownerVisionTicketLink' href='${esc(visionUrl)}'>Open in OnSite Vision →</a></div></div>${a.status==='completed'?'':`<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
 }
-function ownerAssignmentTechOptions(role) {
-  const department = role === 'it' ? 'IT Department Queue' : 'Service Department Queue';
-  return `<option value=''>${department} — any ${role === 'it' ? 'IT Tech' : 'Service Tech'} can claim</option>` + ownerAssignmentProfiles.filter(p => p.role === role).map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')}</option>`).join('');
-}
-function ownerAIMorningReadiness(a,prep=null){
-  const manifest=normalizedEquipmentManifest(a?.equipment_manifest || prep?.equipment_manifest || []);
-  const issues=[], checks=[];
-  const spotters=manifestQty(manifest,'Solar Spotter');
-  const rangers=manifestQty(manifest,'Ranger');
-  const helios=manifestQty(manifest,'Helios');
-  checks.push({ok:!!String(a?.ticket_no||'').trim(),t:'MHelpDesk reference'});
-  checks.push({ok:!!String(a?.site||'').trim(),t:'Customer / site'});
-  if(spotters){
-    checks.push({ok:true,t:spotters+' Solar Spotter → '+spotters+' Solar Stand automatically required in Service'});
-    checks.push({ok:true,t:'Service selects and physically verifies the installed Solar Spotter battery setup'});
-  }
-  if(rangers)checks.push({ok:true,t:rangers+' Ranger → '+rangers+' solar panel + LiTime 12V 110Ah battery automatically required in Service'});
-  if(helios)checks.push({ok:true,t:helios+' Helios → battery box + Cerbo/MPPT Service proof and IT camera/modem/port checks required'});
-  const dual=['it_service','service_it'].includes(String(a?.assignment_flow||a?.department_flow||a?.assigned_department||''));
-  if(String(a?.work_type||'').toLowerCase()==='pickup')checks.push({ok:a?.assigned_role==='service'||dual,t:'Pickup begins with Service, then IT Intake'});
-  else if(a?.requires_it_handoff)checks.push({ok:true,t:'Required cross-department handoff is enforced before the next department starts'});
-  checks.forEach(x=>{if(!x.ok)issues.push(x.t)});
-  return {checks,issues,ready:issues.length===0};
-}
-function ownerAIMorningReadinessHtml(states){
-  if(!states.length)return "<div class='wl-ai-good top8'>✓ No jobs scheduled for tomorrow.</div>";
-  const rows=states.map(({a})=>{const x=ownerAIMorningReadiness(a);return `<details class='wl-morning-job ${x.ready?'ready':'attention'}'><summary><span>#${esc(a.ticket_no||'—')} · ${esc(a.site||'No site')}</span><b>${x.ready?'✓ READY':'⚠ '+x.issues.length+' CHECK'}</b></summary><div>${x.checks.map(v=>`<div class='${v.ok?'ok':'bad'}'>${v.ok?'✓':'⚠'} ${esc(v.t)}</div>`).join('')}</div></details>`}).join('');
-  return `<details class='wl-morning-readiness' open><summary><span>🌅 Morning Readiness Check</span><span class='pill'>${states.filter(x=>!ownerAIMorningReadiness(x.a).ready).length} NEED REVIEW</span></summary><div><div class='small'>Preparation check for tomorrow's MHelpDesk jobs. This is advisory; technicians still physically verify equipment.</div>${rows}</div></details>`;
-}
-function ownerAINotificationKey(a,s){return String(a?.id||a?.ticket_no||'')+':'+String(s?.detail||s?.label||'attention');}
-let ownerAIAckRows=[];
-function ownerAIIsAcknowledged(a,s){const id=String(a?.id||a?.ticket_no||''),key=ownerAINotificationKey(a,s);return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key);}
-async function ownerAIAcknowledge(id,key,detail,ticket){
-  const tech=await currentTechIdentity().catch(()=>null);if(!tech?.id)return alert('Owner/Admin account required.');
-  const {error}=await liveDb.from('owner_ai_alert_acknowledgements').upsert({assignment_id:String(id),alert_key:key,ticket_no:String(ticket||''),alert_detail:String(detail||''),acknowledged_by:tech.id,acknowledged_by_name:tech.name||tech.full_name||tech.username||'Owner',acknowledged_at:new Date().toISOString()},{onConflict:'assignment_id,alert_key'});
-  if(error)return alert(error.message);
-  await installOwnerAssignments(true);
-}
-async function ownerAISyncResolutions(aiStates){
-  const activeKeys=new Set(aiStates.filter(x=>x.s.state==='attention').map(x=>ownerAINotificationKey(x.a,x.s)));
-  const pending=ownerAIAckRows.filter(r=>!r.resolved_at&&!activeKeys.has(r.alert_key));
-  if(!pending.length)return;
-  const now=new Date().toISOString();
-  for(const row of pending){
-    const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({resolved_at:now,resolution_note:'Underlying AI Attention condition is no longer active.'}).eq('id',row.id).is('resolved_at',null);
-    if(!error){row.resolved_at=now;row.resolution_note='Underlying AI Attention condition is no longer active.';}
-  }
-}
+
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
@@ -4390,33 +4344,16 @@ async function installOwnerAssignments(force = false) {
       <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
-      <section class='wl-ai-panel ownerAIDispatchPanel wl-ai-brand-card'>
-        <div class='wl-ai-brand-head'>
-          <div class='wl-ai-brand-title'>
-            <span class='wl-ai-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
-            <span><small>ONSITE VISION</small><b>Owner Assistant</b></span>
-          </div>
-          <span class='wl-ai-state draft'>ASK / CREATE</span>
-        </div>
-        <div class='wl-ai-lead'><b>Talk to OnSite Vision like you talk to me.</b> Ask something, then keep asking follow-up questions. Your conversation stays together below. If you want Vision to change or create something, just say it naturally.</div>
-        <div class='wl-ai-chat-head'><span>Conversation</span><button type='button' data-owner-ai-new-chat>New chat</button></div>
-        <div id='ownerAIConversation' class='wl-ai-chat-thread'>${ownerAIConversationMarkup()}</div>
-        <div class='wl-ai-prompt-box'>
-          <label for='ownerAIDispatchPrompt'>Message OnSite Vision</label>
-          <textarea id='ownerAIDispatchPrompt' rows='3' placeholder="Ask a question or tell Vision what you want changed…"></textarea>
-          <div class='wl-ai-prompt-chips' aria-label='Quick AI prompts'>
-            <button type='button' data-owner-ai-chip="Show me Monday's jobs">Monday's jobs</button>
-            <button type='button' data-owner-ai-chip='What needs attention today?'>Needs attention</button>
-            <button type='button' data-owner-ai-chip='What are the Helios delivery steps?'>Helios steps</button>
-            <button type='button' data-owner-ai-chip='Create a new Tech Check ticket'>Create new ticket</button>
-          </div>
-        </div>
-        <div class='wl-ai-dispatch-actions'>
-          <button type='button' class='wl-ai-dictate' data-owner-ai-dispatch-voice><span>🎙</span> Speak to Vision</button>
-          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Send <span>→</span></button>
-        </div>
-        <div id='ownerAIDispatchVoiceStatus' class='wl-ai-voice-status'></div>
-        <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10' aria-hidden='true'></div>
+      <section class='wl-ai-panel ownerVisionLaunchCard'>
+        <a class='ownerVisionLaunchLink' href='./onsite-vision.html'>
+          <span class='wl-ai-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
+          <span class='ownerVisionLaunchCopy'>
+            <small>ONSITE VISION</small>
+            <b>AI Service Order Workspace</b>
+            <span>Open a dedicated conversation to look up jobs, keep ticket context, assign technicians, and work through the next step together.</span>
+          </span>
+          <strong>Open Vision →</strong>
+        </a>
       </section>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
