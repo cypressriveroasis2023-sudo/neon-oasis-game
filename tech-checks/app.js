@@ -882,7 +882,7 @@ async function saveAndRelease(prepId) {
   alert(
     'Equipment for MHelpDesk Ticket #' +
       p.ticket_no +
-      ' is released to Service Tech checkout.'
+      ' now has a Service handoff ready for checkout.'
   );
 }
 
