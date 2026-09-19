@@ -3159,7 +3159,7 @@ select {
 #view-owner #ownerAIDispatchPrompt{
   box-sizing:border-box;width:100%;min-height:105px;margin:0!important;padding:11px 12px!important;resize:vertical;
   border:1px solid #bbc7d1!important;border-radius:11px!important;background:#fff!important;color:#172839!important;
-  font-size:13px!important;line-height:1.4!important;box-shadow:none!important
+  font-size:16px!important;line-height:1.4!important;box-shadow:none!important
 }
 #view-owner #ownerAIDispatchPrompt:focus{
   border-color:var(--ai-red)!important;box-shadow:0 0 0 3px rgba(210,11,18,.10)!important;outline:0!important
@@ -3342,3 +3342,60 @@ select {
 .wl-ai-scan-check{background:#16844a!important;color:#fff!important}.wl-ai-scan-mark{background:#101820!important;color:#fff!important}
 @keyframes wlVisionSpin{to{transform:rotate(360deg)}}
 @media(max-width:768px){.wl-ai-head{flex-direction:row!important;align-items:center!important}.wl-ai-brand-inline-icon{width:44px!important;height:44px!important}.wl-ai-brand-inline-icon img{width:33px!important;height:33px!important}.wl-ai-brand-inline-copy strong{font-size:16px!important}.wl-ai-head>b{font-size:9px!important}}
+
+/* OnSite Vision Owner Assistant v110 */
+#view-owner .ownerAIDispatchPanel .wl-ai-lead b{color:#101820}
+#view-owner .ownerAIDispatchPanel #ownerAIDispatchPrompt{
+  font-size:16px!important;
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-prompt-box>label{
+  font-size:11px!important;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-prompt-chips button{
+  min-height:34px!important;
+  padding:7px 10px!important;
+  font-size:10px!important;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-dictate,
+#view-owner .ownerAIDispatchPanel .wl-ai-build{
+  min-height:52px!important;
+  font-size:12px!important;
+}
+#view-owner .wl-ai-voice-status{
+  min-height:18px;
+  margin-top:7px;
+  color:#5f6f7e;
+  font-size:10px;
+  font-weight:750;
+}
+#view-owner .wl-ai-assistant-working{
+  display:flex;align-items:center;gap:11px;padding:12px;border:1px solid #d6dee5;border-radius:12px;background:#f7f9fb;
+}
+#view-owner .wl-ai-assistant-working>div{min-width:0}
+#view-owner .wl-ai-assistant-working b{display:block;color:#101820;font-size:13px;font-weight:950}
+#view-owner .wl-ai-assistant-working span:not(.wl-ai-scan-spinner){display:block;margin-top:3px;color:#637383;font-size:11px;font-weight:650;line-height:1.35}
+#view-owner .wl-ai-answer{color:#172839;font-size:12px;line-height:1.5}
+#view-owner .wl-ai-answer>p{margin:6px 0 0}
+#view-owner .wl-ai-answer ol{margin:8px 0 0;padding-left:22px}
+#view-owner .wl-ai-answer li{margin:7px 0}
+#view-owner .wl-ai-answer-intro{margin:2px 0 10px;color:#5f6f7e;font-size:11px;font-weight:700;line-height:1.4}
+#view-owner .wl-ai-job-answer{
+  margin-top:9px;padding:11px;border:1px solid #d6dee5;border-left:4px solid #101820;border-radius:12px;background:#fff;
+}
+#view-owner .wl-ai-job-answer.attention{border-left-color:#d20b12;background:#fff8f8}
+#view-owner .wl-ai-job-answer-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#view-owner .wl-ai-job-answer-head>b{color:#101820;font-size:13px;font-weight:950}
+#view-owner .wl-ai-job-answer-head>span{flex:none;padding:4px 7px;border-radius:999px;background:#101820;color:#fff;font-size:8px;font-weight:950;letter-spacing:.06em}
+#view-owner .wl-ai-job-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+#view-owner .wl-ai-job-meta>span{padding:5px 7px;border-radius:8px;background:#eef2f5;color:#435362;font-size:9px;font-weight:800}
+#view-owner .wl-ai-job-status{display:grid;gap:4px;margin-top:8px;color:#354656;font-size:10px;line-height:1.35}
+#view-owner .wl-ai-next{margin-top:9px;padding:9px 10px;border:1px solid #cfd8df;border-radius:9px;background:#f7f9fb;color:#172839;font-size:10px;line-height:1.4}
+#view-owner .wl-ai-next b{color:#d20b12}
+@media(max-width:680px){
+  #view-owner .ownerAIDispatchPanel #ownerAIDispatchPrompt{font-size:16px!important}
+  #view-owner .ownerAIDispatchPanel .wl-ai-dispatch-actions{grid-template-columns:1fr 1.35fr}
+  #view-owner .ownerAIDispatchPanel .wl-ai-dictate,
+  #view-owner .ownerAIDispatchPanel .wl-ai-build{font-size:11px!important}
+}
