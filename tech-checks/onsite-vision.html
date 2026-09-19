@@ -27,6 +27,7 @@
         <div id="visionHistory" class="vision-history"></div>
       </div>
       <div class="vision-side-footer">
+        <button id="visionTeachButton" class="vision-teach-button" type="button"><span>✦</span> Teach Vision</button>
         <a href="./" class="vision-back-link">← Back to Tech Check</a>
         <div id="visionOwnerName" class="vision-owner-name"></div>
       </div>
@@ -64,11 +65,118 @@
     </aside>
     <div id="visionShade" class="vision-shade"></div>
   </div>
+
+  <div id="visionKnowledgeModal" class="vision-knowledge-modal hidden" aria-hidden="true">
+    <div class="vision-knowledge-shell" role="dialog" aria-modal="true" aria-labelledby="visionKnowledgeTitle">
+      <div class="vision-knowledge-head">
+        <div>
+          <small>COMPANY KNOWLEDGE</small>
+          <b id="visionKnowledgeTitle">Teach OnSite Vision</b>
+          <span>Approved entries become Cameras On Site company knowledge. Drafts are never used as company truth.</span>
+        </div>
+        <button id="visionKnowledgeClose" class="vision-icon-button" type="button">Close</button>
+      </div>
+      <div class="vision-knowledge-layout">
+        <section class="vision-knowledge-editor">
+          <div class="vision-knowledge-editor-head">
+            <div><small>KNOWLEDGE ENTRY</small><b id="visionKnowledgeEditorTitle">New knowledge</b></div>
+            <button id="visionKnowledgeNew" type="button">New</button>
+          </div>
+          <input id="visionKnowledgeEntryId" type="hidden">
+          <label>Title
+            <input id="visionKnowledgeEntryTitle" type="text" placeholder="Example: Helios PTZ port configuration">
+          </label>
+          <div class="vision-knowledge-row">
+            <label>Domain
+              <select id="visionKnowledgeDomain">
+                <option value="technical">Technical</option>
+                <option value="product">Product</option>
+                <option value="workflow">Workflow</option>
+                <option value="sop">SOP</option>
+                <option value="troubleshooting">Troubleshooting</option>
+                <option value="configuration">Configuration</option>
+                <option value="safety">Safety</option>
+                <option value="operations">Operations</option>
+              </select>
+            </label>
+            <label>Equipment
+              <input id="visionKnowledgeEquipment" type="text" list="visionEquipmentOptions" placeholder="Helios, Ranger…">
+              <datalist id="visionEquipmentOptions">
+                <option value="Helios"><option value="Solar Spotter"><option value="Ranger"><option value="Sniper">
+                <option value="Spotter"><option value="Recon 2"><option value="Solar Stand"><option value="Solar Pole">
+                <option value="110V Stand"><option value="Pole">
+              </datalist>
+            </label>
+          </div>
+          <div class="vision-knowledge-row">
+            <label>Workflow
+              <select id="visionKnowledgeWorkflow">
+                <option value="">Any / not specific</option>
+                <option value="delivery">Delivery</option>
+                <option value="pickup">Pickup</option>
+                <option value="swap">Swap</option>
+                <option value="service">Service</option>
+                <option value="return">Return</option>
+                <option value="intake">IT Intake</option>
+                <option value="handoff">IT → Service Handoff</option>
+              </select>
+            </label>
+            <label>Topic
+              <input id="visionKnowledgeTopic" type="text" placeholder="Ports, batteries, Cerbo, return photos…">
+            </label>
+          </div>
+          <label>What Vision should know
+            <textarea id="visionKnowledgeContent" rows="8" placeholder="Write the Cameras On Site rule, technical specification, troubleshooting procedure, or SOP exactly as the team should follow it."></textarea>
+          </label>
+          <div class="vision-knowledge-row">
+            <label>Source
+              <select id="visionKnowledgeSourceKind">
+                <option value="owner">Owner instruction</option>
+                <option value="sop">Company SOP</option>
+                <option value="database_rule">Database rule</option>
+                <option value="code_baseline">Existing Tech Check rule</option>
+                <option value="vendor">Vendor documentation</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Source reference
+              <input id="visionKnowledgeSourceRef" type="text" placeholder="Optional document, ticket, manual, note…">
+            </label>
+          </div>
+          <label>Tags
+            <input id="visionKnowledgeTags" type="text" placeholder="Comma separated: PTZ, ports, router">
+          </label>
+          <div id="visionKnowledgeSaveStatus" class="vision-system-note hidden"></div>
+          <div class="vision-knowledge-actions">
+            <button id="visionKnowledgeSaveDraft" type="button">Save draft</button>
+            <button id="visionKnowledgeApprove" class="primary" type="button">Approve & publish</button>
+            <button id="visionKnowledgeRetire" type="button" class="danger hidden">Retire</button>
+          </div>
+        </section>
+        <aside class="vision-knowledge-list-pane">
+          <div class="vision-knowledge-list-head">
+            <div><small>VISION KNOWLEDGE</small><b>Saved entries</b></div>
+            <select id="visionKnowledgeFilter">
+              <option value="">All</option>
+              <option value="approved">Approved</option>
+              <option value="draft">Drafts</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+          <div id="visionKnowledgeList" class="vision-knowledge-list">
+            <div class="vision-system-note">Loading knowledge…</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./onsite-vision-company-knowledge.js?v=company-knowledge-v1" defer></script>
   <script src="./onsite-vision-workflow-engine.js?v=workflow-engine-v2" defer></script>
   <script src="./onsite-vision-live-data.js?v=live-data-v1" defer></script>
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
+  <script src="./onsite-vision-persistence.js?v=persistence-v1" defer></script>
+  <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
   <script src="./onsite-vision.js?v=vision-workspace-v13" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
