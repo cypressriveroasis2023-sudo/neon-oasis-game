@@ -1694,11 +1694,39 @@ async function showSvcHome() {
   let home=document.getElementById('wlSvcHome'); if(!home){home=document.createElement('div');home.id='wlSvcHome';home.className='card wl-home';viewSvc().prepend(home);}
   const [r,work,phoneAlerts,assignedAssets]=await Promise.all([myReturnCounts(),serviceWorkData(),pushAlertState(),myAssignedInventoryAssets()]);
   const alertBanner=phoneAlertBanner(phoneAlerts);
-  home.innerHTML=`${alertBanner}<div class='wl-title'>Service Tech</div><div class='wl-sub'>Enter the MHelpDesk ticket number every time. Jobs are not displayed here until you pull the correct ticket.</div>
-    <div class='wl-service-ticket-search'><label>MHelpDesk Ticket #</label><div class='wl-ticket-search-row'><input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='Enter ticket #'><button class='wl-blue' data-wl-service-find-job>Find Job →</button></div><div id='wlServiceJobSearchMsg' class='small top8'>The ticket stays hidden until the exact MHelpDesk number is entered.</div></div>
-    <div class='wl-workstrip'><span><b>${work.released.length}</b> IT handoffs available</span><span><b>${r.waiting}</b> returns waiting IT</span></div>
+  const handoffCount=work.released.length;
+  const returnCount=r.waiting+r.inventory;
+  const nextAction=handoffCount
+    ? `<div class='wl-next-action wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>${handoffCount} IT handoff${handoffCount===1?" is":"s are"} ready for Service.</b><div class='small'>Enter the exact current MHelpDesk ticket below to open the correct job and verify the IT handoff.</div></div>`
+    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service handoffs are waiting.</b><div class='small'>When IT creates a handoff, enter the exact MHelpDesk ticket below to open it.</div></div>`;
+  home.innerHTML=`${alertBanner}
+    <div class='wl-mode-pills wl-service-mode-pills'>
+      <button type='button' class='on wl-mode-card'><span class='wl-mode-title'>Field Work</span><span class='wl-mode-sub'>Find & verify assigned jobs</span><span class='wl-mode-badge'>${handoffCount}</span></button>
+      <button type='button' class='wl-mode-card' data-wl-svc='returns'><span class='wl-mode-title'>Returns</span><span class='wl-mode-sub'>Track units returning to IT</span><span class='wl-mode-badge'>${returnCount}</span></button>
+    </div>
+    <div class='wl-title'>My Work Today</div>
+    <div class='wl-sub'>Open the exact MHelpDesk ticket, verify the IT handoff, complete the field work, and return equipment when needed.</div>
+    ${nextAction}
+    <div class='wl-service-ticket-search wl-service-ticket-search-compact'>
+      <div class='wl-next-kicker'>FIND JOB</div>
+      <label>MHelpDesk Ticket #</label>
+      <div class='wl-ticket-search-row'><input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='Enter ticket #'><button class='wl-red' data-wl-service-find-job>Find Job →</button></div>
+      <div id='wlServiceJobSearchMsg' class='small top8'>Only the exact current MHelpDesk ticket will open the job.</div>
+    </div>
+    <div class='wl-workstrip wl-service-workstrip'>
+      <span><b>${handoffCount}</b> handoffs ready</span>
+      <span><b>${r.waiting}</b> returns waiting IT</span>
+      <span><b>${work.inspectionDone?1:0}</b> inspection today</span>
+    </div>
     ${assignedInventoryHtml(assignedAssets)}
-    <div class='wl-menu'><button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button><button class='wl-gray' data-wl-svc='returns'>☰ My Returned Units <span class='wl-count'>${r.waiting+r.inventory}</span></button><button class='wl-amber' data-wl-svc='inspect'>Truck / Trailer Inspection</button><button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button></div>`;
+    <div class='wl-service-actions'>
+      <button class='wl-service-primary wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button>
+      <div class='wl-service-action-grid'>
+        <button class='wl-service-action-card' data-wl-svc='returns'><span>My Returned Units</span><b>${returnCount}</b><small>View return / intake status</small></button>
+        <button class='wl-service-action-card' data-wl-svc='inspect'><span>Truck / Trailer</span><b>${work.inspectionDone?"✓":"—"}</b><small>${work.inspectionDone?"Inspection done today":"Complete inspection"}</small></button>
+      </div>
+      <button class='wl-service-history' data-wl-svc='history'>☰ Inspection History</button>
+    </div>`;
   hideChildren(viewSvc(),[home]); resetWizardPosition();
 }
 async function serviceFindJobByTicket(){
