@@ -598,7 +598,7 @@ async function openTechMenu() {
     body.innerHTML = `
       <div class='wl-owner-menu-primary'>
         <button class='wl-owner-menu-ai' data-wl-menu-ai-dispatch>
-          <span class='wl-owner-menu-ai-icon'>✨</span>
+          <span class='wl-owner-menu-ai-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
           <span><b>Owner AI Dispatch</b><small>Create or dictate a Tech Check job</small></span>
           <strong>›</strong>
         </button>
@@ -2418,6 +2418,16 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  const aiChip=e.target.closest('[data-owner-ai-chip]');
+  if(aiChip){
+    const input=document.getElementById('ownerAIDispatchPrompt');
+    if(input){
+      const phrase=String(aiChip.dataset.ownerAiChip||'').trim();
+      input.value=(input.value.trim()?input.value.trim()+', ':'')+phrase;
+      input.focus();
+    }
+    return;
+  }
   if(e.target.closest('[data-owner-unit-lookup]')) return ownerLookupUnitHistory();
   const dayTab=e.target.closest('[data-owner-ai-day]');if(dayTab){const box=dayTab.closest('.wl-owner-ai-daily');box?.querySelectorAll('[data-owner-ai-day]').forEach(b=>b.classList.toggle('selected',b===dayTab));box?.querySelectorAll('[data-owner-ai-day-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.ownerAiDayPanel!==dayTab.dataset.ownerAiDay));return;}
   const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
@@ -2940,7 +2950,7 @@ function ownerLiveAIStatus(a,prep,solarCheck=null){
   if(a?.status==='completed'||prep?.status==='closed')return {state:'healthy',label:'COMPLETE',detail:'No obvious workflow conflict',flags:[]};
   return {state:'healthy',label:'ON TRACK',detail:p.detail,flags:[]};
 }
-function ownerLiveAIHtml(a,prep,solarCheck=null){const s=ownerLiveAIStatus(a,prep,solarCheck);return `<div class='wl-owner-ai-status ${s.state}'><span>✨ AI</span><b>${esc(s.label)}</b><small>${esc(s.detail)}</small>${s.flags.length?`<div>${s.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</div>`;}
+function ownerLiveAIHtml(a,prep,solarCheck=null){const s=ownerLiveAIStatus(a,prep,solarCheck);return `<div class='wl-owner-ai-status ${s.state}'><span class='wl-ai-inline-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''>AI</span><b>${esc(s.label)}</b><small>${esc(s.detail)}</small>${s.flags.length?`<div>${s.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</div>`;}
 function ownerTimelineWhen(v){if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
 function ownerAIJobTimeline(a,prep,solarCheck=null){
   const role=String(a?.assigned_role||''),type=String(a?.work_type||prep?.work_type||'service').toLowerCase(),status=String(a?.status||''),ps=String(prep?.status||'');
@@ -2964,7 +2974,7 @@ function ownerAIJobTimeline(a,prep,solarCheck=null){
   if(type==='pickup'){if(role==='it')idx=Math.max(idx,3);if(status==='completed')idx=4;}
   else{if(ps==='draft')idx=Math.max(idx,1);if(ps==='released')idx=Math.max(idx,role==='service'?3:2);if(solarCheck?.completed_at)idx=Math.max(idx,3);if(ps==='closed'||status==='completed')idx=4;}
   const ai=ownerLiveAIStatus(a,prep,solarCheck);
-  return `<details class='wl-ai-timeline'><summary>✨ AI Job Timeline <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>{const when=ownerTimelineWhen(s.when);return `<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b><span>${esc(s.who||'')}${when?' · '+esc(when):''}</span>${i===idx?`<span class='wl-ai-current-detail'>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`}).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
+  return `<details class='wl-ai-timeline'><summary><span class='wl-ai-inline-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''>AI Job Timeline</span> <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>{const when=ownerTimelineWhen(s.when);return `<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b><span>${esc(s.who||'')}${when?' · '+esc(when):''}</span>${i===idx?`<span class='wl-ai-current-detail'>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`}).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
 }
 function ownerAIAlertHistoryHtml(a,prep,solarCheck=null){
   const id=String(a?.id||a?.ticket_no||''), current=ownerLiveAIStatus(a,prep,solarCheck), rows=ownerAIAckRows.filter(r=>String(r.assignment_id)===id);
@@ -3102,13 +3112,32 @@ async function installOwnerAssignments(force = false) {
       <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
-      <section class='wl-ai-panel ownerAIDispatchPanel'>
-        <div class='wl-ai-head'><span>✨ Owner AI Dispatch</span><b>DRAFT ONLY</b></div>
-        <div class='small'>Type or dictate the job in your own words. AI Dispatch fills only details it can identify, flags anything missing, and never sends the job by itself.</div>
-        <textarea id='ownerAIDispatchPrompt' rows='4' style='width:100%;min-height:96px;margin-top:10px;resize:vertical' placeholder='Example: MHelpDesk 48215, delivery tomorrow, site: West Lot, 1 Helios, send IT then Service, assign IT to James.'></textarea>
-        <div class='wl-nav top8'><button type='button' class='wl-prev' data-owner-ai-dispatch-voice>🎙 Dictate</button><button type='button' class='wl-next' data-owner-ai-dispatch-build>✨ Build / Update Draft</button></div>
-        <div id='ownerAIDispatchVoiceStatus' class='small'></div>
-        <div id='ownerAIDispatchResult' class='wl-ai-panel hidden top10'></div>
+      <section class='wl-ai-panel ownerAIDispatchPanel wl-ai-brand-card'>
+        <div class='wl-ai-brand-head'>
+          <div class='wl-ai-brand-title'>
+            <span class='wl-ai-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
+            <span><small>TECH CHECK AI</small><b>Owner AI Dispatch</b></span>
+          </div>
+          <span class='wl-ai-state draft'>DRAFT</span>
+        </div>
+        <div class='wl-ai-lead'>Tell Tech Check what the MHelpDesk job needs. AI will build the draft, identify missing details, and leave the final send decision to you.</div>
+        <div class='wl-ai-prompt-box'>
+          <label for='ownerAIDispatchPrompt'>Describe the job</label>
+          <textarea id='ownerAIDispatchPrompt' rows='4' placeholder='Example: MHelpDesk 48215, delivery tomorrow, West Lot, 1 Helios, IT then Service, assign IT to James.'></textarea>
+          <div class='wl-ai-prompt-chips' aria-label='Quick AI prompts'>
+            <button type='button' data-owner-ai-chip='Install job'>Install job</button>
+            <button type='button' data-owner-ai-chip='Service call'>Service call</button>
+            <button type='button' data-owner-ai-chip='Delivery tomorrow'>Delivery tomorrow</button>
+            <button type='button' data-owner-ai-chip='Send IT then Service'>IT → Service</button>
+            <button type='button' data-owner-ai-chip='Assign to James'>Assign to James</button>
+          </div>
+        </div>
+        <div class='wl-ai-dispatch-actions'>
+          <button type='button' class='wl-ai-dictate' data-owner-ai-dispatch-voice><span>🎙</span> Dictate</button>
+          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Build / Update Draft <span>→</span></button>
+        </div>
+        <div id='ownerAIDispatchVoiceStatus' class='wl-ai-voice-status'></div>
+        <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10'></div>
       </section>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
@@ -3164,7 +3193,10 @@ async function installOwnerAssignments(force = false) {
       </section>
       <section class='wl-owner-ai-control-center'>
         <div class='wl-owner-ai-control-head'>
-          <div><span class='wl-owner-ai-kicker'>OWNER AI</span><b>AI Control Center</b><small>Daily workflow health, alerts, and operations</small></div>
+          <div class='wl-owner-ai-control-title'>
+            <span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
+            <div><span class='wl-owner-ai-kicker'>TECH CHECK AI</span><b>AI Control Center</b><small>Daily workflow health, alerts, and operations</small></div>
+          </div>
           <span class='wl-owner-ai-master-status ${aiAttention ? 'attention' : 'healthy'}'>${aiAttention ? aiAttention+' NEEDS REVIEW' : 'ALL CLEAR'}</span>
         </div>
       <details class='wl-owner-ai-daily' open><summary><span>Daily Summary</span><span class='pill'>TODAY</span></summary><div class='wl-owner-ai-daily-body'>
@@ -3659,15 +3691,25 @@ function ownerAIDispatchRender(parsed) {
   const box=document.getElementById("ownerAIDispatchResult"); if(!box)return;
   const missing=ownerAIDispatchMissing(parsed), s=ownerAIDispatchSummary(parsed);
   box.classList.remove("hidden");
+  box.classList.toggle("is-ready", missing.length===0);
+  box.classList.toggle("is-pending", missing.length>0);
   const warningHtml=(parsed.warnings||[]).length ? "<div class='wl-ai-warn top8'>"+parsed.warnings.map(v=>"⚠ "+esc(v)).join("<br>")+"</div>" : "";
-  box.innerHTML="<div class='wl-ai-head'><span>✨ AI Dispatch Draft</span><b>"+(missing.length?"NEEDS "+missing.length+" DETAIL"+(missing.length===1?"":"S"):"READY FOR REVIEW")+"</b></div>"
-    +"<div class='wl-ai-line'><b>MHelpDesk:</b> #"+esc(s.ticket)+" · <b>"+esc(s.type)+"</b></div>"
-    +"<div class='wl-ai-line'><b>Site:</b> "+esc(s.site)+" · <b>Work date:</b> "+esc(s.date)+"</div>"
-    +"<div class='wl-ai-line'><b>Flow:</b> "+esc(s.flow)+" · <b>Assigned:</b> "+esc(s.techs)+"</div>"
-    +"<div class='wl-ai-line'><b>Equipment:</b> "+esc(s.equipment)+"</div>"
+  box.innerHTML=
+    "<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>TECH CHECK AI</small><b>Dispatch Draft</b></span></div><span class='wl-ai-state "+(missing.length?"pending":"ready")+"'>"+(missing.length?"PENDING":"READY")+"</span></div>"
+    +"<div class='wl-ai-result-grid'>"
+      +"<div><span>MHelpDesk</span><b>#"+esc(s.ticket)+"</b></div>"
+      +"<div><span>Job type</span><b>"+esc(s.type)+"</b></div>"
+      +"<div><span>Site</span><b>"+esc(s.site)+"</b></div>"
+      +"<div><span>Work date</span><b>"+esc(s.date)+"</b></div>"
+      +"<div><span>Flow</span><b>"+esc(s.flow)+"</b></div>"
+      +"<div><span>Assigned</span><b>"+esc(s.techs)+"</b></div>"
+    +"</div>"
+    +"<div class='wl-ai-result-equipment'><span>Equipment</span><b>"+esc(s.equipment)+"</b></div>"
     +warningHtml
-    +(missing.length?"<div class='wl-ai-warn top8'><b>I still need:</b><br>"+missing.map(v=>"• "+esc(v)).join("<br>")+"</div><div class='small top8'>Add those details in the form or dictate/type another instruction, then tap Build / Update Draft again.</div>":"<div class='wl-ai-good top8'>✓ The draft has enough information for your review. Nothing has been sent.</div>")
-    +"<div class='small top8'>AI Dispatch only prepares the draft. The normal Tech Check send action still requires your confirmation.</div>";
+    +(missing.length
+      ? "<div class='wl-ai-pending-box'><b>Pending information</b>"+missing.map(v=>"<span>• "+esc(v)+"</span>").join("")+"<small>Add the missing details, then build the draft again.</small></div>"
+      : "<div class='wl-ai-good'><b>✓ Ready for your review</b><br>Nothing has been sent.</div>")
+    +"<div class='wl-ai-advisory'>AI prepares the draft only. You still review and send the Tech Check job.</div>";
   return missing;
 }
 function ownerAIDispatchBuild() {
@@ -3708,7 +3750,25 @@ async function openOwnerAIDispatch() {
 }
 
 function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
-function ownerAIReview(){const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');if(!a.site)issues.push('Customer / Site is blank.');if(!a.job_description)issues.push('Job description is missing.');if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Send it to Service or Service + IT.');if(type==='pickup'&&role==='it_service')issues.push('Pickup will be forced to Service first, then IT Intake.');if((role==='it'||dual)&&!x.equipment.length)issues.push('IT is included but no equipment quantity is listed.');const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),sn=(document.getElementById('ownerAssignStandNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),dt=equipmentManifestDeviceTotal(a.equipment_manifest),st=equipmentManifestStandTotal(a.equipment_manifest);if(dt&&un.length&&dt!==un.length)issues.push('Device quantity is '+dt+' but '+un.length+' unit numbers are entered.');if(st&&sn.length&&st!==sn.length)issues.push('Stand quantity is '+st+' but '+sn.length+' stand/pole numbers are entered.');const box=document.getElementById('ownerAIReviewBox');if(!box)return;box.classList.remove('hidden');box.innerHTML=`<div class='wl-ai-head'><span>✨ Owner AI Preflight</span><b>${issues.length?'REVIEW '+issues.length+' ITEM'+(issues.length===1?'':'S'):'READY TO SEND'}</b></div><div class='small'><b>MHelpDesk #${esc(a.ticket_no||'—')}</b> · ${esc(type.toUpperCase())}</div>${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}<div class='wl-ai-line'><b>Expected flow:</b> ${type==='pickup'?'Service → field pickup → IT Intake':role==='it_service'?'IT → Service handoff':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only'}</div>${issues.length?`<div class='wl-ai-warn'>${issues.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Ticket setup looks consistent with the selected workflow.</div>`}<div class='small top8'>AI Preflight is advisory only. It does not change or send the ticket.</div>`;}
+function ownerAIReview(){
+  const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';
+  if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
+  if(!a.site)issues.push('Customer / Site is blank.');
+  if(!a.job_description)issues.push('Job description is missing.');
+  if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Send it to Service or Service + IT.');
+  if(type==='pickup'&&role==='it_service')issues.push('Pickup will be forced to Service first, then IT Intake.');
+  if((role==='it'||dual)&&!x.equipment.length)issues.push('IT is included but no equipment quantity is listed.');
+  const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),
+        sn=(document.getElementById('ownerAssignStandNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),
+        dt=equipmentManifestDeviceTotal(a.equipment_manifest),st=equipmentManifestStandTotal(a.equipment_manifest);
+  if(dt&&un.length&&dt!==un.length)issues.push('Device quantity is '+dt+' but '+un.length+' unit numbers are entered.');
+  if(st&&sn.length&&st!==sn.length)issues.push('Stand quantity is '+st+' but '+sn.length+' stand/pole numbers are entered.');
+  const box=document.getElementById('ownerAIReviewBox');if(!box)return;
+  box.classList.remove('hidden');
+  box.classList.toggle('is-ready',issues.length===0);
+  box.classList.toggle('is-pending',issues.length>0);
+  box.innerHTML=`<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>TECH CHECK AI</small><b>Preflight Review</b></span></div><span class='wl-ai-state ${issues.length?'pending':'ready'}'>${issues.length?'PENDING':'READY'}</span></div><div class='wl-ai-preflight-summary'><b>MHelpDesk #${esc(a.ticket_no||'—')}</b><span>${esc(type.toUpperCase())}</span></div>${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}<div class='wl-ai-line'><b>Expected flow:</b> ${type==='pickup'?'Service → field pickup → IT Intake':role==='it_service'?'IT → Service handoff':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only'}</div>${issues.length?`<div class='wl-ai-pending-box'><b>Pending review</b>${issues.map(v=>'<span>⚠ '+esc(v)+'</span>').join('')}</div>`:`<div class='wl-ai-good'>✓ Ticket setup looks consistent with the selected workflow.</div>`}<div class='wl-ai-advisory'>AI Preflight is advisory only. It does not change or send the ticket.</div>`;
+}
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
   const site = document.getElementById('ownerAssignSite')?.value.trim() || '';
