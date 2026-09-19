@@ -152,6 +152,24 @@ function knowledgeForTopic(topic: string) {
     }
   }
 
+  const truckSpares = KNOWLEDGE?.truck_spares || null
+  if (truckSpares && /(truck\s+spare|truck\s+backup|spare\s+batter|backup\s+unit)/.test(q)) {
+    return {
+      certainty: 'COMPANY RULE',
+      topic: 'truck_spares',
+      definition: truckSpares,
+    }
+  }
+
+  const gapInventory = KNOWLEDGE?.phase_7_gap_inventory || null
+  if (gapInventory && /(phase\s*7|knowledge\s+gap|missing\s+(?:company\s+)?knowledge|what.*(?:teach|learn)|teach.*vision|still\s+unknown)/.test(q)) {
+    return {
+      certainty: 'MISSING INFORMATION',
+      topic: 'phase_7_gap_inventory',
+      definition: gapInventory,
+    }
+  }
+
   const technicalHits = Object.entries(equipment)
     .filter(([name, def]: any) => {
       const hay = JSON.stringify({ name, def }).toLowerCase()
@@ -352,7 +370,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v5',
+        agent_version: 'onsite-vision-agent-v6',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -527,6 +545,7 @@ Deno.serve(async (req) => {
       '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
       '- If company knowledge marks something partial/unknown, say what is missing instead of inventing an answer.',
+      '- When a product definition includes teaching_needed, use it to state exactly what Cameras On Site information is still missing; do not convert those questions into assumed procedures.',
       '- get_company_knowledge may return owner-approved managed knowledge in addition to the code baseline. Draft and retired entries are never company truth.',
       '- Live database enforcement outranks editable knowledge. If approved managed knowledge conflicts with the code baseline, call out the conflict instead of silently choosing one.',
       '- Distinguish VERIFIED DATABASE FACT, COMPANY RULE, AI INFERENCE, and MISSING INFORMATION.',
