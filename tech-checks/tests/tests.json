@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v99",
-  "service_worker": "v45",
+  "runtime_version": "release-qa-v100",
+  "service_worker": "v46",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
