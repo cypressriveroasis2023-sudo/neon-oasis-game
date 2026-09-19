@@ -2560,7 +2560,7 @@ function itUnitReviewHtml(item, evidence, unitNo) {
   const identity = itItemIdentity(item, unitNo);
   return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} of ${Number(item.required_battery_count || 0)} required</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed'}</div></div>`;
 }
-const TRUCK_SPARE_BATTERY_OPTIONS = [
+const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
   { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
   { key:'spotter-350', equipment_type:'Solar Spotter', battery_type:'12V 350Ah', label:'Solar Spotter · 12V 350Ah' },
   { key:'ranger-litime', equipment_type:'Ranger', battery_type:'LiTime 12V 110Ah', label:'Ranger · LiTime 12V 110Ah' },
