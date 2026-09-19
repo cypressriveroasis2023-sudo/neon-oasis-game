@@ -288,3 +288,17 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   font-size:10px;
   line-height:1.45;
 }
+
+
+/* Audited Vision action states v13 */
+.vision-action-card.audited{
+  border-color:#3f5b73;
+  box-shadow:0 14px 36px rgba(0,0,0,.2),inset 3px 0 0 #d20b12;
+}
+.vision-action-card.audited small{color:#ff474d}
+.vision-action-card.blocked{
+  border-color:rgba(226,184,90,.45);
+  background:linear-gradient(145deg,rgba(226,184,90,.08),#0f1a25);
+  box-shadow:inset 3px 0 0 #e2b85a;
+}
+.vision-action-card.blocked small{color:#e2b85a}
