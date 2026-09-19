@@ -1533,14 +1533,14 @@ async function completeServiceFieldAssignment(id) {
 }
 async function syncServiceAssignmentAfterReturn(ticket,techId) {
   const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','service').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
-  const a=rows?.[0]; if(!a)return {completed:false,count:0,required:0};
+  const a=rows?.[0];if(!a)return {completed:false,count:0,required:0};
   const {data:returns}=await liveDb.from('unit_returns').select('id').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
-  const count=(returns||[]).length, required=assignmentEquipmentCount(a);
-  if(count>=required){
-    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
-    if(error)console.warn('Return saved but Service assignment could not be completed',error);
-    else return {completed:true,count,required};
-  }
+  const count=(returns||[]).length;
+  const {data:preps}=await liveDb.from('prep_tickets').select('id,status,prep_items(equipment_type,purpose)').eq('ticket_no',String(ticket||'')).eq('status','released').order('released_at',{ascending:false}).limit(5);
+  const heliosSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>i.equipment_type==='Helios'&&i.purpose==='SWAP'));
+  if(heliosSwapPrep){const required=(heliosSwapPrep.prep_items||[]).filter(i=>i.equipment_type==='Helios'&&i.purpose==='SWAP').length;return {completed:false,count,required,fieldPending:true};}
+  const required=assignmentEquipmentCount(a);
+  if(count>=required){const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});if(error)console.warn('Return saved but Service assignment could not be completed',error);else return {completed:true,count,required};}
   return {completed:false,count,required};
 }
 async function syncITReturnAssignmentAfterIntake(ticket,techId) {
@@ -2294,11 +2294,18 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
   const tagConfirm = stage === 'it' && unitNo && photos.length ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
   return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'><b>${stage === 'it' && unitNo ? `${esc(identity)} Photo` : unitNo ? `Unit ${unitNo} Photo` : 'Photo Proof'}</b><div class='wl-note'>${instruction}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div><div class='${complete ? 'ok' : 'warn'} top8'><b>${complete ? '✓' : ''} ${photos.length} of ${required} photo${required === 1 ? '' : 's'} saved</b></div>` : `<div class='warn top8'>0 of ${required} photos saved.</div>`}${tagConfirm}${input}</div>`;
 }
+function signatureStamp(name,at){
+  if(!at) return `Signed by ${esc(name || 'Technician')}`;
+  const d=new Date(at);
+  const date=d.toLocaleDateString([], {month:'numeric',day:'numeric',year:'numeric'});
+  const time=d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  return `Signed by ${esc(name || 'Technician')} · ${esc(date)} · ${esc(time)}`;
+}
 async function signatureOnlyHtml(prepId, stage, unitNo = null) {
   const rows = await evidenceRows(prepId, stage);
   const signatureName = unitNo ? `unit-${unitNo}-signature.png` : null;
   const sig = [...rows].reverse().find(r => r.kind === 'signature' && (!unitNo || r.original_name === signatureName));
-  return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'><b>${unitNo ? `Unit ${unitNo} IT Verification Signature` : stage === 'it' ? 'IT Final Sign-Off' : 'Service Receipt Signature'}</b>${sig ? `<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || '')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>`}</div>`;
+  return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'><b>${unitNo ? `Unit ${unitNo} IT Verification Signature` : stage === 'it' ? 'IT Final Sign-Off' : 'Service Receipt Signature'}</b>${sig ? `<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${signatureStamp(sig.created_by_name || (stage === 'it' ? 'IT Technician' : 'Service Tech'),sig.created_at)}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>`}</div>`;
 }
 function itSummaryHtml(forms, evidence) {
   const photos = evidence.filter(r => r.kind === 'photo');
@@ -2326,6 +2333,9 @@ function itItemIdentity(item, unitNo) {
   const tag = String(item?.unit_tag || '').trim();
   return tag ? `${item.equipment_type} ${tag}` : `Unit ${unitNo}`;
 }
+function isHeliosDeploy(item){
+  return item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose);
+}
 function itUnitStepsData(item, unitNo) {
   const support = isSupport(item.equipment_type);
   const identity = itItemIdentity(item, unitNo);
@@ -2339,54 +2349,67 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} what the customer requested and what is listed on the MHelpDesk ticket?` });
     return steps;
   }
-  if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) steps.push({ kind: 'number', field: 'battery_count', label: `How many batteries / battery boxes are prepared for ${identity}?` });
+  if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) {
+    steps.push({ kind: 'number', field: 'battery_count', label: item.equipment_type==='Helios' ? `Confirm ${identity} has exactly its internal Helios battery box prepared. This is ONE Helios battery box — not four Solar Stand batteries.` : `How many batteries / battery boxes are prepared for ${identity}?` });
+  }
   steps.push({ kind: 'bool', field: 'power_ok', label: `Does ${identity} power on correctly?` });
+
+  if (isHeliosDeploy(item)) {
+    steps.push(
+      { kind:'bool', field:'helios_camera1_hardware_ok', label:`Is Camera 1 (bullet camera) installed correctly on ${identity}?` },
+      { kind:'bool', field:'helios_camera2_hardware_ok', label:`Is Camera 2 (bullet camera) installed correctly on ${identity}?` },
+      { kind:'bool', field:'helios_ptz_assembly_ok', label:`Is the Cameras 3/4 PTZ assembly correct on ${identity}: 180° lens on top and PTZ on bottom?` },
+      { kind:'bool', field:'helios_cameras_12v_ok', label:`Are the Helios cameras powered from the required 12V supply?` },
+      { kind:'bool', field:'helios_ptz_plate_4bolts_ok', label:`Is the PTZ mounted to the removable front plate and secured with all 4 bolts?` },
+      { kind:'bool', field:'helios_router_sim_ok', label:`Is the router installed correctly with the SIM installed in ${identity}?` },
+      { kind:'bool', field:'helios_proxicast_4x4_ok', label:`Is the Proxicast 4x4 antenna installed, connected to the router, and secure?` },
+      { kind:'bool', field:'helios_speaker_24v_ok', label:`Is the IP Speaker installed and powered from the required 24V supply?` },
+      { kind:'bool', field:'helios_camera_router_programming_ok', label:`Are the cameras and router programmed together for this Helios before port verification?` },
+      { kind:'bool', field:'delivery_sim_ok', label:`Is the SIM active and is the Helios router online?` },
+      { kind:'bool', field:'delivery_camera_app_ok', label:`Is ${identity} visible and working in the camera app?` },
+      { kind:'bool', field:'helios_camera1_ports_ok', label:`Camera 1: are ports 81 / 554 / 1400 configured and open in both Camera 1 and the router?` },
+      { kind:'bool', field:'helios_camera2_ports_ok', label:`Camera 2: are ports 81 / 554 / 1500 configured and open in both Camera 2 and the router?` },
+      { kind:'bool', field:'helios_ptz_ports_ok', label:`PTZ: are ports 81 / 554 / 1600 configured and open in both the PTZ and the router?` },
+      { kind:'bool', field:'helios_speaker_ports_ok', label:`IP Speaker: are ports 81 / 554 / 1700 configured and open in both the speaker and the router?` },
+      { kind:'bool', field:'helios_alibi_vigilant_ok', label:`Is ${identity} correctly configured and visible in Alibi / Vigilant Control Center?` },
+      { kind:'bool', field:'helios_cerbo_network_ok', label:`Is the Victron Cerbo connected to the Helios router/network?` },
+      { kind:'bool', field:'helios_cerbo_vrm_ok', label:`Is the Cerbo added to Victron VRM and visible online?` },
+      { kind:'bool', field:'helios_rear_unit_tag_ok', label:`Is the permanent Helios unit tag installed on the rear and clearly readable?` },
+      { kind:'bool', field:'helios_battery_box_installed_ok', label:`Is the single Helios battery box installed inside ${identity}?` },
+      { kind:'bool', field:'helios_battery_120v_charged_ok', label:`Did IT charge the Helios battery box while ${identity} was plugged into 120V?` },
+      { kind:'bool', field:'helios_3x1tb_sd_ok', label:`Are all 3 required 1TB SD cards installed in ${identity}?` },
+      { kind:'bool', field:'delivery_recording_ok', label:`Before formatting storage, did IT verify ${identity} is recording correctly?` },
+      { kind:'bool', field:'delivery_sd_formatted_ok', label:`After recording verification, are all 3 × 1TB SD cards formatted and ready?` }
+    );
+    if (item.purpose!=='BACKUP') {
+      steps.push({ kind:'bool', field:'delivery_monitoring_ok', label:`Was Central Station monitoring for ${identity} created and sent in?` });
+      steps.push({ kind:'bool', field:'delivery_customer_email_app_ok', label:`Was ${identity} added under the customer email account in the camera app?` });
+    }
+    steps.push({ kind:'bool', field:'functions_ok', label:`Were all functions on ${identity} tested and working?` });
+    steps.push({ kind:'bool', field:'safe_ok', label:`Is ${identity} ready for the IT → Service handoff?` });
+    return steps;
+  }
+
   if (item.equipment_type === 'Ranger') {
     steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
     steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
     steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
   }
-
   if (['DELIVERY','BACKUP'].includes(item.purpose)) {
-    if (item.equipment_type === 'Helios') {
-      steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Is the Cerbo for ${identity} online and visible in the VRM portal?` });
-      steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration for ${identity} updated?` });
-      steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Is the battery box for ${identity} fully charged?` });
-      steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `Is the battery box charging when ${identity} is hooked up to the Helios tower solar panels?` });
-    }
     steps.push({ kind: 'bool', field: 'delivery_sim_ok', label: `Is the SIM card for ${identity} active and installed in the router?` });
     steps.push({ kind: 'bool', field: 'delivery_camera_app_ok', label: `Is ${identity} visible in the camera app?` });
-
-    if (item.equipment_type === 'Helios') {
-      steps.push({ kind: 'bool', field: 'helios_camera1_ports_ok', label: `Is Camera 1 on ${identity} configured, with ports 81 / 554 / 1400 open in both Camera 1 and the router?` });
-      steps.push({ kind: 'bool', field: 'helios_camera2_ports_ok', label: `Is Camera 2 on ${identity} configured, with ports 81 / 554 / 1500 open in both Camera 2 and the router?` });
-      steps.push({ kind: 'bool', field: 'helios_ptz_ports_ok', label: `Is the PTZ on ${identity} configured, with ports 81 / 554 / 1600 open in both the PTZ and the router?` });
-      steps.push({ kind: 'bool', field: 'helios_speaker_ports_ok', label: `Is the IP Speaker on ${identity} configured, with ports 81 / 554 / 1700 open in both the speaker and the router?` });
-      steps.push({ kind: 'bool', field: 'solar_panels_match_ok', label: `Does ${identity} have all 3 required 1TB SD cards installed?` });
-      steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Before formatting the SD cards, did you verify ${identity} is recording footage correctly?` });
-    } else {
-      steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
-      if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
-    }
-
+    steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
+    if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     if (item.purpose === 'DELIVERY') {
       steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
-      if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
+      steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
     }
-
-    if (item.equipment_type === 'Helios') {
-      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `After confirming recording, are all 3 of the 1TB SD cards in ${identity} formatted and ready?` });
-    } else {
-      steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
-    }
+    steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
     if (item.purpose === 'DELIVERY') steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
-
-    // Keep these as the final two IT checks before photo, signature, and review.
     steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
     steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
     return steps;
   }
-
   steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
   steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
   return steps;
@@ -2396,13 +2419,27 @@ function itUnitReady(item) {
   if (isSolarSupport(item.equipment_type) || isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok && (isSimpleSupport(item.equipment_type) || item.safe_ok));
   if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
   if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
+  if (isHeliosDeploy(item)) {
+    const core=Boolean(
+      item.helios_camera1_hardware_ok && item.helios_camera2_hardware_ok && item.helios_ptz_assembly_ok &&
+      item.helios_proxicast_4x4_ok && item.helios_router_sim_ok && item.helios_speaker_24v_ok &&
+      item.helios_cameras_12v_ok && item.helios_ptz_plate_4bolts_ok && item.helios_cerbo_network_ok &&
+      item.helios_cerbo_vrm_ok && item.helios_rear_unit_tag_ok && item.helios_battery_box_installed_ok &&
+      item.helios_battery_120v_charged_ok && item.helios_camera_router_programming_ok && item.helios_alibi_vigilant_ok &&
+      item.helios_3x1tb_sd_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok &&
+      item.helios_ptz_ports_ok && item.helios_speaker_ports_ok && item.delivery_sim_ok &&
+      item.delivery_camera_app_ok && item.delivery_batteries_charged_ok && item.delivery_sd_formatted_ok &&
+      item.delivery_recording_ok
+    );
+    if(!core) return false;
+    return item.purpose==='BACKUP' ? true : Boolean(item.delivery_customer_email_app_ok && item.delivery_monitoring_ok);
+  }
   if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
   if (!['DELIVERY','BACKUP'].includes(item.purpose)) return true;
-  if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok && item.helios_ptz_ports_ok && item.helios_speaker_ports_ok)) return false;
   const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
   const hardwareReady = Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady);
   if (item.purpose === 'BACKUP') return hardwareReady;
-  return Boolean(hardwareReady && item.delivery_customer_email_app_ok && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
+  return Boolean(hardwareReady && item.delivery_customer_email_app_ok && item.delivery_monitoring_ok && item.delivery_ticket_count_ok);
 }
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
@@ -2417,17 +2454,19 @@ async function configureCurrentItItem() {
     : await liveDb.rpc('add_it_prep_item', { p_prep_id: activeItPrep.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_recon_battery_count: required });
   if (result.error) { alert(result.error.message); return false; }
   activeItPrep = await getPrep(activeItPrep.id);
-  if (itTypeChoice === 'Helios' && ['DELIVERY','BACKUP'].includes(itPurposeChoice)) {
+  if (itTypeChoice === 'Helios' && ['DELIVERY','SWAP','BACKUP'].includes(itPurposeChoice)) {
     const configured = currentItItem();
     if (configured) {
-      const { error: portResetError } = await liveDb.rpc('save_it_helios_port_checks', {
-        p_item_id: configured.id,
-        p_camera1_ports_ok: false,
-        p_camera2_ports_ok: false,
-        p_ptz_ports_ok: false,
-        p_speaker_ports_ok: false,
+      const { error }=await liveDb.rpc('save_it_helios_deploy_checks_v1',{
+        p_item_id:configured.id,
+        p_camera1_hardware_ok:false,p_camera2_hardware_ok:false,p_ptz_assembly_ok:false,p_proxicast_4x4_ok:false,
+        p_router_sim_ok:false,p_speaker_24v_ok:false,p_cameras_12v_ok:false,p_ptz_plate_4bolts_ok:false,
+        p_cerbo_network_ok:false,p_cerbo_vrm_ok:false,p_rear_unit_tag_ok:false,p_battery_box_installed_ok:false,
+        p_battery_120v_charged_ok:false,p_camera_router_programming_ok:false,p_alibi_vigilant_ok:false,p_3x1tb_sd_ok:false,
+        p_camera1_ports_ok:false,p_camera2_ports_ok:false,p_ptz_ports_ok:false,p_speaker_ports_ok:false,
+        p_sim_ok:false,p_camera_app_ok:false,p_customer_email_app_ok:false,p_monitoring_ok:false,p_sd_formatted_ok:false,p_recording_ok:false
       });
-      if (portResetError) { alert(portResetError.message); return false; }
+      if (error) { alert(error.message); return false; }
       activeItPrep = await getPrep(activeItPrep.id);
     }
   }
@@ -2437,35 +2476,35 @@ async function persistCurrentItItem() {
   const item = currentItItem();
   if (!item) return false;
   const { error } = await liveDb.rpc('save_it_prep_item_draft', {
-    p_item_id: item.id,
-    p_unit_tag: item.unit_tag || '',
-    p_battery_count: Number(item.battery_count || 0),
-    p_power_ok: Boolean(item.power_ok),
-    p_functions_ok: Boolean(item.functions_ok),
-    p_safe_ok: Boolean(item.safe_ok),
-    p_sim_ok: Boolean(item.delivery_sim_ok),
-    p_camera_app_ok: Boolean(item.delivery_camera_app_ok), p_customer_email_app_ok: Boolean(item.delivery_customer_email_app_ok),
-    p_batteries_charged_ok: Boolean(item.delivery_batteries_charged_ok),
-    p_monitoring_ok: Boolean(item.delivery_monitoring_ok),
-    p_ticket_count_ok: Boolean(item.delivery_ticket_count_ok),
-    p_sd_formatted_ok: Boolean(item.delivery_sd_formatted_ok),
-    p_recording_ok: Boolean(item.delivery_recording_ok),
-    p_mppt_updated_ok: Boolean(item.solar_mppt_updated_ok),
-    p_mppt_tested_ok: Boolean(item.solar_mppt_tested_ok),
-    p_pv_charging_ok: Boolean(item.solar_pv_charging_ok),
-    p_solar_panels_match_ok: Boolean(item.solar_panels_match_ok),
-    p_ticket_item_match_ok: Boolean(item.ticket_item_match_ok),
+    p_item_id: item.id,p_unit_tag:item.unit_tag||'',p_battery_count:Number(item.battery_count||0),
+    p_power_ok:Boolean(item.power_ok),p_functions_ok:Boolean(item.functions_ok),p_safe_ok:Boolean(item.safe_ok),
+    p_sim_ok:Boolean(item.delivery_sim_ok),p_camera_app_ok:Boolean(item.delivery_camera_app_ok),
+    p_customer_email_app_ok:Boolean(item.delivery_customer_email_app_ok),p_batteries_charged_ok:Boolean(item.delivery_batteries_charged_ok),
+    p_monitoring_ok:Boolean(item.delivery_monitoring_ok),p_ticket_count_ok:Boolean(item.delivery_ticket_count_ok),
+    p_sd_formatted_ok:Boolean(item.delivery_sd_formatted_ok),p_recording_ok:Boolean(item.delivery_recording_ok),
+    p_mppt_updated_ok:Boolean(item.solar_mppt_updated_ok),p_mppt_tested_ok:Boolean(item.solar_mppt_tested_ok),
+    p_pv_charging_ok:Boolean(item.solar_pv_charging_ok),p_solar_panels_match_ok:Boolean(item.solar_panels_match_ok),
+    p_ticket_item_match_ok:Boolean(item.ticket_item_match_ok)
   });
   if (error) { alert(error.message); return false; }
-  if (item.equipment_type === 'Helios' && ['DELIVERY','BACKUP'].includes(item.purpose)) {
-    const { error: heliosPortError } = await liveDb.rpc('save_it_helios_port_checks', {
-      p_item_id: item.id,
-      p_camera1_ports_ok: Boolean(item.helios_camera1_ports_ok),
-      p_camera2_ports_ok: Boolean(item.helios_camera2_ports_ok),
-      p_ptz_ports_ok: Boolean(item.helios_ptz_ports_ok),
-      p_speaker_ports_ok: Boolean(item.helios_speaker_ports_ok),
+  if (isHeliosDeploy(item)) {
+    const { error:heliosError }=await liveDb.rpc('save_it_helios_deploy_checks_v1',{
+      p_item_id:item.id,
+      p_camera1_hardware_ok:Boolean(item.helios_camera1_hardware_ok),p_camera2_hardware_ok:Boolean(item.helios_camera2_hardware_ok),
+      p_ptz_assembly_ok:Boolean(item.helios_ptz_assembly_ok),p_proxicast_4x4_ok:Boolean(item.helios_proxicast_4x4_ok),
+      p_router_sim_ok:Boolean(item.helios_router_sim_ok),p_speaker_24v_ok:Boolean(item.helios_speaker_24v_ok),
+      p_cameras_12v_ok:Boolean(item.helios_cameras_12v_ok),p_ptz_plate_4bolts_ok:Boolean(item.helios_ptz_plate_4bolts_ok),
+      p_cerbo_network_ok:Boolean(item.helios_cerbo_network_ok),p_cerbo_vrm_ok:Boolean(item.helios_cerbo_vrm_ok),
+      p_rear_unit_tag_ok:Boolean(item.helios_rear_unit_tag_ok),p_battery_box_installed_ok:Boolean(item.helios_battery_box_installed_ok),
+      p_battery_120v_charged_ok:Boolean(item.helios_battery_120v_charged_ok),p_camera_router_programming_ok:Boolean(item.helios_camera_router_programming_ok),
+      p_alibi_vigilant_ok:Boolean(item.helios_alibi_vigilant_ok),p_3x1tb_sd_ok:Boolean(item.helios_3x1tb_sd_ok),
+      p_camera1_ports_ok:Boolean(item.helios_camera1_ports_ok),p_camera2_ports_ok:Boolean(item.helios_camera2_ports_ok),
+      p_ptz_ports_ok:Boolean(item.helios_ptz_ports_ok),p_speaker_ports_ok:Boolean(item.helios_speaker_ports_ok),
+      p_sim_ok:Boolean(item.delivery_sim_ok),p_camera_app_ok:Boolean(item.delivery_camera_app_ok),
+      p_customer_email_app_ok:Boolean(item.delivery_customer_email_app_ok),p_monitoring_ok:Boolean(item.delivery_monitoring_ok),
+      p_sd_formatted_ok:Boolean(item.delivery_sd_formatted_ok),p_recording_ok:Boolean(item.delivery_recording_ok)
     });
-    if (heliosPortError) { alert(heliosPortError.message); return false; }
+    if (heliosError) { alert(heliosError.message); return false; }
   }
   activeItPrep = await getPrep(activeItPrep.id);
   return true;
@@ -3097,7 +3136,10 @@ function serviceSolarReady(ctx, check, evidence) {
   if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<requiredStandPhotos || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
   if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
   if (serviceSolarEvidenceCount(evidence,'mppt','photo')<1) return false;
-  if (ctx.has_helios && serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo')<1) return false;
+  if (ctx.has_helios) {
+    if (serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo')<1) return false;
+    if (serviceSolarEvidenceCount(evidence,'helios_yard','photo')<1 || serviceSolarEvidenceCount(evidence,'helios_yard','signature')<1) return false;
+  }
   return true;
 }
 function serviceSolarDefaultStandTag() {
@@ -3122,18 +3164,13 @@ function serviceSolarStandTagsValue(check=null) {
 function serviceSolarProofPanelHtml(rows, category, title, instruction, requireSignature=false) {
   const photos=(rows || []).filter(row => row.category===category && row.kind==='photo');
   const sig=[...(rows || [])].reverse().find(row => row.category===category && row.kind==='signature');
-  return `<div class='wl-proof service wl-solar-proof' data-solar-category='${esc(category)}'>
-    <b>${esc(title)}</b>
-    <div class='wl-note'>${esc(instruction)}</div>
+  return `<div class='wl-proof service wl-solar-proof' data-solar-category='${esc(category)}'><b>${esc(title)}</b><div class='wl-note'>${esc(instruction)}</div>
     ${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='${esc(title)}'>`).join('')}</div><div class='ok top8'><b>✓ ${photos.length} photo${photos.length===1?'':'s'} saved</b></div>` : `<div class='warn top8'>No photo saved yet.</div>`}
-    <input class='wl-solar-file top8' type='file' accept='image/*' capture='environment' multiple>
-    <button class='mini full top8' data-wl-solar-upload>Save ${esc(title)} Photo(s)</button>
-    ${requireSignature ? (sig ? `<div class='wl-saved top8'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || 'Service Tech')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-solar-replace-sign>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign this verification with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-solar-clear>Clear</button><button class='wl-next' data-wl-solar-save-sign>Save Signature</button></div></div>`) : ''}
-  </div>`;
+    <input class='wl-solar-file top8' type='file' accept='image/*' capture='environment' multiple><button class='mini full top8' data-wl-solar-upload>Save ${esc(title)} Photo(s)</button>
+    ${requireSignature ? (sig ? `<div class='wl-saved top8'><b>✓ Signature saved</b><div class='small'>${signatureStamp(sig.created_by_name || 'Service Tech',sig.created_at)}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-solar-replace-sign>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign this verification with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-solar-clear>Clear</button><button class='wl-next' data-wl-solar-save-sign>Save Signature</button></div></div>`) : ''}</div>`;
 }
-
 function serviceSolarHeliosCount() {
-  return (activeSvcPrep?.prep_items || []).filter(row => row.equipment_type==='Helios' && row.purpose==='DELIVERY').length;
+  return (activeSvcPrep?.prep_items || []).filter(row => row.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(row.purpose)).length;
 }
 function serviceSolarBatteryPlan(ctx,check=null) {
   const spotters=Number(ctx?.solar_spotter_count || 0);
@@ -3156,96 +3193,82 @@ function serviceSolarBatteryPlan(ctx,check=null) {
   return {config:'mixed',count:0,description:'Battery system used for charging verification',selectable:false,spotters,rangers,helios};
 }
 function serviceSolarChecklistHtml(ctx, check, evidence) {
-  const expectedPanels=Number(ctx?.expected_solar_panels || 0);
-  const spotters=Number(ctx?.solar_spotter_count || 0);
-  const rangers=Number(ctx?.ranger_count || 0);
-  const batteryPlan=serviceSolarBatteryPlan(ctx,check);
-  const standTag=check?.stand_tag || serviceSolarDefaultStandTag();
-  const panelDefault=check?.solar_panel_count ?? (expectedPanels || '');
-  const complete=serviceSolarReady(ctx,check,evidence);
-  const autoBits=[];
-  if (spotters) autoBits.push(`<span><b>${spotters}</b> Solar Spotter${spotters===1?'':'s'} → <b>${spotters}</b> Solar Stand${spotters===1?'':'s'} + <b>choose installed battery setup</b></span>`);
-  if (rangers) autoBits.push(`<span><b>${rangers}</b> Ranger${rangers===1?'':'s'} → <b>${rangers}</b> Solar Panel${rangers===1?'':'s'} + <b>${rangers}</b> LiTime 12V 110Ah</span>`);
-  if (batteryPlan.helios) autoBits.push(`<span><b>${batteryPlan.helios}</b> Helios battery box${batteryPlan.helios===1?'':'es'} required in Service checkout</span>`);
-  const batteryChoice = spotters ? `<div class='wl-auto-required top8'><b>Solar Spotter Battery Setup</b><div class='small'>Select the setup physically installed on the stand${spotters===1?'':'s'}. This controls the required battery count.</div></div>
-      <label class='check top8'><input type='radio' name='wlSvcBatteryConfig' value='agm_4x_12v_110ah' ${batteryPlan.config==='agm_4x_12v_110ah'?'checked':''}><span><b>4 × AGM 12V 110Ah per Solar Stand</b> · ${spotters*4} total for this ticket</span></label>
-      <label class='check top8'><input type='radio' name='wlSvcBatteryConfig' value='single_12v_350ah' ${batteryPlan.config==='single_12v_350ah'?'checked':''}><span><b>1 × 12V 350Ah per Solar Stand</b> · ${spotters} total for this ticket</span></label>`
-    : `<div class='wl-auto-required top8'><b>Battery Setup</b><div class='small'>${esc(batteryPlan.description)} · ${batteryPlan.count} battery / battery-box item${batteryPlan.count===1?'':'s'} required.</div></div>`;
-  return `<div class='wl-service-solar'>
-    <div class='wl-review'>
-      <b>Service Solar / Ranger / Helios Checkout</b>
-      <div class='small'>This step appears automatically after you finish checking the IT-prepared unit. Complete it before taking the equipment from the shop.</div>
-      ${autoBits.length ? `<div class='wl-auto-service-plan top8'><b>AUTOMATIC SERVICE REQUIREMENTS</b><div class='wl-parts-chips'>${autoBits.join('')}</div></div>` : ''}
-    </div>
+  const expectedPanels=Number(ctx?.expected_solar_panels || 0), spotters=Number(ctx?.solar_spotter_count || 0), rangers=Number(ctx?.ranger_count || 0);
+  const batteryPlan=serviceSolarBatteryPlan(ctx,check), standTag=check?.stand_tag || serviceSolarDefaultStandTag();
+  const panelDefault=check?.solar_panel_count ?? (expectedPanels || 0), complete=serviceSolarReady(ctx,check,evidence), autoBits=[];
+  if (spotters) autoBits.push(`<span><b>${spotters}</b> Solar Spotter${spotters===1?'':'s'} → <b>${spotters}</b> Solar Stand${spotters===1?'':'s'} + choose installed battery setup</span>`);
+  if (rangers) autoBits.push(`<span><b>${rangers}</b> Ranger${rangers===1?'':'s'} → <b>${rangers}</b> loose Solar Panel${rangers===1?'':'s'} + <b>${rangers}</b> LiTime 12V 110Ah</span>`);
+  if (batteryPlan.helios) autoBits.push(`<span><b>${batteryPlan.helios}</b> Helios → internal battery box + yard-tower solar test</span>`);
+  const batteryChoice=spotters?`<div class='wl-auto-required top8'><b>Solar Spotter Battery Setup</b></div><label class='check top8'><input type='radio' name='wlSvcBatteryConfig' value='agm_4x_12v_110ah' ${batteryPlan.config==='agm_4x_12v_110ah'?'checked':''}><span><b>4 × AGM 12V 110Ah per Solar Stand</b></span></label><label class='check top8'><input type='radio' name='wlSvcBatteryConfig' value='single_12v_350ah' ${batteryPlan.config==='single_12v_350ah'?'checked':''}><span><b>1 × 12V 350Ah per Solar Stand</b></span></label>`:`<div class='wl-auto-required top8'><b>Battery Setup</b><div class='small'>${esc(batteryPlan.description)}</div></div>`;
+  const panelBlock=expectedPanels>0?`<div class='grid top10'><div><label>Loose Solar Panels Physically In Hand · required ${expectedPanels}</label><input id='wlSvcSolarPanelCount' type='number' min='0' value='${esc(panelDefault)}'></div><div><label>Battery Requirement</label><input value='${esc(batteryPlan.description)}' readonly></div></div><label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the loose solar panel(s).</span></label>`:`<div class='wl-auto-required top8'><b>No loose Helios panel is checked out.</b><div class='small'>The Helios yard tower already has its solar panel. Use that tower for the PV/charging test.</div></div><input id='wlSvcSolarPanelCount' type='hidden' value='0'>`;
+  return `<div class='wl-service-solar'><div class='wl-review'><b>Service Solar / Ranger / Helios Pre-Trip</b><div class='small'>Complete this after receiving the IT-prepared equipment and before anything leaves the shop.</div>${autoBits.length?`<div class='wl-auto-service-plan top8'><b>AUTOMATIC SERVICE REQUIREMENTS</b><div class='wl-parts-chips'>${autoBits.join('')}</div></div>`:''}</div>
     <div class='wl-question top10'>
-      ${ctx.need_stand ? `<div class='wl-auto-required'><b>${spotters > 1 ? `${spotters} Solar Stands automatically assigned for checkout` : 'Solar Stand automatically assigned for checkout'}</b><div class='small'>Choose the physical stand${spotters>1?'s':''} you are taking and record ${spotters>1?'one exact tag per line or separated by commas':'the exact tag'} below.</div></div><label>Exact Solar Stand / Solar Pole Tag${spotters>1?'s':''}${spotters>0 ? ` · required ${spotters}` : ''}</label>${spotters>1 ? `<textarea id='wlSvcSolarStandTag' rows='3' placeholder='One stand tag per line or comma separated'>${esc(standTag)}</textarea>` : `<input id='wlSvcSolarStandTag' value='${esc(standTag)}' placeholder='Enter the exact stand tag / ID'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified ${spotters>1?'these are the exact Solar Stands / Solar Poles':'this is the exact Solar Stand / Solar Pole'} I am taking for this job.</span></label>` : ''}
+      ${ctx.need_stand?`<div class='wl-auto-required'><b>${spotters>1?`${spotters} Solar Stands automatically assigned for checkout`:'Solar Stand automatically assigned for checkout'}</b></div><label>Exact Solar Stand / Solar Pole Tag${spotters>1?'s':''}</label>${spotters>1?`<textarea id='wlSvcSolarStandTag' rows='3'>${esc(standTag)}</textarea>`:`<input id='wlSvcSolarStandTag' value='${esc(standTag)}'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified the exact stand(s).</span></label>`:''}
       ${batteryChoice}
       <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
       <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>
-      ${ctx.has_helios ? `<label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo update / configuration is current.</span></label><label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online, communicating, and tested.</span></label><label class='check top8'><input id='wlSvcHeliosBatteryCharging' type='checkbox' ${check?.helios_battery_box_charging_ok?'checked':''}><span>Helios battery box is connected to the Helios solar panels and actively charging.</span></label>` : ''}
-      <div class='grid top10'>
-        <div><label>Solar Panels Physically In Hand${expectedPanels>0 ? ` · required ${expectedPanels}` : ' · for charging test'}</label><input id='wlSvcSolarPanelCount' type='number' inputmode='numeric' min='0' value='${esc(panelDefault)}' placeholder='How many solar panels?'></div>
-        <div><label>Battery Requirement</label><input type='text' value='${esc(batteryPlan.description)}' readonly></div>
-      </div>
-      <label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the solar panel(s) required for this checkout.</span></label>
-      <label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I physically verified the required battery / battery-box setup is present and charged.</span></label>
-      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>With the solar panel, battery/battery system, and MPPT connected together, I verified the battery is actively charging.</span></label>
-      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Solar Checkout Checklist</button>
-      ${check?.completed_at ? `<div class='ok top8'><b>✓ Checklist verified by ${esc(check.service_tech_name || 'Service Tech')}</b><div class='small'>${new Date(check.completed_at).toLocaleString()}</div><div class='small'>${esc(check.battery_description || batteryPlan.description)}</div></div>` : `<div class='warn top8'>Complete every required verification above, then save the checklist.</div>`}
+      ${ctx.has_helios?`<div class='wl-stop top10'><b>HELIOS YARD SOLAR TEST — BEFORE LEAVING</b><div>Take the IT-checked-out Helios to a Helios tower in the yard. The tower already has its solar panel.</div></div>
+        <label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo / Victron configuration and updates are current.</span></label>
+        <label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online and communicating.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardPvConnected' type='checkbox' ${check?.helios_yard_pv_connected_ok?'checked':''}><span>I connected the Helios PV cable to the yard tower.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardSwitchPv' type='checkbox' ${check?.helios_yard_switch_pv_ok?'checked':''}><span>I flipped the internal Helios switch to PV.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardVictron' type='checkbox' ${check?.helios_yard_victron_bluetooth_ok?'checked':''}><span>I connected to the unit in the Victron Bluetooth app.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardStatus' type='checkbox' ${check?.helios_yard_updates_status_ok?'checked':''}><span>I verified Victron status / updates and the system is healthy.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosBatteryCharging' type='checkbox' ${check?.helios_battery_box_charging_ok?'checked':''}><span>The internal Helios battery box is present and charged.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardCharging' type='checkbox' ${check?.helios_yard_solar_charging_ok?'checked':''}><span>I verified solar charging from the tower panel.</span></label>
+        <label class='check top8'><input id='wlSvcHeliosYardPtzWrapped' type='checkbox' ${check?.helios_yard_ptz_wrapped_ok?'checked':''}><span>I removed the PTZ from the door/front plate and bubble wrapped it for transport.</span></label>`:''}
+      ${panelBlock}
+      <label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I verified the required battery / battery-box setup is present and charged.</span></label>
+      <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>I verified the battery system is actively charging through MPPT / PV.</span></label>
+      <button class='wl-big wl-blue top10' data-wl-save-service-solar>Save Pre-Trip Checklist</button>
+      ${check?.completed_at?`<div class='ok top8'><b>✓ Pre-trip checklist verified</b><div class='small'>${signatureStamp(check.service_tech_name||'Service Tech',check.completed_at)}</div></div>`:`<div class='warn top8'>Complete every required verification above, then save the checklist.</div>`}
     </div>
-
-    ${ctx.need_stand ? serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand Tag',spotters>1 ? `Take at least ${spotters} clear tag photos — one for each Solar Stand you are taking.` : 'Take a clear picture of the exact Solar Stand tag / ID you are taking from the shop.',true) : ''}
-    ${serviceSolarProofPanelHtml(evidence,'batteries','Checkout Batteries','Take clear pictures of the battery / battery-box setup after you verify it is present and charged.',true)}
-    ${serviceSolarProofPanelHtml(evidence,'mppt','MPPT / Charging Readings','Upload a picture of the MPPT / charging readings while the solar panel, battery system, and MPPT are connected together and actively charging.',false)}
-    ${ctx.has_helios ? serviceSolarProofPanelHtml(evidence,'helios_cerbo_mppt','Helios Cerbo + MPPT','Take pictures showing the Helios Cerbo and MPPT updated, online, and tested.',false) : ''}
-
-    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Solar checkout complete — equipment may leave the shop':'Solar checkout still needs verification'}</b><div class='small'>${complete?'Checklist, required proof photos, and signatures are saved.':'Complete the automatic stand/battery/panel requirements and upload the required MPPT / charging reading proof.'}</div></div>
-  </div>`;
+    ${ctx.need_stand?serviceSolarProofPanelHtml(evidence,'solar_stand','Solar Stand Tag',spotters>1?`Take at least ${spotters} clear tag photos — one per stand.`:'Take a clear picture of the exact Solar Stand tag / ID.',true):''}
+    ${serviceSolarProofPanelHtml(evidence,'batteries','Checkout Batteries','Photograph the verified battery / battery-box setup.',true)}
+    ${serviceSolarProofPanelHtml(evidence,'mppt','MPPT / Charging Readings','Upload the MPPT / charging readings while the system is actively charging.',false)}
+    ${ctx.has_helios?serviceSolarProofPanelHtml(evidence,'helios_cerbo_mppt','Helios Cerbo + MPPT','Photograph the Helios Cerbo and MPPT current, online, and tested.',false):''}
+    ${ctx.has_helios?serviceSolarProofPanelHtml(evidence,'helios_yard','Helios Yard Solar Test','Photograph the Helios connected to the yard tower for PV/Victron charging verification. Sign after the yard test and PTZ transport prep are complete.',true):''}
+    <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Pre-trip complete — equipment may leave the shop after handoff acceptance':'Pre-trip still needs verification'}</b></div></div>`;
 }
-
 async function saveServiceSolarChecklist() {
   if (!activeSvcPrep?.id) return;
-  const ctx=await serviceSolarContextData(activeSvcPrep.id);
-  if (!ctx.need_solar) return;
-  const standTag=document.getElementById('wlSvcSolarStandTag')?.value.trim() || '';
-  const panelCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarPanelCount')?.value || 0)));
-  const expectedPanels=Number(ctx.expected_solar_panels || 0);
-  const requiredStands=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
+  const ctx=await serviceSolarContextData(activeSvcPrep.id); if (!ctx.need_solar) return;
+  const standTag=document.getElementById('wlSvcSolarStandTag')?.value.trim()||'';
+  const panelCount=Math.max(0,Math.floor(Number(document.getElementById('wlSvcSolarPanelCount')?.value||0)));
+  const expectedPanels=Number(ctx.expected_solar_panels||0), requiredStands=ctx.need_stand?Math.max(1,Number(ctx.solar_spotter_count||0)):0;
   const standTags=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean);
-  if (ctx.need_stand && standTags.length !== requiredStands) return alert('Enter exactly ' + requiredStands + ' Solar Stand tag' + (requiredStands===1?'':'s') + ', one for each Solar Spotter delivery unit.');
-  if (ctx.need_stand && !document.getElementById('wlSvcSolarStandVerified')?.checked) return alert('Verify the Solar Stand / Solar Pole you are taking.');
-  const selectedBatteryConfig=document.querySelector("input[name='wlSvcBatteryConfig']:checked")?.value || '';
-  const batteryPlan=serviceSolarBatteryPlan(ctx,{battery_configuration:selectedBatteryConfig || undefined});
-  if (Number(ctx.solar_spotter_count || 0)>0 && !['agm_4x_12v_110ah','single_12v_350ah'].includes(selectedBatteryConfig)) return alert('Choose the battery setup installed on the Solar Stand: 4 × AGM 12V 110Ah or 1 × 12V 350Ah per stand.');
-  if (!document.getElementById('wlSvcMpptUpdated')?.checked) return alert('Verify the MPPT update / configuration.');
-  if (!document.getElementById('wlSvcMpptTested')?.checked) return alert('Verify the MPPT was tested and is working.');
-  if (ctx.has_helios && !document.getElementById('wlSvcCerboUpdated')?.checked) return alert('Verify the Helios Cerbo update / configuration.');
-  if (ctx.has_helios && !document.getElementById('wlSvcCerboOnline')?.checked) return alert('Verify the Helios Cerbo is online and working.');
-  if (ctx.has_helios && !document.getElementById('wlSvcHeliosBatteryCharging')?.checked) return alert('Verify the Helios battery box is charging from the Helios solar panels.');
-  if (panelCount < 1) return alert('Enter how many solar panels you physically have for the charging test.');
-  if (expectedPanels > 0 && panelCount !== expectedPanels) return alert('This job automatically requires ' + expectedPanels + ' solar panel' + (expectedPanels===1?'':'s') + '. You entered ' + panelCount + '.');
-  if (!document.getElementById('wlSvcSolarPanelsVerified')?.checked) return alert('Physically count and verify the required solar panels.');
-  if (!document.getElementById('wlSvcBatteriesCharged')?.checked) return alert('Verify the required battery / battery-box setup is present and charged.');
-  if (!document.getElementById('wlSvcSolarCharging')?.checked) return alert('Connect the solar panel, battery system, and MPPT together and verify the battery is actively charging.');
-
+  if(ctx.need_stand&&standTags.length!==requiredStands)return alert('Enter exactly '+requiredStands+' Solar Stand tag'+(requiredStands===1?'':'s')+'.');
+  if(ctx.need_stand&&!document.getElementById('wlSvcSolarStandVerified')?.checked)return alert('Verify the exact Solar Stand / Solar Pole.');
+  const selectedBatteryConfig=document.querySelector("input[name='wlSvcBatteryConfig']:checked")?.value||'';
+  const batteryPlan=serviceSolarBatteryPlan(ctx,{battery_configuration:selectedBatteryConfig||undefined});
+  if(Number(ctx.solar_spotter_count||0)>0&&!['agm_4x_12v_110ah','single_12v_350ah'].includes(selectedBatteryConfig))return alert('Choose the Solar Stand battery setup.');
+  if(!document.getElementById('wlSvcMpptUpdated')?.checked)return alert('Verify the MPPT update / configuration.');
+  if(!document.getElementById('wlSvcMpptTested')?.checked)return alert('Verify the MPPT test.');
+  const requiredHelios=[
+    ['wlSvcCerboUpdated','Verify the Helios Cerbo update / configuration.'],['wlSvcCerboOnline','Verify the Helios Cerbo is online.'],
+    ['wlSvcHeliosYardPvConnected','Connect the Helios PV cable to the yard tower.'],['wlSvcHeliosYardSwitchPv','Flip the internal switch to PV.'],
+    ['wlSvcHeliosYardVictron','Verify the Helios in the Victron Bluetooth app.'],['wlSvcHeliosYardStatus','Verify Victron status / updates.'],
+    ['wlSvcHeliosBatteryCharging','Verify the internal Helios battery box is present and charged.'],['wlSvcHeliosYardCharging','Verify solar charging from the yard tower.'],
+    ['wlSvcHeliosYardPtzWrapped','Remove the PTZ and bubble wrap it for transport.']
+  ];
+  if(ctx.has_helios)for(const [id,msg] of requiredHelios)if(!document.getElementById(id)?.checked)return alert(msg);
+  if(expectedPanels>0&&panelCount!==expectedPanels)return alert('This job requires '+expectedPanels+' loose solar panel'+(expectedPanels===1?'':'s')+'.');
+  if(expectedPanels>0&&!document.getElementById('wlSvcSolarPanelsVerified')?.checked)return alert('Verify the loose solar panel count.');
+  if(!document.getElementById('wlSvcBatteriesCharged')?.checked)return alert('Verify the battery / battery-box setup.');
+  if(!document.getElementById('wlSvcSolarCharging')?.checked)return alert('Verify active charging.');
   document.body.classList.add('busy');
-  const { error }=await liveDb.rpc('save_my_service_solar_check_v3',{
-    p_prep_id:activeSvcPrep.id,
-    p_stand_tag:standTag,
-    p_battery_configuration:batteryPlan.config,
-    p_mppt_updated_ok:Boolean(document.getElementById('wlSvcMpptUpdated')?.checked),
-    p_mppt_tested_ok:Boolean(document.getElementById('wlSvcMpptTested')?.checked),
-    p_solar_panel_count:panelCount,
-    p_solar_panels_verified:Boolean(document.getElementById('wlSvcSolarPanelsVerified')?.checked),
-    p_batteries_charged_ok:Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked),
-    p_solar_charging_ok:Boolean(document.getElementById('wlSvcSolarCharging')?.checked),
-    p_cerbo_updated_ok:Boolean(document.getElementById('wlSvcCerboUpdated')?.checked),
-    p_cerbo_online_ok:Boolean(document.getElementById('wlSvcCerboOnline')?.checked),
-    p_helios_battery_box_charging_ok:Boolean(document.getElementById('wlSvcHeliosBatteryCharging')?.checked)
+  const {error}=await liveDb.rpc('save_my_service_solar_check_v4',{
+    p_prep_id:activeSvcPrep.id,p_stand_tag:standTag,p_battery_configuration:batteryPlan.config,
+    p_mppt_updated_ok:Boolean(document.getElementById('wlSvcMpptUpdated')?.checked),p_mppt_tested_ok:Boolean(document.getElementById('wlSvcMpptTested')?.checked),
+    p_solar_panel_count:panelCount,p_solar_panels_verified:expectedPanels===0?true:Boolean(document.getElementById('wlSvcSolarPanelsVerified')?.checked),
+    p_batteries_charged_ok:Boolean(document.getElementById('wlSvcBatteriesCharged')?.checked),p_solar_charging_ok:Boolean(document.getElementById('wlSvcSolarCharging')?.checked),
+    p_cerbo_updated_ok:Boolean(document.getElementById('wlSvcCerboUpdated')?.checked),p_cerbo_online_ok:Boolean(document.getElementById('wlSvcCerboOnline')?.checked),
+    p_helios_battery_box_charging_ok:Boolean(document.getElementById('wlSvcHeliosBatteryCharging')?.checked),
+    p_helios_yard_pv_connected_ok:Boolean(document.getElementById('wlSvcHeliosYardPvConnected')?.checked),p_helios_yard_switch_pv_ok:Boolean(document.getElementById('wlSvcHeliosYardSwitchPv')?.checked),
+    p_helios_yard_victron_bluetooth_ok:Boolean(document.getElementById('wlSvcHeliosYardVictron')?.checked),p_helios_yard_updates_status_ok:Boolean(document.getElementById('wlSvcHeliosYardStatus')?.checked),
+    p_helios_yard_solar_charging_ok:Boolean(document.getElementById('wlSvcHeliosYardCharging')?.checked),p_helios_yard_ptz_wrapped_ok:Boolean(document.getElementById('wlSvcHeliosYardPtzWrapped')?.checked)
   });
-  document.body.classList.remove('busy');
-  if (error) return alert(error.message);
-  return renderSvcPrep();
+  document.body.classList.remove('busy'); if(error)return alert(error.message); return renderSvcPrep();
 }
 async function uploadServiceSolarEvidence(prepId,category,kind,file) {
   const { data:{ session } }=await liveDb.auth.getSession();
@@ -3309,68 +3332,97 @@ function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,serv
   const ready=holds.length===0;
   return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'><span>✨ AI Final Handoff Gate</span><b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
 }
+function heliosFieldItems(prep=activeSvcPrep){
+  return [...(prep?.prep_items||[])].filter(row=>row.equipment_type==='Helios'&&['DELIVERY','SWAP'].includes(row.purpose)).sort((a,b)=>a.item_order-b.item_order);
+}
+function serviceHandoffVerifications(){
+  return [...(activeSvcPrep?.prep_items||[])].sort((a,b)=>a.item_order-b.item_order).map(item=>{
+    const required=Number(item.required_battery_count||0);
+    return {item_id:item.id,unit_tag:String(item.unit_tag||''),unit_confirmed:Boolean(document.getElementById(`exact_${item.id}`)?.checked),
+      battery_count:required>0?Number(document.getElementById(`sbatt_${item.id}`)?.value??item.battery_count??0):0,
+      battery_verified:required>0?Boolean(document.getElementById(`sbattok_${item.id}`)?.checked):false};
+  });
+}
+async function loadHeliosSwapReturns(ticket){
+  const {data,error}=await liveDb.from('unit_returns').select('*').eq('ticket_no',String(ticket||'')).eq('equipment_type','Helios').order('returned_at',{ascending:true});
+  if(error){console.warn('Could not load Helios swap returns',error);return [];} return data||[];
+}
+async function acceptHeliosHandoff(){
+  if(!activeSvcPrep?.id)return;
+  const {error}=await liveDb.rpc('accept_helios_handoff_v1',{p_prep_id:activeSvcPrep.id,p_verifications:serviceHandoffVerifications()});
+  if(error)return alert(error.message);
+  activeSvcPrep=await getPrep(activeSvcPrep.id);
+  alert('Helios handoff accepted. The unit is checked out to Service, but it is NOT deployed yet. Complete the field installation next.');
+  return renderSvcPrep();
+}
+async function startHeliosOldUnitReturn(){
+  if(!activeSvcPrep?.ticket_no)return;
+  serviceReturn={step:1,ticket:String(activeSvcPrep.ticket_no),unit:'',type:'Helios',notes:'',photo:null,conditionPhotos:[],damagePhotos:[],knownUnits:[]};
+  serviceReturnRecovered=false; await saveServiceReturnDraft(); return renderServiceReturn();
+}
+function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
+  const units=heliosFieldItems(prep), swaps=units.filter(x=>x.purpose==='SWAP'), installPhotos=serviceSolarEvidenceCount(evidence,'helios_install','photo');
+  const installSig=[...(evidence||[])].reverse().find(row=>row.category==='helios_install'&&row.kind==='signature'), submitted=Boolean(check?.helios_field_completed_at), ownerDone=Boolean(check?.helios_owner_verified_at);
+  const returnRows=(returns||[]).filter(r=>r.equipment_type==='Helios');
+  const allChecks=[
+    ['wlHeliosFieldBox','helios_field_box_mounted_ok','Helios box installed and secured on the tower.'],['wlHeliosFieldPv','helios_field_pv_connected_ok','PV cables connected.'],
+    ['wlHeliosFieldPtz','helios_field_ptz_secured_ok','PTZ reinstalled and secured on the removable front plate.'],['wlHeliosFieldSwitch','helios_field_switch_pv_ok','Internal switch flipped to PV.'],
+    ['wlHeliosFieldPower','helios_field_unit_battery_on_ok','Helios unit and battery turned on.'],['wlHeliosFieldOnline','helios_field_it_online_verified_ok','Called IT and IT verified the Helios is online.'],
+    ['wlHeliosFieldAim','helios_field_cameras_aimed_ok','Camera aim / focus completed with IT.'],['wlHeliosFieldRecording','helios_field_recording_ok','Recording verified after final aim.'],
+    ['wlHeliosField20ft','helios_field_tower_20ft_ok','Tower cranked to approximately 20 feet.'],['wlHeliosFieldMastBolt','helios_field_mast_lock_bolt_ok','Separate tower mast locking bolt inserted and secured.'],
+    ['wlHeliosField45','helios_field_panel_45deg_ok','Solar panel set to approximately 45°.'],['wlHeliosFieldPanelBolt','helios_field_panel_bolt_ok','Separate panel angle/locking bolt installed and secured.'],
+    ['wlHeliosFieldSand','helios_field_4_sandbags_ok','4 bags of sand placed on the tower base.']
+  ];
+  const checklist=allChecks.map(([id,key,label])=>`<label class='check top8'><input id='${id}' type='checkbox' ${check?.[key]?'checked':''} ${submitted?'disabled':''}><span>${esc(label)}</span></label>`).join('');
+  const newUnits=units.map(x=>`<div class='ok top8'><b>NEW UNIT OUT · ${esc(x.unit_tag||'Tag missing')}</b><div class='small'>${esc(x.purpose)} Helios${check?.handoff_accepted_at?` · ${signatureStamp(check.handoff_accepted_by_name||'Service Tech',check.handoff_accepted_at)}`:''}</div></div>`).join('');
+  const oldBlock=swaps.length?`<div class='wl-stop top10'><b>OLD UNIT RETURNING · ${returnRows.length} of ${swaps.length} recorded</b><div>The old Helios is NOT an unused spare. Photograph the old unit and tag, document why it is being swapped, damage/issues/symptoms/repair needed, then Service Return → IT Intake.</div>${returnRows.map(r=>`<div class='wl-review top8'><b>OLD UNIT ${esc(r.unit_tag)}</b><div class='small'>${esc(r.status||'waiting_it')} · ${r.returned_at?esc(new Date(r.returned_at).toLocaleString()):''}</div><div class='small'>${esc(r.return_notes||'No return notes')}</div>${r.tag_scan_status?`<div class='small'>Tag scan: <b>${esc(String(r.tag_scan_status).toUpperCase())}</b></div>`:''}</div>`).join('')}<button class='wl-big wl-red top10' data-wl-helios-old-return>Document OLD UNIT RETURNING →</button></div>`:'';
+  const state=ownerDone?`<div class='ok top10'><b>✓ OWNER FINAL VERIFIED</b><div class='small'>${signatureStamp(check.helios_owner_verified_by_name||'Owner',check.helios_owner_verified_at)}</div></div>`:submitted?`<div class='warn top10'><b>FIELD INSTALL SUBMITTED — WAITING FOR OWNER FINAL VERIFICATION</b><div class='small'>${signatureStamp(check.helios_field_completed_by_name||'Service Tech',check.helios_field_completed_at)}</div></div>`:`<button class='wl-big wl-green top10' data-wl-submit-helios-field>Submit Helios Field Install to Owner →</button>`;
+  return `${progress('Helios Field Install','Install, verify, photograph, sign, then submit to Owner',1,1)}<div class='wl-review'><b>MHelpDesk #${esc(prep.ticket_no)}</b><div class='small'>The handoff is accepted. This job remains open until field installation and Owner final verification are complete.</div></div>${newUnits}${oldBlock}<div class='wl-question top10'><div class='qtext'>FIELD INSTALL CHECKLIST</div>${checklist}</div>${serviceSolarProofPanelHtml(evidence,'helios_install','Final Helios Installation','Take final-product photos showing the Helios, raised tower, mast lock bolt, solar-panel position/bolt, and sandbags. Upload at least one final photo per Helios.',true)}<div class='${installPhotos>=units.length&&installSig?'ok':'warn'} top10'><b>${installPhotos} of ${units.length} minimum final photos saved${installSig?' · signature saved':' · signature still required'}</b></div>${state}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+}
+async function submitHeliosFieldInstall(){
+  if(!activeSvcPrep?.id)return;
+  const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id), units=heliosFieldItems(activeSvcPrep), swaps=units.filter(x=>x.purpose==='SWAP');
+  const returns=swaps.length?await loadHeliosSwapReturns(activeSvcPrep.ticket_no):[];
+  if(swaps.length&&returns.length<swaps.length)return alert('Document every OLD UNIT RETURNING through Service Return → IT Intake first.');
+  if(serviceSolarEvidenceCount(evidence,'helios_install','photo')<units.length)return alert('Upload at least one final installation photo for each Helios.');
+  if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return alert('Save the timestamped Service installation signature.');
+  const ids=['wlHeliosFieldBox','wlHeliosFieldPv','wlHeliosFieldPtz','wlHeliosFieldSwitch','wlHeliosFieldPower','wlHeliosFieldOnline','wlHeliosFieldAim','wlHeliosFieldRecording','wlHeliosField20ft','wlHeliosFieldMastBolt','wlHeliosField45','wlHeliosFieldPanelBolt','wlHeliosFieldSand'];
+  if(ids.some(id=>!document.getElementById(id)?.checked))return alert('Complete every Helios field installation check.');
+  const {error}=await liveDb.rpc('save_my_helios_field_install_v1',{p_prep_id:activeSvcPrep.id,p_box_mounted_ok:true,p_pv_connected_ok:true,p_ptz_secured_ok:true,p_switch_pv_ok:true,p_unit_battery_on_ok:true,p_it_online_verified_ok:true,p_cameras_aimed_ok:true,p_recording_ok:true,p_tower_20ft_ok:true,p_mast_lock_bolt_ok:true,p_panel_45deg_ok:true,p_panel_bolt_ok:true,p_4_sandbags_ok:true});
+  if(error)return alert(error.message);
+  activeSvcPrep=await getPrep(activeSvcPrep.id); alert('Helios field installation submitted to the Owner for final verification.'); return renderSvcPrep();
+}
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
-  const base = document.getElementById('matchedPreps')?.closest('.card');
-  const card = findSvcCard(activeSvcPrep.ticket_no);
-  if (!base || !card) return alert('Could not open the matched equipment.');
-  const forms = svcForms(card);
-  const wizard = svcWizardCard();
-  const partsTotal = ticketPartsTotal(activeSvcPrep);
-  const hasParts = partsTotal > 0;
-  const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
-  const solarRequired = Boolean(solarCtx?.need_solar);
-  const solarCheck = solarRequired ? await loadServiceSolarCheck(activeSvcPrep.id) : null;
-  const solarEvidence = solarRequired ? await serviceSolarEvidenceRows(activeSvcPrep.id) : [];
-  const solarReady = serviceSolarReady(solarCtx,solarCheck,solarEvidence);
-
-  const partStep = forms.length;
-  const solarStep = forms.length + (hasParts ? 1 : 0);
-  const proofStep = solarStep + (solarRequired ? 1 : 0);
-  const photoStep = proofStep + 1;
-  const signStep = proofStep + 2;
-  const finalStep = proofStep + 3;
-  const preparedBy = activeSvcPrep.released_by_name || 'IT Technician';
-  hideChildren(viewSvc(), [wizard]);
-  base.style.display = 'none';
-
-  if (svcUnitIndex < forms.length) {
-    const questions = svcQuestions(forms[svcUnitIndex]);
-    const q = questions[svcQuestionIndex];
-    const afterLast = hasParts ? 'Verify Parts →' : solarRequired ? 'Solar / Helios Check →' : 'Compare IT Photos →';
-    wizard.innerHTML = progress(`Unit ${svcUnitIndex + 1} of ${forms.length}`, q?.label || 'Verify this unit', svcQuestionIndex + 1, Math.max(1, questions.length)) +
-      (q ? svcQuestionHtml(q, svcQuestionIndex, questions.length) : `<div class='ok'><b>This unit has no additional checks.</b></div>`) +
-      `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex === questions.length - 1 ? (svcUnitIndex === forms.length - 1 ? afterLast : 'Next Unit →') : 'Next →'}</button></div>`;
-  } else if (hasParts && svcUnitIndex === partStep) {
-    const confirmed = Boolean(activeSvcPrep.service_parts_confirmed);
-    wizard.innerHTML = progress('Parts Handoff', `Verify parts from IT Tech ${preparedBy}`, 1, 1) +
-      `<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed ? `<div class='ok'><b>✓ Parts verified.</b><div>Recorded by ${esc(activeSvcPrep.service_parts_confirmed_by_name || 'Service Tech')}.</div></div>` : `<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above from IT Tech ${esc(preparedBy)}?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed ? '' : 'disabled'}>${solarRequired ? 'Solar / Helios Check →' : 'Compare IT Photos →'}</button></div>`;
-  } else if (solarRequired && svcUnitIndex === solarStep) {
-    wizard.innerHTML = progress('Solar / Helios Pre-Trip', 'Verify Solar Stand, charging, MPPT, batteries, and Helios Cerbo', 1, 1) +
-      serviceAIEquipmentReview(solarCtx,solarCheck,solarEvidence) + serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence) +
-      `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${solarReady ? '' : 'disabled'}>Compare IT Photos →</button></div>`;
-    wizard.querySelectorAll('canvas').forEach(wireCanvas);
-  } else if (svcUnitIndex === proofStep) {
-    wizard.innerHTML = progress('Compare', `Look at IT Tech ${preparedBy}’s handoff photos`, 1, 1) + await proofHtml(activeSvcPrep.id, 'it', false) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
-  } else if (svcUnitIndex === photoStep) {
-    const itEv = await evidenceRows(activeSvcPrep.id, 'it');
-    const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
-    wizard.innerHTML = progress('Service Photos', `Take ${requiredPhotos} matching receipt photo${requiredPhotos === 1 ? '' : 's'}`, 1, 1) + await photoOnlyHtml(activeSvcPrep.id, 'service', null, requiredPhotos) + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
-  } else if (svcUnitIndex === signStep) {
-    wizard.innerHTML = progress('Service Signature', `Sign that you received and verified the handoff from IT Tech ${preparedBy}`, 1, 1) + await signatureOnlyHtml(activeSvcPrep.id, 'service') + `<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;
-    wizard.querySelectorAll('canvas').forEach(wireCanvas);
-  } else {
-    const ev = await evidenceRows(activeSvcPrep.id, 'service');
-    const itEv = await evidenceRows(activeSvcPrep.id, 'it');
-    const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length;
-    const servicePhotos = ev.filter(x => x.kind === 'photo').length;
-    const allChecksOk = forms.every(form => svcQuestions(form).every(q => q.kind === 'number' ? q.input.value !== '' : q.input.checked));
-    const partsReady = !hasParts || Boolean(activeSvcPrep.service_parts_confirmed);
-    const proofReady = servicePhotos === requiredPhotos && ev.some(x => x.kind === 'signature');
-    const ready = proofReady && allChecksOk && partsReady && solarReady;
+  const base=document.getElementById('matchedPreps')?.closest('.card'),card=findSvcCard(activeSvcPrep.ticket_no);
+  if(!base||!card)return alert('Could not open the matched equipment.');
+  const forms=svcForms(card),wizard=svcWizardCard(),partsTotal=ticketPartsTotal(activeSvcPrep),hasParts=partsTotal>0;
+  const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
+  const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null,solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[],solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
+  const heliosField=heliosFieldItems(activeSvcPrep),partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  hideChildren(viewSvc(),[wizard]);base.style.display='none';
+  if(svcUnitIndex<forms.length){
+    const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Verify Parts →':solarRequired?'Solar / Helios Check →':'Compare IT Photos →';
+    wizard.innerHTML=progress(`Unit ${svcUnitIndex+1} of ${forms.length}`,q?.label||'Verify this unit',svcQuestionIndex+1,Math.max(1,questions.length))+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`;
+  }else if(hasParts&&svcUnitIndex===partStep){
+    const confirmed=Boolean(activeSvcPrep.service_parts_confirmed);
+    wizard.innerHTML=progress('Parts Handoff',`Verify parts from IT Tech ${preparedBy}`,1,1)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Solar / Helios Check →':'Compare IT Photos →'}</button></div>`;
+  }else if(solarRequired&&svcUnitIndex===solarStep){
+    wizard.innerHTML=progress('Solar / Helios Pre-Trip','Verify charging, equipment, and Helios yard test before leaving',1,1)+serviceAIEquipmentReview(solarCtx,solarCheck,solarEvidence)+serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${solarReady?'':'disabled'}>Compare IT Photos →</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+  }else if(svcUnitIndex===proofStep){
+    wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
+  }else if(svcUnitIndex===photoStep){
+    const itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length;
+    wizard.innerHTML=progress('Service Photos',`Take ${requiredPhotos} matching receipt photo${requiredPhotos===1?'':'s'}`,1,1)+await photoOnlyHtml(activeSvcPrep.id,'service',null,requiredPhotos)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
+  }else if(svcUnitIndex===signStep){
+    wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+  }else{
+    if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+    const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
+    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),ready=proofReady&&allChecksOk&&partsReady&&solarReady;
     const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
-    wizard.innerHTML = progress('Final Step', 'Accept equipment and deploy to field', 1, 1) + aiFinal +
-      `<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos} required to match IT</div><div class='small'>${proofReady ? '✓ Matching photo count and final Service signature saved.' : 'Matching receipt photo count and final signature are still required.'}</div>${partsReady ? (hasParts ? `<div class='small'>✓ Listed parts physically verified.</div>` : '') : `<div class='wl-stop'><b>Parts are not verified.</b><div>Use Back and verify the physical parts from IT.</div></div>`}${solarRequired ? (solarReady ? `<div class='small'>✓ Solar / Helios pre-trip checklist, photos, and required signatures complete.</div>` : `<div class='wl-stop'><b>Solar / Helios pre-trip verification is incomplete.</b><div>Use Back to complete the Solar Stand, battery, MPPT, and Cerbo proof.</div></div>`) : ''}${allChecksOk ? `<div class='small'>✓ Every Service equipment verification answer is YES.</div>` : `<div class='wl-stop'><b>One or more Service checks are NO or incomplete.</b><div>Use Back to correct the mismatch before accepting equipment.</div></div>`}</div><button class='wl-big wl-green' data-wl-close-svc ${ready ? '' : 'disabled'}>Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const heliosNotice=heliosField.length?`<div class='warn top10'><b>HELIOS IS NOT DEPLOYED YET</b><div>Accept the IT → Service handoff, then complete field install, any OLD UNIT RETURNING, final photos/signature, and Owner final verification.</div></div>`:'';
+    wizard.innerHTML=progress('Final Step',heliosField.length?'Accept the Helios handoff — field install remains open':'Accept equipment and deploy to field',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}<button class='wl-big wl-green' ${heliosField.length?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosField.length?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue to Field Install →`:`Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -3779,6 +3831,10 @@ document.addEventListener('click', async e => {
   }
   if (e.target.closest('[data-wl-service-parts-mismatch]')) return alert('Do not accept the handoff. Compare the parts with IT and the MHelpDesk ticket, then correct the mismatch before continuing.');
   if (e.target.closest('[data-wl-save-service-solar]')) return saveServiceSolarChecklist();
+  if (e.target.closest('[data-wl-accept-helios]')) return acceptHeliosHandoff();
+  if (e.target.closest('[data-wl-helios-old-return]')) return startHeliosOldUnitReturn();
+  if (e.target.closest('[data-wl-return-to-active-helios]')) return renderSvcPrep();
+  if (e.target.closest('[data-wl-submit-helios-field]')) return submitHeliosFieldInstall();
 
   const solarUpload=e.target.closest('[data-wl-solar-upload]');
   if (solarUpload) {
@@ -3996,6 +4052,8 @@ async function submitServiceReturn() {
   serviceReturn.notes = document.getElementById('wlReturnNotes')?.value || serviceReturn.notes || '';
   await saveServiceReturnDraft();
   if (!serviceReturn.ticket || !serviceReturn.unit || !serviceReturn.type || !serviceReturn.photo) return alert('Ticket, unit, equipment type, and unit tag photo are required.');
+  const isHeliosSwapReturn=serviceReturn.type==='Helios' && activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP');
+  if (isHeliosSwapReturn && !serviceReturn.notes.trim()) return alert('For OLD UNIT RETURNING, document why the Helios is being swapped and the damage / issues / symptoms / repair needed before sending it to IT Intake.');
   if ((serviceReturn.damagePhotos || []).length && !serviceReturn.notes.trim()) return alert('Damage photos were added. Describe what is damaged in Return notes / damage noticed so IT knows what to inspect.');
   if (!navigator.onLine) return alert('No connection. This return is saved as an unsent draft on this device. Reconnect before sending it to IT Intake.');
   serviceReturnSubmitting=true; document.body.classList.add('busy');
@@ -4031,7 +4089,7 @@ async function submitServiceReturn() {
     const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
     const card=serviceReturnCard();
-    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div><button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
+    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>${activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP') ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-helios>← Continue Helios Swap</button>` : ''}<button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
     resetWizardPosition();
   } catch(err) {
     if (uploadedPaths.length) await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(() => null);
