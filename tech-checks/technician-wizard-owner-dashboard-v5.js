@@ -137,6 +137,24 @@ function injectStyles() {
     .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
 
+
+    /* Compact Owner Menu v89 */
+    .wl-menu-close-btn{width:38px;height:38px;min-width:38px;border:0;border-radius:999px;background:#eaf0f4;color:#35495b;display:grid;place-items:center;font-size:23px;line-height:1;font-weight:700;padding:0}
+    .wl-owner-menu{padding:12px!important}
+    .wl-owner-menu .wl-menu-sheet{width:min(560px,100%)!important;max-height:none!important;overflow:visible!important;border-radius:22px!important;padding:15px!important;background:#f8fafb!important}
+    .wl-owner-menu .wl-menu-head{margin-bottom:10px!important}
+    .wl-owner-menu .wl-menu-head h2{font-size:23px!important;line-height:1.05!important;margin:2px 0 0!important}
+    .wl-owner-menu .wl-next-kicker{font-size:9px!important;letter-spacing:.13em!important}
+    .wl-owner-menu-primary{margin-top:4px}
+    .wl-owner-menu-ai{box-sizing:border-box;width:100%;min-height:72px;margin:0;padding:10px 12px;display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;border:1px solid #d8c7f2;border-radius:15px;background:#fff;color:#172839;text-align:left;box-shadow:0 2px 8px rgba(18,43,65,.05)}
+    .wl-owner-menu-ai-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px}
+    .wl-owner-menu-ai>span:nth-child(2){min-width:0}.wl-owner-menu-ai b,.wl-owner-menu-ai small{display:block}.wl-owner-menu-ai b{font-size:15px;line-height:1.1;font-weight:900}.wl-owner-menu-ai small{margin-top:3px;color:#6d7b88;font-size:10px;line-height:1.2;font-weight:650}.wl-owner-menu-ai>strong{color:#7a8793;font-size:22px}
+    .wl-owner-menu-utilities{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+    .wl-owner-menu-util{box-sizing:border-box;width:100%;min-width:0;min-height:60px;margin:0;padding:8px 9px;display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:8px;border:1px solid #d5dfe6;border-radius:14px;background:#fff;color:#172839;text-align:left}
+    .wl-owner-menu-util-icon{width:31px;height:31px;border-radius:10px;background:#eef3f6;color:#24394a;display:grid;place-items:center;font-size:15px;font-weight:950}
+    .wl-owner-menu-util>span:nth-child(2){min-width:0}.wl-owner-menu-util b,.wl-owner-menu-util small{display:block}.wl-owner-menu-util b{font-size:11px;line-height:1.1;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wl-owner-menu-util small{margin-top:3px;color:#71808d;font-size:8px;line-height:1.15;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .wl-owner-menu-ai:active,.wl-owner-menu-util:active,.wl-menu-close-btn:active{transform:scale(.985)}
+    @media(max-width:390px){.wl-owner-menu .wl-menu-sheet{padding:13px!important}.wl-owner-menu-ai{min-height:68px;padding:9px 10px}.wl-owner-menu-utilities{gap:7px}.wl-owner-menu-util{padding:7px 8px}.wl-owner-menu-util b{font-size:10px}}
     #view-service .wl-service-find-row{display:grid!important;grid-template-columns:minmax(0,1fr) 112px!important;gap:8px!important;align-items:stretch!important}
     #view-service .wl-service-find-row input{box-sizing:border-box!important;width:100%!important;min-width:0!important;height:48px!important;min-height:48px!important;margin:0!important;padding:9px 11px!important;border:1px solid #cbd5df!important;border-radius:12px!important;background:#fff!important;font-size:15px!important;box-shadow:none!important}
     #view-service .wl-find-job-button{box-sizing:border-box!important;width:100%!important;min-width:0!important;height:48px!important;min-height:48px!important;margin:0!important;padding:0 13px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;border:1px solid #d20b12!important;border-radius:12px!important;background:#d20b12!important;color:#fff!important;box-shadow:0 3px 8px rgba(210,11,18,.12)!important;font:inherit!important;font-size:12px!important;font-weight:900!important;line-height:1!important;white-space:nowrap!important}
@@ -559,8 +577,8 @@ function ensureTechMenuPanel() {
   panel.className = 'wl-menu-overlay hidden';
   panel.innerHTML = `<div class='wl-menu-sheet'>
     <div class='wl-menu-head'>
-      <div><div class='wl-next-kicker'>TECH CHECK</div><h2>Menu</h2></div>
-      <button class='mini' data-wl-menu-close>Close</button>
+      <div><div class='wl-next-kicker'>TECH CHECK</div><h2 id='wlTechMenuTitle'>Menu</h2></div>
+      <button class='wl-menu-close-btn' data-wl-menu-close aria-label='Close menu'>×</button>
     </div>
     <div id='wlTechMenuBody'></div>
   </div>`;
@@ -570,31 +588,55 @@ function ensureTechMenuPanel() {
 async function openTechMenu() {
   const panel = ensureTechMenuPanel();
   const body = document.getElementById('wlTechMenuBody');
+  const title = document.getElementById('wlTechMenuTitle');
   const role = currentRoleKey();
-  const push = role === 'owner' ? null : await pushAlertState();
+
+  panel.classList.toggle('wl-owner-menu', role === 'owner');
+  if (title) title.textContent = role === 'owner' ? 'Owner Menu' : 'Menu';
+
+  if (role === 'owner') {
+    body.innerHTML = `
+      <div class='wl-owner-menu-primary'>
+        <button class='wl-owner-menu-ai' data-wl-menu-ai-dispatch>
+          <span class='wl-owner-menu-ai-icon'>✨</span>
+          <span><b>Owner AI Dispatch</b><small>Create or dictate a Tech Check job</small></span>
+          <strong>›</strong>
+        </button>
+      </div>
+      <div class='wl-owner-menu-utilities'>
+        <button class='wl-owner-menu-util' data-wl-menu-help>
+          <span class='wl-owner-menu-util-icon'>?</span>
+          <span><b>Help & Training</b><small>Owner walkthrough</small></span>
+        </button>
+        <button class='wl-owner-menu-util' data-wl-menu-refresh>
+          <span class='wl-owner-menu-util-icon'>↻</span>
+          <span><b>Refresh Data</b><small>Reload Tech Check</small></span>
+        </button>
+      </div>
+    `;
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  const push = await pushAlertState();
   const pushLabel = !push ? '' : push.ready ? 'Phone alerts are enabled on this device.' : push.permission === 'denied' ? 'Phone alerts are blocked in this device settings.' : 'Enable once if you want new assignments to alert this phone.';
   body.innerHTML = `
     <div class='wl-app-menu-list'>
       <button class='wl-app-menu-item' data-wl-menu-help>
         <span class='wl-app-menu-icon'>?</span>
-        <span><b>Help & Training</b><small>Replay the full ${role === 'it' ? 'IT Technician' : role === 'service' ? 'Service Tech' : 'Owner'} walkthrough.</small></span>
+        <span><b>Help & Training</b><small>Replay the full ${role === 'it' ? 'IT Technician' : 'Service Tech'} walkthrough.</small></span>
         <strong>›</strong>
       </button>
-      ${role !== 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-phone-alerts>
+      <button class='wl-app-menu-item' data-wl-menu-phone-alerts>
         <span class='wl-app-menu-icon'>↗</span>
         <span><b>Phone Alerts</b><small>${esc(pushLabel)}</small></span>
         <strong>${push?.ready ? 'ON' : '›'}</strong>
-      </button>` : ''}
+      </button>
       <button class='wl-app-menu-item' data-wl-menu-refresh>
         <span class='wl-app-menu-icon'>↻</span>
         <span><b>Refresh Tech Check</b><small>Reload the latest assignments, equipment, and workflow status.</small></span>
         <strong>›</strong>
       </button>
-      ${role === 'owner' ? `<button class='wl-app-menu-item' data-wl-menu-ai-dispatch>
-        <span class='wl-app-menu-icon'>✨</span>
-        <span><b>Owner AI Dispatch</b><small>Type or dictate a job, build the Tech Check draft, then review before sending.</small></span>
-        <strong>›</strong>
-      </button>` : ''}
     </div>
   `;
   panel.classList.remove('hidden');
