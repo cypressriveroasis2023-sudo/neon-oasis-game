@@ -811,12 +811,51 @@ async function send(raw=null){
   catch(error){$('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}
 }
 async function execute(actionId){
-  const a=state.pending.get(actionId);if(!a)return;state.pending.delete(actionId);
+  const a=state.pending.get(actionId);if(!a)return;
+
+  if(a.kind==='audited'){
+    const layer=visionActions();
+    if(!layer?.execute)throw new Error('Vision action layer is unavailable.');
+    const result=await layer.execute(a.auditActionId);
+    state.pending.delete(actionId);
+    if(result?.status!=='succeeded')throw new Error(result?.error||'The audited action was not completed.');
+
+    const ticket=a.ticket||result.ticket_no||'';
+    if(a.actionType==='assign'&&a.canonical?.create_new_assignment&&ticket){
+      try{
+        const rows=result.after_state?.assignments||[];
+        const role=a.canonical?.role||'';
+        const assignment=[...rows].reverse().find(x=>x.assigned_role===role&&['assigned','started'].includes(x.status));
+        if(assignment?.id)await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignment.id}});
+      }catch{}
+    }
+
+    await loadData();
+    visionLiveData()?.invalidate?.(ticket);
+    let label='Tech Check action saved.';
+    if(a.actionType==='assign')label='Assignment saved in Tech Check.';
+    else if(a.actionType==='schedule')label='Schedule updated in Tech Check.';
+    else if(a.actionType==='cancel')label='Assignment cancelled in Tech Check.';
+    else if(a.actionType==='owner_approve')label='Owner final verification saved in Tech Check.';
+
+    let context=null;
+    try{if(ticket)context=await liveContext(ticket,true);}catch{}
+    addMessage('assistant','',
+      '<div class="vision-direct good"><b>'+esc(label)+'</b>The confirmed action completed successfully and the before/after result was recorded in the Vision audit ledger. MHelpDesk remains separate.</div>'
+      +(context?.found?liveJobCard(context):(ticket?jobCard(ticket):''))
+    );
+    renderThread();renderOrder();
+    return;
+  }
+
+  state.pending.delete(actionId);
   if(a.kind==='create-job'){
     const html=await createDraftJob(a.draft);
     addMessage('assistant','',html);renderThread();renderOrder();
     return;
   }
+
+  // Legacy non-agent fallback retained only for compatibility with older cached conversations.
   const ticket=a.ticket,rows=active(ticket),p=prep(ticket),base=rows[0]||group(ticket)[0];if(!base)throw new Error('The service order is no longer available.');
   let result='';
   if(a.kind==='schedule'){
@@ -825,8 +864,7 @@ async function execute(actionId){
   }else{
     const existing=rows.find(r=>r.assigned_role===a.role),tech=a.tech||null;
     if(existing){
-      const update={assignee_user_id:tech?.user_id||null,assignee_name:tech?(tech.full_name||tech.username):(a.role==='service'?'Service Department':'IT Department'),assignment_scope:tech?'direct':'department',updated_at:now()};
-      const x=await db.from('job_assignments').update(update).eq('id',existing.id);if(x.error)throw x.error;
+      const x=await db.rpc('owner_reassign_job_assignment',{p_assignment_id:existing.id,p_assignee_user_id:tech?.user_id||null});if(x.error)throw x.error;
       result=tech?(tech.full_name||tech.username)+' is now assigned to MHelpDesk #'+ticket+'.':'MHelpDesk #'+ticket+' is now in the '+(a.role==='service'?'Service':'IT')+' department queue.';
     }else{
       const x=await db.rpc('owner_assign_job_v8',{p_ticket_no:String(ticket),p_site:base.site||p?.site||'',p_assigned_role:a.role,p_assignee_user_id:tech?.user_id||null,p_requested_unit_count:Number(base.requested_unit_count||0),p_unit_summary:base.unit_summary||'',p_job_description:base.job_description||'',p_notes:base.notes||'',p_solar_panel_qty:Number(base.solar_panel_qty||0),p_battery_replacement_qty:Number(base.battery_replacement_qty||0),p_camera_replacement_qty:Number(base.camera_replacement_qty||0),p_sim_replacement_qty:Number(base.sim_replacement_qty||0),p_micro_sd_qty:Number(base.micro_sd_qty||0),p_equipment_manifest:base.equipment_manifest||p?.equipment_manifest||{},p_requires_it_handoff:a.role==='service'&&String(base.work_type||'').toLowerCase()!=='pickup',p_scheduled_for:base.scheduled_for||dayKey(new Date()),p_work_type:base.work_type||p?.work_type||'service'});
@@ -866,7 +904,12 @@ document.addEventListener('click',async e=>{
   const c=e.target.closest('[data-chat-id]');if(c)return openChat(c.dataset.chatId);
   const p=e.target.closest('[data-vision-prompt],[data-order-prompt]');if(p)return send(p.dataset.visionPrompt||p.dataset.orderPrompt);
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
-  const cancel=e.target.closest('[data-cancel-action]');if(cancel){state.pending.delete(cancel.dataset.cancelAction);addMessage('assistant','', '<div class="vision-system-note">No changes were made.</div>');renderThread();return;}
+  const cancel=e.target.closest('[data-cancel-action]');if(cancel){
+    const pending=state.pending.get(cancel.dataset.cancelAction);
+    try{if(pending?.kind==='audited'&&pending.auditActionId)await visionActions()?.cancel?.(pending.auditActionId);}catch(error){console.warn('Vision audit cancel',error);}
+    state.pending.delete(cancel.dataset.cancelAction);
+    addMessage('assistant','', '<div class="vision-system-note">No changes were made. The proposed Vision action was cancelled.</div>');renderThread();return;
+  }
   if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
   if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();state.agentStatus='unknown';await loadData();await checkAgentStatus();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
