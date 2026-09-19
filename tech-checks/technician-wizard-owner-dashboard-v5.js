@@ -3150,6 +3150,11 @@ function serviceSolarEvidenceCount(rows, category, kind) {
 function serviceSolarReady(ctx, check, evidence) {
   if (!ctx?.need_solar) return true;
   if (!check?.completed_at) return false;
+  if (window.TechCheckRules?.serviceSolarEvidenceRequirements) {
+    return window.TechCheckRules.serviceSolarEvidenceRequirements(ctx).every(req =>
+      serviceSolarEvidenceCount(evidence,req.category,req.kind) >= Number(req.minimum || 1)
+    );
+  }
   const requiredStandPhotos=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
   if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<requiredStandPhotos || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
   if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
