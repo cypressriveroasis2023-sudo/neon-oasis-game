@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v124",
-  "service_worker": "v83",
+  "service_worker": "v84",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1975,7 +1975,27 @@
         "Close restores the same conversation",
         "Focusing the Vision prompt automatically closes the Service Order"
       ]
+    },
+    {
+      "id": "VISION-PEOPLE-LOOKUP-01",
+      "area": "OnSite Vision · Company people",
+      "role": "owner",
+      "mode": "source+db+edge",
+      "destructive": false,
+      "scenario": "Natural person questions resolve against live Cameras On Site profiles instead of generic help text",
+      "steps": [
+        "Ask Who is Mike Monsive?",
+        "Ask Who is Mike?",
+        "Inspect duplicate active/inactive profiles",
+        "Run the server agent people lookup"
+      ],
+      "expected": [
+        "Vision searches Owner, IT, and Service profile records, not only active assignable technicians",
+        "Mike Monsive resolves to the live matching profile records",
+        "If multiple profile records share the name, Vision shows each active/inactive state instead of guessing",
+        "The deterministic browser fallback answers person questions even when the model is unavailable"
+      ]
     }
   ],
-  "last_release_qa_note": "Vision mobile Service Order pass: desktop-style side drawer replaced by centered mobile modal sheet; prompt focus closes the sheet and returns to the same chat. Vision v19 / SW83."
+  "last_release_qa_note": "Vision people lookup: natural Who is / Tell me about questions now query all relevant company profiles, distinguish active/inactive duplicate records, and no longer fall into the generic help response. Vision v20 / Edge v11 / SW84."
 }
