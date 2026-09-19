@@ -1719,11 +1719,11 @@ async function showSvcHome() {
       <span><b>${work.inspectionDone?1:0}</b> inspection today</span>
     </div>
     ${assignedInventoryHtml(assignedAssets)}
-    <div class='wl-menu wl-service-menu'>
-      <button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button>
-      <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
-      <button class='wl-amber' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>
-      <button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button>
+    <div class='wl-service-pillbar' aria-label='Service actions'>
+      <button class='wl-service-pill wl-service-pill-return' data-wl-service-return><span class='wl-service-pill-label'>↩ Return to IT</span><span class='wl-service-pill-badge'>Intake</span></button>
+      <button class='wl-service-pill' data-wl-svc='returns'><span class='wl-service-pill-label'>My Returned Units</span><span class='wl-service-pill-badge'>${returnCount}</span></button>
+      <button class='wl-service-pill' data-wl-svc='inspect'><span class='wl-service-pill-label'>Truck Inspection</span><span class='wl-service-pill-badge'>${work.inspectionDone?"✓":"0"}</span></button>
+      <button class='wl-service-pill' data-wl-svc='history'><span class='wl-service-pill-label'>☰ History</span><span class='wl-service-pill-badge'>View</span></button>
     </div>`;
   hideChildren(viewSvc(),[home]); resetWizardPosition();
 }
