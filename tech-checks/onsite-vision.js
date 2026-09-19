@@ -11,7 +11,7 @@ const id=()=>String(Date.now())+Math.random().toString(36).slice(2,8);
 const reEsc=s=>String(s||'').replace(/[.*+?^$()|[\]\\]/g,'\\$&');
 
 async function techCheckDb(){
-  const response=await fetch('./app.js?v=startup-fast-v30',{cache:'no-store'});
+  const response=await fetch('./app.js?v=startup-fast-v31',{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load the Tech Check connection.');
   const src=await response.text();
   const url=src.match(/const SUPABASE_URL = '([^']+)'/);
