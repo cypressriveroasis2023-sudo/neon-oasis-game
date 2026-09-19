@@ -84,7 +84,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v104')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v105')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1510,23 +1510,23 @@ async function setInventoryAssetStatus(unitKey,status) {
 }
 
 const OWNER_TICKET_PARTS = [
-  { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
-  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
-  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
-  { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'Micro SD Cards' },
+  { key:'solar_panel_qty', id:'SolarPanels', label:'Additional Solar Panels' },
+  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Additional Batteries' },
+  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Additional Cameras' },
+  { key:'sim_replacement_qty', id:'SimReplacements', label:'Additional SIM Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'Additional SD / Micro SD Cards' },
 ];
 function ownerCleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function ownerPartsRows(p) { return OWNER_TICKET_PARTS.map(part => ({...part, qty:ownerCleanPartQty(p?.[part.key])})); }
 function ownerPartsSummary(p) {
   const rows=ownerPartsRows(p).filter(row=>row.qty>0);
-  return '<div class="ownerPartsSummary top8"><b>Parts Required</b>' +
-    (rows.length ? '<div class="ownerPartsChips">' + rows.map(row => '<span><b>'+row.qty+'</b> × '+esc(row.label)+'</span>').join('') + '</div>' : '<div class="small">No extra replacement parts listed.</div>') +
+  return '<div class="ownerPartsSummary top8"><b>Additional Loose Parts</b>' +
+    (rows.length ? '<div class="ownerPartsChips">' + rows.map(row => '<span><b>'+row.qty+'</b> × '+esc(row.label)+'</span>').join('') + '</div>' : '<div class="small">None listed.</div>') +
     '</div>';
 }
 function ownerPartsEditor(p) {
   if (p.status !== 'draft') return ownerPartsSummary(p);
-  return '<div class="ownerPartsEditor top8"><b>Parts Required</b><div class="small">Editable while IT is still preparing this ticket.</div><div class="ownerPartsGrid">' +
+  return '<div class="ownerPartsEditor top8"><b>Additional Loose Parts</b><div class="small">Editable while IT is still preparing this ticket.</div><div class="ownerPartsGrid">' +
     OWNER_TICKET_PARTS.map(part => '<label><span>'+esc(part.label)+'</span><input id="ownerPart_'+part.id+'_'+p.id+'" type="number" min="0" step="1" inputmode="numeric" value="'+ownerCleanPartQty(p[part.key])+'"></label>').join('') +
     '</div><button class="mini top8" onclick="saveOwnerPrepParts(\''+p.id+'\')">Save Parts List</button></div>';
 }
