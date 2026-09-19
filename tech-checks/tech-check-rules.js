@@ -300,7 +300,7 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v1',
+    version:'rules-v2',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
