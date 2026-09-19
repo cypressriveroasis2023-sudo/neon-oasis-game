@@ -445,6 +445,37 @@ async function returnPhotoHtml(paths) {
 }
 async function myReturnCounts() { const { data: { session } } = await liveDb.auth.getSession(); if (!session?.user?.id) return { waiting:0, inventory:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', session.user.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, completed:rows.filter(r=>r.status==='completed').length }; }
 async function releasedPrepCount() { const { data } = await liveDb.from('prep_tickets').select('id').eq('status','released'); return (data||[]).length; }
+async function myTruckSpareData() {
+  const { data:{ session } }=await liveDb.auth.getSession();
+  if (!session?.user?.id) return {units:[],batteries:[]};
+  const [prepQ,batteryQ]=await Promise.all([
+    liveDb.from('prep_tickets')
+      .select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,spare_checked_out_at,spare_checked_out_to)')
+      .eq('status','closed').eq('closed_by',session.user.id)
+      .order('closed_at',{ascending:false}).limit(50),
+    liveDb.from('truck_spare_batteries').select('*')
+      .eq('service_tech_id',session.user.id).eq('status','in_truck')
+      .order('accepted_at',{ascending:true})
+  ]);
+  if (prepQ.error) throw prepQ.error;
+  if (batteryQ.error) throw batteryQ.error;
+  const units=(prepQ.data||[]).flatMap(p=>(p.prep_items||[])
+    .filter(i=>i.purpose==='BACKUP' && i.spare_checked_out_at && i.spare_checked_out_to===session.user.id && !i.spare_outcome)
+    .map(i=>({...i,ticket_no:p.ticket_no,site:p.site,closed_at:p.closed_at})));
+  return {units,batteries:batteryQ.data||[]};
+}
+function truckSpareServiceHtml(spares) {
+  const units=spares?.units||[], batteries=spares?.batteries||[];
+  if (!units.length && !batteries.length) return '';
+  const unitHtml=units.map(i=>`<div class='wl-ticket'><b>${esc(i.equipment_type)} ${esc(i.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(i.ticket_no)} · Truck BACKUP</div><div class='small top8'>Was this spare actually used today?</div><div class='grid2 top8'><button class='wl-big wl-gray' style='min-height:50px;font-size:15px' data-wl-spare-unit-return='${i.id}'>RETURN UNUSED TO SHOP</button><button class='wl-big wl-blue' style='min-height:50px;font-size:15px' data-wl-spare-unit-used='${i.id}'>USED FOR SWAP</button></div></div>`).join('');
+  const batteryHtml=batteries.map(b=>`<div class='wl-ticket'><b>${esc(b.battery_type)}</b><div class='small'>MHelpDesk #${esc(b.ticket_no)} · ${Number(b.qty_prepared||0)} spare prepared for ${esc(b.equipment_type)}</div><label class='top8'>How many were USED?<input id='wlSpareUsed_${b.id}' type='number' inputmode='numeric' min='0' max='${Number(b.qty_prepared||0)}' value='0'></label><button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-spare-battery-resolve='${b.id}' data-wl-spare-battery-max='${Number(b.qty_prepared||0)}'>CHECK IN BATTERY SPARES</button><div class='small'>Anything not used is automatically recorded as returned unused.</div></div>`).join('');
+  return `<div class='wl-stop top10' data-wl-truck-spares>
+    <b>TRUCK SPARES TO RESOLVE · ${units.length+batteries.length}</b>
+    <div>Before ending the day, resolve every backup that IT gave you. <b>Unused backup units return directly to Shop Inventory</b> — do not send them through IT Intake. If you used a spare for a swap, mark it USED and return the failed/replaced field unit through the normal IT Intake flow.</div>
+    ${unitHtml}${batteryHtml}
+  </div>`;
+}
+
 async function serviceWorkData() {
   const { data:{ session } } = await liveDb.auth.getSession();
   if (!session?.user?.id) return { assignments:[], released:[], inspectionDone:false, deployed:[] };
@@ -453,13 +484,17 @@ async function serviceWorkData() {
     myActiveAssignments('service'),
     liveDb.from('prep_tickets').select('id,ticket_no,site,released_at,created_at').eq('status','released').order('released_at',{ascending:true}),
     liveDb.from('unit_returns').select('ticket_no,unit_tag').eq('service_tech_id',session.user.id),
-    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(unit_tag,equipment_type)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
     liveDb.from('morning_checks').select('id').eq('service_tech_id',session.user.id).gte('submitted_at',dayStart.toISOString()).limit(1)
   ]);
   const activeTickets=new Set((assignments||[]).map(a=>norm(a.ticket_no)));
   const released=(releasedQ.data||[]).filter(p=>activeTickets.has(norm(p.ticket_no)));
   const returned = new Set((returnedQ.data||[]).map(r => `${norm(r.ticket_no)}|${norm(r.unit_tag)}`));
-  const deployed = (deployedQ.data||[]).flatMap(p => (p.prep_items||[]).filter(i => i.unit_tag && !returned.has(`${norm(p.ticket_no)}|${norm(i.unit_tag)}`)).map(i => ({ ticket_no:p.ticket_no, site:p.site, closed_at:p.closed_at, unit_tag:i.unit_tag, equipment_type:i.equipment_type })));
+  const deployed = (deployedQ.data||[]).flatMap(p => (p.prep_items||[]).filter(i => {
+    if (!i.unit_tag || returned.has(`${norm(p.ticket_no)}|${norm(i.unit_tag)}`)) return false;
+    if (i.purpose==='BACKUP') return i.spare_outcome==='used';
+    return true;
+  }).map(i => ({ prep_item_id:i.id, ticket_no:p.ticket_no, site:p.site, closed_at:p.closed_at, unit_tag:i.unit_tag, equipment_type:i.equipment_type, purpose:i.purpose, spare_outcome:i.spare_outcome })));
   return { assignments:assignments||[], released, inspectionDone:(inspectionQ.data||[]).length>0, deployed };
 }
 async function loadOwnerReturnPhotos(details) { if (!details?.open || details.dataset.photosLoaded === '1') return; const row = ownerReturnRows.get(details.dataset.ownerReturn); if (!row) return; details.dataset.photosLoaded = '1'; const service = details.querySelector('[data-owner-service-photos]'); const intake = details.querySelector('[data-owner-intake-photos]'); if (service) { service.innerHTML = `<div class='wl-note'>Loading Service photos…</div>`; service.innerHTML = await returnPhotoHtml(row.return_photo_paths) || `<div class='wl-note'>No Service return photos saved.</div>`; } if (intake) { intake.innerHTML = `<div class='wl-note'>Loading IT photo…</div>`; intake.innerHTML = await returnPhotoHtml(row.intake_photo_paths) || `<div class='wl-note'>No IT intake photo saved.</div>`; } }
@@ -581,6 +616,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
     { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
+    { kicker:'TRUCK SPARES', title:'Resolve every truck backup after the call', body:`<p>IT may hand you a <b>BACKUP / truck spare</b> unit or extra batteries for the current MHelpDesk job. These are contingency items in case a field unit or battery is bad.</p><p>If a spare unit was <b>not used</b>, choose <b>RETURN UNUSED TO SHOP</b>; it does not need IT Intake. If it was used for a swap, mark it <b>USED FOR SWAP</b> and return the failed/replaced field unit through normal IT Intake. For spare batteries, enter the quantity used and Tech Check returns the remainder unused.</p>` },
     { kicker:'RETURN TO IT', title:'Send returning equipment back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
     { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY TICKET</b><span>→</span><b>TAKE THIS JOB</b><span>→</span><b>VERIFY IT HANDOFF</b><span>→</span><b>SERVICE CHECKOUT</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
@@ -596,6 +632,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
+    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>At the Ticket Summary, use <b>Truck Spares / Backups</b> when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Add any spare Solar Spotter, Ranger, Helios, or Recon II batteries and mark them physically present, charged, and READY before handoff.</p>` },
     { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, create the handoff to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for tagged equipment returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help Center</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
@@ -849,6 +886,16 @@ function helpStepGuide(role, step){
       ],
       selector:'#wlSvcHome'
     },
+    'service:TRUCK SPARES':{
+      steps:[
+        'Open Truck Spares to Resolve on Service Home after the field call.',
+        'For a backup unit you did NOT use, tap RETURN UNUSED TO SHOP. It goes directly back to Shop Inventory and does not need IT Intake.',
+        'If you used a backup unit for a swap, tap USED FOR SWAP.',
+        'If a spare replaced a failed field unit, return the failed/replaced unit through the normal Return Unit to IT Intake flow.',
+        'For spare batteries, enter how many were used. Tech Check records the rest as returned unused.'
+      ],
+      selector:"[data-wl-truck-spares]"
+    },
     'service:RETURN TO IT':{
       steps:[
         'Tap Return Unit to IT Intake.',
@@ -874,7 +921,7 @@ function helpStepGuide(role, step){
         'Receive and verify the IT handoff when IT prep is involved.',
         'Complete any required Solar / Helios Service checkout.',
         'Perform the field work.',
-        'Return equipment to IT Intake when equipment comes back.'
+        'Resolve every Truck Spare after the call: unused spares go directly back to Shop; used/replaced field equipment follows the normal return flow.'
       ],
       selector:'#wlSvcHome'
     },
@@ -915,6 +962,16 @@ function helpStepGuide(role, step){
         'Sign the unit check and review readiness before handoff.'
       ],
       selector:"[data-wl-it='new']"
+    },
+    'it:TRUCK SPARES':{
+      steps:[
+        'At Ticket Summary, open Truck Spares / Backups.',
+        'Add a spare unit when Service should carry an emergency replacement for this ticket.',
+        'Complete the full deploy-ready IT check, matching-tag photo, and signature for the BACKUP unit.',
+        'Enter any extra Solar Spotter, Ranger, Helios, or Recon II spare batteries and mark each saved batch physically present, charged, and READY.',
+        'Hand the job equipment and all saved truck spares to Service under the same MHelpDesk reference.'
+      ],
+      selector:"[data-wl-truck-spares-it]"
     },
     'it:SERVICE HANDOFF':{
       steps:[
@@ -2192,7 +2249,7 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
   }
 
-  if (item.purpose === 'DELIVERY') {
+  if (['DELIVERY','BACKUP'].includes(item.purpose)) {
     if (item.equipment_type === 'Helios') {
       steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Is the Cerbo for ${identity} online and visible in the VRM portal?` });
       steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration for ${identity} updated?` });
@@ -2240,7 +2297,7 @@ function itUnitReady(item) {
   if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
   if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
   if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
-  if (item.purpose !== 'DELIVERY') return true;
+  if (!['DELIVERY','BACKUP'].includes(item.purpose)) return true;
   if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok && item.helios_ptz_ports_ok && item.helios_speaker_ports_ok)) return false;
   const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
   return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
@@ -2258,7 +2315,7 @@ async function configureCurrentItItem() {
     : await liveDb.rpc('add_it_prep_item', { p_prep_id: activeItPrep.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_recon_battery_count: required });
   if (result.error) { alert(result.error.message); return false; }
   activeItPrep = await getPrep(activeItPrep.id);
-  if (itTypeChoice === 'Helios' && itPurposeChoice === 'DELIVERY') {
+  if (itTypeChoice === 'Helios' && ['DELIVERY','BACKUP'].includes(itPurposeChoice)) {
     const configured = currentItItem();
     if (configured) {
       const { error: portResetError } = await liveDb.rpc('save_it_helios_port_checks', {
@@ -2298,7 +2355,7 @@ async function persistCurrentItItem() {
     p_ticket_item_match_ok: Boolean(item.ticket_item_match_ok),
   });
   if (error) { alert(error.message); return false; }
-  if (item.equipment_type === 'Helios' && item.purpose === 'DELIVERY') {
+  if (item.equipment_type === 'Helios' && ['DELIVERY','BACKUP'].includes(item.purpose)) {
     const { error: heliosPortError } = await liveDb.rpc('save_it_helios_port_checks', {
       p_item_id: item.id,
       p_camera1_ports_ok: Boolean(item.helios_camera1_ports_ok),
@@ -2344,8 +2401,87 @@ function itUnitReviewHtml(item, evidence, unitNo) {
   const identity = itItemIdentity(item, unitNo);
   return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} of ${Number(item.required_battery_count || 0)} required</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed'}</div></div>`;
 }
+const TRUCK_SPARE_BATTERY_OPTIONS = [
+  { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
+  { key:'spotter-350', equipment_type:'Solar Spotter', battery_type:'12V 350Ah', label:'Solar Spotter · 12V 350Ah' },
+  { key:'ranger-litime', equipment_type:'Ranger', battery_type:'LiTime 12V 110Ah', label:'Ranger · LiTime 12V 110Ah' },
+  { key:'helios-box', equipment_type:'Helios', battery_type:'Helios Battery Box', label:'Helios · Battery Box' },
+  { key:'recon-battery', equipment_type:'Recon 2', battery_type:'Recon II Battery', label:'Recon II · Spare Battery' },
+];
+async function loadTruckSpareBatteries(prepId) {
+  if (!prepId) return [];
+  const { data,error } = await liveDb.from('truck_spare_batteries').select('*').eq('prep_ticket_id',prepId).order('created_at',{ascending:true});
+  if (error) throw error;
+  return data || [];
+}
+function truckSpareITPanelHtml(rows,items) {
+  const byKey=new Map((rows||[]).map(r=>[r.equipment_type+'|'+r.battery_type,r]));
+  const backups=(items||[]).filter(i=>i.purpose==='BACKUP');
+  const backupHtml=backups.length
+    ? backups.map(i=>`<div class='wl-ticket'><b>TRUCK SPARE · ${esc(i.equipment_type)}</b><div>Unit ${esc(i.unit_tag||'Tag pending')} · ${i.verified_at?'IT check complete':'IT check pending'}</div><div class='small'>This unit is contingency equipment for this MHelpDesk job. Service must mark it USED or RETURN UNUSED after the field call.</div></div>`).join('')
+    : `<div class='small'>No spare unit added yet. Add one only when Service should carry an emergency replacement for this ticket.</div>`;
+  const batteryRows=TRUCK_SPARE_BATTERY_OPTIONS.map(opt=>{
+    const row=byKey.get(opt.equipment_type+'|'+opt.battery_type);
+    const qty=Number(row?.qty_prepared||0);
+    const ready=Boolean(row?.ready_ok);
+    return `<div class='wl-ticket'><b>${esc(opt.label)}</b><div class='grid2 top8'><label>Spare Qty<input id='wlSpareQty_${opt.key}' type='number' inputmode='numeric' min='0' value='${qty}'></label><label class='check' style='align-self:end'><input id='wlSpareReady_${opt.key}' type='checkbox' ${ready?'checked':''}><span>Physically present, charged & READY</span></label></div>${qty&&!ready?`<div class='warn top8'><b>Pending:</b> mark this battery batch READY before the Service handoff.</div>`:''}</div>`;
+  }).join('');
+  return `<div class='wl-question top10' data-wl-truck-spares-it>
+    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
+    <div class='qtext'>Contingency equipment for this Service call</div>
+    <div class='small'>These are <b>not</b> extra customer/job requirements. They ride in the truck in case Service needs an emergency swap. BACKUP units receive full deploy-ready IT checks, photo and signature. Service must resolve every spare after the call.</div>
+    <div class='top10'><b>Spare Units</b></div>
+    ${backupHtml}
+    <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II battery/camera sets<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
+    <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-add-truck-spare-unit>＋ Add Spare Unit & Run IT Check</button>
+    <div class='top10'><b>Spare Batteries</b><div class='small'>Use these only for extra replacement batteries riding in the truck. Enter 0 when none are needed.</div></div>
+    ${batteryRows}
+    <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-truck-spare-batteries>Save Spare Battery Plan</button>
+  </div>`;
+}
+async function addTruckSpareUnitFromSummary() {
+  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Truck spares can only be added before the Service handoff.');
+  const type=document.getElementById('wlTruckSpareUnitType')?.value || '';
+  if (!type) return alert('Choose the spare unit type first.');
+  const recon=Math.max(1,Number(document.getElementById('wlTruckSpareReconCount')?.value||1));
+  const { data,error }=await liveDb.rpc('add_it_truck_spare_unit',{
+    p_prep_id:activeItPrep.id,
+    p_equipment_type:type,
+    p_recon_battery_count:type==='Recon 2'?recon:null
+  });
+  if (error) return alert(error.message);
+  activeItPrep=await getPrep(activeItPrep.id);
+  itExpectedUnits=activeItPrep.expected_unit_count||itItems().length;
+  const items=itItems();
+  const found=items.findIndex(i=>i.id===data);
+  itUnitIndex=found>=0?found:Math.max(0,items.length-1);
+  itTypeChoice=type;
+  itPurposeChoice='BACKUP';
+  itReconRequired=recon;
+  itQuestionIndex=0;
+  itUnitPhase='checks';
+  return renderItUnitStep();
+}
+async function saveTruckSpareBatteriesFromSummary() {
+  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Spare batteries can only be changed before the Service handoff.');
+  for (const opt of TRUCK_SPARE_BATTERY_OPTIONS) {
+    const qty=Math.max(0,Math.floor(Number(document.getElementById('wlSpareQty_'+opt.key)?.value||0)));
+    const ready=Boolean(document.getElementById('wlSpareReady_'+opt.key)?.checked);
+    const { error }=await liveDb.rpc('save_it_truck_spare_battery',{
+      p_prep_id:activeItPrep.id,
+      p_equipment_type:opt.equipment_type,
+      p_battery_type:opt.battery_type,
+      p_qty:qty,
+      p_ready_ok:ready
+    });
+    if (error) return alert(error.message);
+  }
+  alert('Truck spare battery plan saved.');
+  return renderItUnitStep();
+}
+
 function itTicketSummaryHtml(items, evidence) {
-  const units = items.map((item, index) => { const unitNo = index + 1; const photos = unitEvidence(evidence, unitNo, 'photo'); const sig = unitSignature(evidence, unitNo); const issues = itIssueLinksHtml(item, evidence, unitNo); return `<div class='wl-ticket'><b>Unit ${unitNo} — ${esc(item.equipment_type)}</b><div>${esc(item.purpose)} · Unit ${esc(item.unit_tag || '')}</div><div>📷 ${photos.length} photo${photos.length === 1 ? '' : 's'}</div><div>✍️ ${sig ? `Signed by ${esc(sig.created_by_name || 'IT Technician')} · ${new Date(sig.created_at).toLocaleString()}` : 'Signature missing'}</div>${issues}</div>`; }).join('');
+  const units = items.map((item, index) => { const unitNo = index + 1; const photos = unitEvidence(evidence, unitNo, 'photo'); const sig = unitSignature(evidence, unitNo); const issues = itIssueLinksHtml(item, evidence, unitNo); const unitTitle=item.purpose==='BACKUP'?`TRUCK SPARE — ${esc(item.equipment_type)}`:`Unit ${unitNo} — ${esc(item.equipment_type)}`; return `<div class='wl-ticket'><b>${unitTitle}</b><div>${esc(item.purpose)} · Unit ${esc(item.unit_tag || '')}</div><div>📷 ${photos.length} photo${photos.length === 1 ? '' : 's'}</div><div>✍️ ${sig ? `Signed by ${esc(sig.created_by_name || 'IT Technician')} · ${new Date(sig.created_at).toLocaleString()}` : 'Signature missing'}</div>${issues}</div>`; }).join('');
   const partsEditor = activeItPrep?.status === 'draft' ? `<div class='wl-question top10'><div class='qtext'>Parts Required</div><div class='small'>Update these only if the MHelpDesk ticket changes before the Service handoff.</div>${ticketPartsInputsHtml('wlEditPart', activeItPrep)}<button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-prep-parts>Save Parts List</button></div>` : ticketPartsInlineHtml(activeItPrep);
   return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div><b>Units / Devices:</b> ${Number(activeItPrep.requested_unit_count ?? equipmentManifestDeviceTotal(activeItPrep.equipment_manifest))}</div><div><b>Stands / Poles:</b> ${equipmentManifestStandTotal(activeItPrep.equipment_manifest)}</div><div><b>Total Equipment Items:</b> ${items.length}</div></div>${equipmentManifestInlineHtml(activeItPrep)}${partsEditor}${units}`;
 }
@@ -2366,7 +2502,7 @@ async function releaseItPrepUnitByUnit() {
     for (const item of items) {
       const { error: verifyError } = await liveDb.rpc('verify_prep_item', { p_item_id: item.id, p_unit_tag: item.unit_tag || '', p_battery_count: Number(item.battery_count || 0), p_power_ok: Boolean(item.power_ok), p_functions_ok: Boolean(item.functions_ok), p_safe_ok: Boolean(item.safe_ok) });
       if (verifyError) throw verifyError;
-      if (item.purpose === 'DELIVERY') {
+      if (['DELIVERY','BACKUP'].includes(item.purpose)) {
         // Solar Spotter batteries are a Service-side checkout. The legacy delivery RPC still requires this compatibility flag.
         const { error: deliveryError } = await liveDb.rpc('verify_delivery_item_checks', { p_item_id: item.id, p_sim_ok: Boolean(item.delivery_sim_ok), p_camera_app_ok: Boolean(item.delivery_camera_app_ok), p_customer_email_app_ok: Boolean(item.delivery_customer_email_app_ok), p_batteries_charged_ok: item.equipment_type === 'Solar Spotter' ? true : Boolean(item.delivery_batteries_charged_ok), p_monitoring_ok: Boolean(item.delivery_monitoring_ok), p_ticket_count_ok: item.equipment_type === 'Helios' ? true : Boolean(item.delivery_ticket_count_ok), p_sd_formatted_ok: Boolean(item.delivery_sd_formatted_ok), p_recording_ok: Boolean(item.delivery_recording_ok) });
         if (deliveryError) throw deliveryError;
@@ -2445,8 +2581,11 @@ async function renderItUnitStep() {
   hideChildren(viewIT(), [wizard]);
   if (itUnitIndex >= totalUnits || itUnitPhase === 'final') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
-    const ready = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
-    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div><div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to hand this equipment off to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+    const spareBatteries = await loadTruckSpareBatteries(activeItPrep.id);
+    const itemReady = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
+    const spareBatteriesReady = spareBatteries.every(row => Boolean(row.ready_ok));
+    const ready = itemReady && spareBatteriesReady;
+    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + truckSpareITPanelHtml(spareBatteries,items) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div>${!spareBatteriesReady?`<div class='wl-stop top10'><b>Truck spare battery plan is not ready.</b><div>Every saved spare battery batch must be marked physically present, charged and READY.</div></div>`:''}<div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to hand the job equipment <b>and any truck spares</b> to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -2500,11 +2639,12 @@ async function showSvcHome() {
     home.className='card wl-home';
     viewSvc().prepend(home);
   }
-  const [r,work,phoneAlerts,assignedAssets]=await Promise.all([
+  const [r,work,phoneAlerts,assignedAssets,truckSpares]=await Promise.all([
     myReturnCounts(),
     serviceWorkData(),
     pushAlertState(),
-    myAssignedInventoryAssets()
+    myAssignedInventoryAssets(),
+    myTruckSpareData()
   ]);
   const alertBanner=phoneAlertBanner(phoneAlerts);
   const assignments=work.assignments||[];
@@ -2512,6 +2652,7 @@ async function showSvcHome() {
   const handoffCount=work.released.length;
   const returnCount=r.waiting+r.inventory;
   const deployedCount=(work.deployed||[]).length;
+  const truckSpareCount=(truckSpares.units||[]).length+(truckSpares.batteries||[]).length;
   const assignmentCards=assignments.map((a,i)=>{
     const pickup=String(a.work_type||'').toLowerCase()==='pickup';
     const handoffReady=releasedTickets.has(norm(a.ticket_no));
@@ -2539,7 +2680,9 @@ async function showSvcHome() {
       <span><b>${handoffCount}</b> IT handoffs ready</span>
       <span><b>${deployedCount}</b> units in field</span>
       <span><b>${r.waiting}</b> returns waiting IT</span>
+      <span><b>${truckSpareCount}</b> truck spares to resolve</span>
     </div>
+    ${truckSpareServiceHtml(truckSpares)}
     ${assignmentCards}
     ${assignedInventoryHtml(assignedAssets)}
     <div class='wl-menu'>
@@ -3276,6 +3419,8 @@ document.addEventListener('click', async e => {
     if (itUnitPhase === 'purpose') { itUnitPhase = 'type'; return renderItUnitStep(); }
     if (itUnitPhase === 'type') { if (itUnitIndex === 0) return showPendingList(); itUnitIndex--; itUnitPhase = 'review'; return renderItUnitStep(); }
   }
+  if (e.target.closest('[data-wl-add-truck-spare-unit]')) { e.preventDefault(); e.stopPropagation(); return addTruckSpareUnitFromSummary(); }
+  if (e.target.closest('[data-wl-save-truck-spare-batteries]')) { e.preventDefault(); e.stopPropagation(); return saveTruckSpareBatteriesFromSummary(); }
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
@@ -3397,6 +3542,31 @@ document.addEventListener('click', async e => {
     return;
   }
 
+  const spareReturn=e.target.closest('[data-wl-spare-unit-return]');
+  if (spareReturn) {
+    if (!confirm('Return this UNUSED truck spare directly to Shop Inventory? This does not create an IT Intake return.')) return;
+    const { error }=await liveDb.rpc('resolve_my_truck_spare_unit',{p_item_id:spareReturn.dataset.wlSpareUnitReturn,p_outcome:'returned_unused'});
+    if (error) return alert(error.message);
+    return showSvcHome();
+  }
+  const spareUsed=e.target.closest('[data-wl-spare-unit-used]');
+  if (spareUsed) {
+    if (!confirm('Mark this truck spare USED for the field job? If it replaced a failed unit, return the failed unit through normal IT Intake.')) return;
+    const { error }=await liveDb.rpc('resolve_my_truck_spare_unit',{p_item_id:spareUsed.dataset.wlSpareUnitUsed,p_outcome:'used'});
+    if (error) return alert(error.message);
+    return showSvcHome();
+  }
+  const spareBattery=e.target.closest('[data-wl-spare-battery-resolve]');
+  if (spareBattery) {
+    const max=Math.max(0,Number(spareBattery.dataset.wlSpareBatteryMax||0));
+    const used=Math.max(0,Math.floor(Number(document.getElementById('wlSpareUsed_'+spareBattery.dataset.wlSpareBatteryResolve)?.value||0)));
+    if (used>max) return alert('Used spare battery quantity cannot exceed '+max+'.');
+    if (!confirm('Record '+used+' used and '+(max-used)+' returned unused?')) return;
+    const { error }=await liveDb.rpc('resolve_my_truck_spare_battery',{p_spare_id:spareBattery.dataset.wlSpareBatteryResolve,p_used_qty:used});
+    if (error) return alert(error.message);
+    return showSvcHome();
+  }
+
   if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) { const panel = upload.closest('.wl-proof'); const input = panel.querySelector('.wl-file'); const files = [...(input.files || [])]; if (!files.length) return alert('Take or select at least one photo.'); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const expected = Number(panel.dataset.expected || 0) || null; if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.'); if (panel.dataset.stage === 'service' && expected) { const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length; if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`); } upload.disabled = true; upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…'; try { const optimized = await Promise.all(files.map(optimizeEvidencePhoto)); upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…'; await Promise.all(optimized.map((f, i) => { const original = f.name || files[i].name; const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original; return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId); })); if (panel.dataset.stage === 'it' && unitNo && activeItPrep) { activeItPrep = await getPrep(activeItPrep.id); return renderItUnitStep(); } await refreshProofPanel(panel); } catch (err) { upload.disabled = false; upload.textContent = 'Save Photo(s)'; alert(err.message || 'Upload failed.'); } return; }
   const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
@@ -3421,7 +3591,7 @@ async function prepareReturnPreviewPhotos(files) {
   return prepared;
 }
 async function rememberedUnitsForTicket(ticket) {
-  const { data, error } = await liveDb.from('prep_tickets').select('ticket_no,prep_items(unit_tag,equipment_type)').order('created_at', { ascending: false });
+  const { data, error } = await liveDb.from('prep_tickets').select('ticket_no,prep_items(unit_tag,equipment_type,purpose,spare_outcome)').order('created_at', { ascending: false });
   if (error) return [];
   const prepUnits = (data || []).filter(p => norm(p.ticket_no) === norm(ticket)).flatMap(p => p.prep_items || []);
   const returns = (await returnRows()).filter(r => norm(r.ticket_no) === norm(ticket));
@@ -3430,6 +3600,7 @@ async function rememberedUnitsForTicket(ticket) {
   return prepUnits.filter(item => {
     const tag = String(item.unit_tag || '').trim();
     const key = norm(tag);
+    if (item.purpose==='BACKUP' && item.spare_outcome!=='used') return false;
     if (!tag || alreadyReturned.has(key) || seen.has(key)) return false;
     seen.add(key);
     return true;
