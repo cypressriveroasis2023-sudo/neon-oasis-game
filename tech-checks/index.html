@@ -15,6 +15,51 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="stylesheet" href="./styles.css?v=work-date-hard-fix-v69" />
+    <!-- iPhone Work Date hard containment v70 -->
+    <style>
+      #view-owner .ownerWorkflowFirst,
+      #view-owner .ownerWorkflowFirst .grid,
+      #view-owner .ownerWorkflowFirst .grid.top8,
+      #view-owner .ownerWorkflowFirst .grid > div {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+      #view-owner .ownerWorkflowFirst .grid,
+      #view-owner .ownerWorkflowFirst .grid.top8 {
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr) !important;
+        overflow: hidden !important;
+      }
+      #view-owner .ownerWorkflowFirst .grid > div {
+        overflow: hidden !important;
+      }
+      #view-owner #ownerAssignDate {
+        display: block !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        inline-size: 100% !important;
+        max-inline-size: 100% !important;
+        min-inline-size: 0 !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        overflow: hidden !important;
+      }
+      #view-owner #ownerAssignDate::-webkit-date-and-time-value,
+      #view-owner #ownerAssignDate::-webkit-datetime-edit {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        text-align: left !important;
+      }
+    </style>
   </head>
   <body>
     <div id="app">
