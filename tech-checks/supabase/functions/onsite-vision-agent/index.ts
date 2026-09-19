@@ -278,6 +278,20 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'find_people',
+    description: 'Find Cameras On Site people/profile records by name or username across Owner, IT, and Service, including inactive or archived records. Use for questions like who is Mike, tell me about Teddy, or does this person work here.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -372,7 +386,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v10',
+        agent_version: 'onsite-vision-agent-v11',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -508,6 +522,22 @@ Deno.serve(async (req) => {
         return { role, technicians: data || [] }
       }
 
+      if (name === 'find_people') {
+        const queryText = clean(args.query)
+        const terms = lower(queryText).split(/\s+/).filter(Boolean)
+        const { data, error } = await userClient
+          .from('profiles')
+          .select('user_id,full_name,username,role,active,archived_at')
+          .order('full_name')
+          .limit(250)
+        if (error) throw error
+        const people = (data || []).filter((person: any) => {
+          const hay = lower((person.full_name || '') + ' ' + (person.username || ''))
+          return terms.every((term: string) => hay.includes(term))
+        }).slice(0, 20)
+        return { query: queryText, people }
+      }
+
       if (name === 'get_company_knowledge') {
         const topic=clean(args.topic)
         const baseline=knowledgeForTopic(topic)
@@ -543,6 +573,7 @@ Deno.serve(async (req) => {
       '',
       'GROUNDING RULES:',
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
+      '- For questions about a named company person, employee, technician, owner, or whether someone exists in Tech Check, call find_people. This lookup includes Owner/IT/Service and active/inactive/archived profile records.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
       '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
@@ -564,6 +595,7 @@ Deno.serve(async (req) => {
       '',
       'CONVERSATION:',
       '- Understand natural references such as it, that job, this ticket, the unit, and follow-ups using the supplied active ticket and history.',
+      '- If find_people returns multiple profile records for the same name, describe the records clearly and do not guess which account the owner means. Distinguish active, inactive, and archived status.',
       '- Be concise but operationally thorough. State the immediate next step when it helps.',
       '- Do not expose internal UUIDs unless the user explicitly asks for them.',
     ].join('\n')
