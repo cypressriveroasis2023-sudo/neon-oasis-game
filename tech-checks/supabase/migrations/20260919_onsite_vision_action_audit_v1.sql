@@ -103,7 +103,8 @@ as $$
       select jsonb_agg(jsonb_build_object(
         'id',r.id,'unit_tag',r.unit_tag,'equipment_type',r.equipment_type,
         'status',r.status,'returned_at',r.returned_at,'it_received_at',r.it_received_at,
-        'manager_added_at',r.manager_added_at,'tag_scan_status',r.tag_scan_status
+        'mhelp_inventory_confirmed',r.mhelp_inventory_confirmed,'mhelp_confirmed_at',r.mhelp_confirmed_at,
+        'completed_at',r.completed_at,'tag_scan_status',r.tag_scan_status
       ) order by r.created_at,r.id)
       from public.unit_returns r
       where trim(r.ticket_no)=trim(p_ticket_no)
