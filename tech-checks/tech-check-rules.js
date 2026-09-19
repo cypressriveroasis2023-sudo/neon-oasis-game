@@ -237,9 +237,6 @@
     }
 
     const batteryCount=requiredBatteryCount(item);
-    if(type==='Recon 2'){
-      steps.push({kind:'number',field:'recon_camera_count',min:1,label:'How many cameras are going on '+unit+' for this deployment?'});
-    }
     if(type!=='Solar Spotter'&&type!=='Spotter'&&batteryCount>0){
       steps.push({
         kind:'number',field:'battery_count',
