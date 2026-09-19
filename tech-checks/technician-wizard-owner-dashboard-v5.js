@@ -258,6 +258,28 @@ function injectStyles() {
     #view-owner .ownerFeatureContent{display:block!important;width:100%!important}
     #view-owner .ownerPanelBack{display:block!important;width:100%!important;min-height:48px!important;margin:0 0 8px!important;border:0!important;border-radius:11px!important;background:#edf2f6!important;color:#34495c!important;font-size:14px!important;font-weight:850!important}
     @media(max-width:560px){#view-owner .ownerFeatureHeader{min-height:62px!important;padding:9px 10px!important;grid-template-columns:34px minmax(0,1fr) auto!important;gap:8px!important}#view-owner .ownerFeatureHeader b{font-size:16px!important}#view-owner .ownerFeatureHeader small{font-size:8px!important}#view-owner .ownerFeatureBody{padding:6px!important}}
+
+    /* Owner persistent inline dashboard v84 */
+    #view-owner .ownerHomeMain{display:block!important}
+    #view-owner .ownerFeaturePage{display:none!important;margin:12px 0 0!important;padding:0!important;overflow:hidden!important;border:1px solid #d6e0e8!important;border-radius:14px!important;background:#fff!important;box-shadow:0 2px 8px rgba(18,43,65,.045)!important}
+    #view-owner .ownerFeaturePage.ownerPanelActive{display:block!important}
+    #view-owner .ownerFeaturePage.jobs{border-left:4px solid #22965b!important}#view-owner .ownerFeaturePage.equipment{border-left:4px solid #2d73a5!important}#view-owner .ownerFeaturePage.team{border-left:4px solid #7c4bb1!important}#view-owner .ownerFeaturePage.more{border-left:4px solid #778696!important}
+    #view-owner .ownerFeatureHeader{display:grid!important;grid-template-columns:36px minmax(0,1fr) auto!important;align-items:center!important;gap:10px!important;min-height:62px!important;padding:9px 11px!important;border-bottom:1px solid #e4e9ee!important;background:#fff!important}
+    #view-owner .ownerFeatureHeader>span:nth-child(2){min-width:0!important}#view-owner .ownerFeatureHeader b,#view-owner .ownerFeatureHeader small{display:block!important}#view-owner .ownerFeatureHeader b{color:#152334!important;font-size:16px!important;line-height:1.05!important;font-weight:900!important;letter-spacing:-.02em!important}#view-owner .ownerFeatureHeader small{margin-top:3px!important;color:#718090!important;font-size:8px!important;line-height:1.2!important;font-weight:650!important}
+    #view-owner .ownerFeatureHeaderRight{display:flex!important;align-items:center!important;gap:6px!important}
+    #view-owner .ownerFeatureHeaderRight>strong{min-width:29px!important;height:29px!important;padding:0 7px!important;display:grid!important;place-items:center!important;border-radius:999px!important;background:#eef3f6!important;color:#536576!important;font-size:9px!important;font-weight:900!important}
+    #view-owner .ownerFeatureClose{width:29px!important;height:29px!important;min-width:29px!important;min-height:29px!important;margin:0!important;padding:0!important;border:1px solid #d7e0e7!important;border-radius:999px!important;background:#fff!important;color:#607080!important;font-size:18px!important;line-height:1!important;font-weight:700!important}
+    #view-owner .ownerFeatureBody{display:block!important;padding:7px!important;background:#f8fafb!important}
+    #view-owner .ownerFeatureContent{display:block!important;width:100%!important}
+    #view-owner .ownerCompactAssignForm:not([open]),#view-owner .ownerCompactAttentionDetail:not([open]){display:none!important}
+    #view-owner .ownerFeaturePage.ownerPanelActive .ownerCompactAssignForm[open],#view-owner .ownerFeaturePage.ownerPanelActive .ownerCompactAttentionDetail[open]{display:block!important}
+    @media(max-width:560px){
+      #view-owner .ownerFeaturePage{margin-top:10px!important}
+      #view-owner .ownerFeatureHeader{grid-template-columns:32px minmax(0,1fr) auto!important;gap:8px!important;min-height:58px!important;padding:8px 9px!important}
+      #view-owner .ownerFeatureHeader b{font-size:15px!important}
+      #view-owner .ownerFeatureHeader small{font-size:8px!important}
+      #view-owner .ownerFeatureBody{padding:6px!important}
+    }
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -3221,6 +3243,8 @@ function ownerShowHome(){
   const shell=document.getElementById('ownerCompactShell'); if(!shell)return;
   shell.querySelector('.ownerHomeMain')?.classList.remove('hidden');
   shell.querySelectorAll('.ownerFeaturePage').forEach(p=>p.classList.remove('ownerPanelActive'));
+  shell.querySelectorAll('.ownerHomeModes .wl-mode-card').forEach(b=>b.classList.remove('on'));
+  shell.querySelector('.ownerHomeModes [data-owner-home-panel="Jobs"]')?.classList.add('on');
   syncOwnerCompactDashboard();
   resetWizardPosition();
 }
@@ -3228,10 +3252,25 @@ function ownerShowGroup(name){
   const shell=document.getElementById('ownerCompactShell');
   const page=document.getElementById('ownerCompact'+name);
   if(!shell||!page)return page;
-  shell.querySelector('.ownerHomeMain')?.classList.add('hidden');
+
+  // Owner Home is persistent. Only the expanded Owner section changes.
+  shell.querySelector('.ownerHomeMain')?.classList.remove('hidden');
   shell.querySelectorAll('.ownerFeaturePage').forEach(p=>p.classList.remove('ownerPanelActive'));
   page.classList.add('ownerPanelActive');
-  resetWizardPosition(page);
+
+  // Keep the high-level Owner tabs visible and show which side the open section belongs to.
+  shell.querySelectorAll('.ownerHomeModes .wl-mode-card').forEach(b=>b.classList.remove('on'));
+  const mode = (name==='Team'||name==='More') ? 'Team' : 'Jobs';
+  shell.querySelector('.ownerHomeModes [data-owner-home-panel="'+mode+'"]')?.classList.add('on');
+
+  // Normal section opens should not expose the giant assignment/attention forms.
+  if(name==='Jobs'){
+    const assign=document.getElementById('ownerJobAssignments');
+    const attention=document.getElementById('ownerAttentionCard');
+    if(assign) assign.open=false;
+    if(attention) attention.open=false;
+  }
+  syncOwnerCompactDashboard();
   return page;
 }
 function syncOwnerCompactDashboard(){
@@ -3257,8 +3296,8 @@ function syncOwnerCompactDashboard(){
 }
 function ownerFeaturePageHtml(id,kind,icon,title,sub,badgeId,badge){
   return "<section id='ownerCompact"+id+"' class='card ownerFeaturePage "+kind+"'>"+
-    "<div class='ownerFeatureHeader'><span class='ownerCompactIcon'>"+icon+"</span><span><b>"+title+"</b><small>"+sub+"</small></span><strong "+(badgeId?"id='"+badgeId+"'":"")+">"+badge+"</strong></div>"+
-    "<div class='ownerFeatureBody'><button type='button' class='wl-back ownerPanelBack' data-owner-compact-home>← Owner Home</button><div id='ownerCompact"+id+"Body' class='ownerFeatureContent'></div></div></section>";
+    "<div class='ownerFeatureHeader'><span class='ownerCompactIcon'>"+icon+"</span><span><b>"+title+"</b><small>"+sub+"</small></span><span class='ownerFeatureHeaderRight'><strong "+(badgeId?"id='"+badgeId+"'":"")+">"+badge+"</strong><button type='button' class='ownerFeatureClose' data-owner-compact-home aria-label='Close section'>×</button></span></div>"+
+    "<div class='ownerFeatureBody'><div id='ownerCompact"+id+"Body' class='ownerFeatureContent'></div></div></section>";
 }
 function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner'); if(!view||!roleText().includes('Owner/Admin'))return;
@@ -3291,7 +3330,7 @@ function organizeOwnerDashboard(){
   if(ai&&liveBody){let wrap=liveBody.querySelector('.ownerCompactAIStatus');if(!wrap){wrap=document.createElement('details');wrap.className='ownerCompactAIStatus';const state=ai.querySelector('.wl-owner-ai-master-status'),att=state?.classList.contains('attention'),txt=String(state?.textContent||'ALL CLEAR').trim();wrap.innerHTML="<summary><span class='ownerCompactAIIcon'>✨</span><span><b>AI Status</b><small>Workflow health, alerts, and tomorrow readiness</small></span><strong class='"+(att?'attention':'')+"'>"+txt+"</strong></summary>";ai.before(wrap);wrap.appendChild(ai);}}
   if(liveBody){const snapshot=liveBody.querySelector('.ownerLiveSummary'),waiting=liveBody.querySelector('.ownerJobStatusSection.assigned'),progress=liveBody.querySelector('.ownerJobStatusSection.progress'),history=liveBody.querySelector('.ownerHistoryFold'),aiWrap=liveBody.querySelector('.ownerCompactAIStatus');[snapshot,waiting,progress,history,aiWrap].filter(Boolean).forEach(el=>liveBody.appendChild(el));}
   move('ownerIntakeTracking',equipment);move('ownerUnitStatusCard',equipment);move('ownerHandoffsCard',equipment);move('ownerActivityCard',team);move('ownerAccountsCard',team);move('ownerResetCard',more);
-  const assign=document.getElementById('ownerJobAssignments');if(assign)assign.classList.add('ownerCompactSecondary','ownerCompactAssignForm');
+  const assign=document.getElementById('ownerJobAssignments');if(assign){assign.classList.add('ownerCompactSecondary','ownerCompactAssignForm');if(!assign.dataset.ownerExplicitOpen)assign.open=false;}
   const attCard=document.getElementById('ownerAttentionCard');if(attCard)attCard.classList.add('ownerCompactSecondary','ownerCompactAttentionDetail');
   ['ownerLiveJobProgress','ownerIntakeTracking','ownerUnitStatusCard','ownerHandoffsCard','ownerActivityCard','ownerAccountsCard','ownerResetCard'].forEach(id=>document.getElementById(id)?.classList.add('ownerCompactSecondary'));
   if(!ownerCompactJumpWrapped&&typeof window.ownerJump==='function'){ownerCompactJumpWrapped=true;const originalJump=window.ownerJump,originalReturn=typeof window.ownerOpenReturn==='function'?window.ownerOpenReturn:null;window.ownerJump=(target)=>{if(target==='returns'||target==='prep')ownerShowGroup('Equipment');else if(target==='accounts'||target==='activity'||target==='daily')ownerShowGroup('Team');else ownerShowGroup('Jobs');requestAnimationFrame(()=>originalJump(target));};if(originalReturn)window.ownerOpenReturn=(id)=>{ownerShowGroup('Equipment');requestAnimationFrame(()=>originalReturn(id));};}
@@ -3783,15 +3822,15 @@ document.addEventListener('click', async e => {
     const ownerPanel=e.target.closest('[data-owner-home-panel]');
     if(ownerPanel){ownerShowGroup(ownerPanel.dataset.ownerHomePanel);return;}
     if (e.target.closest('[data-owner-compact-assign]')) {
-      ownerCompactOpenGroup('Jobs');
+      ownerShowGroup('Jobs');
       const form=document.getElementById('ownerJobAssignments');
-      if(form){form.open=true;form.scrollIntoView({behavior:'smooth',block:'start'});}
+      if(form){form.open=true;requestAnimationFrame(()=>form.scrollIntoView({behavior:'smooth',block:'start'}));}
       return;
     }
     if (e.target.closest('[data-owner-compact-attention]')) {
-      ownerCompactOpenGroup('Jobs');
+      ownerShowGroup('Jobs');
       const card=document.getElementById('ownerAttentionCard');
-      if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}
+      if(card){card.open=true;requestAnimationFrame(()=>card.scrollIntoView({behavior:'smooth',block:'start'}));}
       return;
     }
     if (e.target.closest('[data-owner-ai-dispatch-build]')) return ownerAIDispatchBuild();
