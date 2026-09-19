@@ -1961,3 +1961,12 @@ begin
     updated_at=now();
 end;
 $function$;
+
+
+-- ============================================================
+-- 20260919043643  lock_truck_spare_trigger_execution
+-- ============================================================
+
+revoke all on function public.activate_truck_spares_on_close() from public,anon,authenticated;
+revoke all on function public.enforce_truck_spares_before_release() from public,anon,authenticated;
+revoke all on function public.lock_checked_out_truck_spare_prep() from public,anon,authenticated;
