@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v10, company-knowledge-v7, workflow-engine-v4 and rules-v6"
+        "Agent reports onsite-vision-agent-v11, company-knowledge-v7, workflow-engine-v4 and rules-v6"
       ]
     },
     {
@@ -1997,5 +1997,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Vision people lookup: natural Who is / Tell me about questions now query all relevant company profiles, distinguish active/inactive duplicate records, and no longer fall into the generic help response. Vision v20 / Edge v11 / SW84."
+  "last_release_qa_note": "Full non-destructive release QA pass: source syntax/parity, production DB contracts, ticket 22712 live flow, profile lookup/RLS, Vision persistence/action tables, release/close triggers, mobile Vision fixes, and current Edge deployment checked. Stale PHASE7-AGENT expected version corrected to v11. Public GitHub Pages serving could not be independently fetched from tool network/DNS. Vision v20 / Edge v11 / SW84."
 }
