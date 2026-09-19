@@ -1422,7 +1422,7 @@ function equipmentRecurringIssueAnalysis(rows=[]){
 }
 function equipmentRecurringIssueHtml(rows=[]){
   const recurring=equipmentRecurringIssueAnalysis(rows);if(!recurring.length)return '';
-  return `<div class='wl-ai-repeat-issues'><div class='wl-ai-head'><span>✨ AI History Pattern</span><b>RECURRING ISSUE</b></div>${recurring.map(x=>`<div><b>⚠ ${esc(x.name)} mentioned in ${x.count} prior records</b><span>MHelpDesk: ${x.tickets.slice(0,5).map(t=>'#'+esc(t)).join(', ')}</span></div>`).join('')}<div class='small top8'>Pattern detection uses prior Tech Check notes only. IT must still perform the current physical checks.</div></div>`;
+  return `<div class='wl-ai-repeat-issues'><div class='wl-ai-head'>${onsiteVisionTitle('History Pattern')}<b>RECURRING ISSUE</b></div>${recurring.map(x=>`<div><b>⚠ ${esc(x.name)} mentioned in ${x.count} prior records</b><span>MHelpDesk: ${x.tickets.slice(0,5).map(t=>'#'+esc(t)).join(', ')}</span></div>`).join('')}<div class='small top8'>Pattern detection uses prior Tech Check notes only. IT must still perform the current physical checks.</div></div>`;
 }
 function equipmentHealthHistoryHtml(tag,rows=[]){
   if(!rows.length)return '';
@@ -1459,9 +1459,12 @@ function techCheckAIAnalysis(a, role){
   if(Number(a?.requested_unit_count||0)>0 && !devices.length) warnings.push('A unit count exists but no device type is listed.');
   return {type,equipment,warnings,steps};
 }
+function onsiteVisionTitle(label='Equipment Check'){
+  return `<span class='wl-ai-brand-inline'><span class='wl-ai-brand-inline-icon'><img src='./techcheck-eye-192.png?v=1' alt=''></span><span class='wl-ai-brand-inline-copy'><small>ONSITE VISION</small><strong>${esc(label)}</strong></span></span>`;
+}
 function techCheckAIHtml(a,role){
   const x=techCheckAIAnalysis(a,role), status=x.warnings.length?'REVIEW NEEDED':'WORKFLOW CHECK';
-  return `<div class='wl-ai-panel'><div class='wl-ai-head'><span>✨ AI Assist</span><b>${status}</b></div>
+  return `<div class='wl-ai-panel'><div class='wl-ai-head'>${onsiteVisionTitle('Workflow Check')}<b>${status}</b></div>
     <div class='small'><b>MHelpDesk #${esc(a?.ticket_no||'—')}</b> · ${esc(String(x.type).toUpperCase())}</div>
     ${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}
     ${x.steps.length?`<div class='wl-ai-line'><b>Expected flow:</b> ${x.steps.map(esc).join(' → ')}</div>`:''}
@@ -2009,7 +2012,7 @@ function intakeAIReview(row){
   if(row?.return_notes) flags.push('Service documented return/damage notes — review them against the photos.');
   if(!row?.return_photo_paths?.length) flags.push('No Service return photo is attached.');
   const pct=Math.round(answered/intakeWizard.answers.length*100);
-  return `<div class='wl-ai-panel wl-ai-progress'><div class='wl-ai-head'><span>✨ AI Intake Review</span><b>${noCount?'ATTENTION':remaining?'IN PROGRESS':'CHECKS COMPLETE'}</b></div><div class='wl-ai-line'><b>Checklist:</b> ${answered}/${intakeWizard.answers.length} answered · ${pct}%</div>${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No checklist conflicts detected so far.</div>`}<div class='small top8'>AI reviews recorded answers and evidence status only. Technician verification is still required.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-progress'><div class='wl-ai-head'>${onsiteVisionTitle('Intake Review')}<b>${noCount?'ATTENTION':remaining?'IN PROGRESS':'CHECKS COMPLETE'}</b></div><div class='wl-ai-line'><b>Checklist:</b> ${answered}/${intakeWizard.answers.length} answered · ${pct}%</div>${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No checklist conflicts detected so far.</div>`}<div class='small top8'>AI reviews recorded answers and evidence status only. Technician verification is still required.</div></div>`;
 }
 async function renderITIntakeWizard() {
   const row = intakeWizard.row;
@@ -2181,10 +2184,20 @@ async function scanUnitTagPhoto(file,expectedTag) {
 }
 function tagScanStatusHtml(scan,expectedTag) {
   if (!scan?.status) return '';
-  const confidence=scan.confidence!=null ? ` · ${Math.round(Number(scan.confidence))}% OCR confidence` : '';
-  if (scan.status==='match') return `<div class='ok top8'><b>✓ AI TAG MATCH</b><div class='small'>Photo scan found ${esc(expectedTag)}${confidence}. Technician visual confirmation is still required.</div></div>`;
-  if (scan.status==='mismatch') return `<div class='wl-stop top8'><b>✕ AI TAG MISMATCH</b><div class='small'>Expected <b>${esc(expectedTag)}</b>, but the scan read <b>${esc(scan.detected||'a different tag')}</b>${confidence}. Retake the photo before approving it.</div></div>`;
-  return `<div class='warn top8'><b>AI COULD NOT READ THE TAG</b><div class='small'>Expected <b>${esc(expectedTag)}</b>. Retake a clearer photo or visually verify the tag yourself.</div></div>`;
+  const confidence=scan.confidence!=null ? ` · ${Math.round(Number(scan.confidence))}% scan confidence` : '';
+  if (scan.status==='scanning') return `<div class='wl-ai-scan-live processing top8'><span class='wl-ai-scan-spinner' aria-hidden='true'></span><div><b>OnSite Vision is processing this photo…</b><span>Checking the unit tag now. This may take a few seconds.</span></div></div>`;
+  if (scan.status==='match') return `<div class='wl-ai-scan-live clear top8'><span class='wl-ai-scan-check'>✓</span><div><b>Scan complete — tag match detected</b><span>OnSite Vision found ${esc(expectedTag)}${confidence}. Confirm the tag visually below to continue.</span></div></div>`;
+  if (scan.status==='mismatch') return `<div class='wl-ai-scan-live stop top8'><span class='wl-ai-scan-mark'>!</span><div><b>Scan complete — tag mismatch</b><span>Expected <b>${esc(expectedTag)}</b>, but OnSite Vision read <b>${esc(scan.detected||'a different tag')}</b>${confidence}. Retake the photo.</span></div></div>`;
+  return `<div class='wl-ai-scan-live pending top8'><span class='wl-ai-scan-mark'>?</span><div><b>Scan complete — tag could not be read</b><span>Expected <b>${esc(expectedTag)}</b>. Retake a clearer photo or visually verify the tag yourself.</span></div></div>`;
+}
+function showLiveTagScan(panel,expectedTag){
+  if(!panel) return;
+  panel.querySelector('.wl-ai-scan-live')?.remove();
+  const box=document.createElement('div');
+  box.className='wl-ai-scan-live processing top8';
+  box.innerHTML=`<span class='wl-ai-scan-spinner' aria-hidden='true'></span><div><b>OnSite Vision is processing this photo…</b><span>Checking unit tag ${esc(expectedTag||'')} now. This may take a few seconds.</span></div>`;
+  const anchor=panel.querySelector('[data-wl-upload]');
+  if(anchor) anchor.insertAdjacentElement('beforebegin',box); else panel.append(box);
 }
 function itemTagScan(item) {
   return item?.ai_tag_scan_status ? {
@@ -2289,7 +2302,7 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
   const complete = photos.length === required;
   const input = complete && !unitNo ? '' : `<input class='wl-file top8' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}><button class='mini full top8' data-wl-upload='${stage}'>${unitNo && photos.length ? 'Replace Unit Photo' : 'Save Photo(s)'}</button>`;
   const aiScan = stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? itemTagScan(item) : null;
-  const aiScanHtml = aiScan ? tagScanStatusHtml(aiScan,tag) : (stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? `<div class='warn top8'><b>AI tag scan pending.</b><div class='small'>Retake/save the unit photo if the scan did not run.</div></div>` : '');
+  const aiScanHtml = aiScan ? tagScanStatusHtml(aiScan,tag) : (stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? (item?.photo_tag_match_ok ? `<div class='wl-ai-scan-live clear top8'><span class='wl-ai-scan-check'>✓</span><div><b>Clear to continue</b><span>The technician already verified unit tag ${esc(tag)}. No separate OnSite Vision scan result was recorded for this photo.</span></div></div>` : `<div class='wl-ai-scan-live pending top8'><span class='wl-ai-scan-mark'>…</span><div><b>OnSite Vision scan not recorded</b><span>Retake/save the unit photo to run the live tag check.</span></div></div>`) : '');
   const aiMismatch = aiScan?.status === 'mismatch';
   const tagConfirm = stage === 'it' && unitNo && photos.length ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
   return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'><b>${stage === 'it' && unitNo ? `${esc(identity)} Photo` : unitNo ? `Unit ${unitNo} Photo` : 'Photo Proof'}</b><div class='wl-note'>${instruction}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div><div class='${complete ? 'ok' : 'warn'} top8'><b>${complete ? '✓' : ''} ${photos.length} of ${required} photo${required === 1 ? '' : 's'} saved</b></div>` : `<div class='warn top8'>0 of ${required} photos saved.</div>`}${tagConfirm}${input}</div>`;
@@ -2376,9 +2389,9 @@ function itUnitStepsData(item, unitNo) {
       { kind:'bool', field:'helios_cerbo_vrm_ok', label:`Is the Cerbo added to Victron VRM and visible online?` },
       { kind:'bool', field:'helios_rear_unit_tag_ok', label:`Is the permanent Helios unit tag installed on the rear and clearly readable?` },
       { kind:'bool', field:'helios_battery_box_installed_ok', label:`Is the single Helios battery box installed inside ${identity}?` },
-      { kind:'bool', field:'helios_battery_120v_charged_ok', label:`Did IT charge the Helios battery box while ${identity} was plugged into 120V?` },
+      { kind:'bool', field:'helios_battery_120v_charged_ok', label:`Did you charge the Helios battery box while ${identity} was plugged into 120V?` },
       { kind:'bool', field:'helios_3x1tb_sd_ok', label:`Are all 3 required 1TB SD cards installed in ${identity}?` },
-      { kind:'bool', field:'delivery_recording_ok', label:`Before formatting storage, did IT verify ${identity} is recording correctly?` },
+      { kind:'bool', field:'delivery_recording_ok', label:`Before formatting storage, did you verify ${identity} is recording correctly?` },
       { kind:'bool', field:'delivery_sd_formatted_ok', label:`After recording verification, are all 3 × 1TB SD cards formatted and ready?` }
     );
     if (item.purpose!=='BACKUP') {
@@ -2819,7 +2832,7 @@ function itEquipmentAIReview(item,ev,unitNo){
   if(low.includes('solar spotter')) flags.push('Solar Spotter IT check does not include battery checkout. The Solar Stand and its battery setup are verified on the Service side (4 × AGM 12V 110Ah or 1 × 12V 350Ah per stand).');
   if(low.includes('ranger')) flags.push('Ranger: verify MPPT update, MPPT operation, and charging. Service should receive 1 solar panel per Ranger.');
   if(low.includes('helios')) flags.push('Verify Camera 1: 81/554/1400 · Camera 2: 81/554/1500 · PTZ: 81/554/1600 · IP Speaker: 81/554/1700.');
-  return `<div class='wl-ai-panel wl-ai-equipment'><div class='wl-ai-head'><span>✨ AI Equipment Check</span><b>${issues.length?'VERIFY '+issues.length+' ITEM'+(issues.length===1?'':'S'):'ON TRACK'}</b></div><div class='wl-ai-line'><b>${esc(type)}</b> · Item ${unitNo}</div>${flags.length?`<div class='wl-ai-line'>${flags.map(v=>'• '+esc(v)).join('<br>')}</div>`:''}${issues.length?`<div class='wl-ai-warn'>${issues.slice(0,5).map(v=>'⚠ '+esc(v.label||v.message||v.phase||'Required check incomplete')).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No required-item conflicts detected at this point.</div>`}<div class='small top8'>AI Assist does not answer checks or approve equipment for the technician.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-equipment'><div class='wl-ai-head'>${onsiteVisionTitle('Equipment Check')}<b>${issues.length?'VERIFY '+issues.length+' ITEM'+(issues.length===1?'':'S'):'ON TRACK'}</b></div><div class='wl-ai-line'><b>${esc(type)}</b> · Item ${unitNo}</div>${flags.length?`<div class='wl-ai-line'>${flags.map(v=>'• '+esc(v)).join('<br>')}</div>`:''}${issues.length?`<div class='wl-ai-warn'>${issues.slice(0,5).map(v=>'⚠ '+esc(v.label||v.message||v.phase||'Required check incomplete')).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No required-item conflicts detected at this point.</div>`}<div class='small top8'>AI Assist does not answer checks or approve equipment for the technician.</div></div>`;
 }
 async function renderItUnitStep() {
   const items = itItems();
@@ -3321,7 +3334,7 @@ function serviceAIEquipmentReview(ctx,check,evidence){
   if(rangers){if(panels<rangers)flags.push('Ranger plan expects at least '+rangers+' solar panel'+(rangers===1?'':'s')+' — one per Ranger.');if(batteryPhotos<1)flags.push('Ranger battery photo proof is missing.');if(mpptPhotos<1)flags.push('Ranger MPPT / charging proof photo is missing.');}
   if(ctx?.has_helios){if(!check?.helios_battery_box_charging_ok)flags.push('Helios battery-box charging verification is incomplete.');if(heliosPhotos<1)flags.push('Helios Cerbo / MPPT proof photo is missing.');}
   if(ctx?.need_solar&&!check?.completed_at)flags.push('Solar / Helios Service checklist is not completed yet.');
-  return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'><span>✨ AI Service Equipment Check</span><b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${esc(check?.battery_description || batteryPlan.description)}</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'} + LiTime 12V 110Ah battery setup</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'>${onsiteVisionTitle('Service Equipment Check')}<b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${esc(check?.battery_description || batteryPlan.description)}</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'} + LiTime 12V 110Ah battery setup</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
 }
 function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired}){
   const holds=[];
@@ -3330,7 +3343,7 @@ function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,serv
   if(hasParts&&!partsReady) holds.push('Listed parts have not been physically verified.');
   if(solarRequired&&!solarReady) holds.push('Solar / Helios pre-trip requirements or evidence are incomplete.');
   const ready=holds.length===0;
-  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'><span>✨ AI Final Handoff Gate</span><b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Final Handoff Gate')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
 }
 function heliosFieldItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(row=>row.equipment_type==='Helios'&&['DELIVERY','SWAP'].includes(row.purpose)).sort((a,b)=>a.item_order-b.item_order);
@@ -3936,8 +3949,11 @@ document.addEventListener('click', async e => {
       const optimized = await Promise.all(files.map(optimizeEvidencePhoto));
       let tagScan=null;
       if (panel.dataset.stage==='it' && unitNo && item && shouldScanUnitTag(item.equipment_type) && item.unit_tag) {
-        upload.textContent='AI scanning unit tag…';
+        upload.textContent='OnSite Vision is scanning…';
+        showLiveTagScan(panel,item.unit_tag);
         tagScan=await scanUnitTagPhoto(optimized[0],item.unit_tag);
+        const liveScan=panel.querySelector('.wl-ai-scan-live');
+        if(liveScan) liveScan.outerHTML=tagScanStatusHtml(tagScan,item.unit_tag);
       }
       upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…';
       await Promise.all(optimized.map((f, i) => {
