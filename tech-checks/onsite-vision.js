@@ -198,6 +198,233 @@ function assignIntent(text){
   return null;
 }
 function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||t)&&/\b(move|change|set|make|schedule|reschedule|put)\b/i.test(text)?{kind:'schedule',date:d,time:t}:null;}
+
+function isCreateRequest(text){
+  const s=String(text||'').toLowerCase();
+  return /\b(create|make|start|prepare|set\s*up|setup)\b[\s\S]{0,45}\b(ticket|job|assignment)\b/.test(s)
+    || /\b(create|make|start|prepare)\b[\s\S]{0,25}\b(delivery|pickup|swap|service)\b[\s\S]{0,20}\b(ticket|job)\b/.test(s);
+}
+function draftWorkType(text){
+  const s=String(text||'').toLowerCase();
+  if(/\b(pickup|pick\s+up)\b/.test(s))return'pickup';
+  if(/\b(delivery|deliver|deploy)\b/.test(s))return'delivery';
+  if(/\b(swap|swapping)\b/.test(s))return'swap';
+  if(/\bservice\b/.test(s))return'service';
+  return'';
+}
+function draftDefaultRole(type){
+  if(type==='delivery'||type==='swap')return'it_service';
+  if(type==='pickup')return'service_it';
+  if(type==='service')return'service';
+  return'';
+}
+function draftFlowLabel(d){
+  return d.role==='it_service'?'IT → Service':d.role==='service_it'?'Service → IT':d.role==='it'?'IT only':d.role==='service'?'Service only':'—';
+}
+function draftEquipmentParse(text){
+  const raw=numberWords(String(text||'')),lower=raw.toLowerCase();
+  const defs=[
+    {category:'device',label:'Solar Spotter',aliases:['solar spotter','solar spotters']},
+    {category:'device',label:'Recon 2',aliases:['recon 2','recon ii','recon two']},
+    {category:'device',label:'Helios',aliases:['helios','helio']},
+    {category:'device',label:'Ranger',aliases:['ranger','rangers']},
+    {category:'device',label:'Sniper',aliases:['sniper','snipers']},
+    {category:'device',label:'Spotter',aliases:['spotter','spotters']},
+    {category:'stand',label:'Solar Stand',aliases:['solar stand','solar stands']},
+    {category:'stand',label:'Solar Pole',aliases:['solar pole','solar poles']},
+    {category:'stand',label:'110V Stand',aliases:['110v stand','110 v stand','110 volt stand']},
+    {category:'stand',label:'Pole',aliases:['pole','poles']}
+  ];
+  const rows=[];
+  for(const def of defs){
+    let source=lower;
+    if(def.label==='Spotter')source=source.replace(/solar spotters?/g,'');
+    if(def.label==='Pole')source=source.replace(/solar poles?/g,'');
+    let qty=null,mentioned=false;
+    for(const alias of def.aliases){
+      const a=reEsc(alias);
+      const before=source.match(new RegExp('\\b(\\d+)\\s*(?:x|×)?\\s*'+a+'\\b','i'));
+      const after=source.match(new RegExp('\\b'+a+'\\s*(?:x|×)\\s*(\\d+)\\b','i'));
+      const one=source.match(new RegExp('\\b(?:a|an)\\s+'+a+'\\b','i'));
+      if(before){qty=Number(before[1]);mentioned=true;break;}
+      if(after){qty=Number(after[1]);mentioned=true;break;}
+      if(one){qty=1;mentioned=true;break;}
+      if(new RegExp('\\b'+a+'\\b','i').test(source))mentioned=true;
+    }
+    if(qty&&qty>0)rows.push({category:def.category,label:def.label,qty});
+    else if(mentioned)rows.push({category:def.category,label:def.label,qty:0});
+  }
+  return rows;
+}
+function draftMergeEquipment(d,rows){
+  for(const row of rows||[]){
+    const existing=(d.equipment_manifest||[]).find(x=>x.category===row.category&&String(x.label).toLowerCase()===String(row.label).toLowerCase());
+    if(existing){if(row.qty>0)existing.qty=row.qty;}
+    else d.equipment_manifest.push({...row});
+  }
+  d.equipment_manifest=d.equipment_manifest.filter(x=>Number(x.qty||0)>0);
+}
+function draftDeviceTotal(d){
+  return (d.equipment_manifest||[]).filter(x=>x.category==='device').reduce((n,x)=>n+Number(x.qty||0),0);
+}
+function draftStandTotal(d){
+  return (d.equipment_manifest||[]).filter(x=>x.category==='stand').reduce((n,x)=>n+Number(x.qty||0),0);
+}
+function draftEquipmentText(d){
+  return (d.equipment_manifest||[]).map(x=>x.qty+' × '+x.label).join(', ')||'—';
+}
+function draftMissingKey(d){
+  if(!d.work_type)return'work_type';
+  if(!d.ticket_no)return'ticket_no';
+  if(!d.site)return'site';
+  if(!d.scheduled_for)return'scheduled_for';
+  if(!(d.equipment_manifest||[]).length&&(d.role==='it'||d.role==='it_service'||d.role==='service_it'))return'equipment_manifest';
+  if(!d.job_description)return'job_description';
+  return'';
+}
+function draftQuestion(key,d){
+  if(key==='work_type')return'What kind of job is this — Delivery, Pickup, Swap, or Service?';
+  if(key==='ticket_no')return'What is the MHelpDesk ticket number?';
+  if(key==='site')return'What customer or site is listed on that MHelpDesk ticket?';
+  if(key==='scheduled_for')return'What date should I schedule it for? You can say something like “Monday” or “tomorrow.”';
+  if(key==='equipment_manifest')return'What equipment is going out, and how many? For example: “1 Helios” or “2 Solar Spotters.”';
+  if(key==='job_description')return'What should the job description say?';
+  return'';
+}
+function draftSummaryHtml(d){
+  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.scheduled_time?' · '+d.scheduled_time:'')):'—';
+  return '<div class="vision-draft-card">'
+    +'<div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
+    +'<div class="vision-draft-grid">'
+      +'<div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div>'
+      +'<div><span>Site</span><b>'+esc(d.site||'—')+'</b></div>'
+      +'<div><span>Schedule</span><b>'+esc(when)+'</b></div>'
+      +'<div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div>'
+    +'</div>'
+    +(d.job_description?'<div class="vision-draft-description"><span>Job description</span><b>'+esc(d.job_description)+'</b></div>':'')
+    +'</div>';
+}
+function draftApplyInput(d,text,initial=false){
+  const raw=String(text||'').trim();
+  const expected=draftMissingKey(d);
+  const type=draftWorkType(raw);
+  if(type){
+    d.work_type=type;
+    d.role=draftDefaultRole(type);
+  }
+  const explicitTicket=ticketFrom(raw);
+  const bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
+  if(explicitTicket||bareTicket)d.ticket_no=explicitTicket||bareTicket;
+
+  const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|:|=|-)\s*([^,.;\n]+)/i);
+  if(siteMatch)d.site=String(siteMatch[1]||'').trim();
+
+  const when=dateFrom(raw); if(when)d.scheduled_for=when;
+  const clock=timeFrom(raw); if(clock)d.scheduled_time=clock;
+
+  const equipment=draftEquipmentParse(raw); if(equipment.some(x=>x.qty>0))draftMergeEquipment(d,equipment);
+  const unitMatch=raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
+  if(unitMatch)d.unit_numbers=unitMatch[1].trim();
+  const standMatch=raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
+  if(standMatch)d.stand_numbers=standMatch[1].trim();
+
+  const descMatch=raw.match(/\bdescription\s*(?:is|:|=)\s*([^;\n]+)/i);
+  if(descMatch)d.job_description=String(descMatch[1]||'').trim();
+  const notesMatch=raw.match(/\bnotes?\s*(?:are|is|:|=)\s*([^;\n]+)/i);
+  if(notesMatch)d.notes=String(notesMatch[1]||'').trim();
+
+  const tech=findTech(raw);
+  if(tech&&/\b(assign|task|send|give)\b/i.test(raw)){
+    d.assignees=d.assignees||{};
+    d.assignees[tech.role]=tech.user_id;
+  }
+
+  const afterKnown=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||descMatch||notesMatch||tech);
+  if(!initial&&!afterKnown){
+    if(expected==='site')d.site=raw;
+    else if(expected==='job_description')d.job_description=raw;
+  }
+  return d;
+}
+function draftResponseHtml(d,started=false){
+  const missing=draftMissingKey(d);
+  if(missing){
+    return '<div class="vision-answer-title">'+(started?'I started a '+esc(d.work_type?d.work_type.charAt(0).toUpperCase()+d.work_type.slice(1):'new')+' Tech Check draft.':'Got it — I updated the draft.')+'</div>'
+      +draftSummaryHtml(d)
+      +'<div class="vision-draft-question"><b>'+esc(draftQuestion(missing,d))+'</b></div>'
+      +'<div class="vision-system-note">MHelpDesk stays separate. Vision is preparing the Tech Check job from the MHelpDesk information you give it.</div>';
+  }
+  const actionId=id();
+  state.pending.set(actionId,{kind:'create-job',draft:JSON.parse(JSON.stringify(d))});
+  return '<div class="vision-answer-title">This Tech Check job is ready for your review.</div>'
+    +draftSummaryHtml(d)
+    +'<div class="vision-action-card"><small>READY TO CREATE</small><b>Create this '+esc(String(d.work_type).toUpperCase())+' job?</b><p>Vision will create the Tech Check assignment(s). It will not create or change the MHelpDesk ticket.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Create Tech Check job</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Keep editing</button></div></div>';
+}
+function startDraft(text){
+  state.currentTicket='';
+  const d={work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',equipment_manifest:[],unit_numbers:'',stand_numbers:'',job_description:'',notes:'',assignees:{}};
+  draftApplyInput(d,text,true);
+  const current=ensureChat();current.ticket='';current.draft=d;saveChats();renderOrder();
+  return draftResponseHtml(d,true);
+}
+function continueDraft(text){
+  const current=ensureChat(),d=current.draft;
+  if(!d)return'';
+  if(/\b(cancel|never\s+mind|nevermind|discard|stop)\b/i.test(text)){
+    current.draft=null;saveChats();
+    return '<div class="vision-answer-title">Draft cancelled.</div><div class="vision-answer-copy">No Tech Check job was created.</div>';
+  }
+  draftApplyInput(d,text,false);current.draft=d;saveChats();
+  return draftResponseHtml(d,false);
+}
+async function createDraftJob(d){
+  const duplicate=state.jobs.find(j=>j.status!=='completed'&&String(j.ticket_no||'')===String(d.ticket_no));
+  if(duplicate){
+    state.currentTicket=String(d.ticket_no);
+    const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();
+    renderOrder();
+    return '<div class="vision-direct warn"><b>That Tech Check job already exists.</b>I did not create a duplicate. I opened the existing MHelpDesk #'+esc(d.ticket_no)+' job instead.</div>'+jobCard(d.ticket_no);
+  }
+  const roles=d.role==='it_service'?['it','service']:d.role==='service_it'?['service','it']:d.role?[d.role]:[d.work_type==='service'?'service':'it'];
+  const ids=[];
+  for(const role of roles){
+    const assignee=d.assignees?.[role]||null;
+    const response=await db.rpc('owner_assign_job_v8',{
+      p_ticket_no:String(d.ticket_no),
+      p_site:d.site,
+      p_assigned_role:role,
+      p_assignee_user_id:assignee,
+      p_requested_unit_count:draftDeviceTotal(d),
+      p_unit_summary:[d.unit_numbers?'Unit #s: '+d.unit_numbers:'',d.stand_numbers?'Stand / Solar Stand #s: '+d.stand_numbers:''].filter(Boolean).join(' | '),
+      p_job_description:d.job_description,
+      p_notes:d.notes||'',
+      p_solar_panel_qty:0,
+      p_battery_replacement_qty:0,
+      p_camera_replacement_qty:0,
+      p_sim_replacement_qty:0,
+      p_micro_sd_qty:0,
+      p_equipment_manifest:d.equipment_manifest,
+      p_requires_it_handoff:d.work_type==='pickup'?false:((d.role==='it_service'&&role==='service')||(d.role==='service_it'&&role==='it')),
+      p_scheduled_for:d.scheduled_for,
+      p_work_type:d.work_type
+    });
+    if(response.error)throw response.error;
+    if(response.data){
+      ids.push(response.data);
+      if(d.scheduled_time){
+        const timeUpdate=await db.from('job_assignments').update({scheduled_time:d.scheduled_time,updated_at:now()}).eq('id',response.data);
+        if(timeUpdate.error)throw timeUpdate.error;
+      }
+    }
+  }
+  for(const assignmentId of ids){
+    try{await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignmentId}});}catch{}
+  }
+  await loadData();
+  state.currentTicket=String(d.ticket_no);
+  const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();
+  return '<div class="vision-direct good"><b>Tech Check job created.</b>MHelpDesk #'+esc(d.ticket_no)+' is now set up as a '+esc(String(d.work_type).toUpperCase())+' workflow. '+esc(draftFlowLabel(d))+' is in place.</div>'+jobCard(d.ticket_no);
+}
 function actionCard(a,ticket){
   if(a.kind==='choose-tech'){
     const people=state.techs.filter(t=>t.role===a.role);
@@ -218,7 +445,12 @@ function who(ticket){
   const rows=active(ticket);return rows.length?'<div class="vision-direct good"><b>Here is who currently has MHelpDesk #'+esc(ticket)+'.</b>'+rows.map(r=>'<div>'+esc(String(r.assigned_role||'').toUpperCase())+': '+esc(assignee(r))+'</div>').join('')+'</div>'+jobCard(ticket):'<div class="vision-direct warn"><b>No active assignment is showing.</b>MHelpDesk #'+esc(ticket)+' has no active IT or Service assignment in Tech Check.</div>';
 }
 async function answer(text){
-  const raw=String(text||'').trim(),lower=raw.toLowerCase(),hint=unitHint(raw);let ticket=ticketFrom(raw)||ticketByUnit(hint);
+  const raw=String(text||'').trim(),lower=raw.toLowerCase();
+  const current=chat();
+  if(current?.draft)return continueDraft(raw);
+  if(isCreateRequest(raw))return startDraft(raw);
+
+  const hint=unitHint(raw);let ticket=ticketFrom(raw)||ticketByUnit(hint);
   if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
   const d=dateFrom(raw);
   if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return dateJobs(d);
@@ -242,7 +474,7 @@ async function answer(text){
   if(assignIntent(raw))return '<div class="vision-answer-title">Which service order?</div><div class="vision-answer-copy">Tell me the MHelpDesk ticket number or unit first, then I can prepare the assignment.</div>';
   if(scheduleIntent(raw))return '<div class="vision-answer-title">Which service order should I reschedule?</div><div class="vision-answer-copy">Tell me the ticket number or unit and I will keep the date/time change ready.</div>';
   if(/\b(helios).*(steps|workflow|process)|\b(steps|workflow|process).*(helios)\b/i.test(raw))return '<div class="vision-answer-title">Helios delivery workflow</div><div class="vision-direct"><b>Owner -> IT -> Service -> Field -> Owner Final</b>IT prepares Helios and creates the Service handoff. Service performs yard PV/Victron/charging checks and transport prep, then field installation and final proof. Owner completes final verification.</div>';
-  return '<div class="vision-answer-title">I can work through the Tech Check record with you.</div><div class="vision-answer-copy">Try "show me ticket 22712," "who has Helios 007?", "assign Josh to this job," or "move it to Tuesday at 8 AM."</div>';
+  return '<div class="vision-answer-title">I can work through the Tech Check record with you.</div><div class="vision-answer-copy">You can ask me to create a new Delivery, Pickup, Swap, or Service job, or work with an existing ticket or unit.</div>';
 }
 async function send(raw=null){
   const input=$('visionPrompt'),text=String(raw??input?.value??'').trim();if(!text)return;if(input){input.value='';grow(input);}
@@ -252,6 +484,11 @@ async function send(raw=null){
 }
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;state.pending.delete(actionId);
+  if(a.kind==='create-job'){
+    const html=await createDraftJob(a.draft);
+    addMessage('assistant','',html);renderThread();renderOrder();
+    return;
+  }
   const ticket=a.ticket,rows=active(ticket),p=prep(ticket),base=rows[0]||group(ticket)[0];if(!base)throw new Error('The service order is no longer available.');
   let result='';
   if(a.kind==='schedule'){
