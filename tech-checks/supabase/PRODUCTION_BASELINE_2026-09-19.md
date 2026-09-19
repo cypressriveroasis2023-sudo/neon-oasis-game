@@ -545,3 +545,39 @@ Regression checks passed for JavaScript syntax, browser/server bundle parity, de
 - Current Mike Monsive data includes one active Owner/Admin profile and one inactive Service profile; no active Tech Check assignments are currently recorded under that name.
 - Release identifiers: Vision `vision-workspace-v20`, Edge agent `onsite-vision-agent-v11`, service worker `tech-check-field-shell-v84`.
 - Regression QA count: 104.
+
+
+## Full release QA and Vision workflow parity (2026-09-19)
+
+A non-destructive production QA pass was completed across the Owner app, OnSite Vision, shared workflow rules, live Supabase contracts, and the deployed Edge agent.
+
+Verified:
+- browser JavaScript syntax passes for Tech Check rules, Company Knowledge, workflow engine, Vision workspace, Owner/technician wizard, app loader, and service worker;
+- browser/Edge parity is exact for shared rules, Company Knowledge, and workflow engine;
+- production database migration count remains 79;
+- Vision persistence is active in production and currently contains saved conversation/message records;
+- ticket 22712 resolves to effective work type Delivery, released IT prep, and no active Service assignment, so Vision correctly returns Service assignment as the next step;
+- profile lookup can resolve duplicate active/inactive company profiles without guessing;
+- Owner dashboard Live Job Progress no longer leaves an empty Safari `Details` element;
+- iPhone Vision thread scrolling, keyboard handling, conversation reset/history, and mobile Service Order modal source checks pass;
+- Tesseract/OCR remains absent from the service-worker startup cache;
+- GitHub Pages build/deployment succeeded for the tested release commit.
+
+QA found and fixed one workflow parity gap:
+- Vision now mirrors the database close/release rules for Spotter/Recon II/Ranger IT readiness;
+- Ranger Delivery/SWAP now surfaces the required field Victron Bluetooth verification;
+- Sniper/Spotter/Recon II SWAP now surfaces the required replaced-unit Service Return → IT Intake blocker before close.
+
+Current release identifiers:
+- technician: `release-qa-v124`
+- loader: `startup-fast-v38`
+- OnSite Vision workspace: `vision-workspace-v20`
+- shared rules: `rules-v6`
+- Company Knowledge: `company-knowledge-v7`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v12` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v85`
+- database migrations: 79
+- QA test definitions: 108
+
+Known non-blocking project hardening debt remains in Supabase advisors: one mutable-search-path warning and a broader group of legacy anonymous-executable SECURITY DEFINER functions. The functions checked in this QA retain internal role guards, but the broader function-surface cleanup should be handled as a dedicated security-hardening pass rather than mixed into release-flow changes.
