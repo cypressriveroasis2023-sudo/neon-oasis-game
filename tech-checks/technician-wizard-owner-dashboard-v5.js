@@ -816,7 +816,7 @@ function helpStepGuide(role, step){
         'Choose IT + Service when IT must prepare equipment before Service can start.',
         'Choose Service + IT when Service works first and IT should wait for returned equipment.',
         'For Pickup, always start with Service; IT Intake begins only after Service checks the equipment back in.',
-        'For IT + Service, IT completes the unit checks and creates the Service handoff before Service continues.',
+        'For IT + Service, IT completes the unit checks. Any Truck Spare must also be explicitly checked out by IT before the Service handoff can be created.',
         'IT Intake and Owner / Manager inventory confirmation finish returned-equipment flow.'
       ],
       selector:'#ownerAssignRole'
@@ -993,7 +993,8 @@ function helpStepGuide(role, step){
         'Finish every required IT equipment check.',
         'Confirm required photos, visible tag match, and IT signature are complete.',
         'Resolve every readiness issue shown by Tech Check.',
-        'Create the Service handoff only after the unit is ready.',
+        'If the ticket has Truck Spares, use CHECK OUT SPARE / CHECK OUT SPARE BATTERIES first.',
+        'Create the Service handoff only after all required job equipment and spares are ready and checked out.',
         'Physically hand Service the exact equipment and parts listed on the same ticket.'
       ],
       selector:'#wlItWizardOnly'
@@ -2506,7 +2507,9 @@ async function addTruckSpareUnitFromSummary() {
 async function saveTruckSpareBatteriesFromSummary() {
   if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Spare batteries can only be changed before the Service handoff.');
   for (const opt of TRUCK_SPARE_BATTERY_OPTIONS) {
-    const qty=Math.max(0,Math.floor(Number(document.getElementById('wlSpareQty_'+opt.key)?.value||0)));
+    const qtyInput=document.getElementById('wlSpareQty_'+opt.key);
+    if (qtyInput?.disabled) continue;
+    const qty=Math.max(0,Math.floor(Number(qtyInput?.value||0)));
     const ready=Boolean(document.getElementById('wlSpareReady_'+opt.key)?.checked);
     const { error }=await liveDb.rpc('save_it_truck_spare_battery',{
       p_prep_id:activeItPrep.id,
