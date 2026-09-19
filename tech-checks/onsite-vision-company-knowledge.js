@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v6
+ * Version: company-knowledge-v7
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v6",
+  "version": "company-knowledge-v7",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -358,7 +358,7 @@
         "4 cameras",
         "internal router",
         "NVR or SD-card recording/storage depending on the unit",
-        "built-in top-mounted component — exact component name not yet confirmed"
+        "antenna on top of the Spotter"
       ],
       "platform": "Alibi app",
       "network_ports": {
@@ -383,13 +383,11 @@
       "swap_return_rule": "The replaced field Spotter must be brought back by Service and recorded through Service Return → IT Intake before the Tech Check can close.",
       "battery_rule": "Spotter has no battery requirement.",
       "unknowns": [
-        "Exact name/function of the top-mounted component described by the Owner",
         "Exact camera/router/NVR/SD hardware models if model-specific procedures differ",
         "Exact reprogramming sequence for a Spotter that is not already programmed",
         "Approved Spotter troubleshooting tree"
       ],
       "teaching_needed": [
-        "Name the Spotter top-mounted component if Vision needs to identify/check it specifically.",
         "Provide exact camera/router/NVR/SD model details only if they change the procedure.",
         "Document the reprogramming sequence for a Spotter that fails the already-programmed check.",
         "Document the approved Spotter troubleshooting sequence."
@@ -627,7 +625,7 @@
     "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
     "products": {
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
-      "Spotter": "Core 4-camera/internal-router/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact top-mounted component name, model-specific details if needed, reprogramming steps, and troubleshooting.",
+      "Spotter": "Core 4-camera/internal-router/top-antenna/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are model-specific details if needed, reprogramming steps, and troubleshooting.",
       "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
       "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, troubleshooting, BACKUP-purpose parity, and standalone Service-close behavior still need Owner-approved documentation.",
       "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
