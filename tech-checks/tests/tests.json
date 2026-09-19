@@ -1,0 +1,651 @@
+{
+  "suite": "Tech Check Release QA",
+  "runtime_version": "release-qa-v99",
+  "service_worker": "v45",
+  "generated_for": "Monday release readiness",
+  "production_safety": {
+    "default_mode": "non-destructive",
+    "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
+    "roles": [
+      "owner",
+      "it",
+      "service"
+    ]
+  },
+  "status_values": [
+    "PASS",
+    "FIXED",
+    "NEEDS MANUAL DEVICE TEST",
+    "BLOCKER"
+  ],
+  "tests": [
+    {
+      "id": "HELP-01",
+      "area": "Help",
+      "role": "all",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Role Help Center matches current workflow",
+      "steps": [
+        "Open Help Center",
+        "Review Owner, IT, Service tabs",
+        "Compare role walkthrough maps and How do I topics to current controls"
+      ],
+      "expected": [
+        "Owner describes assignment/progress/returns/AI",
+        "IT uses Service handoff terminology",
+        "Service requires exact current MHelpDesk ticket",
+        "Solar wording shows Service-selected Solar Spotter battery setup"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "HELP-02",
+      "area": "Help",
+      "role": "all",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Show me coaching is non-destructive",
+      "steps": [
+        "Open Help walkthrough",
+        "Choose a step with a visible control",
+        "Tap Show me in the app",
+        "Use Back to Help"
+      ],
+      "expected": [
+        "Real control scrolls into view and highlights",
+        "Training pointer toast appears",
+        "No submit/claim/send/save/data change occurs",
+        "Back to Help restores same walkthrough"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "OWNER-01",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Classic stacked dashboard remains responsive",
+      "steps": [
+        "Open and close each Owner dashboard section"
+      ],
+      "expected": [
+        "Create / Assign Job, Live Job Progress, Needs Attention, Returns & Intake, Unit Status & Search, Equipment Handoffs, Recent Activity, Technician Accounts, Maintenance all toggle without lag or re-render loop"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "OWNER-02",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Direct IT assignment",
+      "steps": [
+        "Use approved QA ticket",
+        "Assign directly to named IT Tech",
+        "Refresh Owner progress"
+      ],
+      "expected": [
+        "IT job appears for named tech",
+        "Owner progress shows technician name",
+        "No MHelpDesk record is changed by Tech Check"
+      ]
+    },
+    {
+      "id": "OWNER-03",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "IT department queue assignment and claim",
+      "steps": [
+        "Use approved QA ticket",
+        "Assign to IT Department queue",
+        "IT claims using exact ticket"
+      ],
+      "expected": [
+        "Only IT role can claim",
+        "Claim requires exact ticket",
+        "Owner sees claiming technician name"
+      ]
+    },
+    {
+      "id": "OWNER-04",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Service department queue assignment and claim",
+      "steps": [
+        "Use approved QA ticket",
+        "Assign to Service Department queue",
+        "Service opens exact ticket and claims"
+      ],
+      "expected": [
+        "Only Service role can claim",
+        "Owner sees claiming technician name",
+        "Service work appears in My Work Today"
+      ]
+    },
+    {
+      "id": "OWNER-05",
+      "area": "Owner",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "AI Dispatch draft/preflight",
+      "steps": [
+        "Open Owner AI Dispatch",
+        "Enter a sample job prompt",
+        "Build / Update Draft",
+        "Run AI Review Before Sending",
+        "Cancel before Send"
+      ],
+      "expected": [
+        "Red/black/white AI branding remains",
+        "Missing information is yellow/pending",
+        "Ready items are green",
+        "AI only drafts/reviews; it never sends by itself"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "STARTUP-01",
+      "area": "Startup",
+      "role": "all",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "First browser load",
+      "steps": [
+        "Open live app in Safari/browser from cold start"
+      ],
+      "expected": [
+        "Login/app surface becomes interactive before heavy Owner data completes",
+        "No repeated render/freeze/double loading"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "STARTUP-02",
+      "area": "Startup",
+      "role": "all",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Reload and PWA/Home Screen resume",
+      "steps": [
+        "Reload live app",
+        "Open from Home Screen",
+        "Background app and return"
+      ],
+      "expected": [
+        "Cached shell opens",
+        "Controls remain tappable",
+        "No duplicate rows or repeated rerender storm"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "IT-01",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Assigned IT job start and resume",
+      "steps": [
+        "Open approved QA IT assignment",
+        "Begin prep",
+        "Answer several YES checks",
+        "Navigate Back",
+        "Resume pending prep"
+      ],
+      "expected": [
+        "Answers persist",
+        "Back does not reset YES answers",
+        "Same MHelpDesk ticket/prep resumes"
+      ]
+    },
+    {
+      "id": "IT-02",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "One-unit-at-a-time flow",
+      "steps": [
+        "Use QA ticket with multiple units",
+        "Complete first unit through review",
+        "Advance to second"
+      ],
+      "expected": [
+        "Each unit has independent tag/check/photo/signature state",
+        "Cannot skip incomplete unit requirements"
+      ]
+    },
+    {
+      "id": "IT-03",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Helios full IT requirements",
+      "steps": [
+        "Use QA Helios DELIVERY",
+        "Verify cameras, router ports, Cerbo/VRM, MPPT, battery box, SIM, camera app, 3x1TB SD, recording, monitoring, customer email",
+        "Complete final two readiness checks",
+        "Add photo/tag confirmation/signature"
+      ],
+      "expected": [
+        "Camera1 81/554/1400 required",
+        "Camera2 81/554/1500 required",
+        "PTZ 81/554/1600 required",
+        "IP Speaker 81/554/1700 required",
+        "Final two checks are functions tested then ready for field use"
+      ]
+    },
+    {
+      "id": "IT-04",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Helios port hard gate",
+      "steps": [
+        "Leave one Helios port check NO/incomplete",
+        "Attempt Service handoff"
+      ],
+      "expected": [
+        "UI readiness shows issue",
+        "Database blocks released/handoff state until all four Helios port checks are true"
+      ]
+    },
+    {
+      "id": "IT-05",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Solar Spotter IT flow",
+      "steps": [
+        "Use QA Solar Spotter DELIVERY",
+        "Complete IT unit checks",
+        "Do not perform Service battery checkout on IT side",
+        "Complete photo/tag/signature",
+        "Create Service handoff"
+      ],
+      "expected": [
+        "No IT battery checkout question is required for Solar Spotter",
+        "Compatibility field does not create a fake user-facing battery check",
+        "Handoff can proceed when all real IT requirements pass"
+      ]
+    },
+    {
+      "id": "IT-06",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Ranger IT flow",
+      "steps": [
+        "Use QA Ranger DELIVERY",
+        "Verify Ranger MPPT update/test and PV charging plus delivery requirements",
+        "Complete evidence/signature"
+      ],
+      "expected": [
+        "Ranger IT checklist blocks readiness when required check is missing"
+      ]
+    },
+    {
+      "id": "IT-07",
+      "area": "IT",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Spotter/Recon/other supported equipment",
+      "steps": [
+        "Run one QA prep for each supported type used in production"
+      ],
+      "expected": [
+        "Equipment-specific checks appear",
+        "Recon quantity requirement works",
+        "Required evidence/signature gates remain enforced"
+      ]
+    },
+    {
+      "id": "IT-08",
+      "area": "IT Intake",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Service return to IT Intake",
+      "steps": [
+        "Open returned QA unit",
+        "Review Service name/ticket/notes/photos",
+        "Answer intake checks",
+        "Navigate Back and forward",
+        "Finish intake with photo"
+      ],
+      "expected": [
+        "Saved answers persist",
+        "All checks must be YES",
+        "SIM/monitoring/Alibi/SD/customer email/cleaning/inventory steps remain present",
+        "Moves to Owner/Manager inventory stage only after completion"
+      ]
+    },
+    {
+      "id": "SERVICE-01",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Exact MHelpDesk assignment lookup",
+      "steps": [
+        "Open Service Job",
+        "Enter wrong ticket",
+        "Enter exact assigned ticket"
+      ],
+      "expected": [
+        "Wrong/unassigned ticket does not open or claim work",
+        "Exact current assigned/claimable ticket previews before Take This Job",
+        "Unit number alone cannot open old work"
+      ]
+    },
+    {
+      "id": "SERVICE-02",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "IT handoff verification",
+      "steps": [
+        "Open exact QA ticket after IT handoff",
+        "Verify prepared-by name, exact units, parts and quantities"
+      ],
+      "expected": [
+        "Service cannot proceed on mismatch",
+        "IT evidence and exact equipment remain tied to same prep/ticket"
+      ]
+    },
+    {
+      "id": "SERVICE-03",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Solar Spotter Service checkout - AGM",
+      "steps": [
+        "Use QA Solar Spotter DELIVERY",
+        "Select 4 x AGM 12V 110Ah per stand",
+        "Enter one exact stand tag per Spotter",
+        "Verify MPPT/charging",
+        "Upload stand, battery, readings evidence and signatures"
+      ],
+      "expected": [
+        "Battery count is 4 per stand",
+        "One stand photo per Spotter required",
+        "Close/deploy blocked until v3 solar checkout and proof complete"
+      ]
+    },
+    {
+      "id": "SERVICE-04",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Solar Spotter Service checkout - single 350Ah",
+      "steps": [
+        "Use QA Solar Spotter DELIVERY",
+        "Select 1 x 12V 350Ah per stand",
+        "Complete required proof"
+      ],
+      "expected": [
+        "Battery count is 1 per stand",
+        "Help/UI do not force four AGM batteries",
+        "Close/deploy accepts the selected supported configuration when all proof is complete"
+      ]
+    },
+    {
+      "id": "SERVICE-05",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Ranger Service solar checkout",
+      "steps": [
+        "Use QA Ranger DELIVERY",
+        "Verify one removable solar panel per Ranger",
+        "Verify LiTime 12V 110Ah battery/MPPT/charging proof"
+      ],
+      "expected": [
+        "Panel count must exactly match Ranger count",
+        "Ranger-only battery configuration is LiTime 12V 110Ah"
+      ]
+    },
+    {
+      "id": "SERVICE-06",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Helios Service checkout",
+      "steps": [
+        "Use QA Helios DELIVERY",
+        "Verify Helios battery box charging",
+        "Verify Cerbo/MPPT",
+        "Upload required proof"
+      ],
+      "expected": [
+        "Helios battery-box charging is required",
+        "Cerbo update/online checks are required",
+        "Close/deploy remains blocked until proof is complete"
+      ]
+    },
+    {
+      "id": "SERVICE-07",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Service-only field assignment",
+      "steps": [
+        "Use QA Service Department Only non-pickup assignment",
+        "Open exact ticket",
+        "Claim if queue",
+        "Complete field work",
+        "Mark Tech Check Service Task Complete"
+      ],
+      "expected": [
+        "No fake IT handoff is required",
+        "Completion only updates Tech Check and does not change MHelpDesk",
+        "Assignment leaves active Service work after completion"
+      ]
+    },
+    {
+      "id": "SERVICE-08",
+      "area": "Service",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Service return documentation",
+      "steps": [
+        "Return QA unit to IT Intake",
+        "Record exact ticket/unit/type",
+        "Take readable unit-tag photo",
+        "Add condition/damage photos and notes"
+      ],
+      "expected": [
+        "Damage photos require notes",
+        "Duplicate same ticket+unit return is rejected",
+        "Return appears to IT as waiting_it"
+      ]
+    },
+    {
+      "id": "SERVICE-09",
+      "area": "Service",
+      "role": "service",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Truck / Trailer Inspection and alerts/history",
+      "steps": [
+        "Open inspection",
+        "Navigate without submission",
+        "Open Status & History",
+        "Open Phone Alerts"
+      ],
+      "expected": [
+        "Inspection stays tied to Service account",
+        "History is accessible",
+        "Phone alert setup is reachable"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "XROLE-A",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Normal IT to Service delivery",
+      "steps": [
+        "Owner assigns IT→Service QA ticket",
+        "IT claims/opens and completes checks/evidence",
+        "IT creates Service handoff",
+        "Service opens exact ticket, verifies and closes/deploys"
+      ],
+      "expected": [
+        "Service waits until IT handoff exists",
+        "Assignment/prep ticket linkage matches exactly",
+        "Owner sees progression and named technicians"
+      ]
+    },
+    {
+      "id": "XROLE-B",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Solar Spotter",
+      "steps": [
+        "Owner assigns Spotter delivery",
+        "IT completes Spotter without battery checkout",
+        "Service selects actual supported battery configuration and verifies stand/MPPT/charging proof"
+      ],
+      "expected": [
+        "IT battery checkout remains absent",
+        "Service handles stand and battery configuration",
+        "Deployment gate uses v3 Service solar check"
+      ]
+    },
+    {
+      "id": "XROLE-C",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Ranger",
+      "steps": [
+        "Owner assigns Ranger",
+        "IT prep completes",
+        "Service verifies Ranger solar panel/LiTime battery/charging proof"
+      ],
+      "expected": [
+        "One removable solar panel per Ranger required",
+        "IT and Service requirements remain separate"
+      ]
+    },
+    {
+      "id": "XROLE-D",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Helios",
+      "steps": [
+        "Owner assigns Helios",
+        "IT deliberately leaves one port incomplete and confirms block",
+        "Complete all ports/IT checks",
+        "Service completes Helios solar/Cerbo proof"
+      ],
+      "expected": [
+        "IT handoff cannot release with missing Helios port",
+        "Service cannot close/deploy without its required proof"
+      ]
+    },
+    {
+      "id": "XROLE-E",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Return chain",
+      "steps": [
+        "Service records returned QA unit",
+        "IT completes Intake",
+        "Owner/Manager confirms MHelpDesk inventory"
+      ],
+      "expected": [
+        "Service assignment completes after required returns recorded",
+        "IT assignment completes after required returned units processed",
+        "Final unit return status becomes completed only after Owner/Manager confirmation"
+      ]
+    },
+    {
+      "id": "XROLE-F",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Department queue",
+      "steps": [
+        "Owner sends QA job to department queue",
+        "Wrong-role user attempts claim",
+        "Correct-role tech enters exact ticket and claims"
+      ],
+      "expected": [
+        "Wrong role cannot claim",
+        "Exact ticket required",
+        "Owner sees claimant",
+        "Work continues normally after claim"
+      ]
+    },
+    {
+      "id": "XROLE-G",
+      "area": "Cross-role",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Wrong ticket / old unit protection",
+      "steps": [
+        "Use a unit that has prior ticket history",
+        "Attempt to open old/different ticket by unit knowledge only",
+        "Enter current assigned exact ticket"
+      ],
+      "expected": [
+        "Unit number cannot bypass exact-ticket lookup",
+        "Unassigned released handoff is rejected",
+        "Current assigned ticket opens normally"
+      ]
+    },
+    {
+      "id": "PWA-01",
+      "area": "PWA",
+      "role": "all",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Home Screen cache/version smoke",
+      "steps": [
+        "Remove stale open tabs",
+        "Open live app once online",
+        "Launch existing Home Screen icon",
+        "Background and reopen"
+      ],
+      "expected": [
+        "v45 shell loads without AccessDenied",
+        "Latest controls/help wording appear",
+        "No stale v98/v44 UI after refresh cycle"
+      ],
+      "manual_device": true
+    }
+  ]
+}
