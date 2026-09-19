@@ -3477,6 +3477,12 @@ async function refreshProofPanel(panel) {
   const next = document.querySelector(selector);
   next?.querySelectorAll('canvas').forEach(wireCanvas);
 }
+document.addEventListener('keydown', e => {
+  if(e.target?.id==='ownerAIDispatchPrompt' && e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    ownerAIDispatchBuild();
+  }
+});
 document.addEventListener('change', async e => {
   if (e.target.id === 'wlReturnPhoto') {
     const file=e.target.files?.[0];
@@ -3502,6 +3508,7 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  if(e.target.closest('[data-owner-ai-new-chat]')) { ownerAIConversationClear(); return; }
   const aiChip=e.target.closest('[data-owner-ai-chip]');
   if(aiChip){
     const input=document.getElementById('ownerAIDispatchPrompt');
@@ -4391,10 +4398,10 @@ async function installOwnerAssignments(force = false) {
           </div>
           <span class='wl-ai-state draft'>ASK / CREATE</span>
         </div>
-        <div class='wl-ai-lead'><b>Ask OnSite Vision like a person.</b> Ask about jobs, status, equipment, or next steps. Vision only prepares a new Tech Check draft when you clearly say <b>create a new ticket, job, or assignment</b>.</div>
+        <div class='wl-ai-lead'><b>Talk to OnSite Vision like you talk to me.</b> Ask something, then keep asking follow-up questions. Your conversation stays together below. If you want Vision to change or create something, just say it naturally.</div>
         <div class='wl-ai-prompt-box'>
           <label for='ownerAIDispatchPrompt'>Ask or tell OnSite Vision what you need</label>
-          <textarea id='ownerAIDispatchPrompt' rows='4' placeholder="Examples: Tell me about Monday's Helios delivery. What needs attention today? What are the Helios delivery steps? Create a new delivery ticket for Monday."></textarea>
+          <textarea id='ownerAIDispatchPrompt' rows='3' placeholder="Message OnSite Vision…"></textarea>
           <div class='wl-ai-prompt-chips' aria-label='Quick AI prompts'>
             <button type='button' data-owner-ai-chip="Show me Monday's jobs">Monday's jobs</button>
             <button type='button' data-owner-ai-chip='What needs attention today?'>Needs attention</button>
@@ -4404,10 +4411,12 @@ async function installOwnerAssignments(force = false) {
         </div>
         <div class='wl-ai-dispatch-actions'>
           <button type='button' class='wl-ai-dictate' data-owner-ai-dispatch-voice><span>🎙</span> Speak to Vision</button>
-          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Ask OnSite Vision <span>→</span></button>
+          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Send <span>→</span></button>
         </div>
         <div id='ownerAIDispatchVoiceStatus' class='wl-ai-voice-status'></div>
-        <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10'></div>
+        <div class='wl-ai-chat-head'><span>Conversation</span><button type='button' data-owner-ai-new-chat>New chat</button></div>
+        <div id='ownerAIConversation' class='wl-ai-chat-thread'>${ownerAIConversationMarkup()}</div>
+        <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10' aria-hidden='true'></div>
       </section>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
@@ -4727,7 +4736,89 @@ let ownerAIDispatchPrepared = false;
 let ownerAIDispatchLastParse = null;
 let ownerAIDispatchRecognition = null;
 let ownerAIAssistantLastJobs = [];
+let ownerAIConversationTurns = [];
+let ownerAIActiveResponseBox = null;
 
+function ownerAIConversationMarkup() {
+  if(!ownerAIConversationTurns.length){
+    return "<div class='wl-ai-chat-empty'><b>Start a conversation with OnSite Vision</b><span>Ask a question, look up a job, change something you just discussed, or tell Vision to prepare a new Tech Check.</span></div>";
+  }
+  return ownerAIConversationTurns.map(turn=>{
+    if(turn.role==='user') return "<div class='wl-ai-chat-turn user'><div class='wl-ai-chat-label'>YOU</div><div class='wl-ai-chat-bubble'>"+esc(turn.text||'')+"</div></div>";
+    return "<div class='wl-ai-chat-turn assistant'><div class='wl-ai-chat-label'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''> ONSITE VISION</div><div class='wl-ai-chat-bubble'>"+String(turn.html||'')+"</div></div>";
+  }).join('');
+}
+function ownerAIConversationAppendUser(text) {
+  const host=document.getElementById('ownerAIConversation');
+  if(!host)return;
+  host.querySelector('.wl-ai-chat-empty')?.remove();
+  ownerAIConversationTurns.push({role:'user',text:String(text||'')});
+  const turn=document.createElement('div');
+  turn.className='wl-ai-chat-turn user';
+  turn.innerHTML="<div class='wl-ai-chat-label'>YOU</div><div class='wl-ai-chat-bubble'>"+esc(text)+"</div>";
+  host.append(turn);
+}
+function ownerAIConversationBeginAssistant() {
+  const host=document.getElementById('ownerAIConversation');
+  if(!host)return null;
+  host.querySelector('.wl-ai-chat-empty')?.remove();
+  const turn=document.createElement('div');
+  turn.className='wl-ai-chat-turn assistant';
+  turn.innerHTML="<div class='wl-ai-chat-label'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''> ONSITE VISION</div><div class='wl-ai-chat-bubble'><div class='wl-ai-assistant-working'><span class='wl-ai-scan-spinner'></span><div><b>Thinking through Tech Check…</b><span>Looking at the conversation and current records.</span></div></div></div>";
+  host.append(turn);
+  return turn.querySelector('.wl-ai-chat-bubble');
+}
+function ownerAIConversationFinishAssistant(box) {
+  if(!box)return;
+  ownerAIConversationTurns.push({role:'assistant',html:box.innerHTML});
+  const turn=box.closest('.wl-ai-chat-turn');
+  turn?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+}
+function ownerAIResponseBox() {
+  return ownerAIActiveResponseBox || document.getElementById('ownerAIDispatchResult');
+}
+function ownerAIConversationClear() {
+  ownerAIConversationTurns=[];
+  ownerAIAssistantLastJobs=[];
+  const host=document.getElementById('ownerAIConversation');
+  if(host) host.innerHTML=ownerAIConversationMarkup();
+  const input=document.getElementById('ownerAIDispatchPrompt');
+  if(input) input.value='';
+}
+function ownerAIConversationDraftCorrection(raw) {
+  if(!ownerAIDispatchPrepared)return null;
+  const lower=String(raw||'').toLowerCase();
+  const correction=/\b(i meant|actually|instead|change|correct|should be|make that|not\b.+\bbut)\b/i.test(raw);
+  if(!correction)return null;
+  const parsed=ownerAIParseDispatch(raw), changes=[];
+  if(parsed.work_type){
+    const el=document.getElementById('ownerAssignWorkType');
+    if(el && el.value!==parsed.work_type){el.value=parsed.work_type;el.dataset.aiSet='1';changes.push('job type → '+parsed.work_type.toUpperCase());}
+  }
+  if(parsed.scheduled_for){
+    const el=document.getElementById('ownerAssignDate');
+    if(el && el.value!==parsed.scheduled_for){el.value=parsed.scheduled_for;el.dataset.aiSet='1';changes.push('date → '+ownerAIScheduleText(parsed.scheduled_for,''));}
+  }
+  if(parsed.scheduled_time){
+    const el=document.getElementById('ownerAssignTime');
+    if(el && el.value!==parsed.scheduled_time){el.value=parsed.scheduled_time;el.dataset.aiSet='1';changes.push('time → '+ownerAIScheduleText('',parsed.scheduled_time));}
+  }
+  const desc=String(raw||'').match(/\b(?:description|job description)\s*(?:to|is|should be|should say|say)\s*[:=-]?\s*(.+)$/i);
+  if(desc){
+    const el=document.getElementById('ownerAssignDescription'), value=String(desc[1]||'').trim();
+    if(el&&value){el.value=value;changes.push('description updated');}
+  }
+  const notes=String(raw||'').match(/\bnotes?\s*(?:to|is|should be|should say|say)\s*[:=-]?\s*(.+)$/i);
+  if(notes){
+    const el=document.getElementById('ownerAssignNotes'), value=String(notes[1]||'').trim();
+    if(el&&value){el.value=value;changes.push('notes updated');}
+  }
+  if(!changes.length)return null;
+  refreshOwnerWorkTypeLabels();
+  refreshOwnerAutoServicePlan();
+  ownerAIDispatchLastParse={...(ownerAIDispatchLastParse||{}),...parsed};
+  return changes;
+}
 function ownerAIEscapeRegExp(v) {
   return String(v || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
@@ -5023,7 +5114,7 @@ function ownerAIDispatchSummary(parsed) {
   return {ticket:a.ticket_no||"—",site:a.site||"—",date:ownerAIScheduleText(document.getElementById("ownerAssignDate")?.value||"",document.getElementById("ownerAssignTime")?.value||""),type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
 }
 function ownerAIDispatchRender(parsed) {
-  const box=document.getElementById("ownerAIDispatchResult"); if(!box)return;
+  const box=ownerAIResponseBox(); if(!box)return;
   const missing=ownerAIDispatchMissing(parsed), s=ownerAIDispatchSummary(parsed);
   box.classList.remove("hidden");
   box.classList.toggle("is-ready", missing.length===0);
@@ -5096,7 +5187,7 @@ function ownerAIAssistantNextStep(a,prep,solar) {
   return p.detail || 'Open the job and continue the current Tech Check step.';
 }
 async function ownerAIAssistantAnswer(raw) {
-  const box=document.getElementById('ownerAIDispatchResult'); if(!box)return;
+  const box=ownerAIResponseBox(); if(!box)return;
   const parsed=ownerAIParseDispatch(raw), intent=ownerAIAssistantIntent(raw);
   const guide=ownerAIAssistantWorkflowGuide(parsed,raw);
   box.classList.remove('hidden','is-ready','is-pending');
@@ -5119,6 +5210,11 @@ async function ownerAIAssistantAnswer(raw) {
   if(unitHint?.type && !equipmentNames.some(v=>String(v).toLowerCase()===String(unitHint.type).toLowerCase())) equipmentNames.push(unitHint.type);
 
   let baseMatches=[...jobs];
+  const hasDirectJobReference=Boolean(parsed.ticket_no||unitHint||equipmentNames.length||parsed.work_type);
+  if(intent==='schedule' && !hasDirectJobReference && ownerAIAssistantLastJobs.length){
+    const priorIds=new Set(ownerAIAssistantLastJobs.map(a=>String(a.id)));
+    baseMatches=jobs.filter(a=>priorIds.has(String(a.id)));
+  }
   if(parsed.ticket_no)baseMatches=baseMatches.filter(a=>String(a.ticket_no||'')===String(parsed.ticket_no));
   if(parsed.work_type)baseMatches=baseMatches.filter(a=>ownerAIEffectiveWorkType(a,prepMap.get(a.prep_ticket_id))===String(parsed.work_type).toLowerCase());
   if(equipmentNames.length)baseMatches=baseMatches.filter(a=>{
@@ -5212,22 +5308,41 @@ async function ownerAIAssistantAnswer(raw) {
 async function ownerAIDispatchBuild() {
   const input=document.getElementById('ownerAIDispatchPrompt');
   const raw=String(input?.value||'').trim();
-  if(!raw)return alert('Ask OnSite Vision a question, or tell it what you want done.');
-  const box=document.getElementById('ownerAIDispatchResult');
+  if(!raw)return;
+  if(input) input.value='';
+  ownerAIConversationAppendUser(raw);
+  const response=ownerAIConversationBeginAssistant();
+  ownerAIActiveResponseBox=response;
+  const status=document.getElementById('ownerAIDispatchVoiceStatus');
+  if(status)status.textContent='';
   try{
-    if(ownerAIAssistantIntent(raw)==='draft'){
+    const correction=ownerAIConversationDraftCorrection(raw);
+    if(correction){
+      response.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Got it — I changed the draft</b></span></div><span class='wl-ai-state ready'>UPDATED</span></div>"
+        +"<div class='wl-ai-good'><b>✓ "+esc(correction.join(' · '))+"</b></div>"
+        +"<div class='wl-ai-answer-intro'>Here is the draft now. You can keep talking to me if anything else needs to change.</div>";
+      const recap=document.createElement('div');
+      response.append(recap);
+      ownerAIActiveResponseBox=recap;
+      ownerAIDispatchRender(ownerAIDispatchLastParse||{warnings:[]});
+      ownerAIReview();
+      ownerAIActiveResponseBox=response;
+    } else if(ownerAIAssistantIntent(raw)==='draft'){
       const parsed=ownerAIParseDispatch(raw);
       ownerAIDispatchApply(parsed);
       ownerAIDispatchPrepared=true;
       ownerAIDispatchLastParse=parsed;
       ownerAIDispatchRender(parsed);
       ownerAIReview();
-      return;
+    } else {
+      await ownerAIAssistantAnswer(raw);
     }
-    await ownerAIAssistantAnswer(raw);
   }catch(error){
     console.warn('OnSite Vision owner assistant error',error);
-    if(box){box.classList.remove('hidden');box.innerHTML="<div class='wl-ai-warn'><b>OnSite Vision could not finish that request.</b><br>"+esc(error?.message||'Please try again.')+"</div>";}
+    if(response)response.innerHTML="<div class='wl-ai-warn'><b>OnSite Vision could not finish that request.</b><br>"+esc(error?.message||'Please try again.')+"</div>";
+  }finally{
+    ownerAIActiveResponseBox=null;
+    ownerAIConversationFinishAssistant(response);
   }
 }
 function ownerAIDispatchStartVoice() {
@@ -5237,13 +5352,13 @@ function ownerAIDispatchStartVoice() {
   const input=document.getElementById('ownerAIDispatchPrompt'), status=document.getElementById('ownerAIDispatchVoiceStatus'), button=document.querySelector('[data-owner-ai-dispatch-voice]');
   const rec=new Ctor(); ownerAIDispatchRecognition=rec;
   rec.lang='en-US';rec.interimResults=false;rec.continuous=false;rec.maxAlternatives=1;
-  rec.onstart=()=>{if(status)status.textContent='Listening — say what you want OnSite Vision to do or tell you.';if(button)button.innerHTML='<span>●</span> Listening…';};
+  rec.onstart=()=>{if(status)status.textContent='Listening… speak naturally.';if(button)button.innerHTML='<span>●</span> Listening…';};
   rec.onerror=e=>{if(status)status.textContent='Voice request stopped. You can type instead.';if(button)button.innerHTML='<span>🎙</span> Speak to Vision';console.warn('OnSite Vision voice error',e);};
   rec.onend=()=>{if(button)button.innerHTML='<span>🎙</span> Speak to Vision';ownerAIDispatchRecognition=null;};
   rec.onresult=async e=>{
     const spoken=String(e.results?.[0]?.[0]?.transcript||'').trim();
     if(input&&spoken)input.value=spoken;
-    if(status)status.textContent=spoken?'I heard you. Checking Tech Check now…':'I did not catch that. Try again.';
+    if(status)status.textContent=spoken?'Got it — adding that to the conversation…':'I did not catch that. Try again.';
     if(spoken)await ownerAIDispatchBuild();
   };
   rec.start();
