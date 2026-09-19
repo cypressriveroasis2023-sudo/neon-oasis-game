@@ -3688,3 +3688,83 @@ select {
     text-align:center;
   }
 }
+
+
+/* Top-level OnSite Vision Owner card v117 */
+#view-owner .ownerVisionTopCard{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  min-height:112px;
+  padding:16px!important;
+  border:1px solid #d7e0e8!important;
+  border-left:6px solid #d20b12!important;
+  border-radius:18px!important;
+  background:linear-gradient(135deg,#0f1d2a 0%,#14283a 100%)!important;
+  color:#fff!important;
+  text-decoration:none!important;
+  box-shadow:0 10px 28px rgba(16,24,32,.12);
+}
+#view-owner .ownerVisionTopIcon{
+  width:58px;
+  height:58px;
+  border-radius:16px;
+  display:grid;
+  place-items:center;
+  background:#0a121a;
+  border:1px solid #4b5b6a;
+}
+#view-owner .ownerVisionTopIcon img{width:44px;height:44px;object-fit:contain}
+#view-owner .ownerVisionTopCopy{min-width:0}
+#view-owner .ownerVisionTopCopy small{
+  display:block;
+  color:#ff363c;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.16em;
+}
+#view-owner .ownerVisionTopCopy>b{
+  display:block;
+  margin-top:3px;
+  color:#fff;
+  font-size:21px;
+  line-height:1.08;
+  font-weight:950;
+}
+#view-owner .ownerVisionTopCopy>span{
+  display:block;
+  margin-top:6px;
+  color:#afc0cf;
+  font-size:11px;
+  line-height:1.35;
+  font-weight:700;
+}
+#view-owner .ownerVisionTopGo{
+  align-self:center;
+  border-radius:999px;
+  background:#d20b12;
+  color:#fff;
+  padding:10px 13px;
+  font-size:10px;
+  font-weight:950;
+  white-space:nowrap;
+}
+@media(max-width:680px){
+  #view-owner .ownerVisionTopCard{
+    grid-template-columns:auto minmax(0,1fr);
+    gap:11px;
+    min-height:105px;
+    padding:14px!important;
+  }
+  #view-owner .ownerVisionTopIcon{width:52px;height:52px;border-radius:14px}
+  #view-owner .ownerVisionTopIcon img{width:39px;height:39px}
+  #view-owner .ownerVisionTopCopy>b{font-size:18px}
+  #view-owner .ownerVisionTopCopy>span{font-size:10px}
+  #view-owner .ownerVisionTopGo{
+    grid-column:1/-1;
+    width:100%;
+    text-align:center;
+    padding:10px 12px;
+  }
+}
