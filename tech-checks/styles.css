@@ -2826,3 +2826,50 @@ select {
     padding-right:6px;
   }
 }
+
+
+/* Owner work-date hard fix v69 */
+#view-owner .ownerWorkflowFirst .grid,
+#view-owner .ownerWorkflowFirst .grid.top8{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+}
+#view-owner .ownerWorkflowFirst .grid>div,
+#view-owner .ownerWorkDateField{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+}
+#view-owner .ownerWorkDateField{
+  overflow:hidden!important;
+  contain:layout inline-size;
+}
+#view-owner #ownerAssignDate{
+  display:block!important;
+  box-sizing:border-box!important;
+  inline-size:100%!important;
+  width:100%!important;
+  max-inline-size:100%!important;
+  max-width:100%!important;
+  min-inline-size:0!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:8px 10px!important;
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  font-size:15px!important;
+  text-align:left!important;
+}
+#view-owner #ownerAssignDate::-webkit-date-and-time-value{
+  min-width:0!important;
+  width:100%!important;
+  text-align:left!important;
+}
+#view-owner #ownerAssignDate::-webkit-datetime-edit{
+  min-width:0!important;
+  padding:0!important;
+}
