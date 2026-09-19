@@ -345,6 +345,21 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}))
+    const apiKey = Deno.env.get('OPENAI_API_KEY') || ''
+    const model = Deno.env.get('ONSITE_VISION_MODEL') || 'gpt-5.6-sol'
+
+    if (body.mode === 'status') {
+      return json({
+        ok: true,
+        agent_version: 'onsite-vision-agent-v2',
+        model,
+        model_configured: Boolean(apiKey),
+        knowledge_version: KNOWLEDGE?.version || 'unknown',
+        workflow_engine_version: ENGINE?.version || 'unknown',
+        write_tools_enabled: false,
+      })
+    }
+
     const message = clean(body.message)
     if (!message) return json({ error: 'Message is required.' }, 400)
     if (message.length > 12000) return json({ error: 'Message is too long.' }, 400)
@@ -356,7 +371,6 @@ Deno.serve(async (req) => {
           .map((m: any) => ({ role: m.role, content: clean(m.content).slice(0, 8000) }))
       : []
 
-    const apiKey = Deno.env.get('OPENAI_API_KEY') || ''
     if (!apiKey) {
       return json({
         error: 'OnSite Vision AI model is not configured yet.',
@@ -365,7 +379,6 @@ Deno.serve(async (req) => {
       }, 503)
     }
 
-    const model = Deno.env.get('ONSITE_VISION_MODEL') || 'gpt-5.6-sol'
     const currentDate = todayCentral()
 
     const getContext = async (ticketNo: string) => {
@@ -374,7 +387,9 @@ Deno.serve(async (req) => {
       return data
     }
 
+    const toolTrace: Array<{ name: string; args: unknown }> = []
     const toolCall = async (name: string, args: any): Promise<Json> => {
+      toolTrace.push({ name, args })
       if (name === 'get_job_context') {
         const context = await getContext(args.ticket_no)
         return compactJobContext(context) as Json
@@ -496,6 +511,8 @@ Deno.serve(async (req) => {
       'ACTION SAFETY:',
       '- This server agent is READ ONLY. It has no mutation tools.',
       '- If the owner asks to create, assign, reschedule, update, hand off, complete, cancel, return, check out, check in, verify, or approve something, explain the proposed action and populate proposed_action.',
+      '- For proposed schedule actions, proposed_action.date must be YYYY-MM-DD and proposed_action.time should be HH:MM in local Central time when known.',
+      '- For proposed assignment actions, use role exactly "it" or "service" when known.',
       '- Never say a write occurred. The Tech Check client will show a confirmation and execute an approved write path separately.',
       '- If a request is ambiguous, ask a natural clarifying question rather than guessing.',
       '',
@@ -599,8 +616,9 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v1',
+      agent_version: 'onsite-vision-agent-v2',
       model,
+      tool_trace: toolTrace,
       ...parsed,
     })
   } catch (error) {
