@@ -1,6 +1,7 @@
 const SUPABASE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.TechCheckDB = db;
 const $ = id => document.getElementById(id);
 const AUTH_DOMAIN = 'cameras-on-site.invalid';
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
@@ -69,7 +70,33 @@ let liveRefreshTimer = null;
 let ownerReportLimit = 15;
 const RESET_REQUEST_KEY = 'cos-tech-password-reset-v1';
 let claimedTemporaryPassword = '';
-function scheduleRefreshData() { clearTimeout(liveRefreshTimer); liveRefreshTimer = setTimeout(() => refreshData(), 180); }
+let refreshInFlight = null;
+let refreshQueued = false;
+let deferredModulesPromise = null;
+let realtimeStarted = false;
+function scheduleRefreshData() {
+  clearTimeout(liveRefreshTimer);
+  liveRefreshTimer = setTimeout(() => refreshData(), 240);
+}
+function scheduleIdle(task, timeout=700) {
+  if ('requestIdleCallback' in window) return requestIdleCallback(task, { timeout });
+  return setTimeout(task, Math.min(timeout, 260));
+}
+function loadDeferredModules() {
+  if (deferredModulesPromise) return deferredModulesPromise;
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v104')
+    .then(() => {
+      window.dispatchEvent(new CustomEvent('techcheck:app-ready', { detail:{ role:state.profile?.role, deferred:true } }));
+      if (state.profile?.role === 'owner') {
+        scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
+      }
+    })
+    .catch(error => {
+      console.error('Could not load Tech Check workflow tools', error);
+      deferredModulesPromise = null;
+    });
+  return deferredModulesPromise;
+}
 
 function esc(s) {
   return String(s ?? '').replace(
@@ -200,6 +227,7 @@ function showAuth() {
     db.removeChannel(liveChannel);
     liveChannel = null;
   }
+  realtimeStarted = false;
 }
 async function login() {
   msg('loginMessage', '');
@@ -251,12 +279,17 @@ async function enterApp(session) {
   updateItWelcome();
   updateItWeather();
   configureTabs();
-  setupRealtime();
 
-  // Make the app responsive immediately. Shared data refreshes just after first paint.
-  window.dispatchEvent(new CustomEvent('techcheck:app-ready', { detail:{ role:profile.role } }));
-  const startInitialRefresh = () => refreshData().catch(error => console.warn('Initial Tech Check refresh failed', error));
-  requestAnimationFrame(() => setTimeout(startInitialRefresh, 0));
+  // Paint the signed-in shell first. Heavy workflow code and shared-data hydration
+  // are deliberately moved off the critical startup path.
+  const sync = $('syncStatus');
+  if (sync) sync.textContent = 'Opening Tech Check…';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (sync) sync.textContent = 'Loading live work…';
+    scheduleIdle(() => loadDeferredModules(), 240);
+    scheduleIdle(() => refreshData({ skipProfile:true, initial:true }).catch(error => console.warn('Initial Tech Check refresh failed', error)), 320);
+    scheduleIdle(() => setupRealtime(), 900);
+  }));
 }
 function showForcedPasswordChange(profile) {
   $('authView').classList.add('hidden');
@@ -400,6 +433,8 @@ async function useTemporaryResetPassword() {
   if (state.session) { localStorage.removeItem(RESET_REQUEST_KEY); claimedTemporaryPassword = ''; }
 }
 function setupRealtime() {
+  if (realtimeStarted && liveChannel) return;
+  realtimeStarted = true;
   if (liveChannel) db.removeChannel(liveChannel);
   liveChannel = db
     .channel('cos-shared-live')
@@ -465,42 +500,76 @@ function setupRealtime() {
       $('syncStatus').textContent = !navigator.onLine ? 'Offline — unsent field drafts stay on this device' : s === 'SUBSCRIBED' ? 'Live shared data connected' : 'Connecting shared data…';
     });
 }
-async function refreshData() {
+async function refreshData(options = {}) {
   if (!state.session) return;
-  const { data: currentProfile } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
-  if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
-    await db.auth.signOut();
-    return showAuth();
+  if (refreshInFlight) {
+    refreshQueued = true;
+    return refreshInFlight;
   }
-  if (currentProfile.role !== state.profile?.role || currentProfile.full_name !== state.profile?.full_name) {
-    state.profile = currentProfile;
-    $('whoName').textContent = currentProfile.full_name || currentProfile.username || 'Technician';
-    $('whoRole').textContent = roleLabel(currentProfile.role);
-    configureTabs();
-  } else {
-    state.profile = currentProfile;
+  refreshInFlight = refreshDataInner(options)
+    .catch(error => { console.warn('Tech Check refresh failed', error); })
+    .finally(() => {
+      refreshInFlight = null;
+      if (refreshQueued && state.session) {
+        refreshQueued = false;
+        scheduleRefreshData();
+      }
+    });
+  return refreshInFlight;
+}
+async function loadPrepSnapshot(initial=false) {
+  const historyLimit = initial ? 35 : 120;
+  const [activeQ, recentQ] = await Promise.all([
+    db.from('prep_tickets').select('*,prep_items(*)').neq('status','closed').order('created_at',{ascending:true}),
+    db.from('prep_tickets').select('*,prep_items(*)').eq('status','closed').order('created_at',{ascending:false}).limit(historyLimit)
+  ]);
+  if (activeQ.error && recentQ.error) return null;
+  const byId = new Map();
+  for (const row of (activeQ.data || [])) byId.set(row.id,row);
+  for (const row of (recentQ.data || [])) if (!byId.has(row.id)) byId.set(row.id,row);
+  return [...byId.values()].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+}
+async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
+  if (!state.session) return;
+
+  if (!skipProfile) {
+    const { data: currentProfile } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
+    if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
+      await db.auth.signOut();
+      return showAuth();
+    }
+    if (currentProfile.role !== state.profile?.role || currentProfile.full_name !== state.profile?.full_name) {
+      state.profile = currentProfile;
+      $('whoName').textContent = currentProfile.full_name || currentProfile.username || 'Technician';
+      $('whoRole').textContent = roleLabel(currentProfile.role);
+      configureTabs();
+    } else {
+      state.profile = currentProfile;
+    }
   }
-  const prepQ = await db
-    .from('prep_tickets')
-    .select('*,prep_items(*)')
-    .order('created_at', { ascending: true });
-  if (!prepQ.error) state.preps = prepQ.data || [];
+
+  const prepRows = await loadPrepSnapshot(initial);
+  if (prepRows) state.preps = prepRows;
+
   if (state.profile.role === 'owner') {
     const dayStart = new Date(); dayStart.setHours(0,0,0,0);
     const selectedStart = dateFromKey(ownerDailyDate); selectedStart.setHours(0,0,0,0);
     const selectedEnd = new Date(selectedStart); selectedEnd.setDate(selectedEnd.getDate()+1);
+    const reportLimit = initial ? 60 : 250;
+    const historyLimit = initial ? 80 : 300;
+    const registryLimit = initial ? 180 : 500;
     const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, truckSpareBatteries] = await Promise.all([
-      db.from('reports').select('*').order('created_at', { ascending: false }),
-      db.from('profiles').select('*').order('created_at', { ascending: true }),
-      db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(50),
+      db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
+      db.from('profiles').select('*').order('created_at',{ascending:true}),
+      db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
       db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
       db.from('job_assignments').select('*').eq('scheduled_for',ownerDailyDate).order('assigned_at',{ascending:true}),
-      db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(500),
+      db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(registryLimit),
       db.from('asset_inventory').select('*').order('asset_category',{ascending:true}).order('unit_tag',{ascending:true}),
-      db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(300),
-      db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(100),
+      db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(historyLimit),
+      db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(initial ? 40 : 100),
       db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true})
     ]);
     if (!rep.error) state.reports = rep.data || [];
@@ -523,9 +592,20 @@ async function refreshData() {
     renderPasswordResetRequests();
     renderUsers();
   }
+
   renderIT();
   renderMatched();
   updateMorningStatus();
+  const sync = $('syncStatus');
+  if (sync && navigator.onLine) sync.textContent = 'Live work loaded';
+
+  // After the fast initial owner snapshot is interactive, quietly expand the
+  // recent history once. This keeps launch fast without losing normal history.
+  if (initial && state.profile.role === 'owner') {
+    scheduleIdle(() => {
+      if (state.session && !document.hidden) refreshData({ skipProfile:true, initial:false });
+    }, 1800);
+  }
 }
 
 function toggleReconBatteryInput() {
