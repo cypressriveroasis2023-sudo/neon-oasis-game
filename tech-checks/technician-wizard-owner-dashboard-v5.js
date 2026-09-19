@@ -174,6 +174,43 @@ function injectStyles() {
     #view-owner .ownerCompactAssignForm:not([open]),#view-owner .ownerCompactAttentionDetail:not([open]){display:none!important}
     #view-owner .ownerCompactAssignForm>.ownerDashSummary>div>b,#view-owner .ownerCompactAttentionDetail>.ownerDashSummary>div>b{color:#b20b10}
     @media(max-width:560px){.ownerCompactTopbar{grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:7px}.ownerCompactAssign,.ownerCompactAttention{min-height:46px}.ownerCompactAssign b{font-size:11px}.ownerCompactGroupSummary{min-height:62px;padding:9px 10px;grid-template-columns:34px minmax(0,1fr) auto;gap:8px}.ownerCompactIcon{width:32px;height:32px}.ownerCompactGroupSummary b{font-size:16px}.ownerCompactGroupSummary small{font-size:8px}.ownerCompactGroupBody{padding:6px}}
+
+    /* Owner Jobs focus layout v78 */
+    #ownerCompactJobsBody #ownerLiveJobProgress{border:0!important;border-radius:0!important;margin:0!important;background:transparent!important;box-shadow:none!important;overflow:visible!important}
+    #ownerCompactJobsBody #ownerLiveJobProgress>.ownerDashSummary{display:none!important}
+    #ownerCompactJobsBody #ownerLiveJobProgress>.ownerDashBody{display:block!important;padding:2px 0 0!important;background:transparent!important}
+    #ownerCompactJobsBody .ownerLiveSummary{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;margin:0 0 8px!important}
+    #ownerCompactJobsBody .ownerLiveSummary span{min-width:0!important;padding:8px 5px!important;border:1px solid #dce4ea!important;border-radius:10px!important;background:#fff!important;text-align:center!important;color:#6c7a88!important;font-size:8px!important;line-height:1.15!important;font-weight:700!important}
+    #ownerCompactJobsBody .ownerLiveSummary b{display:block!important;margin-bottom:3px!important;color:#162536!important;font-size:17px!important;line-height:1!important;font-weight:900!important}
+    #ownerCompactJobsBody .ownerJobStatusSection{margin:7px 0!important;padding:8px!important;border-width:1px!important;border-radius:11px!important;box-shadow:none!important}
+    #ownerCompactJobsBody .ownerActiveLabel{margin-bottom:6px!important;font-size:9px!important;line-height:1.1!important;letter-spacing:.08em!important}
+    #ownerCompactJobsBody .wl-assignment-row{margin:6px 0!important;padding:9px!important;border-radius:10px!important;box-shadow:none!important}
+    #ownerCompactJobsBody .ownerHistoryFold{margin-top:7px!important;border:1px solid #dde5eb!important;border-radius:10px!important;background:#fff!important}
+    #ownerCompactJobsBody .ownerHistoryFold>summary{padding:8px 10px!important;font-size:10px!important;font-weight:800!important}
+
+    .ownerCompactAIStatus{margin:8px 0 0!important;border:1px solid #ded8ed!important;border-radius:11px!important;background:#fff!important;overflow:hidden!important}
+    .ownerCompactAIStatus>summary{list-style:none;display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:50px;padding:7px 9px;cursor:pointer}
+    .ownerCompactAIStatus>summary::-webkit-details-marker{display:none}
+    .ownerCompactAIIcon{width:29px;height:29px;display:grid;place-items:center;border-radius:9px;background:#f4effb;font-size:14px}
+    .ownerCompactAIStatus>summary>span:nth-child(2){min-width:0}.ownerCompactAIStatus>summary b,.ownerCompactAIStatus>summary small{display:block}.ownerCompactAIStatus>summary b{color:#4f2391;font-size:12px;line-height:1.1;font-weight:900}.ownerCompactAIStatus>summary small{margin-top:2px;color:#7a7187;font-size:8px;line-height:1.15;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ownerCompactAIStatus>summary strong{padding:5px 7px;border:1px solid #b9eac8;border-radius:999px;background:#f0fbf3;color:#16723f;font-size:8px;font-weight:900;white-space:nowrap}
+    .ownerCompactAIStatus>summary strong.attention{border-color:#f1b6b9;background:#fff2f2;color:#b20b10}
+    .ownerCompactAIStatus>.wl-owner-ai-control-center{margin:0!important;border:0!important;border-top:1px solid #ebe6f2!important;border-radius:0!important;box-shadow:none!important}
+
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup{margin:0 0 7px!important;border:1px solid #dbe4eb!important;border-radius:11px!important;background:#fff!important;box-shadow:none!important}
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup .wl-owner-unit-lookup-head{padding:0!important}
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup .wl-eyebrow{font-size:7px!important}
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup .wl-owner-unit-lookup-head b{font-size:13px!important}
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup .wl-owner-unit-lookup-head small{font-size:8px!important}
+    #ownerCompactEquipmentBody>.ownerCompactEquipmentLookup .wl-owner-unit-search{margin-top:7px!important}
+
+    @media(max-width:560px){
+      #ownerCompactJobsBody .ownerLiveSummary{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+      #ownerCompactJobsBody .ownerLiveSummary span{padding:7px 3px!important;font-size:7px!important}
+      #ownerCompactJobsBody .ownerLiveSummary b{font-size:16px!important}
+      .ownerCompactAIStatus>summary{grid-template-columns:28px minmax(0,1fr) auto;gap:7px;padding:6px 8px}
+      .ownerCompactAIStatus>summary strong{max-width:82px;overflow:hidden;text-overflow:ellipsis}
+    }
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -2984,6 +3021,7 @@ async function installOwnerAssignments(force = false) {
   liveHost.open = liveWasOpen || active.length > 0;
   refreshOwnerAutoServicePlan();
   refreshOwnerWorkTypeLabels();
+  organizeOwnerDashboard();
 }
 async function ownerLookupUnitHistory(){
   const input=document.getElementById('ownerUnitLookupInput'),out=document.getElementById('ownerUnitLookupResult');
@@ -3151,6 +3189,49 @@ function organizeOwnerDashboard(){
   move('ownerLiveJobProgress',jobs);
   move('ownerJobAssignments',jobs);
   move('ownerAttentionCard',jobs);
+
+  const live=document.getElementById('ownerLiveJobProgress');
+  const liveBody=live?.querySelector('.ownerDashBody');
+  if(live){
+    live.open=true;
+    live.classList.add('ownerCompactLivePrimary');
+  }
+
+  // Unit history/search belongs with Equipment, not Jobs.
+  const freshLookup=live?.querySelector('.wl-owner-unit-lookup');
+  if(freshLookup && equipment){
+    const oldLookup=equipment.querySelector('.wl-owner-unit-lookup');
+    if(oldLookup && oldLookup!==freshLookup) oldLookup.remove();
+    freshLookup.classList.add('ownerCompactEquipmentLookup');
+    equipment.prepend(freshLookup);
+  }
+
+  // Turn the large AI dashboard into one compact expandable status row.
+  const ai=live?.querySelector('.wl-owner-ai-control-center');
+  if(ai && liveBody){
+    let aiWrap=liveBody.querySelector('.ownerCompactAIStatus');
+    if(!aiWrap){
+      aiWrap=document.createElement('details');
+      aiWrap.className='ownerCompactAIStatus';
+      const aiState=ai.querySelector('.wl-owner-ai-master-status');
+      const aiAttention=aiState?.classList.contains('attention');
+      const aiText=String(aiState?.textContent||'ALL CLEAR').trim();
+      aiWrap.innerHTML="<summary><span class='ownerCompactAIIcon'>✨</span><span><b>AI Status</b><small>Workflow health, alerts, and tomorrow readiness</small></span><strong class='"+(aiAttention?"attention":"")+"'>"+aiText+"</strong></summary>";
+      ai.before(aiWrap);
+      aiWrap.appendChild(ai);
+    }
+  }
+
+  // Jobs should show actual work first. AI is secondary and stays collapsed below it.
+  if(liveBody){
+    const snapshot=liveBody.querySelector('.ownerLiveSummary');
+    const waiting=liveBody.querySelector('.ownerJobStatusSection.assigned');
+    const progress=liveBody.querySelector('.ownerJobStatusSection.progress');
+    const history=liveBody.querySelector('.ownerHistoryFold');
+    const aiWrap=liveBody.querySelector('.ownerCompactAIStatus');
+    [snapshot,waiting,progress,history,aiWrap].filter(Boolean).forEach(el=>liveBody.appendChild(el));
+  }
+
   move('ownerIntakeTracking',equipment);
   move('ownerUnitStatusCard',equipment);
   move('ownerHandoffsCard',equipment);
