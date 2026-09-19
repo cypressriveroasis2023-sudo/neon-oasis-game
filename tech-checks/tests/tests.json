@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v118",
-  "service_worker": "v72",
-  "generated_for": "OnSite Vision knowledge + live context + protected server agent foundation",
+  "service_worker": "v73",
+  "generated_for": "OnSite Vision knowledge + live context + server agent + confirmed action audit foundation",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -1325,7 +1325,107 @@
         "No success claim occurs before the approved write path confirms database success"
       ],
       "manual_device": true
+    },
+    {
+      "id": "VISION-ACTION-01",
+      "area": "OnSite Vision Action Audit",
+      "role": "owner",
+      "mode": "db+source",
+      "destructive": false,
+      "scenario": "AI proposal is canonicalized and audited before execution",
+      "steps": [
+        "Prepare a supported Vision action",
+        "Inspect vision_action_audit",
+        "Cancel the proposal before confirmation"
+      ],
+      "expected": [
+        "Proposal receives an audit action_id",
+        "Canonical payload is server-generated",
+        "before_state is recorded",
+        "Operational Tech Check records remain unchanged before confirmation",
+        "Cancelled proposal is recorded as cancelled"
+      ]
+    },
+    {
+      "id": "VISION-ACTION-02",
+      "area": "OnSite Vision Action Audit",
+      "role": "owner",
+      "mode": "db",
+      "destructive": false,
+      "scenario": "Existing workflow gates still block invalid confirmed actions",
+      "steps": [
+        "Prepare Owner final approval for MHelpDesk #22712",
+        "Confirm/execute through vision_execute_action_v1",
+        "Read audit status and live job context"
+      ],
+      "expected": [
+        "Action execution calls the existing Owner final Helios verification rule",
+        "Execution fails because Service field installation has not been submitted",
+        "Audit status is failed with the database error",
+        "before_state exists",
+        "after_state is absent for failed execution",
+        "Operational #22712 workflow remains unchanged"
+      ]
+    },
+    {
+      "id": "VISION-ACTION-03",
+      "area": "OnSite Vision Action Audit",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Audit ledger cannot be directly mutated by authenticated clients",
+      "steps": [
+        "Inspect RLS on vision_action_audit",
+        "Inspect authenticated table grants",
+        "Inspect action RPC grants"
+      ],
+      "expected": [
+        "RLS is enabled",
+        "Authenticated table privilege is SELECT only",
+        "Prepare/execute/cancel RPCs require Owner role internally",
+        "Anonymous users cannot execute the action RPCs"
+      ]
+    },
+    {
+      "id": "VISION-ACTION-04",
+      "area": "OnSite Vision Action Audit",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "AI LIVE and DATA LIVE use the same confirmation/audit standard",
+      "steps": [
+        "Ask Vision to assign a technician in AI LIVE mode",
+        "Repeat with deterministic fallback/Data Live behavior",
+        "Inspect the confirmation card"
+      ],
+      "expected": [
+        "Both supported paths use vision_prepare_action_v1",
+        "Card is labeled AUDITED PROPOSED ACTION",
+        "No write occurs until Confirm is tapped",
+        "Confirmation executes through vision_execute_action_v1",
+        "Cancel records the proposal as cancelled"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-ACTION-05",
+      "area": "OnSite Vision Action Audit",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Evidence-heavy actions stay guided instead of bypassing workflow",
+      "steps": [
+        "Ask Vision to hand off, return, check in/out, or complete a job without required evidence",
+        "Inspect Vision response"
+      ],
+      "expected": [
+        "Proposal may be audited",
+        "Action is marked non-executable when required workflow evidence/checklist data is missing",
+        "Vision routes the Owner to the correct guided workflow",
+        "No production shortcut is performed"
+      ],
+      "manual_device": true
     }
   ],
-  "last_release_qa_note": "Phase 3: authenticated read-only onsite-vision-agent Edge Function v2, GPT-5.6 Sol default when OPENAI_API_KEY is configured, strict tool calling/structured output, client AI-first with deterministic fallback, Vision v12, SW v72."
+  "last_release_qa_note": "Phase 4: vision_action_audit ledger, owner-only prepare/execute/cancel RPCs, Action Layer v1, Vision v13, SW v73. Supported AI writes are confirmed/audited; evidence-heavy actions remain guided. QA verified existing Helios final-verification gate blocks premature Owner approval."
 }
