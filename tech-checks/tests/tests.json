@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v121",
-  "service_worker": "v76",
+  "runtime_version": "release-qa-v122",
+  "service_worker": "v78",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1659,7 +1659,7 @@
         "tech-check-rules.js content SHA matches",
         "Company Knowledge content SHA matches",
         "Workflow Engine content SHA matches",
-        "Edge Function v7 is ACTIVE with JWT verification",
+        "Edge Function v8 is ACTIVE with JWT verification",
         "Agent status reports shared rules version from TechCheckRules"
       ]
     },
@@ -1669,18 +1669,19 @@
       "role": "all",
       "mode": "source+db",
       "destructive": false,
-      "scenario": "Sniper battery rule is verified and centralized without inventing unfinished product details",
+      "scenario": "Sniper core hardware and operating flow are Owner-documented without inventing remaining port/programming details",
       "steps": [
-        "Inspect active app.js BATTERY metadata",
-        "Inspect TechCheckRules Sniper definition",
-        "Inspect live add_it_prep_item/configure_it_prep_item battery count rule",
-        "Inspect Company Knowledge Sniper definition"
+        "Inspect TechCheckRules Sniper definition and Sniper profile",
+        "Inspect live Sniper battery count rule",
+        "Inspect Company Knowledge Sniper definition",
+        "Inspect technician Sniper DELIVERY/SWAP/BACKUP checklist"
       ],
       "expected": [
-        "Sniper requires 2 batteries in shared rules and live database setup",
-        "Verified battery specification is 12V 35Ah",
-        "Vision labels Sniper COMPANY RULE — PARTIAL until components, ports and troubleshooting are taught",
-        "No undocumented Sniper internals or port values are invented"
+        "Sniper requires 2 × 12V 35Ah batteries",
+        "Core hardware is Avigilon ES appliance + 2 Avigilon bullet cameras + InHand router",
+        "Customer deployments use Avigilon Unity, active SIM/router, public IP from the 2026 Unit Tracker, Monitoring Center setup and customer app access",
+        "Sniper SWAP uses the same customer-deployment preparation as DELIVERY",
+        "Vision remains COMPANY RULE — PARTIAL only for exact ports, deeper Unity/programming steps, exact Monitoring Center field list, model-specific details if needed, and troubleshooting"
       ]
     },
     {
@@ -1695,7 +1696,7 @@
         "Inspect unknowns and teaching_needed in Company Knowledge and Workflow Engine"
       ],
       "expected": [
-        "All six partial product families remain explicitly partial",
+        "All six Phase 7 product families may remain partial where exact Cameras On Site procedures are still undocumented; Sniper now has its core workflow documented",
         "Each partial product returns exact teaching_needed prompts",
         "Recon II database label Recon II Battery is not presented as a physical battery specification",
         "Vision returns MISSING INFORMATION for undocumented technical procedures instead of generic internet guesses",
@@ -1739,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v7, company-knowledge-v4, workflow-engine-v4 and rules-v3"
+        "Agent reports onsite-vision-agent-v8, company-knowledge-v5, workflow-engine-v4 and rules-v4"
       ]
     },
     {
@@ -1760,9 +1761,66 @@
         "Helios Delivery remains 31 shared IT checks with unchanged port groups",
         "Ranger retains MPPT updated/tested/PV charging requirements",
         "Solar Spotter retains zero IT battery checkout",
-        "No existing photo, signature, handoff, return or Owner-verification gate is weakened"
+        "No existing photo, signature, handoff, return or Owner-verification gate is weakened",
+        "Sniper DELIVERY/SWAP customer-readiness behavior is identical in shared browser rules, technician fallback, and live database release gates"
+      ]
+    },
+    {
+      "id": "PHASE7-SNIPER-01",
+      "area": "IT Tech · Sniper",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Sniper DELIVERY and SWAP use the Owner-taught customer deployment preparation flow",
+      "steps": [
+        "Open a Sniper DELIVERY checklist and inspect every shared check",
+        "Open a Sniper SWAP checklist and compare it to DELIVERY",
+        "Inspect save_it_prep_item_draft and release_prep"
+      ],
+      "expected": [
+        "Both require 120V power-up, 2 × 12V 35Ah batteries, active SIM in the InHand router, Avigilon ES reachable by the unit public IP, Avigilon Unity visibility, recording/storage readiness, Monitoring Center setup, current Service order match and customer Unity app access",
+        "The database persists these fields for Sniper SWAP instead of clearing them",
+        "The Service handoff is blocked if a Sniper SWAP is missing any customer-deployment readiness check"
+      ]
+    },
+    {
+      "id": "PHASE7-SNIPER-02",
+      "area": "Service Tech · Sniper",
+      "role": "service",
+      "mode": "source+workflow",
+      "destructive": false,
+      "scenario": "Sniper field workflow preserves Owner instructions and return handling",
+      "steps": [
+        "Review the Sniper Service field knowledge",
+        "Review Service handoff verification and Return → IT Intake workflow"
+      ],
+      "expected": [
+        "Service verifies 2 batteries are physically inside the Sniper",
+        "Service installs the Sniper on the pole or stand specified by the Service order",
+        "Service calls IT to focus/adjust both cameras and verify signal",
+        "Service uploads field photos showing the installed unit and unit number/tag before finalization",
+        "A SWAP returns the old field Sniper through Service Return → IT Intake"
+      ]
+    },
+    {
+      "id": "PHASE7-SNIPER-03",
+      "area": "Truck Spares / Sniper",
+      "role": "it+service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Sniper BACKUP stays hardware-ready and resolves correctly after the field call",
+      "steps": [
+        "Inspect Sniper BACKUP checklist",
+        "Inspect truck-spare checkout and Service resolution rules"
+      ],
+      "expected": [
+        "BACKUP requires the hardware-ready Sniper checks but does not invent customer-specific Monitoring Center/app setup",
+        "IT explicitly checks the spare out before the IT → Service handoff",
+        "Unused Sniper spare returns directly to Shop Inventory and is removed from the Service truck",
+        "If the spare is used for a swap, the replaced field Sniper follows Service Return → IT Intake",
+        "No standalone Sniper spare-battery batch is invented or accepted"
       ]
     }
   ],
-  "last_release_qa_note": "Phase 7 company-brain pass: TechCheckRules v3 centralizes the verified Sniper 2 × 12V 35Ah rule plus server-backed truck-spare mappings/lifecycle; Company Knowledge v4 and Workflow Engine v4 expose exact teaching gaps, including unresolved Solar Pole/Pole server-parity questions; agent v7 routes truck-spare/gap questions without generic guesses; release v121 / loader v35 / Vision v16 / SW v77."
+  "last_release_qa_note": "Phase 7 Sniper teaching pass: TechCheckRules v4 documents the Avigilon ES + 2 bullet-camera + InHand/Unity Sniper workflow; Sniper SWAP now uses the same customer-deployment readiness gate as DELIVERY in technician UI and live database functions; Company Knowledge v5 preserves only the still-unknown ports/deeper programming/Monitoring Center field list/model-specific details/troubleshooting; Edge agent v8 is active with JWT; release v122 / loader v36 / Vision v16 / SW v78 / DB migration 78."
 }
