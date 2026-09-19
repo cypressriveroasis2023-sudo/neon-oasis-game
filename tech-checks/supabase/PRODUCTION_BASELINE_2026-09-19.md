@@ -469,7 +469,7 @@ Owner instruction captured on 2026-09-19 adds the core Spotter, Recon II, and Ra
 - Customer deployment sends required monitoring information to Central Station and adds customer-provided email access.
 - DELIVERY identifies whether Service needs a pole or stand.
 - SWAP does not add another pole/stand; the replaced field Spotter must enter Service Return → IT Intake before close.
-- Exact name of the Owner-mentioned top-mounted component remains intentionally undocumented until confirmed.
+- Spotter has an antenna on top.
 
 ### Recon II
 - Camera count is now tracked separately from battery quantity.
@@ -491,15 +491,17 @@ Owner instruction captured on 2026-09-19 adds the core Spotter, Recon II, and Ra
 Migration 79 (`camera_family_workflows_v1`) adds camera-family port/programming/camera-count fields, Ranger field verification, release gates, and standard SWAP-return close gates.
 
 Current release:
-- shared rules: `rules-v5`
-- Company Knowledge: `company-knowledge-v6`
+- shared rules: `rules-v6`
+- Company Knowledge: `company-knowledge-v7`
 - Workflow Engine: `workflow-engine-v4`
 - technician: `release-qa-v123`
 - loader: `startup-fast-v37`
 - OnSite Vision workspace: `vision-workspace-v16`
-- Edge agent: `onsite-vision-agent-v9` ACTIVE with JWT verification
-- service worker: `tech-check-field-shell-v79`
+- Edge agent: `onsite-vision-agent-v10` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v80`
 - database migrations: 79
 - QA tests: 98
 
 Regression checks passed for JavaScript syntax, browser/server bundle parity, deployed Edge parity, live database columns/triggers, cache versions, and absence of Tesseract/OCR from the startup cache. Supabase advisors reported existing project-wide warnings plus the new Ranger verifier foreign-key index as a performance advisory; no new anonymous-execution warning was introduced for the two new RPCs.
+
+- Spotter antenna correction: the Owner clarified the component is the antenna on top, not an unidentified top-mounted component.
