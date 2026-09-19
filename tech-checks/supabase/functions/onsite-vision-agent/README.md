@@ -1,6 +1,6 @@
 # OnSite Vision Server Agent
 
-Phase 3 introduces a protected server-side AI agent for Cameras On Site Tech Check.
+Phase 3 introduced a protected server-side AI agent for Cameras On Site Tech Check.
 
 ## Security model
 
@@ -54,3 +54,23 @@ The agent must distinguish:
 - MISSING INFORMATION
 
 It must use live Tech Check data for current operational facts and the Cameras On Site Company Knowledge Layer for technical rules. It must not replace missing company documentation with generic technical guesses.
+
+
+## Managed knowledge
+
+Agent v3 adds Owner-managed company knowledge through `vision_search_knowledge_v1`.
+
+Knowledge lifecycle:
+
+- Draft — editable, never returned to the AI as company truth.
+- Approved — eligible for grounding as COMPANY RULE.
+- Retired — preserved but excluded from AI grounding.
+
+Authority order used by the agent:
+
+1. Live database / server enforcement
+2. Approved managed company knowledge
+3. Code baseline knowledge
+4. AI inference
+
+If an approved managed entry conflicts with a live database rule, the database remains authoritative. If it conflicts with the code baseline, Vision should report the conflict so the application/workflow rules can be brought into parity rather than silently drifting.
