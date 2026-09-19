@@ -261,6 +261,23 @@
       ]
     },
     {
+      "id": "IT-04B",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Helios non-port database release gate",
+      "steps": [
+        "Inspect production release trigger",
+        "Verify Helios DELIVERY release requires Cerbo/VRM, MPPT update, solar charging, and all 3 required 1TB SD cards in addition to the four port checks"
+      ],
+      "expected": [
+        "Database rejects Service handoff when any Helios solar/Cerbo/SD requirement is false even if front-end validation is bypassed",
+        "Existing Ranger database release gate remains intact"
+      ],
+      "manual_device": false
+    },
+    {
       "id": "IT-05",
       "area": "IT",
       "role": "it",
@@ -647,5 +664,6 @@
       ],
       "manual_device": true
     }
-  ]
+  ],
+  "last_release_qa_note": "Helios release trigger hardened in production and documented under tech-checks/supabase/migrations/20260919_harden_helios_it_release_gate.sql"
 }
