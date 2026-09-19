@@ -5049,6 +5049,9 @@ function ownerAIDispatchRender(parsed) {
 }
 function ownerAIAssistantIntent(text) {
   const raw=String(text||'').trim();
+  const hasScheduleValue=Boolean(ownerAIDateFromText(raw)||ownerAITimeFromText(raw));
+  const scheduleChange=hasScheduleValue && /\b(put|set|change|update|move|reschedule|schedule|make)\b[\s\S]{0,60}\b(date|time|delivery|pickup|swap|service|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow)\b/i.test(raw);
+  if(scheduleChange) return 'schedule';
   const explicitCreate=/\b(create|make|start|set\s*up|setup|add|prepare|build)\b[\s\S]{0,40}\b(?:new\s+)?(?:tech\s*check|ticket|job|assignment)\b/i.test(raw)
     || /\b(create|make|start|set\s*up|setup)\b[\s\S]{0,30}\b(delivery|pickup|swap|service)\b/i.test(raw)
     || /\b(update|change|edit)\b[\s\S]{0,30}\b(draft|new\s+ticket|new\s+job|assignment)\b/i.test(raw);
@@ -5094,14 +5097,14 @@ function ownerAIAssistantNextStep(a,prep,solar) {
 }
 async function ownerAIAssistantAnswer(raw) {
   const box=document.getElementById('ownerAIDispatchResult'); if(!box)return;
-  const parsed=ownerAIParseDispatch(raw);
+  const parsed=ownerAIParseDispatch(raw), intent=ownerAIAssistantIntent(raw);
   const guide=ownerAIAssistantWorkflowGuide(parsed,raw);
   box.classList.remove('hidden','is-ready','is-pending');
-  if(guide){
+  if(guide && intent!=='schedule'){
     box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Next Steps</b></span></div><span class='wl-ai-state ready'>GUIDE</span></div>"+guide;
     return;
   }
-  box.innerHTML="<div class='wl-ai-assistant-working'><span class='wl-ai-scan-spinner'></span><div><b>OnSite Vision is checking Tech Check…</b><span>Looking at the current job records and workflow status.</span></div></div>";
+  box.innerHTML="<div class='wl-ai-assistant-working'><span class='wl-ai-scan-spinner'></span><div><b>OnSite Vision is checking Tech Check…</b><span>Finding the matching equipment, ticket, schedule, and workflow status.</span></div></div>";
   const results=await Promise.all([
     liveDb.from('job_assignments').select('*').in('status',['assigned','started','completed']).order('assigned_at',{ascending:false}).limit(100),
     liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at,prep_items(equipment_type,purpose,unit_tag)').order('created_at',{ascending:false}).limit(100),
@@ -5111,49 +5114,100 @@ async function ownerAIAssistantAnswer(raw) {
   if(jobResult.error) throw jobResult.error;
   const jobs=jobResult.data||[], preps=prepResult.data||[], solarRows=solarResult.data||[];
   const prepMap=new Map(preps.map(p=>[p.id,p])), solarMap=new Map(solarRows.map(s=>[s.prep_ticket_id,s]));
+  const unitHint=parsed.unit_hint||ownerAIUnitReference(raw);
   const equipmentNames=[...(parsed.manifest||[]).map(r=>r.label),...(parsed.mentionedWithoutQty||[])].filter(v=>OWNER_DEVICE_TYPES.includes(v)||OWNER_STAND_TYPES.includes(v));
-  let matches=[...jobs];
-  if(parsed.ticket_no)matches=matches.filter(a=>String(a.ticket_no||'')===String(parsed.ticket_no));
-  if(parsed.scheduled_for)matches=matches.filter(a=>String(a.scheduled_for||'')===String(parsed.scheduled_for));
-  if(parsed.work_type)matches=matches.filter(a=>String(a.work_type||'').toLowerCase()===String(parsed.work_type).toLowerCase());
-  if(equipmentNames.length)matches=matches.filter(a=>{
+  if(unitHint?.type && !equipmentNames.some(v=>String(v).toLowerCase()===String(unitHint.type).toLowerCase())) equipmentNames.push(unitHint.type);
+
+  let baseMatches=[...jobs];
+  if(parsed.ticket_no)baseMatches=baseMatches.filter(a=>String(a.ticket_no||'')===String(parsed.ticket_no));
+  if(parsed.work_type)baseMatches=baseMatches.filter(a=>ownerAIEffectiveWorkType(a,prepMap.get(a.prep_ticket_id))===String(parsed.work_type).toLowerCase());
+  if(equipmentNames.length)baseMatches=baseMatches.filter(a=>{
     const prep=prepMap.get(a.prep_ticket_id), rows=normalizedEquipmentManifest((a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[]);
     return equipmentNames.some(name=>rows.some(r=>String(r.label).toLowerCase()===String(name).toLowerCase()));
   });
+  if(unitHint)baseMatches=baseMatches.filter(a=>ownerAIUnitMatches(a,prepMap.get(a.prep_ticket_id),unitHint));
+
+  if(intent==='schedule'){
+    const active=baseMatches.filter(a=>a.status!=='completed');
+    const grouped=new Map();
+    active.forEach(a=>{const key=String(a.prep_ticket_id||a.ticket_no||a.id);if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(a);});
+    if(!parsed.scheduled_for && !parsed.scheduled_time){
+      box.innerHTML="<div class='wl-ai-warn'><b>I found the job, but I need the new date or time.</b><br>For example: “Set Helios 007 for Monday at 8 AM.”</div>";
+      return;
+    }
+    if(grouped.size===1){
+      const rows=[...grouped.values()][0], target=rows[0], prep=prepMap.get(target.prep_ticket_id), solar=prep?solarMap.get(prep.id):null;
+      const update={updated_at:new Date().toISOString()};
+      if(parsed.scheduled_for) update.scheduled_for=parsed.scheduled_for;
+      if(parsed.scheduled_time) update.scheduled_time=parsed.scheduled_time;
+      let q=liveDb.from('job_assignments').update(update);
+      q=target.prep_ticket_id ? q.eq('prep_ticket_id',target.prep_ticket_id) : q.eq('id',target.id);
+      const {error}=await q;
+      if(error) throw error;
+      rows.forEach(r=>{if(parsed.scheduled_for)r.scheduled_for=parsed.scheduled_for;if(parsed.scheduled_time)r.scheduled_time=parsed.scheduled_time;});
+      const unitText=unitHint?.type ? unitHint.type+' '+unitHint.tag : equipmentManifestText((target.equipment_manifest?.length?target.equipment_manifest:prep?.equipment_manifest)||[]);
+      const effective=ownerAIEffectiveWorkType(target,prep).toUpperCase();
+      box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Schedule Updated</b></span></div><span class='wl-ai-state ready'>SAVED</span></div>"
+        +"<div class='wl-ai-good'><b>✓ Updated MHelpDesk #"+esc(target.ticket_no||'—')+" in Tech Check</b><br>"+esc(unitText||'Equipment')+" · "+esc(effective)+"<br><b>"+esc(ownerAIScheduleText(target.scheduled_for,target.scheduled_time))+"</b></div>"
+        +"<div class='wl-ai-job-status'>"+rows.map(r=>"<div><b>"+esc(String(r.assigned_role||'').toUpperCase())+":</b> "+esc(r.assignee_name||((r.assignment_scope==='department')?'Department queue':'Unassigned'))+" · "+esc(ownerAssignmentProgress(r,prep,solar).label)+"</div>").join('')+"</div>"
+        +"<div class='wl-ai-next'><b>Next:</b> "+esc(ownerAIAssistantNextStep(rows.find(r=>r.status!=='completed')||target,prep,solar))+"</div>"
+        +"<div class='wl-ai-advisory'>The date/time was saved to Tech Check. MHelpDesk itself is still a separate system.</div>";
+      ownerAIAssistantLastJobs=rows;
+      return;
+    }
+    if(grouped.size>1){
+      const choices=[...grouped.values()].slice(0,6).map(rows=>{
+        const a=rows[0],prep=prepMap.get(a.prep_ticket_id);
+        return "<div class='wl-ai-job-answer'><b>#"+esc(a.ticket_no||'—')+" · "+esc(a.site||prep?.site||'No site')+"</b><div class='small'>"+esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))+" · "+esc(equipmentManifestText((a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[]))+"</div></div>";
+      }).join('');
+      box.innerHTML="<div class='wl-ai-warn'><b>I found more than one active match, so I did not change anything.</b><br>Tell me the MHelpDesk ticket number and I can update the correct one.</div>"+choices;
+      return;
+    }
+  }
+
+  let matches=[...baseMatches], scheduleMismatch=false;
+  if(parsed.scheduled_for){
+    const dated=matches.filter(a=>String(a.scheduled_for||'')===String(parsed.scheduled_for));
+    if(dated.length) matches=dated;
+    else if(matches.length && (unitHint||parsed.ticket_no)){scheduleMismatch=true;}
+    else matches=dated;
+  }
   const wantsAttention=/\b(attention|problem|problems|issue|issues|stuck|overdue|needs? me|needs? review)\b/i.test(raw);
   if(wantsAttention)matches=matches.filter(a=>{
     const prep=prepMap.get(a.prep_ticket_id), solar=prep?solarMap.get(prep.id):null;
     return ownerLiveAIStatus(a,prep,solar).state==='attention';
   });
-  const hasSelector=Boolean(parsed.ticket_no||parsed.scheduled_for||parsed.work_type||equipmentNames.length||wantsAttention);
+  const hasSelector=Boolean(parsed.ticket_no||parsed.scheduled_for||parsed.work_type||equipmentNames.length||unitHint||wantsAttention);
   if(!hasSelector && ownerAIAssistantLastJobs.length && /\b(it|that|this|those|next|who|status|where)\b/i.test(raw)){
     const ids=new Set(ownerAIAssistantLastJobs.map(a=>String(a.id)));
     matches=jobs.filter(a=>ids.has(String(a.id)));
   }
   if(!matches.length){
-    const what=[parsed.work_type,parsed.scheduled_for,equipmentNames.join(' ')].filter(Boolean).join(' ');
+    const what=[parsed.work_type,unitHint?(unitHint.type+' '+unitHint.tag):'',parsed.scheduled_for,equipmentNames.join(' ')].filter(Boolean).join(' ');
     box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>No matching Tech Check job found</b></span></div><span class='wl-ai-state pending'>NO MATCH</span></div>"
-      +"<div class='wl-ai-answer'><p>I do not see a current Tech Check record matching <b>"+esc(what||raw)+"</b>.</p><div class='wl-ai-next'><b>If this is a new MHelpDesk job:</b> say “Create a new ticket…” and give me the MHelpDesk number, site, date, equipment, and quantity. I will prepare the form for you instead of making you type it all below.</div><div class='wl-ai-advisory'>MHelpDesk is separate, so OnSite Vision can only look up what has already been entered into Tech Check.</div></div>";
+      +"<div class='wl-ai-answer'><p>I do not see a current Tech Check record matching <b>"+esc(what||raw)+"</b>.</p><div class='wl-ai-next'><b>If this is a new MHelpDesk job:</b> say “Create a new ticket…” and give me the MHelpDesk number, site, date, equipment, and quantity. I will prepare the form for you.</div><div class='wl-ai-advisory'>MHelpDesk is separate, so OnSite Vision can only look up what has already been entered into Tech Check.</div></div>";
     ownerAIAssistantLastJobs=[];
     return;
   }
   ownerAIAssistantLastJobs=matches.slice(0,12);
   const groups=new Map();
-  matches.forEach(a=>{const key=String(a.ticket_no||a.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(a);});
+  matches.forEach(a=>{const key=String(a.prep_ticket_id||a.ticket_no||a.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(a);});
   const cards=[...groups.values()].slice(0,8).map(rows=>{
     const a=rows[0], prep=rows.map(r=>prepMap.get(r.prep_ticket_id)).find(Boolean)||null, solar=prep?solarMap.get(prep.id):null;
     const manifest=(a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[];
+    const unitRows=(prep?.prep_items||[]).filter(x=>x.unit_tag).map(x=>String(x.equipment_type||'Unit')+' '+String(x.unit_tag)).join(', ');
     const statuses=rows.map(r=>{const p=ownerAssignmentProgress(r,prep,solar);return "<div><b>"+esc(String(r.assigned_role||'').toUpperCase())+":</b> "+esc(r.assignee_name||((r.assignment_scope==='department')?'Department queue':'Unassigned'))+" · "+esc(p.label)+"</div>";}).join('');
     const active=rows.filter(r=>r.status!=='completed');
     const target=active.find(r=>ownerLiveAIStatus(r,prep,solar).state==='attention')||active.find(r=>r.assigned_role==='it')||active[0]||rows[0];
-    const ai=ownerLiveAIStatus(target,prep,solar);
-    return "<div class='wl-ai-job-answer "+(ai.state==='attention'?'attention':'')+"'><div class='wl-ai-job-answer-head'><b>#"+esc(a.ticket_no||'—')+" · "+esc(a.site||prep?.site||'No site')+"</b><span>"+esc(String(a.work_type||prep?.work_type||'service').toUpperCase())+"</span></div>"
-      +"<div class='wl-ai-job-meta'><span>"+esc(a.scheduled_for||'No work date')+"</span><span>"+esc(equipmentManifestText(manifest)||'No equipment listed')+"</span></div>"
+    const ai=ownerLiveAIStatus(target,prep,solar), effective=ownerAIEffectiveWorkType(a,prep).toUpperCase();
+    return "<div class='wl-ai-job-answer "+(ai.state==='attention'?'attention':'')+"'><div class='wl-ai-job-answer-head'><b>#"+esc(a.ticket_no||'—')+" · "+esc(a.site||prep?.site||'No site')+"</b><span>"+esc(effective)+"</span></div>"
+      +"<div class='wl-ai-job-meta'><span>"+esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))+"</span><span>"+esc(unitRows||equipmentManifestText(manifest)||'No equipment listed')+"</span></div>"
       +"<div class='wl-ai-job-status'>"+statuses+"</div>"
       +"<div class='wl-ai-next'><b>Next:</b> "+esc(ownerAIAssistantNextStep(target,prep,solar))+"</div></div>";
   }).join('');
   box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>"+(wantsAttention?'Needs Attention':'Tech Check Answer')+"</b></span></div><span class='wl-ai-state ready'>"+groups.size+" FOUND</span></div>"
-    +"<div class='wl-ai-answer-intro'>I found the matching Tech Check record"+(groups.size===1?'':'s')+". Here is what is happening and what should happen next.</div>"+cards;
+    +(scheduleMismatch?"<div class='wl-ai-warn'><b>I found the exact equipment/ticket, but its saved date does not match the date you mentioned.</b><br>I am showing the likely match instead of pretending there is no ticket.</div>":"")
+    +"<div class='wl-ai-answer-intro'>I found the matching Tech Check record"+(groups.size===1?'':'s')+". Here is the schedule, current status, and what should happen next.</div>"+cards;
 }
 async function ownerAIDispatchBuild() {
   const input=document.getElementById('ownerAIDispatchPrompt');
