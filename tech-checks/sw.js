@@ -1,5 +1,6 @@
-const CACHE_NAME = 'tech-check-field-shell-v61';
+const CACHE_NAME = 'tech-check-field-shell-v62';
 const APP_SHELL = './';
+const VISION_SHELL = './onsite-vision.html';
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -7,10 +8,13 @@ self.addEventListener('install', event => {
     // Shell first so install is resilient; performance assets are best-effort.
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
-      cache.add(new Request('./app.js?v=startup-fast-v29', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v115', { cache:'reload' })),
+      cache.add(new Request(VISION_SHELL, { cache:'reload' })),
+      cache.add(new Request('./app.js?v=startup-fast-v30', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v116', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
-      cache.add(new Request('./styles.css?v=onsite-chat-v115', { cache:'reload' }))
+      cache.add(new Request('./styles.css?v=onsite-chat-v116', { cache:'reload' })),
+      cache.add(new Request('./onsite-vision.css?v=vision-workspace-v2', { cache:'reload' })),
+      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v2', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
@@ -31,18 +35,20 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      const cachedShell = await caches.match(APP_SHELL, { ignoreSearch: true });
+      const isVision = url.pathname.endsWith('/onsite-vision.html');
+      const shellKey = isVision ? VISION_SHELL : APP_SHELL;
+      const cachedShell = await caches.match(shellKey, { ignoreSearch: true });
       try {
         const freshRequest = new Request(request, { cache:'reload' });
         const response = await fetch(freshRequest);
         if (response?.ok) {
           const cache=await caches.open(CACHE_NAME);
-          cache.put(APP_SHELL,response.clone()).catch(() => {});
+          cache.put(shellKey,response.clone()).catch(() => {});
           return response;
         }
       } catch {}
       if (cachedShell) return cachedShell;
-      return fetch(APP_SHELL, { cache:'reload' });
+      return fetch(shellKey, { cache:'reload' });
     })());
     return;
   }
