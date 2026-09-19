@@ -166,3 +166,23 @@ Safety characteristics:
 - Derives `summary.effective_work_type` from actual prep-item purpose first, preventing older `job_assignments.work_type` values from overriding a DELIVERY or SWAP prep workflow.
 
 Production migration count after Phase 2: **74**.
+
+
+## Phase 3 server AI agent
+
+Supabase Edge Function `onsite-vision-agent` was added as the protected natural-language reasoning layer.
+
+Security and behavior:
+
+- Edge Function JWT verification is enabled.
+- The function re-validates the caller as an active Owner/Admin.
+- The agent uses a user-scoped Supabase client so existing RLS remains active for read tools.
+- The model has no SQL tool and no production write tool.
+- Approved tools are limited to live job context, workflow analysis, unit lookup, active/date job lists, technician lookup, and Cameras On Site company knowledge.
+- Write requests are returned as structured `proposed_action` objects and must pass through the existing Tech Check confirmation/write paths.
+- The default model is `gpt-5.6-sol` when the `OPENAI_API_KEY` Edge Function secret is configured.
+- `ONSITE_VISION_MODEL` can override the default model.
+- If the model credential is absent or the agent is unavailable, the browser falls back to the deterministic Vision implementation.
+- The client shows **AI LIVE** only when the authenticated agent status endpoint confirms model configuration; otherwise it shows **DATA LIVE**.
+
+This phase does not add autonomous writes.
