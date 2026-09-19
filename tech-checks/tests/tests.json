@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v118",
-  "service_worker": "v70",
-  "generated_for": "OnSite Vision company knowledge/workflow engine foundation",
+  "service_worker": "v71",
+  "generated_for": "OnSite Vision company knowledge + live job context foundation",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -1183,7 +1183,69 @@
         "Baseline records production migration count and critical server-side safeguards",
         "No database gate was removed or weakened by the knowledge-engine foundation"
       ]
+    },
+    {
+      "id": "VISION-LIVE-01",
+      "area": "OnSite Vision Live Context",
+      "role": "owner",
+      "mode": "db+source",
+      "destructive": false,
+      "scenario": "Authoritative job context resolves effective workflow from prep-item purpose",
+      "steps": [
+        "Call get_tech_check_job_context_v1 for MHelpDesk #22712",
+        "Compare raw job assignment work_type with prep item purpose",
+        "Inspect summary.effective_work_type"
+      ],
+      "expected": [
+        "Context reports found=true",
+        "Raw historical assignment may still say service",
+        "Prep item purpose DELIVERY is preserved",
+        "summary.effective_work_type resolves to delivery"
+      ]
+    },
+    {
+      "id": "VISION-LIVE-02",
+      "area": "OnSite Vision Live Context",
+      "role": "owner",
+      "mode": "db+source",
+      "destructive": false,
+      "scenario": "Live context RPC preserves RLS and cannot be called anonymously",
+      "steps": [
+        "Inspect pg_proc security mode and grants for get_tech_check_job_context_v1",
+        "Confirm SECURITY INVOKER",
+        "Confirm authenticated execute and anon denial"
+      ],
+      "expected": [
+        "security_definer=false",
+        "authenticated has EXECUTE",
+        "anon does not have EXECUTE",
+        "RPC contains no mutation statements"
+      ]
+    },
+    {
+      "id": "VISION-LIVE-03",
+      "area": "OnSite Vision Live Context",
+      "role": "owner",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Vision uses live context for assignment, blockers, next step, equipment, evidence and Service Order panel",
+      "steps": [
+        "Open OnSite Vision on an existing ticket",
+        "Ask who has it",
+        "Ask what is holding it up",
+        "Ask what happens next",
+        "Ask what equipment is on it",
+        "Open the Service Order drawer"
+      ],
+      "expected": [
+        "Answers are based on get_tech_check_job_context_v1",
+        "Effective workflow label uses live context",
+        "Workflow Engine computes blockers and next step",
+        "Service Order panel refreshes from live context",
+        "Write actions still require the existing confirmation/action paths"
+      ],
+      "manual_device": true
     }
   ],
-  "last_release_qa_note": "Phase 1 foundation: source-controlled live Supabase baseline, Company Knowledge Layer v1, Workflow Engine v1, Vision guided drafts now consume the shared engine with fallback, and SW v70 precaches the new modules. No production database gate was removed."
+  "last_release_qa_note": "Phase 2: live read-only get_tech_check_job_context_v1 RPC, Live Data Layer v1, Workflow Engine v2, Vision v11, SW v71. Existing write confirmations and database gates remain unchanged."
 }
