@@ -601,9 +601,10 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
   // After the fast initial owner snapshot is interactive, quietly expand the
   // recent history once. This keeps launch fast without losing normal history.
   if (initial && state.profile.role === 'owner') {
-    scheduleIdle(() => {
-      if (state.session && !document.hidden) refreshData({ skipProfile:true, initial:false });
-    }, 1800);
+    setTimeout(() => {
+      if (!state.session || document.hidden) return;
+      scheduleIdle(() => refreshData({ skipProfile:true, initial:false }), 1200);
+    }, 4200);
   }
 }
 
