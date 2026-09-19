@@ -1666,6 +1666,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_tech_check_job_context_v1: {
+        Args: { p_ticket_no: string }
+        Returns: Json
+      }
       it_checkout_truck_spare_battery: {
         Args: { p_spare_id: string }
         Returns: undefined
