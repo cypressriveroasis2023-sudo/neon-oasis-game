@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v102",
-  "service_worker": "v48",
+  "runtime_version": "release-qa-v103",
+  "service_worker": "v49",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,9 +658,9 @@
         "Background and reopen"
       ],
       "expected": [
-        "v48 cached shell loads without AccessDenied",
-        "release-qa-v102 controls and Help wording appear",
-        "Truck Spares / Backups UI is not stale after refresh/background cycle"
+        "v49 cached shell loads without AccessDenied",
+        "release-qa-v103 IT spare checkout controls appear",
+        "No stale v102 spare behavior after refresh/background cycle"
       ],
       "manual_device": true
     },
@@ -835,7 +835,88 @@
         "Owner can see outstanding spare until resolution",
         "Unused spare bypasses IT Intake; used/replaced field equipment follows normal return chain"
       ]
+    },
+    {
+      "id": "IT-12",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Explicit spare-unit checkout before handoff",
+      "steps": [
+        "Complete BACKUP unit IT checks/photo/signature",
+        "Return to Ticket Summary",
+        "Tap CHECK OUT SPARE",
+        "Attempt Service handoff only after checkout"
+      ],
+      "expected": [
+        "Checkout action is unavailable until spare is fully ready",
+        "IT checkout records technician/time",
+        "BACKUP prep details are locked after checkout",
+        "Service handoff is blocked if any BACKUP lacks IT checkout"
+      ]
+    },
+    {
+      "id": "IT-13",
+      "area": "IT",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Explicit spare-battery checkout before handoff",
+      "steps": [
+        "Save spare battery quantity",
+        "Mark physically present/charged/READY",
+        "Tap CHECK OUT SPARE BATTERIES",
+        "Attempt handoff"
+      ],
+      "expected": [
+        "READY alone is not enough",
+        "IT checkout records technician/time",
+        "Checked-out battery batch becomes locked",
+        "Service handoff is blocked while any saved batch lacks IT checkout"
+      ]
+    },
+    {
+      "id": "SERVICE-13",
+      "area": "Service",
+      "role": "service",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Service sees IT checkout proof before taking spares",
+      "steps": [
+        "Open exact released Service ticket containing checked-out spares",
+        "Review IT Truck Spare Checkout section",
+        "Physically verify units/battery quantities before accepting"
+      ],
+      "expected": [
+        "Spare unit shows IT CHECKED OUT technician/time",
+        "Spare battery batch shows checked-out quantity and technician",
+        "Service close is database-blocked if an unchecked spare somehow exists"
+      ]
+    },
+    {
+      "id": "XROLE-I",
+      "area": "Cross-role",
+      "role": "all",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "IT checkout accountability chain",
+      "steps": [
+        "Owner assigns QA IT→Service job",
+        "IT prepares BACKUP spare",
+        "IT completes checks/photo/signature",
+        "IT explicitly checks out spare",
+        "IT creates Service handoff",
+        "Service verifies checkout proof and accepts",
+        "Service later marks USED or RETURN UNUSED"
+      ],
+      "expected": [
+        "Spare is reserved/assigned under IT accountability at checkout",
+        "Service cannot receive before IT checkout",
+        "On Service acceptance holder transfers to Service",
+        "End-of-day spare resolution remains unchanged"
+      ]
     }
   ],
-  "last_release_qa_note": "Truck spare workflow added: IT BACKUP units and spare batteries are ticket-linked, Service resolves USED vs RETURN UNUSED, Owner sees outstanding spares, BACKUP hardware readiness is separated from customer-specific DELIVERY setup."
+  "last_release_qa_note": "Truck-spare flow now requires explicit IT checkout after checks/photo/signature and before Service handoff. Service sees IT checkout proof; checked-out spare prep/battery batches are locked; end-of-day USED vs RETURN UNUSED flow remains."
 }
