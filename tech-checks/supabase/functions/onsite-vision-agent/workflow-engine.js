@@ -1,5 +1,5 @@
 /* Cameras On Site — OnSite Vision Workflow Engine
- * Version: workflow-engine-v1
+ * Version: workflow-engine-v4
  * Pure/read-only decision layer. It does not mutate Supabase.
  */
 (function(root){
@@ -84,6 +84,7 @@
         owner_final_verification:Boolean(def.owner_final_verification),
         swap_rules:def.swap_rules||[],
         unknowns:def.unknowns||[],
+        teaching_needed:def.teaching_needed||[],
         shared_it_checklist:def.shared_it_checklist||[],
         shared_it_check_fields:def.shared_it_check_fields||[]
       });
@@ -295,7 +296,7 @@
   }
 
   root.OnSiteVisionWorkflowEngine=Object.freeze({
-    version:'workflow-engine-v3',
+    version:'workflow-engine-v4',
     normalizeWorkType,
     normalizeEquipmentType,
     getEquipmentDefinition,
