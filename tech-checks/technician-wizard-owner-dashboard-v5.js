@@ -1719,13 +1719,11 @@ async function showSvcHome() {
       <span><b>${work.inspectionDone?1:0}</b> inspection today</span>
     </div>
     ${assignedInventoryHtml(assignedAssets)}
-    <div class='wl-service-actions'>
-      <button class='wl-service-primary wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button>
-      <div class='wl-service-action-grid'>
-        <button class='wl-service-action-card' data-wl-svc='returns'><span>My Returned Units</span><b>${returnCount}</b><small>View return / intake status</small></button>
-        <button class='wl-service-action-card' data-wl-svc='inspect'><span>Truck / Trailer</span><b>${work.inspectionDone?"✓":"—"}</b><small>${work.inspectionDone?"Inspection done today":"Complete inspection"}</small></button>
-      </div>
-      <button class='wl-service-history' data-wl-svc='history'>☰ Inspection History</button>
+    <div class='wl-menu wl-service-menu'>
+      <button class='wl-red' data-wl-service-return>↩ Return Unit to IT Intake</button>
+      <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
+      <button class='wl-amber' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>
+      <button class='wl-gray' data-wl-svc='history'>☰ Inspection History</button>
     </div>`;
   hideChildren(viewSvc(),[home]); resetWizardPosition();
 }
