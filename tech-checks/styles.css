@@ -2873,3 +2873,216 @@ select {
   min-width:0!important;
   padding:0!important;
 }
+
+
+/* Service Tech board match IT v72 */
+#view-service #wlSvcHome{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+  padding:0;
+}
+#view-service #wlSvcHome .wl-title{
+  margin-top:4px;
+  color:#111827;
+  font-size:27px;
+  font-weight:850;
+  line-height:1.05;
+  letter-spacing:-.035em;
+}
+#view-service #wlSvcHome .wl-sub{
+  margin-top:6px;
+  color:#667085;
+  font-size:13px;
+  line-height:1.35;
+  font-weight:500;
+}
+#view-service .wl-service-mode-pills{
+  margin-top:0!important;
+}
+#view-service .wl-service-mode-pills .wl-mode-card.on{
+  border-color:#d20b12!important;
+}
+#view-service .wl-service-next{
+  margin-top:14px;
+  margin-bottom:12px;
+  border-width:1px;
+  border-left:4px solid #d20b12;
+  border-radius:13px;
+  box-shadow:none;
+}
+#view-service .wl-service-next.clear{
+  border-left-color:#8a99a8;
+}
+#view-service .wl-service-next b{
+  font-size:17px;
+  line-height:1.2;
+  font-weight:800;
+}
+#view-service .wl-service-next .small{
+  margin-top:4px;
+  color:#657483;
+  font-size:11px;
+  line-height:1.35;
+}
+#view-service .wl-service-ticket-search-compact{
+  margin:0 0 12px;
+  padding:11px;
+  border:1px solid #d4dee7;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 2px 8px rgba(18,43,65,.04);
+}
+#view-service .wl-service-ticket-search-compact label{
+  display:block;
+  margin-bottom:5px;
+  color:#17283b;
+  font-size:12px;
+  font-weight:750;
+}
+#view-service .wl-service-ticket-search-compact .wl-ticket-search-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 112px!important;
+  gap:7px;
+  align-items:stretch;
+}
+#view-service .wl-service-ticket-search-compact input,
+#view-service .wl-service-ticket-search-compact button{
+  box-sizing:border-box;
+  min-width:0;
+  min-height:44px;
+  height:44px;
+  margin:0;
+  border-radius:9px;
+}
+#view-service .wl-service-ticket-search-compact input{
+  padding:8px 10px;
+  border:1px solid #cbd5df;
+  font-size:15px;
+}
+#view-service .wl-service-ticket-search-compact button{
+  padding:8px 9px;
+  border:1px solid #d20b12;
+  background:#d20b12;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+#view-service .wl-service-ticket-search-compact #wlServiceJobSearchMsg{
+  margin-top:6px;
+  color:#738190;
+  font-size:10px;
+  line-height:1.3;
+}
+#view-service .wl-service-workstrip{
+  margin:0 0 12px;
+}
+#view-service .wl-service-workstrip span{
+  min-width:0;
+  padding:8px;
+  text-align:left;
+}
+#view-service .wl-service-workstrip b{
+  font-size:18px;
+  font-weight:800;
+}
+#view-service .wl-service-actions{
+  display:grid;
+  gap:10px;
+  margin-top:12px;
+}
+#view-service .wl-service-primary{
+  width:100%;
+  min-height:58px;
+  margin:0;
+  border:1px solid #d20b12;
+  border-radius:13px;
+  background:#d20b12;
+  color:#fff;
+  font-size:16px;
+  font-weight:850;
+  box-shadow:0 4px 10px rgba(210,11,18,.10);
+}
+#view-service .wl-service-action-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:9px;
+}
+#view-service .wl-service-action-card{
+  position:relative;
+  min-height:92px;
+  padding:12px;
+  border:1px solid #d6e0e8;
+  border-radius:14px;
+  background:#fff;
+  color:#17283b;
+  text-align:left;
+  box-shadow:0 3px 10px rgba(18,43,65,.05);
+}
+#view-service .wl-service-action-card span{
+  display:block;
+  padding-right:32px;
+  font-size:13px;
+  line-height:1.15;
+  font-weight:800;
+}
+#view-service .wl-service-action-card b{
+  position:absolute;
+  top:10px;
+  right:10px;
+  display:grid;
+  place-items:center;
+  min-width:27px;
+  height:27px;
+  padding:0 6px;
+  border-radius:999px;
+  background:#eef2f5;
+  color:#17283b;
+  font-size:12px;
+  font-weight:850;
+}
+#view-service .wl-service-action-card small{
+  display:block;
+  margin-top:8px;
+  color:#738190;
+  font-size:10px;
+  line-height:1.25;
+  font-weight:600;
+}
+#view-service .wl-service-history{
+  width:100%;
+  min-height:52px;
+  margin:0;
+  padding:10px 13px;
+  border:1px solid #d6e0e8;
+  border-radius:13px;
+  background:#fff;
+  color:#17283b;
+  text-align:left;
+  font-size:14px;
+  font-weight:800;
+}
+#view-service .wl-service-ticket-preview{
+  border-width:1px!important;
+  border-color:#9ddcb1!important;
+  border-radius:12px!important;
+  box-shadow:none!important;
+}
+@media(max-width:680px){
+  #view-service #wlSvcHome{margin-top:0!important}
+  #view-service .wl-service-mode-pills{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px!important;
+    margin-bottom:18px!important;
+  }
+  #view-service .wl-service-mode-pills .wl-mode-card{
+    min-height:86px!important;
+  }
+  #view-service .wl-service-ticket-search-compact .wl-ticket-search-row{
+    grid-template-columns:minmax(0,1fr) 108px!important;
+  }
+  #view-service .wl-service-workstrip{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
