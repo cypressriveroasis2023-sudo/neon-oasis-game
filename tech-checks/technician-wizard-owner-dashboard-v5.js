@@ -618,7 +618,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
     { kicker:'FIELD WORK', title:'Delivery, service, pickup, or swap', body:`<p>Use the current MHelpDesk ticket for the task you are doing today. A later visit gets a new ticket number even if the same unit is involved.</p><p>For a swap or pickup, the unit number lets Tech Check remember that equipment across old closed tickets and the new current ticket.</p>` },
     { kicker:'TRUCK SPARES', title:'Resolve every truck backup after the call', body:`<p>IT may hand you a <b>BACKUP / truck spare</b> unit or extra batteries for the current MHelpDesk job. These are contingency items in case a field unit or battery is bad.</p><p>If a spare unit was <b>not used</b>, choose <b>RETURN UNUSED TO SHOP</b>; it does not need IT Intake. If it was used for a swap, mark it <b>USED FOR SWAP</b> and return the failed/replaced field unit through normal IT Intake. For spare batteries, enter the quantity used and Tech Check returns the remainder unused.</p>` },
-    { kicker:'RETURN TO IT', title:'Send returning equipment back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
+    { kicker:'RETURN TO IT', title:'Send returning equipment back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>For Helios and other solar equipment, Tech Check performs an AI-assisted OCR scan of the tag photo and compares it to the expected unit tag. A clear mismatch requires a new photo; an unreadable scan falls back to technician visual confirmation.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
     { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY IT HANDOFF + SPARES</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RESOLVE TRUCK SPARES</b><span>→</span><b>RETURN FAILED / FIELD UNITS TO IT</b></div><p>Unused truck spares return directly to Shop Inventory. Equipment that was actually in the field and comes back follows IT Intake.</p>` },
   ];
@@ -916,7 +916,8 @@ function helpStepGuide(role, step){
         'Tap Return Unit to IT Intake.',
         'Enter the current MHelpDesk reference and exact unit tag.',
         'Record the unit condition and return notes.',
-        'Take / upload the required return photos.',
+        'Take / upload the required return photos. For Helios and other solar equipment, Tech Check scans the tag photo against the unit number you selected.',
+        'A different tag blocks the return until the photo is corrected; an unreadable scan requires visual confirmation.',
         'Submit the return so IT can receive it through Intake.'
       ],
       selector:"[data-wl-service-return]"
@@ -973,7 +974,8 @@ function helpStepGuide(role, step){
         'Read the requested equipment and parts before pulling anything from the shelf.',
         'Pull the actual unit and enter its permanent unit tag.',
         'Complete each required equipment-specific question in order.',
-        'Take the required photo and confirm the visible tag matches.',
+        'Take the required photo. For Helios and other solar equipment, the AI-assisted tag scan compares the visible tag to the expected unit tag.',
+        'A clear AI mismatch requires a new photo. If the scan cannot read the tag, visually verify it yourself.',
         'Sign the unit check and review readiness before handoff.'
       ],
       selector:"[data-wl-it='new']"
@@ -3457,7 +3459,16 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-service-return]')) return showServiceReturn();
   if (e.target.closest('[data-wl-return-next]')) return serviceReturnNext();
   const returnUnit = e.target.closest('[data-wl-return-unit]');
-  if (returnUnit) { serviceReturn.unit = returnUnit.dataset.wlReturnUnit || ''; if (returnUnit.dataset.wlReturnType) serviceReturn.type = returnUnit.dataset.wlReturnType; if (serviceReturn.step === 1) serviceReturn.step = 2; saveServiceReturnDraft(); return renderServiceReturn(); }
+  if (returnUnit) {
+    const nextUnit=returnUnit.dataset.wlReturnUnit || '';
+    const nextType=returnUnit.dataset.wlReturnType || serviceReturn.type;
+    if (norm(nextUnit)!==norm(serviceReturn.unit) || nextType!==serviceReturn.type) { serviceReturn.photo=null; serviceReturn.tagScan=null; }
+    serviceReturn.unit=nextUnit;
+    serviceReturn.type=nextType;
+    if (serviceReturn.step === 1) serviceReturn.step = 2;
+    saveServiceReturnDraft();
+    return renderServiceReturn();
+  }
   if (e.target.closest('[data-wl-return-prev]')) { serviceReturn.step = Math.max(0, serviceReturn.step - 1); saveServiceReturnDraft(); return renderServiceReturn(); }
   if (e.target.closest('[data-wl-return-submit]')) return submitServiceReturn();
   if (e.target.id === 'wlReturnPhoto') return;
@@ -5165,8 +5176,8 @@ document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
 });
 
-document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
-document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 let ownerRefreshTimer=null;
