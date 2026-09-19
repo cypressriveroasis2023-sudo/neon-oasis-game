@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v103",
-  "service_worker": "v49",
+  "runtime_version": "release-qa-v104",
+  "service_worker": "v50",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -658,9 +658,9 @@
         "Background and reopen"
       ],
       "expected": [
-        "v49 cached shell loads without AccessDenied",
-        "release-qa-v103 IT spare checkout controls appear",
-        "No stale v102 spare behavior after refresh/background cycle"
+        "v50 cached shell loads without AccessDenied",
+        "release-qa-v104 loads core UI before the large workflow module",
+        "No stale v103 workflow after refresh/background cycle"
       ],
       "manual_device": true
     },
@@ -916,7 +916,79 @@
         "On Service acceptance holder transfers to Service",
         "End-of-day spare resolution remains unchanged"
       ]
+    },
+    {
+      "id": "STARTUP-03",
+      "area": "Startup",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Heavy workflow module is lazy-loaded after first paint",
+      "steps": [
+        "Inspect index startup scripts",
+        "Inspect app deferred loader"
+      ],
+      "expected": [
+        "Index loads app.js but not technician-wizard-owner-dashboard-v5.js directly",
+        "Workflow module is dynamically imported after signed-in shell paint",
+        "Owner email settings load only for Owner and after workflow startup"
+      ]
+    },
+    {
+      "id": "STARTUP-04",
+      "area": "Startup",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Single Supabase client across core and workflow",
+      "steps": [
+        "Inspect app.js client initialization",
+        "Inspect workflow module client initialization"
+      ],
+      "expected": [
+        "Core creates one Supabase client",
+        "Workflow reuses window.TechCheckDB",
+        "No second client is created on normal startup"
+      ]
+    },
+    {
+      "id": "STARTUP-05",
+      "area": "Startup",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Initial data hydration is bounded and non-overlapping",
+      "steps": [
+        "Inspect enterApp startup scheduling",
+        "Inspect refreshData guard and prep snapshot",
+        "Inspect Owner initial query limits"
+      ],
+      "expected": [
+        "Initial refresh skips redundant profile fetch",
+        "Concurrent refreshes are coalesced",
+        "Active preps always load",
+        "Closed prep history is bounded",
+        "Owner reports/registry/history are bounded during initial hydration"
+      ]
+    },
+    {
+      "id": "PWA-02",
+      "area": "PWA",
+      "role": "all",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Repeat launches use pre-cached performance assets",
+      "steps": [
+        "Inspect service worker install",
+        "Inspect cache version and precache requests"
+      ],
+      "expected": [
+        "v50 caches shell",
+        "Core app module is pre-cached",
+        "Deferred workflow module is pre-cached",
+        "Owner email settings and styles are best-effort pre-cached"
+      ]
     }
   ],
-  "last_release_qa_note": "Truck-spare flow now requires explicit IT checkout after checks/photo/signature and before Service handoff. Service sees IT checkout proof; checked-out spare prep/battery batches are locked; end-of-day USED vs RETURN UNUSED flow remains."
+  "last_release_qa_note": "Startup performance release: heavy workflow module lazy-loads after first paint, workflow reuses the core Supabase client, initial data hydration is bounded/coalesced, and SW v50 pre-caches deferred assets."
 }
