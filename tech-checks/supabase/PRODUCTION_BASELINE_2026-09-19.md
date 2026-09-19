@@ -524,3 +524,12 @@ Regression checks passed for JavaScript syntax, browser/server bundle parity, de
 - New Chat clears and blurs the prompt so it does not force the keyboard open.
 - Release identifiers: Vision `vision-workspace-v18`, service worker `tech-check-field-shell-v82`.
 - Regression QA count: 102.
+
+
+## Vision mobile Service Order correction (2026-09-19)
+
+- On iPhone, Service Order now opens as a centered modal sheet with margins and a dimmed backdrop instead of a desktop-style right drawer.
+- Closing the Service Order returns to the same Vision conversation.
+- Focusing the Vision prompt automatically closes the Service Order so the user can immediately ask another question.
+- Release identifiers: Vision `vision-workspace-v19`, service worker `tech-check-field-shell-v83`.
+- Regression QA count: 103.
