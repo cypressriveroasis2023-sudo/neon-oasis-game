@@ -1402,6 +1402,10 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'delivery_camera_app_ok', label: `Is ${identity} visible in the camera app?` });
 
     if (item.equipment_type === 'Helios') {
+      steps.push({ kind: 'bool', field: 'helios_camera1_ports_ok', label: `Is Camera 1 on ${identity} configured, with ports 81 / 554 / 1400 open in both Camera 1 and the router?` });
+      steps.push({ kind: 'bool', field: 'helios_camera2_ports_ok', label: `Is Camera 2 on ${identity} configured, with ports 81 / 554 / 1500 open in both Camera 2 and the router?` });
+      steps.push({ kind: 'bool', field: 'helios_ptz_ports_ok', label: `Is the PTZ on ${identity} configured, with ports 81 / 554 / 1600 open in both the PTZ and the router?` });
+      steps.push({ kind: 'bool', field: 'helios_speaker_ports_ok', label: `Is the IP Speaker on ${identity} configured, with ports 81 / 554 / 1700 open in both the speaker and the router?` });
       steps.push({ kind: 'bool', field: 'solar_panels_match_ok', label: `Does ${identity} have all 3 required 1TB SD cards installed?` });
       steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Before formatting the SD cards, did you verify ${identity} is recording footage correctly?` });
     } else {
@@ -1412,17 +1416,16 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
     if (item.equipment_type !== 'Helios') steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
 
-    // General readiness checks come before the two final deployment checks.
-    steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
-    steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
-
-    // Keep these as the final two checks by request.
     if (item.equipment_type === 'Helios') {
       steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `After confirming recording, are all 3 of the 1TB SD cards in ${identity} formatted and ready?` });
     } else {
       steps.push({ kind: 'bool', field: 'delivery_sd_formatted_ok', label: `Is the SD card / NVR storage for ${identity} formatted and ready?` });
     }
     steps.push({ kind: 'bool', field: 'delivery_customer_email_app_ok', label: `Was ${identity} added under the customer email account in the camera app?` });
+
+    // Keep these as the final two IT checks before photo, signature, and review.
+    steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
+    steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
     return steps;
   }
 
@@ -1437,7 +1440,7 @@ function itUnitReady(item) {
   if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
   if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
   if (item.purpose !== 'DELIVERY') return true;
-  if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok)) return false;
+  if (item.equipment_type === 'Helios' && !(item.solar_mppt_tested_ok && item.solar_mppt_updated_ok && item.delivery_batteries_charged_ok && item.solar_pv_charging_ok && item.solar_panels_match_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok && item.helios_ptz_ports_ok && item.helios_speaker_ports_ok)) return false;
   const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
   return Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_customer_email_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady && item.delivery_monitoring_ok && (item.equipment_type === 'Helios' || item.delivery_ticket_count_ok));
 }
@@ -1454,6 +1457,20 @@ async function configureCurrentItItem() {
     : await liveDb.rpc('add_it_prep_item', { p_prep_id: activeItPrep.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_recon_battery_count: required });
   if (result.error) { alert(result.error.message); return false; }
   activeItPrep = await getPrep(activeItPrep.id);
+  if (itTypeChoice === 'Helios' && itPurposeChoice === 'DELIVERY') {
+    const configured = currentItItem();
+    if (configured) {
+      const { error: portResetError } = await liveDb.rpc('save_it_helios_port_checks', {
+        p_item_id: configured.id,
+        p_camera1_ports_ok: false,
+        p_camera2_ports_ok: false,
+        p_ptz_ports_ok: false,
+        p_speaker_ports_ok: false,
+      });
+      if (portResetError) { alert(portResetError.message); return false; }
+      activeItPrep = await getPrep(activeItPrep.id);
+    }
+  }
   return true;
 }
 async function persistCurrentItItem() {
@@ -1480,6 +1497,16 @@ async function persistCurrentItItem() {
     p_ticket_item_match_ok: Boolean(item.ticket_item_match_ok),
   });
   if (error) { alert(error.message); return false; }
+  if (item.equipment_type === 'Helios' && item.purpose === 'DELIVERY') {
+    const { error: heliosPortError } = await liveDb.rpc('save_it_helios_port_checks', {
+      p_item_id: item.id,
+      p_camera1_ports_ok: Boolean(item.helios_camera1_ports_ok),
+      p_camera2_ports_ok: Boolean(item.helios_camera2_ports_ok),
+      p_ptz_ports_ok: Boolean(item.helios_ptz_ports_ok),
+      p_speaker_ports_ok: Boolean(item.helios_speaker_ports_ok),
+    });
+    if (heliosPortError) { alert(heliosPortError.message); return false; }
+  }
   activeItPrep = await getPrep(activeItPrep.id);
   return true;
 }
