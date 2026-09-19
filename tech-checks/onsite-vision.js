@@ -273,96 +273,163 @@ function draftStandTotal(d){
 function draftEquipmentText(d){
   return (d.equipment_manifest||[]).map(x=>x.qty+' × '+x.label).join(', ')||'—';
 }
+
+function draftPartsParse(text){
+  const s=numberWords(String(text||'').toLowerCase());
+  const defs=[
+    {key:'solar_panel_qty',aliases:['solar panel','solar panels']},
+    {key:'battery_replacement_qty',aliases:['replacement battery','replacement batteries','battery replacement','battery replacements']},
+    {key:'camera_replacement_qty',aliases:['replacement camera','replacement cameras','camera replacement','camera replacements']},
+    {key:'sim_replacement_qty',aliases:['replacement sim','replacement sims','sim replacement','sim replacements','sim card','sim cards']},
+    {key:'micro_sd_qty',aliases:['micro sd','micro sds','micro sd card','micro sd cards']}
+  ];
+  const parts={};
+  for(const def of defs){
+    for(const alias of def.aliases){
+      const a=reEsc(alias);
+      const before=s.match(new RegExp('\\b(\\d+)\\s*(?:x|×)?\\s*'+a+'\\b','i'));
+      const after=s.match(new RegExp('\\b'+a+'\\s*(?:x|×)\\s*(\\d+)\\b','i'));
+      if(before){parts[def.key]=Number(before[1]);break;}
+      if(after){parts[def.key]=Number(after[1]);break;}
+    }
+  }
+  return parts;
+}
+function draftPartsText(d){
+  const p=d.parts||{},rows=[];
+  if(Number(p.solar_panel_qty||0)>0)rows.push(p.solar_panel_qty+' solar panel'+(Number(p.solar_panel_qty)===1?'':'s'));
+  if(Number(p.battery_replacement_qty||0)>0)rows.push(p.battery_replacement_qty+' replacement batter'+(Number(p.battery_replacement_qty)===1?'y':'ies'));
+  if(Number(p.camera_replacement_qty||0)>0)rows.push(p.camera_replacement_qty+' replacement camera'+(Number(p.camera_replacement_qty)===1?'':'s'));
+  if(Number(p.sim_replacement_qty||0)>0)rows.push(p.sim_replacement_qty+' SIM card'+(Number(p.sim_replacement_qty)===1?'':'s'));
+  if(Number(p.micro_sd_qty||0)>0)rows.push(p.micro_sd_qty+' micro SD card'+(Number(p.micro_sd_qty)===1?'':'s'));
+  return rows.join(', ')||'None';
+}
+function draftMatchedTechs(text){
+  const lower=String(text||'').toLowerCase(),hits=[];
+  for(const tech of state.techs){
+    const full=String(tech.full_name||'').trim(),user=String(tech.username||'').trim(),first=full.split(/\s+/)[0]||'';
+    if((full.length>2&&lower.includes(full.toLowerCase()))||(user.length>2&&new RegExp('\\b'+reEsc(user)+'\\b','i').test(lower))||(first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(lower)))hits.push(tech);
+  }
+  return hits;
+}
+function draftAssignmentText(d){
+  const out=[];
+  for(const role of ['it','service']){
+    const id=d.assignees?.[role],tech=id?state.techs.find(t=>t.user_id===id):null;
+    const needed=d.role===role||d.role==='it_service'||d.role==='service_it';
+    if(!needed)continue;
+    out.push((role==='it'?'IT':'Service')+': '+(tech?(tech.full_name||tech.username):'Department queue'));
+  }
+  return out.join(' · ')||'—';
+}
+function draftStepKeys(){return ['work_type','ticket_no','site','scheduled_for','scheduled_time','equipment_manifest','equipment_numbers','job_description','parts','assignment','notes'];}
+function draftChoiceHtml(key,d){
+  if(key==='work_type')return '<div class="vision-draft-choices">'+['Delivery','Pickup','Swap','Service'].map(v=>'<button type="button" data-vision-prompt="'+v+'">'+v+'</button>').join('')+'</div>';
+  if(key==='scheduled_for')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="Today">Today</button><button type="button" data-vision-prompt="Tomorrow">Tomorrow</button><button type="button" data-vision-prompt="Monday">Monday</button><button type="button" data-vision-prompt="Tuesday">Tuesday</button></div>';
+  if(key==='scheduled_time')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="8 AM">8 AM</button><button type="button" data-vision-prompt="9 AM">9 AM</button><button type="button" data-vision-prompt="No specific time">No specific time</button></div>';
+  if(key==='equipment_manifest'){
+    const noEq=d.work_type==='service'?'<button type="button" data-vision-prompt="No equipment">No equipment</button>':'';
+    return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="1 Helios">1 Helios</button><button type="button" data-vision-prompt="1 Solar Spotter">1 Solar Spotter</button><button type="button" data-vision-prompt="1 Ranger">1 Ranger</button><button type="button" data-vision-prompt="1 Sniper">1 Sniper</button>'+noEq+'</div>';
+  }
+  if(key==='equipment_numbers')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No equipment numbers yet">No numbers yet</button></div>';
+  if(key==='parts')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No additional parts">No additional parts</button></div>';
+  if(key==='assignment'){
+    const people=state.techs.filter(t=>d.role==='it_service'||d.role==='service_it'||t.role===d.role).slice(0,8);
+    return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="Use department queues">Department queues</button>'+people.map(t=>'<button type="button" data-vision-prompt="Assign '+esc(t.full_name||t.username)+'">'+esc((t.role==='it'?'IT: ':'Service: ')+(t.full_name||t.username))+'</button>').join('')+'</div>';
+  }
+  if(key==='notes')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No additional notes">No additional notes</button></div>';
+  return '';
+}
+
 function draftMissingKey(d){
   if(!d.work_type)return'work_type';
   if(!d.ticket_no)return'ticket_no';
   if(!d.site)return'site';
   if(!d.scheduled_for)return'scheduled_for';
-  if(!(d.equipment_manifest||[]).length&&(d.role==='it'||d.role==='it_service'||d.role==='service_it'))return'equipment_manifest';
+  if(!d.time_answered)return'scheduled_time';
+  const needsEquipment=d.work_type!=='service';
+  if(needsEquipment&&!(d.equipment_manifest||[]).length)return'equipment_manifest';
+  if(!needsEquipment&&!d.equipment_answered&&!(d.equipment_manifest||[]).length)return'equipment_manifest';
+  if(!d.equipment_numbers_answered)return'equipment_numbers';
   if(!d.job_description)return'job_description';
+  if(!d.parts_answered)return'parts';
+  if(!d.assignment_answered)return'assignment';
+  if(!d.notes_answered)return'notes';
   return'';
 }
 function draftQuestion(key,d){
-  if(key==='work_type')return'What kind of job is this — Delivery, Pickup, Swap, or Service?';
+  if(key==='work_type')return'What kind of work order are we creating?';
   if(key==='ticket_no')return'What is the MHelpDesk ticket number?';
-  if(key==='site')return'What customer or site is listed on that MHelpDesk ticket?';
-  if(key==='scheduled_for')return'What date should I schedule it for? You can say something like “Monday” or “tomorrow.”';
-  if(key==='equipment_manifest')return'What equipment is going out, and how many? For example: “1 Helios” or “2 Solar Spotters.”';
-  if(key==='job_description')return'What should the job description say?';
+  if(key==='site')return'What customer or site is listed on the MHelpDesk ticket?';
+  if(key==='scheduled_for')return'What date should this work be scheduled for?';
+  if(key==='scheduled_time')return'What time should it be scheduled for? If there is no exact time, choose “No specific time.”';
+  if(key==='equipment_manifest')return d.work_type==='service'?'Does this Service job need any equipment from the shop?':'What equipment is required, and how many?';
+  if(key==='equipment_numbers')return'Do you have the specific unit / stand numbers from MHelpDesk? Type them, or choose “No numbers yet.”';
+  if(key==='job_description')return'What should the technician actually do on this work order?';
+  if(key==='parts')return'Are any extra parts or supplies required — solar panels, replacement batteries, cameras, SIM cards, or micro SD cards?';
+  if(key==='assignment')return'Who should this work be assigned to? Choose a technician or leave each step in its department queue.';
+  if(key==='notes')return'Any additional owner notes for the technicians?';
   return'';
 }
 function draftSummaryHtml(d){
-  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.scheduled_time?' · '+d.scheduled_time:'')):'—';
-  return '<div class="vision-draft-card">'
-    +'<div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
-    +'<div class="vision-draft-grid">'
-      +'<div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div>'
-      +'<div><span>Site</span><b>'+esc(d.site||'—')+'</b></div>'
-      +'<div><span>Schedule</span><b>'+esc(when)+'</b></div>'
-      +'<div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div>'
-    +'</div>'
-    +(d.job_description?'<div class="vision-draft-description"><span>Job description</span><b>'+esc(d.job_description)+'</b></div>':'')
-    +'</div>';
+  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.scheduled_time?' · '+d.scheduled_time:' · no exact time')):'—';
+  return '<div class="vision-draft-card"><div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
+    +'<div class="vision-draft-grid"><div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div><div><span>Site</span><b>'+esc(d.site||'—')+'</b></div><div><span>Schedule</span><b>'+esc(when)+'</b></div><div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div><div><span>Assignment</span><b>'+esc(draftAssignmentText(d))+'</b></div><div><span>Parts</span><b>'+esc(draftPartsText(d))+'</b></div></div>'
+    +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
+    +(d.notes?'<div class="vision-draft-description"><span>Owner notes</span><b>'+esc(d.notes)+'</b></div>':'')+'</div>';
 }
 function draftApplyInput(d,text,initial=false){
-  const raw=String(text||'').trim();
-  const expected=draftMissingKey(d);
-  const type=draftWorkType(raw);
-  if(type){
-    d.work_type=type;
-    d.role=draftDefaultRole(type);
-  }
-  const explicitTicket=ticketFrom(raw);
-  const bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
+  const raw=String(text||'').trim(),expected=draftMissingKey(d),type=draftWorkType(raw);
+  if(type){d.work_type=type;d.role=draftDefaultRole(type);}
+  const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
   if(explicitTicket||bareTicket)d.ticket_no=explicitTicket||bareTicket;
-
   const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|:|=|-)\s*([^,.;\n]+)/i);
   if(siteMatch)d.site=String(siteMatch[1]||'').trim();
-
-  const when=dateFrom(raw); if(when)d.scheduled_for=when;
-  const clock=timeFrom(raw); if(clock)d.scheduled_time=clock;
-
-  const equipment=draftEquipmentParse(raw); if(equipment.some(x=>x.qty>0))draftMergeEquipment(d,equipment);
+  const when=dateFrom(raw);if(when)d.scheduled_for=when;
+  const clock=timeFrom(raw);if(clock){d.scheduled_time=clock;d.time_answered=true;}
+  if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
+  const equipment=draftEquipmentParse(raw);
+  if(equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
+  if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;}
   const unitMatch=raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
-  if(unitMatch)d.unit_numbers=unitMatch[1].trim();
+  if(unitMatch){d.unit_numbers=unitMatch[1].trim();d.equipment_numbers_answered=true;}
   const standMatch=raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
-  if(standMatch)d.stand_numbers=standMatch[1].trim();
-
+  if(standMatch){d.stand_numbers=standMatch[1].trim();d.equipment_numbers_answered=true;}
+  if(expected==='equipment_numbers'&&/\b(no equipment numbers|no numbers|not yet|unknown|skip|none)\b/i.test(raw))d.equipment_numbers_answered=true;
   const descMatch=raw.match(/\bdescription\s*(?:is|:|=)\s*([^;\n]+)/i);
   if(descMatch)d.job_description=String(descMatch[1]||'').trim();
+  const parts=draftPartsParse(raw);
+  if(Object.keys(parts).length){d.parts={...(d.parts||{}),...parts};d.parts_answered=true;}
+  if(expected==='parts'&&/\b(no additional parts|no parts|none|skip)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
+  const techs=draftMatchedTechs(raw);
+  if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give)\b/i.test(raw))d.assignment_answered=true;}
+  if(expected==='assignment'&&/\b(department queues?|queue|leave.*queue|unassigned)\b/i.test(raw)){d.assignees=d.assignees||{};d.assignment_answered=true;}
   const notesMatch=raw.match(/\bnotes?\s*(?:are|is|:|=)\s*([^;\n]+)/i);
-  if(notesMatch)d.notes=String(notesMatch[1]||'').trim();
-
-  const tech=findTech(raw);
-  if(tech&&/\b(assign|task|send|give)\b/i.test(raw)){
-    d.assignees=d.assignees||{};
-    d.assignees[tech.role]=tech.user_id;
-  }
-
-  const afterKnown=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||descMatch||notesMatch||tech);
-  if(!initial&&!afterKnown){
+  if(notesMatch){d.notes=String(notesMatch[1]||'').trim();d.notes_answered=true;}
+  if(expected==='notes'&&/\b(no additional notes|no notes|none|skip)\b/i.test(raw)){d.notes='';d.notes_answered=true;}
+  const recognized=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||unitMatch||standMatch||descMatch||Object.keys(parts).length||techs.length||notesMatch);
+  if(!initial&&!recognized){
     if(expected==='site')d.site=raw;
     else if(expected==='job_description')d.job_description=raw;
+    else if(expected==='notes'){d.notes=raw;d.notes_answered=true;}
   }
   return d;
 }
 function draftResponseHtml(d,started=false){
   const missing=draftMissingKey(d);
   if(missing){
-    return '<div class="vision-answer-title">'+(started?'I started a '+esc(d.work_type?d.work_type.charAt(0).toUpperCase()+d.work_type.slice(1):'new')+' Tech Check draft.':'Got it — I updated the draft.')+'</div>'
-      +draftSummaryHtml(d)
-      +'<div class="vision-draft-question"><b>'+esc(draftQuestion(missing,d))+'</b></div>'
-      +'<div class="vision-system-note">MHelpDesk stays separate. Vision is preparing the Tech Check job from the MHelpDesk information you give it.</div>';
+    const keys=draftStepKeys(d),step=Math.max(1,keys.indexOf(missing)+1);
+    return '<div class="vision-answer-title">'+(started?'I started the work order. I’ll ask you one thing at a time.':'Got it. Here is the next question.')+'</div>'+draftSummaryHtml(d)
+      +'<div class="vision-draft-question"><small>QUESTION '+step+' OF '+keys.length+'</small><b>'+esc(draftQuestion(missing,d))+'</b>'+draftChoiceHtml(missing,d)+'</div>'
+      +'<div class="vision-system-note">Answer below or tap one of the choices. Vision remembers the answers already in this draft.</div>';
   }
-  const actionId=id();
-  state.pending.set(actionId,{kind:'create-job',draft:JSON.parse(JSON.stringify(d))});
-  return '<div class="vision-answer-title">This Tech Check job is ready for your review.</div>'
-    +draftSummaryHtml(d)
-    +'<div class="vision-action-card"><small>READY TO CREATE</small><b>Create this '+esc(String(d.work_type).toUpperCase())+' job?</b><p>Vision will create the Tech Check assignment(s). It will not create or change the MHelpDesk ticket.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Create Tech Check job</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Keep editing</button></div></div>';
+  const actionId=id();state.pending.set(actionId,{kind:'create-job',draft:JSON.parse(JSON.stringify(d))});
+  return '<div class="vision-answer-title">The work order is complete and ready for review.</div>'+draftSummaryHtml(d)
+    +'<div class="vision-action-card"><small>READY TO CREATE</small><b>Create this '+esc(String(d.work_type).toUpperCase())+' Tech Check job?</b><p>Vision will create the Tech Check workflow shown above. MHelpDesk remains separate.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Create Tech Check job</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Keep editing</button></div></div>';
 }
 function startDraft(text){
   state.currentTicket='';
-  const d={work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',equipment_manifest:[],unit_numbers:'',stand_numbers:'',job_description:'',notes:'',assignees:{}};
+  const d={work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false};
   draftApplyInput(d,text,true);
   const current=ensureChat();current.ticket='';current.draft=d;saveChats();renderOrder();
   return draftResponseHtml(d,true);
@@ -379,50 +446,16 @@ function continueDraft(text){
 }
 async function createDraftJob(d){
   const duplicate=state.jobs.find(j=>j.status!=='completed'&&String(j.ticket_no||'')===String(d.ticket_no));
-  if(duplicate){
-    state.currentTicket=String(d.ticket_no);
-    const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();
-    renderOrder();
-    return '<div class="vision-direct warn"><b>That Tech Check job already exists.</b>I did not create a duplicate. I opened the existing MHelpDesk #'+esc(d.ticket_no)+' job instead.</div>'+jobCard(d.ticket_no);
-  }
-  const roles=d.role==='it_service'?['it','service']:d.role==='service_it'?['service','it']:d.role?[d.role]:[d.work_type==='service'?'service':'it'];
-  const ids=[];
+  if(duplicate){state.currentTicket=String(d.ticket_no);const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();return '<div class="vision-direct warn"><b>That Tech Check job already exists.</b>I did not create a duplicate. I opened the existing MHelpDesk #'+esc(d.ticket_no)+' job instead.</div>'+jobCard(d.ticket_no);}
+  const roles=d.role==='it_service'?['it','service']:d.role==='service_it'?['service','it']:d.role?[d.role]:[d.work_type==='service'?'service':'it'],ids=[],parts=d.parts||{};
   for(const role of roles){
     const assignee=d.assignees?.[role]||null;
-    const response=await db.rpc('owner_assign_job_v8',{
-      p_ticket_no:String(d.ticket_no),
-      p_site:d.site,
-      p_assigned_role:role,
-      p_assignee_user_id:assignee,
-      p_requested_unit_count:draftDeviceTotal(d),
-      p_unit_summary:[d.unit_numbers?'Unit #s: '+d.unit_numbers:'',d.stand_numbers?'Stand / Solar Stand #s: '+d.stand_numbers:''].filter(Boolean).join(' | '),
-      p_job_description:d.job_description,
-      p_notes:d.notes||'',
-      p_solar_panel_qty:0,
-      p_battery_replacement_qty:0,
-      p_camera_replacement_qty:0,
-      p_sim_replacement_qty:0,
-      p_micro_sd_qty:0,
-      p_equipment_manifest:d.equipment_manifest,
-      p_requires_it_handoff:d.work_type==='pickup'?false:((d.role==='it_service'&&role==='service')||(d.role==='service_it'&&role==='it')),
-      p_scheduled_for:d.scheduled_for,
-      p_work_type:d.work_type
-    });
+    const response=await db.rpc('owner_assign_job_v8',{p_ticket_no:String(d.ticket_no),p_site:d.site,p_assigned_role:role,p_assignee_user_id:assignee,p_requested_unit_count:draftDeviceTotal(d),p_unit_summary:[d.unit_numbers?'Unit #s: '+d.unit_numbers:'',d.stand_numbers?'Stand / Solar Stand #s: '+d.stand_numbers:''].filter(Boolean).join(' | '),p_job_description:d.job_description,p_notes:d.notes||'',p_solar_panel_qty:Number(parts.solar_panel_qty||0),p_battery_replacement_qty:Number(parts.battery_replacement_qty||0),p_camera_replacement_qty:Number(parts.camera_replacement_qty||0),p_sim_replacement_qty:Number(parts.sim_replacement_qty||0),p_micro_sd_qty:Number(parts.micro_sd_qty||0),p_equipment_manifest:d.equipment_manifest,p_requires_it_handoff:d.work_type==='pickup'?false:((d.role==='it_service'&&role==='service')||(d.role==='service_it'&&role==='it')),p_scheduled_for:d.scheduled_for,p_work_type:d.work_type});
     if(response.error)throw response.error;
-    if(response.data){
-      ids.push(response.data);
-      if(d.scheduled_time){
-        const timeUpdate=await db.from('job_assignments').update({scheduled_time:d.scheduled_time,updated_at:now()}).eq('id',response.data);
-        if(timeUpdate.error)throw timeUpdate.error;
-      }
-    }
+    if(response.data){ids.push(response.data);if(d.scheduled_time){const timeUpdate=await db.from('job_assignments').update({scheduled_time:d.scheduled_time,updated_at:now()}).eq('id',response.data);if(timeUpdate.error)throw timeUpdate.error;}}
   }
-  for(const assignmentId of ids){
-    try{await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignmentId}});}catch{}
-  }
-  await loadData();
-  state.currentTicket=String(d.ticket_no);
-  const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();
+  for(const assignmentId of ids){try{await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignmentId}});}catch{}}
+  await loadData();state.currentTicket=String(d.ticket_no);const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();
   return '<div class="vision-direct good"><b>Tech Check job created.</b>MHelpDesk #'+esc(d.ticket_no)+' is now set up as a '+esc(String(d.work_type).toUpperCase())+' workflow. '+esc(draftFlowLabel(d))+' is in place.</div>'+jobCard(d.ticket_no);
 }
 function actionCard(a,ticket){
