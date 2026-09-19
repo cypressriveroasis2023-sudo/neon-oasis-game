@@ -223,3 +223,66 @@ Production QA verified that attempting Owner final approval on MHelpDesk #22712 
 The action was recorded as `failed`, the before-state was preserved, and the operational job remained unchanged.
 
 A second QA proposal for assigning #22712 to the Service department was successfully canonicalized and then cancelled before execution, proving prepare/cancel behavior without changing the operational assignment.
+
+
+## Phase 5 persistent conversations + managed knowledge
+
+Production now has **77 recorded migrations**.
+
+New Owner-private conversation tables:
+
+- `vision_conversations`
+- `vision_messages`
+
+New managed knowledge tables:
+
+- `vision_knowledge_entries`
+- `vision_knowledge_versions`
+
+New RPCs:
+
+- `vision_save_conversation_v1`
+- `vision_load_conversations_v1`
+- `vision_archive_conversation_v1`
+- `vision_save_knowledge_entry_v1`
+- `vision_list_knowledge_v1`
+- `vision_search_knowledge_v1`
+
+Conversation behavior:
+
+- Existing localStorage conversations remain a local fallback.
+- On authenticated Owner startup, local and cloud conversations are merged by conversation id and newest update time.
+- Existing device conversations are migrated into the Owner's private cloud history.
+- Draft work-order state and active MHelpDesk ticket context persist with the conversation.
+- Conversation writes occur through owner-gated RPCs.
+- Cloud-restored assistant HTML is sanitized before rendering.
+- Old action confirmation buttons expire after a new browser session rather than remaining clickable without their in-memory pending action.
+
+Knowledge behavior:
+
+- `draft` — saved for Owner editing but never used as company truth by Vision.
+- `approved` — eligible for OnSite Vision company-rule grounding.
+- `retired` — preserved/history-visible but excluded from AI grounding.
+- Every edit increments the entry version.
+- The prior version is stored in `vision_knowledge_versions`.
+- Reviewer name and review timestamp are recorded when an entry is approved.
+- The server AI agent combines approved managed knowledge with the code-based Company Knowledge Layer.
+- Live database enforcement remains the highest authority.
+- If approved managed knowledge conflicts with a live database rule, the database rule wins.
+- If approved managed knowledge conflicts with the code baseline, Vision is instructed to report the conflict instead of silently choosing one.
+
+Security:
+
+- RLS is enabled on all four Phase 5 tables.
+- Authenticated users have direct SELECT only.
+- All conversation and knowledge writes go through authenticated owner-gated RPCs.
+- Anonymous users cannot execute the Phase 5 RPCs.
+
+Production QA verified:
+
+- A conversation containing a draft, active ticket, user message, and assistant response persisted and loaded correctly in a later committed read.
+- A test knowledge entry saved as Draft, then was approved.
+- Approval advanced its version from 1 to 2 and recorded the Owner reviewer/timestamp.
+- The approved entry became searchable as `COMPANY RULE`.
+- A version-history row existed for the prior Draft version.
+- QA conversation and knowledge records were deleted after verification so they do not appear in the Owner workspace.
