@@ -585,7 +585,7 @@ function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
     { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows the job's real stage, such as <b>Waiting for Tech / Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Service Verify / Solar Checkout → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
-    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p>IT Techs prepare equipment and create the handoff. Service Techs receive and verify the handoff, do the field work, and return equipment to IT. Returning equipment goes back through IT Intake before shelf inventory.</p>` },
+    { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p><b>IT + Service</b> means IT prepares the equipment first and Service waits for the Service handoff. <b>Service + IT</b> means Service works first and IT waits for the returned equipment before Intake.</p><p><b>Pickup always starts with Service.</b> Returning equipment goes through IT Intake before shelf inventory.</p>` },
     { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
   ];
   return [
@@ -771,13 +771,13 @@ function helpStepGuide(role, step){
     },
     'owner:ROLE SEPARATION':{
       steps:[
-        'Send IT work to IT when equipment prep is required.',
-        'IT completes the unit checks and creates the Service handoff.',
-        'Service opens the same MHelpDesk ticket and verifies the handed-off equipment.',
-        'Service completes field work and returns equipment to IT when needed.',
-        'IT Intake and Owner / Manager inventory confirmation finish the return flow.'
+        'Choose IT + Service when IT must prepare equipment before Service can start.',
+        'Choose Service + IT when Service works first and IT should wait for returned equipment.',
+        'For Pickup, always start with Service; IT Intake begins only after Service checks the equipment back in.',
+        'For IT + Service, IT completes the unit checks and creates the Service handoff before Service continues.',
+        'IT Intake and Owner / Manager inventory confirmation finish returned-equipment flow.'
       ],
-      selector:'#tab-it'
+      selector:'#ownerAssignRole'
     },
     'owner:UNIT HISTORY':{
       steps:[
@@ -4275,6 +4275,7 @@ async function ownerAssignJob() {
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
+  if (workType === 'pickup' && role === 'it') return alert('Pickup starts with Service. Choose Service Department Only, IT + Service Departments, or Service + IT Departments so Service handles the field pickup before IT Intake.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
   if (['it','it_service','service_it'].includes(role) && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area because this workflow includes IT.');
@@ -4320,7 +4321,9 @@ async function ownerAssignJob() {
       p_sim_replacement_qty: parts.sim_replacement_qty,
       p_micro_sd_qty: parts.micro_sd_qty,
       p_equipment_manifest: equipmentManifest,
-      p_requires_it_handoff: workType === 'pickup' ? false : (targetRole === 'service' && rolesToSend.includes('it')),
+      p_requires_it_handoff: workType === 'pickup'
+        ? false
+        : ((role === 'it_service' && targetRole === 'service') || (role === 'service_it' && targetRole === 'it')),
       p_scheduled_for: scheduledFor,
       p_work_type: workType,
     });
