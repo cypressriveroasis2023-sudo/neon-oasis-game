@@ -1659,7 +1659,7 @@
         "tech-check-rules.js content SHA matches",
         "Company Knowledge content SHA matches",
         "Workflow Engine content SHA matches",
-        "Edge Function v6 is ACTIVE with JWT verification",
+        "Edge Function v7 is ACTIVE with JWT verification",
         "Agent status reports shared rules version from TechCheckRules"
       ]
     },
@@ -1698,7 +1698,8 @@
         "All six partial product families remain explicitly partial",
         "Each partial product returns exact teaching_needed prompts",
         "Recon II database label Recon II Battery is not presented as a physical battery specification",
-        "Vision returns MISSING INFORMATION for undocumented technical procedures instead of generic internet guesses"
+        "Vision returns MISSING INFORMATION for undocumented technical procedures instead of generic internet guesses",
+        "Solar Pole/Pole BACKUP-purpose parity and standalone Solar Pole Service-close behavior are explicitly flagged as unresolved rather than guessed"
       ]
     },
     {
@@ -1738,7 +1739,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v6, company-knowledge-v4, workflow-engine-v4 and rules-v3"
+        "Agent reports onsite-vision-agent-v7, company-knowledge-v4, workflow-engine-v4 and rules-v3"
       ]
     },
     {
@@ -1763,5 +1764,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Phase 7 company-brain pass: TechCheckRules v3 centralizes the verified Sniper 2 × 12V 35Ah rule plus server-backed truck-spare mappings/lifecycle; Company Knowledge v4 and Workflow Engine v4 expose exact teaching gaps for unfinished product families; agent v6 routes truck-spare/gap questions without generic guesses; release v121 / loader v35 / Vision v16 / SW v77."
+  "last_release_qa_note": "Phase 7 company-brain pass: TechCheckRules v3 centralizes the verified Sniper 2 × 12V 35Ah rule plus server-backed truck-spare mappings/lifecycle; Company Knowledge v4 and Workflow Engine v4 expose exact teaching gaps, including unresolved Solar Pole/Pole server-parity questions; agent v7 routes truck-spare/gap questions without generic guesses; release v121 / loader v35 / Vision v16 / SW v77."
 }
