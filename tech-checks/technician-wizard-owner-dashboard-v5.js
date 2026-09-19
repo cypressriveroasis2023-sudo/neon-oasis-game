@@ -231,6 +231,8 @@ function injectStyles() {
     #view-owner .ownerCompactGroup{display:none!important;margin:0!important}
     #view-owner .ownerCompactGroup.ownerPanelActive{display:block!important}
     #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupSummary{display:grid!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupSummary{cursor:default!important;user-select:none!important;-webkit-user-select:none!important}
+    #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupSummary>strong{background:#eef3f6!important;color:#536576!important}
     #view-owner .ownerCompactGroup.ownerPanelActive>.ownerCompactGroupBody{display:block!important}
     #view-owner .ownerPanelBack{margin:0 0 8px!important}
     #view-owner .ownerCompactGroupSummary{min-height:68px!important}
@@ -3372,6 +3374,7 @@ function organizeOwnerDashboard(){
     };
     if(originalReturn){window.ownerOpenReturn=(id)=>{ownerShowGroup('Equipment');requestAnimationFrame(()=>originalReturn(id));};}
   }
+  shell.querySelectorAll('.ownerCompactGroup.ownerPanelActive').forEach(g=>{g.open=true;});
   syncOwnerCompactDashboard();
 }
 let ownerAIDispatchPrepared = false;
@@ -3855,7 +3858,13 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
-  const ownerHome=e.target.closest('[data-owner-compact-home]');
+  const ownerLockedSummary=e.target.closest('.ownerCompactGroupSummary');
+    if(ownerLockedSummary?.parentElement?.classList.contains('ownerPanelActive')){
+      e.preventDefault();
+      ownerLockedSummary.parentElement.open=true;
+      return;
+    }
+    const ownerHome=e.target.closest('[data-owner-compact-home]');
     if(ownerHome){ownerShowHome();return;}
     const ownerPanel=e.target.closest('[data-owner-home-panel]');
     if(ownerPanel){ownerShowGroup(ownerPanel.dataset.ownerHomePanel);return;}
