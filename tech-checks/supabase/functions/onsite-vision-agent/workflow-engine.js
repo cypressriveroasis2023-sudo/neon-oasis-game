@@ -20,6 +20,11 @@
   }
 
   function normalizeEquipmentType(value){
+    const shared=root.TechCheckRules;
+    if(shared?.normalizeEquipmentType){
+      const normalized=shared.normalizeEquipmentType(value);
+      if(normalized)return normalized;
+    }
     const raw=norm(value);
     if(!raw) return '';
     if(K().equipment?.[raw]) return raw;
@@ -40,6 +45,8 @@
   }
 
   function manifestRows(draft){
+    const shared=root.TechCheckRules;
+    if(shared?.normalizeManifest)return shared.normalizeManifest(draft?.equipment_manifest||[]);
     return (Array.isArray(draft?.equipment_manifest)?draft.equipment_manifest:[])
       .map(row=>({
         label:normalizeEquipmentType(row?.label)||norm(row?.label),
@@ -76,7 +83,9 @@
         automatic_service_requirements:def.automatic_service_requirements||null,
         owner_final_verification:Boolean(def.owner_final_verification),
         swap_rules:def.swap_rules||[],
-        unknowns:def.unknowns||[]
+        unknowns:def.unknowns||[],
+        shared_it_checklist:def.shared_it_checklist||[],
+        shared_it_check_fields:def.shared_it_check_fields||[]
       });
     }
     return out;
@@ -286,7 +295,7 @@
   }
 
   root.OnSiteVisionWorkflowEngine=Object.freeze({
-    version:'workflow-engine-v2',
+    version:'workflow-engine-v3',
     normalizeWorkType,
     normalizeEquipmentType,
     getEquipmentDefinition,
