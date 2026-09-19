@@ -61,6 +61,83 @@
         text-align: left !important;
       }
     </style>
+    <!-- Service action pills v74 -->
+    <style>
+      #view-service .wl-service-pillbar{
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+        gap:8px !important;
+        margin:12px 0 2px !important;
+        padding:0 !important;
+      }
+      #view-service .wl-service-pill{
+        box-sizing:border-box !important;
+        width:100% !important;
+        min-width:0 !important;
+        min-height:48px !important;
+        margin:0 !important;
+        padding:7px 10px 7px 13px !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:7px !important;
+        border:1px solid #ccd7e1 !important;
+        border-radius:999px !important;
+        background:#fff !important;
+        color:#17283b !important;
+        box-shadow:0 2px 6px rgba(18,43,65,.05) !important;
+        text-align:left !important;
+        font-size:11px !important;
+        font-weight:800 !important;
+        line-height:1.1 !important;
+        white-space:nowrap !important;
+        overflow:hidden !important;
+      }
+      #view-service .wl-service-pill-label{
+        display:block !important;
+        min-width:0 !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+        white-space:nowrap !important;
+      }
+      #view-service .wl-service-pill-badge{
+        flex:none !important;
+        min-width:27px !important;
+        height:27px !important;
+        padding:0 8px !important;
+        display:inline-flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        border-radius:999px !important;
+        background:#eef2f5 !important;
+        color:#516170 !important;
+        font-size:9px !important;
+        font-weight:850 !important;
+        line-height:1 !important;
+      }
+      #view-service .wl-service-pill-return{
+        border-color:#d20b12 !important;
+        background:#d20b12 !important;
+        color:#fff !important;
+      }
+      #view-service .wl-service-pill-return .wl-service-pill-badge{
+        background:rgba(255,255,255,.18) !important;
+        color:#fff !important;
+      }
+      #view-service .wl-service-pill:active{
+        transform:scale(.985);
+      }
+      @media(max-width:360px){
+        #view-service .wl-service-pill{
+          padding-left:10px !important;
+          padding-right:8px !important;
+          font-size:10px !important;
+        }
+        #view-service .wl-service-pill-badge{
+          padding:0 6px !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app">
@@ -406,7 +483,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script type="module" src="./app.js?v=activity-order-v13"></script>
-    <script type="module" src="./technician-wizard-owner-dashboard-v5.js?v=service-actions-v73"></script>
+    <script type="module" src="./technician-wizard-owner-dashboard-v5.js?v=service-pills-v74"></script>
     <script type="module" src="./team-email-settings.js?v=email-settings-v3"></script>
     <script>
       if ('serviceWorker' in navigator) {
