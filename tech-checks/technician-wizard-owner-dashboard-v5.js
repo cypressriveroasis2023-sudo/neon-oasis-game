@@ -619,12 +619,13 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'TRUCK SPARES', title:'Resolve every truck backup after the call', body:`<p>IT may hand you a <b>BACKUP / truck spare</b> unit or extra batteries for the current MHelpDesk job. These are contingency items in case a field unit or battery is bad.</p><p>If a spare unit was <b>not used</b>, choose <b>RETURN UNUSED TO SHOP</b>; it does not need IT Intake. If it was used for a swap, mark it <b>USED FOR SWAP</b> and return the failed/replaced field unit through normal IT Intake. For spare batteries, enter the quantity used and Tech Check returns the remainder unused.</p>` },
     { kicker:'RETURN TO IT', title:'Send returning equipment back to IT', body:`<p>When equipment comes back from the field, use <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p>The return is recorded under your name as the Service Tech who brought it back. IT then receives it, performs intake, and returns it to shelf inventory when ready.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
-    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY TICKET</b><span>→</span><b>TAKE THIS JOB</b><span>→</span><b>VERIFY IT HANDOFF</b><span>→</span><b>SERVICE CHECKOUT</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RETURN TO IT</b></div><p>The MHelpDesk job closes when that job is finished. The unit record continues.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY IT HANDOFF + SPARES</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RESOLVE TRUCK SPARES</b><span>→</span><b>RETURN FAILED / FIELD UNITS TO IT</b></div><p>Unused truck spares return directly to Shop Inventory. Equipment that was actually in the field and comes back follows IT Intake.</p>` },
   ];
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
     { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows the job's real stage, such as <b>Waiting for Tech / Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Service Verify / Solar Checkout → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
     { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p><b>IT + Service</b> means IT prepares the equipment first and Service waits for the Service handoff. <b>Service + IT</b> means Service works first and IT waits for the returned equipment before Intake.</p><p><b>Pickup always starts with Service.</b> Returning equipment goes through IT Intake before shelf inventory.</p>` },
+    { kicker:'TRUCK SPARES', title:'Monitor contingency equipment that is still out', body:`<p>IT can add a <b>BACKUP / Truck Spare</b> to a Service ticket without changing the customer/job equipment manifest. The Owner Equipment Handoffs area shows truck spares that Service has not resolved yet.</p><p>An <b>unused</b> spare goes directly back to Shop Inventory. A spare marked <b>USED</b> stays with the field job, while the failed/replaced field unit follows the normal Service → IT Intake → Owner/Manager inventory flow.</p>` },
     { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
   ];
   return [
@@ -669,15 +670,16 @@ function helpRoleIcon(role){
   return role==='owner' ? 'O' : role==='service' ? 'S' : 'IT';
 }
 function helpFlowHtml(role){
-  if(role==='owner') return "<div class='wl-help-flow-map'><span>OWNER ASSIGNS</span><i>→</i><span>IT PREP</span><i>→</i><span>SERVICE VERIFY</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RETURN / COMPLETE</span></div>";
-  if(role==='service') return "<div class='wl-help-flow-map'><span>OPEN MHELP TICKET</span><i>→</i><span>VERIFY IT HANDOFF</span><i>→</i><span>SERVICE CHECKOUT</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RETURN TO IT</span></div>";
-  return "<div class='wl-help-flow-map'><span>ASSIGNED / CLAIM</span><i>→</i><span>PULL EQUIPMENT</span><i>→</i><span>TECH CHECK</span><i>→</i><span>PHOTO + SIGN</span><i>→</i><span>CREATE HANDOFF</span></div>";
+  if(role==='owner') return "<div class='wl-help-flow-map'><span>OWNER ASSIGNS</span><i>→</i><span>IT PREP + SPARES</span><i>→</i><span>SERVICE VERIFY</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RESOLVE SPARES / RETURNS</span></div>";
+  if(role==='service') return "<div class='wl-help-flow-map'><span>OPEN MHELP TICKET</span><i>→</i><span>VERIFY IT HANDOFF</span><i>→</i><span>FIELD WORK</span><i>→</i><span>RESOLVE TRUCK SPARES</span><i>→</i><span>RETURN FAILED / FIELD UNITS</span></div>";
+  return "<div class='wl-help-flow-map'><span>ASSIGNED / CLAIM</span><i>→</i><span>PULL JOB EQUIPMENT</span><i>→</i><span>ADD TRUCK SPARES</span><i>→</i><span>TECH CHECK + PROOF</span><i>→</i><span>CREATE HANDOFF</span></div>";
 }
 function helpTopicsForRole(role){
   if(role==='owner') return [
     {id:'assign',icon:'+',title:'Assign a new job',desc:'MHelpDesk reference, equipment, department flow, and technician assignment.',body:"<p>Use the <b>current MHelpDesk ticket</b> as the source of truth. Enter the reference, site, work date, job description, equipment quantities/numbers, parts, and department flow.</p><p>You can assign directly to a named technician or leave it in the department queue. AI Dispatch can prepare the draft, but <b>you still review and send it</b>.</p>"},
     {id:'progress',icon:'◎',title:'Track live jobs',desc:'See who owns the work, the handoff stage, and what is still open.',body:"<p><b>Live Job Progress</b> shows assigned/waiting work and jobs already in progress. Once a department-queue job is claimed, the technician's name becomes visible to the Owner.</p><p>Use the AI status as an advisory signal: green is on track, yellow is waiting/pending, and red needs Owner attention.</p>"},
     {id:'handoff',icon:'⇄',title:'Understand IT → Service handoff',desc:'What IT finishes and what Service must verify.',body:"<p>IT completes the required unit checks, photos, signature, and readiness items, then creates the <b>Service handoff</b>. Service opens the same MHelpDesk reference and physically verifies the handed-off equipment before continuing.</p>"},
+    {id:'spares',icon:'↔',title:'Track truck spares',desc:'See contingency units and batteries that are still riding with Service.',body:"<p>Truck spares are tied to the same MHelpDesk job but are separate from the customer equipment manifest. In <b>Equipment Handoffs</b>, watch <b>Truck Spares Still Out</b>. Service resolves each one as used or returned unused. Unused spares go directly back to Shop Inventory; failed/replaced field equipment goes through IT Intake.</p>"},
     {id:'returns',icon:'↩',title:'Returns & IT Intake',desc:'Follow equipment from Service back to shelf inventory.',body:"<p>Service records the returning unit, condition, notes, and photos. IT Intake receives it and completes the intake checklist. The Owner/Manager completes the final inventory confirmation before the unit returns to shelf inventory.</p>"},
     {id:'team',icon:'👥',title:'Technicians & activity',desc:'Accounts, activity, resets, and accountability.',body:"<p>Use <b>Technician Accounts</b> for logins/access and <b>Recent Activity</b> to review submitted work. Tech Check keeps the named technician attached to work they claimed, prepared, verified, or returned.</p>"},
     {id:'ai',icon:'AI',title:'Use Tech Check AI',desc:'Dispatch drafts, preflight review, alerts, and workflow health.',body:"<p>AI tools are advisory. AI Dispatch can build a job draft from your wording. AI Preflight can flag setup inconsistencies. The AI Control Center can highlight waiting, on-track, or attention states.</p><p><b>AI never sends a job by itself.</b></p>"}
@@ -818,6 +820,16 @@ function helpStepGuide(role, step){
         'IT Intake and Owner / Manager inventory confirmation finish returned-equipment flow.'
       ],
       selector:'#ownerAssignRole'
+    },
+    'owner:TRUCK SPARES':{
+      steps:[
+        'Open Equipment Handoffs.',
+        'Look for Truck Spares Still Out.',
+        'The card shows the Service Tech, MHelpDesk reference, spare unit or battery type, and anything still unresolved.',
+        'Unused spares return directly to Shop Inventory when Service checks them in; used spares remain field equipment.',
+        'A failed/replaced field unit still follows the normal Return & Intake process.'
+      ],
+      selector:'#ownerHandoffsCard > summary, #ownerHandoffsCard'
     },
     'owner:UNIT HISTORY':{
       steps:[
