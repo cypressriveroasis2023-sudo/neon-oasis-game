@@ -447,17 +447,20 @@ async function myReturnCounts() { const { data: { session } } = await liveDb.aut
 async function releasedPrepCount() { const { data } = await liveDb.from('prep_tickets').select('id').eq('status','released'); return (data||[]).length; }
 async function serviceWorkData() {
   const { data:{ session } } = await liveDb.auth.getSession();
-  if (!session?.user?.id) return { released:[], inspectionDone:false, deployed:[] };
+  if (!session?.user?.id) return { assignments:[], released:[], inspectionDone:false, deployed:[] };
   const dayStart = new Date(); dayStart.setHours(0,0,0,0);
-  const [releasedQ, returnedQ, deployedQ, inspectionQ] = await Promise.all([
+  const [assignments,releasedQ,returnedQ,deployedQ,inspectionQ] = await Promise.all([
+    myActiveAssignments('service'),
     liveDb.from('prep_tickets').select('id,ticket_no,site,released_at,created_at').eq('status','released').order('released_at',{ascending:true}),
     liveDb.from('unit_returns').select('ticket_no,unit_tag').eq('service_tech_id',session.user.id),
     liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(unit_tag,equipment_type)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
     liveDb.from('morning_checks').select('id').eq('service_tech_id',session.user.id).gte('submitted_at',dayStart.toISOString()).limit(1)
   ]);
+  const activeTickets=new Set((assignments||[]).map(a=>norm(a.ticket_no)));
+  const released=(releasedQ.data||[]).filter(p=>activeTickets.has(norm(p.ticket_no)));
   const returned = new Set((returnedQ.data||[]).map(r => `${norm(r.ticket_no)}|${norm(r.unit_tag)}`));
   const deployed = (deployedQ.data||[]).flatMap(p => (p.prep_items||[]).filter(i => i.unit_tag && !returned.has(`${norm(p.ticket_no)}|${norm(i.unit_tag)}`)).map(i => ({ ticket_no:p.ticket_no, site:p.site, closed_at:p.closed_at, unit_tag:i.unit_tag, equipment_type:i.equipment_type })));
-  return { released:releasedQ.data||[], inspectionDone:(inspectionQ.data||[]).length>0, deployed };
+  return { assignments:assignments||[], released, inspectionDone:(inspectionQ.data||[]).length>0, deployed };
 }
 async function loadOwnerReturnPhotos(details) { if (!details?.open || details.dataset.photosLoaded === '1') return; const row = ownerReturnRows.get(details.dataset.ownerReturn); if (!row) return; details.dataset.photosLoaded = '1'; const service = details.querySelector('[data-owner-service-photos]'); const intake = details.querySelector('[data-owner-intake-photos]'); if (service) { service.innerHTML = `<div class='wl-note'>Loading Service photos…</div>`; service.innerHTML = await returnPhotoHtml(row.return_photo_paths) || `<div class='wl-note'>No Service return photos saved.</div>`; } if (intake) { intake.innerHTML = `<div class='wl-note'>Loading IT photo…</div>`; intake.innerHTML = await returnPhotoHtml(row.intake_photo_paths) || `<div class='wl-note'>No IT intake photo saved.</div>`; } }
 async function loadServiceReturnPhotos(details) { if (!details?.open || details.dataset.photosLoaded === '1') return; const row = serviceReturnRows.get(details.dataset.svcReturn); if (!row) return; details.dataset.photosLoaded = '1'; const host = details.querySelector('[data-svc-return-photos]'); if (!host) return; host.innerHTML = `<div class='wl-note'>Loading return photos…</div>`; host.innerHTML = `${await returnPhotoHtml(row.return_photo_paths)}${await returnPhotoHtml(row.intake_photo_paths)}` || `<div class='wl-note'>No return photos saved.</div>`; }
@@ -1405,6 +1408,77 @@ async function assignmentGateState(assignment) {
   const {data}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
   return data?.length ? {ready:true,label:'Service return received',returnId:data[0].id} : {ready:false,label:'WAITING FOR SERVICE RETURN',detail:'Service must finish the field pickup/return and hand the unit to IT Intake before IT can start.'};
 }
+function assignmentEquipmentCount(a) {
+  return Math.max(1, normalizedEquipmentManifest(a?.equipment_manifest || []).reduce((sum,row)=>sum+Number(row.qty||0),0) || Number(a?.requested_unit_count||0) || 1);
+}
+async function serviceAssignmentNeedsITReturn(a) {
+  if (!a?.ticket_no) return false;
+  const { data }=await liveDb.from('job_assignments').select('id').eq('ticket_no',a.ticket_no).eq('assigned_role','it').eq('requires_it_handoff',true).in('status',['assigned','started']).limit(1);
+  return Boolean(data?.length);
+}
+function serviceFieldCard() {
+  let card=document.getElementById('wlSvcFieldAssignment');
+  if(!card){card=document.createElement('div');card.id='wlSvcFieldAssignment';card.className='card';viewSvc().append(card);}
+  return card;
+}
+async function renderServiceFieldAssignment(a,needsReturn=false) {
+  const card=serviceFieldCard();
+  const count=assignmentEquipmentCount(a);
+  card.innerHTML=`${progress('Service Field Work','MHelpDesk #'+esc(a.ticket_no),2,3)}
+    <button class='wl-back' data-wl-home='svc'>← Service Home</button>
+    <div class='wl-review'><div class='wl-next-kicker'>SERVICE TASK</div><b style='font-size:24px'>MHelpDesk #${esc(a.ticket_no)}</b><div class='top8'><b>Customer / Site:</b> ${esc(a.site||'Not listed')}</div><div class='top8'><b>Job Type:</b> ${esc(String(a.work_type||'service').toUpperCase())}</div>${a.job_description?`<div class='top8'><b>Work:</b> ${esc(a.job_description)}</div>`:''}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${a.notes?`<div class='small top8'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}</div>
+    ${needsReturn?`<div class='warn top10'><b>Service → IT return required</b><div>Complete the field work, then check the returning equipment into IT Intake under this same MHelpDesk ticket. This assignment completes after the required returned equipment is recorded.</div></div><button class='wl-big wl-red top10' data-wl-service-begin-return='${a.id}'>Return Equipment to IT Intake →</button>`:`<div class='ok top10'><b>No IT handoff is required for this Service-only Tech Check task.</b><div>Complete the field work in MHelpDesk, then mark this Tech Check assignment complete. Tech Check does not modify MHelpDesk.</div></div><button class='wl-big wl-green top10' data-wl-service-complete-assignment='${a.id}'>Mark Tech Check Service Task Complete →</button>`}
+    <div class='small top10'>Equipment items listed for this assignment: ${count}.</div>`;
+  hideChildren(viewSvc(),[card]);
+  resetWizardPosition();
+}
+async function beginServiceReturnForAssignment(id) {
+  const { data:rows,error }=await liveDb.from('job_assignments').select('*').eq('id',id).eq('assigned_role','service').limit(1);
+  if(error)return alert(error.message);
+  const a=rows?.[0]; if(!a)return alert('This Service assignment is no longer available.');
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(!tech?.id || a.assignee_user_id!==tech.id)return alert('Claim or open this Service job from My Work Today before returning equipment.');
+  activeSvcAssignment=a;
+  if(a.status!=='started') {
+    const {error:startError}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'started'});
+    if(startError)return alert(startError.message);
+  }
+  serviceReturn={ step:1, ticket:String(a.ticket_no||''), unit:'', type:'', notes:'', photo:null, conditionPhotos:[], damagePhotos:[], knownUnits:await rememberedUnitsForTicket(a.ticket_no) };
+  serviceReturnRecovered=false;
+  await saveServiceReturnDraft();
+  return renderServiceReturn();
+}
+async function completeServiceFieldAssignment(id) {
+  if(!confirm('Mark this Tech Check Service task complete?\n\nThis only updates Tech Check. It does not change MHelpDesk.')) return;
+  const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'completed'});
+  if(error)return alert(error.message);
+  activeSvcAssignment=null;
+  await showSvcHome();
+}
+async function syncServiceAssignmentAfterReturn(ticket,techId) {
+  const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','service').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
+  const a=rows?.[0]; if(!a)return {completed:false,count:0,required:0};
+  const {data:returns}=await liveDb.from('unit_returns').select('id').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
+  const count=(returns||[]).length, required=assignmentEquipmentCount(a);
+  if(count>=required){
+    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
+    if(error)console.warn('Return saved but Service assignment could not be completed',error);
+    else return {completed:true,count,required};
+  }
+  return {completed:false,count,required};
+}
+async function syncITReturnAssignmentAfterIntake(ticket,techId) {
+  const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','it').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
+  const a=rows?.[0]; if(!a)return;
+  const required=assignmentEquipmentCount(a);
+  const {data:returns}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',String(ticket||''));
+  const processed=(returns||[]).filter(r=>['pending_mhelp_inventory','completed'].includes(r.status)).length;
+  if(processed>=required){
+    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
+    if(error)console.warn('IT Intake saved but IT assignment could not be completed',error);
+  }
+}
+
 async function startAssignedJob(id) {
   let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
   let assignment = rows?.[0];
@@ -1471,11 +1545,16 @@ async function startAssignedJob(id) {
 
   activeSvcAssignment = assignment;
   if (String(assignment.work_type || '').toLowerCase()==='pickup' || (!assignment.work_type && /\bpick[ -]?up\b/i.test(String(assignment.job_description||'')))) {
-    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
-    serviceReturn={ step:1, ticket:String(assignment.ticket_no||''), unit:'', type:'', notes:'', photo:null, conditionPhotos:[], damagePhotos:[], knownUnits:await rememberedUnitsForTicket(assignment.ticket_no) };
-    serviceReturnRecovered=false;
-    await saveServiceReturnDraft();
-    return renderServiceReturn();
+    return beginServiceReturnForAssignment(id);
+  }
+  if (!assignment.requires_it_handoff) {
+    if (assignment.status !== 'started') {
+      const {error:startError}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'started'});
+      if(startError)return alert(startError.message);
+      assignment.status='started';
+    }
+    const needsReturn=await serviceAssignmentNeedsITReturn(assignment);
+    return renderServiceFieldAssignment(assignment,needsReturn);
   }
   const { data: released } = await liveDb.from('prep_tickets')
     .select('id,ticket_no,status')
@@ -2428,26 +2507,40 @@ async function showSvcHome() {
     myAssignedInventoryAssets()
   ]);
   const alertBanner=phoneAlertBanner(phoneAlerts);
+  const assignments=work.assignments||[];
+  const releasedTickets=new Set((work.released||[]).map(p=>norm(p.ticket_no)));
   const handoffCount=work.released.length;
   const returnCount=r.waiting+r.inventory;
   const deployedCount=(work.deployed||[]).length;
-  const nextAction=handoffCount
-    ? `<div class='wl-next-action wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>${handoffCount} IT handoff${handoffCount===1?" is":"s are"} ready for Service.</b><div class='small'>Open Service Job, enter the exact MHelpDesk ticket, and verify the IT handoff.</div></div>`
-    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service handoffs are waiting.</b><div class='small'>When IT creates a handoff, use Open Service Job and enter the exact MHelpDesk ticket.</div></div>`;
+  const assignmentCards=assignments.map((a,i)=>{
+    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
+    const handoffReady=releasedTickets.has(norm(a.ticket_no));
+    const state=pickup ? 'Ready for Service pickup / return workflow'
+      : a.requires_it_handoff ? (handoffReady ? 'IT handoff ready — verify exact ticket' : 'Waiting for IT handoff')
+      : 'Service task ready — exact ticket verification required';
+    const queue=!a.assignee_user_id && a.assignment_scope==='department';
+    return `<div class='wl-it-flow-card wl-service-assignment-card'><div class='wl-next-kicker'>${i===0?'NEXT SERVICE TASK':'UPCOMING SERVICE TASK'}</div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div><div class='small'><b>${esc(String(a.work_type||'service').toUpperCase())}</b> · ${esc(state)}</div>${queue?`<div class='small'><b>Service Department queue</b> · claim requires the exact ticket number</div>`:''}${a.job_description?`<div class='small'><b>Work:</b> ${esc(a.job_description)}</div>`:''}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${techCheckAIHtml(a,'service')}<button class='wl-big wl-blue top10' data-wl-service-open-job>Verify Ticket & Open →</button></div>`;
+  }).join('');
+  const assigned=assignments[0]||null;
+  const nextAction=assigned
+    ? `<div class='wl-next-action wl-assigned-next wl-service-next'><div class='wl-next-kicker'>ASSIGNED / AVAILABLE SERVICE WORK</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site||'No customer / site')}</div><div class='small'>Enter the exact current MHelpDesk ticket before Tech Check will open or claim this job.</div><button class='wl-big wl-blue top10' data-wl-service-open-job>Open Service Job →</button></div>`
+    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service work is currently assigned or waiting in your department queue.</b><div class='small'>When the Owner assigns work, it will appear here. IT handoffs remain locked behind the exact MHelpDesk ticket.</div></div>`;
 
   home.innerHTML=`${alertBanner}
     <div class='wl-mode-pills'>
-      <button type='button' class='on wl-mode-card'><span class='wl-mode-title'>Field Work</span><span class='wl-mode-sub'>Find & verify assigned jobs</span><span class='wl-mode-badge'>${handoffCount}</span></button>
+      <button type='button' class='on wl-mode-card'><span class='wl-mode-title'>Field Work</span><span class='wl-mode-sub'>Find & verify assigned jobs</span><span class='wl-mode-badge'>${assignments.length}</span></button>
       <button type='button' class='wl-mode-card' data-wl-svc='returns'><span class='wl-mode-title'>Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${returnCount}</span></button>
     </div>
     <div class='wl-title'>My Work Today</div>
-    <div class='wl-sub'>Owner-assigned Service work is opened by exact MHelpDesk ticket, followed by the next workflow action.</div>
+    <div class='wl-sub'>Owner-assigned Service work and department-queue work appear here. Opening or claiming a job still requires the exact current MHelpDesk ticket.</div>
     ${nextAction}
     <div class='wl-workstrip'>
-      <span><b>${handoffCount}</b> handoffs ready</span>
+      <span><b>${assignments.length}</b> active / available jobs</span>
+      <span><b>${handoffCount}</b> IT handoffs ready</span>
       <span><b>${deployedCount}</b> units in field</span>
       <span><b>${r.waiting}</b> returns waiting IT</span>
     </div>
+    ${assignmentCards}
     ${assignedInventoryHtml(assignedAssets)}
     <div class='wl-menu'>
       <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
@@ -2459,7 +2552,6 @@ async function showSvcHome() {
   hideChildren(viewSvc(),[home]);
   resetWizardPosition();
 }
-
 function showServiceJobLookup() {
   let card=document.getElementById('wlSvcLookup');
   if(!card){
@@ -2553,6 +2645,15 @@ async function matchSvcTicket() {
   const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,status').eq('status', 'released');
   const prep = (data || []).find(p => norm(p.ticket_no) === norm(entered));
   if (!prep) { document.getElementById('wlLookupMsg').innerHTML = `<div class='bad top10'><b>No equipment is waiting for Service under that ticket.</b></div>`; return; }
+  const tech=await currentTechIdentity().catch(()=>null);
+  const assignment=(activeSvcAssignment?.ticket_no===prep.ticket_no && activeSvcAssignment?.assignee_user_id===tech?.id)
+    ? activeSvcAssignment
+    : await myServiceAssignmentForTicket(prep.ticket_no,prep.id);
+  if(currentRoleKey()!=='owner' && !assignment){
+    document.getElementById('wlLookupMsg').innerHTML = `<div class='bad top10'><b>This released handoff is not assigned to you.</b><div>Return to Service Home and open / claim the correct MHelpDesk job first.</div></div>`;
+    return;
+  }
+  if(assignment) activeSvcAssignment=assignment;
   document.getElementById('svcLookup').value = prep.ticket_no;
   await window.findPrep();
   await new Promise(r => setTimeout(r, 200));
@@ -3006,6 +3107,7 @@ document.addEventListener('click', async e => {
     intakeWizard.meta.answers = [...a];
     const { error } = await liveDb.from('unit_returns').update({ status: 'pending_mhelp_inventory', it_tech_id: tech.id, it_tech_name: tech.name, it_received_at: now, damage_notes: writeIntakeRecord(intakeWizard.notes, intakeWizard.meta), intake_photo_paths: paths, updated_at: now }).eq('id', row.id);
     if (error) return alert(error.message);
+    await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
     intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
     return showITIntake();
   }
@@ -3177,6 +3279,10 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
+  const beginAssignedReturn=e.target.closest('[data-wl-service-begin-return]');
+  if(beginAssignedReturn) return beginServiceReturnForAssignment(beginAssignedReturn.dataset.wlServiceBeginReturn);
+  const completeServiceAssignment=e.target.closest('[data-wl-service-complete-assignment]');
+  if(completeServiceAssignment) return completeServiceFieldAssignment(completeServiceAssignment.dataset.wlServiceCompleteAssignment);
   if (e.target.closest('[data-wl-service-find-job]')) return serviceFindJobByTicket();
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
   if(takeServiceJob) return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob);
@@ -3390,9 +3496,10 @@ async function submitServiceReturn() {
     uploadedPaths=await uploadReturnPhotos([taggedPhoto,...conditionPhotos,...damagePhotos],returnId,`service/unit-${safeUnit}`);
     const { error }=await liveDb.from('unit_returns').insert({ id:returnId, ticket_no:serviceReturn.ticket, unit_tag:serviceReturn.unit, equipment_type:serviceReturn.type, service_tech_id:tech.id, service_tech_name:tech.name, return_notes:serviceReturn.notes, return_photo_paths:uploadedPaths });
     if (error) throw error;
+    const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
     const card=serviceReturnCard();
-    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div></div><button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
+    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div><button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
     resetWizardPosition();
   } catch(err) {
     if (uploadedPaths.length) await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(() => null);
