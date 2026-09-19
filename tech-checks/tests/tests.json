@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v123",
-  "service_worker": "v79",
+  "service_worker": "v80",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v9, company-knowledge-v6, workflow-engine-v4 and rules-v5"
+        "Agent reports onsite-vision-agent-v10, company-knowledge-v7, workflow-engine-v4 and rules-v6"
       ]
     },
     {
@@ -1883,5 +1883,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Phase 7 camera-family teaching pass: Spotter, Recon II, and Ranger Owner rules captured. Spotter is 4-camera/internal-router/Alibi with no batteries; Recon II camera count is separate from battery quantity; Spotter/Recon II/Ranger require router ports 81/554; Ranger requires field Victron Bluetooth verification; Sniper/Spotter/Recon II swap returns are gated before close. Edge v9 active with JWT; rules v5 / knowledge v6 / technician v123 / loader v37 / SW79 / DB migration 79."
+  "last_release_qa_note": "Phase 7 camera-family teaching pass: Spotter, Recon II, and Ranger Owner rules captured. Spotter is 4-camera/internal-router/Alibi with no batteries; Recon II camera count is separate from battery quantity; Spotter/Recon II/Ranger require router ports 81/554; Ranger requires field Victron Bluetooth verification; Sniper/Spotter/Recon II swap returns are gated before close. Edge v10 active with JWT; rules v6 / knowledge v7 / technician v123 / loader v37 / SW80 / DB migration 79. Spotter correction: the previously unnamed top component is the antenna on top."
 }
