@@ -1559,9 +1559,9 @@
         "Inspect service-worker cache"
       ],
       "expected": [
-        "tech-check-rules.js rules-v3 loads before app.js",
-        "tech-check-rules.js rules-v3 loads before Company Knowledge and Workflow Engine",
-        "SW v77 caches the same rules-v3 URL"
+        "tech-check-rules.js rules-v4 loads before app.js",
+        "tech-check-rules.js rules-v4 loads before Company Knowledge and Workflow Engine",
+        "SW v78 caches the same rules-v4 URL"
       ]
     },
     {
