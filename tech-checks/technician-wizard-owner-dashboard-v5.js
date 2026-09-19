@@ -2098,6 +2098,7 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  if(e.target.closest('[data-owner-unit-lookup]')) return ownerLookupUnitHistory();
   const dayTab=e.target.closest('[data-owner-ai-day]');if(dayTab){const box=dayTab.closest('.wl-owner-ai-daily');box?.querySelectorAll('[data-owner-ai-day]').forEach(b=>b.classList.toggle('selected',b===dayTab));box?.querySelectorAll('[data-owner-ai-day-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.ownerAiDayPanel!==dayTab.dataset.ownerAiDay));return;}
   const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
@@ -2827,6 +2828,11 @@ async function installOwnerAssignments(force = false) {
       <span id='ownerAssignmentBadge' class='ownerDashBadge ${active.length ? 'alert' : 'neutral'}'>${active.length}</span>
     </summary>
     <div class='ownerDashBody'>
+      <section class='wl-owner-unit-lookup'>
+        <div class='wl-owner-unit-lookup-head'><div><span class='wl-eyebrow'>EQUIPMENT MEMORY</span><b>Unit Lookup</b><small>Search any numbered unit to see its Tech Check history.</small></div><span class='wl-owner-unit-icon'>⌕</span></div>
+        <div class='wl-owner-unit-search'><input id='ownerUnitLookupInput' inputmode='text' autocomplete='off' placeholder='Enter unit #, e.g. 058'><button type='button' data-owner-unit-lookup>Search</button></div>
+        <div id='ownerUnitLookupResult'></div>
+      </section>
       <details class='wl-owner-ai-daily' open><summary><span>✨ Owner AI Daily Summary</span><span class='pill'>TODAY</span></summary><div class='wl-owner-ai-daily-body'>
         <div class='wl-owner-ai-day-tabs'><button type='button' class='selected' data-owner-ai-day='today'>Today</button><button type='button' data-owner-ai-day='tomorrow'>Tomorrow <span>${tomorrowJobs.length}</span></button></div>
         <div data-owner-ai-day-panel='today'>
@@ -2866,6 +2872,47 @@ async function installOwnerAssignments(force = false) {
   liveHost.open = liveWasOpen || active.length > 0;
   refreshOwnerAutoServicePlan();
   refreshOwnerWorkTypeLabels();
+}
+async function ownerLookupUnitHistory(){
+  const input=document.getElementById('ownerUnitLookupInput'),out=document.getElementById('ownerUnitLookupResult');
+  const tag=String(input?.value||'').trim();if(!out)return;if(!tag){out.innerHTML="<div class='small'>Enter a unit number to view its Tech Check history.</div>";return;}
+  out.innerHTML="<div class='wl-owner-unit-loading'>Searching Tech Check history…</div>";
+  const [retQ,itemQ]=await Promise.all([
+    liveDb.from('unit_returns').select('unit_tag,equipment_type,ticket_no,status,service_tech_name,returned_at,it_tech_name,it_received_at,completed_at,damage_notes,return_notes,created_at').ilike('unit_tag',tag).order('created_at',{ascending:false}).limit(100),
+    liveDb.from('prep_items').select('id,prep_ticket_id,equipment_type,purpose,unit_tag,verified_at,service_verified_at,required_battery_count,battery_count,service_battery_count,power_ok,functions_ok,safe_ok').ilike('unit_tag',tag).order('verified_at',{ascending:false}).limit(100)
+  ]);
+  if(retQ.error||itemQ.error){out.innerHTML="<div class='wl-ai-warn'>Unable to load unit history right now.</div>";return;}
+  const returns=retQ.data||[],items=itemQ.data||[],prepIds=[...new Set(items.map(x=>x.prep_ticket_id).filter(Boolean))];
+  let prepMap=new Map();
+  if(prepIds.length){
+    const {data}=await liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,released_at,closed_at,created_at').in('id',prepIds);
+    prepMap=new Map((data||[]).map(x=>[x.id,x]));
+  }
+  if(!returns.length&&!items.length){out.innerHTML=`<div class='wl-owner-unit-empty'><b>No Tech Check history for ${esc(tag)}</b><span>This unit has not been recorded in a completed IT/Service check or return/intake yet.</span></div>`;return;}
+  const recurring=equipmentRecurringIssueAnalysis(returns);
+  const events=[];
+  items.forEach(x=>{const p=prepMap.get(x.prep_ticket_id)||{};const base='MHelpDesk #'+(p.ticket_no||'—')+(p.site?' · '+p.site:'');
+    if(p.created_at)events.push({when:p.created_at,title:'Tech Check job created',detail:base});
+    if(x.verified_at)events.push({when:x.verified_at,title:'IT equipment check verified',detail:base+' · '+(x.equipment_type||'Equipment')});
+    if(p.released_at)events.push({when:p.released_at,title:'IT handoff created',detail:base});
+    if(x.service_verified_at)events.push({when:x.service_verified_at,title:'Service equipment verification',detail:base});
+    if(p.closed_at)events.push({when:p.closed_at,title:'Tech Check workflow closed',detail:base});
+  });
+  returns.forEach(x=>{
+    if(x.returned_at)events.push({when:x.returned_at,title:'Returned from field',detail:'MHelpDesk #'+(x.ticket_no||'—')+(x.service_tech_name?' · Service: '+x.service_tech_name:'')});
+    if(x.it_received_at)events.push({when:x.it_received_at,title:'IT Intake received',detail:'MHelpDesk #'+(x.ticket_no||'—')+(x.it_tech_name?' · IT: '+x.it_tech_name:'')});
+    if(x.damage_notes||x.return_notes)events.push({when:x.returned_at||x.it_received_at||x.created_at,title:'Issue / return notes',detail:x.damage_notes||x.return_notes,issue:true});
+    if(x.completed_at)events.push({when:x.completed_at,title:'IT Intake completed',detail:'MHelpDesk #'+(x.ticket_no||'—')});
+  });
+  events.sort((a,b)=>new Date(b.when||0)-new Date(a.when||0));
+  const latest=events[0],types=[...new Set([...items.map(x=>x.equipment_type),...returns.map(x=>x.equipment_type)].filter(Boolean))];
+  out.innerHTML=`<div class='wl-owner-unit-profile'>
+    <div class='wl-owner-unit-profile-head'><div><span>UNIT HISTORY</span><h3>${esc(tag)}</h3><p>${types.length?esc(types.join(' · ')):'Equipment type not recorded'}</p></div><div class='wl-owner-unit-score'><b>${returns.length+items.length}</b><span>records</span></div></div>
+    <div class='wl-owner-unit-statrow'><div><b>${items.length}</b><span>IT / Service checks</span></div><div><b>${returns.length}</b><span>Return / intake records</span></div><div class='${recurring.length?'attention':''}'><b>${recurring.length}</b><span>Recurring patterns</span></div></div>
+    ${latest?`<div class='wl-owner-unit-last'><span>Latest activity</span><b>${esc(latest.title)}</b><small>${esc(ownerTimelineWhen(latest.when))}</small></div>`:''}
+    ${recurring.length?`<div class='wl-owner-unit-patterns'><b>✨ AI History Patterns</b>${recurring.map(x=>`<span>⚠ ${esc(x.name)} · ${x.count} prior mentions</span>`).join('')}<small>Advisory only — current equipment checks are still required.</small></div>`:''}
+    <details class='wl-owner-unit-timeline' open><summary>Full Tech Check timeline <span class='pill'>${events.length}</span></summary><div>${events.slice(0,40).map(e=>`<div class='wl-owner-unit-event ${e.issue?'issue':''}'><i></i><div><b>${esc(e.title)}</b><span>${e.when?esc(ownerTimelineWhen(e.when)):'Date not recorded'}</span><p>${esc(e.detail||'')}</p></div></div>`).join('')}</div></details>
+  </div>`;
 }
 function ownerApplyAIFilter(state,button){const live=document.getElementById('ownerLiveJobProgress');if(!live)return;const off=button.classList.contains('selected');live.querySelectorAll('[data-owner-ai-filter]').forEach(b=>b.classList.remove('selected'));const target=off?'':state;if(!off)button.classList.add('selected');live.querySelectorAll('.wl-assignment-row[data-owner-ai-state]').forEach(row=>row.classList.toggle('wl-ai-filter-hidden',!!target&&row.dataset.ownerAiState!==target));}
 function addOwnerTechPill() {
@@ -3132,7 +3179,7 @@ document.addEventListener('change', e => {
 
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
-document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
+document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
 let serviceSolarRealtimeStarted=false;
