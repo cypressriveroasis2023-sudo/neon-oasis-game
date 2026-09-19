@@ -4344,17 +4344,6 @@ async function installOwnerAssignments(force = false) {
       <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
-      <section class='wl-ai-panel ownerVisionLaunchCard'>
-        <a class='ownerVisionLaunchLink' href='./onsite-vision.html'>
-          <span class='wl-ai-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
-          <span class='ownerVisionLaunchCopy'>
-            <small>ONSITE VISION</small>
-            <b>AI Service Order Workspace</b>
-            <span>Open a dedicated conversation to look up jobs, keep ticket context, assign technicians, and work through the next step together.</span>
-          </span>
-          <strong>Open Vision →</strong>
-        </a>
-      </section>
       <div class='warn manualReferenceNotice'>
         <b>MHelpDesk is separate from Tech Check.</b>
         <div class='small'>Use the current MHelpDesk ticket as the source of truth every time. Enter the MHelpDesk reference, unit count, equipment, and work exactly as shown there. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
@@ -4614,7 +4603,25 @@ function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner');
   if(!view || !roleText().includes('Owner/Admin')) return;
 
+  let visionCard=document.getElementById('ownerVisionWorkspaceCard');
+  if(!visionCard){
+    visionCard=document.createElement('a');
+    visionCard.id='ownerVisionWorkspaceCard';
+    visionCard.className='card ownerDashSection ownerVisionTopCard';
+    visionCard.href='./onsite-vision.html';
+    visionCard.innerHTML=`
+      <span class='ownerVisionTopIcon'><img src='./techcheck-eye-192.png?v=1' alt=''></span>
+      <span class='ownerVisionTopCopy'>
+        <small>ONSITE VISION</small>
+        <b>AI Service Order Workspace</b>
+        <span>Open your dedicated AI workspace to talk through jobs, assign techs, change schedules, and work a service order together.</span>
+      </span>
+      <span class='ownerVisionTopGo'>Open →</span>
+    `;
+  }
+
   const order=[
+    'ownerVisionWorkspaceCard',
     'ownerJobAssignments',
     'ownerLiveJobProgress',
     'ownerAttentionCard',
