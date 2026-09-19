@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v1",
+  "version": "company-knowledge-v2",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -624,6 +624,47 @@
     ]
   }
 };
+  const shared=root.TechCheckRules;
+  if(shared){
+    data.shared_rules_version=shared.version;
+    data.equipment_aliases={...data.equipment_aliases,...(shared.equipmentAliases||{})};
+    for(const [name,rule] of Object.entries(shared.equipment||{})){
+      if(!data.equipment[name])data.equipment[name]={documented:'partial'};
+      const target=data.equipment[name];
+      target.category=rule.category||target.category;
+      if(typeof rule.required_batteries==='number')target.required_it_batteries=rule.required_batteries;
+      target.shared_required_batteries=rule.required_batteries;
+      if(Array.isArray(rule.purposes))target.purposes=[...rule.purposes];
+      if(rule.battery_label)target.battery_label=rule.battery_label;
+      if(shared.itChecklist){
+        const required=typeof rule.required_batteries==='number'?rule.required_batteries:1;
+        const sample={equipment_type:name,purpose:'DELIVERY',required_battery_count:required};
+        target.shared_it_checklist=shared.itChecklist(sample,1).map(step=>({
+          kind:step.kind,field:step.field,label:step.label
+        }));
+        target.shared_it_check_fields=target.shared_it_checklist.map(step=>step.field);
+      }
+    }
+    if(data.equipment.Helios&&shared.heliosPorts){
+      data.equipment.Helios.network_rules=[
+        {component:'Camera 1',ports:[...shared.heliosPorts.camera1],where:'device and router'},
+        {component:'Camera 2',ports:[...shared.heliosPorts.camera2],where:'device and router'},
+        {component:'PTZ',ports:[...shared.heliosPorts.ptz],where:'device and router'},
+        {component:'IP Speaker',ports:[...shared.heliosPorts.speaker],where:'device and router'}
+      ];
+    }
+    data.shared_service_rules={
+      solar_spotter_delivery:shared.automaticServiceSolarPlan
+        ? shared.automaticServiceSolarPlan([{category:'device',label:'Solar Spotter',qty:1}],'delivery')
+        : null,
+      ranger_delivery:shared.automaticServiceSolarPlan
+        ? shared.automaticServiceSolarPlan([{category:'device',label:'Ranger',qty:1}],'delivery')
+        : null,
+      helios_service_evidence:shared.serviceSolarEvidenceRequirements
+        ? shared.serviceSolarEvidenceRequirements({need_solar:true,need_stand:false,has_helios:true,solar_spotter_count:0})
+        : []
+    };
+  }
   const deepFreeze=(value)=>{
     if(!value||typeof value!=='object'||Object.isFrozen(value)) return value;
     Object.freeze(value);
