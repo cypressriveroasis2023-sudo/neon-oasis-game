@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v1
+ * Version: company-knowledge-v4
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v3",
+  "version": "company-knowledge-v4",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -274,7 +274,7 @@
       "category": "device",
       "documented": "partial",
       "required_it_batteries": 2,
-      "battery_label": "2 required batteries (exact model not yet centralized in verified company knowledge)",
+      "battery_label": "12V 35Ah batteries",
       "purposes": [
         "DELIVERY",
         "SWAP",
@@ -295,6 +295,14 @@
         "Detailed internal components",
         "port map",
         "product-specific troubleshooting tree"
+      ],
+      "teaching_needed": [
+        "List the Sniper internal components and what belongs with each unit.",
+        "Document the Sniper device/router port map and any programming/configuration sequence.",
+        "Document Sniper-specific IT checks beyond the shared deployable-device checks.",
+        "Document any Sniper-specific Service checkout or field-install steps.",
+        "Document any Sniper-specific mandatory photos/signatures beyond the generic handoff evidence.",
+        "Document the approved Sniper troubleshooting sequence for power, batteries, SIM/router, camera app/video, recording, and storage."
       ],
       "sources": [
         "add_it_prep_item",
@@ -327,6 +335,14 @@
         "port map",
         "product-specific troubleshooting tree"
       ],
+      "teaching_needed": [
+        "List the Spotter internal components and what belongs with each unit.",
+        "Confirm whether Spotter has a battery requirement beyond the current database requirement of 0; if yes, document exact battery model and quantity.",
+        "Document the Spotter device/router port map and programming/configuration sequence.",
+        "Document Spotter-specific IT checks beyond the shared deployable-device checks.",
+        "Document any Spotter-specific Service checkout or field-install steps and mandatory evidence.",
+        "Document the approved Spotter troubleshooting sequence."
+      ],
       "sources": [
         "add_it_prep_item",
         "itUnitStepsData"
@@ -358,6 +374,14 @@
         "detailed internal components",
         "port map",
         "product-specific troubleshooting tree"
+      ],
+      "teaching_needed": [
+        "Document the exact Recon II battery model/specification; the database label Recon II Battery is not a physical specification.",
+        "List the Recon II internal components and what belongs with each configured unit/camera set.",
+        "Document the Recon II device/router port map and programming/configuration sequence.",
+        "Document Recon II-specific IT checks beyond the shared deployable-device checks.",
+        "Document any Recon II-specific Service checkout or field-install steps and mandatory evidence.",
+        "Document the approved Recon II troubleshooting sequence."
       ],
       "sources": [
         "add_it_prep_item",
@@ -405,9 +429,17 @@
       "unknowns": [
         "Detailed product-specific field installation SOP"
       ],
+      "teaching_needed": [
+        "List every Solar Pole component/accessory that must travel with it.",
+        "Document the Solar Pole Service field-install/removal SOP.",
+        "Document any Solar Pole battery, MPPT, PV/charging, positioning, anchoring, or safety rules that apply.",
+        "Document Solar Pole-specific mandatory photos/signatures.",
+        "Document the approved Solar Pole troubleshooting sequence."
+      ],
       "sources": [
         "configure_it_prep_item",
-        "enforce_support_safe_before_release"
+        "enforce_support_safe_before_release",
+        "service_solar_context_v2"
       ]
     },
     "110V Stand": {
@@ -423,6 +455,13 @@
       ],
       "unknowns": [
         "Detailed product-specific field installation SOP"
+      ],
+      "teaching_needed": [
+        "List every 110V Stand component/accessory that must travel with it.",
+        "Document the exact 110V Stand SWAP installation/removal SOP.",
+        "Document the company-required power-source, cord, outlet, GFCI, or electrical checks, if any.",
+        "Document 110V Stand-specific mandatory photos/signatures.",
+        "Document the approved 110V Stand troubleshooting sequence."
       ],
       "sources": [
         "add_it_prep_item",
@@ -445,11 +484,82 @@
       "unknowns": [
         "Detailed product-specific field installation SOP"
       ],
+      "teaching_needed": [
+        "List every Pole component/accessory that must travel with it.",
+        "Document the Pole Delivery/Swap installation and removal SOP.",
+        "Document any company mounting, anchoring, height, positioning, or safety rules that apply.",
+        "Document Pole-specific mandatory photos/signatures.",
+        "Document the approved Pole troubleshooting sequence."
+      ],
       "sources": [
         "configure_it_prep_item",
         "itUnitStepsData"
       ]
     }
+  },
+  "truck_spares": {
+    "documented": true,
+    "authority": [
+      "add_it_truck_spare_unit",
+      "save_it_truck_spare_battery",
+      "enforce_truck_spares_before_release",
+      "resolve_my_truck_spare_unit",
+      "resolve_my_truck_spare_battery"
+    ],
+    "unit_types": [
+      "Sniper",
+      "Ranger",
+      "Helios",
+      "Solar Spotter",
+      "Spotter",
+      "Recon 2"
+    ],
+    "unit_purpose": "BACKUP",
+    "unit_flow": [
+      "IT runs the full applicable unit check.",
+      "Matching-tag photo and IT signature are required by the existing prep workflow.",
+      "IT explicitly checks out the spare before the IT → Service handoff.",
+      "Service resolves the spare after the field call as used or returned_unused.",
+      "Unused spare units return directly to Shop Inventory and do not create an IT Intake return.",
+      "If a spare unit is used for a swap, the failed/replaced field unit follows the normal Service Return → IT Intake flow."
+    ],
+    "battery_batches": [
+      {"equipment_type":"Solar Spotter","battery_type":"AGM 12V 110Ah"},
+      {"equipment_type":"Solar Spotter","battery_type":"12V 350Ah"},
+      {"equipment_type":"Ranger","battery_type":"LiTime 12V 110Ah"},
+      {"equipment_type":"Helios","battery_type":"Helios Battery Box"},
+      {"equipment_type":"Recon 2","battery_type":"Recon II Battery"}
+    ],
+    "battery_flow": [
+      "IT records the spare quantity.",
+      "IT must mark the batch physically present, charged and READY.",
+      "IT explicitly checks out the batch before the IT → Service handoff.",
+      "Service records the quantity used; any remainder is returned unused.",
+      "Checked-out batches are locked from editing by the existing database workflow."
+    ],
+    "manifest_rule": "Truck spares remain separate from the customer/job equipment manifest.",
+    "known_limits": [
+      "The current database does not accept a standalone Sniper spare-battery batch.",
+      "The current database does not accept a standalone Spotter spare-battery batch.",
+      "Recon II Battery is an accepted database label, but its exact physical model/specification is still undocumented."
+    ]
+  },
+  "phase_7_gap_inventory": {
+    "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
+    "products": {
+      "Sniper": "Internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
+      "Spotter": "Internal components, battery applicability/specification, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
+      "Recon 2": "Exact battery model/specification, internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
+      "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, and troubleshooting still need Owner-approved documentation.",
+      "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
+      "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, and troubleshooting still need Owner-approved documentation."
+    },
+    "truck_spares": [
+      "Confirm whether Sniper should support a standalone spare-battery batch and, if so, its exact battery label/specification.",
+      "Confirm whether Spotter should support a standalone spare-battery batch and, if so, its exact battery label/specification.",
+      "Document the exact physical Recon II battery specification behind the current Recon II Battery database label.",
+      "Document any product-specific spare-kit contents beyond the checked unit and supported battery batches."
+    ]
   },
   "workflows": {
     "delivery": {
