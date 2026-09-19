@@ -77,7 +77,7 @@ async function newChat(){
   const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',messages:[]};
   state.chats.unshift(c);state.chats=state.chats.slice(0,20);state.chatId=c.id;
   saveChats();renderHistory();renderThread();renderOrder();closeDrawers();
-  const prompt=$('visionPrompt');if(prompt){prompt.value='';grow(prompt);}
+  const prompt=$('visionPrompt');if(prompt){prompt.value='';grow(prompt);prompt.blur();}
 }
 function openChat(chatId){
   const c=state.chats.find(x=>x.id===chatId);if(!c)return;
