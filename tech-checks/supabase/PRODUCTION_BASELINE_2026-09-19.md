@@ -455,3 +455,51 @@ Final source/deployment checks for this pass:
 - `tests.json` parses successfully;
 - Sniper SWAP release and persistence gates are present in the live database;
 - Tesseract/OCR is not present in the service-worker startup cache.
+
+
+## Phase 7 Spotter / Recon II / Ranger Owner teaching pass
+
+Owner instruction captured on 2026-09-19 adds the core Spotter, Recon II, and Ranger operating rules.
+
+### Spotter
+- 4 cameras, internal router, no batteries.
+- Older/prebuilt unit: verify the actual unit is programmed and visible in Alibi before deployment.
+- Router ports 81 and 554 must be available/configured for Central Station access.
+- Verify all 4 cameras, verify recording, then leave the NVR or SD-card storage formatted/ready.
+- Customer deployment sends required monitoring information to Central Station and adds customer-provided email access.
+- DELIVERY identifies whether Service needs a pole or stand.
+- SWAP does not add another pole/stand; the replaced field Spotter must enter Service Return → IT Intake before close.
+- Exact name of the Owner-mentioned top-mounted component remains intentionally undocumented until confirmed.
+
+### Recon II
+- Camera count is now tracked separately from battery quantity.
+- Verify actual unit programming/visibility in Reconeyez.
+- Ports 81 and 554 must be available/configured for Central Station access.
+- After programming/readiness, IT prepares the actual battery quantity. The live database minimum remains 1 until exact battery model/rule is taught.
+- DELIVERY identifies whether Service needs a pole or stand.
+- SWAP replacement uses customer-deployment readiness and the replaced field unit must enter Service Return → IT Intake before close.
+
+### Ranger
+- 1 × LiTime 12V 110Ah.
+- IT shop test verifies battery/solar charging through MPPT.
+- Ports 81 and 554 must be available/configured for Central Station.
+- Verify recording before formatting the internal SD card; then leave storage formatted/ready.
+- Customer deployments include Central Station information and shared-email/camera access.
+- Service must verify the Ranger is up to date in the Victron Bluetooth app in the field before Tech Check can close.
+
+### Database / release
+Migration 79 (`camera_family_workflows_v1`) adds camera-family port/programming/camera-count fields, Ranger field verification, release gates, and standard SWAP-return close gates.
+
+Current release:
+- shared rules: `rules-v5`
+- Company Knowledge: `company-knowledge-v6`
+- Workflow Engine: `workflow-engine-v4`
+- technician: `release-qa-v123`
+- loader: `startup-fast-v37`
+- OnSite Vision workspace: `vision-workspace-v16`
+- Edge agent: `onsite-vision-agent-v9` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v79`
+- database migrations: 79
+- QA tests: 98
+
+Regression checks passed for JavaScript syntax, browser/server bundle parity, deployed Edge parity, live database columns/triggers, cache versions, and absence of Tesseract/OCR from the startup cache. Supabase advisors reported existing project-wide warnings plus the new Ranger verifier foreign-key index as a performance advisory; no new anonymous-execution warning was introduced for the two new RPCs.
