@@ -4408,7 +4408,6 @@ function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
-  if (host && host.dataset.loaded === '1' && !force) return;
   if (!host) {
     host = document.createElement('details');
     host.id = 'ownerJobAssignments';
@@ -4418,12 +4417,24 @@ async function installOwnerAssignments(force = false) {
   }
 
   let liveHost = document.getElementById('ownerLiveJobProgress');
+  let liveNeedsHydration = false;
   if (!liveHost) {
     liveHost = document.createElement('details');
     liveHost.id = 'ownerLiveJobProgress';
     liveHost.className = 'card ownerDashSection ownerLiveJobsCard';
     host.insertAdjacentElement('afterend', liveHost);
+    liveNeedsHydration = true;
   }
+  if (!liveHost.querySelector('summary')) {
+    liveHost.innerHTML = `
+      <summary class='ownerDashSummary'>
+        <div><b>Live Job Progress</b><span>See what is assigned, who has it, and what is currently being worked</span></div>
+        <span class='ownerDashBadge neutral'>0</span>
+      </summary>
+      <div class='ownerDashBody'><div class='small'>Loading live Tech Check jobs…</div></div>`;
+    liveNeedsHydration = true;
+  }
+  if (host.dataset.loaded === '1' && !force && !liveNeedsHydration) return;
 
   const wasOpen = host.open;
   const liveWasOpen = liveHost.open;
