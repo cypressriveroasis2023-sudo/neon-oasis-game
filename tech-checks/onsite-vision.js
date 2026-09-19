@@ -173,6 +173,13 @@ function timeFrom(text){
 function dateLabel(k){const d=new Date(k+'T12:00:00');return Number.isNaN(d.getTime())?k:d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});}
 function dateJobs(k){
   const tickets=[...new Set(state.jobs.filter(j=>j.status!=='completed'&&String(j.scheduled_for||'')===String(k)).map(j=>String(j.ticket_no||'')))].filter(Boolean);
+  if(tickets.length===1){
+    state.currentTicket=tickets[0];
+    const current=ensureChat();
+    current.ticket=tickets[0];
+    saveChats();
+    setTimeout(renderOrder,0);
+  }
   return tickets.length?'<div class="vision-answer-title">'+tickets.length+' job'+(tickets.length===1?'':'s')+' on '+esc(dateLabel(k))+'</div><div class="vision-answer-copy">I pulled the live Tech Check schedule and assignments.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No Tech Check jobs are scheduled for '+esc(dateLabel(k))+'.</div>';
 }
 function findTech(text,role=''){
@@ -180,11 +187,27 @@ function findTech(text,role=''){
   return pool.find(t=>{const first=String(t.full_name||'').trim().split(/\s+/)[0].toLowerCase();return first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(s);})||null;
 }
 function assignIntent(text){
-  const s=String(text||'').toLowerCase();if(!/\b(assign|task|send|put|give|ask)\b/.test(s)||!/\b(job|ticket|this|service|it|tech|technician|to)\b/.test(s))return null;
-  const service=/\bservice\b/.test(s),it=/\bit\b/.test(s),tech=findTech(text,service?'service':it?'it':'');if(tech)return{kind:'assign-tech',role:tech.role,tech};if(service)return{kind:'assign-queue',role:'service'};if(it)return{kind:'assign-queue',role:'it'};return null;
+  const s=String(text||'').toLowerCase();
+  if(!/\b(assign|task|send|put|give|ask)\b/.test(s)||!/\b(job|ticket|this|service|it|tech|technician|to)\b/.test(s))return null;
+  const service=/\bservice\b/.test(s),it=/\bit\b/.test(s),tech=findTech(text,service?'service':it?'it':'');
+  if(tech)return{kind:'assign-tech',role:tech.role,tech};
+  if(service&&/\b(?:a|any|which)?\s*service\s+(?:tech|technician)\b/.test(s))return{kind:'choose-tech',role:'service'};
+  if(it&&/\b(?:a|any|which)?\s*it\s+(?:tech|technician)\b/.test(s))return{kind:'choose-tech',role:'it'};
+  if(service)return{kind:'assign-queue',role:'service'};
+  if(it)return{kind:'assign-queue',role:'it'};
+  return null;
 }
 function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||t)&&/\b(move|change|set|make|schedule|reschedule|put)\b/i.test(text)?{kind:'schedule',date:d,time:t}:null;}
 function actionCard(a,ticket){
+  if(a.kind==='choose-tech'){
+    const people=state.techs.filter(t=>t.role===a.role);
+    if(!people.length)return '<div class="vision-direct warn"><b>No active '+esc(a.role==='service'?'Service':'IT')+' technicians are available.</b>You can still ask Vision to send this job to the department queue.</div>';
+    const choices=people.map(t=>{
+      const name=t.full_name||t.username||'Technician';
+      return '<button type="button" data-vision-prompt="Assign '+esc(name)+' as the '+esc(a.role==='service'?'Service Tech':'IT Technician')+' for this job">'+esc(name)+'</button>';
+    }).join('');
+    return '<div class="vision-action-card"><small>CHOOSE TECHNICIAN</small><b>Who should take MHelpDesk #'+esc(ticket)+'?</b><p>Select a technician and Vision will prepare the assignment for confirmation.</p><div class="vision-tech-choice-grid">'+choices+'</div></div>';
+  }
   const actionId=id();state.pending.set(actionId,{...a,ticket});
   if(a.kind==='assign-tech')return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Assign '+esc(a.tech.full_name||a.tech.username)+' as '+esc(a.role==='service'?'Service Tech':'IT Technician')+'</b><p>Ticket #'+esc(ticket)+' will be assigned directly in Tech Check. MHelpDesk will not be changed.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm assignment</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
   if(a.kind==='assign-queue')return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Send ticket #'+esc(ticket)+' to the '+esc(a.role==='service'?'Service':'IT')+' department queue</b><p>A technician in that department can claim it using the exact MHelpDesk ticket number.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm department assignment</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
@@ -251,6 +274,18 @@ async function execute(actionId){
   await loadData();addMessage('assistant','', '<div class="vision-direct good"><b>Saved in Tech Check.</b>'+esc(result)+' MHelpDesk remains separate.</div>'+jobCard(ticket));renderThread();renderOrder();
 }
 function grow(el){if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,150)+'px';}
+function syncVisualViewport(){
+  const vv=window.visualViewport;
+  const root=document.documentElement;
+  if(!vv){root.style.setProperty('--vision-visual-bottom','0px');return;}
+  const layoutH=document.documentElement.clientHeight||window.innerHeight||vv.height;
+  const offset=Math.max(0,layoutH-vv.height-vv.offsetTop);
+  root.style.setProperty('--vision-visual-bottom',offset+'px');
+}
+window.visualViewport?.addEventListener('resize',syncVisualViewport);
+window.visualViewport?.addEventListener('scroll',syncVisualViewport);
+window.addEventListener('resize',syncVisualViewport);
+syncVisualViewport();
 function closeDrawers(){$('visionApp')?.classList.remove('sidebar-open','order-open');}
 function voice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addMessage('assistant','', '<div class="vision-system-note">Use the iPhone keyboard microphone for voice dictation on this device.</div>');renderThread();return;}
@@ -261,8 +296,8 @@ document.addEventListener('click',async e=>{
   const p=e.target.closest('[data-vision-prompt],[data-order-prompt]');if(p)return send(p.dataset.visionPrompt||p.dataset.orderPrompt);
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){state.pending.delete(cancel.dataset.cancelAction);addMessage('assistant','', '<div class="vision-system-note">No changes were made.</div>');renderThread();return;}
-  if(e.target.closest('#visionNewChat'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
-  if(e.target.closest('#visionRefreshButton')){try{await loadData();addMessage('assistant','', '<div class="vision-system-note">Tech Check data refreshed.</div>');renderThread();renderOrder();}catch(error){console.warn(error);}return;}
+  if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
+  if(e.target.closest('#visionRefreshButton')){try{await loadData();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
