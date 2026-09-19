@@ -56,7 +56,7 @@ async function loadData(){
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='LIVE';
 }
 async function init(){
-  db=await techCheckDb();loadChats();
+  db=await techCheckDb();window.OnSiteVisionLiveData?.configure?.(db);loadChats();
   const session=(await db.auth.getSession()).data.session;
   if(!session){location.replace('./');return;}
   state.session=session;
@@ -107,6 +107,78 @@ function bottom(smooth=true){
 function prep(ticket){return state.preps.find(p=>String(p.ticket_no||'')===String(ticket))||null;}
 function group(ticket){return state.jobs.filter(j=>String(j.ticket_no||'')===String(ticket));}
 function active(ticket){return group(ticket).filter(j=>j.status!=='completed');}
+function visionLiveData(){return window.OnSiteVisionLiveData||null;}
+async function liveContext(ticket,force=false){
+  const layer=visionLiveData();
+  if(!layer?.getJobContext)return null;
+  return await layer.getJobContext(String(ticket||''),{force});
+}
+function liveEngineContext(context){
+  const layer=visionLiveData();
+  return layer?.forWorkflowEngine?layer.forWorkflowEngine(context):context;
+}
+function liveScheduleText(context){
+  const s=context?.summary||{};
+  if(!s.scheduled_for)return'Not scheduled';
+  const d=dateLabel(s.scheduled_for);
+  return s.scheduled_time?d+' · '+String(s.scheduled_time).slice(0,5):d+' · no exact time';
+}
+function liveEquipmentText(context){
+  const items=Array.isArray(context?.items)?context.items:[];
+  if(items.length)return items.map(i=>[i.equipment_type,i.unit_tag?('#'+i.unit_tag):'',i.purpose?('· '+i.purpose):''].filter(Boolean).join(' ')).join(', ');
+  const manifest=context?.prep?.equipment_manifest||context?.assignments?.[0]?.equipment_manifest||[];
+  return Array.isArray(manifest)&&manifest.length?manifest.map(x=>(Number(x.qty||1)+' × '+String(x.label||'Equipment'))).join(', '):'No equipment recorded';
+}
+function liveJobCard(context){
+  if(!context?.found)return'';
+  const engine=visionWorkflowEngine(),wc=liveEngineContext(context);
+  const step=engine?.getWorkflowNextStep?engine.getWorkflowNextStep(wc):null;
+  const summary=context.summary||{},assignments=Array.isArray(context.assignments)?context.assignments:[],open=assignments.filter(a=>!['completed','cancelled'].includes(a.status));
+  const rows=(open.length?open:assignments).map(a=>'<div class="vision-assignment-row"><span><b>'+esc(String(a.assigned_role||'').toUpperCase())+'</b> - '+esc(a.assignee_name||((a.assignment_scope==='department')?'Department queue':'Unassigned'))+'</span><span>'+esc(String(a.status||'').toUpperCase())+'</span></div>').join('');
+  const registry=Array.isArray(context.unit_registry)?context.unit_registry:[];
+  const lifecycle=registry.length?registry.map(u=>esc((u.equipment_type||'Unit')+' '+(u.unit_tag||'')+' · '+String(u.lifecycle_status||'unknown').replaceAll('_',' '))).join('<br>'):'';
+  return '<div class="vision-job-card"><div class="vision-job-head"><b>#'+esc(context.ticket_no)+' - '+esc(summary.site||context.prep?.site||'No site')+'</b><span class="vision-pill">'+esc(String(summary.effective_work_type||'service').toUpperCase())+'</span></div>'
+    +'<div class="vision-job-meta"><span>'+esc(liveScheduleText(context))+'</span><span>'+esc(liveEquipmentText(context))+'</span><span>LIVE DATABASE</span></div>'
+    +'<div class="vision-assignment-list">'+(rows||'<div class="vision-system-note">No active assignment.</div>')+'</div>'
+    +(lifecycle?'<div class="vision-system-note">'+lifecycle+'</div>':'')
+    +(step?.next?'<div class="vision-next"><b>Next:</b> '+esc(step.next)+'</div>':'')+'</div>';
+}
+function liveWhoHtml(context){
+  const rows=(context?.assignments||[]).filter(a=>!['completed','cancelled'].includes(a.status));
+  return rows.length?'<div class="vision-answer-title">Current Tech Check assignment</div><div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>'+rows.map(a=>'<div>'+esc(String(a.assigned_role||'').toUpperCase())+': '+esc(a.assignee_name||((a.assignment_scope==='department')?'Department queue':'Unassigned'))+' · '+esc(String(a.status||'').toUpperCase())+'</div>').join('')+'</div>'+liveJobCard(context)
+    :'<div class="vision-direct warn"><b>VERIFIED DATABASE FACT</b>No active IT or Service assignment is showing for MHelpDesk #'+esc(context?.ticket_no||'')+'.</div>'+liveJobCard(context);
+}
+function liveBlockersHtml(context){
+  const engine=visionWorkflowEngine(),wc=liveEngineContext(context);
+  const blockers=engine?.getWorkflowBlockers?engine.getWorkflowBlockers(wc):[];
+  if(!blockers.length)return '<div class="vision-answer-title">No workflow blocker is showing.</div><div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>The current records do not show a known Tech Check workflow blocker.</div>'+liveJobCard(context);
+  return '<div class="vision-answer-title">What is holding this job up</div>'+blockers.map(b=>'<div class="vision-direct warn"><b>'+esc(b.certainty||'VERIFIED DATABASE FACT')+'</b>'+esc(b.message||b.code||'Workflow blocker')+'</div>').join('')+liveJobCard(context);
+}
+function liveNextHtml(context){
+  const engine=visionWorkflowEngine(),wc=liveEngineContext(context);
+  const result=engine?.getWorkflowNextStep?engine.getWorkflowNextStep(wc):null;
+  return '<div class="vision-answer-title">What should happen next</div><div class="vision-direct"><b>COMPANY WORKFLOW + LIVE DATABASE</b>'+esc(result?.next||'Continue the active Tech Check workflow.')+'</div>'+liveJobCard(context);
+}
+function liveEquipmentHtml(context){
+  const items=Array.isArray(context?.items)?context.items:[],registry=Array.isArray(context?.unit_registry)?context.unit_registry:[];
+  if(!items.length)return '<div class="vision-answer-title">Equipment on this job</div><div class="vision-direct warn"><b>MISSING INFORMATION</b>No prepared equipment items are currently recorded for this ticket.</div>'+liveJobCard(context);
+  return '<div class="vision-answer-title">Equipment on this job</div>'+items.map(i=>{
+    const u=registry.find(x=>String(x.prep_item_id||'')===String(i.id)||String(x.unit_tag||'')===String(i.unit_tag||''));
+    return '<div class="vision-direct good"><b>'+esc(i.equipment_type||'Equipment')+' '+esc(i.unit_tag?('#'+i.unit_tag):'')+'</b>'+esc('Purpose: '+String(i.purpose||'—')+' · Lifecycle: '+String(u?.lifecycle_status||'not recorded').replaceAll('_',' '))+'</div>';
+  }).join('')+liveJobCard(context);
+}
+function liveEvidenceHtml(context){
+  const handoff=Array.isArray(context?.handoff_evidence)?context.handoff_evidence:[],solar=Array.isArray(context?.service_solar_evidence)?context.service_solar_evidence:[],returns=Array.isArray(context?.returns)?context.returns:[];
+  const returnCount=returns.reduce((n,r)=>n+(r.return_photo_paths?.length||0)+(r.intake_photo_paths?.length||0),0);
+  const total=handoff.length+solar.length+returnCount;
+  if(!total)return '<div class="vision-answer-title">Evidence for this job</div><div class="vision-direct warn"><b>VERIFIED DATABASE FACT</b>No Tech Check photo/signature evidence is currently recorded for this job.</div>';
+  const rows=[
+    ...handoff.map(e=>({label:(e.stage||'handoff')+' '+(e.kind||'evidence'),who:e.created_by_name,at:e.created_at})),
+    ...solar.map(e=>({label:(e.category||'solar')+' '+(e.kind||'evidence'),who:e.created_by_name,at:e.created_at}))
+  ];
+  return '<div class="vision-answer-title">'+total+' evidence item'+(total===1?'':'s')+' recorded</div><div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>'+rows.map(e=>'<div>'+esc(e.label)+' · '+esc(e.who||'Unknown signer/uploader')+(e.at?' · '+esc(new Date(e.at).toLocaleString()):'')+'</div>').join('')+(returnCount?'<div>'+returnCount+' return/intake photo record'+(returnCount===1?'':'s')+'</div>':'')+'</div>';
+}
+
 function workType(rows,p){
   const purpose=(p?.prep_items||[]).map(x=>String(x.purpose||'').toUpperCase()).find(x=>x==='DELIVERY'||x==='SWAP');
   return String(purpose?purpose.toLowerCase():(rows[0]?.work_type||p?.work_type||'service')).toLowerCase();
@@ -525,13 +597,17 @@ async function answer(text){
     return flag.length?'<div class="vision-answer-title">'+flag.length+' job'+(flag.length===1?'':'s')+' need workflow attention</div>'+flag.slice(0,10).map(jobCard).join(''):'<div class="vision-answer-title">No handoff blockers are showing right now.</div>';
   }
   if(ticket){
-    if(!group(ticket).length&&!prep(ticket))return ticketAnswer(ticket);
+    const context=await liveContext(ticket,true);
+    if(!context?.found&&!group(ticket).length&&!prep(ticket))return ticketAnswer(ticket);
     state.currentTicket=ticket;ensureChat().ticket=ticket;saveChats();renderOrder();
-    const a=assignIntent(raw);if(a)return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+jobCard(ticket);
-    const s=scheduleIntent(raw);if(s)return '<div class="vision-answer-title">I can update the schedule.</div>'+actionCard(s,ticket)+jobCard(ticket);
-    if(/\b(who\s+(?:has|is\s+assigned|is\s+handling)|who(?:'s|\s+is)\s+(?:task|assigned|handling)|assignment|assigned\s+to|who\s+has\s+it)\b/i.test(raw))return who(ticket);
-    if(/\b(what happens next|what next|still needs|remaining|finish it|what needs to be done)\b/i.test(raw))return '<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
-    return ticketAnswer(ticket,'Here is the live Tech Check side of this service order.');
+    const a=assignIntent(raw);if(a)return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
+    const s=scheduleIntent(raw);if(s)return '<div class="vision-answer-title">I can update the schedule.</div>'+actionCard(s,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
+    if(/\b(who\s+(?:has|is\s+assigned|is\s+handling)|who(?:'s|\s+is)\s+(?:task|assigned|handling)|assignment|assigned\s+to|who\s+has\s+it)\b/i.test(raw))return context?.found?liveWhoHtml(context):who(ticket);
+    if(/\b(holding|hold(?:ing)? up|blocked|blocker|stuck|why (?:can'?t|cannot)|what.*preventing)\b/i.test(raw))return context?.found?liveBlockersHtml(context):'<div class="vision-answer-title">I could not load the full blocker context.</div>'+jobCard(ticket);
+    if(/\b(what happens next|what next|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
+    if(/\b(show|list|what).*(equipment|unit|units|gear)|\bwhat equipment\b/i.test(raw))return context?.found?liveEquipmentHtml(context):jobCard(ticket);
+    if(/\b(show|list|see|what).*(photo|photos|picture|pictures|evidence|signature|signatures)\b/i.test(raw))return context?.found?liveEvidenceHtml(context):'<div class="vision-answer-title">No evidence context is available.</div>';
+    return context?.found?'<div class="vision-answer-title">MHelpDesk #'+esc(ticket)+'</div><div class="vision-answer-copy">Here is the current Tech Check context from the live database.</div>'+liveJobCard(context):ticketAnswer(ticket,'Here is the live Tech Check side of this service order.');
   }
   if(assignIntent(raw))return '<div class="vision-answer-title">Which service order?</div><div class="vision-answer-copy">Tell me the MHelpDesk ticket number or unit first, then I can prepare the assignment.</div>';
   if(scheduleIntent(raw))return '<div class="vision-answer-title">Which service order should I reschedule?</div><div class="vision-answer-copy">Tell me the ticket number or unit and I will keep the date/time change ready.</div>';
@@ -570,7 +646,7 @@ async function execute(actionId){
       result=tech?(tech.full_name||tech.username)+' was assigned to MHelpDesk #'+ticket+'.':'MHelpDesk #'+ticket+' was sent to the '+(a.role==='service'?'Service':'IT')+' department queue.';
     }
   }
-  await loadData();addMessage('assistant','', '<div class="vision-direct good"><b>Saved in Tech Check.</b>'+esc(result)+' MHelpDesk remains separate.</div>'+jobCard(ticket));renderThread();renderOrder();
+  await loadData();visionLiveData()?.invalidate?.(ticket);addMessage('assistant','', '<div class="vision-direct good"><b>Saved in Tech Check.</b>'+esc(result)+' MHelpDesk remains separate.</div>'+jobCard(ticket));renderThread();renderOrder();
 }
 function grow(el){if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,150)+'px';}
 function syncVisualViewport(){
@@ -602,7 +678,7 @@ document.addEventListener('click',async e=>{
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){state.pending.delete(cancel.dataset.cancelAction);addMessage('assistant','', '<div class="vision-system-note">No changes were made.</div>');renderThread();return;}
   if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
-  if(e.target.closest('#visionRefreshButton')){try{await loadData();renderOrder();}catch(error){console.warn(error);}return;}
+  if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();await loadData();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
