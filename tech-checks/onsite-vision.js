@@ -108,6 +108,57 @@ function agentProposalHtml(p){
   if(!p||p.type==='none')return'';
   return '<div class="vision-action-card"><small>PROPOSED ACTION</small><b>'+esc(p.summary||String(p.type||'').replaceAll('_',' '))+'</b><p>Vision has not changed Tech Check yet.</p></div>';
 }
+function visionActions(){return window.OnSiteVisionActions||null;}
+function legacyActionPayload(a,ticket){
+  if(!a)return null;
+  if(a.kind==='assign-tech')return{type:'assign',ticket_no:String(ticket||''),role:a.role||'',technician_name:a.tech?.full_name||a.tech?.username||'',work_type:'',date:'',time:'',summary:'Assign technician',requires_confirmation:true};
+  if(a.kind==='assign-queue')return{type:'assign',ticket_no:String(ticket||''),role:a.role||'',technician_name:'',work_type:'',date:'',time:'',summary:'Assign department queue',requires_confirmation:true};
+  if(a.kind==='schedule')return{type:'schedule',ticket_no:String(ticket||''),role:'',technician_name:'',work_type:'',date:a.date||'',time:a.time||'',summary:'Update Tech Check schedule',requires_confirmation:true};
+  return null;
+}
+function auditActionLabel(action){
+  const type=String(action?.type||'').toLowerCase();
+  if(type==='assign')return'Confirm assignment';
+  if(type==='schedule')return'Confirm schedule change';
+  if(type==='cancel')return'Confirm cancellation';
+  if(type==='owner_approve')return'Confirm Owner approval';
+  return'Confirm action';
+}
+async function auditedActionCard(action,userMessage=''){
+  const layer=visionActions();
+  if(!layer?.prepare)return agentProposalHtml(action);
+  const result=await layer.prepare({
+    conversation_id:state.chatId||'',
+    action,
+    user_message:userMessage||''
+  });
+  const canonical=result?.canonical_action||action||{};
+  if(!result?.executable){
+    const reason=result?.validation?.reason||'This action requires the guided Tech Check workflow.';
+    return '<div class="vision-action-card blocked"><small>GUIDED WORKFLOW REQUIRED</small><b>'+esc(canonical.type?String(canonical.type).replaceAll('_',' '):'Action not available')+'</b><p>'+esc(reason)+'</p><div class="vision-system-note">Vision recorded the request, but it did not change Tech Check.</div></div>';
+  }
+  const localId=String(result.action_id||id());
+  state.pending.set(localId,{
+    kind:'audited',
+    auditActionId:String(result.action_id||''),
+    ticket:String(canonical.ticket_no||action?.ticket_no||state.currentTicket||''),
+    actionType:String(canonical.type||action?.type||''),
+    canonical
+  });
+  const summary=action?.summary||(
+    canonical.type==='assign'
+      ?('Assign '+(canonical.technician_name||((canonical.role==='it'?'IT':'Service')+' Department'))+' to '+String(canonical.role||'').toUpperCase())
+      :canonical.type==='schedule'
+        ?('Update schedule'+(canonical.date?' to '+canonical.date:'')+(canonical.time?' at '+canonical.time:''))
+        :canonical.type==='cancel'
+          ?('Cancel '+String(canonical.role||'').toUpperCase()+' assignment')
+          :canonical.type==='owner_approve'
+            ?'Final Owner verification'
+            :String(canonical.type||'Action').replaceAll('_',' ')
+  );
+  return '<div class="vision-action-card audited"><small>AUDITED PROPOSED ACTION</small><b>'+esc(summary)+'</b><p>Ticket #'+esc(canonical.ticket_no||'')+' · Nothing changes until you confirm.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(localId)+'">'+esc(auditActionLabel(canonical))+'</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(localId)+'">Cancel</button></div></div>';
+}
+
 async function serverAgentAnswer(raw){
   const result=await callVisionAgent(raw);
   if(!result)return null;
@@ -117,7 +168,7 @@ async function serverAgentAnswer(raw){
     const current=ensureChat();current.ticket=state.currentTicket;saveChats();renderOrder();
   }
 
-  const p=result.proposed_action||{type:'none'};
+  const p={...(result.proposed_action||{type:'none'})};
   if(p.type==='create_job'){
     const seeded=[p.work_type||'',raw].filter(Boolean).join(' ');
     return startDraft(seeded);
@@ -125,29 +176,24 @@ async function serverAgentAnswer(raw){
 
   let html='<div class="vision-agent-answer">'+esc(result.answer||'').replace(/\n/g,'<br>')+'</div>'+agentFactsHtml(result.facts||[]);
   const ticket=String(p.ticket_no||result.active_ticket||state.currentTicket||'');
+  if(ticket&&!p.ticket_no)p.ticket_no=ticket;
 
-  if(p.type==='assign'&&ticket){
+  if(p.type==='assign'){
     const role=String(p.role||'').toLowerCase();
-    const normalizedRole=role.includes('service')?'service':role.includes('it')?'it':'';
+    p.role=role.includes('service')?'service':role.includes('it')?'it':'';
     const techName=String(p.technician_name||'').trim();
-    if(normalizedRole){
-      const tech=techName?findTech(techName,normalizedRole):null;
-      if(techName&&tech)html+='<div class="vision-answer-title">I prepared the assignment.</div>'+actionCard({kind:'assign-tech',role:normalizedRole,tech},ticket);
-      else if(techName&&!tech)html+='<div class="vision-direct warn"><b>MISSING INFORMATION</b>I understood the requested technician as '+esc(techName)+', but I could not match that name to an active '+esc(normalizedRole.toUpperCase())+' technician.</div>'+actionCard({kind:'choose-tech',role:normalizedRole},ticket);
-      else html+=actionCard({kind:'choose-tech',role:normalizedRole},ticket);
+    if(p.role&&techName&&!findTech(techName,p.role)){
+      html+='<div class="vision-direct warn"><b>MISSING INFORMATION</b>I understood the requested technician as '+esc(techName)+', but I could not match that name to an active '+esc(p.role.toUpperCase())+' technician.</div>'+actionCard({kind:'choose-tech',role:p.role},ticket);
       return html;
     }
   }
 
-  if(p.type==='schedule'&&ticket&&(p.date||p.time)){
-    html+='<div class="vision-answer-title">I prepared the schedule change.</div>'+actionCard({kind:'schedule',date:p.date||'',time:p.time||''},ticket);
-    return html;
+  if(p.type!=='none'){
+    try{html+=await auditedActionCard(p,raw);}
+    catch(error){html+='<div class="vision-direct warn"><b>Vision could not prepare that action.</b>'+esc(error?.message||'Please check the request and try again.')+'</div>';}
   }
-
-  if(p.type!=='none')html+=agentProposalHtml(p);
   return html;
 }
-
 async function loadData(){
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='SYNC';
   const [jobs,preps,techs]=await Promise.all([
@@ -160,7 +206,7 @@ async function loadData(){
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='LIVE';
 }
 async function init(){
-  db=await techCheckDb();window.OnSiteVisionLiveData?.configure?.(db);loadChats();
+  db=await techCheckDb();window.OnSiteVisionLiveData?.configure?.(db);window.OnSiteVisionActions?.configure?.(db);loadChats();
   const session=(await db.auth.getSession()).data.session;
   if(!session){location.replace('./');return;}
   state.session=session;
@@ -735,8 +781,17 @@ async function answer(text){
     const context=await liveContext(ticket,true);
     if(!context?.found&&!group(ticket).length&&!prep(ticket))return ticketAnswer(ticket);
     state.currentTicket=ticket;ensureChat().ticket=ticket;saveChats();renderOrder();
-    const a=assignIntent(raw);if(a)return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
-    const s=scheduleIntent(raw);if(s)return '<div class="vision-answer-title">I can update the schedule.</div>'+actionCard(s,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
+    const a=assignIntent(raw);
+    if(a){
+      if(a.kind==='choose-tech')return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
+      const payload=legacyActionPayload(a,ticket);
+      return '<div class="vision-answer-title">I can prepare that change.</div>'+await auditedActionCard(payload,raw)+(context?.found?liveJobCard(context):jobCard(ticket));
+    }
+    const s=scheduleIntent(raw);
+    if(s){
+      const payload=legacyActionPayload(s,ticket);
+      return '<div class="vision-answer-title">I can update the schedule.</div>'+await auditedActionCard(payload,raw)+(context?.found?liveJobCard(context):jobCard(ticket));
+    }
     if(/\b(who\s+(?:has|is\s+assigned|is\s+handling)|who(?:'s|\s+is)\s+(?:task|assigned|handling)|assignment|assigned\s+to|who\s+has\s+it)\b/i.test(raw))return context?.found?liveWhoHtml(context):who(ticket);
     if(/\b(holding|hold(?:ing)? up|blocked|blocker|stuck|why (?:can'?t|cannot)|what.*preventing)\b/i.test(raw))return context?.found?liveBlockersHtml(context):'<div class="vision-answer-title">I could not load the full blocker context.</div>'+jobCard(ticket);
     if(/\b(what happens next|what next|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
