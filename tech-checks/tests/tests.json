@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v118",
-  "service_worker": "v73",
-  "generated_for": "OnSite Vision knowledge + live context + server agent + confirmed action audit foundation",
+  "service_worker": "v74",
+  "generated_for": "OnSite Vision knowledge + live context + server agent + actions + persistent conversations and managed knowledge",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -1425,7 +1425,127 @@
         "No production shortcut is performed"
       ],
       "manual_device": true
+    },
+    {
+      "id": "VISION-PERSIST-01",
+      "area": "OnSite Vision Persistence",
+      "role": "owner",
+      "mode": "db+manual",
+      "destructive": false,
+      "scenario": "Conversation, active ticket, messages and draft persist across sessions",
+      "steps": [
+        "Create or update a Vision conversation",
+        "Save a work-order draft and active ticket context",
+        "Reload Vision or open on another Owner session",
+        "Open the same conversation"
+      ],
+      "expected": [
+        "Conversation title/history loads from Supabase",
+        "User and assistant messages are restored",
+        "Active MHelpDesk ticket is restored",
+        "Guided work-order draft is restored",
+        "Existing local conversations are merged rather than discarded"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-PERSIST-02",
+      "area": "OnSite Vision Persistence",
+      "role": "owner",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Persisted assistant HTML is safe and stale actions expire",
+      "steps": [
+        "Reload a conversation containing assistant HTML",
+        "Inspect restored action cards",
+        "Inspect rendered content"
+      ],
+      "expected": [
+        "Dangerous tags/event attributes are stripped",
+        "Prior-session Confirm/Cancel actions are disabled when no current pending action exists",
+        "Historical conversation content remains readable"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-KNOWLEDGE-01",
+      "area": "OnSite Vision Knowledge Management",
+      "role": "owner",
+      "mode": "db+manual",
+      "destructive": false,
+      "scenario": "Draft knowledge does not become company truth until approved",
+      "steps": [
+        "Open Teach Vision",
+        "Save a new entry as Draft",
+        "Inspect saved entry",
+        "Approve & publish it"
+      ],
+      "expected": [
+        "Draft is stored with status=draft",
+        "Draft is not eligible for AI company-rule search",
+        "Approval changes status to approved",
+        "Reviewer and approval time are recorded",
+        "Version increments on edit/approval"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-KNOWLEDGE-02",
+      "area": "OnSite Vision Knowledge Management",
+      "role": "owner",
+      "mode": "db+source",
+      "destructive": false,
+      "scenario": "Approved managed knowledge is searchable and versioned",
+      "steps": [
+        "Approve a knowledge entry",
+        "Search through vision_search_knowledge_v1",
+        "Inspect vision_knowledge_versions"
+      ],
+      "expected": [
+        "Approved entry is returned as COMPANY RULE",
+        "Previous version snapshot is retained",
+        "Draft and retired entries are excluded from AI search",
+        "Live database rules remain authoritative"
+      ]
+    },
+    {
+      "id": "VISION-KNOWLEDGE-03",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "edge+source",
+      "destructive": false,
+      "scenario": "Server agent combines approved managed knowledge with code baseline",
+      "steps": [
+        "Inspect get_company_knowledge tool implementation",
+        "Ask a technical question covered by approved managed knowledge"
+      ],
+      "expected": [
+        "Agent queries vision_search_knowledge_v1",
+        "Only approved managed knowledge is returned",
+        "Response includes baseline and managed knowledge authority order",
+        "Agent reports conflicts rather than silently overriding database-enforced rules"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "VISION-KNOWLEDGE-04",
+      "area": "OnSite Vision Knowledge Management",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Knowledge/conversation tables cannot be directly mutated by authenticated clients",
+      "steps": [
+        "Inspect RLS on Phase 5 tables",
+        "Inspect authenticated table grants",
+        "Inspect RPC grants"
+      ],
+      "expected": [
+        "RLS enabled on all Phase 5 tables",
+        "Authenticated direct table privilege is SELECT only",
+        "Write operations require owner-gated RPCs",
+        "Anonymous users cannot execute the RPCs"
+      ]
     }
   ],
-  "last_release_qa_note": "Phase 4: vision_action_audit ledger, owner-only prepare/execute/cancel RPCs, Action Layer v1, Vision v13, SW v73. Supported AI writes are confirmed/audited; evidence-heavy actions remain guided. QA verified existing Helios final-verification gate blocks premature Owner approval."
+  "last_release_qa_note": "Phase 5: Owner-private persistent Vision conversations, cross-device draft/context sync, Teach Vision managed knowledge with Draft/Approved/Retired lifecycle and version history, server agent v3 managed-knowledge grounding, Vision v14, SW v74."
 }
