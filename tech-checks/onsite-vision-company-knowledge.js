@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v4
+ * Version: company-knowledge-v5
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v4",
+  "version": "company-knowledge-v5",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -280,33 +280,67 @@
         "SWAP",
         "BACKUP"
       ],
-      "it_checks": [
-        "exact unit tag",
-        "power on",
-        "battery count",
-        "SIM active/router online for deployable work",
-        "camera app visibility",
-        "recording",
-        "storage formatted/ready",
-        "functions tested",
-        "safe/ready"
+      "components": [
+        "Avigilon ES appliance",
+        "2 × Avigilon bullet cameras",
+        "InHand router",
+        "2 × 12V 35Ah batteries"
+      ],
+      "platform": "Avigilon Unity",
+      "network_and_monitoring": {
+        "router": "InHand router",
+        "sim": "Active SIM card required for deployable Sniper work",
+        "public_ip_source": "Use the public IP recorded for the exact unit in the 2026 Unit Tracker in Google Sheets",
+        "monitoring": "For customer deployment, send all required unit/monitoring information to the Monitoring Center and confirm the unit is set up on the monitoring side"
+      },
+      "it_delivery_flow": [
+        "Pull the assigned Sniper from the shelf.",
+        "Plug the Sniper into 120V.",
+        "Verify the Avigilon ES appliance is reachable using the public IP recorded for that unit in the 2026 Unit Tracker.",
+        "Install an active SIM card in the InHand router and verify the router is online.",
+        "Verify the Sniper is on the Avigilon Unity platform.",
+        "Send the required information to the Monitoring Center and verify the monitoring-side setup.",
+        "Confirm the customer has access to the Avigilon Unity app.",
+        "Confirm 2 × 12V 35Ah batteries are inside the Sniper.",
+        "Complete the existing recording/storage/functions/safe-ready checks, IT photo with visible matching unit tag, and IT signature before the IT → Service handoff."
+      ],
+      "it_swap_rule": "A Sniper SWAP prepares the replacement Sniper the same way as a Sniper DELIVERY before the IT → Service handoff.",
+      "service_field_flow": [
+        "Physically verify the Sniper has 2 batteries inside.",
+        "At the site, set up the Sniper on the pole or stand specified by the Service order.",
+        "Call the IT Tech and work together to focus and adjust both cameras and verify signal.",
+        "Take field pictures of the installed Sniper and its unit number/tag and upload them to Tech Check.",
+        "Submit the completed Sniper work for finalization/completion so the Owner can review it in the Owner app."
+      ],
+      "swap_return_rule": "After a Sniper SWAP, bring the old field Sniper back and record it through the normal Service Return → IT Intake flow.",
+      "truck_spare_rule": "A Sniper BACKUP / truck spare follows the existing checked-out spare workflow. If unused, return it to Shop Inventory and remove it from the Service truck. If used for a swap, the replaced field Sniper returns through Service Return → IT Intake.",
+      "evidence": [
+        "IT: exactly one clear handoff photo per unit with visible matching unit tag plus IT signature",
+        "Service: field pictures of the installed Sniper and unit number/tag",
+        "SWAP: returning old field unit must have the normal Service Return evidence before IT Intake"
       ],
       "unknowns": [
-        "Detailed internal components",
-        "port map",
-        "product-specific troubleshooting tree"
+        "Exact Sniper camera/router port map and port-forwarding values",
+        "Exact Avigilon Unity enrollment/programming sequence beyond the verified operational checks",
+        "Exact Monitoring Center data fields/package beyond sending all required monitoring information",
+        "Exact Avigilon ES appliance and bullet-camera model numbers if model-specific procedures are required",
+        "Approved Sniper troubleshooting tree"
       ],
       "teaching_needed": [
-        "List the Sniper internal components and what belongs with each unit.",
-        "Document the Sniper device/router port map and any programming/configuration sequence.",
-        "Document Sniper-specific IT checks beyond the shared deployable-device checks.",
-        "Document any Sniper-specific Service checkout or field-install steps.",
-        "Document any Sniper-specific mandatory photos/signatures beyond the generic handoff evidence.",
-        "Document the approved Sniper troubleshooting sequence for power, batteries, SIM/router, camera app/video, recording, and storage."
+        "Document the exact Sniper port map and router port-forwarding values.",
+        "Document any additional Avigilon Unity enrollment/programming steps that IT must perform beyond the verified operational checks.",
+        "Document the exact Monitoring Center fields/information package if Vision should validate individual monitoring fields.",
+        "Provide model numbers only if the ES appliance or bullet-camera model changes the required procedure.",
+        "Document the approved Sniper troubleshooting sequence for power, batteries, SIM/InHand router, public-IP access, Unity, video/recording/storage, and monitoring."
       ],
       "sources": [
+        "Owner instruction 2026-09-19",
+        "TechCheckRules Sniper profile",
         "add_it_prep_item",
-        "itUnitStepsData",
+        "save_it_prep_item_draft",
+        "verify_delivery_item_checks",
+        "release_prep",
+        "handoff evidence / Service Return → IT Intake workflow",
         "app.js BATTERY metadata"
       ]
     },
@@ -553,7 +587,7 @@
   "phase_7_gap_inventory": {
     "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
     "products": {
-      "Sniper": "Internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
+      "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
       "Spotter": "Internal components, battery applicability/specification, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
       "Recon 2": "Exact battery model/specification, internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
       "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, troubleshooting, BACKUP-purpose parity, and standalone Service-close behavior still need Owner-approved documentation.",
