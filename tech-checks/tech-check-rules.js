@@ -1,5 +1,5 @@
 /* Cameras On Site — Shared Tech Check Rules
- * Version: rules-v3
+ * Version: rules-v4
  * Pure rule definitions shared by Owner/IT/Service UI and OnSite Vision.
  * Supabase RPCs/triggers remain the final authority for production transitions.
  */
@@ -26,6 +26,45 @@
     'solar stand':'Solar Stand','solar pole':'Solar Pole',
     '110v stand':'110V Stand','110 stand':'110V Stand',
     'sniper':'Sniper','ranger':'Ranger','spotter':'Spotter','pole':'Pole'
+  });
+
+  const SNIPER_PROFILE=Object.freeze({
+    components:Object.freeze([
+      'Avigilon ES appliance',
+      '2 × Avigilon bullet cameras',
+      'InHand router',
+      '2 × 12V 35Ah batteries'
+    ]),
+    platform:'Avigilon Unity',
+    network:'InHand router with active SIM card',
+    unit_tracker:'2026 Unit Tracker in Google Sheets',
+    delivery_it:Object.freeze([
+      'Pull the assigned Sniper from the shelf.',
+      'Plug the Sniper into 120V power.',
+      'Verify the Avigilon ES appliance is reachable using the public IP recorded for that unit in the 2026 Unit Tracker.',
+      'Install an active SIM card in the InHand router and verify the router is online.',
+      'Verify the Sniper is on the Avigilon Unity platform.',
+      'Send the required unit and monitoring information to the Monitoring Center.',
+      'Confirm the customer has access to the Unity app.',
+      'Confirm the Sniper has 2 × 12V 35Ah batteries inside before the IT → Service handoff.'
+    ]),
+    service_field:Object.freeze([
+      'Physically verify the Sniper has 2 batteries inside.',
+      'At the site, mount/set up the Sniper on the pole or stand specified by the Service order.',
+      'Call IT and work with IT to focus and adjust both cameras and verify signal.',
+      'Take field photos showing the installed Sniper and its unit number/tag and upload them to Tech Check.',
+      'Submit the completed Sniper work for finalization so the Owner can review it in the Owner app.'
+    ]),
+    swap_rule:'A Sniper SWAP prepares the replacement Sniper the same way as a DELIVERY. After the swap, the old field Sniper must be brought back and recorded through Service Return → IT Intake.',
+    spare_rule:'A Sniper BACKUP / truck spare is prepared hardware-ready. If unused, return it to Shop Inventory and remove it from the Service truck. If it is used for a swap, the replaced field unit follows Service Return → IT Intake.',
+    remaining_unknowns:Object.freeze([
+      'Exact Avigilon ES appliance model, if model-specific behavior matters.',
+      'Exact Avigilon bullet camera model(s), if model-specific behavior matters.',
+      'Exact Sniper port map and router port-forwarding values.',
+      'Exact Unity enrollment/programming sequence beyond the verified operational checks.',
+      'Exact Monitoring Center data fields/package beyond sending all required monitoring information.',
+      'Approved Sniper troubleshooting tree.'
+    ])
   });
 
   const DEVICE_TYPES=Object.freeze(Object.keys(EQUIPMENT).filter(k=>EQUIPMENT[k].category==='device'));
@@ -176,7 +215,23 @@
       });
     }
 
-    steps.push({kind:'bool',field:'power_ok',label:'Does '+unit+' power on correctly?'});
+    steps.push({kind:'bool',field:'power_ok',label:type==='Sniper' ? 'With '+unit+' plugged into 120V, does the Sniper power on correctly?' : 'Does '+unit+' power on correctly?'});
+
+    if(type==='Sniper'&&['DELIVERY','SWAP','BACKUP'].includes(purpose)){
+      steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is an active SIM installed in the InHand router for '+unit+' and is the router online?'});
+      steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Using the public IP recorded for '+unit+' in the 2026 Unit Tracker, is the Avigilon ES appliance reachable and is this Sniper on the Avigilon Unity platform?'});
+      steps.push({kind:'bool',field:'delivery_recording_ok',label:'Is video / recording from both Avigilon bullet cameras working on '+unit+'?'});
+      steps.push({kind:'bool',field:'delivery_batteries_charged_ok',label:'Are both required 12V 35Ah batteries installed in '+unit+' and ready for field use?'});
+      steps.push({kind:'bool',field:'delivery_sd_formatted_ok',label:'Is the Avigilon ES appliance storage on '+unit+' ready for deployment?'});
+      if(purpose!=='BACKUP'){
+        steps.push({kind:'bool',field:'delivery_monitoring_ok',label:'Was all required information for '+unit+' sent to the Monitoring Center and set up on the monitoring side?'});
+        steps.push({kind:'bool',field:'delivery_ticket_count_ok',label:'Is '+unit+' included correctly on the current MHelpDesk Service order / ticket?'});
+        steps.push({kind:'bool',field:'delivery_customer_email_app_ok',label:'Was customer access to the Avigilon Unity app confirmed for '+unit+'?'});
+      }
+      steps.push({kind:'bool',field:'functions_ok',label:'Were the Avigilon ES appliance, both bullet cameras, InHand router, and required Sniper functions tested and working?'});
+      steps.push({kind:'bool',field:'safe_ok',label:'Is '+unit+' ready for the IT → Service handoff?'});
+      return steps;
+    }
 
     if(isHeliosDeploy(item)){
       steps.push(
@@ -269,7 +324,8 @@
     }
 
     if(type==='Ranger'&&!(item.solar_mppt_updated_ok&&item.solar_mppt_tested_ok&&item.solar_pv_charging_ok))return false;
-    if(!['DELIVERY','BACKUP'].includes(purpose))return true;
+    const sniperSwap=type==='Sniper'&&purpose==='SWAP';
+    if(!['DELIVERY','BACKUP'].includes(purpose)&&!sniperSwap)return true;
     const batteryReady=type==='Solar Spotter'||item.delivery_batteries_charged_ok;
     const hardwareReady=Boolean(item.delivery_sim_ok&&item.delivery_camera_app_ok&&item.delivery_sd_formatted_ok&&item.delivery_recording_ok&&batteryReady);
     if(purpose==='BACKUP')return hardwareReady;
@@ -322,12 +378,13 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v3',
+    version:'rules-v4',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
     standTypes:STAND_TYPES,
     heliosPorts:HELIOS_PORTS,
+    sniperProfile:SNIPER_PROFILE,
     truckSpareBatteryOptions:TRUCK_SPARE_BATTERY_OPTIONS,
     truckSpareRules:TRUCK_SPARE_RULES,
     heliosFieldChecklist:HELIOS_FIELD_CHECKLIST,
