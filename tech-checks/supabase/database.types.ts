@@ -1485,6 +1485,78 @@ export type Database = {
           },
         ]
       }
+      vision_action_audit: {
+        Row: {
+          action_type: string
+          after_state: Json | null
+          before_state: Json | null
+          cancelled_at: string | null
+          canonical_payload: Json
+          confirmed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          error_text: string | null
+          executable: boolean
+          executed_at: string | null
+          id: string
+          requested_by: string
+          requested_by_name: string
+          requested_payload: Json
+          requires_confirmation: boolean
+          status: string
+          ticket_no: string | null
+          updated_at: string
+          user_message: string | null
+          validation: Json
+        }
+        Insert: {
+          action_type: string
+          after_state?: Json | null
+          before_state?: Json | null
+          cancelled_at?: string | null
+          canonical_payload?: Json
+          confirmed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_text?: string | null
+          executable?: boolean
+          executed_at?: string | null
+          id?: string
+          requested_by: string
+          requested_by_name: string
+          requested_payload?: Json
+          requires_confirmation?: boolean
+          status?: string
+          ticket_no?: string | null
+          updated_at?: string
+          user_message?: string | null
+          validation?: Json
+        }
+        Update: {
+          action_type?: string
+          after_state?: Json | null
+          before_state?: Json | null
+          cancelled_at?: string | null
+          canonical_payload?: Json
+          confirmed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_text?: string | null
+          executable?: boolean
+          executed_at?: string | null
+          id?: string
+          requested_by?: string
+          requested_by_name?: string
+          requested_payload?: Json
+          requires_confirmation?: boolean
+          status?: string
+          ticket_no?: string | null
+          updated_at?: string
+          user_message?: string | null
+          validation?: Json
+        }
+        Relationships: []
+      }
       workflow_checkpoints: {
         Row: {
           after_data: Json | null
@@ -2544,6 +2616,20 @@ export type Database = {
           p_unit_tag: string
         }
         Returns: undefined
+      }
+      vision_action_job_snapshot_v1: {
+        Args: { p_ticket_no: string }
+        Returns: Json
+      }
+      vision_cancel_action_v1: { Args: { p_action_id: string }; Returns: Json }
+      vision_execute_action_v1: { Args: { p_action_id: string }; Returns: Json }
+      vision_prepare_action_v1: {
+        Args: {
+          p_action: Json
+          p_conversation_id: string
+          p_user_message?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
