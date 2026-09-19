@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v2",
+  "version": "company-knowledge-v3",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -653,6 +653,10 @@
         {component:'IP Speaker',ports:[...shared.heliosPorts.speaker],where:'device and router'}
       ];
     }
+    data.shared_helios_field_install=shared.heliosFieldChecklist?[...shared.heliosFieldChecklist]:[];
+    data.shared_it_intake_checklist=shared.itIntakeChecklist?[...shared.itIntakeChecklist]:[];
+    if(data.equipment.Helios)data.equipment.Helios.shared_field_install_checklist=data.shared_helios_field_install;
+    if(data.workflows?.intake)data.workflows.intake.shared_checklist=data.shared_it_intake_checklist;
     data.shared_service_rules={
       solar_spotter_delivery:shared.automaticServiceSolarPlan
         ? shared.automaticServiceSolarPlan([{category:'device',label:'Solar Spotter',qty:1}],'delivery')
