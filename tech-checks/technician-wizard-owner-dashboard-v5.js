@@ -2369,7 +2369,23 @@ function itUnitStepsData(item, unitNo) {
   if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) {
     steps.push({ kind: 'number', field: 'battery_count', label: item.equipment_type==='Helios' ? `Confirm ${identity} has exactly its internal Helios battery box prepared. This is ONE Helios battery box — not four Solar Stand batteries.` : `How many batteries / battery boxes are prepared for ${identity}?` });
   }
-  steps.push({ kind: 'bool', field: 'power_ok', label: `Does ${identity} power on correctly?` });
+  steps.push({ kind: 'bool', field: 'power_ok', label: item.equipment_type === 'Sniper' ? `With ${identity} plugged into 120V, does the Sniper power on correctly?` : `Does ${identity} power on correctly?` });
+
+  if (item.equipment_type === 'Sniper' && ['DELIVERY','SWAP','BACKUP'].includes(item.purpose)) {
+    steps.push({ kind:'bool', field:'delivery_sim_ok', label:`Is an active SIM installed in the InHand router for ${identity} and is the router online?` });
+    steps.push({ kind:'bool', field:'delivery_camera_app_ok', label:`Using the public IP recorded for ${identity} in the 2026 Unit Tracker, is the Avigilon ES appliance reachable and is this Sniper on the Avigilon Unity platform?` });
+    steps.push({ kind:'bool', field:'delivery_recording_ok', label:`Is video / recording from both Avigilon bullet cameras working on ${identity}?` });
+    steps.push({ kind:'bool', field:'delivery_batteries_charged_ok', label:`Are both required 12V 35Ah batteries installed in ${identity} and ready for field use?` });
+    steps.push({ kind:'bool', field:'delivery_sd_formatted_ok', label:`Is the Avigilon ES appliance storage on ${identity} ready for deployment?` });
+    if (item.purpose !== 'BACKUP') {
+      steps.push({ kind:'bool', field:'delivery_monitoring_ok', label:`Was all required information for ${identity} sent to the Monitoring Center and set up on the monitoring side?` });
+      steps.push({ kind:'bool', field:'delivery_ticket_count_ok', label:`Is ${identity} included correctly on the current MHelpDesk Service order / ticket?` });
+      steps.push({ kind:'bool', field:'delivery_customer_email_app_ok', label:`Was customer access to the Avigilon Unity app confirmed for ${identity}?` });
+    }
+    steps.push({ kind:'bool', field:'functions_ok', label:`Were the Avigilon ES appliance, both bullet cameras, InHand router, and required Sniper functions tested and working?` });
+    steps.push({ kind:'bool', field:'safe_ok', label:`Is ${identity} ready for the IT → Service handoff?` });
+    return steps;
+  }
 
   if (isHeliosDeploy(item)) {
     steps.push(
@@ -2453,7 +2469,8 @@ function itUnitReady(item) {
     return item.purpose==='BACKUP' ? true : Boolean(item.delivery_customer_email_app_ok && item.delivery_monitoring_ok);
   }
   if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
-  if (!['DELIVERY','BACKUP'].includes(item.purpose)) return true;
+  const sniperSwap = item.equipment_type === 'Sniper' && item.purpose === 'SWAP';
+  if (!['DELIVERY','BACKUP'].includes(item.purpose) && !sniperSwap) return true;
   const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
   const hardwareReady = Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady);
   if (item.purpose === 'BACKUP') return hardwareReady;
@@ -2766,7 +2783,7 @@ async function releaseItPrepUnitByUnit() {
     for (const item of items) {
       const { error: verifyError } = await liveDb.rpc('verify_prep_item', { p_item_id: item.id, p_unit_tag: item.unit_tag || '', p_battery_count: Number(item.battery_count || 0), p_power_ok: Boolean(item.power_ok), p_functions_ok: Boolean(item.functions_ok), p_safe_ok: Boolean(item.safe_ok) });
       if (verifyError) throw verifyError;
-      if (['DELIVERY','BACKUP'].includes(item.purpose)) {
+      if (['DELIVERY','BACKUP'].includes(item.purpose) || (item.equipment_type === 'Sniper' && item.purpose === 'SWAP')) {
         // Solar Spotter batteries are a Service-side checkout. The legacy delivery RPC still requires this compatibility flag.
         const { error: deliveryError } = await liveDb.rpc('verify_delivery_item_checks', { p_item_id: item.id, p_sim_ok: Boolean(item.delivery_sim_ok), p_camera_app_ok: Boolean(item.delivery_camera_app_ok), p_customer_email_app_ok: Boolean(item.delivery_customer_email_app_ok), p_batteries_charged_ok: item.equipment_type === 'Solar Spotter' ? true : Boolean(item.delivery_batteries_charged_ok), p_monitoring_ok: Boolean(item.delivery_monitoring_ok), p_ticket_count_ok: item.equipment_type === 'Helios' ? true : Boolean(item.delivery_ticket_count_ok), p_sd_formatted_ok: Boolean(item.delivery_sd_formatted_ok), p_recording_ok: Boolean(item.delivery_recording_ok) });
         if (deliveryError) throw deliveryError;
