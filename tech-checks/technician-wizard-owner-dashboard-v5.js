@@ -3904,31 +3904,96 @@ document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearc
 document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
-window.refreshOwnerIntake = () => { installOwnerAssignments(true); installOwnerIntake(true); };
+let ownerRefreshTimer=null;
+let ownerRefreshInFlight=false;
+let ownerRefreshQueued=false;
+let ownerStartupScheduled=false;
+let ownerLastRefreshAt=0;
+
+async function runOwnerRefresh(force=false) {
+  if (!roleText().includes('Owner/Admin')) return;
+  if (ownerRefreshInFlight) { ownerRefreshQueued=true; return; }
+  ownerRefreshInFlight=true;
+  try {
+    await Promise.all([installOwnerAssignments(force), installOwnerIntake(force)]);
+    organizeOwnerDashboard();
+    ownerLastRefreshAt=Date.now();
+  } finally {
+    ownerRefreshInFlight=false;
+    if (ownerRefreshQueued) {
+      ownerRefreshQueued=false;
+      scheduleOwnerRefresh(true, 180);
+    }
+  }
+}
+function scheduleOwnerRefresh(force=false, delay=180) {
+  clearTimeout(ownerRefreshTimer);
+  ownerRefreshTimer=setTimeout(() => runOwnerRefresh(force), delay);
+}
+function scheduleOwnerStartupLoad() {
+  if (ownerStartupScheduled) return;
+  ownerStartupScheduled=true;
+  const load=() => runOwnerRefresh(false);
+  if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout:700 });
+  else setTimeout(load, 280);
+}
+window.refreshOwnerIntake = () => scheduleOwnerRefresh(true, 160);
 let serviceSolarRealtimeStarted=false;
 function setupServiceSolarRealtime() {
   if (serviceSolarRealtimeStarted) return;
   serviceSolarRealtimeStarted=true;
   liveDb.channel('tech-check-service-solar-live')
-    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_checks'},async()=>{
-      if (roleText().includes('Owner/Admin')) await installOwnerAssignments(true);
+    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_checks'},()=>{
+      if (roleText().includes('Owner/Admin')) scheduleOwnerRefresh(true,220);
     })
-    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_evidence'},async()=>{
-      if (roleText().includes('Owner/Admin')) await installOwnerAssignments(true);
+    .on('postgres_changes',{event:'*',schema:'public',table:'service_solar_evidence'},()=>{
+      if (roleText().includes('Owner/Admin')) scheduleOwnerRefresh(true,220);
     })
     .subscribe();
 }
 function boot() {
-  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge(); organizeOwnerDashboard();
+  injectStyles();
+  installTabs();
+  setupNotificationRealtime();
+  setupServiceSolarRealtime();
+  refreshNotificationBadge();
+  organizeOwnerDashboard();
+
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
-  if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
+  if (!appVisible) return;
+
+  if (roleText().includes('Owner/Admin')) scheduleOwnerStartupLoad();
+  if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome();
+  if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome();
+  setTimeout(maybeShowFirstTimeWalkthrough, 250);
 }
-let bootQueued = false;
-function scheduleBoot() { if (bootQueued) return; bootQueued = true; requestAnimationFrame(() => { bootQueued = false; boot(); }); }
-const bootObserver = new MutationObserver(scheduleBoot);
-bootObserver.observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['class'] });
-window.addEventListener('focus', scheduleBoot);
-setInterval(scheduleBoot, 5000);
+let bootQueued=false;
+function scheduleBoot() {
+  if (bootQueued) return;
+  bootQueued=true;
+  requestAnimationFrame(() => { bootQueued=false; boot(); });
+}
+function handleTechCheckViewChange(event) {
+  scheduleBoot();
+  if (event?.detail?.view === 'owner' && roleText().includes('Owner/Admin')) {
+    if (!ownerStartupScheduled) scheduleOwnerStartupLoad();
+    else if (Date.now()-ownerLastRefreshAt > 15000) scheduleOwnerRefresh(true,160);
+  }
+}
+window.addEventListener('techcheck:app-ready', scheduleBoot);
+window.addEventListener('techcheck:view-changed', handleTechCheckViewChange);
+
+let lastLifecycleRefresh=0;
+function refreshAfterResume() {
+  if (document.hidden) return;
+  const now=Date.now();
+  if (now-lastLifecycleRefresh < 15000) return;
+  lastLifecycleRefresh=now;
+  scheduleBoot();
+  if (roleText().includes('Owner/Admin')) scheduleOwnerRefresh(true,220);
+}
+document.addEventListener('visibilitychange', refreshAfterResume);
+window.addEventListener('focus', refreshAfterResume);
 boot();
 
 // ASSIGNMENT_NOTIFICATION_PUBLISH_STAMP_V1
