@@ -286,3 +286,49 @@ Production QA verified:
 - The approved entry became searchable as `COMPANY RULE`.
 - A version-history row existed for the prior Draft version.
 - QA conversation and knowledge records were deleted after verification so they do not appear in the Owner workspace.
+
+
+## Phase 6 shared rule parity
+
+Phase 6 required **no new Supabase schema migration**. Production remains at **77 recorded migrations**.
+
+New browser/runtime source of truth:
+
+- `tech-checks/tech-check-rules.js` — `rules-v2`
+
+The shared runtime is now consumed by both the technician application and OnSite Vision for:
+
+- canonical device/stand types and equipment aliases
+- equipment-manifest normalization
+- battery-count rules
+- IT equipment checklist generation
+- IT readiness calculation
+- Helios device/router port requirements
+- Ranger MPPT/PV requirements
+- Solar Spotter/Ranger automatic Service checkout derivation
+- Service solar/Helios evidence minimums
+- Service solar battery-plan calculation
+- 13-step Helios field-install checklist and exact RPC parameter mapping
+- 15-step IT Intake checklist
+
+Parity safeguards:
+
+- Existing technician functions retain legacy fallback implementations if the shared runtime fails to load during this transition.
+- Existing Supabase triggers/RPCs remain the final authority.
+- `save_it_helios_deploy_checks_v1` continues mapping the specific Helios 120V battery-box charging check into the legacy `delivery_batteries_charged_ok` compatibility field.
+- The 13 shared Helios field-install RPC parameter names were verified against the live PostgreSQL `pg_proc.proargnames` contract.
+- Vision Company Knowledge v3 exposes the same shared IT, Helios field, and IT Intake checklists.
+- Workflow Engine v3 uses shared equipment normalization.
+- Deployed `onsite-vision-agent` v5 contains byte-identical copies of the browser shared rules, Company Knowledge, and Workflow Engine.
+- No photo/signature/handoff/return/Owner-final-verification database gate was weakened or removed.
+
+Release identifiers after Phase 6:
+
+- Tech Check technician workflow: `release-qa-v120`
+- Main loader: `startup-fast-v34`
+- OnSite Vision: `vision-workspace-v16`
+- Shared rules: `rules-v2`
+- Company Knowledge: `company-knowledge-v3`
+- Workflow Engine: `workflow-engine-v3`
+- Edge agent: v5
+- Service-worker cache: v76
