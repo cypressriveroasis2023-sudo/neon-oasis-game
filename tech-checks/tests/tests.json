@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v100",
-  "service_worker": "v46",
+  "runtime_version": "release-qa-v101",
+  "service_worker": "v47",
   "generated_for": "Monday release readiness",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -665,5 +665,5 @@
       "manual_device": true
     }
   ],
-  "last_release_qa_note": "Helios release trigger hardened in production and documented under tech-checks/supabase/migrations/20260919_harden_helios_it_release_gate.sql"
+  "last_release_qa_note": "Helios release trigger hardened in production and documented; Help return wording aligned to tagged-equipment return records."
 }
