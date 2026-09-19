@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v124",
-  "service_worker": "v82",
+  "service_worker": "v83",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1956,7 +1956,26 @@
         "The prior conversation remains listed in Recent conversations",
         "New Chat clears and blurs the prompt instead of forcing the iPhone keyboard open"
       ]
+    },
+    {
+      "id": "UI-VISION-MOBILE-ORDER-SHEET-01",
+      "area": "OnSite Vision · Mobile Service Order",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Service Order opens as a true mobile modal sheet without making the chat appear to slide away",
+      "steps": [
+        "Open a Vision job on an iPhone-sized viewport",
+        "Tap Job / Service Order",
+        "Close it or tap the prompt"
+      ],
+      "expected": [
+        "Service Order is centered with margins and a dimmed backdrop",
+        "Chat remains intact underneath",
+        "Close restores the same conversation",
+        "Focusing the Vision prompt automatically closes the Service Order"
+      ]
     }
   ],
-  "last_release_qa_note": "Vision mobile keyboard/history pass: full app no longer resizes to visualViewport height; composer alone tracks keyboard obstruction. New Chat explicitly saves the conversation being left, starts a blank chat, preserves history, and closes the keyboard. Vision v18 / SW82."
+  "last_release_qa_note": "Vision mobile Service Order pass: desktop-style side drawer replaced by centered mobile modal sheet; prompt focus closes the sheet and returns to the same chat. Vision v19 / SW83."
 }
