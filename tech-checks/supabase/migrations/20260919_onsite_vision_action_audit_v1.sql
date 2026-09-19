@@ -172,8 +172,8 @@ begin
     end if;
 
     if v_tech_name<>'' then
-      select count(*), min(user_id), min(coalesce(full_name,username,'Technician'))
-      into v_tech_count,v_tech_id,v_tech_display
+      select count(*)
+      into v_tech_count
       from public.profiles
       where active=true and archived_at is null
         and role::text=v_role
@@ -187,6 +187,17 @@ begin
       elsif v_tech_count>1 then
         raise exception 'Technician name "%" is ambiguous. Choose the exact technician.',v_tech_name;
       end if;
+
+      select user_id,coalesce(full_name,username,'Technician')
+      into v_tech_id,v_tech_display
+      from public.profiles
+      where active=true and archived_at is null
+        and role::text=v_role
+        and (
+          lower(trim(coalesce(full_name,'')))=lower(v_tech_name)
+          or lower(trim(coalesce(username,'')))=lower(v_tech_name)
+        )
+      limit 1;
     end if;
 
     select count(*) into v_assignment_count
