@@ -1777,45 +1777,73 @@ async function showITStatus() {
 }
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
-  let home=document.getElementById('wlSvcHome'); if(!home){home=document.createElement('div');home.id='wlSvcHome';home.className='card wl-home';viewSvc().prepend(home);}
-  const [r,work,phoneAlerts,assignedAssets]=await Promise.all([myReturnCounts(),serviceWorkData(),pushAlertState(),myAssignedInventoryAssets()]);
+  let home=document.getElementById('wlSvcHome');
+  if(!home){
+    home=document.createElement('div');
+    home.id='wlSvcHome';
+    home.className='card wl-home';
+    viewSvc().prepend(home);
+  }
+  const [r,work,phoneAlerts,assignedAssets]=await Promise.all([
+    myReturnCounts(),
+    serviceWorkData(),
+    pushAlertState(),
+    myAssignedInventoryAssets()
+  ]);
   const alertBanner=phoneAlertBanner(phoneAlerts);
   const handoffCount=work.released.length;
   const returnCount=r.waiting+r.inventory;
+  const deployedCount=(work.deployed||[]).length;
   const nextAction=handoffCount
-    ? `<div class='wl-next-action wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>${handoffCount} IT handoff${handoffCount===1?" is":"s are"} ready for Service.</b><div class='small'>Enter the exact current MHelpDesk ticket below to open the correct job and verify the IT handoff.</div></div>`
-    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service handoffs are waiting.</b><div class='small'>When IT creates a handoff, enter the exact MHelpDesk ticket below to open it.</div></div>`;
+    ? `<div class='wl-next-action wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>${handoffCount} IT handoff${handoffCount===1?" is":"s are"} ready for Service.</b><div class='small'>Open Service Job, enter the exact MHelpDesk ticket, and verify the IT handoff.</div></div>`
+    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service handoffs are waiting.</b><div class='small'>When IT creates a handoff, use Open Service Job and enter the exact MHelpDesk ticket.</div></div>`;
+
   home.innerHTML=`${alertBanner}
-    <div class='wl-mode-pills wl-service-mode-pills'>
+    <div class='wl-mode-pills'>
       <button type='button' class='on wl-mode-card'><span class='wl-mode-title'>Field Work</span><span class='wl-mode-sub'>Find & verify assigned jobs</span><span class='wl-mode-badge'>${handoffCount}</span></button>
-      <button type='button' class='wl-mode-card' data-wl-svc='returns'><span class='wl-mode-title'>Returns</span><span class='wl-mode-sub'>Track units returning to IT</span><span class='wl-mode-badge'>${returnCount}</span></button>
+      <button type='button' class='wl-mode-card' data-wl-svc='returns'><span class='wl-mode-title'>Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${returnCount}</span></button>
     </div>
     <div class='wl-title'>My Work Today</div>
-    <div class='wl-sub'>Open the exact MHelpDesk ticket, verify the IT handoff, complete the field work, and return equipment when needed.</div>
+    <div class='wl-sub'>Owner-assigned Service work is opened by exact MHelpDesk ticket, followed by the next workflow action.</div>
     ${nextAction}
-    <div class='wl-service-ticket-search wl-service-ticket-search-compact'>
-      <div class='wl-next-kicker'>FIND JOB</div>
-      <label>MHelpDesk Ticket #</label>
-      <div class='wl-ticket-search-row wl-service-find-row'><input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='Enter ticket #'><button class='wl-find-job-button' data-wl-service-find-job><span>Find Job</span><strong>→</strong></button></div>
-      <div id='wlServiceJobSearchMsg' class='small top8'>Only the exact current MHelpDesk ticket will open the job.</div>
-    </div>
-    <div class='wl-workstrip wl-service-workstrip'>
+    <div class='wl-workstrip'>
       <span><b>${handoffCount}</b> handoffs ready</span>
+      <span><b>${deployedCount}</b> units in field</span>
       <span><b>${r.waiting}</b> returns waiting IT</span>
-      <span><b>${work.inspectionDone?1:0}</b> inspection today</span>
     </div>
     ${assignedInventoryHtml(assignedAssets)}
-    <section class='wl-service-quick' aria-label='Quick Service actions'>
-      <div class='wl-service-quick-head'><b>Quick Actions</b><span>Service tools</span></div>
-      <div class='wl-service-quick-grid'>
-        <button class='wl-service-quick-pill return' data-wl-service-return><span class='wl-service-quick-icon'>↩</span><span class='wl-service-quick-label'>Return to IT</span><span class='wl-service-quick-badge'>Intake</span></button>
-        <button class='wl-service-quick-pill' data-wl-svc='returns'><span class='wl-service-quick-icon'>↺</span><span class='wl-service-quick-label'>Returned Units</span><span class='wl-service-quick-badge'>${returnCount}</span></button>
-        <button class='wl-service-quick-pill' data-wl-svc='inspect'><span class='wl-service-quick-icon'>▣</span><span class='wl-service-quick-label'>Truck Check</span><span class='wl-service-quick-badge'>${work.inspectionDone?"✓":"0"}</span></button>
-        <button class='wl-service-quick-pill' data-wl-svc='history'><span class='wl-service-quick-icon'>☰</span><span class='wl-service-quick-label'>History</span><span class='wl-service-quick-badge'>View</span></button>
-      </div>
-    </section>`;
-  hideChildren(viewSvc(),[home]); resetWizardPosition();
+    <div class='wl-menu'>
+      <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
+      <button class='${deployedCount ? "wl-red" : "wl-gray"}' data-wl-service-return>↩ Return Unit to IT Intake <span class='wl-count'>${deployedCount}</span></button>
+      <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
+      <button class='wl-gray' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>
+      <button class='wl-gray' data-wl-svc='history'>☰ Status & History <span class='wl-count'>${r.completed}</span></button>
+    </div>`;
+  hideChildren(viewSvc(),[home]);
+  resetWizardPosition();
 }
+
+function showServiceJobLookup() {
+  let card=document.getElementById('wlSvcLookup');
+  if(!card){
+    card=document.createElement('div');
+    card.id='wlSvcLookup';
+    card.className='card';
+    viewSvc().append(card);
+  }
+  card.innerHTML=`${progress('Service Job','Enter the exact MHelpDesk ticket',1,1)}
+    <button class='wl-back' data-wl-home='svc'>← Service Home</button>
+    <div class='wl-question'>
+      <div class='qnum'>Find Assigned Job</div>
+      <div class='qtext'>MHelpDesk Ticket #</div>
+      <input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='Enter ticket #'>
+      <button class='wl-big wl-blue top10' data-wl-service-find-job>Find Job →</button>
+      <div id='wlServiceJobSearchMsg' class='small top8'>Only the exact current MHelpDesk ticket will open the Service job.</div>
+    </div>`;
+  hideChildren(viewSvc(),[card]);
+  resetWizardPosition();
+}
+
 async function serviceFindJobByTicket(){
   const input=document.getElementById('wlServiceJobSearch'), msg=document.getElementById('wlServiceJobSearchMsg');
   const ticket=String(input?.value||'').trim().replace(/^#\s*/,'');
@@ -2470,6 +2498,7 @@ document.addEventListener('click', async e => {
   }
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
+  if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
   if (e.target.closest('[data-wl-service-find-job]')) return serviceFindJobByTicket();
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
   if(takeServiceJob) return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob);
