@@ -2366,7 +2366,7 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'ticket_item_match_ok', label: `Is ${identity} what the customer requested and what is listed on the MHelpDesk ticket?` });
     return steps;
   }
-  if (item.equipment_type !== 'Solar Spotter' && Number(item.required_battery_count || 0) > 0) {
+  if (!['Solar Spotter','Spotter'].includes(item.equipment_type) && Number(item.required_battery_count || 0) > 0) {
     steps.push({ kind: 'number', field: 'battery_count', label: item.equipment_type==='Helios' ? `Confirm ${identity} has exactly its internal Helios battery box prepared. This is ONE Helios battery box — not four Solar Stand batteries.` : `How many batteries / battery boxes are prepared for ${identity}?` });
   }
   steps.push({ kind: 'bool', field: 'power_ok', label: item.equipment_type === 'Sniper' ? `With ${identity} plugged into 120V, does the Sniper power on correctly?` : `Does ${identity} power on correctly?` });
@@ -2428,11 +2428,11 @@ function itUnitStepsData(item, unitNo) {
     steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
     steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
   }
-  if (['DELIVERY','BACKUP'].includes(item.purpose)) {
+  if (['DELIVERY','BACKUP'].includes(item.purpose) || (['Sniper','Spotter','Recon 2','Ranger'].includes(item.equipment_type) && item.purpose === 'SWAP')) {
     steps.push({ kind: 'bool', field: 'delivery_sim_ok', label: `Is the SIM card for ${identity} active and installed in the router?` });
     steps.push({ kind: 'bool', field: 'delivery_camera_app_ok', label: `Is ${identity} visible in the camera app?` });
     steps.push({ kind: 'bool', field: 'delivery_recording_ok', label: `Was recording footage confirmed for ${identity}?` });
-    if (item.equipment_type !== 'Solar Spotter') steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
+    if (!['Solar Spotter','Spotter'].includes(item.equipment_type)) steps.push({ kind: 'bool', field: 'delivery_batteries_charged_ok', label: `Are the batteries / battery box for ${identity} charged and ready?` });
     if (item.purpose === 'DELIVERY') {
       steps.push({ kind: 'bool', field: 'delivery_monitoring_ok', label: `Was Central Station monitoring for ${identity} created and sent in?` });
       steps.push({ kind: 'bool', field: 'delivery_ticket_count_ok', label: `Is ${identity} included in the equipment type and quantity on the MHelpDesk ticket?` });
@@ -2468,10 +2468,12 @@ function itUnitReady(item) {
     if(!core) return false;
     return item.purpose==='BACKUP' ? true : Boolean(item.delivery_customer_email_app_ok && item.delivery_monitoring_ok);
   }
-  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok)) return false;
-  const sniperSwap = item.equipment_type === 'Sniper' && item.purpose === 'SWAP';
-  if (!['DELIVERY','BACKUP'].includes(item.purpose) && !sniperSwap) return true;
-  const batteryReady = item.equipment_type === 'Solar Spotter' || item.delivery_batteries_charged_ok;
+  if (item.equipment_type === 'Spotter' && !(item.unit_programmed_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
+  if (item.equipment_type === 'Recon 2' && !(item.unit_programmed_ok && Number(item.recon_camera_count || 0) >= 1 && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
+  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
+  const customerSwap = ['Sniper','Spotter','Recon 2','Ranger'].includes(item.equipment_type) && item.purpose === 'SWAP';
+  if (!['DELIVERY','BACKUP'].includes(item.purpose) && !customerSwap) return true;
+  const batteryReady = ['Solar Spotter','Spotter'].includes(item.equipment_type) || item.delivery_batteries_charged_ok;
   const hardwareReady = Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady);
   if (item.purpose === 'BACKUP') return hardwareReady;
   return Boolean(hardwareReady && item.delivery_customer_email_app_ok && item.delivery_monitoring_ok && item.delivery_ticket_count_ok);
@@ -2483,12 +2485,26 @@ function itPhotoTagReady(item) { return item?.photo_tag_match_ok === true; }
 async function configureCurrentItItem() {
   const item = currentItItem();
   if (!itTypeChoice || !itPurposeChoice) return false;
-  const required = itTypeChoice === 'Recon 2' ? Math.max(1, Number(itReconRequired || 1)) : 1;
+  const required = 1;
   const result = item
     ? await liveDb.rpc('configure_it_prep_item', { p_item_id: item.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_required_battery_count: required })
     : await liveDb.rpc('add_it_prep_item', { p_prep_id: activeItPrep.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_recon_battery_count: required });
   if (result.error) { alert(result.error.message); return false; }
   activeItPrep = await getPrep(activeItPrep.id);
+  if (['Spotter','Recon 2','Ranger'].includes(itTypeChoice)) {
+    const configured=currentItItem();
+    if (configured) {
+      const { error:familyError }=await liveDb.rpc('save_it_camera_family_checks_v1',{
+        p_item_id:configured.id,
+        p_programmed_ok:false,
+        p_port_81_ok:false,
+        p_port_554_ok:false,
+        p_recon_camera_count:itTypeChoice==='Recon 2'?Math.max(1,Number(itReconRequired||1)):null
+      });
+      if (familyError) { alert(familyError.message); return false; }
+      activeItPrep=await getPrep(activeItPrep.id);
+    }
+  }
   if (itTypeChoice === 'Helios' && ['DELIVERY','SWAP','BACKUP'].includes(itPurposeChoice)) {
     const configured = currentItItem();
     if (configured) {
@@ -2510,6 +2526,16 @@ async function configureCurrentItItem() {
 async function persistCurrentItItem() {
   const item = currentItItem();
   if (!item) return false;
+  if (['Spotter','Recon 2','Ranger'].includes(item.equipment_type)) {
+    const { error:familyError }=await liveDb.rpc('save_it_camera_family_checks_v1',{
+      p_item_id:item.id,
+      p_programmed_ok:Boolean(item.unit_programmed_ok),
+      p_port_81_ok:Boolean(item.camera_port_81_ok),
+      p_port_554_ok:Boolean(item.camera_port_554_ok),
+      p_recon_camera_count:item.equipment_type==='Recon 2'?Math.max(1,Number(item.recon_camera_count||1)):null
+    });
+    if (familyError) { alert(familyError.message); return false; }
+  }
   const { error } = await liveDb.rpc('save_it_prep_item_draft', {
     p_item_id: item.id,p_unit_tag:item.unit_tag||'',p_battery_count:Number(item.battery_count||0),
     p_power_ok:Boolean(item.power_ok),p_functions_ok:Boolean(item.functions_ok),p_safe_ok:Boolean(item.safe_ok),
@@ -2546,7 +2572,7 @@ async function persistCurrentItItem() {
 }
 function itCheckStepHtml(item, step, index, total, unitNo) {
   if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='Exact unit tag'></div>`;
-  if (step.kind === 'number') return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${Number(item.required_battery_count || 0)}' value='${esc(item.battery_count ?? item.required_battery_count ?? '')}'><div class='wl-note top8'>Required minimum: ${Number(item.required_battery_count || 0)}</div></div>`;
+  if (step.kind === 'number') { const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1); const value=item[step.field] ?? (step.field==='battery_count' ? item.required_battery_count : min); return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>Required minimum: ${min}</div></div>`; }
   const answered = itBoolAnswered(item, step.field);
   const value = itBoolValue(item, step.field);
   const yes = answered && value === true;
@@ -2557,7 +2583,7 @@ function itUnitIssues(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo);
   const issues = [];
   steps.forEach((step, index) => {
-    const failed = step.kind === 'number' ? Number(item[step.field] || 0) < Number(item.required_battery_count || 0) : step.kind === 'tag' ? !String(item[step.field] || '').trim() : itBoolValue(item, step.field) !== true;
+    const failed = step.kind === 'number' ? Number(item[step.field] || 0) < Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1) : step.kind === 'tag' ? !String(item[step.field] || '').trim() : itBoolValue(item, step.field) !== true;
     if (failed) issues.push({ phase: 'checks', index, label: step.label });
   });
   if (!unitEvidence(evidence, unitNo, 'photo').length) issues.push({ phase: 'photo', index: 0, label: 'Required equipment photo is missing.' });
@@ -2575,7 +2601,7 @@ function itUnitReviewHtml(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo).filter(s => s.kind === 'bool');
   const passed = steps.filter(s => itBoolValue(item, s.field) === true).length;
   const identity = itItemIdentity(item, unitNo);
-  return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} of ${Number(item.required_battery_count || 0)} required</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed'}</div></div>`;
+  return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${item.equipment_type==='Recon 2'? `<div><b>Recon II cameras:</b> ${Number(item.recon_camera_count||0)}</div>` : ''}${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} (minimum ${Number(item.required_battery_count || 0)})</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed'}</div></div>`;
 }
 const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
   { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
@@ -2630,7 +2656,7 @@ function truckSpareITPanelHtml(rows,items,evidence=[]) {
     <div class='small'>The flow remains <b>IT check → photo/signature → IT CHECK OUT → Service handoff</b>. A spare cannot leave with Service until IT checks it out. After the field call, Service resolves it as USED or RETURN UNUSED.</div>
     <div class='top10'><b>Spare Units</b></div>
     ${backupHtml}
-    <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II battery/camera sets<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
+    <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II camera count<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
     <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-add-truck-spare-unit>＋ Add Spare Unit & Run IT Check</button>
     <div class='top10'><b>Spare Batteries</b><div class='small'>Enter and save the spare quantity first. Then IT must use CHECK OUT SPARE BATTERIES before the Service handoff.</div></div>
     ${batteryRows}
@@ -2645,10 +2671,21 @@ async function addTruckSpareUnitFromSummary() {
   const { data,error }=await liveDb.rpc('add_it_truck_spare_unit',{
     p_prep_id:activeItPrep.id,
     p_equipment_type:type,
-    p_recon_battery_count:type==='Recon 2'?recon:null
+    p_recon_battery_count:type==='Recon 2'?1:null
   });
   if (error) return alert(error.message);
   activeItPrep=await getPrep(activeItPrep.id);
+  if (['Spotter','Recon 2','Ranger'].includes(type)) {
+    const added=itItems().find(i=>i.id===data);
+    if (added) {
+      const { error:familyError }=await liveDb.rpc('save_it_camera_family_checks_v1',{
+        p_item_id:added.id,p_programmed_ok:false,p_port_81_ok:false,p_port_554_ok:false,
+        p_recon_camera_count:type==='Recon 2'?recon:null
+      });
+      if (familyError) return alert(familyError.message);
+      activeItPrep=await getPrep(activeItPrep.id);
+    }
+  }
   itExpectedUnits=activeItPrep.expected_unit_count||itItems().length;
   const items=itItems();
   const found=items.findIndex(i=>i.id===data);
@@ -2834,7 +2871,7 @@ async function showItPrep(prepId) {
     const unitNo = itUnitIndex + 1;
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
-    itReconRequired = Number(item.required_battery_count || 1);
+    itReconRequired = Number(item.recon_camera_count || 1);
     if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || ''; }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
@@ -2907,7 +2944,7 @@ async function renderItUnitStep() {
     const purposes = itAllowedPurposes(itTypeChoice);
     wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `What is Unit ${unitNo} for?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Choose SWAP or DELIVERY</div><div class='wl-options'>${purposes.map(p => `<button class='${itPurposeChoice === p ? 'pass on' : 'pass'}' data-wl-unit-purpose='${p}'>${p}</button>`).join('')}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'recon') {
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, 'Recon II requirement', 1, 1) + `<div class='wl-question'><div class='qtext'>How many Recon II camera / battery sets are required for this unit?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${Math.max(1, Number(itReconRequired || 1))}'></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, 'Recon II camera count', 1, 1) + `<div class='wl-question'><div class='qtext'>How many cameras are going on this Recon II for this deployment?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${Math.max(1, Number(itReconRequired || 1))}'></div><div class='wl-note top8'>Battery quantity is entered separately during the unit check after the Recon II is programmed and ready.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'checks') {
     const steps = itUnitStepsData(item, unitNo);
     const step = steps[itQuestionIndex];
@@ -3445,6 +3482,53 @@ async function submitHeliosFieldInstall(){
   if(error)return alert(error.message);
   activeSvcPrep=await getPrep(activeSvcPrep.id); alert('Helios field installation submitted to the Owner for final verification.'); return renderSvcPrep();
 }
+function rangerFieldItems(prep=activeSvcPrep){
+  return [...(prep?.prep_items||[])].filter(i=>i.equipment_type==='Ranger'&&['DELIVERY','SWAP'].includes(i.purpose));
+}
+function rangerFieldReady(prep=activeSvcPrep){
+  const rows=rangerFieldItems(prep);
+  return !rows.length||rows.every(i=>i.ranger_field_victron_updated_ok===true);
+}
+function standardSwapItems(prep=activeSvcPrep){
+  return [...(prep?.prep_items||[])].filter(i=>['Sniper','Spotter','Recon 2'].includes(i.equipment_type)&&i.purpose==='SWAP');
+}
+async function standardSwapReturnState(prep=activeSvcPrep){
+  const swaps=standardSwapItems(prep), returns=(await returnRows()).filter(r=>norm(r.ticket_no)===norm(prep?.ticket_no));
+  const types=['Sniper','Spotter','Recon 2'], byType={};
+  types.forEach(type=>{
+    const required=swaps.filter(i=>i.equipment_type===type).length;
+    const returned=returns.filter(r=>r.equipment_type===type).length;
+    byType[type]={required,returned,missing:Math.max(0,required-returned)};
+  });
+  const missing=types.flatMap(type=>Array(byType[type].missing).fill(type));
+  return{swaps,returns,byType,missing,ready:missing.length===0};
+}
+function rangerFieldHtml(prep){
+  const rows=rangerFieldItems(prep);
+  const cards=rows.map((item,index)=>`<label class='check top8'><input type='checkbox' data-wl-ranger-field-item='${esc(item.id)}' ${item.ranger_field_victron_updated_ok?'checked':''}><span><b>${esc(item.unit_tag||('Ranger '+(index+1)))}</b> — at the site, verify this Ranger is up to date in the Victron Bluetooth app.</span></label>`).join('');
+  const ready=rangerFieldReady(prep);
+  return `<div class='wl-review'><b>Ranger Field Check</b><div class='small'>Complete this in the field before closing the Tech Check.</div>${cards}</div>${ready?`<div class='ok top10'><b>✓ Ranger Victron field verification complete.</b></div>`:`<button class='wl-big wl-blue top10' data-wl-save-ranger-field>Save Ranger Field Verification</button>`}`;
+}
+async function saveRangerFieldVerification(){
+  const rows=rangerFieldItems(activeSvcPrep);
+  for(const item of rows){
+    const checked=Boolean(document.querySelector(`[data-wl-ranger-field-item="${item.id}"]`)?.checked);
+    if(!checked)return alert('Verify every Ranger is up to date in the Victron Bluetooth app while in the field.');
+    const {error}=await liveDb.rpc('save_my_ranger_field_check_v1',{p_item_id:item.id,p_victron_updated_ok:true});
+    if(error)return alert(error.message);
+  }
+  activeSvcPrep=await getPrep(activeSvcPrep.id);
+  return renderSvcPrep();
+}
+async function startStandardSwapReturn(type){
+  const saved=await loadDeviceDraft('service-return');
+  if(saved?.ticket)return showServiceReturn();
+  serviceReturn={step:1,ticket:String(activeSvcPrep?.ticket_no||''),unit:'',type:String(type||''),notes:'',photo:null,tagScan:null,conditionPhotos:[],damagePhotos:[],knownUnits:await rememberedUnitsForTicket(activeSvcPrep?.ticket_no||'')};
+  serviceReturnRecovered=false;
+  await saveServiceReturnDraft();
+  return renderServiceReturn();
+}
+
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
   const base=document.getElementById('matchedPreps')?.closest('.card'),card=findSvcCard(activeSvcPrep.ticket_no);
@@ -3452,7 +3536,7 @@ async function renderSvcPrep() {
   const forms=svcForms(card),wizard=svcWizardCard(),partsTotal=ticketPartsTotal(activeSvcPrep),hasParts=partsTotal>0;
   const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
   const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null,solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[],solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
-  const heliosField=heliosFieldItems(activeSvcPrep),partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  const heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep),partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,rangerStep=signStep+1,preparedBy=activeSvcPrep.released_by_name||'IT Technician';
   hideChildren(viewSvc(),[wizard]);base.style.display='none';
   if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
   if(svcUnitIndex<forms.length){
@@ -3469,14 +3553,20 @@ async function renderSvcPrep() {
     const itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length;
     wizard.innerHTML=progress('Service Photos',`Take ${requiredPhotos} matching receipt photo${requiredPhotos===1?'':'s'}`,1,1)+await photoOnlyHtml(activeSvcPrep.id,'service',null,requiredPhotos)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
   }else if(svcUnitIndex===signStep){
-    wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Review →</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+  }else if(rangerField.length&&svcUnitIndex===rangerStep){
+    wizard.innerHTML=progress('Ranger Field Check','Verify Victron Bluetooth status at the site',1,1)+rangerFieldHtml(activeSvcPrep)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${rangerFieldReady(activeSvcPrep)?'':'disabled'}>Review →</button></div>`;
   }else{
     if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
     const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
-    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),ready=proofReady&&allChecksOk&&partsReady&&solarReady;
+    const swapState=await standardSwapReturnState(activeSvcPrep);
+    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep),swapReady=swapState.ready,ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
     const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
     const heliosNotice=heliosField.length?`<div class='warn top10'><b>HELIOS IS NOT DEPLOYED YET</b><div>Accept the IT → Service handoff, then complete field install, any OLD UNIT RETURNING, final photos/signature, and Owner final verification.</div></div>`:'';
-    wizard.innerHTML=progress('Final Step',heliosField.length?'Accept the Helios handoff — field install remains open':'Accept equipment and deploy to field',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}<button class='wl-big wl-green' ${heliosField.length?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosField.length?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue to Field Install →`:`Accept from IT Tech ${esc(preparedBy)} & Mark Deployed →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
+    const missingSwapType=swapState.missing[0]||'';
+    const swapNotice=swapState.swaps.length?(swapReady?`<div class='ok top10'><b>✓ Replaced SWAP unit return(s) recorded in IT Intake.</b></div>`:`<div class='wl-stop top10'><b>OLD SWAP UNIT RETURN REQUIRED</b><div>${swapState.missing.length} replaced field unit${swapState.missing.length===1?'':'s'} still need to be sent to IT Intake before this Tech Check can close.</div><button class='wl-big wl-red top10' data-wl-standard-swap-return='${esc(missingSwapType)}'>Return ${esc(missingSwapType)} to IT Intake →</button></div>`):'';
+    wizard.innerHTML=progress('Final Step',heliosField.length?'Accept the Helios handoff — field install remains open':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-green' ${heliosField.length?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosField.length?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue to Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -3703,7 +3793,7 @@ document.addEventListener('click', async e => {
     }
     if (itUnitPhase === 'recon') {
       const value = Math.max(1, Number(document.getElementById('wlReconRequired')?.value || 0));
-      if (value < 1) return alert('Enter the Recon II camera / battery requirement.');
+      if (value < 1) return alert('Enter how many cameras are going on this Recon II.');
       itReconRequired = value;
       if (!await configureCurrentItItem()) return;
       itQuestionIndex = 0;
@@ -3721,8 +3811,9 @@ document.addEventListener('click', async e => {
         item.unit_tag = value; needsSave = true;
       } else if (step.kind === 'number') {
         const value = Number(document.getElementById('wlItUnitValue')?.value || 0);
-        if (value < Number(item.required_battery_count || 0)) return alert(`This unit requires at least ${Number(item.required_battery_count || 0)} batteries / battery boxes.`);
-        item.battery_count = value; needsSave = true;
+        const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1);
+        if (value < min) return alert(`This check requires at least ${min}.`);
+        item[step.field] = value; needsSave = true;
       } else if (!itBoolAnswered(item, step.field)) {
         return alert('Choose YES or NO first.');
       }
@@ -3859,6 +3950,8 @@ document.addEventListener('click', async e => {
     const proofStep = solarStep + (solarRequired ? 1 : 0);
     const photoStep = proofStep + 1;
     const signStep = proofStep + 2;
+    const rangerStep = signStep + 1;
+    const rangerField = rangerFieldItems(activeSvcPrep);
     if (svcUnitIndex < forms.length) return advanceSvcVerification();
     if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
     if (solarRequired && svcUnitIndex === solarStep) {
@@ -3868,6 +3961,7 @@ document.addEventListener('click', async e => {
     }
     if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
     if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+    if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
     svcUnitIndex++; return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-svc-prev]')) {
@@ -3895,6 +3989,10 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-helios-old-return]')) return startHeliosOldUnitReturn();
   if (e.target.closest('[data-wl-return-to-active-helios]')) return renderSvcPrep();
   if (e.target.closest('[data-wl-submit-helios-field]')) return submitHeliosFieldInstall();
+  if (e.target.closest('[data-wl-save-ranger-field]')) return saveRangerFieldVerification();
+  const standardSwapReturn=e.target.closest('[data-wl-standard-swap-return]');
+  if(standardSwapReturn)return startStandardSwapReturn(standardSwapReturn.dataset.wlStandardSwapReturn);
+  if (e.target.closest('[data-wl-return-to-active-standard]')) return renderSvcPrep();
 
   const solarUpload=e.target.closest('[data-wl-solar-upload]');
   if (solarUpload) {
@@ -4152,7 +4250,7 @@ async function submitServiceReturn() {
     const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
     const card=serviceReturnCard();
-    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>${activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP') ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-helios>← Continue Helios Swap</button>` : ''}<button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
+    card.innerHTML=`${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>${activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP') ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-helios>← Continue Helios Swap</button>` : ''}${activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && standardSwapItems(activeSvcPrep).some(x=>x.equipment_type===serviceReturn.type) ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-standard>← Continue ${esc(serviceReturn.type)} Swap</button>` : ''}<button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
     resetWizardPosition();
   } catch(err) {
     if (uploadedPaths.length) await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(() => null);
