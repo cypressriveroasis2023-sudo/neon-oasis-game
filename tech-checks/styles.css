@@ -2789,3 +2789,40 @@ select {
   #view-owner .ownerDashSummary>div>b{font-size:17px}
   #view-owner .ownerDashSummary>div>span{font-size:9px}
 }
+
+
+/* Owner work-date containment v68 */
+#view-owner .ownerWorkflowFirst .grid,
+#view-owner .ownerWorkflowFirst .grid.top8{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+#view-owner .ownerWorkflowFirst .grid>div{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+}
+#view-owner #ownerAssignDate{
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  inline-size:100%;
+  min-inline-size:0;
+  margin:0;
+}
+@media(max-width:430px){
+  #view-owner .ownerWorkflowFirst .grid,
+  #view-owner .ownerWorkflowFirst .grid.top8{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  }
+  #view-owner #ownerAssignDate{
+    font-size:14px;
+    padding-left:6px;
+    padding-right:6px;
+  }
+}
