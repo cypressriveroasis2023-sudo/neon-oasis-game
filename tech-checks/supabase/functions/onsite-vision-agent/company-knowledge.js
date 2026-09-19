@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v5
+ * Version: company-knowledge-v6
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v5",
+  "version": "company-knowledge-v6",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -231,43 +231,48 @@
       "documented": true,
       "required_it_batteries": 1,
       "battery_label": "LiTime 12V 110Ah",
-      "purposes": [
-        "DELIVERY",
-        "SWAP",
-        "BACKUP"
-      ],
+      "purposes": ["DELIVERY","SWAP","BACKUP"],
+      "network_ports": {
+        "required_router_ports": [81,554],
+        "purpose": "Central Station camera access"
+      },
       "it_checks": [
         "exact unit tag",
         "power on",
+        "1 × LiTime 12V 110Ah battery attached/ready",
         "MPPT firmware/configuration updated",
         "MPPT tested",
-        "battery charging verified through MPPT with solar panel connected",
-        "SIM active/router online",
-        "visible in camera app",
-        "recording confirmed",
-        "storage formatted/ready",
-        "battery charged/ready",
+        "solar charging verified through the MPPT with the battery attached",
+        "camera/network online",
+        "router ports 81 and 554 available/configured",
+        "camera video works",
+        "verify recording to the internal SD card before formatting it",
+        "format the SD card after recording verification and leave it ready",
+        "Central Station receives all required information for customer deployments",
+        "customer shared-email/camera access completed for customer deployments",
         "functions tested",
-        "safe/ready for field use"
-      ],
-      "delivery_only_checks": [
-        "Central Station monitoring",
-        "MHelpDesk equipment quantity/type confirmation",
-        "customer email camera-app assignment"
+        "safe/ready for the IT → Service handoff"
       ],
       "automatic_service_requirements": {
         "delivery": "1 removable solar panel per Ranger",
         "battery": "1 × LiTime 12V 110Ah per Ranger",
-        "evidence": [
-          "battery proof",
-          "MPPT/charging readings proof"
-        ]
+        "pre_trip_evidence": ["battery proof","MPPT/charging readings proof"],
+        "field_requirement": "At the site, Service must verify the Ranger is up to date in the Victron Bluetooth app before Tech Check completion."
       },
+      "swap_rule": "A Ranger SWAP replacement follows the same customer-deployment readiness checks as DELIVERY. Ranger field Victron verification is still required before close.",
       "sources": [
+        "Owner instruction 2026-09-19",
+        "TechCheckRules Ranger profile",
         "add_it_prep_item",
+        "save_it_camera_family_checks_v1",
+        "save_it_prep_item_draft",
+        "verify_delivery_item_checks",
+        "enforce_camera_family_before_release_v1",
         "enforce_it_solar_delivery_before_release",
         "service_solar_context_v2",
-        "save_my_service_solar_check_v4"
+        "save_my_service_solar_check_v4",
+        "save_my_ranger_field_check_v1",
+        "enforce_standard_field_before_close_v1"
       ]
     },
     "Sniper": {
@@ -348,38 +353,57 @@
       "category": "device",
       "documented": "partial",
       "required_it_batteries": 0,
-      "purposes": [
-        "DELIVERY",
-        "SWAP",
-        "BACKUP"
+      "purposes": ["DELIVERY","SWAP","BACKUP"],
+      "components": [
+        "4 cameras",
+        "internal router",
+        "NVR or SD-card recording/storage depending on the unit",
+        "built-in top-mounted component — exact component name not yet confirmed"
       ],
-      "it_checks": [
-        "exact unit tag",
-        "power on",
-        "SIM active/router online for deployable work",
-        "camera app visibility",
-        "recording",
-        "storage formatted/ready",
-        "functions tested",
-        "safe/ready"
+      "platform": "Alibi app",
+      "network_ports": {
+        "required_router_ports": [81,554],
+        "purpose": "Central Station camera access"
+      },
+      "build_state": "Spotter units are already built and are normally already programmed because they are older units; IT still verifies the actual unit is programmed/visible before deployment.",
+      "it_delivery_flow": [
+        "Pull the assigned Spotter and plug/power it up.",
+        "Verify the unit is programmed and comes up in the Alibi app.",
+        "Verify the internal router/network is online.",
+        "Verify router ports 81 and 554 are available/configured so Central Station can reach the cameras.",
+        "Verify all 4 cameras work.",
+        "Verify recording works on the NVR or SD-card storage.",
+        "Format the NVR or SD-card storage as applicable and leave it ready.",
+        "Send the required paperwork/information to Central Station and verify Central Station can see the unit.",
+        "Add the customer-provided email address(es) so the customer has access.",
+        "Verify the Service order says whether the Delivery needs a pole or a stand; Service physically grabs/verifies that support equipment.",
+        "Take the required IT unit-tag photo, sign, and create the IT → Service handoff."
       ],
+      "swap_rule": "Prepare the replacement Spotter with the same customer-deployment checks as DELIVERY, but do not add another pole or stand for the swap.",
+      "swap_return_rule": "The replaced field Spotter must be brought back by Service and recorded through Service Return → IT Intake before the Tech Check can close.",
+      "battery_rule": "Spotter has no battery requirement.",
       "unknowns": [
-        "Detailed internal components",
-        "battery specification if applicable",
-        "port map",
-        "product-specific troubleshooting tree"
+        "Exact name/function of the top-mounted component described by the Owner",
+        "Exact camera/router/NVR/SD hardware models if model-specific procedures differ",
+        "Exact reprogramming sequence for a Spotter that is not already programmed",
+        "Approved Spotter troubleshooting tree"
       ],
       "teaching_needed": [
-        "List the Spotter internal components and what belongs with each unit.",
-        "Confirm whether Spotter has a battery requirement beyond the current database requirement of 0; if yes, document exact battery model and quantity.",
-        "Document the Spotter device/router port map and programming/configuration sequence.",
-        "Document Spotter-specific IT checks beyond the shared deployable-device checks.",
-        "Document any Spotter-specific Service checkout or field-install steps and mandatory evidence.",
+        "Name the Spotter top-mounted component if Vision needs to identify/check it specifically.",
+        "Provide exact camera/router/NVR/SD model details only if they change the procedure.",
+        "Document the reprogramming sequence for a Spotter that fails the already-programmed check.",
         "Document the approved Spotter troubleshooting sequence."
       ],
       "sources": [
+        "Owner instruction 2026-09-19",
+        "TechCheckRules Spotter profile",
         "add_it_prep_item",
-        "itUnitStepsData"
+        "save_it_camera_family_checks_v1",
+        "save_it_prep_item_draft",
+        "verify_delivery_item_checks",
+        "enforce_camera_family_before_release_v1",
+        "enforce_standard_field_before_close_v1",
+        "handoff evidence / Service Return → IT Intake workflow"
       ]
     },
     "Recon 2": {
@@ -387,40 +411,55 @@
       "display_name": "Recon II",
       "documented": "partial",
       "required_it_batteries": "dynamic minimum 1",
-      "purposes": [
-        "DELIVERY",
-        "SWAP",
-        "BACKUP"
+      "purposes": ["DELIVERY","SWAP","BACKUP"],
+      "platform": "Reconeyez app",
+      "network_ports": {
+        "required_router_ports": [81,554],
+        "purpose": "Central Station camera access"
+      },
+      "configuration_rules": [
+        "Record how many cameras are going on this Recon II deployment.",
+        "Camera count is separate from battery quantity.",
+        "Verify whether the actual unit is programmed and visible in the Reconeyez app; older units are often already programmed.",
+        "After the unit is programmed/ready, IT records and prepares the actual battery quantity.",
+        "The current database minimum is 1 battery, but the exact physical Recon II battery specification is still undocumented."
       ],
-      "it_checks": [
-        "exact unit tag",
-        "power on",
-        "configured battery quantity",
-        "SIM active/router online for deployable work",
-        "camera app visibility",
-        "recording",
-        "storage formatted/ready",
-        "functions tested",
-        "safe/ready"
+      "it_delivery_flow": [
+        "Enter the Recon II camera count for this deployment.",
+        "Verify the unit is programmed and visible in the Reconeyez app.",
+        "Verify the network/cellular connection is online.",
+        "Verify router ports 81 and 554 are available/configured so Central Station can reach the cameras.",
+        "Verify the configured camera set works and records.",
+        "Prepare/record the actual battery quantity after the unit is programmed and ready.",
+        "Verify storage/recording is ready.",
+        "For customer deployment, complete Central Station information and required customer access.",
+        "Verify whether the Service order requires a pole or stand; Service physically grabs/verifies that support equipment.",
+        "Complete the required IT unit-tag photo, signature, and IT → Service handoff."
       ],
+      "swap_rule": "A Recon II SWAP replacement follows the same customer-deployment readiness checks as DELIVERY.",
+      "swap_return_rule": "The replaced field Recon II must be brought back by Service and recorded through Service Return → IT Intake before the Tech Check can close.",
       "unknowns": [
-        "Exact Recon battery model/specification",
-        "detailed internal components",
-        "port map",
-        "product-specific troubleshooting tree"
+        "Exact Recon II battery model/specification behind the database label Recon II Battery",
+        "Exact internal camera/router/storage hardware models if model-specific procedures differ",
+        "Exact programming sequence for a Recon II that is not already programmed",
+        "Approved Recon II troubleshooting tree"
       ],
       "teaching_needed": [
-        "Document the exact Recon II battery model/specification; the database label Recon II Battery is not a physical specification.",
-        "List the Recon II internal components and what belongs with each configured unit/camera set.",
-        "Document the Recon II device/router port map and programming/configuration sequence.",
-        "Document Recon II-specific IT checks beyond the shared deployable-device checks.",
-        "Document any Recon II-specific Service checkout or field-install steps and mandatory evidence.",
+        "Document the exact physical Recon II battery model/specification.",
+        "Provide internal hardware model details only if they change required checks.",
+        "Document the programming sequence for a Recon II that is not already programmed.",
         "Document the approved Recon II troubleshooting sequence."
       ],
       "sources": [
+        "Owner instruction 2026-09-19",
+        "TechCheckRules Recon II profile",
         "add_it_prep_item",
         "configure_it_prep_item",
-        "app.js BATTERY metadata"
+        "save_it_camera_family_checks_v1",
+        "save_it_prep_item_draft",
+        "verify_delivery_item_checks",
+        "enforce_camera_family_before_release_v1",
+        "enforce_standard_field_before_close_v1"
       ]
     },
     "Solar Stand": {
@@ -588,15 +627,15 @@
     "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
     "products": {
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
-      "Spotter": "Internal components, battery applicability/specification, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
-      "Recon 2": "Exact battery model/specification, internal components, port/programming map, product-specific IT/Service evidence, and troubleshooting still need Owner-approved documentation.",
+      "Spotter": "Core 4-camera/internal-router/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact top-mounted component name, model-specific details if needed, reprogramming steps, and troubleshooting.",
+      "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
       "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, troubleshooting, BACKUP-purpose parity, and standalone Service-close behavior still need Owner-approved documentation.",
       "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
       "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
     "truck_spares": [
       "Confirm whether Sniper should support a standalone spare-battery batch and, if so, its exact battery label/specification.",
-      "Confirm whether Spotter should support a standalone spare-battery batch and, if so, its exact battery label/specification.",
+      "Spotter has no battery requirement; do not invent a standalone Spotter spare-battery batch.",
       "Document the exact physical Recon II battery specification behind the current Recon II Battery database label.",
       "Document any product-specific spare-kit contents beyond the checked unit and supported battery batches."
     ]
@@ -806,6 +845,10 @@
     data.shared_helios_field_install=shared.heliosFieldChecklist?[...shared.heliosFieldChecklist]:[];
     data.shared_it_intake_checklist=shared.itIntakeChecklist?[...shared.itIntakeChecklist]:[];
     if(data.equipment.Helios)data.equipment.Helios.shared_field_install_checklist=data.shared_helios_field_install;
+    if(data.equipment.Sniper&&shared.sniperProfile)data.equipment.Sniper.shared_sniper_profile=shared.sniperProfile;
+    if(data.equipment.Spotter&&shared.spotterProfile)data.equipment.Spotter.shared_spotter_profile=shared.spotterProfile;
+    if(data.equipment['Recon 2']&&shared.recon2Profile)data.equipment['Recon 2'].shared_recon2_profile=shared.recon2Profile;
+    if(data.equipment.Ranger&&shared.rangerProfile)data.equipment.Ranger.shared_ranger_profile=shared.rangerProfile;
     if(data.workflows?.intake)data.workflows.intake.shared_checklist=data.shared_it_intake_checklist;
     if(data.truck_spares&&shared.truckSpareRules){
       data.truck_spares.shared_rules=shared.truckSpareRules;
