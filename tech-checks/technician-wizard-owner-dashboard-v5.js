@@ -3506,9 +3506,8 @@ document.addEventListener('click', async e => {
   if(aiChip){
     const input=document.getElementById('ownerAIDispatchPrompt');
     if(input){
-      const phrase=String(aiChip.dataset.ownerAiChip||'').trim();
-      input.value=(input.value.trim()?input.value.trim()+', ':'')+phrase;
-      input.focus();
+      input.value=String(aiChip.dataset.ownerAiChip||'').trim();
+      return ownerAIDispatchBuild();
     }
     return;
   }
@@ -4388,25 +4387,24 @@ async function installOwnerAssignments(force = false) {
         <div class='wl-ai-brand-head'>
           <div class='wl-ai-brand-title'>
             <span class='wl-ai-brand-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span>
-            <span><small>TECH CHECK AI</small><b>Owner AI Dispatch</b></span>
+            <span><small>ONSITE VISION</small><b>Owner Assistant</b></span>
           </div>
-          <span class='wl-ai-state draft'>DRAFT</span>
+          <span class='wl-ai-state draft'>ASK / CREATE</span>
         </div>
-        <div class='wl-ai-lead'>Tell Tech Check what the MHelpDesk job needs. AI will build the draft, identify missing details, and leave the final send decision to you.</div>
+        <div class='wl-ai-lead'><b>Ask OnSite Vision like a person.</b> Ask about jobs, status, equipment, or next steps. Vision only prepares a new Tech Check draft when you clearly say <b>create a new ticket, job, or assignment</b>.</div>
         <div class='wl-ai-prompt-box'>
-          <label for='ownerAIDispatchPrompt'>Describe the job</label>
-          <textarea id='ownerAIDispatchPrompt' rows='4' placeholder='Example: MHelpDesk 48215, delivery tomorrow, West Lot, 1 Helios, IT then Service, assign IT to James.'></textarea>
+          <label for='ownerAIDispatchPrompt'>Ask or tell OnSite Vision what you need</label>
+          <textarea id='ownerAIDispatchPrompt' rows='4' placeholder="Examples: Tell me about Monday's Helios delivery. What needs attention today? What are the Helios delivery steps? Create a new delivery ticket for Monday."></textarea>
           <div class='wl-ai-prompt-chips' aria-label='Quick AI prompts'>
-            <button type='button' data-owner-ai-chip='Install job'>Install job</button>
-            <button type='button' data-owner-ai-chip='Service call'>Service call</button>
-            <button type='button' data-owner-ai-chip='Delivery tomorrow'>Delivery tomorrow</button>
-            <button type='button' data-owner-ai-chip='Send IT then Service'>IT → Service</button>
-            <button type='button' data-owner-ai-chip='Assign to James'>Assign to James</button>
+            <button type='button' data-owner-ai-chip="Show me Monday's jobs">Monday's jobs</button>
+            <button type='button' data-owner-ai-chip='What needs attention today?'>Needs attention</button>
+            <button type='button' data-owner-ai-chip='What are the Helios delivery steps?'>Helios steps</button>
+            <button type='button' data-owner-ai-chip='Create a new Tech Check ticket'>Create new ticket</button>
           </div>
         </div>
         <div class='wl-ai-dispatch-actions'>
-          <button type='button' class='wl-ai-dictate' data-owner-ai-dispatch-voice><span>🎙</span> Dictate</button>
-          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Build / Update Draft <span>→</span></button>
+          <button type='button' class='wl-ai-dictate' data-owner-ai-dispatch-voice><span>🎙</span> Speak to Vision</button>
+          <button type='button' class='wl-ai-build' data-owner-ai-dispatch-build>Ask OnSite Vision <span>→</span></button>
         </div>
         <div id='ownerAIDispatchVoiceStatus' class='wl-ai-voice-status'></div>
         <div id='ownerAIDispatchResult' class='wl-ai-panel wl-ai-result-card hidden top10'></div>
@@ -4728,6 +4726,7 @@ function organizeOwnerDashboard(){
 let ownerAIDispatchPrepared = false;
 let ownerAIDispatchLastParse = null;
 let ownerAIDispatchRecognition = null;
+let ownerAIAssistantLastJobs = [];
 
 function ownerAIEscapeRegExp(v) {
   return String(v || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
@@ -4967,7 +4966,7 @@ function ownerAIDispatchRender(parsed) {
   box.classList.toggle("is-pending", missing.length>0);
   const warningHtml=(parsed.warnings||[]).length ? "<div class='wl-ai-warn top8'>"+parsed.warnings.map(v=>"⚠ "+esc(v)).join("<br>")+"</div>" : "";
   box.innerHTML=
-    "<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>TECH CHECK AI</small><b>Dispatch Draft</b></span></div><span class='wl-ai-state "+(missing.length?"pending":"ready")+"'>"+(missing.length?"PENDING":"READY")+"</span></div>"
+    "<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>New Ticket Draft</b></span></div><span class='wl-ai-state "+(missing.length?"pending":"ready")+"'>"+(missing.length?"PENDING":"READY")+"</span></div>"
     +"<div class='wl-ai-result-grid'>"
       +"<div><span>MHelpDesk</span><b>#"+esc(s.ticket)+"</b></div>"
       +"<div><span>Job type</span><b>"+esc(s.type)+"</b></div>"
@@ -4979,48 +4978,165 @@ function ownerAIDispatchRender(parsed) {
     +"<div class='wl-ai-result-equipment'><span>Equipment</span><b>"+esc(s.equipment)+"</b></div>"
     +warningHtml
     +(missing.length
-      ? "<div class='wl-ai-pending-box'><b>Pending information</b>"+missing.map(v=>"<span>• "+esc(v)+"</span>").join("")+"<small>Add the missing details, then build the draft again.</small></div>"
+      ? "<div class='wl-ai-pending-box'><b>Pending information</b>"+missing.map(v=>"<span>• "+esc(v)+"</span>").join("")+"<small>Tell OnSite Vision the missing details, or fill them in below, then ask Vision again.</small></div>"
       : "<div class='wl-ai-good'><b>✓ Ready for your review</b><br>Nothing has been sent.</div>")
-    +"<div class='wl-ai-advisory'>AI prepares the draft only. You still review and send the Tech Check job.</div>";
+    +"<div class='wl-ai-advisory'>OnSite Vision prepared this draft because you asked to create or update a ticket. Nothing is sent until you review and send the Tech Check job.</div>";
   return missing;
 }
-function ownerAIDispatchBuild() {
-  const input=document.getElementById("ownerAIDispatchPrompt");
-  const raw=String(input?.value||"").trim();
-  if (!raw) return alert("Type or dictate the job you want AI Dispatch to prepare.");
+function ownerAIAssistantIntent(text) {
+  const raw=String(text||'').trim();
+  const explicitCreate=/\b(create|make|start|set\s*up|setup|add|prepare|build)\b[\s\S]{0,40}\b(?:new\s+)?(?:tech\s*check|ticket|job|assignment)\b/i.test(raw)
+    || /\b(create|make|start|set\s*up|setup)\b[\s\S]{0,30}\b(delivery|pickup|swap|service)\b/i.test(raw)
+    || /\b(update|change|edit)\b[\s\S]{0,30}\b(draft|new\s+ticket|new\s+job|assignment)\b/i.test(raw);
+  return explicitCreate ? 'draft' : 'ask';
+}
+function ownerAIAssistantWorkflowGuide(parsed,raw) {
+  if (parsed?.ticket_no || parsed?.scheduled_for) return '';
+  if (!/\b(step|steps|workflow|process|requirement|requirements|what do i need|what should|how do|how does|what happens|directions)\b/i.test(raw)) return '';
+  const names=[...(parsed?.manifest||[]).map(r=>r.label),...(parsed?.mentionedWithoutQty||[])].map(v=>String(v||'').toLowerCase());
+  const type=String(parsed?.work_type||'').toLowerCase();
+  if(names.includes('helios')){
+    return "<div class='wl-ai-answer'><b>Helios "+esc((type||'delivery').toUpperCase())+" workflow</b>"
+      +"<ol><li><b>Owner:</b> start from the MHelpDesk ticket and create the Tech Check assignment with the date, site, Helios quantity, and unit number.</li>"
+      +"<li><b>IT:</b> complete the Helios lab checks — cameras/router/ports, Proxicast 4x4, Cerbo/VRM, 3 × 1TB SD cards, internal battery box and 120V charge — then photo, sign, and create the Service handoff.</li>"
+      +"<li><b>Service before leaving:</b> connect PV, switch to PV, verify Victron/Bluetooth and active solar charging, remove/wrap the PTZ, then accept the handoff.</li>"
+      +"<li><b>Field:</b> mount the box and PTZ, connect PV, power on, call IT to verify online/aim/recording, crank to about 20 ft, install mast bolt, set panel about 45°, install panel bolt, add 4 sandbags, then upload final photos and sign.</li>"
+      +"<li><b>Owner final:</b> review the field proof and complete Owner Final Verify.</li></ol>"
+      +"<div class='wl-ai-next'><b>Next step:</b> If this is a new job, say “Create a new Helios delivery ticket…” and include the MHelpDesk number, site, date, quantity, and unit number.</div></div>";
+  }
+  if(names.includes('solar spotter')){
+    return "<div class='wl-ai-answer'><b>Solar Spotter delivery workflow</b><p>IT checks the Solar Spotter itself. After IT creates the handoff, Service is automatically responsible for the Solar Stand and the battery setup, verifies charging/MPPT proof, and then takes the equipment from the shop.</p><div class='wl-ai-next'><b>Next step:</b> Create the ticket from the MHelpDesk details; do not add the automatic Solar Stand to the IT prep list.</div></div>";
+  }
+  if(names.includes('ranger')){
+    return "<div class='wl-ai-answer'><b>Ranger delivery workflow</b><p>IT prepares the Ranger. Service verifies the Ranger solar checkout, including the required solar panel, LiTime 12V 110Ah battery setup, MPPT operation/update, charging proof, and photos before leaving.</p></div>";
+  }
+  if(type==='pickup') return "<div class='wl-ai-answer'><b>Pickup workflow</b><p>Service goes to the field first, photographs and returns the equipment to the shop, then the returned unit enters IT Intake. IT does not start the pickup.</p></div>";
+  if(type==='delivery') return "<div class='wl-ai-answer'><b>Delivery workflow</b><p>Owner creates the Tech Check from MHelpDesk → IT prepares and signs off equipment → IT creates the Service handoff → Service verifies and takes the equipment → field work is completed.</p></div>";
+  return '';
+}
+function ownerAIAssistantNextStep(a,prep,solar) {
+  const p=ownerAssignmentProgress(a,prep,solar);
+  if(p.label==='DONE') return 'No action needed — this assignment is complete.';
+  if(p.label==='WAITING OWNER FINAL VERIFY') return 'Review the Helios field photos/checklist and complete Owner Final Verify.';
+  if(p.label==='HELIOS FIELD INSTALL IN PROGRESS') return 'Service needs to finish the Helios field checklist, final photos, and dated signature.';
+  if(p.label==='HELIOS YARD TEST COMPLETE') return 'Service needs to accept the IT handoff before leaving the shop.';
+  if(p.label==='HELIOS PRE-TRIP IN PROGRESS') return 'Service needs to finish the yard PV/Victron/solar test and transport prep.';
+  if(p.label==='SOLAR CHECKOUT IN PROGRESS') return 'Service needs to finish the required solar/equipment checkout proof.';
+  if(p.label==='READY FOR SERVICE') return 'Service needs to open the same MHelpDesk ticket and verify the IT handoff.';
+  if(p.label==='TECH CHECK IN PROGRESS') return 'IT needs to finish the unit checks, required photo/tag proof, signature, and handoff.';
+  if(/WAITING FOR/.test(p.label)) return 'A technician needs to claim this assignment from the department queue.';
+  if(p.label==='SENT') return 'The assigned technician needs to start the job.';
+  return p.detail || 'Open the job and continue the current Tech Check step.';
+}
+async function ownerAIAssistantAnswer(raw) {
+  const box=document.getElementById('ownerAIDispatchResult'); if(!box)return;
   const parsed=ownerAIParseDispatch(raw);
-  ownerAIDispatchApply(parsed);
-  ownerAIDispatchPrepared=true;
-  ownerAIDispatchLastParse=parsed;
-  ownerAIDispatchRender(parsed);
-  ownerAIReview();
+  const guide=ownerAIAssistantWorkflowGuide(parsed,raw);
+  box.classList.remove('hidden','is-ready','is-pending');
+  if(guide){
+    box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Next Steps</b></span></div><span class='wl-ai-state ready'>GUIDE</span></div>"+guide;
+    return;
+  }
+  box.innerHTML="<div class='wl-ai-assistant-working'><span class='wl-ai-scan-spinner'></span><div><b>OnSite Vision is checking Tech Check…</b><span>Looking at the current job records and workflow status.</span></div></div>";
+  const results=await Promise.all([
+    liveDb.from('job_assignments').select('*').in('status',['assigned','started','completed']).order('assigned_at',{ascending:false}).limit(100),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at,prep_items(equipment_type,purpose,unit_tag)').order('created_at',{ascending:false}).limit(100),
+    liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at,handoff_accepted_at,handoff_accepted_by_name,helios_field_completed_at,helios_field_completed_by_name,helios_owner_verified_at,helios_owner_verified_by_name').order('updated_at',{ascending:false}).limit(100)
+  ]);
+  const jobResult=results[0], prepResult=results[1], solarResult=results[2];
+  if(jobResult.error) throw jobResult.error;
+  const jobs=jobResult.data||[], preps=prepResult.data||[], solarRows=solarResult.data||[];
+  const prepMap=new Map(preps.map(p=>[p.id,p])), solarMap=new Map(solarRows.map(s=>[s.prep_ticket_id,s]));
+  const equipmentNames=[...(parsed.manifest||[]).map(r=>r.label),...(parsed.mentionedWithoutQty||[])].filter(v=>OWNER_DEVICE_TYPES.includes(v)||OWNER_STAND_TYPES.includes(v));
+  let matches=[...jobs];
+  if(parsed.ticket_no)matches=matches.filter(a=>String(a.ticket_no||'')===String(parsed.ticket_no));
+  if(parsed.scheduled_for)matches=matches.filter(a=>String(a.work_date||'')===String(parsed.scheduled_for));
+  if(parsed.work_type)matches=matches.filter(a=>String(a.work_type||'').toLowerCase()===String(parsed.work_type).toLowerCase());
+  if(equipmentNames.length)matches=matches.filter(a=>{
+    const prep=prepMap.get(a.prep_ticket_id), rows=normalizedEquipmentManifest((a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[]);
+    return equipmentNames.some(name=>rows.some(r=>String(r.label).toLowerCase()===String(name).toLowerCase()));
+  });
+  const wantsAttention=/\b(attention|problem|problems|issue|issues|stuck|overdue|needs? me|needs? review)\b/i.test(raw);
+  if(wantsAttention)matches=matches.filter(a=>{
+    const prep=prepMap.get(a.prep_ticket_id), solar=prep?solarMap.get(prep.id):null;
+    return ownerLiveAIStatus(a,prep,solar).state==='attention';
+  });
+  const hasSelector=Boolean(parsed.ticket_no||parsed.scheduled_for||parsed.work_type||equipmentNames.length||wantsAttention);
+  if(!hasSelector && ownerAIAssistantLastJobs.length && /\b(it|that|this|those|next|who|status|where)\b/i.test(raw)){
+    const ids=new Set(ownerAIAssistantLastJobs.map(a=>String(a.id)));
+    matches=jobs.filter(a=>ids.has(String(a.id)));
+  }
+  if(!matches.length){
+    const what=[parsed.work_type,parsed.scheduled_for,equipmentNames.join(' ')].filter(Boolean).join(' ');
+    box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>No matching Tech Check job found</b></span></div><span class='wl-ai-state pending'>NO MATCH</span></div>"
+      +"<div class='wl-ai-answer'><p>I do not see a current Tech Check record matching <b>"+esc(what||raw)+"</b>.</p><div class='wl-ai-next'><b>If this is a new MHelpDesk job:</b> say “Create a new ticket…” and give me the MHelpDesk number, site, date, equipment, and quantity. I will prepare the form for you instead of making you type it all below.</div><div class='wl-ai-advisory'>MHelpDesk is separate, so OnSite Vision can only look up what has already been entered into Tech Check.</div></div>";
+    ownerAIAssistantLastJobs=[];
+    return;
+  }
+  ownerAIAssistantLastJobs=matches.slice(0,12);
+  const groups=new Map();
+  matches.forEach(a=>{const key=String(a.ticket_no||a.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(a);});
+  const cards=[...groups.values()].slice(0,8).map(rows=>{
+    const a=rows[0], prep=rows.map(r=>prepMap.get(r.prep_ticket_id)).find(Boolean)||null, solar=prep?solarMap.get(prep.id):null;
+    const manifest=(a.equipment_manifest?.length?a.equipment_manifest:prep?.equipment_manifest)||[];
+    const statuses=rows.map(r=>{const p=ownerAssignmentProgress(r,prep,solar);return "<div><b>"+esc(String(r.assigned_role||'').toUpperCase())+":</b> "+esc(r.assignee_name||((r.assignment_scope==='department')?'Department queue':'Unassigned'))+" · "+esc(p.label)+"</div>";}).join('');
+    const active=rows.filter(r=>r.status!=='completed');
+    const target=active.find(r=>ownerLiveAIStatus(r,prep,solar).state==='attention')||active.find(r=>r.assigned_role==='it')||active[0]||rows[0];
+    const ai=ownerLiveAIStatus(target,prep,solar);
+    return "<div class='wl-ai-job-answer "+(ai.state==='attention'?'attention':'')+"'><div class='wl-ai-job-answer-head'><b>#"+esc(a.ticket_no||'—')+" · "+esc(a.site||prep?.site||'No site')+"</b><span>"+esc(String(a.work_type||prep?.work_type||'service').toUpperCase())+"</span></div>"
+      +"<div class='wl-ai-job-meta'><span>"+esc(a.work_date||'No work date')+"</span><span>"+esc(equipmentManifestText(manifest)||'No equipment listed')+"</span></div>"
+      +"<div class='wl-ai-job-status'>"+statuses+"</div>"
+      +"<div class='wl-ai-next'><b>Next:</b> "+esc(ownerAIAssistantNextStep(target,prep,solar))+"</div></div>";
+  }).join('');
+  box.innerHTML="<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>"+(wantsAttention?'Needs Attention':'Tech Check Answer')+"</b></span></div><span class='wl-ai-state ready'>"+groups.size+" FOUND</span></div>"
+    +"<div class='wl-ai-answer-intro'>I found the matching Tech Check record"+(groups.size===1?'':'s')+". Here is what is happening and what should happen next.</div>"+cards;
+}
+async function ownerAIDispatchBuild() {
+  const input=document.getElementById('ownerAIDispatchPrompt');
+  const raw=String(input?.value||'').trim();
+  if(!raw)return alert('Ask OnSite Vision a question, or tell it what you want done.');
+  const box=document.getElementById('ownerAIDispatchResult');
+  try{
+    if(ownerAIAssistantIntent(raw)==='draft'){
+      const parsed=ownerAIParseDispatch(raw);
+      ownerAIDispatchApply(parsed);
+      ownerAIDispatchPrepared=true;
+      ownerAIDispatchLastParse=parsed;
+      ownerAIDispatchRender(parsed);
+      ownerAIReview();
+      return;
+    }
+    await ownerAIAssistantAnswer(raw);
+  }catch(error){
+    console.warn('OnSite Vision owner assistant error',error);
+    if(box){box.classList.remove('hidden');box.innerHTML="<div class='wl-ai-warn'><b>OnSite Vision could not finish that request.</b><br>"+esc(error?.message||'Please try again.')+"</div>";}
+  }
 }
 function ownerAIDispatchStartVoice() {
   const Ctor=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if (!Ctor) return alert("Voice dictation is not available in this browser. Type the job request instead.");
-  try { ownerAIDispatchRecognition?.stop?.(); } catch {}
-  const input=document.getElementById("ownerAIDispatchPrompt"), status=document.getElementById("ownerAIDispatchVoiceStatus");
+  if(!Ctor)return alert('Voice requests are not available in this browser. Type your request and tap Ask OnSite Vision.');
+  try{ownerAIDispatchRecognition?.stop?.();}catch{}
+  const input=document.getElementById('ownerAIDispatchPrompt'), status=document.getElementById('ownerAIDispatchVoiceStatus'), button=document.querySelector('[data-owner-ai-dispatch-voice]');
   const rec=new Ctor(); ownerAIDispatchRecognition=rec;
-  rec.lang="en-US"; rec.interimResults=false; rec.continuous=false; rec.maxAlternatives=1;
-  rec.onstart=()=>{if(status)status.textContent="Listening…";};
-  rec.onerror=e=>{if(status)status.textContent="Voice dictation stopped."; console.warn("AI Dispatch dictation error",e);};
-  rec.onend=()=>{if(status)status.textContent=""; ownerAIDispatchRecognition=null;};
-  rec.onresult=e=>{
-    const spoken=String(e.results?.[0]?.[0]?.transcript||"").trim();
-    if(input && spoken) input.value=(input.value.trim()?input.value.trim()+" ":"")+spoken;
+  rec.lang='en-US';rec.interimResults=false;rec.continuous=false;rec.maxAlternatives=1;
+  rec.onstart=()=>{if(status)status.textContent='Listening — say what you want OnSite Vision to do or tell you.';if(button)button.innerHTML='<span>●</span> Listening…';};
+  rec.onerror=e=>{if(status)status.textContent='Voice request stopped. You can type instead.';if(button)button.innerHTML='<span>🎙</span> Speak to Vision';console.warn('OnSite Vision voice error',e);};
+  rec.onend=()=>{if(button)button.innerHTML='<span>🎙</span> Speak to Vision';ownerAIDispatchRecognition=null;};
+  rec.onresult=async e=>{
+    const spoken=String(e.results?.[0]?.[0]?.transcript||'').trim();
+    if(input&&spoken)input.value=spoken;
+    if(status)status.textContent=spoken?'I heard you. Checking Tech Check now…':'I did not catch that. Try again.';
+    if(spoken)await ownerAIDispatchBuild();
   };
   rec.start();
 }
 async function openOwnerAIDispatch() {
-  document.getElementById("wlTechMenuPanel")?.classList.add("hidden");
+  document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
   await installOwnerAssignments(false);
   organizeOwnerDashboard();
-  const host=document.getElementById("ownerJobAssignments"); if(host)host.open=true;
-  const input=document.getElementById("ownerAIDispatchPrompt");
-  input?.scrollIntoView?.({behavior:"smooth",block:"center"});
-  setTimeout(()=>input?.focus?.(),250);
+  const host=document.getElementById('ownerJobAssignments');if(host)host.open=true;
+  document.querySelector('.ownerAIDispatchPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 }
-
 function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
 function ownerAIReview(){
   const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';
