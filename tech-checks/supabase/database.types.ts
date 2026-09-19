@@ -1557,6 +1557,181 @@ export type Database = {
         }
         Relationships: []
       }
+      vision_conversations: {
+        Row: {
+          active_ticket: string | null
+          archived_at: string | null
+          created_at: string
+          draft: Json | null
+          id: string
+          owner_user_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active_ticket?: string | null
+          archived_at?: string | null
+          created_at?: string
+          draft?: Json | null
+          id: string
+          owner_user_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          active_ticket?: string | null
+          archived_at?: string | null
+          created_at?: string
+          draft?: Json | null
+          id?: string
+          owner_user_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vision_knowledge_entries: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          created_by_name: string
+          domain: string
+          equipment_type: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+          source_kind: string
+          source_ref: string | null
+          status: string
+          tags: string[]
+          title: string
+          topic: string | null
+          updated_at: string
+          version: number
+          workflow_type: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          created_by_name: string
+          domain?: string
+          equipment_type?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          source_kind?: string
+          source_ref?: string | null
+          status?: string
+          tags?: string[]
+          title: string
+          topic?: string | null
+          updated_at?: string
+          version?: number
+          workflow_type?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          domain?: string
+          equipment_type?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          source_kind?: string
+          source_ref?: string | null
+          status?: string
+          tags?: string[]
+          title?: string
+          topic?: string | null
+          updated_at?: string
+          version?: number
+          workflow_type?: string | null
+        }
+        Relationships: []
+      }
+      vision_knowledge_versions: {
+        Row: {
+          changed_by: string
+          changed_by_name: string
+          created_at: string
+          entry_id: string
+          id: string
+          snapshot: Json
+          version: number
+        }
+        Insert: {
+          changed_by: string
+          changed_by_name: string
+          created_at?: string
+          entry_id: string
+          id?: string
+          snapshot: Json
+          version: number
+        }
+        Update: {
+          changed_by?: string
+          changed_by_name?: string
+          created_at?: string
+          entry_id?: string
+          id?: string
+          snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vision_knowledge_versions_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "vision_knowledge_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vision_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          html_content: string
+          id: string
+          owner_user_id: string
+          role: string
+          text_content: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          html_content?: string
+          id: string
+          owner_user_id: string
+          role: string
+          text_content?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          html_content?: string
+          id?: string
+          owner_user_id?: string
+          role?: string
+          text_content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vision_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "vision_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_checkpoints: {
         Row: {
           after_data: Json | null
@@ -2621,13 +2796,48 @@ export type Database = {
         Args: { p_ticket_no: string }
         Returns: Json
       }
+      vision_archive_conversation_v1: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       vision_cancel_action_v1: { Args: { p_action_id: string }; Returns: Json }
       vision_execute_action_v1: { Args: { p_action_id: string }; Returns: Json }
+      vision_list_knowledge_v1: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
+      vision_load_conversations_v1: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       vision_prepare_action_v1: {
         Args: {
           p_action: Json
           p_conversation_id: string
           p_user_message?: string
+        }
+        Returns: Json
+      }
+      vision_save_conversation_v1: {
+        Args: {
+          p_active_ticket: string
+          p_conversation_id: string
+          p_draft: Json
+          p_messages: Json
+          p_title: string
+        }
+        Returns: Json
+      }
+      vision_save_knowledge_entry_v1: {
+        Args: { p_entry: Json; p_entry_id: string }
+        Returns: Json
+      }
+      vision_search_knowledge_v1: {
+        Args: {
+          p_equipment_type?: string
+          p_limit?: number
+          p_query: string
+          p_workflow_type?: string
         }
         Returns: Json
       }
