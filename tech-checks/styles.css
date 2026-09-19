@@ -3768,3 +3768,41 @@ select {
     padding:10px 12px;
   }
 }
+
+
+/* Owner OnSite Vision header access v118 */
+.accountActions .ownerVisionHeaderButton{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:36px;
+  border:1px solid #172839!important;
+  background:#172839!important;
+  color:#fff!important;
+  text-decoration:none!important;
+  font-weight:900!important;
+}
+.accountActions .ownerVisionHeaderButton img{
+  width:19px;
+  height:19px;
+  border-radius:5px;
+  object-fit:contain;
+}
+@media(max-width:680px){
+  .accountActions{
+    flex-wrap:wrap;
+  }
+  .accountActions .ownerVisionHeaderButton{
+    order:2;
+    padding-left:9px!important;
+    padding-right:9px!important;
+  }
+  .accountActions .ownerVisionHeaderButton span{
+    font-size:0;
+  }
+  .accountActions .ownerVisionHeaderButton span::after{
+    content:'Vision';
+    font-size:11px;
+  }
+}
