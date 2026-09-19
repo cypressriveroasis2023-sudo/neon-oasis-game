@@ -920,9 +920,11 @@ function serviceItem(item) {
     ' — exact unit ' +
     esc(item.unit_tag) +
     '</b></div>' +
-    (['DELIVERY','BACKUP'].includes(item.purpose)
-      ? '<div class="small">IT completed the deploy-ready checks before release.</div>'
-      : '') +
+    (item.purpose === 'BACKUP'
+      ? '<div class="small"><b>Truck Spare:</b> ' + (item.spare_it_checked_out_at ? '✓ IT CHECKED OUT by ' + esc(item.spare_it_checked_out_by_name || 'IT Technician') : 'CHECKOUT PENDING — do not take this spare') + '</div>'
+      : item.purpose === 'DELIVERY'
+        ? '<div class="small">IT completed the deploy-ready checks before release.</div>'
+        : '') +
     '<div class="check"><input id="' +
     exactId(item) +
     '" type="checkbox"><div><b>I physically have this exact unit tag.</b></div></div>' +
@@ -1485,7 +1487,7 @@ function renderOwner() {
       unresolvedSpareBatteries.map(b => '<div class="small top8"><b>' + Number(b.qty_prepared || 0) + ' × ' + esc(b.battery_type) + '</b> · MHelpDesk #' + esc(b.ticket_no) + ' · ' + esc(b.service_tech_name || 'Service Tech') + '</div>').join('') +
       '</div>'
     : '';
-  const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + ownerPartsEditor(p) + '<div class="top8"><b>Units / Equipment</b><div>' + ((p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '')).join(' · ') || 'No units started yet.') + '</div></div></div></details>';
+  const prepHtml = p => '<details class="ownerFold"><summary><span><b>MHelpDesk Ticket #' + esc(p.ticket_no) + '</b><span class="small ownerFoldHint">' + esc(p.site || 'No site') + '</span></span>' + (p.status === 'draft' ? '<span class="pill amber">IT EQUIPMENT PREP</span>' : p.status === 'released' ? '<span class="pill green">READY FOR SERVICE CHECKOUT</span>' : '<span class="pill">EQUIPMENT VERIFIED</span>') + '</summary><div class="ownerFoldBody small">' + ownerPartsEditor(p) + '<div class="top8"><b>Units / Equipment</b><div>' + ((p.prep_items || []).map(i => i.purpose + ' ' + eqLabel(i.equipment_type) + (i.unit_tag ? ' ' + i.unit_tag : '') + (i.purpose === 'BACKUP' ? (i.spare_it_checked_out_at ? ' [IT CHECKED OUT]' : ' [CHECKOUT PENDING]') : '')).join(' · ') || 'No units started yet.') + '</div></div></div></details>';
   const draftCount = activePreps.filter(p => p.status === 'draft').length;
   const serviceCount = activePreps.filter(p => p.status === 'released').length;
   const handoffBadge = $('ownerHandoffsBadge');
