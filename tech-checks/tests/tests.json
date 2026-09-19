@@ -1,6 +1,6 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v120",
+  "runtime_version": "release-qa-v121",
   "service_worker": "v76",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
@@ -1559,9 +1559,9 @@
         "Inspect service-worker cache"
       ],
       "expected": [
-        "tech-check-rules.js rules-v2 loads before app.js",
-        "tech-check-rules.js rules-v2 loads before Company Knowledge and Workflow Engine",
-        "SW v76 caches the same rules-v2 URL"
+        "tech-check-rules.js rules-v3 loads before app.js",
+        "tech-check-rules.js rules-v3 loads before Company Knowledge and Workflow Engine",
+        "SW v77 caches the same rules-v3 URL"
       ]
     },
     {
@@ -1659,10 +1659,109 @@
         "tech-check-rules.js content SHA matches",
         "Company Knowledge content SHA matches",
         "Workflow Engine content SHA matches",
-        "Edge Function v5 is ACTIVE with JWT verification",
+        "Edge Function v6 is ACTIVE with JWT verification",
         "Agent status reports shared rules version from TechCheckRules"
+      ]
+    },
+    {
+      "id": "PHASE7-KNOWLEDGE-01",
+      "area": "OnSite Vision Company Brain",
+      "role": "all",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Sniper battery rule is verified and centralized without inventing unfinished product details",
+      "steps": [
+        "Inspect active app.js BATTERY metadata",
+        "Inspect TechCheckRules Sniper definition",
+        "Inspect live add_it_prep_item/configure_it_prep_item battery count rule",
+        "Inspect Company Knowledge Sniper definition"
+      ],
+      "expected": [
+        "Sniper requires 2 batteries in shared rules and live database setup",
+        "Verified battery specification is 12V 35Ah",
+        "Vision labels Sniper COMPANY RULE — PARTIAL until components, ports and troubleshooting are taught",
+        "No undocumented Sniper internals or port values are invented"
+      ]
+    },
+    {
+      "id": "PHASE7-KNOWLEDGE-02",
+      "area": "OnSite Vision Company Brain",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Every partial Phase 7 product exposes exact teaching gaps",
+      "steps": [
+        "Ask for product requirements for Sniper, Spotter, Recon II, Solar Pole, 110V Stand and Pole",
+        "Inspect unknowns and teaching_needed in Company Knowledge and Workflow Engine"
+      ],
+      "expected": [
+        "All six partial product families remain explicitly partial",
+        "Each partial product returns exact teaching_needed prompts",
+        "Recon II database label Recon II Battery is not presented as a physical battery specification",
+        "Vision returns MISSING INFORMATION for undocumented technical procedures instead of generic internet guesses"
+      ]
+    },
+    {
+      "id": "PHASE7-SPARES-01",
+      "area": "Truck Spares / Backups",
+      "role": "it",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Truck-spare battery mappings and lifecycle use the shared rule source and match live server enforcement",
+      "steps": [
+        "Inspect TechCheckRules.truckSpareBatteryOptions and truckSpareRules",
+        "Inspect technician Truck Spares editor source",
+        "Inspect save_it_truck_spare_battery and enforce_truck_spares_before_release",
+        "Inspect Service spare resolution RPCs"
+      ],
+      "expected": [
+        "Shared battery mappings are Solar Spotter AGM 12V 110Ah / 12V 350Ah, Ranger LiTime 12V 110Ah, Helios Battery Box, and Recon II Battery",
+        "Technician UI consumes TechCheckRules.truckSpareBatteryOptions with the legacy local list retained only as fallback",
+        "IT READY plus explicit CHECK OUT remains required before the IT → Service handoff",
+        "Service resolves units as used or returned_unused and records battery quantity used",
+        "Standalone Sniper and Spotter spare-battery batches are not accepted by the current save RPC"
+      ]
+    },
+    {
+      "id": "PHASE7-AGENT-01",
+      "area": "OnSite Vision Server Agent",
+      "role": "owner",
+      "mode": "edge+source",
+      "destructive": false,
+      "scenario": "Agent prioritizes server-enforced truck-spare rules and exposes Phase 7 missing knowledge",
+      "steps": [
+        "Ask about a Sniper truck spare battery",
+        "Ask what Cameras On Site still needs to teach Vision for the partial product families",
+        "Inspect agent knowledge routing and deployed status"
+      ],
+      "expected": [
+        "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
+        "Vision does not claim a Sniper standalone spare-battery batch is allowed",
+        "Knowledge-gap questions return the Phase 7 gap inventory",
+        "Agent reports onsite-vision-agent-v6, company-knowledge-v4, workflow-engine-v4 and rules-v3"
+      ]
+    },
+    {
+      "id": "PHASE7-PARITY-01",
+      "area": "Shared Tech Check Rules",
+      "role": "all",
+      "mode": "source+edge",
+      "destructive": false,
+      "scenario": "Phase 7 browser and server bundles remain byte-identical after product knowledge expansion",
+      "steps": [
+        "Compare browser and Edge Function copies of tech-check-rules.js",
+        "Compare browser and Edge Function Company Knowledge",
+        "Compare browser and Edge Function Workflow Engine",
+        "Run Helios/Ranger/Solar Spotter regression assertions"
+      ],
+      "expected": [
+        "All three browser/server bundle pairs are byte-identical",
+        "Helios Delivery remains 31 shared IT checks with unchanged port groups",
+        "Ranger retains MPPT updated/tested/PV charging requirements",
+        "Solar Spotter retains zero IT battery checkout",
+        "No existing photo, signature, handoff, return or Owner-verification gate is weakened"
       ]
     }
   ],
-  "last_release_qa_note": "Phase 6: shared TechCheckRules v2 now drives technician equipment normalization, IT checklists/readiness, Solar Spotter/Ranger automatic Service plan, Service evidence requirements, Helios field install, and IT Intake; Vision Company Knowledge v3 and Workflow Engine v3 consume the same runtime; agent v5 carries byte-identical bundles; release v120 / Vision v16 / SW v76."
+  "last_release_qa_note": "Phase 7 company-brain pass: TechCheckRules v3 centralizes the verified Sniper 2 × 12V 35Ah rule plus server-backed truck-spare mappings/lifecycle; Company Knowledge v4 and Workflow Engine v4 expose exact teaching gaps for unfinished product families; agent v6 routes truck-spare/gap questions without generic guesses; release v121 / loader v35 / Vision v16 / SW v77."
 }
