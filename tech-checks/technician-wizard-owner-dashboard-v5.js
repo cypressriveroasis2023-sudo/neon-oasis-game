@@ -29,6 +29,7 @@ let activeItPrep = null;
 let itUnitIndex = 0;
 let itQuestionIndex = 0;
 let itUnitPhase = 'type';
+let itFinalView = 'summary';
 let itTypeChoice = '';
 let itPurposeChoice = '';
 let itReconRequired = 1;
@@ -1694,11 +1695,11 @@ function expectedPrepItemCount() {
   return equipmentManifestDeviceTotal(manifest) + equipmentManifestStandTotal(manifest);
 }
 const TICKET_PARTS = [
-  { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panels' },
-  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Replacement Batteries' },
-  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Replacement Cameras' },
-  { key:'sim_replacement_qty', id:'SimReplacements', label:'Replacement SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'Replacement SD / Micro SD Cards' },
+  { key:'solar_panel_qty', id:'SolarPanels', label:'Additional Solar Panels' },
+  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Additional Batteries' },
+  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Additional Cameras' },
+  { key:'sim_replacement_qty', id:'SimReplacements', label:'Additional SIM Cards' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'Additional SD / Micro SD Cards' },
 ];
 function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function readTicketPartInputs(prefix='wlPart') {
@@ -1712,7 +1713,7 @@ function ticketPartsRows(data) {
 function ticketPartsTotal(data) { return ticketPartsRows(data).reduce((sum,row) => sum + row.qty, 0); }
 function ticketPartsInlineHtml(data) {
   const rows = ticketPartsRows(data).filter(row => row.qty > 0);
-  return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>No extra replacement parts listed.</div></div>`;
+  return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>None listed.</div></div>`;
 }
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
@@ -2547,10 +2548,69 @@ async function checkoutTruckSpareBattery(spareId) {
 }
 
 function itTicketSummaryHtml(items, evidence) {
-  const units = items.map((item, index) => { const unitNo = index + 1; const photos = unitEvidence(evidence, unitNo, 'photo'); const sig = unitSignature(evidence, unitNo); const issues = itIssueLinksHtml(item, evidence, unitNo); const unitTitle=item.purpose==='BACKUP'?`TRUCK SPARE — ${esc(item.equipment_type)}`:`Unit ${unitNo} — ${esc(item.equipment_type)}`; return `<div class='wl-ticket'><b>${unitTitle}</b><div>${esc(item.purpose)} · Unit ${esc(item.unit_tag || '')}</div><div>📷 ${photos.length} photo${photos.length === 1 ? '' : 's'}</div><div>✍️ ${sig ? `Signed by ${esc(sig.created_by_name || 'IT Technician')} · ${new Date(sig.created_at).toLocaleString()}` : 'Signature missing'}</div>${issues}</div>`; }).join('');
-  const partsEditor = activeItPrep?.status === 'draft' ? `<div class='wl-question top10'><div class='qtext'>Parts Required</div><div class='small'>Update these only if the MHelpDesk ticket changes before the Service handoff.</div>${ticketPartsInputsHtml('wlEditPart', activeItPrep)}<button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-prep-parts>Save Parts List</button></div>` : ticketPartsInlineHtml(activeItPrep);
-  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site || '')}</div><div><b>Units / Devices:</b> ${Number(activeItPrep.requested_unit_count ?? equipmentManifestDeviceTotal(activeItPrep.equipment_manifest))}</div><div><b>Stands / Poles:</b> ${equipmentManifestStandTotal(activeItPrep.equipment_manifest)}</div><div><b>Total Equipment Items:</b> ${items.length}</div></div>${equipmentManifestInlineHtml(activeItPrep)}${partsEditor}${units}`;
+  const jobItems=items.map((item,index)=>({item,index})).filter(row=>row.item.purpose!=='BACKUP');
+  const units=jobItems.map(({item,index})=>{
+    const unitNo=index+1;
+    const photos=unitEvidence(evidence,unitNo,'photo');
+    const sig=unitSignature(evidence,unitNo);
+    return `<div class='wl-ticket'>
+      <b>Unit ${unitNo} — ${esc(item.equipment_type)}</b>
+      <div>${esc(item.purpose)} · Unit ${esc(item.unit_tag||'')}</div>
+      <div class='small'>📷 ${photos.length} photo${photos.length===1?'':'s'} · ✍️ ${sig?'Signed by '+esc(sig.created_by_name||'IT Technician'):'Signature missing'}</div>
+      <button class='mini top8' data-wl-final-unit='${index}'>Review / Adjust Unit</button>
+    </div>`;
+  }).join('');
+  return `<div class='wl-review'>
+    <b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b>
+    <div>${esc(activeItPrep.site||'')}</div>
+    <div><b>Units / Devices:</b> ${Number(activeItPrep.requested_unit_count ?? equipmentManifestDeviceTotal(activeItPrep.equipment_manifest))}</div>
+    <div><b>Stands / Poles:</b> ${equipmentManifestStandTotal(activeItPrep.equipment_manifest)}</div>
+  </div>
+  ${equipmentManifestInlineHtml(activeItPrep)}
+  <div class='top10'>${units||"<div class='small'>No job equipment prepared yet.</div>"}</div>`;
 }
+function itFinalPartsSummaryHtml() {
+  const rows=ticketPartsRows(activeItPrep).filter(row=>row.qty>0);
+  const line=rows.length?rows.map(row=>row.qty+' × '+esc(row.label)).join(' · '):'None listed';
+  return `<div class='wl-question top10'>
+    <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
+    <div class='qtext'>${line}</div>
+    <div class='small'>Unit-specific required components belong in that unit's checklist, not here.</div>
+    <button class='mini top8' data-wl-final-view='parts'>Adjust Parts</button>
+  </div>`;
+}
+function itFinalSpareSummaryHtml(items,rows) {
+  const units=(items||[]).filter(item=>item.purpose==='BACKUP');
+  const batteries=(rows||[]).filter(row=>Number(row.qty_prepared||0)>0);
+  const bits=[];
+  if(units.length) bits.push(units.map(item=>esc(item.equipment_type)+' '+esc(item.unit_tag||'')).join(' · '));
+  if(batteries.length) bits.push(batteries.map(row=>Number(row.qty_prepared)+' × '+esc(row.battery_type)).join(' · '));
+  return `<div class='wl-question top10'>
+    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
+    <div class='qtext'>${bits.join(' · ')||'None added'}</div>
+    <div class='small'>Contingency equipment stays separate from the main ticket equipment summary.</div>
+    <button class='mini top8' data-wl-final-view='spares'>Manage Truck Spares</button>
+  </div>`;
+}
+function itFinalPartsEditorHtml() {
+  return `${progress('Additional Parts','Separate from the ticket review',1,1)}
+    <div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div></div>
+    <div class='wl-question top10'>
+      <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
+      <div class='qtext'>Only add loose parts specifically needed for this ticket.</div>
+      <div class='small'>Normal components that belong to the unit are handled in that unit's IT checklist.</div>
+      ${ticketPartsInputsHtml('wlEditPart',activeItPrep)}
+      <button class='wl-big wl-blue top10' data-wl-save-prep-parts>Save & Return to Ticket Summary</button>
+    </div>
+    <div class='wl-nav'><button class='wl-prev' data-wl-final-view='summary'>← Ticket Summary</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>`;
+}
+function itFinalSparesEditorHtml(spareBatteries,items,evidence) {
+  return `${progress('Truck Spares / Backups','Separate contingency equipment',1,1)}
+    <div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div></div>
+    ${truckSpareITPanelHtml(spareBatteries,items,evidence)}
+    <div class='wl-nav'><button class='wl-prev' data-wl-final-view='summary'>← Ticket Summary</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>`;
+}
+
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items = itItems();
@@ -2608,6 +2668,7 @@ async function showItPrep(prepId) {
   itAnswered = new Set();
   if (itUnitIndex >= itExpectedUnits) {
     itUnitPhase = 'final';
+    itFinalView = 'summary';
   } else if (itUnitIndex >= items.length) {
     itUnitPhase = 'type';
     itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
@@ -2654,7 +2715,31 @@ async function renderItUnitStep() {
     const spareBatteriesReady = spareBatteries.every(row => Boolean(row.ready_ok));
     const spareBatteriesCheckedOut = spareBatteries.every(row => Boolean(row.it_checked_out_at));
     const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut;
-    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + truckSpareITPanelHtml(spareBatteries,items,ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div>${!spareUnitsCheckedOut?`<div class='wl-stop top10'><b>Truck spare checkout is not complete.</b><div>IT must CHECK OUT every spare unit before Service can take it.</div></div>`:''}${!spareBatteriesReady||!spareBatteriesCheckedOut?`<div class='wl-stop top10'><b>Spare battery checkout is not complete.</b><div>Every saved spare battery batch must be READY and CHECKED OUT by IT.</div></div>`:''}<div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK + CHECKOUT COMPLETE</b><div>The job equipment and truck spares are ready for the Service handoff.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+
+    if (itFinalView==='parts') {
+      wizard.innerHTML=itFinalPartsEditorHtml();
+      resetWizardPosition(wizard);
+      return;
+    }
+    if (itFinalView==='spares') {
+      wizard.innerHTML=itFinalSparesEditorHtml(spareBatteries,items,ev);
+      resetWizardPosition(wizard);
+      return;
+    }
+
+    wizard.innerHTML =
+      progress('Ticket Summary', ready ? 'READY — Review & Hand Off' : 'Review before handoff', 1, 1) +
+      itTicketSummaryHtml(items, ev) +
+      itFinalPartsSummaryHtml() +
+      itFinalSpareSummaryHtml(items,spareBatteries) +
+      `<div class='wl-question top10'><div class='qnum'>PREPARED ITEMS</div>${unitCountEditor(totalUnits)}</div>` +
+      (!spareUnitsCheckedOut ? `<div class='wl-stop top10'><b>Truck spare checkout is not complete.</b><div>Open Manage Truck Spares and CHECK OUT every spare unit before Service can take it.</div></div>` : '') +
+      ((!spareBatteriesReady || !spareBatteriesCheckedOut) ? `<div class='wl-stop top10'><b>Spare battery checkout is not complete.</b><div>Open Manage Truck Spares and finish the spare battery checkout.</div></div>` : '') +
+      `<div id='wlSendItMsg'></div>` +
+      (ready ? `<div class='ok top10'><b>✓ IT PREP COMPLETE</b><div>Review the ticket above, then create the Service handoff.</div></div>` : '') +
+      `<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button>
+      <div class='wl-nav'><button class='wl-prev' data-wl-final-last-unit>← Back to Unit Checks</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>
+      <button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -3464,6 +3549,7 @@ document.addEventListener('click', async e => {
       } else {
         itUnitIndex = totalUnits;
         itUnitPhase = 'final';
+        itFinalView = 'summary';
       }
       return renderItUnitStep();
     }
@@ -3486,9 +3572,29 @@ document.addEventListener('click', async e => {
     itQuestionIndex = firstIssue.index || 0;
     return renderItUnitStep();
   }
+  const finalView=e.target.closest('[data-wl-final-view]');
+  if (finalView && itUnitPhase==='final') {
+    itFinalView=finalView.dataset.wlFinalView || 'summary';
+    return renderItUnitStep();
+  }
+  const finalUnit=e.target.closest('[data-wl-final-unit]');
+  if (finalUnit && itUnitPhase==='final') {
+    itFinalView='summary';
+    itUnitIndex=Math.max(0,Number(finalUnit.dataset.wlFinalUnit||0));
+    itUnitPhase='review';
+    return renderItUnitStep();
+  }
+  if (e.target.closest('[data-wl-final-last-unit]') && itUnitPhase==='final') {
+    itFinalView='summary';
+    const jobItems=itItems().map((item,index)=>({item,index})).filter(row=>row.item.purpose!=='BACKUP');
+    itUnitIndex=jobItems.length ? jobItems[jobItems.length-1].index : Math.max(0,itItems().length-1);
+    itUnitPhase='review';
+    return renderItUnitStep();
+  }
+
   if (e.target.closest('[data-wl-it-prev]')) {
     const items = itItems();
-    if (itUnitPhase === 'final') { itUnitIndex = Math.max(0, items.length - 1); itUnitPhase = 'review'; return renderItUnitStep(); }
+    if (itUnitPhase === 'final') { itFinalView='summary'; itUnitIndex = Math.max(0, items.length - 1); itUnitPhase = 'review'; return renderItUnitStep(); }
     if (itUnitPhase === 'signature') { itUnitPhase = 'photo'; return renderItUnitStep(); }
     if (itUnitPhase === 'review') { itUnitPhase = 'signature'; return renderItUnitStep(); }
     if (itUnitPhase === 'photo') { itUnitPhase = 'checks'; itQuestionIndex = Math.max(0, itUnitStepsData(currentItItem(), itUnitIndex + 1).length - 1); return renderItUnitStep(); }
@@ -4764,6 +4870,7 @@ async function saveActivePrepParts() {
   if (error) return alert(error.message);
   activeItPrep = await getPrep(activeItPrep.id);
   await window.refreshData?.();
+  itFinalView='summary';
   await renderItUnitStep();
   alert('Parts list updated.');
 }
