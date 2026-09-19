@@ -1055,6 +1055,7 @@ function syncVisualViewport(){
   const root=document.documentElement;
   const composer=document.querySelector('.vision-composer-wrap');
   root.style.setProperty('--vision-composer-space',Math.ceil(composer?.getBoundingClientRect().height||92)+'px');
+  root.style.setProperty('--vision-viewport-height',Math.max(1,Math.round(vv?.height||window.innerHeight||document.documentElement.clientHeight))+'px');
   if(!vv){root.style.setProperty('--vision-visual-bottom','0px');return;}
   const layoutH=document.documentElement.clientHeight||window.innerHeight||vv.height;
   const offset=Math.max(0,layoutH-vv.height-vv.offsetTop);
