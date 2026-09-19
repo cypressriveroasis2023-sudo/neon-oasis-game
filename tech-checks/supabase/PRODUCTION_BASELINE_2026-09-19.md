@@ -332,3 +332,67 @@ Release identifiers after Phase 6:
 - Workflow Engine: `workflow-engine-v3`
 - Edge agent: v5
 - Service-worker cache: v76
+
+## Phase 7 company brain / product knowledge pass
+
+Phase 7 required **no new Supabase schema migration**. Production remains at **77 recorded migrations**.
+
+Verified product knowledge promoted into the shared source:
+
+- Sniper requires **2 × 12V 35Ah batteries**. The quantity remains enforced by the live prep RPCs; the battery specification was already present in the active `app.js` metadata and is now centralized in `TechCheckRules`.
+- Truck-spare battery mappings are now centralized in `TechCheckRules` and the technician Truck Spares editor consumes that shared list while retaining its legacy local fallback.
+- Live `save_it_truck_spare_battery` currently accepts only:
+  - Solar Spotter — `AGM 12V 110Ah`
+  - Solar Spotter — `12V 350Ah`
+  - Ranger — `LiTime 12V 110Ah`
+  - Helios — `Helios Battery Box`
+  - Recon 2 — `Recon II Battery`
+- `Recon II Battery` is a valid database label, but its exact physical battery model/specification is still **missing information**.
+- The current server does not accept standalone Sniper or Spotter spare-battery batches.
+
+Truck-spare lifecycle preserved:
+
+- Spare units are `BACKUP` items and remain separate from the customer/job equipment manifest.
+- IT completes the applicable unit check, matching-tag photo/signature flow, and explicit IT checkout before the IT → Service handoff.
+- Spare battery batches must be physically present, charged/READY, saved, and explicitly checked out by IT before handoff.
+- Service resolves spare units as `used` or `returned_unused`; unused units return directly to Shop Inventory without IT Intake.
+- Service records spare-battery quantity used; the remainder is returned unused.
+- Existing database checkout/locking gates remain authoritative.
+
+Knowledge-gap behavior:
+
+- Company Knowledge v4 keeps Sniper, Spotter, Recon 2, Solar Pole, 110V Stand, and Pole explicitly **partial** where Cameras On Site procedures are not yet documented.
+- Each partial product now exposes exact `teaching_needed` items so Vision can say what is missing instead of filling gaps with generic technical assumptions.
+- No approved managed knowledge entries currently supply additional rules for those Phase 7 product families or truck-spare topics.
+- Workflow Engine v4 carries `teaching_needed` through product requirements.
+- Agent v7 prioritizes truck-spare questions against the server-backed spare mapping before generic product battery metadata and can return the Phase 7 gap inventory.
+
+Unresolved server/shared-rule parity noted but **not changed by assumption**:
+
+- Shared rules currently document Solar Pole and Pole for Delivery/Swap.
+- Current `add_it_prep_item` / `configure_it_prep_item` server logic does not explicitly reject `BACKUP` for Solar Pole or Pole.
+- `service_solar_context_v2` can surface a standalone Solar Pole in Service solar context, while `enforce_service_solar_check_before_close` hard-gates Solar Spotter, Ranger, and Helios—not a standalone Solar Pole by itself.
+- These are now explicit Owner teaching/decision gaps. No RPC, trigger, or workflow gate was changed until the intended company rule is confirmed.
+
+Regression/parity verification after the Phase 7 source changes:
+
+- Helios Delivery remains **31 shared IT checks**.
+- Helios ports remain Camera 1 `81/554/1400`, Camera 2 `81/554/1500`, PTZ `81/554/1600`, IP Speaker `81/554/1700`.
+- Ranger retains MPPT updated / MPPT tested / PV charging checks.
+- Solar Spotter retains **0 IT battery checkout**.
+- Browser and Edge Function copies of shared rules, Company Knowledge, and Workflow Engine were byte-identical at verification.
+- Deployed `onsite-vision-agent` is **v7 ACTIVE** with JWT verification enabled.
+- Live database verification confirmed **77 migrations**, the Sniper quantity rule, and the exact truck-spare battery mapping above.
+- No photo, signature, handoff, return, IT Intake, truck-spare checkout, Helios field-install, or Owner-final-verification gate was removed or weakened.
+
+Release identifiers after this Phase 7 pass:
+
+- Tech Check technician workflow: `release-qa-v121`
+- Main loader: `startup-fast-v35`
+- OnSite Vision workspace: `vision-workspace-v16` (workspace UI unchanged)
+- Shared rules: `rules-v3`
+- Company Knowledge: `company-knowledge-v4`
+- Workflow Engine: `workflow-engine-v4`
+- Edge agent: v7
+- Service-worker cache: v77
+
