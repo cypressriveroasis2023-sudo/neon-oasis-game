@@ -147,6 +147,33 @@ function injectStyles() {
     .wl-service-quick-badge{flex:none;min-width:24px;height:24px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#eef2f5;color:#607080;font-size:8px;font-weight:900;line-height:1}
     .wl-service-quick-pill.return .wl-service-quick-badge{background:#fde7e8;color:#a90b10}
     .wl-service-quick-pill:active{transform:scale(.985)}
+
+    /* Owner compact dashboard v76 */
+    #view-owner>.ownerCompactShell{display:block;width:100%}
+    .ownerCompactTopbar{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.35fr);gap:8px;margin:6px 0 10px}
+    .ownerCompactAssign,.ownerCompactAttention{box-sizing:border-box;min-width:0;min-height:48px;margin:0;border-radius:13px;font:inherit;cursor:pointer}
+    .ownerCompactAssign{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;border:1px solid #d20b12;background:#d20b12;color:#fff;box-shadow:0 3px 8px rgba(210,11,18,.12)}
+    .ownerCompactAssign span{font-size:19px;font-weight:600}.ownerCompactAssign b{font-size:12px;font-weight:900}
+    .ownerCompactAttention{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:7px;padding:6px 9px;border:1px solid #d8e0e7;background:#fff;color:#17283b;text-align:left;box-shadow:0 2px 7px rgba(18,43,65,.04)}
+    .ownerCompactAlertIcon{width:26px;height:26px;display:grid;place-items:center;border-radius:999px;background:#eef2f5;color:#637383;font-size:12px;font-weight:950}
+    .ownerCompactAttention>span:nth-child(2){min-width:0}.ownerCompactAttention b,.ownerCompactAttention small{display:block}.ownerCompactAttention b{font-size:10px;line-height:1.1}.ownerCompactAttention small{margin-top:2px;color:#788695;font-size:8px;line-height:1.15;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ownerCompactAttention strong{min-width:25px;height:25px;padding:0 6px;display:grid;place-items:center;border-radius:999px;background:#eef2f5;color:#607080;font-size:10px}
+    .ownerCompactAttention.has-attention{border-color:#efb1b4;background:#fff8f8}.ownerCompactAttention.has-attention .ownerCompactAlertIcon,.ownerCompactAttention.has-attention strong{background:#d20b12;color:#fff}.ownerCompactAttention.has-attention b{color:#a90b10}
+    #view-owner .ownerCompactGroup{margin:8px 0!important;padding:0!important;overflow:hidden;border:1px solid #d6e0e8!important;border-radius:14px!important;background:#fff!important;box-shadow:0 2px 8px rgba(18,43,65,.045)!important}
+    #view-owner .ownerCompactGroup.jobs{border-left:4px solid #22965b!important}#view-owner .ownerCompactGroup.equipment{border-left:4px solid #2d73a5!important}#view-owner .ownerCompactGroup.team{border-left:4px solid #7c4bb1!important}#view-owner .ownerCompactGroup.more{border-left:4px solid #778696!important}
+    .ownerCompactGroupSummary{list-style:none;display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:66px;padding:10px 12px;cursor:pointer;background:#fff}.ownerCompactGroupSummary::-webkit-details-marker{display:none}
+    .ownerCompactIcon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#f0f4f7;color:#294054;font-size:12px;font-weight:950;letter-spacing:-.03em}
+    .ownerCompactGroup.jobs .ownerCompactIcon{background:#eef9f2;color:#187346}.ownerCompactGroup.equipment .ownerCompactIcon{background:#eff6fb;color:#2b6e9d}.ownerCompactGroup.team .ownerCompactIcon{background:#f6f0fb;color:#7141a5}
+    .ownerCompactGroupSummary>span:nth-child(2){min-width:0}.ownerCompactGroupSummary b,.ownerCompactGroupSummary small{display:block}.ownerCompactGroupSummary b{color:#152334;font-size:17px;line-height:1.05;font-weight:900;letter-spacing:-.02em}.ownerCompactGroupSummary small{margin-top:4px;color:#718090;font-size:9px;line-height:1.2;font-weight:650}
+    .ownerCompactGroupSummary>strong{min-width:31px;height:31px;padding:0 8px;display:grid;place-items:center;border-radius:999px;background:#eef3f6;color:#536576;font-size:10px;font-weight:900}.ownerCompactGroup[open]>.ownerCompactGroupSummary{border-bottom:1px solid #e4e9ee}.ownerCompactGroup[open]>.ownerCompactGroupSummary>strong{background:#152334;color:#fff}
+    .ownerCompactGroupBody{padding:8px;background:#f8fafb}
+    #view-owner .ownerCompactSecondary{margin:7px 0!important;border:1px solid #dbe3ea!important;border-radius:11px!important;box-shadow:none!important;background:#fff!important;overflow:hidden}
+    #view-owner .ownerCompactSecondary>.ownerDashSummary{min-height:52px!important;padding:8px 10px!important;border-left:0!important;background:#fff!important}
+    #view-owner .ownerCompactSecondary>.ownerDashSummary>div>b{font-size:14px!important;line-height:1.1!important;letter-spacing:-.01em!important}#view-owner .ownerCompactSecondary>.ownerDashSummary>div>span{margin-top:2px!important;font-size:8px!important;line-height:1.15!important}
+    #view-owner .ownerCompactSecondary>.ownerDashSummary .ownerDashBadge{min-width:28px!important;height:28px!important;font-size:10px!important;box-shadow:none!important}#view-owner .ownerCompactSecondary>.ownerDashBody{padding:9px!important}
+    #view-owner .ownerCompactAssignForm:not([open]),#view-owner .ownerCompactAttentionDetail:not([open]){display:none!important}
+    #view-owner .ownerCompactAssignForm>.ownerDashSummary>div>b,#view-owner .ownerCompactAttentionDetail>.ownerDashSummary>div>b{color:#b20b10}
+    @media(max-width:560px){.ownerCompactTopbar{grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:7px}.ownerCompactAssign,.ownerCompactAttention{min-height:46px}.ownerCompactAssign b{font-size:11px}.ownerCompactGroupSummary{min-height:62px;padding:9px 10px;grid-template-columns:34px minmax(0,1fr) auto;gap:8px}.ownerCompactIcon{width:32px;height:32px}.ownerCompactGroupSummary b{font-size:16px}.ownerCompactGroupSummary small{font-size:8px}.ownerCompactGroupBody{padding:6px}}
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
@@ -3068,6 +3095,83 @@ function refreshOwnerWorkTypeLabels() {
   });
 }
 
+let ownerCompactJumpWrapped=false;
+function ownerCompactOpenGroup(name){
+  const group=document.getElementById('ownerCompact'+name);
+  if(group?.tagName==='DETAILS') group.open=true;
+  return group;
+}
+function syncOwnerCompactDashboard(){
+  const copy=(from,to,fallback='0')=>{
+    const src=document.getElementById(from),dst=document.getElementById(to);
+    if(dst) dst.textContent=String(src?.textContent?.trim()||fallback);
+  };
+  copy('ownerAssignmentBadge','ownerCompactJobsBadge','0');
+  copy('ownerAccountsBadge','ownerCompactTeamBadge','TEAM');
+  const attSrc=document.getElementById('ownerAttentionBadge');
+  const att=document.getElementById('ownerCompactAttentionCount');
+  const strip=document.getElementById('ownerCompactAttention');
+  const count=Number(String(attSrc?.textContent||'0').replace(/[^0-9]/g,''))||0;
+  if(att) att.textContent=String(count);
+  if(strip){
+    strip.classList.toggle('has-attention',count>0);
+    const copyEl=strip.querySelector('[data-owner-attention-copy]');
+    if(copyEl) copyEl.textContent=count>0 ? count+' item'+(count===1?'':'s')+' need review' : 'Nothing needs your attention';
+  }
+}
+function organizeOwnerDashboard(){
+  const view=document.getElementById('view-owner');
+  if(!view || !roleText().includes('Owner/Admin')) return;
+  let shell=document.getElementById('ownerCompactShell');
+  if(!shell){
+    shell=document.createElement('div');
+    shell.id='ownerCompactShell';
+    shell.className='ownerCompactShell';
+    shell.innerHTML=[
+      "<div class='ownerCompactTopbar'>",
+      "<button type='button' class='ownerCompactAssign' data-owner-compact-assign><span>＋</span><b>Assign Job</b></button>",
+      "<button type='button' id='ownerCompactAttention' class='ownerCompactAttention' data-owner-compact-attention><span class='ownerCompactAlertIcon'>!</span><span><b>Needs Attention</b><small data-owner-attention-copy>Nothing needs your attention</small></span><strong id='ownerCompactAttentionCount'>0</strong></button>",
+      "</div>",
+      "<details id='ownerCompactJobs' class='card ownerCompactGroup jobs' open><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>J</span><span><b>Jobs</b><small>Live work, progress, and new assignments</small></span><strong id='ownerCompactJobsBadge'>0</strong></summary><div id='ownerCompactJobsBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactEquipment' class='card ownerCompactGroup equipment'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>E</span><span><b>Equipment</b><small>Returns, unit search, and handoffs</small></span><strong>3</strong></summary><div id='ownerCompactEquipmentBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactTeam' class='card ownerCompactGroup team'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>T</span><span><b>Team</b><small>Technicians and recent activity</small></span><strong id='ownerCompactTeamBadge'>TEAM</strong></summary><div id='ownerCompactTeamBody' class='ownerCompactGroupBody'></div></details>",
+      "<details id='ownerCompactMore' class='card ownerCompactGroup more'><summary class='ownerCompactGroupSummary'><span class='ownerCompactIcon'>•••</span><span><b>More</b><small>Maintenance and admin tools</small></span><strong>›</strong></summary><div id='ownerCompactMoreBody' class='ownerCompactGroupBody'></div></details>"
+    ].join('');
+    view.prepend(shell);
+  }
+  const jobs=document.getElementById('ownerCompactJobsBody');
+  const equipment=document.getElementById('ownerCompactEquipmentBody');
+  const team=document.getElementById('ownerCompactTeamBody');
+  const more=document.getElementById('ownerCompactMoreBody');
+  const move=(id,body)=>{const el=document.getElementById(id);if(el&&body)body.appendChild(el);};
+  move('ownerLiveJobProgress',jobs);
+  move('ownerJobAssignments',jobs);
+  move('ownerAttentionCard',jobs);
+  move('ownerIntakeTracking',equipment);
+  move('ownerUnitStatusCard',equipment);
+  move('ownerHandoffsCard',equipment);
+  move('ownerActivityCard',team);
+  move('ownerAccountsCard',team);
+  move('ownerResetCard',more);
+  const assign=document.getElementById('ownerJobAssignments');
+  if(assign) assign.classList.add('ownerCompactSecondary','ownerCompactAssignForm');
+  const attention=document.getElementById('ownerAttentionCard');
+  if(attention) attention.classList.add('ownerCompactSecondary','ownerCompactAttentionDetail');
+  ['ownerLiveJobProgress','ownerIntakeTracking','ownerUnitStatusCard','ownerHandoffsCard','ownerActivityCard','ownerAccountsCard','ownerResetCard'].forEach(id=>document.getElementById(id)?.classList.add('ownerCompactSecondary'));
+  if(!ownerCompactJumpWrapped && typeof window.ownerJump==='function'){
+    ownerCompactJumpWrapped=true;
+    const originalJump=window.ownerJump;
+    const originalReturn=typeof window.ownerOpenReturn==='function' ? window.ownerOpenReturn : null;
+    window.ownerJump=(target)=>{
+      if(target==='returns'||target==='prep') ownerCompactOpenGroup('Equipment');
+      else if(target==='accounts'||target==='activity'||target==='daily') ownerCompactOpenGroup('Team');
+      else ownerCompactOpenGroup('Jobs');
+      requestAnimationFrame(()=>originalJump(target));
+    };
+    if(originalReturn){window.ownerOpenReturn=(id)=>{ownerCompactOpenGroup('Equipment');requestAnimationFrame(()=>originalReturn(id));};}
+  }
+  syncOwnerCompactDashboard();
+}
 let ownerAIDispatchPrepared = false;
 let ownerAIDispatchLastParse = null;
 let ownerAIDispatchRecognition = null;
@@ -3346,6 +3450,7 @@ function ownerAIDispatchStartVoice() {
 }
 async function openOwnerAIDispatch() {
   document.getElementById("wlTechMenuPanel")?.classList.add("hidden");
+  ownerCompactOpenGroup('Jobs');
   await installOwnerAssignments(false);
   const host=document.getElementById("ownerJobAssignments"); if(host)host.open=true;
   const input=document.getElementById("ownerAIDispatchPrompt");
@@ -3548,7 +3653,19 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
-  if (e.target.closest('[data-owner-ai-dispatch-build]')) return ownerAIDispatchBuild();
+  if (e.target.closest('[data-owner-compact-assign]')) {
+      ownerCompactOpenGroup('Jobs');
+      const form=document.getElementById('ownerJobAssignments');
+      if(form){form.open=true;form.scrollIntoView({behavior:'smooth',block:'start'});}
+      return;
+    }
+    if (e.target.closest('[data-owner-compact-attention]')) {
+      ownerCompactOpenGroup('Jobs');
+      const card=document.getElementById('ownerAttentionCard');
+      if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}
+      return;
+    }
+    if (e.target.closest('[data-owner-ai-dispatch-build]')) return ownerAIDispatchBuild();
   if (e.target.closest('[data-owner-ai-dispatch-voice]')) return ownerAIDispatchStartVoice();
   if (e.target.closest('[data-owner-ai-review]')) return ownerAIReview();
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
@@ -3582,7 +3699,7 @@ function setupServiceSolarRealtime() {
     .subscribe();
 }
 function boot() {
-  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge();
+  injectStyles(); installTabs(); installOwnerAssignments(); installOwnerIntake(); setupNotificationRealtime(); setupServiceSolarRealtime(); refreshNotificationBadge(); organizeOwnerDashboard(); setTimeout(organizeOwnerDashboard,120); setTimeout(organizeOwnerDashboard,500);
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (appVisible) { if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome(); if (isSvc() && !viewSvc()?.classList.contains('hidden') && !document.getElementById('wlSvcHome')) showSvcHome(); setTimeout(maybeShowFirstTimeWalkthrough, 250); }
 }
