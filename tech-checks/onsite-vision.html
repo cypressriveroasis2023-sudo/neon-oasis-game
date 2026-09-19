@@ -7,7 +7,7 @@
   <title>OnSite Vision · Tech Check</title>
   <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
   <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
-  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v14">
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v15">
 </head>
 <body>
   <div id="visionLoading" class="vision-loading">
@@ -171,16 +171,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./onsite-vision-company-knowledge.js?v=company-knowledge-v1" defer></script>
-  <script src="./onsite-vision-workflow-engine.js?v=workflow-engine-v2" defer></script>
+  <script src="./tech-check-rules.js?v=rules-v1" defer></script>
+  <script src="./onsite-vision-company-knowledge.js?v=company-knowledge-v2" defer></script>
+  <script src="./onsite-vision-workflow-engine.js?v=workflow-engine-v3" defer></script>
   <script src="./onsite-vision-live-data.js?v=live-data-v1" defer></script>
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v1" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-workspace-v14" defer></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v15" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=74', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=75', { scope: './', updateViaCache: 'none' }).catch(console.warn));
     }
   </script>
 </body>
