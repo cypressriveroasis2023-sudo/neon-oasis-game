@@ -633,7 +633,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
-    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>At the Ticket Summary, use <b>Truck Spares / Backups</b> when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete hardware/deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Add any spare Solar Spotter, Ranger, Helios, or Recon II batteries and mark them physically present, charged, and READY before handoff.</p>` },
+    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>At the Ticket Summary, use <b>Truck Spares / Backups</b> when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete hardware/deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Then <b>IT must CHECK OUT the spare</b> before Service is allowed to take it. Spare batteries follow the same style: save the physically present/charged/READY quantity, then use <b>CHECK OUT SPARE BATTERIES</b>. Only after checkout does IT create the Service handoff.</p>` },
     { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, create the handoff to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for tagged equipment returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help Center</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
@@ -864,6 +864,7 @@ function helpStepGuide(role, step){
       steps:[
         'Open the exact MHelpDesk Service job.',
         'Read the IT handoff information and the name of the IT Tech who prepared it.',
+        'For every truck spare, confirm Tech Check shows that IT checked it out before you take it.',
         'Physically locate every listed unit and part before accepting anything.',
         'Do not continue if the ticket, unit tag, or quantities do not match.'
       ],
@@ -979,9 +980,10 @@ function helpStepGuide(role, step){
       steps:[
         'At Ticket Summary, open Truck Spares / Backups.',
         'Add a spare unit when Service should carry an emergency replacement for this ticket.',
-        'Complete the full deploy-ready IT check, matching-tag photo, and signature for the BACKUP unit.',
-        'Enter any extra Solar Spotter, Ranger, Helios, or Recon II spare batteries and mark each saved batch physically present, charged, and READY.',
-        'Hand the job equipment and all saved truck spares to Service under the same MHelpDesk reference.'
+        'Complete the full hardware/deploy-ready IT check, matching-tag photo, and signature for the BACKUP unit.',
+        'Tap CHECK OUT SPARE after the unit is fully ready. Service cannot take it until IT checks it out.',
+        'For extra Solar Spotter, Ranger, Helios, or Recon II batteries, save the READY quantity and then tap CHECK OUT SPARE BATTERIES.',
+        'Only after all spares are checked out should IT create the Service handoff.'
       ],
       selector:"[data-wl-truck-spares-it]"
     },
@@ -2430,27 +2432,49 @@ async function loadTruckSpareBatteries(prepId) {
   if (error) throw error;
   return data || [];
 }
-function truckSpareITPanelHtml(rows,items) {
+function truckSpareITPanelHtml(rows,items,evidence=[]) {
   const byKey=new Map((rows||[]).map(r=>[r.equipment_type+'|'+r.battery_type,r]));
-  const backups=(items||[]).filter(i=>i.purpose==='BACKUP');
+  const indexed=(items||[]).map((item,index)=>({item,index}));
+  const backups=indexed.filter(row=>row.item.purpose==='BACKUP');
   const backupHtml=backups.length
-    ? backups.map(i=>`<div class='wl-ticket'><b>TRUCK SPARE · ${esc(i.equipment_type)}</b><div>Unit ${esc(i.unit_tag||'Tag pending')} · ${i.verified_at?'IT check complete':'IT check pending'}</div><div class='small'>This unit is contingency equipment for this MHelpDesk job. Service must mark it USED or RETURN UNUSED after the field call.</div></div>`).join('')
+    ? backups.map(({item:i,index})=>{
+        const checkedOut=Boolean(i.spare_it_checked_out_at);
+        const issues=itUnitIssues(i,evidence,index+1);
+        const canCheckout=issues.length===0;
+        const status=checkedOut
+          ? `<div class='ok top8'><b>✓ IT CHECKED OUT</b><div class='small'>${esc(i.spare_it_checked_out_by_name||'IT Technician')} · ${new Date(i.spare_it_checked_out_at).toLocaleString()}</div></div>`
+          : canCheckout
+            ? `<button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-checkout-truck-spare-unit='${i.id}'>CHECK OUT SPARE →</button><div class='small'>IT must check this spare out before Service can take it.</div>`
+            : `<div class='warn top8'><b>CHECKOUT PENDING</b><div class='small'>Finish this spare's IT checks, matching-tag photo, and signature first.</div></div>`;
+        return `<div class='wl-ticket'><b>TRUCK SPARE · ${esc(i.equipment_type)}</b><div>Unit ${esc(i.unit_tag||'Tag pending')} · ${i.verified_at?'IT check complete':'IT check pending'}</div><div class='small'>This is contingency equipment for MHelpDesk #${esc(activeItPrep?.ticket_no||'')}. IT checkout happens before the Service handoff.</div>${status}</div>`;
+      }).join('')
     : `<div class='small'>No spare unit added yet. Add one only when Service should carry an emergency replacement for this ticket.</div>`;
+
   const batteryRows=TRUCK_SPARE_BATTERY_OPTIONS.map(opt=>{
     const row=byKey.get(opt.equipment_type+'|'+opt.battery_type);
     const qty=Number(row?.qty_prepared||0);
     const ready=Boolean(row?.ready_ok);
-    return `<div class='wl-ticket'><b>${esc(opt.label)}</b><div class='grid2 top8'><label>Spare Qty<input id='wlSpareQty_${opt.key}' type='number' inputmode='numeric' min='0' value='${qty}'></label><label class='check' style='align-self:end'><input id='wlSpareReady_${opt.key}' type='checkbox' ${ready?'checked':''}><span>Physically present, charged & READY</span></label></div>${qty&&!ready?`<div class='warn top8'><b>Pending:</b> mark this battery batch READY before the Service handoff.</div>`:''}</div>`;
+    const checkedOut=Boolean(row?.it_checked_out_at);
+    const locked=checkedOut ? 'disabled' : '';
+    const checkout=qty>0
+      ? checkedOut
+        ? `<div class='ok top8'><b>✓ IT CHECKED OUT</b><div class='small'>${esc(row?.it_checked_out_by_name||'IT Technician')} · ${new Date(row.it_checked_out_at).toLocaleString()}</div></div>`
+        : ready
+          ? `<button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-checkout-truck-spare-battery='${row.id}'>CHECK OUT SPARE BATTERIES →</button>`
+          : `<div class='warn top8'><b>CHECKOUT PENDING</b><div class='small'>Mark this battery batch physically present, charged & READY, save the plan, then check it out.</div></div>`
+      : '';
+    return `<div class='wl-ticket'><b>${esc(opt.label)}</b><div class='grid2 top8'><label>Spare Qty<input id='wlSpareQty_${opt.key}' type='number' inputmode='numeric' min='0' value='${qty}' ${locked}></label><label class='check' style='align-self:end'><input id='wlSpareReady_${opt.key}' type='checkbox' ${ready?'checked':''} ${locked}><span>Physically present, charged & READY</span></label></div>${qty&&!ready?`<div class='warn top8'><b>Pending:</b> mark this battery batch READY before checkout.</div>`:''}${checkout}</div>`;
   }).join('');
+
   return `<div class='wl-question top10' data-wl-truck-spares-it>
     <div class='qnum'>TRUCK SPARES / BACKUPS</div>
     <div class='qtext'>Contingency equipment for this Service call</div>
-    <div class='small'>These are <b>not</b> extra customer/job requirements. They ride in the truck in case Service needs an emergency swap. BACKUP units receive full hardware/deploy-ready IT checks, photo and signature. Service must resolve every spare after the call.</div>
+    <div class='small'>The flow remains <b>IT check → photo/signature → IT CHECK OUT → Service handoff</b>. A spare cannot leave with Service until IT checks it out. After the field call, Service resolves it as USED or RETURN UNUSED.</div>
     <div class='top10'><b>Spare Units</b></div>
     ${backupHtml}
     <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II battery/camera sets<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
     <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-add-truck-spare-unit>＋ Add Spare Unit & Run IT Check</button>
-    <div class='top10'><b>Spare Batteries</b><div class='small'>Use these only for extra replacement batteries riding in the truck. Enter 0 when none are needed.</div></div>
+    <div class='top10'><b>Spare Batteries</b><div class='small'>Enter and save the spare quantity first. Then IT must use CHECK OUT SPARE BATTERIES before the Service handoff.</div></div>
     ${batteryRows}
     <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-truck-spare-batteries>Save Spare Battery Plan</button>
   </div>`;
@@ -2493,6 +2517,28 @@ async function saveTruckSpareBatteriesFromSummary() {
     if (error) return alert(error.message);
   }
   alert('Truck spare battery plan saved.');
+  return renderItUnitStep();
+}
+
+
+async function checkoutTruckSpareUnit(itemId) {
+  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Truck spare checkout must happen before the Service handoff.');
+  const item=itItems().find(row=>row.id===itemId);
+  if (!item) return alert('Truck spare unit could not be found.');
+  if (!confirm('Check out '+item.equipment_type+' '+(item.unit_tag||'')+' as a truck spare for MHelpDesk #'+activeItPrep.ticket_no+'?')) return;
+  const { error }=await liveDb.rpc('it_checkout_truck_spare_unit',{p_item_id:itemId});
+  if (error) return alert(error.message);
+  activeItPrep=await getPrep(activeItPrep.id);
+  return renderItUnitStep();
+}
+async function checkoutTruckSpareBattery(spareId) {
+  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Spare battery checkout must happen before the Service handoff.');
+  const rows=await loadTruckSpareBatteries(activeItPrep.id);
+  const row=rows.find(x=>x.id===spareId);
+  if (!row) return alert('Spare battery batch could not be found.');
+  if (!confirm('Check out '+row.qty_prepared+' × '+row.battery_type+' for MHelpDesk #'+activeItPrep.ticket_no+'?')) return;
+  const { error }=await liveDb.rpc('it_checkout_truck_spare_battery',{p_spare_id:spareId});
+  if (error) return alert(error.message);
   return renderItUnitStep();
 }
 
@@ -2599,9 +2645,12 @@ async function renderItUnitStep() {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const spareBatteries = await loadTruckSpareBatteries(activeItPrep.id);
     const itemReady = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
+    const spareUnits=items.filter(row=>row.purpose==='BACKUP');
+    const spareUnitsCheckedOut=spareUnits.every(row=>Boolean(row.spare_it_checked_out_at));
     const spareBatteriesReady = spareBatteries.every(row => Boolean(row.ready_ok));
-    const ready = itemReady && spareBatteriesReady;
-    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + truckSpareITPanelHtml(spareBatteries,items) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div>${!spareBatteriesReady?`<div class='wl-stop top10'><b>Truck spare battery plan is not ready.</b><div>Every saved spare battery batch must be marked physically present, charged and READY.</div></div>`:''}<div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK COMPLETE</b><div>Your next step is to hand the job equipment <b>and any truck spares</b> to the Service Tech.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+    const spareBatteriesCheckedOut = spareBatteries.every(row => Boolean(row.it_checked_out_at));
+    const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut;
+    wizard.innerHTML = progress('Ticket Summary', ready ? 'READY — Hand Off to the Service Tech' : 'Review all completed equipment', 1, 1) + itTicketSummaryHtml(items, ev) + truckSpareITPanelHtml(spareBatteries,items,ev) + `<div class='wl-question top10'><div class='qtext'>Total Equipment Items for This Ticket</div>${unitCountEditor(totalUnits)}</div>${!spareUnitsCheckedOut?`<div class='wl-stop top10'><b>Truck spare checkout is not complete.</b><div>IT must CHECK OUT every spare unit before Service can take it.</div></div>`:''}${!spareBatteriesReady||!spareBatteriesCheckedOut?`<div class='wl-stop top10'><b>Spare battery checkout is not complete.</b><div>Every saved spare battery batch must be READY and CHECKED OUT by IT.</div></div>`:''}<div id='wlSendItMsg'></div>${ready ? `<div class='ok top10'><b>✓ IT CHECK + CHECKOUT COMPLETE</b><div>The job equipment and truck spares are ready for the Service handoff.</div></div>` : ''}<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button><div class='small top10' style='text-align:center'>After sending, you will return to IT Home to start your next task.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div><button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -3436,6 +3485,10 @@ document.addEventListener('click', async e => {
     if (itUnitPhase === 'type') { if (itUnitIndex === 0) return showPendingList(); itUnitIndex--; itUnitPhase = 'review'; return renderItUnitStep(); }
   }
   if (e.target.closest('[data-wl-add-truck-spare-unit]')) { e.preventDefault(); e.stopPropagation(); return addTruckSpareUnitFromSummary(); }
+  const checkoutSpareUnit=e.target.closest('[data-wl-checkout-truck-spare-unit]');
+  if (checkoutSpareUnit) { e.preventDefault(); e.stopPropagation(); return checkoutTruckSpareUnit(checkoutSpareUnit.dataset.wlCheckoutTruckSpareUnit); }
+  const checkoutSpareBattery=e.target.closest('[data-wl-checkout-truck-spare-battery]');
+  if (checkoutSpareBattery) { e.preventDefault(); e.stopPropagation(); return checkoutTruckSpareBattery(checkoutSpareBattery.dataset.wlCheckoutTruckSpareBattery); }
   if (e.target.closest('[data-wl-save-truck-spare-batteries]')) { e.preventDefault(); e.stopPropagation(); return saveTruckSpareBatteriesFromSummary(); }
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
