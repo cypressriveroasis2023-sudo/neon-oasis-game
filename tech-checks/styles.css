@@ -2313,3 +2313,479 @@ select {
   #view-owner .wl-owner-ai-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
   #view-owner .wl-owner-ai-overview{padding:10px 12px 12px}
 }
+
+
+/* Owner mobile polish v67 */
+/* Tight, crisp Owner mobile UI based on live iPhone screenshots */
+#view-owner .ownerDispatchCard .ownerDashBody{
+  padding:12px 13px 14px;
+}
+#view-owner .ownerDispatchCard .manualReferenceNotice{
+  margin:10px 0;
+  padding:10px 12px;
+  border:1px solid #f1c879;
+  border-radius:10px;
+  background:#fff8e8;
+  color:#536273;
+  font-size:11px;
+  line-height:1.35;
+  font-weight:500;
+}
+#view-owner .ownerDispatchCard .manualReferenceNotice>b{
+  display:block;
+  margin-bottom:2px;
+  color:#17283b;
+  font-size:13px;
+  line-height:1.25;
+  font-weight:750;
+}
+#view-owner .ownerWorkflowFirst{
+  padding:10px 11px;
+  border:1px solid #c9d9e8;
+  border-radius:11px;
+  background:#f6f9fc;
+}
+#view-owner .ownerWorkflowFirst .qtext{
+  margin-bottom:7px;
+  font-size:13px;
+  font-weight:750;
+  line-height:1.2;
+}
+#view-owner .ownerWorkflowFirst label,
+#view-owner .ownerDispatchCard>div label{
+  font-weight:700;
+}
+#view-owner .ownerDispatchCard input,
+#view-owner .ownerDispatchCard select,
+#view-owner .ownerDispatchCard textarea{
+  border-width:1px;
+  border-color:#cbd5df;
+  border-radius:10px;
+  box-shadow:none;
+}
+#view-owner .ownerDispatchCard input,
+#view-owner .ownerDispatchCard select{
+  min-height:44px;
+  padding:8px 10px;
+}
+#view-owner .ownerDispatchCard textarea{
+  padding:10px;
+}
+#view-owner .ownerDispatchCard input:focus,
+#view-owner .ownerDispatchCard select:focus,
+#view-owner .ownerDispatchCard textarea:focus{
+  border-color:#6b8db0;
+  box-shadow:0 0 0 2px rgba(71,112,143,.10);
+}
+#view-owner .ownerAIDispatchPanel{
+  margin:0 0 10px;
+  padding:11px;
+  border:1px solid #ded6f7;
+  border-radius:11px;
+  background:#fcfbff;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-head{
+  align-items:center;
+  flex-direction:row;
+}
+#view-owner .ownerAIDispatchPanel .wl-ai-head span{
+  font-size:14px;
+}
+#view-owner .ownerAIDispatchPanel textarea{
+  min-height:76px !important;
+  margin-top:8px !important;
+  font-size:12px;
+  line-height:1.35;
+}
+#view-owner .ownerAIDispatchPanel .wl-nav{
+  display:grid;
+  grid-template-columns:.8fr 1.35fr;
+  gap:7px;
+  margin-top:8px;
+  padding:0;
+}
+#view-owner .ownerAIDispatchPanel .wl-nav button{
+  min-height:44px;
+  margin:0;
+  padding:8px 10px;
+  border-radius:9px;
+  font-size:12px;
+  font-weight:750;
+}
+#view-owner .ownerAIDispatchPanel [data-owner-ai-dispatch-build]{
+  background:#d70b12;
+  border-color:#d70b12;
+  color:#fff;
+}
+#view-owner .ownerAIDispatchPanel [data-owner-ai-dispatch-voice]{
+  background:#fff;
+  border:1px solid #d8dee7;
+  color:#344054;
+}
+
+/* Compact job fields */
+#view-owner .ownerDispatchCard>.ownerDashBody>.grid,
+#view-owner .ownerDispatchCard .grid.top10{
+  gap:8px;
+  margin-top:8px;
+}
+#view-owner .ownerDispatchCard label{
+  margin-bottom:4px;
+  color:#17283b;
+  font-size:11px;
+  line-height:1.15;
+}
+#view-owner .ownerDispatchCard input::placeholder,
+#view-owner .ownerDispatchCard textarea::placeholder{
+  color:#a2a9b2;
+  font-weight:500;
+}
+
+/* Equipment section */
+#view-owner .wl-ticket-parts-setup{
+  margin-top:10px;
+  padding:10px;
+  border-radius:11px;
+  background:#fafbfc;
+}
+#view-owner .wl-ticket-parts-setup .qtext{
+  font-size:15px;
+  line-height:1.2;
+  font-weight:750;
+  letter-spacing:-.01em;
+}
+#view-owner .wl-ticket-parts-setup>.small{
+  margin-top:2px;
+  font-size:10px;
+  line-height:1.35;
+}
+#view-owner .wl-owner-equipment-requirements{
+  gap:8px;
+  margin-top:9px;
+}
+#view-owner .wl-requirement-section.unitArea,
+#view-owner .wl-requirement-section.standArea{
+  padding:9px;
+  border-left-width:4px;
+  border-radius:10px;
+}
+#view-owner .wl-requirement-section.unitArea + .wl-requirement-section.standArea{
+  margin-top:8px;
+}
+#view-owner .wl-requirement-heading{
+  margin-bottom:3px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.01em;
+}
+#view-owner .wl-requirement-section>.small{
+  margin-bottom:6px;
+  font-size:10px;
+  line-height:1.3;
+}
+#view-owner .wl-owner-equipment-grid{
+  gap:6px;
+}
+#view-owner .wl-owner-equipment-qty{
+  min-height:0;
+  padding:7px 8px;
+  border-radius:9px;
+}
+#view-owner .wl-owner-equipment-qty span{
+  min-height:0;
+  color:#17283b;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.15;
+}
+#view-owner .wl-owner-equipment-qty small{
+  margin:2px 0 4px;
+  font-size:9px;
+  line-height:1.1;
+}
+#view-owner .wl-owner-equipment-qty input{
+  min-height:38px;
+  height:38px;
+  margin:0;
+  padding:5px;
+  border-radius:8px;
+  font-size:15px;
+  font-weight:750;
+}
+#view-owner .wl-equipment-number-block{
+  margin-top:8px !important;
+  padding:9px;
+  border:1px solid #d8e2eb;
+  border-radius:10px;
+  background:#f8fafc;
+}
+#view-owner .wl-equipment-number-block .wl-requirement-heading{
+  font-size:11px;
+}
+#view-owner .wl-equipment-number-block .small{
+  margin-bottom:7px;
+  font-size:10px;
+  line-height:1.3;
+}
+#view-owner .wl-equipment-number-grid{
+  gap:7px;
+}
+#view-owner .wl-equipment-number-grid input{
+  min-height:40px;
+  height:40px;
+}
+#view-owner .wl-requirement-section.partsArea,
+#view-owner .wl-ticket-parts-setup>.wl-requirement-section:last-child{
+  margin-top:9px;
+  padding-top:9px;
+}
+#view-owner .wl-parts-grid,
+#view-owner .ownerPartsGrid{
+  gap:7px;
+  margin-top:7px;
+}
+#view-owner .wl-parts-grid label span,
+#view-owner .ownerPartsGrid label span{
+  min-height:24px;
+  font-size:9px;
+  line-height:1.15;
+}
+#view-owner .wl-parts-grid input,
+#view-owner .ownerPartsGrid input{
+  min-height:38px;
+  height:38px;
+  padding:5px;
+  font-size:15px;
+}
+
+/* Assignment controls and actions */
+#view-owner .wl-tech-add-row{
+  gap:6px;
+}
+#view-owner .wl-tech-add-row select{
+  min-width:0;
+}
+#view-owner .wl-tech-add-row .wl-add-tech-plus{
+  width:44px;
+  min-width:44px;
+  height:44px;
+  min-height:44px;
+  padding:0;
+  border-radius:10px;
+  font-size:22px;
+}
+#view-owner .owner-ai-actions{
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+#view-owner .owner-ai-actions .btn,
+#view-owner .owner-ai-actions .ownerDispatchButton{
+  min-height:46px;
+  margin:0;
+  padding:9px 10px;
+  border-radius:10px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.15;
+}
+#view-owner .owner-ai-actions .wl-ai-review-btn{
+  background:#fff!important;
+  border:1px solid #7c3aed!important;
+  color:#6d28d9!important;
+  box-shadow:none!important;
+}
+#view-owner .owner-ai-actions .ownerDispatchButton{
+  background:#d70b12!important;
+  border-color:#d70b12!important;
+  color:#fff!important;
+}
+
+/* Equipment Memory / Unit Lookup */
+#view-owner .wl-owner-unit-lookup{
+  margin:0 0 10px;
+  padding:10px 11px;
+  border:1px solid #d9e1e8;
+  border-radius:11px;
+  background:#fafbfc;
+}
+#view-owner .wl-owner-unit-lookup-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+#view-owner .wl-owner-unit-lookup-head>div{
+  min-width:0;
+}
+#view-owner .wl-owner-unit-lookup-head .wl-eyebrow{
+  display:block;
+  color:#687787;
+  font-size:8px;
+  line-height:1.1;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+#view-owner .wl-owner-unit-lookup-head b{
+  display:block;
+  margin-top:2px;
+  color:#17283b;
+  font-size:14px;
+  line-height:1.15;
+  font-weight:750;
+}
+#view-owner .wl-owner-unit-lookup-head small{
+  display:block;
+  margin-top:2px;
+  color:#6b7a8d;
+  font-size:10px;
+  line-height:1.25;
+}
+#view-owner .wl-owner-unit-icon{
+  flex:none;
+  color:#6d28d9;
+  font-size:18px;
+}
+#view-owner .wl-owner-unit-search{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:7px;
+  align-items:center;
+  margin-top:8px;
+}
+#view-owner .wl-owner-unit-search input{
+  min-height:40px;
+  height:40px;
+  margin:0;
+  padding:7px 10px;
+  border:1px solid #cbd5df;
+  border-radius:9px;
+  font-size:12px;
+}
+#view-owner .wl-owner-unit-search button{
+  min-height:40px;
+  margin:0;
+  padding:7px 12px;
+  border:1px solid #0b2a3f;
+  border-radius:9px;
+  background:#0b2a3f;
+  color:#fff;
+  font-size:11px;
+  font-weight:750;
+}
+
+/* Tighten Live Job Progress below AI */
+#view-owner .ownerLiveSummary{
+  gap:7px;
+  margin-top:10px;
+}
+#view-owner .ownerLiveSummary span{
+  padding:8px 6px;
+  border-radius:10px;
+  font-size:10px;
+}
+#view-owner .ownerLiveSummary b{
+  font-size:17px;
+}
+#view-owner .ownerJobStatusSection{
+  margin-top:10px;
+  padding:9px;
+  border-radius:11px;
+}
+#view-owner .ownerActiveLabel{
+  font-size:10px;
+  letter-spacing:.06em;
+}
+#view-owner .wl-assignment-row{
+  padding:10px;
+  border-radius:10px;
+}
+#view-owner .wl-assignment-main .small{
+  font-size:10px;
+  line-height:1.3;
+}
+#view-owner .wl-live-stage{
+  padding:8px 9px;
+  border-radius:9px;
+}
+#view-owner .wl-live-stage b{
+  font-size:11px;
+}
+#view-owner .wl-live-stage span{
+  font-size:10px;
+}
+#view-owner .wl-owner-ai-status{
+  margin:7px 0;
+  padding:7px 8px;
+  font-size:10px;
+}
+#view-owner .wl-ai-timeline{
+  margin:7px 0;
+  border-color:#ddd6fe;
+  border-radius:9px;
+}
+#view-owner .wl-ai-timeline>summary{
+  padding:7px 9px;
+  font-size:11px;
+  font-weight:750;
+}
+#view-owner .wl-equipment-manifest{
+  margin-top:7px;
+  padding:8px;
+  border-radius:9px;
+}
+#view-owner .wl-manifest-title{
+  font-size:11px;
+}
+#view-owner .ownerPartsSummary,
+#view-owner .wl-parts-summary{
+  padding:8px;
+  border-radius:9px;
+}
+
+/* Dashboard accordion density */
+#view-owner .ownerDashSummary{
+  min-height:64px;
+  padding:12px 14px;
+}
+#view-owner .ownerDashSummary>div>b{
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:-.02em;
+}
+#view-owner .ownerDashSummary>div>span{
+  margin-top:3px;
+  font-size:10px;
+  line-height:1.2;
+  font-weight:600;
+}
+#view-owner .ownerDashSummary::after{
+  font-size:24px;
+}
+#view-owner .ownerDashBadge{
+  min-width:34px;
+  height:34px;
+  padding:0 8px;
+  font-size:12px;
+  font-weight:800;
+  box-shadow:none;
+}
+
+@media(max-width:560px){
+  #view-owner .ownerDispatchCard .ownerDashBody{padding:10px 11px 13px}
+  #view-owner .ownerDispatchCard .grid{grid-template-columns:1fr!important}
+  #view-owner .ownerWorkflowFirst .grid{grid-template-columns:1fr 1fr!important}
+  #view-owner .ownerWorkflowFirst input,
+  #view-owner .ownerWorkflowFirst select{min-height:42px}
+  #view-owner .wl-owner-equipment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view-owner .wl-owner-equipment-qty{padding:6px 7px}
+  #view-owner .wl-equipment-number-grid{grid-template-columns:1fr}
+  #view-owner .owner-ai-actions{grid-template-columns:1fr 1.15fr}
+  #view-owner .owner-ai-actions .btn,
+  #view-owner .owner-ai-actions .ownerDispatchButton{font-size:11px;padding:8px 7px}
+  #view-owner .ownerLiveSummary{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #view-owner .ownerLiveSummary span{font-size:9px}
+  #view-owner .ownerDashSummary{min-height:62px;padding:11px 12px}
+  #view-owner .ownerDashSummary>div>b{font-size:17px}
+  #view-owner .ownerDashSummary>div>span{font-size:9px}
+}
