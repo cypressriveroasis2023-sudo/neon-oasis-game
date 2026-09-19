@@ -127,6 +127,18 @@ function knowledgeForTopic(topic: string) {
   const aliases = KNOWLEDGE?.equipment_aliases || {}
   const equipment = KNOWLEDGE?.equipment || {}
   const workflows = KNOWLEDGE?.workflows || {}
+  const truckSpares = KNOWLEDGE?.truck_spares || null
+  const gapInventory = KNOWLEDGE?.phase_7_gap_inventory || null
+
+  // Truck-spare questions must resolve against the server-enforced spare mappings
+  // before a normal product battery label can be mistaken for an allowed spare batch.
+  if (truckSpares && /(truck\s+spare|truck\s+backup|spare\s+batter|backup\s+unit)/.test(q)) {
+    return {
+      certainty: 'COMPANY RULE',
+      topic: 'truck_spares',
+      definition: truckSpares,
+    }
+  }
 
   let equipmentName = Object.keys(equipment).find((name) => lower(name) === q)
   if (!equipmentName && aliases[q]) equipmentName = aliases[q]
@@ -152,16 +164,6 @@ function knowledgeForTopic(topic: string) {
     }
   }
 
-  const truckSpares = KNOWLEDGE?.truck_spares || null
-  if (truckSpares && /(truck\s+spare|truck\s+backup|spare\s+batter|backup\s+unit)/.test(q)) {
-    return {
-      certainty: 'COMPANY RULE',
-      topic: 'truck_spares',
-      definition: truckSpares,
-    }
-  }
-
-  const gapInventory = KNOWLEDGE?.phase_7_gap_inventory || null
   if (gapInventory && /(phase\s*7|knowledge\s+gap|missing\s+(?:company\s+)?knowledge|what.*(?:teach|learn)|teach.*vision|still\s+unknown)/.test(q)) {
     return {
       certainty: 'MISSING INFORMATION',
