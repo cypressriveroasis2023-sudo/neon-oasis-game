@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v123",
-  "service_worker": "v80",
+  "runtime_version": "release-qa-v124",
+  "service_worker": "v81",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1881,7 +1881,43 @@
         "Customer deployment includes Central Station information and shared-email access",
         "Service must verify the Ranger is up to date in the Victron Bluetooth app in the field before close"
       ]
+    },
+    {
+      "id": "UI-VISION-MOBILE-SCROLL-01",
+      "area": "OnSite Vision · iPhone",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Long Vision conversations remain vertically scrollable above the fixed composer on iPhone",
+      "steps": [
+        "Open a multi-turn Vision conversation on a narrow mobile viewport",
+        "Scroll upward through earlier user and assistant turns",
+        "Verify the composer remains available at the bottom"
+      ],
+      "expected": [
+        "The Vision main grid is constrained to the visual viewport height",
+        "The thread owns vertical scrolling and can reach earlier messages",
+        "The fixed composer does not trap or cover the conversation scroll area"
+      ]
+    },
+    {
+      "id": "UI-OWNER-EMPTY-DETAILS-01",
+      "area": "Owner dashboard",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Live Job Progress never renders Safari's default empty Details summary",
+      "steps": [
+        "Load the Owner dashboard while live assignments are still loading",
+        "Inspect the area after Send Job to Tech",
+        "Simulate an existing empty Live Job Progress details element"
+      ],
+      "expected": [
+        "Live Job Progress receives a real summary immediately",
+        "An incomplete live card is rehydrated instead of skipped",
+        "No dead browser-generated Details strip appears"
+      ]
     }
   ],
-  "last_release_qa_note": "Phase 7 camera-family teaching pass: Spotter, Recon II, and Ranger Owner rules captured. Spotter is 4-camera/internal-router/Alibi with no batteries; Recon II camera count is separate from battery quantity; Spotter/Recon II/Ranger require router ports 81/554; Ranger requires field Victron Bluetooth verification; Sniper/Spotter/Recon II swap returns are gated before close. Edge v10 active with JWT; rules v6 / knowledge v7 / technician v123 / loader v37 / SW80 / DB migration 79. Spotter correction: the previously unnamed top component is the antenna on top."
+  "last_release_qa_note": "Mobile UI regression pass: Vision visual-viewport scrolling fixed; Owner Live Job Progress now hydrates a real summary before data load, preventing Safari's default empty Details row. release-qa-v124 / Vision v17 / SW81."
 }
