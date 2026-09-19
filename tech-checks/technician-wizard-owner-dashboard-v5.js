@@ -605,10 +605,28 @@ async function loadEquipmentMemory(tags=[]){
   }
   return new Map(clean.map(t=>[t,equipmentMemoryCache.get(t)||[]]));
 }
+function equipmentRecurringIssueAnalysis(rows=[]){
+  const cats=[
+    ['camera',/camera|ptz|lens|video|image|ir\b/i],
+    ['SD card',/sd\s*card|micro\s*sd|storage|format/i],
+    ['power',/power|offline|won't turn|wont turn|voltage|electronic/i],
+    ['battery',/battery|batteries|charge|charging/i],
+    ['connectivity',/network|connect|offline|modem|sim|signal|cellular|internet/i],
+    ['speaker',/speaker|audio/i],
+    ['MPPT / solar',/mppt|solar|panel/i]
+  ];
+  const counts=new Map(),tickets=new Map();
+  rows.forEach(r=>{const text=[r.damage_notes,r.return_notes].filter(Boolean).join(' ');if(!text)return;cats.forEach(([name,re])=>{if(re.test(text)){counts.set(name,(counts.get(name)||0)+1);if(!tickets.has(name))tickets.set(name,new Set());tickets.get(name).add(String(r.ticket_no||'—'));}})});
+  return [...counts.entries()].filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).map(([name,n])=>({name,count:n,tickets:[...(tickets.get(name)||[])]}));
+}
+function equipmentRecurringIssueHtml(rows=[]){
+  const recurring=equipmentRecurringIssueAnalysis(rows);if(!recurring.length)return '';
+  return `<div class='wl-ai-repeat-issues'><div class='wl-ai-head'><span>✨ AI History Pattern</span><b>RECURRING ISSUE</b></div>${recurring.map(x=>`<div><b>⚠ ${esc(x.name)} mentioned in ${x.count} prior records</b><span>MHelpDesk: ${x.tickets.slice(0,5).map(t=>'#'+esc(t)).join(', ')}</span></div>`).join('')}<div class='small top8'>Pattern detection uses prior Tech Check notes only. IT must still perform the current physical checks.</div></div>`;
+}
 function equipmentMemoryHtml(tag,rows=[]){
   if(!rows.length)return `<div class='wl-equipment-memory'><b>🧠 Equipment Memory · ${esc(tag)}</b><span>No prior Tech Check return/intake history found. History will build as this equipment moves through the app.</span></div>`;
   const last=rows[0], issues=rows.filter(r=>String(r.damage_notes||r.return_notes||'').trim()).length;
-  return `<details class='wl-equipment-memory'><summary><span>🧠 Equipment Memory · ${esc(tag)}</span><span class='pill'>${rows.length} HISTORY</span></summary><div><div class='small'><b>Last MHelpDesk:</b> #${esc(last.ticket_no||'—')} · ${esc(last.equipment_type||'Equipment')} · ${esc(last.status||'Recorded')}</div>${last.completed_at?`<div class='small'><b>Last intake completed:</b> ${esc(ownerTimelineWhen(last.completed_at))}${last.it_tech_name?' · '+esc(last.it_tech_name):''}</div>`:''}${issues?`<div class='wl-ai-warn top8'>⚠ ${issues} prior history record${issues===1?'':'s'} include notes/issues. Review before sending this equipment back to the field.</div>`:`<div class='wl-ai-good top8'>✓ No prior return/intake notes are recorded in the available history.</div>`}<details class='top8'><summary>Previous Tech Check records</summary>${rows.slice(0,6).map(r=>`<div class='small top8'><b>#${esc(r.ticket_no||'—')}</b> · ${esc(r.status||'Recorded')}${r.completed_at?' · '+esc(ownerTimelineWhen(r.completed_at)):''}${r.damage_notes||r.return_notes?'<br>Notes: '+esc(r.damage_notes||r.return_notes):''}</div>`).join('')}</details></div></details>`;
+  return `<details class='wl-equipment-memory'><summary><span>🧠 Equipment Memory · ${esc(tag)}</span><span class='pill'>${rows.length} HISTORY</span></summary><div><div class='small'><b>Last MHelpDesk:</b> #${esc(last.ticket_no||'—')} · ${esc(last.equipment_type||'Equipment')} · ${esc(last.status||'Recorded')}</div>${last.completed_at?`<div class='small'><b>Last intake completed:</b> ${esc(ownerTimelineWhen(last.completed_at))}${last.it_tech_name?' · '+esc(last.it_tech_name):''}</div>`:''}${issues?`<div class='wl-ai-warn top8'>⚠ ${issues} prior history record${issues===1?'':'s'} include notes/issues. Review before sending this equipment back to the field.</div>`:`<div class='wl-ai-good top8'>✓ No prior return/intake notes are recorded in the available history.</div>`}${equipmentRecurringIssueHtml(rows)}<details class='top8'><summary>Previous Tech Check records</summary>${rows.slice(0,6).map(r=>`<div class='small top8'><b>#${esc(r.ticket_no||'—')}</b> · ${esc(r.status||'Recorded')}${r.completed_at?' · '+esc(ownerTimelineWhen(r.completed_at)):''}${r.damage_notes||r.return_notes?'<br>Notes: '+esc(r.damage_notes||r.return_notes):''}</div>`).join('')}</details></div></details>`;
 }
 async function injectEquipmentMemory(root=document){
   const nodes=[...root.querySelectorAll('[data-unit-tag]')];const tags=nodes.map(n=>n.dataset.unitTag).filter(Boolean);if(!tags.length)return;
