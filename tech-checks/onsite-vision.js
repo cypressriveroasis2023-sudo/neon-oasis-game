@@ -12,14 +12,11 @@ const dayKey=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart
 const id=()=>String(Date.now())+Math.random().toString(36).slice(2,8);
 const reEsc=s=>String(s||'').replace(/[.*+?^$()|[\]\\]/g,'\\$&');
 
-async function techCheckDb(){
-  const response=await fetch('./app.js?v=startup-fast-v32',{cache:'no-store'});
-  if(!response.ok)throw new Error('Could not load the Tech Check connection.');
-  const src=await response.text();
-  const url=src.match(/const SUPABASE_URL = '([^']+)'/);
-  const key=src.match(/const SUPABASE_KEY = '([^']+)'/);
-  if(!url||!key)throw new Error('Tech Check connection settings were not found.');
-  return supabase.createClient(url[1],key[1]);
+function techCheckDb(){
+  return supabase.createClient(
+    'https://goqrnolcvqnirjmzaeyk.supabase.co',
+    'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw'
+  );
 }
 function visionPersistence(){return window.OnSiteVisionPersistence||null;}
 function visionKnowledgeAdmin(){return window.OnSiteVisionKnowledgeAdmin||null;}
@@ -369,9 +366,8 @@ async function init(){
   const p=profileResult.data;
   if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){location.replace('./');return;}
   state.profile=p;$('visionOwnerName').textContent=(p.full_name||p.username||'Owner')+' - Owner/Admin';
-  await hydratePersistentChats();
-  await loadData();
-  await checkAgentStatus();
+  await Promise.all([hydratePersistentChats(),loadData()]);
+  checkAgentStatus().catch(error=>console.warn('Vision AI status check',error));
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
   const q=new URLSearchParams(location.search).get('ticket');
   if(q){
