@@ -292,6 +292,18 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_system_health',
+    description: 'Get the Owner-only live Tech Check health report: security exposure, workflow attention, data-integrity violations, profile ambiguity, Vision persistence/audit counts, knowledge counts, and migration count. Use for system/database/AI health or integrity questions.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -386,7 +398,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v12',
+        agent_version: 'onsite-vision-agent-v13',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -538,6 +550,12 @@ Deno.serve(async (req) => {
         return { query: queryText, people }
       }
 
+      if (name === 'get_system_health') {
+        const { data, error } = await userClient.rpc('get_owner_system_health_v1')
+        if (error) throw error
+        return (data || {}) as Json
+      }
+
       if (name === 'get_company_knowledge') {
         const topic=clean(args.topic)
         const baseline=knowledgeForTopic(topic)
@@ -573,6 +591,7 @@ Deno.serve(async (req) => {
       '',
       'GROUNDING RULES:',
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
+      '- For system health, database health, AI data integrity, security exposure, profile ambiguity, or whether Tech Check is ready for review, call get_system_health and distinguish critical integrity failures from normal workflow attention.',
       '- For questions about a named company person, employee, technician, owner, or whether someone exists in Tech Check, call find_people. This lookup includes Owner/IT/Service and active/inactive/archived profile records.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
       '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
