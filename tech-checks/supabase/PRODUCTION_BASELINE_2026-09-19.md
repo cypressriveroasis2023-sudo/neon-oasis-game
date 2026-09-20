@@ -712,3 +712,43 @@ Current release after retirement:
 - database migrations: 83
 - QA test definitions: 122
 - Phase 7 known-gap products after retirement: Sniper, Spotter, Recon II, 110V Stand, Pole.
+
+
+## Phase 7 110V Stand Owner teaching pass
+
+Owner instruction captured on 2026-09-19 adds the verified 110V Stand product facts without filling undocumented procedure gaps.
+
+Verified Company Brain facts:
+- The 110V Stand itself is a passive support/mounting structure and has 0 batteries.
+- The stand itself does not power the attached unit.
+- Compatible units documented by the Owner: Sniper, Spotter, and Ranger.
+- Helios does not use a 110V Stand.
+- When a Sniper or Spotter is mounted on the stand, the attached unit uses 110V power.
+- When a Ranger is used on the stand, exactly 1 solar panel mounts on the 110V Stand and that solar panel powers the Ranger.
+- Required stand condition inspection includes checking whether the pole is straight/bent and checking the brick fascia for damage.
+
+Still intentionally undocumented / MISSING INFORMATION:
+- Exact 110V Stand field installation/removal SOP.
+- Any additional company-required cord/outlet/GFCI/electrical checks beyond the documented power arrangement.
+- 110V Stand-specific mandatory photos/signatures.
+- Approved 110V Stand troubleshooting sequence.
+- Whether DELIVERY and/or BACKUP are allowed purposes in addition to the currently documented SWAP purpose.
+
+Runtime hardening:
+- Browser and Edge Company Knowledge advanced to `company-knowledge-v9` and are kept byte-identical.
+- Edge agent advanced to `onsite-vision-agent-v16` and was deployed ACTIVE with JWT verification enabled.
+- PWA service-worker cache advanced to `tech-check-field-shell-v92` and now preloads Company Knowledge v9 instead of v8.
+- Added non-destructive 110V Stand regression QA.
+- No Supabase schema change was required; database migration count remains 83.
+
+Current stack after this teaching pass:
+- technician: `release-qa-v125`
+- loader: `startup-fast-v40`
+- OnSite Vision workspace: `vision-workspace-v26`
+- shared rules: `rules-v7`
+- Company Knowledge: `company-knowledge-v9`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v16` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v92`
+- database migrations: 83
+- QA test definitions: 123
