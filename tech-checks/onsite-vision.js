@@ -326,9 +326,29 @@ async function serverAgentAnswer(raw){
   if(ticket&&!p.ticket_no)p.ticket_no=ticket;
 
   if(p.type==='assign'){
-    const role=String(p.role||'').toLowerCase();
+    let role=String(p.role||'').toLowerCase();
     p.role=role.includes('service')?'service':role.includes('it')?'it':'';
-    const techName=String(p.technician_name||'').trim();
+    let techName=String(p.technician_name||'').trim();
+
+    // Owner natural-language override: "assign it to Josh" must bypass a department queue
+    // when that name uniquely matches an active technician. The audited confirmation still applies.
+    if(!techName){
+      const normalizedRaw=String(raw||'').toLowerCase();
+      const matches=(state.techs||[]).filter(t=>{
+        const names=[t.full_name,t.username].filter(Boolean).map(v=>String(v).trim());
+        return names.some(name=>{
+          const parts=name.toLowerCase().split(/\s+/).filter(Boolean);
+          return normalizedRaw.includes(name.toLowerCase()) || parts.some(part=>part.length>=3&&new RegExp('\\b'+reEsc(part)+'\\b','i').test(raw));
+        });
+      });
+      const unique=[...new Map(matches.map(t=>[String(t.user_id),t])).values()];
+      if(unique.length===1){
+        const t=unique[0];
+        techName=String(t.full_name||t.username||'').trim();
+        p.technician_name=techName;
+        p.role=String(t.role||p.role||'').toLowerCase();
+      }
+    }
     if(p.role&&techName&&!findTech(techName,p.role)){
       html+='<div class="vision-direct warn"><b>MISSING INFORMATION</b>I understood the requested technician as '+esc(techName)+', but I could not match that name to an active '+esc(p.role.toUpperCase())+' technician.</div>'+actionCard({kind:'choose-tech',role:p.role},ticket);
       return html;
