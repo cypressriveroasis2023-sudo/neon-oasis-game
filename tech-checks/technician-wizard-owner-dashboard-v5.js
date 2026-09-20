@@ -4480,7 +4480,7 @@ async function installOwnerAssignments(force = false) {
   const liveWasOpen = liveHost.open;
   host.dataset.loaded = '1';
 
-  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }, { data: aiAcks }] = await Promise.all([
+  const ownerLoadResults = await Promise.all([
     liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active', true).is('archived_at', null).in('role', ['it','service']).order('full_name'),
     liveDb.from('job_assignments').select('*').in('status', ['assigned','started','completed']).order('assigned_at', { ascending: false }).limit(50),
     liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,equipment_manifest,released_by_name,released_at,closed_by_name,closed_at,prep_items(equipment_type,purpose,unit_tag)').order('created_at', { ascending:false }).limit(100),
@@ -4488,6 +4488,9 @@ async function installOwnerAssignments(force = false) {
     liveDb.from('service_solar_checks').select('prep_ticket_id,service_tech_name,completed_at,updated_at,handoff_accepted_at,handoff_accepted_by_name,helios_field_completed_at,helios_field_completed_by_name,helios_owner_verified_at,helios_owner_verified_by_name').order('updated_at',{ascending:false}).limit(100),
     liveDb.from('owner_ai_alert_acknowledgements').select('*').order('acknowledged_at',{ascending:false}).limit(500),
   ]);
+  const ownerLoadError = ownerLoadResults.find(result => result?.error)?.error;
+  if (ownerLoadError) throw ownerLoadError;
+  const [{ data: profiles }, { data: assignments }, { data: preps }, { data: assets }, { data: solarChecks }, { data: aiAcks }] = ownerLoadResults;
   ownerAIAckRows = aiAcks || [];
   ownerAssignmentProfiles = profiles || [];
   ownerAssignmentAssets = assets || [];
@@ -5848,6 +5851,7 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
+document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 let ownerRefreshTimer=null;
 let ownerRefreshInFlight=false;
@@ -5863,6 +5867,13 @@ async function runOwnerRefresh(force=false) {
     await Promise.all([installOwnerAssignments(force), installOwnerIntake(force)]);
     organizeOwnerDashboard();
     ownerLastRefreshAt=Date.now();
+  } catch (error) {
+    console.error('Owner dashboard refresh failed', error);
+    const message=esc(error?.message||'Could not load live Tech Check data.');
+    const host=document.getElementById('ownerJobAssignments');
+    const live=document.getElementById('ownerLiveJobProgress');
+    if(host)host.innerHTML="<summary class='ownerDashSummary'><div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div><span class='ownerDashBadge alert'>!</span></summary><div class='ownerDashBody'><div class='bad'><b>Could not load assignments.</b><div class='small'>"+message+"</div><button class='mini top8' type='button' data-owner-retry-live>Retry now</button></div></div>";
+    if(live)live.innerHTML="<summary class='ownerDashSummary'><div><b>Live Job Progress</b><span>See what is assigned, who has it, and what is currently being worked</span></div><span class='ownerDashBadge alert'>!</span></summary><div class='ownerDashBody'><div class='bad'><b>Live data did not finish loading.</b><div class='small'>"+message+"</div><button class='mini top8' type='button' data-owner-retry-live>Retry now</button></div></div>";
   } finally {
     ownerRefreshInFlight=false;
     if (ownerRefreshQueued) {
@@ -5883,6 +5894,19 @@ function scheduleOwnerStartupLoad() {
   else setTimeout(load, 280);
 }
 window.refreshOwnerIntake = () => scheduleOwnerRefresh(true, 160);
+let ownerLiveRealtimeStarted=false;
+function setupOwnerLiveRealtime(){
+  if(ownerLiveRealtimeStarted)return;
+  ownerLiveRealtimeStarted=true;
+  const refresh=()=>{if(roleText().includes('Owner/Admin'))scheduleOwnerRefresh(true,140);};
+  liveDb.channel('tech-check-owner-dashboard-live-v2')
+    .on('postgres_changes',{event:'*',schema:'public',table:'job_assignments'},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'prep_tickets'},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'prep_items'},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'unit_returns'},refresh)
+    .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},refresh)
+    .subscribe();
+}
 let serviceSolarRealtimeStarted=false;
 function setupServiceSolarRealtime() {
   if (serviceSolarRealtimeStarted) return;
@@ -5900,7 +5924,7 @@ function boot() {
   injectStyles();
   installTabs();
   setupNotificationRealtime();
-  if (roleText().includes('Owner/Admin')) setupServiceSolarRealtime();
+  if (roleText().includes('Owner/Admin')) { setupServiceSolarRealtime(); setupOwnerLiveRealtime(); }
   refreshNotificationBadge();
   if (roleText().includes('Owner/Admin')) organizeOwnerDashboard();
 
