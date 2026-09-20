@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v125",
-  "service_worker": "v93",
+  "runtime_version": "release-qa-v126",
+  "service_worker": "v94",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2359,6 +2359,31 @@
         "Dirt/grass anchoring requires rebar on all 4 legs and 4 sandbags",
         "Concrete anchoring requires 4 nails in the stand legs",
         "Exact anchor hardware specifications remain undocumented unless Owner supplies them"
+      ]
+    },
+    {
+      "id": "VISION-KNOWLEDGE-110V-02",
+      "area": "110V Stand",
+      "role": "owner+it+service",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "110V Stand may be intentionally untagged without weakening tag rules for other equipment",
+      "steps": [
+        "Create a rollback-only 110V Stand SWAP prep item with no unit tag",
+        "Save the IT stand verification with MHelpDesk/item confirmation true",
+        "Verify the tag remains null while verified_at is populated",
+        "Attach the normal IT stand photo and signature evidence",
+        "Release the prep through the production release_prep gate",
+        "Rollback the transaction and confirm zero QA residue",
+        "Verify technician UI labels the 110V Stand tag as optional and does not require a photo-tag match when no tag exists"
+      ],
+      "expected": [
+        "An untagged 110V Stand can verify and pass the IT → Service handoff",
+        "A clear stand photo remains required",
+        "If a tag exists it is recorded and matched normally",
+        "No tag by itself does not block the 110V Stand",
+        "Non-110V equipment retains its existing unit-tag requirement",
+        "Rollback test leaves zero production records"
       ]
     }
   ],
