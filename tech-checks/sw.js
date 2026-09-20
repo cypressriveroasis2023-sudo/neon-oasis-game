@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v100';
+const CACHE_NAME = 'tech-check-field-shell-v101';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -11,7 +11,7 @@ self.addEventListener('install', event => {
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v8', { cache:'reload' })),
       cache.add(new Request('./app.js?v=startup-fast-v42', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v129', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v130', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=onsite-chat-v118', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v30', { cache:'reload' })),
