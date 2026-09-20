@@ -7,7 +7,7 @@
   <title>OnSite Vision · Tech Check</title>
   <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
   <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
-  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v24">
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v25">
 </head>
 <body>
   <div id="visionLoading" class="vision-loading">
@@ -50,7 +50,7 @@
       <footer class="vision-composer-wrap">
         <div class="vision-composer">
           <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision">🎙</button>
-          <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision anything about Tech Check…" enterkeyhint="send"></textarea>
+          <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision…" enterkeyhint="send"></textarea>
           <button id="visionSendButton" class="vision-send" type="button" aria-label="Send">➜</button>
         </div>
         <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
@@ -181,7 +181,7 @@
   <script src="./onsite-vision.js?v=vision-workspace-v24" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=89', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=90', { scope: './', updateViaCache: 'none' }).catch(console.warn));
     }
   </script>
 </body>
