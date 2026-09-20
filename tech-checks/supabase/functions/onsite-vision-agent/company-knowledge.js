@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v8
+ * Version: company-knowledge-v9
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v8",
+  "version": "company-knowledge-v9",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -490,21 +490,45 @@
       "purposes": [
         "SWAP"
       ],
+      "compatible_units": [
+        "Sniper",
+        "Spotter",
+        "Ranger"
+      ],
+      "excluded_units": [
+        "Helios"
+      ],
+      "power_and_mounting_rules": [
+        "The 110V Stand itself is a passive support/mounting structure; it does not power the attached unit.",
+        "The 110V Stand has 0 batteries.",
+        "When used with a Sniper or Spotter, the attached unit uses 110V power.",
+        "When used with a Ranger, exactly 1 solar panel mounts on the 110V Stand and that solar panel powers the Ranger.",
+        "Helios does not use a 110V Stand."
+      ],
       "it_checks": [
         "exact stand tag",
         "matches requested/MHelpDesk equipment"
       ],
+      "required_condition_checks": [
+        "Inspect whether the stand pole is straight or bent.",
+        "Inspect the brick fascia for damage."
+      ],
       "unknowns": [
-        "Detailed product-specific field installation SOP"
+        "Exact product-specific field installation/removal SOP",
+        "Any additional company-required electrical checks beyond the documented power arrangement",
+        "110V Stand-specific mandatory photos/signatures",
+        "Approved 110V Stand troubleshooting sequence",
+        "Whether DELIVERY and/or BACKUP are allowed purposes in addition to the currently documented SWAP purpose"
       ],
       "teaching_needed": [
-        "List every 110V Stand component/accessory that must travel with it.",
-        "Document the exact 110V Stand SWAP installation/removal SOP.",
-        "Document the company-required power-source, cord, outlet, GFCI, or electrical checks, if any.",
+        "Document the exact 110V Stand installation/removal SOP.",
+        "Document any additional company-required power-source, cord, outlet, GFCI, or electrical checks, if any.",
         "Document 110V Stand-specific mandatory photos/signatures.",
-        "Document the approved 110V Stand troubleshooting sequence."
+        "Document the approved 110V Stand troubleshooting sequence.",
+        "Confirm whether 110V Stand is allowed for DELIVERY and/or BACKUP, or SWAP only."
       ],
       "sources": [
+        "Owner instruction 2026-09-19",
         "add_it_prep_item",
         "configure_it_prep_item",
         "itUnitStepsData"
@@ -593,7 +617,7 @@
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
       "Spotter": "Core 4-camera/internal-router/top-antenna/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are model-specific details if needed, reprogramming steps, and troubleshooting.",
       "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
-      "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
+      "110V Stand": "Owner-documented: passive 0-battery stand; compatible with Sniper, Spotter, and Ranger; Helios excluded; Sniper/Spotter use 110V power; Ranger uses exactly 1 solar panel mounted on the stand to power the Ranger; inspect pole straightness and brick fascia damage. Remaining gaps are exact install/removal SOP, any additional electrical checks, evidence, troubleshooting, and purpose parity beyond SWAP.",
       "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
     "truck_spares": [
