@@ -623,3 +623,41 @@ Current release:
 
 Known remaining hardening item from Supabase Auth advisor:
 - Leaked-password protection is disabled in Supabase Auth. The available Supabase connector does not expose an Auth-settings mutation action, so this remains an account-level setting to enable separately.
+
+
+## Monday owner torture-test pass
+
+A production-rule torture-test pass was executed inside rollback transactions so the real RPCs/triggers were exercised without leaving fake jobs or evidence in production.
+
+Passed rollback scenarios:
+- Spotter Delivery full Owner → IT → Service happy path closes successfully.
+- IT handoff is blocked when required IT photo/signature proof is missing.
+- Service completion is blocked when the verified unit tag does not match IT-prepared equipment.
+- Service completion is blocked without the matching receipt photo/signature evidence.
+- Pickup cannot begin with IT; Service-first followed by IT Intake assignment succeeds.
+- Ranger close is blocked first by missing Service solar checkout, then by missing field Victron Bluetooth verification, and closes after both are completed.
+- Recon II rejects a missing/zero deployment camera count and stores a valid count.
+- Inactive technician profiles cannot receive new assignments.
+- Duplicate active unit tags are rejected across open prep records.
+- Spotter BACKUP is treated as an extra truck-spare item, must use the dedicated truck-spare path, and blocks release until IT explicitly checks it out.
+- Vision action preparation does not mutate the assignment. The tested reassignment changed only after explicit execute/confirmation.
+- Vision one-click completion remains blocked and routed to the guided workflow.
+
+QA discovery/fix:
+- The legacy Owner test-prep helper still used the old Solar Spotter rule of 4 IT-side batteries.
+- It was corrected to 0 IT-side batteries, matching current production rules where Service handles Solar Stand batteries.
+- The test helper now also accepts Solar Pole and Pole in its equipment type list.
+- Live migration: `align_owner_test_prep_with_camera_rules`.
+- Repo migration file: `20260920_align_owner_test_prep_with_camera_rules.sql`.
+- Database migration count: 81.
+- QA test definitions: 120.
+
+Current Monday-review stack after this pass:
+- technician: `release-qa-v124`
+- loader: `startup-fast-v38`
+- OnSite Vision workspace: `vision-workspace-v23`
+- shared rules: `rules-v6`
+- Company Knowledge: `company-knowledge-v7`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v14`
+- service worker: `tech-check-field-shell-v88`
