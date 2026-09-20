@@ -413,7 +413,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v19',
+        agent_version: 'onsite-vision-agent-v20',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -633,6 +633,8 @@ Deno.serve(async (req) => {
       '- If the owner asks to create, assign, reschedule, update, hand off, complete, cancel, return, check out, check in, verify, or approve something, explain the proposed action and populate proposed_action.',
       '- For proposed schedule actions, proposed_action.date must be YYYY-MM-DD and proposed_action.time should be HH:MM in local Central time when known.',
       '- For proposed assignment actions, use role exactly "it" or "service" when known.',
+      '- If the Owner names a technician in an assignment request (for example "assign it to Josh"), call list_technicians when needed and ALWAYS put that exact matched active technician in proposed_action.technician_name. Do not propose a department queue when the Owner explicitly named a technician.',
+      '- An Owner may directly reassign an existing IT or Service department-queue assignment to a specific active technician. Treat that as an assign action to the named technician; the client confirmation remains required.',
       '- Never say a write occurred. The Tech Check client will show a confirmation and execute an approved write path separately.',
       '- If a request is ambiguous, ask a natural clarifying question rather than guessing.',
       '',
