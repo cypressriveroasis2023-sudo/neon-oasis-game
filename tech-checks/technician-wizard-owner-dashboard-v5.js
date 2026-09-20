@@ -4405,6 +4405,13 @@ function ownerAIJobTimeline(a,prep,solarCheck=null){
   const ai=ownerLiveAIStatus(a,prep,solarCheck);
   return `<details class='wl-ai-timeline'><summary><span class='wl-ai-inline-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''>AI Job Timeline</span> <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>{const when=ownerTimelineWhen(s.when);return `<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b><span>${esc(s.who||'')}${when?' · '+esc(when):''}</span>${i===idx?`<span class='wl-ai-current-detail'>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`}).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
 }
+function ownerAIMorningReadinessHtml(states){
+  const rows=Array.isArray(states)?states:[];
+  if(!rows.length)return "<div class='wl-ai-good'><b>Tomorrow readiness:</b> No Tech Check jobs assigned.</div>";
+  const attention=rows.filter(x=>x?.s?.state==='attention');
+  if(!attention.length)return "<div class='wl-ai-good'><b>Tomorrow readiness:</b> ✓ All assigned jobs are currently on track.</div>";
+  return "<div class='wl-ai-warn'><b>Tomorrow readiness:</b> "+attention.length+" job"+(attention.length===1?'':'s')+" need review before work starts.<br>"+attention.slice(0,6).map(x=>'#'+esc(x?.a?.ticket_no||'—')+' — '+esc(x?.s?.detail||'Needs review')).join('<br>')+"</div>";
+}
 function ownerAINotificationKey(a,status){
   const id=String(a?.id||a?.ticket_no||'unknown');
   const detail=[status?.label||'',...(status?.flags||[])].join('|').trim();
