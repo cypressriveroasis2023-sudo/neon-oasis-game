@@ -752,3 +752,22 @@ Current stack after this teaching pass:
 - service worker: `tech-check-field-shell-v92`
 - database migrations: 83
 - QA test definitions: 123
+
+
+### 110V Stand field anchoring update
+
+Owner instruction captured on 2026-09-19 adds the Service field-placement and anchoring rules for the 110V Stand:
+
+- Transport the stand to the job site on a trailer.
+- Move and position it at the designated field location.
+- Dirt/grass installation: rebar on all 4 stand legs plus 4 sandbags.
+- Concrete installation: 4 nails in the stand legs.
+- Exact rebar and concrete-nail specifications remain intentionally undocumented until the Owner provides them.
+- Removal procedure, mandatory evidence, troubleshooting, additional electrical checks, and purpose parity beyond SWAP remain MISSING INFORMATION.
+
+Runtime after this update:
+- Company Knowledge: `company-knowledge-v10`
+- Edge agent: `onsite-vision-agent-v17` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v93`
+- database migrations: 83
+- QA test definitions: 123
