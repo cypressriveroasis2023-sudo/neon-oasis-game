@@ -967,7 +967,7 @@ async function systemHealthHtml(){
     (good?'No critical Tech Check data-integrity failures are showing.':'Critical data-integrity issues are present and should be reviewed.')+'</div>';
   html+='<div class="vision-context-block"><h3>Live health summary</h3><div class="vision-context-grid">'+
     '<div><span>HARD ERRORS</span><b>'+esc(h.hard_error_count||0)+'</b></div>'+
-    '<div><span>ATTENTION</span><b>'+esc(h.attention_count||0)+'</b></div>'+
+    '<div><span>REVIEW ITEMS</span><b>'+esc(h.attention_count||0)+'</b></div>'+
     '<div><span>ANON PRIVILEGED RPCs</span><b>'+esc(security.anonymous_security_definer_functions||0)+'</b></div>'+
     '<div><span>DB MIGRATIONS</span><b>'+esc(database.migration_count||0)+'</b></div>'+
     '<div><span>EDGE AI</span><b>'+esc(agent.ok?((agent.agent_version||'online')+' · '+(agent.model_configured?'AI LIVE':'DATA LIVE')):'Unavailable')+'</b></div>'+
@@ -983,10 +983,16 @@ async function systemHealthHtml(){
     '<div><span>MESSAGES</span><b>'+esc(vision.messages||0)+'</b></div>'+
     '<div><span>AUDITED ACTIONS</span><b>'+esc(vision.audited_actions||0)+'</b></div>'+
     '<div><span>FAILED ACTIONS</span><b>'+esc(vision.failed_actions||0)+'</b></div>'+
-    '<div><span>APPROVED KNOWLEDGE</span><b>'+esc(vision.approved_knowledge_entries||0)+'</b></div>'+
-    '<div><span>DRAFT KNOWLEDGE</span><b>'+esc(vision.draft_knowledge_entries||0)+'</b></div>'+
+    '<div><span>MANAGED APPROVALS</span><b>'+esc(vision.approved_knowledge_entries||0)+'</b></div>'+
+    '<div><span>MANAGED DRAFTS</span><b>'+esc(vision.draft_knowledge_entries||0)+'</b></div>'+
   '</div></div>';
-  html+='<div class="vision-system-note">Generated from the live Tech Check database. Normal workflow attention is separated from hard integrity failures.</div>';
+  html+='<div class="vision-context-block"><h3>AI operating layer</h3><div class="vision-context-grid">'+
+    '<div><span>KNOWLEDGE BASELINE</span><b>'+esc(agent.knowledge_version||'unknown')+'</b></div>'+
+    '<div><span>SHARED RULES</span><b>'+esc(agent.shared_rules_version||'unknown')+'</b></div>'+
+    '<div><span>WORKFLOW ENGINE</span><b>'+esc(agent.workflow_engine_version||'unknown')+'</b></div>'+
+    '<div><span>AGENT VERSION</span><b>'+esc(agent.agent_version||'unknown')+'</b></div>'+
+  '</div></div>';
+  html+='<div class="vision-system-note">Generated from the live Tech Check database. Managed knowledge counts are extra Owner-approved entries; the verified Company Knowledge baseline is shown separately above. Normal workflow review items are separated from hard integrity failures.</div>';
   return html;
 }
 
