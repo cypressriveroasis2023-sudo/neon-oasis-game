@@ -2124,7 +2124,168 @@
         "Known gap product count/list is displayed",
         "Vision explicitly states it will return MISSING INFORMATION rather than invent undocumented procedures"
       ]
+    },
+    {
+      "id": "MONDAY-SPOTTER-E2E-01",
+      "area": "Owner review · Spotter Delivery",
+      "role": "owner+it+service",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Full Spotter Delivery completes Owner assignment → IT prep → IT handoff → Service verification → close",
+      "steps": [
+        "Assign IT and Service",
+        "Create Spotter prep",
+        "Complete programming/ports/readiness",
+        "Attach IT photo/signature",
+        "Release handoff",
+        "Attach Service receipt photo/signature",
+        "Close"
+      ],
+      "expected": [
+        "Final prep status is closed",
+        "No fake production records remain because the QA transaction rolls back"
+      ]
+    },
+    {
+      "id": "MONDAY-EVIDENCE-GATES-01",
+      "area": "Owner review · Evidence",
+      "role": "it+service",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Missing or mismatched handoff evidence blocks progression",
+      "steps": [
+        "Attempt release with no IT unit photo/signature",
+        "Attempt Service close with wrong unit tag",
+        "Attempt Service close without matching receipt evidence"
+      ],
+      "expected": [
+        "IT handoff is blocked without required proof",
+        "Wrong Service unit tag is rejected",
+        "Service close is blocked without matching receipt photo/signature"
+      ]
+    },
+    {
+      "id": "MONDAY-RANGER-GATES-01",
+      "area": "Owner review · Ranger",
+      "role": "service",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Ranger close follows solar checkout then field Victron verification",
+      "steps": [
+        "Attempt close before Service solar checkout",
+        "Complete Service solar checkout/evidence",
+        "Attempt close before Ranger field Victron",
+        "Complete field Victron check",
+        "Close"
+      ],
+      "expected": [
+        "First blocker is Service solar checkout",
+        "Next blocker is Ranger field Victron Bluetooth verification",
+        "Close succeeds after both requirements"
+      ]
+    },
+    {
+      "id": "MONDAY-BACKUP-TRUCKSPARE-01",
+      "area": "Owner review · BACKUP",
+      "role": "it",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "BACKUP camera unit is an extra truck spare and requires explicit IT checkout",
+      "steps": [
+        "Prepare one normal Spotter job unit",
+        "Add an extra Spotter through add_it_truck_spare_unit",
+        "Complete checks/evidence",
+        "Attempt release before spare checkout",
+        "Check out spare",
+        "Release"
+      ],
+      "expected": [
+        "Release is blocked until IT checks out every truck spare",
+        "Normal job manifest count remains separate from BACKUP count",
+        "Release succeeds after checkout"
+      ]
+    },
+    {
+      "id": "MONDAY-PICKUP-ORDER-01",
+      "area": "Owner review · Pickup",
+      "role": "owner",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Pickup starts with Service, then IT Intake",
+      "steps": [
+        "Attempt IT-first Pickup assignment",
+        "Assign Service first",
+        "Then assign IT Intake"
+      ],
+      "expected": [
+        "IT-first Pickup is rejected",
+        "Service-first then IT assignment succeeds"
+      ]
+    },
+    {
+      "id": "MONDAY-ASSIGNMENT-SAFETY-01",
+      "area": "Owner review · People",
+      "role": "owner",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Inactive technicians cannot receive new work",
+      "steps": [
+        "Try assigning an inactive Service profile"
+      ],
+      "expected": [
+        "Assignment is rejected with an active-technician validation error"
+      ]
+    },
+    {
+      "id": "MONDAY-UNIT-INTEGRITY-01",
+      "area": "Owner review · Unit identity",
+      "role": "it",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Same unit tag cannot be active on two open prep records",
+      "steps": [
+        "Save a unit tag on one active prep",
+        "Try the same tag on a second active prep"
+      ],
+      "expected": [
+        "Second save is rejected as already assigned to another active prep"
+      ]
+    },
+    {
+      "id": "MONDAY-VISION-CONFIRM-01",
+      "area": "Owner review · Vision actions",
+      "role": "owner",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Vision prepares auditable changes without mutating until confirmation",
+      "steps": [
+        "Prepare a reassignment from Abel Cervantes to Josh Mireles",
+        "Verify assignment remains Abel after prepare",
+        "Execute confirmed action",
+        "Verify assignment changes to Josh",
+        "Prepare one-click completion"
+      ],
+      "expected": [
+        "Prepare does not mutate live work",
+        "Execute changes the assignment only after confirmation",
+        "One-click completion is blocked into guided workflow"
+      ]
+    },
+    {
+      "id": "MONDAY-TEST-HELPER-PARITY-01",
+      "area": "Owner review · Test Mode parity",
+      "role": "owner",
+      "mode": "db rollback",
+      "destructive": false,
+      "scenario": "Owner test-prep helper follows current Solar Spotter rules",
+      "steps": [
+        "Create a rollback Solar Spotter test prep"
+      ],
+      "expected": [
+        "Solar Spotter required_battery_count is 0 on IT side",
+        "Test helper accepts current support-equipment types without reintroducing old battery rules"
+      ]
     }
   ],
-  "last_release_qa_note": "Monday-readiness hardening complete: anonymous privileged RPC exposure is zero, owner-health v1 is live, Company Brain coverage/gap reporting is visible, Edge v14 exposes get_system_health with AI-layer coverage, Vision v23 / SW88 / migration 80."
+  "last_release_qa_note": "Monday owner torture-test matrix added after live rollback execution. Spotter Delivery happy path, evidence gates, Ranger sequential gates, BACKUP truck-spare checkout, Pickup order, inactive-assignee protection, duplicate unit protection, and Vision confirmation safety all passed. Legacy Owner test-prep Solar Spotter battery rule corrected to 0 IT-side batteries. Migration 81."
 }
