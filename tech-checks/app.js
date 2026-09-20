@@ -12,7 +12,6 @@ const BATTERY = {
   Helios: { per: 1, label: 'charged Helios battery box' },
   'Recon 2': { dynamic: true, label: 'Recon batteries' },
   'Solar Stand': { per: 0, label: 'solar stand batteries — checked by Service' },
-  'Solar Pole': { per: 0, label: 'solar pole batteries — checked by Service' },
 };
 const TRUCK = [
   'Fuel level sufficient for today’s route',
@@ -42,7 +41,6 @@ const INVENTORY_TYPES = [
   'Recon II',
   '110V Stand',
   'Solar Stand',
-  'Solar Pole',
   'Pole',
   'Other',
 ];
@@ -696,7 +694,7 @@ async function createPrep() {
   await refreshData();
 }
 function deliveryReady(item) {
-  if (['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item?.equipment_type)) return true;
+  if (['Solar Stand', '110V Stand', 'Pole'].includes(item?.equipment_type)) return true;
   return (
     !['DELIVERY','BACKUP'].includes(item.purpose) ||
     (item.delivery_sim_ok &&
@@ -715,7 +713,7 @@ function checked(v) {
   return v ? ' checked' : '';
 }
 function deliveryChecklist(item) {
-  if (!['DELIVERY','BACKUP'].includes(item.purpose) || ['Solar Stand', 'Solar Pole', '110V Stand', 'Pole'].includes(item.equipment_type)) return '';
+  if (!['DELIVERY','BACKUP'].includes(item.purpose) || ['Solar Stand', '110V Stand', 'Pole'].includes(item.equipment_type)) return '';
   const delivery=item.purpose==='DELIVERY';
   return (
     '<div class="deliveryChecks"><div class="subhead">' + (delivery ? 'DELIVERY Readiness' : 'BACKUP Hardware Readiness') + '</div><div class="small">' +
