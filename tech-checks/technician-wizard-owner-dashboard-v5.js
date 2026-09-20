@@ -5047,7 +5047,7 @@ function ownerAIParseEquipment(text) {
   for (const row of rows) {
     let scan = source;
     if (row.label === "Spotter") scan = scan.replace(/solar spotters?/g, "");
-    if (row.label === "Pole") scan = scan.replace(/solar poles?/g, "");
+    if (row.label === "Pole") scan = scan.replace(/solar\s+poles?/g, "");
     const found = ownerAIQtyNearAlias(scan,row.aliases);
     if (found.qty != null && found.qty > 0) manifest.push({category:row.category,label:row.label,qty:found.qty});
     else if (found.mentioned) mentionedWithoutQty.push(row.label);
