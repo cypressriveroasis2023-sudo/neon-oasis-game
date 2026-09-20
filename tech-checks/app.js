@@ -283,9 +283,9 @@ async function enterApp(session) {
   if (sync) sync.textContent = 'Opening Tech Check…';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (sync) sync.textContent = 'Loading live work…';
-    scheduleIdle(() => loadDeferredModules(), 240);
-    scheduleIdle(() => refreshData({ skipProfile:true, initial:true }).catch(error => console.warn('Initial Tech Check refresh failed', error)), 320);
-    scheduleIdle(() => setupRealtime(), 900);
+    refreshData({ skipProfile:true, initial:true }).catch(error => console.warn('Initial Tech Check refresh failed', error));
+    scheduleIdle(() => loadDeferredModules(), 700);
+    scheduleIdle(() => setupRealtime(), 1200);
   }));
 }
 function showForcedPasswordChange(profile) {
