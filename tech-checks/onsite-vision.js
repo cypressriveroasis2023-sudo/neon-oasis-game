@@ -1180,7 +1180,25 @@ if(window.ResizeObserver){
   const composer=document.querySelector('.vision-composer-wrap');
   if(composer)new ResizeObserver(()=>syncVisualViewport()).observe(composer);
 }
-function closeDrawers(){$('visionApp')?.classList.remove('sidebar-open','order-open');}
+function closeDrawers(){
+  const app=$('visionApp');
+  app?.classList.remove('sidebar-open','order-open');
+  const panel=$('visionOrderPanel');
+  const shade=$('visionShade');
+  panel?.setAttribute('aria-hidden','true');
+  shade?.setAttribute('aria-hidden','true');
+  if(document.activeElement && (panel?.contains(document.activeElement)||$('visionSidebar')?.contains(document.activeElement))) document.activeElement.blur();
+}
+function openOrderDrawer(){
+  closeDrawers();
+  const app=$('visionApp'),panel=$('visionOrderPanel'),shade=$('visionShade');
+  app?.classList.add('order-open');
+  panel?.setAttribute('aria-hidden','false');
+  shade?.setAttribute('aria-hidden','false');
+}
+function toggleOrderDrawer(){
+  if($('visionApp')?.classList.contains('order-open')) closeDrawers(); else openOrderDrawer();
+}
 function voice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addMessage('assistant','', '<div class="vision-system-note">Use the iPhone keyboard microphone for voice dictation on this device.</div>');renderThread();return;}
   const r=new SR();r.lang='en-US';r.interimResults=false;r.maxAlternatives=1;r.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';if(text)send(text);};r.start();
@@ -1213,10 +1231,12 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#visionKnowledgeRetire')){
     try{await saveKnowledgeEntry('retired');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not retire knowledge.';}}return;
   }
-  if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){$('visionApp').classList.toggle('sidebar-open');return;}if(e.target.closest('#visionOrderButton')){$('visionApp').classList.toggle('order-open');return;}if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
+  if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){closeDrawers();$('visionApp').classList.add('sidebar-open');return;}if(e.target.closest('#visionOrderButton'))return toggleOrderDrawer();if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
   if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();state.agentStatus='unknown';await loadData();await checkAgentStatus();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
+// iOS/PWA: pointer-up fallback makes Close/backdrop reliable even when a scroll gesture suppresses click.
+['visionOrderClose','visionShade'].forEach(id=>$(id)?.addEventListener('pointerup',e=>{e.preventDefault();e.stopPropagation();closeDrawers();},{passive:false}));
 document.addEventListener('input',e=>{if(e.target?.id==='visionPrompt')grow(e.target);});
 document.addEventListener('change',e=>{if(e.target?.id==='visionKnowledgeFilter')loadKnowledgeEntries();});
 document.addEventListener('focusin',e=>{
