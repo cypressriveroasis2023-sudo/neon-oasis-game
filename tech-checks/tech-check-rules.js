@@ -222,7 +222,10 @@
     const unit=identity(item,unitNo);
     const steps=[{
       kind:'tag',field:'unit_tag',
-      label:isSupport(type)?'Enter the exact tag / ID for '+type:'Enter the exact unit tag for '+type
+      optional:type==='110V Stand',
+      label:type==='110V Stand'
+        ? 'Enter the 110V Stand tag / ID if it has one. Leave blank if this stand has no tag.'
+        : (isSupport(type)?'Enter the exact tag / ID for '+type:'Enter the exact unit tag for '+type)
     }];
 
     if(isSolarSupport(type)){
@@ -464,7 +467,7 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v7',
+    version:'rules-v8',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
