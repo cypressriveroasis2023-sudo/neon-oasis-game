@@ -665,7 +665,7 @@ function draftEquipmentParse(text){
   for(const def of defs){
     let source=lower;
     if(def.label==='Spotter')source=source.replace(/solar spotters?/g,'');
-    if(def.label==='Pole')source=source.replace(/solar poles?/g,'');
+    if(def.label==='Pole')source=source.replace(/solar\s+poles?/g,'');
     let qty=null,mentioned=false;
     for(const alias of def.aliases){
       const a=reEsc(alias);
