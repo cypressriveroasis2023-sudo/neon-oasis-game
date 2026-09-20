@@ -986,12 +986,17 @@ async function systemHealthHtml(){
     '<div><span>MANAGED APPROVALS</span><b>'+esc(vision.approved_knowledge_entries||0)+'</b></div>'+
     '<div><span>MANAGED DRAFTS</span><b>'+esc(vision.draft_knowledge_entries||0)+'</b></div>'+
   '</div></div>';
+  const coverage=agent.knowledge_coverage||{};
   html+='<div class="vision-context-block"><h3>AI operating layer</h3><div class="vision-context-grid">'+
     '<div><span>KNOWLEDGE BASELINE</span><b>'+esc(agent.knowledge_version||'unknown')+'</b></div>'+
     '<div><span>SHARED RULES</span><b>'+esc(agent.shared_rules_version||'unknown')+'</b></div>'+
     '<div><span>WORKFLOW ENGINE</span><b>'+esc(agent.workflow_engine_version||'unknown')+'</b></div>'+
     '<div><span>AGENT VERSION</span><b>'+esc(agent.agent_version||'unknown')+'</b></div>'+
-  '</div></div>';
+    '<div><span>EQUIPMENT DEFINITIONS</span><b>'+esc(coverage.equipment_total??'unknown')+'</b></div>'+
+    '<div><span>KNOWN GAP PRODUCTS</span><b>'+esc(coverage.known_gap_product_count??'unknown')+'</b></div>'+
+  '</div>'+
+  (Array.isArray(coverage.known_gap_products)&&coverage.known_gap_products.length?'<div class="vision-system-note"><b>Known documentation gaps:</b> '+coverage.known_gap_products.map(esc).join(', ')+'. Vision is required to return MISSING INFORMATION rather than invent these procedures.</div>':'')+
+  '</div>';
   html+='<div class="vision-system-note">Generated from the live Tech Check database. Managed knowledge counts are extra Owner-approved entries; the verified Company Knowledge baseline is shown separately above. Normal workflow review items are separated from hard integrity failures.</div>';
   return html;
 }
