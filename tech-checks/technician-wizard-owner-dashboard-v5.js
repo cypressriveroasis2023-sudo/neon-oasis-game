@@ -2301,13 +2301,19 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
   const item = stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
   const identity = item ? itItemIdentity(item, unitNo) : `Unit ${unitNo}`;
   const tag = String(item?.unit_tag || '').trim();
-  const instruction = unitNo ? (stage === 'it' && tag ? `Take exactly 1 clear photo of ${identity}. Make sure unit tag ${tag} is clearly visible and readable in the photo.` : `Take exactly 1 clear photo for Unit ${unitNo}.`) : stage === 'service' ? `IT supplied ${required} photo${required === 1 ? '' : 's'}. Take exactly ${required} Service receipt photo${required === 1 ? '' : 's'} so the photo counts match.` : 'Photograph exactly what is leaving the shop.';
+  const instruction = unitNo
+    ? (stage === 'it' && tag
+      ? `Take exactly 1 clear photo of ${identity}. Make sure unit tag ${tag} is clearly visible and readable in the photo.`
+      : (stage === 'it' && item?.equipment_type === '110V Stand'
+        ? 'Take exactly 1 clear photo of the 110V Stand. If it has a tag, include it in the photo. If it has no tag, the stand photo is enough.'
+        : `Take exactly 1 clear photo for Unit ${unitNo}.`))
+    : stage === 'service' ? `IT supplied ${required} photo${required === 1 ? '' : 's'}. Take exactly ${required} Service receipt photo${required === 1 ? '' : 's'} so the photo counts match.` : 'Photograph exactly what is leaving the shop.';
   const complete = photos.length === required;
   const input = complete && !unitNo ? '' : `<input class='wl-file top8' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}><button class='mini full top8' data-wl-upload='${stage}'>${unitNo && photos.length ? 'Replace Unit Photo' : 'Save Photo(s)'}</button>`;
   const aiScan = stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? itemTagScan(item) : null;
   const aiScanHtml = aiScan ? tagScanStatusHtml(aiScan,tag) : (stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? (item?.photo_tag_match_ok ? `<div class='wl-ai-scan-live clear top8'><span class='wl-ai-scan-check'>✓</span><div><b>Clear to continue</b><span>The technician already verified unit tag ${esc(tag)}. No separate OnSite Vision scan result was recorded for this photo.</span></div></div>` : `<div class='wl-ai-scan-live pending top8'><span class='wl-ai-scan-mark'>…</span><div><b>OnSite Vision scan not recorded</b><span>Retake/save the unit photo to run the live tag check.</span></div></div>`) : '');
   const aiMismatch = aiScan?.status === 'mismatch';
-  const tagConfirm = stage === 'it' && unitNo && photos.length ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
+  const tagConfirm = stage === 'it' && unitNo && photos.length && tag ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
   return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'><b>${stage === 'it' && unitNo ? `${esc(identity)} Photo` : unitNo ? `Unit ${unitNo} Photo` : 'Photo Proof'}</b><div class='wl-note'>${instruction}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div><div class='${complete ? 'ok' : 'warn'} top8'><b>${complete ? '✓' : ''} ${photos.length} of ${required} photo${required === 1 ? '' : 's'} saved</b></div>` : `<div class='warn top8'>0 of ${required} photos saved.</div>`}${tagConfirm}${input}</div>`;
 }
 function signatureStamp(name,at){
@@ -2347,7 +2353,9 @@ function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; re
 function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
 function itItemIdentity(item, unitNo) {
   const tag = String(item?.unit_tag || '').trim();
-  return tag ? `${item.equipment_type} ${tag}` : `Unit ${unitNo}`;
+  if (tag) return `${item.equipment_type} ${tag}`;
+  if (item?.equipment_type === '110V Stand') return '110V Stand · no tag';
+  return `Unit ${unitNo}`;
 }
 function isHeliosDeploy(item){
   return window.TechCheckRules?.isHeliosDeploy ? window.TechCheckRules.isHeliosDeploy(item) : (item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose));
@@ -2481,7 +2489,10 @@ function itUnitReady(item) {
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
 function itBoolAnswered(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) || item[field] === true || itAnswered.has(key); }
-function itPhotoTagReady(item) { return item?.photo_tag_match_ok === true; }
+function itPhotoTagReady(item) {
+  if (item?.equipment_type === '110V Stand' && !String(item?.unit_tag || '').trim()) return true;
+  return item?.photo_tag_match_ok === true;
+}
 async function configureCurrentItItem() {
   const item = currentItItem();
   if (!itTypeChoice || !itPurposeChoice) return false;
@@ -2571,7 +2582,7 @@ async function persistCurrentItItem() {
   return true;
 }
 function itCheckStepHtml(item, step, index, total, unitNo) {
-  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='Exact unit tag'></div>`;
+  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='${step.optional ? 'Enter tag if present' : 'Exact unit tag'}'>${step.optional ? "<div class='wl-note top8'>No tag is valid for a 110V Stand. Leave this blank if the stand does not have one.</div>" : ''}</div>`;
   if (step.kind === 'number') { const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1); const value=item[step.field] ?? (step.field==='battery_count' ? item.required_battery_count : min); return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>Required minimum: ${min}</div></div>`; }
   const answered = itBoolAnswered(item, step.field);
   const value = itBoolValue(item, step.field);
@@ -2583,7 +2594,7 @@ function itUnitIssues(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo);
   const issues = [];
   steps.forEach((step, index) => {
-    const failed = step.kind === 'number' ? Number(item[step.field] || 0) < Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1) : step.kind === 'tag' ? !String(item[step.field] || '').trim() : itBoolValue(item, step.field) !== true;
+    const failed = step.kind === 'number' ? Number(item[step.field] || 0) < Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1) : step.kind === 'tag' ? (!step.optional && !String(item[step.field] || '').trim()) : itBoolValue(item, step.field) !== true;
     if (failed) issues.push({ phase: 'checks', index, label: step.label });
   });
   if (!unitEvidence(evidence, unitNo, 'photo').length) issues.push({ phase: 'photo', index: 0, label: 'Required equipment photo is missing.' });
@@ -2601,7 +2612,8 @@ function itUnitReviewHtml(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo).filter(s => s.kind === 'bool');
   const passed = steps.filter(s => itBoolValue(item, s.field) === true).length;
   const identity = itItemIdentity(item, unitNo);
-  return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${item.equipment_type==='Recon 2'? `<div><b>Recon II cameras:</b> ${Number(item.recon_camera_count||0)}</div>` : ''}${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} (minimum ${Number(item.required_battery_count || 0)})</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed'}</div></div>`;
+  const tagText = item.equipment_type === '110V Stand' && !String(item.unit_tag || '').trim() ? 'No tag on this stand' : (itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed');
+  return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${item.equipment_type==='Recon 2'? `<div><b>Recon II cameras:</b> ${Number(item.recon_camera_count||0)}</div>` : ''}${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} (minimum ${Number(item.required_battery_count || 0)})</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${tagText}</div></div>`;
 }
 const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
   { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
@@ -3807,7 +3819,7 @@ document.addEventListener('click', async e => {
       let needsSave = false;
       if (step.kind === 'tag') {
         const value = document.getElementById('wlItUnitValue')?.value.trim() || '';
-        if (!value) return alert('Enter the exact unit tag first.');
+        if (!value && !step.optional) return alert('Enter the exact unit tag first.');
         item.unit_tag = value; needsSave = true;
       } else if (step.kind === 'number') {
         const value = Number(document.getElementById('wlItUnitValue')?.value || 0);
