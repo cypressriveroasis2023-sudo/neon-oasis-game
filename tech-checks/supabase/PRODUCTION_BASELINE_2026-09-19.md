@@ -649,8 +649,8 @@ QA discovery/fix:
 - The test helper now also accepts Solar Pole and Pole in its equipment type list.
 - Live migration: `align_owner_test_prep_with_camera_rules`.
 - Repo migration file: `20260920_align_owner_test_prep_with_camera_rules.sql`.
-- Database migration count: 81.
-- QA test definitions: 120.
+- Database migration count: 82.
+- QA test definitions: 121.
 
 Current Monday-review stack after this pass:
 - technician: `release-qa-v124`
@@ -661,3 +661,20 @@ Current Monday-review stack after this pass:
 - Workflow Engine: `workflow-engine-v5`
 - Edge agent: `onsite-vision-agent-v14`
 - service worker: `tech-check-field-shell-v88`
+
+
+### Helios Owner final-close regression fix
+
+Monday torture testing exposed a production-only sequencing bug in the generic solar close trigger. A normal Helios flow has Service perform the solar/yard checkout and evidence, then the Owner performs final verification. The generic close trigger was incorrectly looking for a solar checkout and solar evidence created by the user performing the close. During Owner final verification, that meant it searched for an Owner-owned solar checkout instead of the completed Service Tech checkout.
+
+Fix:
+- `enforce_service_solar_check_before_close()` now distinguishes Owner final verification from Service close.
+- For Service close, it still requires the current Service Tech's completed solar checkout.
+- For Owner final verification, it accepts the completed Service solar checkout attached to the prep.
+- Solar evidence validation now follows the Service Tech recorded on that checkout rather than `auth.uid()` when the Owner performs final verification.
+- Owner still cannot final-verify Helios before Service submits the field installation.
+- After complete Service field installation + MPPT/battery proof, Owner final verification closes successfully.
+- Live migration: `owner_helios_service_solar_close_fix`.
+- Repo migration file: `20260920_owner_helios_service_solar_close_fix.sql`.
+- Database migration count: 82.
+- QA test definitions: 121.
