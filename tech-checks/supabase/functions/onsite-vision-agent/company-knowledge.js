@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v7
+ * Version: company-knowledge-v8
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v7",
+  "version": "company-knowledge-v8",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -35,7 +35,6 @@
     "solar spotter": "Solar Spotter",
     "solarspotter": "Solar Spotter",
     "solar stand": "Solar Stand",
-    "solar pole": "Solar Pole",
     "110v stand": "110V Stand",
     "110 stand": "110V Stand",
     "sniper": "Sniper",
@@ -484,39 +483,6 @@
         "save_my_service_solar_check_v4"
       ]
     },
-    "Solar Pole": {
-      "category": "stand",
-      "documented": "partial",
-      "required_it_batteries": 0,
-      "purposes": [
-        "DELIVERY",
-        "SWAP"
-      ],
-      "it_checks": [
-        "exact pole tag",
-        "listed on MHelpDesk ticket",
-        "physically ready for Service"
-      ],
-      "unknowns": [
-        "Detailed product-specific field installation SOP",
-        "Purpose parity: shared rules document DELIVERY/SWAP, while current add/configure RPCs do not explicitly reject BACKUP",
-        "Standalone Solar Pole Service-close enforcement: service_solar_context_v2 can surface solar checkout, but enforce_service_solar_check_before_close only hard-gates Solar Spotter, Ranger, and Helios"
-      ],
-      "teaching_needed": [
-        "Confirm whether Solar Pole BACKUP should be allowed or explicitly prohibited so shared rules and server behavior can be brought into parity.",
-        "Confirm the intended Service checkout/close requirements for a standalone Solar Pole delivery before adding product-specific mandatory evidence.",
-        "List every Solar Pole component/accessory that must travel with it.",
-        "Document the Solar Pole Service field-install/removal SOP.",
-        "Document any Solar Pole battery, MPPT, PV/charging, positioning, anchoring, or safety rules that apply.",
-        "Document Solar Pole-specific mandatory photos/signatures.",
-        "Document the approved Solar Pole troubleshooting sequence."
-      ],
-      "sources": [
-        "configure_it_prep_item",
-        "enforce_support_safe_before_release",
-        "service_solar_context_v2"
-      ]
-    },
     "110V Stand": {
       "category": "stand",
       "documented": "partial",
@@ -627,7 +593,6 @@
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
       "Spotter": "Core 4-camera/internal-router/top-antenna/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are model-specific details if needed, reprogramming steps, and troubleshooting.",
       "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
-      "Solar Pole": "Components/accessories, detailed field install/removal, solar/power/safety rules, evidence, troubleshooting, BACKUP-purpose parity, and standalone Service-close behavior still need Owner-approved documentation.",
       "110V Stand": "Components/accessories, SWAP install/removal, electrical checks if applicable, evidence, and troubleshooting still need Owner-approved documentation.",
       "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
