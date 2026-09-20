@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v124",
-  "service_worker": "v87",
+  "service_worker": "v88",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v13, company-knowledge-v7, workflow-engine-v5 and rules-v6"
+        "Agent reports onsite-vision-agent-v14, company-knowledge-v7, workflow-engine-v5 and rules-v6"
       ]
     },
     {
@@ -2104,7 +2104,27 @@
         "Vision offers a System health quick action and deterministic fallback",
         "Edge agent exposes get_system_health"
       ]
+    },
+    {
+      "id": "VISION-KNOWLEDGE-COVERAGE-01",
+      "area": "OnSite Vision · Company Brain coverage",
+      "role": "owner",
+      "mode": "source+edge",
+      "destructive": false,
+      "scenario": "System Health shows the loaded Company Knowledge baseline and known product gaps instead of implying managed entries are the whole knowledge base",
+      "steps": [
+        "Open System Health",
+        "Inspect AI operating layer",
+        "Inspect known gap products"
+      ],
+      "expected": [
+        "Knowledge baseline version is displayed",
+        "Shared rules, workflow engine, and agent versions are displayed",
+        "Equipment definition count is displayed",
+        "Known gap product count/list is displayed",
+        "Vision explicitly states it will return MISSING INFORMATION rather than invent undocumented procedures"
+      ]
     }
   ],
-  "last_release_qa_note": "Final pre-owner-review hardening: Vision System Health now reports live DB integrity/security/workflow review items, exposes baseline versions so managed-knowledge counts are not misleading, anonymous SECURITY DEFINER execution remains zero, migration 80 is recorded, Edge v13 active, Vision v22 / SW87."
+  "last_release_qa_note": "Monday-readiness hardening complete: anonymous privileged RPC exposure is zero, owner-health v1 is live, Company Brain coverage/gap reporting is visible, Edge v14 exposes get_system_health with AI-layer coverage, Vision v23 / SW88 / migration 80."
 }
