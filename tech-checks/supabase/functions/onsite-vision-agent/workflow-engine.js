@@ -80,6 +80,10 @@
         delivery_only_checks:def.delivery_only_checks||[],
         service_yard_checks:def.service_yard_checks||[],
         service_field_checks:def.service_field_checks||[],
+        required_condition_checks:def.required_condition_checks||[],
+        transport_and_field_install:def.transport_and_field_install||[],
+        field_evidence:def.field_evidence||[],
+        pickup_and_return:def.pickup_and_return||[],
         automatic_service_requirements:def.automatic_service_requirements||null,
         owner_final_verification:Boolean(def.owner_final_verification),
         swap_rules:def.swap_rules||[],
@@ -162,7 +166,7 @@
     } else if(key==='equipment_manifest' && type==='delivery'){
       q.context='Vision will derive product-specific IT and Service requirements after you name the equipment.';
     } else if(key==='assignment' && type==='pickup'){
-      q.context='Pickup starts with Service; IT Intake follows after the returned equipment reaches the shop.';
+      q.context='Pickup starts with Service. A 110V Stand returns directly to Shop Inventory from Service; other returned equipment follows IT Intake.';
     }
     return q;
   }
@@ -176,7 +180,16 @@
 
     if(norm(d.ticket_no) && !/^\d{3,}$/.test(norm(d.ticket_no))) warnings.push('MHelpDesk reference does not look like the usual numeric ticket format.');
     if(type!=='service' && !rows.length) errors.push('Equipment is required for this workflow.');
-    if(type==='pickup' && d.role==='it') errors.push('Pickup must start with Service; IT Intake follows the Service return.');
+    const direct110Pickup=type==='pickup' && rows.length>0 && rows.every(row=>row.label==='110V Stand');
+    if(type==='pickup' && d.role==='it') errors.push(direct110Pickup
+      ? '110V Stand pickup is Service-only; Service returns the stand directly to Shop Inventory and IT Intake is not required.'
+      : 'Pickup must start with Service; IT Intake follows the Service return.');
+    if(direct110Pickup) derived.push({
+      rule:'110V Stand pickup',
+      flow:'Service → trailer → Shop Inventory',
+      it_intake_required:false,
+      tag_optional:true
+    });
 
     for(const row of rows){
       const def=getEquipmentDefinition(row.label);
@@ -209,6 +222,28 @@
     return {valid:missing.length===0 && errors.length===0,missing,errors,warnings,derived};
   }
 
+  function jobEquipmentTypes(job){
+    const j=job||{};
+    const types=new Set();
+    const prep=j.prep||{};
+    const assignments=Array.isArray(j.assignments)?j.assignments:[];
+    const items=Array.isArray(j.items)?j.items:(Array.isArray(prep.prep_items)?prep.prep_items:[]);
+    for(const a of assignments){
+      for(const row of manifestRows({equipment_manifest:a?.equipment_manifest||[]})) if(row.label) types.add(row.label);
+    }
+    for(const row of manifestRows({equipment_manifest:prep?.equipment_manifest||[]})) if(row.label) types.add(row.label);
+    for(const item of items){
+      const name=normalizeEquipmentType(item?.equipment_type);
+      if(name) types.add(name);
+    }
+    return [...types];
+  }
+
+  function isDirect110VPickup(job){
+    const types=jobEquipmentTypes(job);
+    return types.length>0 && types.every(type=>type==='110V Stand');
+  }
+
   function getWorkflowBlockers(job){
     const j=job||{},blockers=[];
     const type=normalizeWorkType(j.work_type||j.prep?.work_type);
@@ -222,7 +257,12 @@
 
     if(!norm(j.ticket_no||assignments[0]?.ticket_no||prep.ticket_no)) blockers.push({code:'MISSING_TICKET',message:'MHelpDesk reference is missing.',certainty:'VERIFIED DATABASE FACT'});
     if(type==='pickup'){
+      const direct110=isDirect110VPickup(j);
       if(!svc && !returns.length) blockers.push({code:'PICKUP_NEEDS_SERVICE',message:'Pickup must start with Service.',certainty:'COMPANY RULE'});
+      if(direct110){
+        if(it) blockers.push({code:'IT_NOT_REQUIRED_110V_STAND',message:'110V Stand pickup does not use IT Intake. Service returns the stand directly to Shop Inventory.',certainty:'COMPANY RULE'});
+        return blockers;
+      }
       if(it && !returns.some(r=>r.status==='waiting_it')) blockers.push({code:'IT_WAITING_RETURN',message:'IT Intake must wait until Service returns the equipment to the shop.',certainty:'COMPANY RULE'});
       return blockers;
     }
@@ -324,6 +364,12 @@
     const blockers=getWorkflowBlockers(j);
 
     if(type==='pickup'){
+      const direct110=isDirect110VPickup(j);
+      if(direct110){
+        const returned110=returns.filter(r=>r.equipment_type==='110V Stand');
+        if(!returned110.some(r=>r.status==='completed')) return {stage:'service_pickup',next:'Service puts the 110V Stand on the trailer, brings it back to the shop, and adds it directly back to Shop Inventory. A physical tag is optional. IT Intake is not required.'};
+        return {stage:'complete',next:'The 110V Stand is back in Shop Inventory. IT Intake is not required.'};
+      }
       if(!returns.length) return {stage:'service_pickup',next:'Service completes the field pickup and documents the returned equipment.'};
       if(returns.some(r=>r.status==='waiting_it')) return {stage:'it_intake',next:'IT receives the returned equipment and completes IT Intake.'};
       if(returns.some(r=>r.status==='pending_mhelp_inventory')) return {stage:'manager_inventory',next:'Owner/Manager confirms the MHelpDesk inventory step.'};
@@ -362,7 +408,7 @@
   }
 
   root.OnSiteVisionWorkflowEngine=Object.freeze({
-    version:'workflow-engine-v5',
+    version:'workflow-engine-v6',
     normalizeWorkType,
     normalizeEquipmentType,
     getEquipmentDefinition,
