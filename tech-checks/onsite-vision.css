@@ -542,3 +542,14 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
  .vision-app:not(.order-open) .vision-order-panel{pointer-events:none!important;visibility:hidden!important}
  .vision-app:not(.sidebar-open):not(.order-open) .vision-shade{display:none!important;pointer-events:none!important}
 }
+
+/* Stable compact iPhone viewport v30 */
+@media(max-width:560px){
+  .vision-thread{padding-left:10px!important;padding-right:10px!important}
+  .vision-turn{margin-bottom:18px}
+  .vision-turn.user .vision-bubble{font-size:13px;max-width:84%}
+  .vision-turn.assistant .vision-bubble{font-size:12px}
+  .vision-job-card,.vision-context-block,.vision-action-card{border-radius:11px}
+  .vision-composer textarea{font-size:16px!important;transform:none!important}
+  input,select,textarea{font-size:16px}
+}
