@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v11
+ * Version: company-knowledge-v12
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v11",
+  "version": "company-knowledge-v12",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -524,8 +524,13 @@
         "If the stand has a tag, include the tag in the photo when practical.",
         "If the stand has no tag, record it as untagged; the lack of a tag does not block completion by itself."
       ],
+      "pickup_and_return": [
+        "For pickup/removal, put the 110V Stand on the trailer and transport it back to the shop.",
+        "The Service Tech adds the returned 110V Stand directly back to Shop Inventory.",
+        "110V Stand pickup does not require IT Intake.",
+        "A returned 110V Stand may have a tag or may legitimately have no tag; no tag does not block the Service-to-Shop return."
+      ],
       "unknowns": [
-        "Exact product-specific removal SOP",
         "Exact rebar specification/size and exact concrete nail specification/size",
         "Any additional company-required electrical checks beyond the documented power arrangement",
         "Whether any additional 110V Stand-specific signature is required beyond the existing workflow",
@@ -533,7 +538,6 @@
         "Whether DELIVERY and/or BACKUP are allowed purposes in addition to the currently documented SWAP purpose"
       ],
       "teaching_needed": [
-        "Document the exact 110V Stand removal SOP.",
         "Document any additional company-required power-source, cord, outlet, GFCI, or electrical checks, if any.",
         "Confirm whether any additional 110V Stand-specific signature is required beyond the existing workflow.",
         "Document the approved 110V Stand troubleshooting sequence.",
@@ -629,7 +633,7 @@
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
       "Spotter": "Core 4-camera/internal-router/top-antenna/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are model-specific details if needed, reprogramming steps, and troubleshooting.",
       "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
-      "110V Stand": "Owner-documented: passive 0-battery stand; compatible with Sniper, Spotter, and Ranger; Helios excluded; Sniper/Spotter use 110V power; Ranger uses exactly 1 solar panel mounted on the stand to power the Ranger; inspect pole straightness and brick fascia damage; transport by trailer; dirt/grass installation requires rebar on all 4 legs plus 4 sandbags; concrete installation uses 4 nails in the stand legs; final evidence is a clear stand photo, with the tag shown if present, while an untagged stand is valid and does not block completion. Remaining gaps are removal SOP, exact anchor hardware specifications, any additional electrical checks, any extra product-specific signature requirement, troubleshooting, and purpose parity beyond SWAP.",
+      "110V Stand": "Owner-documented: passive 0-battery stand; compatible with Sniper, Spotter, and Ranger; Helios excluded; Sniper/Spotter use 110V power; Ranger uses exactly 1 solar panel mounted on the stand to power the Ranger; inspect pole straightness and brick fascia damage; transport by trailer; dirt/grass installation requires rebar on all 4 legs plus 4 sandbags; concrete installation uses 4 nails in the stand legs; final evidence is a clear stand photo, with the tag shown if present, while an untagged stand is valid; pickup/removal is Service loading the stand on the trailer, bringing it back to the shop, and adding it directly back to Shop Inventory without IT Intake, whether tagged or untagged. Remaining gaps are exact anchor hardware specifications, any additional electrical checks, any extra product-specific signature requirement, troubleshooting, and purpose parity beyond SWAP.",
       "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
     "truck_spares": [
