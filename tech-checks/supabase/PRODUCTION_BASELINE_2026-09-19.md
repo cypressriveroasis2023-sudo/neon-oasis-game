@@ -703,12 +703,12 @@ Verified rollback tests:
 Current release after retirement:
 - technician: `release-qa-v125`
 - loader: `startup-fast-v39`
-- OnSite Vision workspace: `vision-workspace-v24`
+- OnSite Vision workspace: `vision-workspace-v25`
 - shared rules: `rules-v7`
 - Company Knowledge: `company-knowledge-v8`
 - Workflow Engine: `workflow-engine-v5`
 - Edge agent: `onsite-vision-agent-v15` ACTIVE with JWT verification
-- service worker: `tech-check-field-shell-v89`
+- service worker: `tech-check-field-shell-v90`
 - database migrations: 83
 - QA test definitions: 122
 - Phase 7 known-gap products after retirement: Sniper, Spotter, Recon II, 110V Stand, Pole.
