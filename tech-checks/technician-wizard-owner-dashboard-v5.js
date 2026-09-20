@@ -1724,7 +1724,7 @@ function ticketPartsInputsHtml(prefix='wlPart', data={}) {
   return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
 }
 const OWNER_DEVICE_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
-const OWNER_STAND_TYPES = window.TechCheckRules?.standTypes || ['110V Stand','Solar Stand','Solar Pole','Pole'];
+const OWNER_STAND_TYPES = window.TechCheckRules?.standTypes || ['110V Stand','Solar Stand','Pole'];
 function equipmentDisplayLabel(label) { return label === 'Recon 2' ? 'Recon II' : label; }
 function normalizedEquipmentManifest(raw) {
   if (window.TechCheckRules?.normalizeManifest) return window.TechCheckRules.normalizeManifest(raw);
@@ -1813,7 +1813,7 @@ function ownerEquipmentQtyGrid(category) {
   }).join('');
 }
 function ownerEquipmentManifestInputsHtml() {
-  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STANDS / SOLAR STANDS — Count + MHelpDesk Tag / Unit #</div><div class='small'>Use this for stands, solar stands, poles, or solar poles being picked up, delivered, or swapped. Enter the count below and the exact tag / unit numbers from MHelpDesk here.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
+  return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose the unit types and quantities that match the MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('device')}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STANDS / SOLAR STANDS — Count + MHelpDesk Tag / Unit #</div><div class='small'>Use this for stands, solar stands, or poles being picked up, delivered, or swapped. Enter the count below and the exact tag / unit numbers from MHelpDesk here.</div><div class='wl-owner-equipment-grid top8'>${ownerEquipmentQtyGrid('stand')}</div></div></div>`;
 }
 function readOwnerEquipmentManifest() {
   return [...document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]')].map(input => ({ category: input.dataset.category || 'other', label: input.dataset.label || '', qty: cleanPartQty(input.value) })).filter(row => row.label && row.qty > 0);
@@ -2147,7 +2147,7 @@ async function optimizeEvidencePhoto(file) {
 }
 let tagScannerModulePromise=null;
 function shouldScanUnitTag(type) {
-  return ['Helios','Ranger','Solar Spotter','Solar Stand','Solar Pole'].includes(String(type||''));
+  return ['Helios','Ranger','Solar Spotter','Solar Stand'].includes(String(type||''));
 }
 function normalizeScannedTag(value) {
   return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -2336,8 +2336,8 @@ function itSummaryHtml(forms, evidence) {
   return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b>${activeItPrep.site ? `<div>Ticket Name / Site: <b>${esc(activeItPrep.site)}</b></div>` : ''}<div>Total units checked: <b>${forms.length}</b></div></div>${units}<div class='wl-review'><div>📷 <b>${photos.length} photo${photos.length === 1 ? '' : 's'} saved</b></div><div class='small'>Review these unit checks and photo proof. Your final signature comes next.</div></div>`;
 }
 const CAMERA_UNIT_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
-const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','Solar Pole','110V Stand','Pole'];
-function isSolarSupport(type) { return window.TechCheckRules?.isSolarSupport ? window.TechCheckRules.isSolarSupport(type) : ['Solar Stand','Solar Pole'].includes(type); }
+const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','110V Stand','Pole'];
+function isSolarSupport(type) { return window.TechCheckRules?.isSolarSupport ? window.TechCheckRules.isSolarSupport(type) : type==='Solar Stand'; }
 function isSimpleSupport(type) { return window.TechCheckRules?.isSimpleSupport ? window.TechCheckRules.isSimpleSupport(type) : ['110V Stand','Pole'].includes(type); }
 function isSupport(type) { return window.TechCheckRules?.isSupport ? window.TechCheckRules.isSupport(type) : (isSolarSupport(type) || isSimpleSupport(type)); }
 function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
@@ -3220,12 +3220,12 @@ function serviceSolarReady(ctx, check, evidence) {
   return true;
 }
 function serviceSolarDefaultStandTag() {
-  const item=(activeSvcPrep?.prep_items || []).find(row => ['Solar Stand','Solar Pole'].includes(row.equipment_type));
+  const item=(activeSvcPrep?.prep_items || []).find(row => row.equipment_type==='Solar Stand');
   return item?.unit_tag || '';
 }
 function serviceSolarDefaultBatteryCount(ctx=null) {
   if (ctx && Number(ctx.expected_batteries || 0) > 0) return Number(ctx.expected_batteries || 0);
-  return (activeSvcPrep?.prep_items || []).filter(row => ['Solar Stand','Solar Pole','Helios'].includes(row.equipment_type)).reduce((sum,row)=>sum+Number(row.battery_count || 0),0);
+  return (activeSvcPrep?.prep_items || []).filter(row => ['Solar Stand','Helios'].includes(row.equipment_type)).reduce((sum,row)=>sum+Number(row.battery_count || 0),0);
 }
 function serviceSolarExpectedPanels(ctx=null) {
   if (ctx && Number(ctx.expected_solar_panels || 0) > 0) return Number(ctx.expected_solar_panels || 0);
@@ -3282,7 +3282,7 @@ function serviceSolarChecklistHtml(ctx, check, evidence) {
   const panelBlock=expectedPanels>0?`<div class='grid top10'><div><label>Loose Solar Panels Physically In Hand · required ${expectedPanels}</label><input id='wlSvcSolarPanelCount' type='number' min='0' value='${esc(panelDefault)}'></div><div><label>Battery Requirement</label><input value='${esc(batteryPlan.description)}' readonly></div></div><label class='check top8'><input id='wlSvcSolarPanelsVerified' type='checkbox' ${check?.solar_panels_verified?'checked':''}><span>I physically counted and verified the loose solar panel(s).</span></label>`:`<div class='wl-auto-required top8'><b>No loose Helios panel is checked out.</b><div class='small'>The Helios yard tower already has its solar panel. Use that tower for the PV/charging test.</div></div><input id='wlSvcSolarPanelCount' type='hidden' value='0'>`;
   return `<div class='wl-service-solar'><div class='wl-review'><b>Service Solar / Ranger / Helios Pre-Trip</b><div class='small'>Complete this after receiving the IT-prepared equipment and before anything leaves the shop.</div>${autoBits.length?`<div class='wl-auto-service-plan top8'><b>AUTOMATIC SERVICE REQUIREMENTS</b><div class='wl-parts-chips'>${autoBits.join('')}</div></div>`:''}</div>
     <div class='wl-question top10'>
-      ${ctx.need_stand?`<div class='wl-auto-required'><b>${spotters>1?`${spotters} Solar Stands automatically assigned for checkout`:'Solar Stand automatically assigned for checkout'}</b></div><label>Exact Solar Stand / Solar Pole Tag${spotters>1?'s':''}</label>${spotters>1?`<textarea id='wlSvcSolarStandTag' rows='3'>${esc(standTag)}</textarea>`:`<input id='wlSvcSolarStandTag' value='${esc(standTag)}'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified the exact stand(s).</span></label>`:''}
+      ${ctx.need_stand?`<div class='wl-auto-required'><b>${spotters>1?`${spotters} Solar Stands automatically assigned for checkout`:'Solar Stand automatically assigned for checkout'}</b></div><label>Exact Solar Stand Tag${spotters>1?'s':''}</label>${spotters>1?`<textarea id='wlSvcSolarStandTag' rows='3'>${esc(standTag)}</textarea>`:`<input id='wlSvcSolarStandTag' value='${esc(standTag)}'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified the exact stand(s).</span></label>`:''}
       ${batteryChoice}
       <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
       <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>
@@ -3317,7 +3317,7 @@ async function saveServiceSolarChecklist() {
   const expectedPanels=Number(ctx.expected_solar_panels||0), requiredStands=ctx.need_stand?Math.max(1,Number(ctx.solar_spotter_count||0)):0;
   const standTags=standTag.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean);
   if(ctx.need_stand&&standTags.length!==requiredStands)return alert('Enter exactly '+requiredStands+' Solar Stand tag'+(requiredStands===1?'':'s')+'.');
-  if(ctx.need_stand&&!document.getElementById('wlSvcSolarStandVerified')?.checked)return alert('Verify the exact Solar Stand / Solar Pole.');
+  if(ctx.need_stand&&!document.getElementById('wlSvcSolarStandVerified')?.checked)return alert('Verify the exact Solar Stand.');
   const selectedBatteryConfig=document.querySelector("input[name='wlSvcBatteryConfig']:checked")?.value||'';
   const batteryPlan=serviceSolarBatteryPlan(ctx,{battery_configuration:selectedBatteryConfig||undefined});
   if(Number(ctx.solar_spotter_count||0)>0&&!['agm_4x_12v_110ah','single_12v_350ah'].includes(selectedBatteryConfig))return alert('Choose the Solar Stand battery setup.');
@@ -4289,7 +4289,7 @@ function assignmentNeedsServiceSolar(a, prep) {
   const hasHelios=rows.some(row=>row.label==='Helios'&&row.qty>0)||prepHasHeliosField(prep);
   if(workType==='swap') return hasHelios;
   if(workType&&workType!=='delivery') return false;
-  return rows.some(row=>['Solar Spotter','Ranger','Solar Stand','Solar Pole','Helios'].includes(row.label)&&row.qty>0);
+  return rows.some(row=>['Solar Spotter','Ranger','Solar Stand','Helios'].includes(row.label)&&row.qty>0);
 }
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
   const roleLabel=a.assigned_role==='it'?'IT':'SERVICE';
@@ -5039,7 +5039,6 @@ function ownerAIParseEquipment(text) {
     {category:"device",label:"Sniper",aliases:["sniper","snipers"]},
     {category:"device",label:"Spotter",aliases:["spotter","spotters"]},
     {category:"stand",label:"Solar Stand",aliases:["solar stand","solar stands"]},
-    {category:"stand",label:"Solar Pole",aliases:["solar pole","solar poles"]},
     {category:"stand",label:"110V Stand",aliases:["110v stand","110 v stand","110-volt stand","110 volt stand"]},
     {category:"stand",label:"Pole",aliases:["pole","poles"]}
   ];
