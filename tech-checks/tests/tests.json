@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v124",
-  "service_worker": "v86",
+  "service_worker": "v87",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2106,5 +2106,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Security and owner-health hardening: anonymous SECURITY DEFINER execution removed, normalize_unit_key search_path fixed, Owner-only get_owner_system_health_v1 added, Vision System Health quick action/deterministic path added, and Edge agent v13 exposes get_system_health. Vision v21 / SW86 / migration 80."
+  "last_release_qa_note": "Final pre-owner-review hardening: Vision System Health now reports live DB integrity/security/workflow review items, exposes baseline versions so managed-knowledge counts are not misleading, anonymous SECURITY DEFINER execution remains zero, migration 80 is recorded, Edge v13 active, Vision v22 / SW87."
 }
