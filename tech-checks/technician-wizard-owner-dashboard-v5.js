@@ -4405,6 +4405,38 @@ function ownerAIJobTimeline(a,prep,solarCheck=null){
   const ai=ownerLiveAIStatus(a,prep,solarCheck);
   return `<details class='wl-ai-timeline'><summary><span class='wl-ai-inline-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''>AI Job Timeline</span> <span class='pill'>${esc(steps[idx]?.t||'Current')}</span></summary><div class='wl-ai-timeline-track'>${steps.map((s,i)=>{const when=ownerTimelineWhen(s.when);return `<div class='wl-ai-time-step ${i<idx?'done':i===idx?'current':'future'}'><i></i><div><b>${i<idx?'✓ ':i===idx?'→ ':''}${esc(s.t)}</b><span>${esc(s.who||'')}${when?' · '+esc(when):''}</span>${i===idx?`<span class='wl-ai-current-detail'>${esc(ai.detail||'Current workflow position')}</span>`:''}</div></div>`}).join('')}</div>${ai.state==='attention'?`<div class='wl-ai-warn'><b>AI detected an issue at the current stage:</b><br>${ai.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:''}</details>`;
 }
+function ownerAINotificationKey(a,status){
+  const id=String(a?.id||a?.ticket_no||'unknown');
+  const detail=[status?.label||'',...(status?.flags||[])].join('|').trim();
+  return id+'::'+detail;
+}
+function ownerAIIsAcknowledged(a,status){
+  const id=String(a?.id||a?.ticket_no||'');
+  const key=ownerAINotificationKey(a,status);
+  return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key&&!r.resolved_at);
+}
+async function ownerAISyncResolutions(aiStates){
+  const activeKeys=new Set((aiStates||[]).filter(x=>x?.s?.state==='attention').map(x=>ownerAINotificationKey(x.a,x.s)));
+  const unresolved=ownerAIAckRows.filter(r=>!r.resolved_at&&!activeKeys.has(r.alert_key));
+  if(!unresolved.length)return;
+  const now=new Date().toISOString();
+  for(const row of unresolved){
+    const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({resolved_at:now,resolution_note:'Workflow condition cleared in live Tech Check data.'}).eq('id',row.id).is('resolved_at',null);
+    if(error)console.warn('Could not resolve Owner AI alert',error);
+    else {row.resolved_at=now;row.resolution_note='Workflow condition cleared in live Tech Check data.';}
+  }
+}
+async function ownerAIAcknowledge(assignmentId,alertKey,detail,ticketNo){
+  try{
+    if(ownerAIAckRows.some(r=>String(r.assignment_id)===String(assignmentId)&&r.alert_key===alertKey&&!r.resolved_at))return;
+    const identity=await currentTechIdentity();
+    const row={assignment_id:String(assignmentId||''),alert_key:String(alertKey||''),ticket_no:String(ticketNo||''),alert_detail:String(detail||'AI Attention alert'),acknowledged_by:identity.id,acknowledged_by_name:identity.name};
+    const {data,error}=await liveDb.from('owner_ai_alert_acknowledgements').insert(row).select('*').single();
+    if(error)throw error;
+    ownerAIAckRows.unshift(data);
+    scheduleOwnerRefresh(true,0);
+  }catch(error){alert(error?.message||'Could not acknowledge this AI alert.');}
+}
 function ownerAIAlertHistoryHtml(a,prep,solarCheck=null){
   const id=String(a?.id||a?.ticket_no||''), current=ownerLiveAIStatus(a,prep,solarCheck), rows=ownerAIAckRows.filter(r=>String(r.assignment_id)===id);
   if(!rows.length&&current.state!=='attention')return '';
