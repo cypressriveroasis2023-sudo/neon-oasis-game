@@ -678,3 +678,37 @@ Fix:
 - Repo migration file: `20260920_owner_helios_service_solar_close_fix.sql`.
 - Database migration count: 82.
 - QA test definitions: 121.
+
+
+## Solar Pole retirement
+
+Owner decision: Solar Pole is no longer a Cameras On Site Tech Check equipment type and is fully retired from the system.
+
+Production changes:
+- Removed Solar Pole from shared equipment rules, aliases, support-type logic, Owner/IT/Service equipment catalogs, AI dispatch parsing, Vision catalog, Company Knowledge, and the Phase 7 knowledge-gap inventory.
+- Removed Solar Pole from active database workflow functions that previously accepted or surfaced it.
+- Added database retirement guards on `prep_items`, `job_assignments.equipment_manifest`, and `prep_tickets.equipment_manifest`.
+- Stale clients/direct writes now receive: `Solar Pole has been retired from Tech Check.`
+- Owner test-prep and IT add-item flows reject Solar Pole as an invalid equipment type.
+- At retirement time production contained 0 active Solar Pole prep items, 0 historical Solar Pole prep items, and 0 Solar Pole unit-registry rows.
+- Earlier Solar Pole references in this baseline describe historical states only and are superseded by this retirement.
+
+Verified rollback tests:
+- Owner test helper rejects Solar Pole.
+- Owner assignment manifest rejects Solar Pole.
+- IT add-item rejects Solar Pole.
+- Direct prep-item insert rejects Solar Pole.
+- No supported database workflow function retains a Solar Pole reference.
+
+Current release after retirement:
+- technician: `release-qa-v125`
+- loader: `startup-fast-v39`
+- OnSite Vision workspace: `vision-workspace-v24`
+- shared rules: `rules-v7`
+- Company Knowledge: `company-knowledge-v8`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v15` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v89`
+- database migrations: 83
+- QA test definitions: 122
+- Phase 7 known-gap products after retirement: Sniper, Spotter, Recon II, 110V Stand, Pole.
