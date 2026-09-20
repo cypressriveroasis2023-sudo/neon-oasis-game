@@ -189,6 +189,21 @@ function knowledgeForTopic(topic: string) {
   }
 }
 
+function knowledgeCoverage() {
+  const equipment = KNOWLEDGE?.equipment || {}
+  const names = Object.keys(equipment)
+  const fullyDocumented = names.filter((name) => equipment?.[name]?.documented === true)
+  const gaps = KNOWLEDGE?.phase_7_gap_inventory?.products || {}
+  return {
+    knowledge_version: KNOWLEDGE?.version || 'unknown',
+    equipment_total: names.length,
+    fully_documented_equipment: fullyDocumented.length,
+    partial_or_incomplete_equipment: Math.max(0, names.length - fullyDocumented.length),
+    known_gap_products: Object.keys(gaps),
+    known_gap_product_count: Object.keys(gaps).length,
+  }
+}
+
 function responseText(response: any) {
   if (typeof response?.output_text === 'string' && response.output_text.trim()) return response.output_text.trim()
   const parts: string[] = []
@@ -398,10 +413,11 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v13',
+        agent_version: 'onsite-vision-agent-v14',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
+        knowledge_coverage: knowledgeCoverage(),
         workflow_engine_version: ENGINE?.version || 'unknown',
         shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
         write_tools_enabled: false,
@@ -553,7 +569,15 @@ Deno.serve(async (req) => {
       if (name === 'get_system_health') {
         const { data, error } = await userClient.rpc('get_owner_system_health_v1')
         if (error) throw error
-        return (data || {}) as Json
+        return {
+          ...(data || {}),
+          ai_layer: {
+            knowledge: knowledgeCoverage(),
+            shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
+            workflow_engine_version: ENGINE?.version || 'unknown',
+            agent_version: 'onsite-vision-agent-v14',
+          }
+        } as Json
       }
 
       if (name === 'get_company_knowledge') {
