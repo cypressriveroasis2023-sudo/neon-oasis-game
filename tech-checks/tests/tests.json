@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v125",
-  "service_worker": "v90",
+  "service_worker": "v92",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2328,6 +2328,31 @@
         "Direct prep-item writes are blocked by the retirement trigger",
         "Production contains zero Solar Pole prep-item and unit-registry records",
         "Edge agent uses rules-v7 and company-knowledge-v8 without Solar Pole"
+      ]
+    },
+    {
+      "id": "VISION-KNOWLEDGE-110V-01",
+      "area": "OnSite Vision Company Brain",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "110V Stand Owner-approved product knowledge is preserved without inventing missing SOP details",
+      "steps": [
+        "Inspect browser and Edge Company Knowledge 110V Stand definitions",
+        "Verify browser and Edge Company Knowledge remain byte-identical",
+        "Verify the 110V Stand records 0 batteries and is a passive support/mounting structure",
+        "Verify Sniper and Spotter use 110V power when mounted on it",
+        "Verify Ranger uses exactly 1 solar panel mounted on the stand and the panel powers the Ranger",
+        "Verify Helios is excluded",
+        "Verify condition checks include pole straightness and brick fascia damage",
+        "Verify unknown installation/electrical/evidence/troubleshooting details remain marked as missing"
+      ],
+      "expected": [
+        "No battery is assigned to the 110V Stand itself",
+        "No statement says the stand itself powers the Ranger",
+        "Ranger solar-panel count is exactly 1",
+        "Helios is not compatible with the 110V Stand",
+        "Undocumented procedures remain explicit MISSING INFORMATION rather than AI invention"
       ]
     }
   ],
