@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v9
+ * Version: company-knowledge-v10
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v9",
+  "version": "company-knowledge-v10",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -513,15 +513,22 @@
         "Inspect whether the stand pole is straight or bent.",
         "Inspect the brick fascia for damage."
       ],
+      "transport_and_field_install": [
+        "Transport the 110V Stand to the job site on a trailer.",
+        "Move and position the stand at the designated field location.",
+        "If installed in dirt or grass: install rebar on all 4 stand legs and place 4 sandbags.",
+        "If installed on concrete: secure the stand legs with 4 nails."
+      ],
       "unknowns": [
-        "Exact product-specific field installation/removal SOP",
+        "Exact product-specific removal SOP",
+        "Exact rebar specification/size and exact concrete nail specification/size",
         "Any additional company-required electrical checks beyond the documented power arrangement",
         "110V Stand-specific mandatory photos/signatures",
         "Approved 110V Stand troubleshooting sequence",
         "Whether DELIVERY and/or BACKUP are allowed purposes in addition to the currently documented SWAP purpose"
       ],
       "teaching_needed": [
-        "Document the exact 110V Stand installation/removal SOP.",
+        "Document the exact 110V Stand removal SOP.",
         "Document any additional company-required power-source, cord, outlet, GFCI, or electrical checks, if any.",
         "Document 110V Stand-specific mandatory photos/signatures.",
         "Document the approved 110V Stand troubleshooting sequence.",
@@ -617,7 +624,7 @@
       "Sniper": "Core hardware, Unity/InHand/public-IP workflow, Delivery/SWAP preparation, Service field sequence, evidence, return, and truck-spare handling are now Owner-documented. Remaining gaps are exact ports, any deeper Unity programming sequence, exact Monitoring Center field list, model-specific details if needed, and troubleshooting.",
       "Spotter": "Core 4-camera/internal-router/top-antenna/Alibi/no-battery workflow, ports 81/554, NVR-or-SD recording, Central Station/customer access, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are model-specific details if needed, reprogramming steps, and troubleshooting.",
       "Recon 2": "Reconeyez/programmed-unit verification, separate camera count and battery quantity, ports 81/554, Delivery support selection, and SWAP return are Owner-documented. Remaining gaps are the exact physical battery specification, model-specific internals if needed, reprogramming steps, and troubleshooting.",
-      "110V Stand": "Owner-documented: passive 0-battery stand; compatible with Sniper, Spotter, and Ranger; Helios excluded; Sniper/Spotter use 110V power; Ranger uses exactly 1 solar panel mounted on the stand to power the Ranger; inspect pole straightness and brick fascia damage. Remaining gaps are exact install/removal SOP, any additional electrical checks, evidence, troubleshooting, and purpose parity beyond SWAP.",
+      "110V Stand": "Owner-documented: passive 0-battery stand; compatible with Sniper, Spotter, and Ranger; Helios excluded; Sniper/Spotter use 110V power; Ranger uses exactly 1 solar panel mounted on the stand to power the Ranger; inspect pole straightness and brick fascia damage; transport by trailer; dirt/grass installation requires rebar on all 4 legs plus 4 sandbags; concrete installation uses 4 nails in the stand legs. Remaining gaps are removal SOP, exact anchor hardware specifications, any additional electrical checks, evidence, troubleshooting, and purpose parity beyond SWAP.",
       "Pole": "Components/accessories, Delivery/Swap install/removal, mounting/anchoring/height/safety rules if applicable, evidence, troubleshooting, and BACKUP-purpose parity still need Owner-approved documentation."
     },
     "truck_spares": [
