@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v125",
-  "service_worker": "v92",
+  "service_worker": "v93",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2345,14 +2345,20 @@
         "Verify Ranger uses exactly 1 solar panel mounted on the stand and the panel powers the Ranger",
         "Verify Helios is excluded",
         "Verify condition checks include pole straightness and brick fascia damage",
-        "Verify unknown installation/electrical/evidence/troubleshooting details remain marked as missing"
+        "Verify unknown installation/electrical/evidence/troubleshooting details remain marked as missing",
+        "Verify trailer transport and placement at the designated field location are documented",
+        "Verify dirt/grass installation requires rebar on all 4 legs plus 4 sandbags",
+        "Verify concrete installation requires 4 nails in the stand legs"
       ],
       "expected": [
         "No battery is assigned to the 110V Stand itself",
         "No statement says the stand itself powers the Ranger",
         "Ranger solar-panel count is exactly 1",
         "Helios is not compatible with the 110V Stand",
-        "Undocumented procedures remain explicit MISSING INFORMATION rather than AI invention"
+        "Undocumented procedures remain explicit MISSING INFORMATION rather than AI invention",
+        "Dirt/grass anchoring requires rebar on all 4 legs and 4 sandbags",
+        "Concrete anchoring requires 4 nails in the stand legs",
+        "Exact anchor hardware specifications remain undocumented unless Owner supplies them"
       ]
     }
   ],
