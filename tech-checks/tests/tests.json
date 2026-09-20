@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v126",
-  "service_worker": "v94",
+  "runtime_version": "release-qa-v127",
+  "service_worker": "v95",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2384,6 +2384,31 @@
         "No tag by itself does not block the 110V Stand",
         "Non-110V equipment retains its existing unit-tag requirement",
         "Rollback test leaves zero production records"
+      ]
+    },
+    {
+      "id": "VISION-KNOWLEDGE-110V-03",
+      "area": "110V Stand Pickup / Return",
+      "role": "owner+service",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "Service returns tagged or tagless 110V Stands directly to Shop without weakening normal equipment return controls",
+      "steps": [
+        "Create a rollback-only tagless 110V Stand direct-to-Shop return through the production RPC",
+        "Verify the return completes with a null physical tag and creates no blank Unit Registry identity",
+        "Create a rollback-only tagged 110V Stand direct-to-Shop return and verify its registry state is shop_inventory",
+        "Attempt a tagless normal device return and verify the existing tag gate rejects it",
+        "Verify the Service UI exposes 110V STAND — NO TAG and routes 110V Stand returns to the direct Shop RPC",
+        "Verify browser and Edge Company Knowledge and Workflow Engine remain byte-identical",
+        "Rollback all QA records and confirm zero residue"
+      ],
+      "expected": [
+        "110V Stand pickup is Service → trailer → Shop Inventory",
+        "IT Intake is not required for a 110V Stand pickup",
+        "Tagged and legitimately tagless 110V Stands can be returned by Service",
+        "A clear stand return photo remains required",
+        "Other equipment retains the normal tag and IT Intake return controls",
+        "Rollback QA leaves no return, registry, or report residue"
       ]
     }
   ],
