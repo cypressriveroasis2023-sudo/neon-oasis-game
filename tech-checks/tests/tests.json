@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v125",
-  "service_worker": "v89",
+  "service_worker": "v90",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2331,5 +2331,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Solar Pole retired end-to-end at Owner request. Removed from shared rules, Company Brain, Owner/IT/Service UI, Vision catalog, app fallbacks, and active DB workflow functions. Database retirement triggers reject stale manifests/direct inserts. Rollback rejection tests pass with zero Solar Pole records. Edge v15 / rules v7 / knowledge v8 / technician v125 / Vision v24 / SW89 / migration 83."
+  "last_release_qa_note": "Solar Pole retired end-to-end at Owner request. Removed from shared rules, Company Brain, Owner/IT/Service UI, Vision catalog, app fallbacks, and active DB workflow functions. Database retirement triggers reject stale manifests/direct inserts. Rollback rejection tests pass with zero Solar Pole records. Edge v15 / rules v7 / knowledge v8 / technician v125 / Vision v25 / SW90 / migration 83."
 }
