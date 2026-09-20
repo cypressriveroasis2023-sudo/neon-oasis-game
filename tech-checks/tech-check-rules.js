@@ -1,5 +1,5 @@
 /* Cameras On Site — Shared Tech Check Rules
- * Version: rules-v6
+ * Version: rules-v7
  * Pure rule definitions shared by Owner/IT/Service UI and OnSite Vision.
  * Supabase RPCs/triggers remain the final authority for production transitions.
  */
@@ -15,7 +15,6 @@
     'Recon 2':Object.freeze({category:'device',required_batteries:'dynamic_min_1',display_name:'Recon II',purposes:['DELIVERY','SWAP','BACKUP']}),
     '110V Stand':Object.freeze({category:'stand',required_batteries:0,purposes:['SWAP']}),
     'Solar Stand':Object.freeze({category:'stand',required_batteries:0,purposes:['DELIVERY','SWAP']}),
-    'Solar Pole':Object.freeze({category:'stand',required_batteries:0,purposes:['DELIVERY','SWAP']}),
     'Pole':Object.freeze({category:'stand',required_batteries:0,purposes:['DELIVERY','SWAP']})
   });
 
@@ -23,7 +22,7 @@
     'recon ii':'Recon 2','recon 2':'Recon 2','recon2':'Recon 2',
     'helio':'Helios','helios':'Helios',
     'solar spotter':'Solar Spotter','solarspotter':'Solar Spotter',
-    'solar stand':'Solar Stand','solar pole':'Solar Pole',
+    'solar stand':'Solar Stand',
     '110v stand':'110V Stand','110 stand':'110V Stand',
     'sniper':'Sniper','ranger':'Ranger','spotter':'Spotter','pole':'Pole'
   });
@@ -187,7 +186,7 @@
     return normalizeManifest(raw).filter(row=>row.label===target).reduce((sum,row)=>sum+row.qty,0);
   }
 
-  function isSolarSupport(type){return['Solar Stand','Solar Pole'].includes(normalizeEquipmentType(type));}
+  function isSolarSupport(type){return normalizeEquipmentType(type)==='Solar Stand';}
   function isSimpleSupport(type){return['110V Stand','Pole'].includes(normalizeEquipmentType(type));}
   function isSupport(type){return isSolarSupport(type)||isSimpleSupport(type);}
   function isHeliosDeploy(item){
@@ -465,7 +464,7 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v6',
+    version:'rules-v7',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
