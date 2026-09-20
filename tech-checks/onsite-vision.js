@@ -658,7 +658,6 @@ function draftEquipmentParse(text){
     {category:'device',label:'Sniper',aliases:['sniper','snipers']},
     {category:'device',label:'Spotter',aliases:['spotter','spotters']},
     {category:'stand',label:'Solar Stand',aliases:['solar stand','solar stands']},
-    {category:'stand',label:'Solar Pole',aliases:['solar pole','solar poles']},
     {category:'stand',label:'110V Stand',aliases:['110v stand','110 v stand','110 volt stand']},
     {category:'stand',label:'Pole',aliases:['pole','poles']}
   ];
