@@ -2285,7 +2285,27 @@
         "Solar Spotter required_battery_count is 0 on IT side",
         "Test helper accepts current support-equipment types without reintroducing old battery rules"
       ]
+    },
+    {
+      "id": "MONDAY-HELIOS-OWNER-CLOSE-01",
+      "area": "Monday review · Helios Owner final verification",
+      "role": "owner+service",
+      "mode": "live rollback + db",
+      "destructive": false,
+      "scenario": "Owner final Helios verification uses the Service Tech's completed solar checkout and evidence instead of requiring the Owner to have performed the Service checkout",
+      "steps": [
+        "Create a released Helios Delivery rollback scenario with a completed Service solar checkout owned by Service",
+        "Verify Owner cannot final-verify before Service field installation is submitted",
+        "Add required Service MPPT/battery/final-install evidence and complete the field checklist",
+        "Run Owner final verification"
+      ],
+      "expected": [
+        "Owner is blocked before Service field completion",
+        "Owner final verification accepts the completed Service solar checkout/evidence",
+        "Prep closes successfully after the field install and Owner final verification",
+        "The generic solar close gate does not incorrectly require a solar checkout row owned by the Owner"
+      ]
     }
   ],
-  "last_release_qa_note": "Monday owner torture-test matrix added after live rollback execution. Spotter Delivery happy path, evidence gates, Ranger sequential gates, BACKUP truck-spare checkout, Pickup order, inactive-assignee protection, duplicate unit protection, and Vision confirmation safety all passed. Legacy Owner test-prep Solar Spotter battery rule corrected to 0 IT-side batteries. Migration 81."
+  "last_release_qa_note": "Monday owner torture-test pass complete. Live rollback scenarios validated Spotter Delivery, evidence gates, wrong-tag rejection, Pickup ordering, Ranger sequential gates, Recon II port/camera-count gates, BACKUP truck-spare checkout, inactive technician protection, duplicate-name role/UUID handling, Solar Spotter battery configurations, Sniper battery readiness, and Helios Owner final verification. Torture testing found and fixed the Helios Owner-close solar-proof actor bug. Migration 82."
 }
