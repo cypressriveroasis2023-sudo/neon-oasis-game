@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v124",
-  "service_worker": "v88",
+  "runtime_version": "release-qa-v125",
+  "service_worker": "v89",
   "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -1066,7 +1066,7 @@
       "destructive": false,
       "scenario": "AI-assisted solar unit tag scan",
       "steps": [
-        "Take a Helios/Ranger/Solar Spotter/Solar Stand/Solar Pole unit photo",
+        "Take a Helios/Ranger/Solar Spotter/Solar Stand unit photo",
         "Save photo"
       ],
       "expected": [
@@ -1692,7 +1692,7 @@
       "destructive": false,
       "scenario": "Every partial Phase 7 product exposes exact teaching gaps",
       "steps": [
-        "Ask for product requirements for Sniper, Spotter, Recon II, Solar Pole, 110V Stand and Pole",
+        "Ask for product requirements for Sniper, Spotter, Recon II, 110V Stand and Pole",
         "Inspect unknowns and teaching_needed in Company Knowledge and Workflow Engine"
       ],
       "expected": [
@@ -1700,7 +1700,7 @@
         "Each partial product returns exact teaching_needed prompts",
         "Recon II database label Recon II Battery is not presented as a physical battery specification",
         "Vision returns MISSING INFORMATION for undocumented technical procedures instead of generic internet guesses",
-        "Solar Pole/Pole BACKUP-purpose parity and standalone Solar Pole Service-close behavior are explicitly flagged as unresolved rather than guessed"
+        "Pole BACKUP-purpose parity remains explicitly flagged as unresolved rather than guessed"
       ]
     },
     {
@@ -1740,7 +1740,7 @@
         "Truck-spare wording routes to the truck_spares company rule before generic product battery metadata",
         "Vision does not claim a Sniper standalone spare-battery batch is allowed",
         "Knowledge-gap questions return the Phase 7 gap inventory",
-        "Agent reports onsite-vision-agent-v14, company-knowledge-v7, workflow-engine-v5 and rules-v6"
+        "Agent reports onsite-vision-agent-v15, company-knowledge-v8, workflow-engine-v5 and rules-v7"
       ]
     },
     {
@@ -2305,7 +2305,31 @@
         "Prep closes successfully after the field install and Owner final verification",
         "The generic solar close gate does not incorrectly require a solar checkout row owned by the Owner"
       ]
+    },
+    {
+      "id": "RETIRED-SOLAR-POLE-01",
+      "area": "Equipment retirement · Solar Pole",
+      "role": "owner+it+service",
+      "mode": "source+db+edge",
+      "destructive": false,
+      "scenario": "Solar Pole is fully retired from Tech Check and cannot be recreated by UI, stale clients, test helpers, or direct prep writes",
+      "steps": [
+        "Verify shared rules, Company Knowledge, Owner/IT/Service UI, and Vision catalog do not list Solar Pole",
+        "Attempt Owner test-prep creation with Solar Pole",
+        "Attempt Owner assignment manifest containing Solar Pole",
+        "Attempt IT add-item with Solar Pole",
+        "Attempt direct prep-item insert with Solar Pole",
+        "Verify no Solar Pole prep-item or registry records exist"
+      ],
+      "expected": [
+        "Solar Pole is absent from active equipment catalogs and Company Brain gaps",
+        "Owner test helper and IT add-item reject Solar Pole as an invalid equipment type",
+        "Owner/prep manifest database guards reject Solar Pole as retired",
+        "Direct prep-item writes are blocked by the retirement trigger",
+        "Production contains zero Solar Pole prep-item and unit-registry records",
+        "Edge agent uses rules-v7 and company-knowledge-v8 without Solar Pole"
+      ]
     }
   ],
-  "last_release_qa_note": "Monday owner torture-test pass complete. Live rollback scenarios validated Spotter Delivery, evidence gates, wrong-tag rejection, Pickup ordering, Ranger sequential gates, Recon II port/camera-count gates, BACKUP truck-spare checkout, inactive technician protection, duplicate-name role/UUID handling, Solar Spotter battery configurations, Sniper battery readiness, and Helios Owner final verification. Torture testing found and fixed the Helios Owner-close solar-proof actor bug. Migration 82."
+  "last_release_qa_note": "Solar Pole retired end-to-end at Owner request. Removed from shared rules, Company Brain, Owner/IT/Service UI, Vision catalog, app fallbacks, and active DB workflow functions. Database retirement triggers reject stale manifests/direct inserts. Rollback rejection tests pass with zero Solar Pole records. Edge v15 / rules v7 / knowledge v8 / technician v125 / Vision v24 / SW89 / migration 83."
 }
