@@ -771,3 +771,40 @@ Runtime after this update:
 - service worker: `tech-check-field-shell-v93`
 - database migrations: 83
 - QA test definitions: 123
+
+
+### 110V Stand optional-tag evidence update
+
+Owner instruction captured on 2026-09-19 clarifies that some 110V Stands do not have asset tags.
+
+Approved rule:
+- A 110V Stand may have a tag or may legitimately have no tag.
+- If a tag exists, record it and show it in the stand photo when practical.
+- If no tag exists, record the stand as untagged; no tag does not block verification, IT → Service handoff, or completion by itself.
+- A clear photo showing the stand remains the required product-specific visual proof.
+- Other equipment types retain their existing tag requirements.
+
+Production workflow fix:
+- Live migration `allow_untagged_110v_stands` updated the active prep verification/release functions so only 110V Stand can verify/release with a null tag.
+- The release gate skips photo-tag matching only for a 110V Stand that truly has no tag.
+- Tagged 110V Stands still use the normal matching-tag behavior.
+- Unit Registry already ignores blank/null tag keys, so an untagged stand does not create a fake registry identity.
+- Repo migration file: `20260920_allow_untagged_110v_stands.sql`.
+
+Verification:
+- Rollback production test created an untagged 110V Stand SWAP, verified it with the MHelpDesk/item check, attached normal IT photo/signature evidence, and successfully passed `release_prep`.
+- The rollback completed with zero QA residue.
+- Browser and Edge shared rules remain byte-identical.
+- Browser and Edge Company Knowledge remain byte-identical.
+
+Current stack:
+- technician: `release-qa-v126`
+- loader: `startup-fast-v41`
+- OnSite Vision workspace: `vision-workspace-v26`
+- shared rules: `rules-v8`
+- Company Knowledge: `company-knowledge-v11`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v18` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v94`
+- database migrations: 84
+- QA test definitions: 124
