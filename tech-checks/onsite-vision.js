@@ -421,7 +421,7 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Ask about a job, assign a technician, change the schedule, or work through the next step with Vision. The service order stays in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Ask about a job, assign a technician, change the schedule, or work through the next step with Vision. The service order stays in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -930,6 +930,66 @@ function actionCard(a,ticket){
 function who(ticket){
   const rows=active(ticket);return rows.length?'<div class="vision-direct good"><b>Here is who currently has MHelpDesk #'+esc(ticket)+'.</b>'+rows.map(r=>'<div>'+esc(String(r.assigned_role||'').toUpperCase())+': '+esc(assignee(r))+'</div>').join('')+'</div>'+jobCard(ticket):'<div class="vision-direct warn"><b>No active assignment is showing.</b>MHelpDesk #'+esc(ticket)+' has no active IT or Service assignment in Tech Check.</div>';
 }
+function systemHealthIntent(raw){
+  const s=String(raw||'').trim().toLowerCase();
+  return /\bhealth\s*check\b|\b(system|database|data|vision|ai)\s+(health|healthy|integrity)\b|\bis\s+(?:the\s+)?(system|database|data|vision|ai)\s+healthy\b|\bcheck\s+(?:the\s+)?(system|database|data|vision|ai)\b/.test(s);
+}
+function healthRows(items,key='ticket_no'){
+  if(!Array.isArray(items)||!items.length)return'';
+  return '<div class="vision-system-note">'+items.slice(0,8).map(x=>{
+    if(typeof x==='string')return esc(x);
+    const main=x?.[key]||x?.name||x?.unit_tag||x?.equipment_type||'Item';
+    const detail=Object.entries(x||{}).filter(([k,v])=>k!==key&&k!=='name'&&v!==null&&v!==''&&v!==false).slice(0,3).map(([k,v])=>String(k).replaceAll('_',' ')+': '+String(v)).join(' · ');
+    return '<b>'+esc(main)+'</b>'+(detail?' — '+esc(detail):'');
+  }).join('<br>')+'</div>';
+}
+async function systemHealthHtml(){
+  const [healthResult,agentResult]=await Promise.all([
+    db.rpc('get_owner_system_health_v1'),
+    db.functions.invoke('onsite-vision-agent',{body:{mode:'status'}}).catch(()=>({data:null,error:true}))
+  ]);
+  if(healthResult.error)throw healthResult.error;
+  const h=healthResult.data||{};
+  const integrity=h.integrity||{},workflow=h.workflow||{},people=h.people||{},vision=h.vision||{},security=h.security||{},database=h.database||{};
+  const status=String(h.status||'unknown').toLowerCase();
+  const good=status==='healthy'&&Number(h.hard_error_count||0)===0;
+  const agent=agentResult?.data||{};
+  const criticalGroups=[
+    ...(integrity.closed_with_active_assignment||[]),
+    ...(integrity.inactive_assignee_on_active_job||[]),
+    ...(integrity.released_camera_family_rule_violations||[]),
+    ...(integrity.closed_ranger_without_field_victron||[]),
+    ...(integrity.closed_swap_missing_return||[]),
+    ...(integrity.unit_registry_mismatches||[])
+  ];
+  let html='<div class="vision-answer-title">'+(good?'System health: HEALTHY':'System health: NEEDS ATTENTION')+'</div>';
+  html+='<div class="vision-direct '+(good?'good':'warn')+'"><b>'+esc(String(h.health_version||'Live health check'))+'</b>'+
+    (good?'No critical Tech Check data-integrity failures are showing.':'Critical data-integrity issues are present and should be reviewed.')+'</div>';
+  html+='<div class="vision-context-block"><h3>Live health summary</h3><div class="vision-context-grid">'+
+    '<div><span>HARD ERRORS</span><b>'+esc(h.hard_error_count||0)+'</b></div>'+
+    '<div><span>ATTENTION</span><b>'+esc(h.attention_count||0)+'</b></div>'+
+    '<div><span>ANON PRIVILEGED RPCs</span><b>'+esc(security.anonymous_security_definer_functions||0)+'</b></div>'+
+    '<div><span>DB MIGRATIONS</span><b>'+esc(database.migration_count||0)+'</b></div>'+
+    '<div><span>EDGE AI</span><b>'+esc(agent.ok?((agent.agent_version||'online')+' · '+(agent.model_configured?'AI LIVE':'DATA LIVE')):'Unavailable')+'</b></div>'+
+    '<div><span>ACTIVE TICKETS</span><b>'+esc(workflow.active_tickets||0)+'</b></div>'+
+  '</div></div>';
+  if(criticalGroups.length)html+='<div class="vision-context-block"><h3>Critical integrity issues</h3>'+healthRows(criticalGroups)+'</div>';
+  if((workflow.released_without_service||[]).length)html+='<div class="vision-context-block"><h3>Workflow attention</h3><p>Released IT handoffs waiting for Service assignment.</p>'+healthRows(workflow.released_without_service)+'</div>';
+  if((people.duplicate_active_names||[]).length||(people.duplicate_names_all_profiles||[]).length){
+    html+='<div class="vision-context-block"><h3>Profile ambiguity</h3><p>Duplicate names are shown as attention items so Vision does not guess which account is intended.</p>'+healthRows(people.duplicate_active_names,'name')+healthRows(people.duplicate_names_all_profiles,'name')+'</div>';
+  }
+  html+='<div class="vision-context-block"><h3>Vision data</h3><div class="vision-context-grid">'+
+    '<div><span>CONVERSATIONS</span><b>'+esc(vision.active_conversations||0)+'</b></div>'+
+    '<div><span>MESSAGES</span><b>'+esc(vision.messages||0)+'</b></div>'+
+    '<div><span>AUDITED ACTIONS</span><b>'+esc(vision.audited_actions||0)+'</b></div>'+
+    '<div><span>FAILED ACTIONS</span><b>'+esc(vision.failed_actions||0)+'</b></div>'+
+    '<div><span>APPROVED KNOWLEDGE</span><b>'+esc(vision.approved_knowledge_entries||0)+'</b></div>'+
+    '<div><span>DRAFT KNOWLEDGE</span><b>'+esc(vision.draft_knowledge_entries||0)+'</b></div>'+
+  '</div></div>';
+  html+='<div class="vision-system-note">Generated from the live Tech Check database. Normal workflow attention is separated from hard integrity failures.</div>';
+  return html;
+}
+
 function personLookupName(raw){
   const text=String(raw||'').trim();
   if(/\b(assigned|assignment|handling|has\s+it|has\s+this|service\s+order|ticket)\b/i.test(text))return'';
@@ -975,6 +1035,8 @@ async function answer(text){
     return continueDraft(raw);
   }
   if(isCreateRequest(raw))return startDraft(raw);
+
+  if(systemHealthIntent(raw))return await systemHealthHtml();
 
   const personReply=await personLookupHtml(raw);
   if(personReply)return personReply;
