@@ -542,6 +542,7 @@ let notificationRealtimeChannel = null;
 let notificationRealtimeUserId = null;
 let ownerAssignmentProfiles = [];
 let ownerAssignmentAssets = [];
+let ownerAIAckRows = [];
 let pendingAssignmentLinkId = null;
 let pendingAssignmentManifest = [];
 let pendingAssignmentWorkType = 'service';
