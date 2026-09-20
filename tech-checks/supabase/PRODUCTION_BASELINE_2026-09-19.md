@@ -808,3 +808,47 @@ Current stack:
 - service worker: `tech-check-field-shell-v94`
 - database migrations: 84
 - QA test definitions: 124
+
+
+### 110V Stand direct Service-to-Shop pickup update
+
+Owner instruction captured on 2026-09-19 completes the documented 110V Stand pickup/removal flow.
+
+Approved pickup/removal rule:
+- Service puts the 110V Stand on the trailer and transports it back to the shop.
+- Service adds the stand directly back to Tech Check Shop Inventory.
+- 110V Stand pickup does not require IT Intake.
+- The stand may have a physical tag or may legitimately have no tag.
+- A clear stand return photo is still required.
+- If a tag is present, it is recorded and the normal tagged inventory/registry state is updated.
+- If the stand has no tag, no fake physical tag or blank Unit Registry identity is created.
+- This exception applies only to 110V Stand. Normal returned devices retain their tag and IT Intake controls.
+
+Production database changes:
+- Live migration: `service_110v_stand_direct_shop_return`.
+- Repo migration file: `20260920_service_110v_stand_direct_shop_return.sql`.
+- `unit_returns.unit_tag` is nullable only so the approved tagless 110V Stand return can be represented.
+- `guard_unit_return_conflict()` retains the normal tag requirement except for a completed 110V Stand direct-Shop return.
+- `sync_unit_registry_from_return()` ignores blank tag keys instead of creating a false registry identity.
+- New role-gated RPC `service_return_110v_stand_to_shop_v1(...)` is executable by authenticated users but not anon, and internally requires Service or Owner.
+- MHelpDesk remains separate from Tech Check; this flow records the Tech Check Shop return and does not claim to update MHelpDesk inventory.
+
+Rollback production QA:
+- Tagless 110V Stand returned directly to Shop successfully.
+- Tagged 110V Stand returned directly to Shop and reached `shop_inventory` registry state.
+- A tagless Sniper control return was still rejected.
+- Rollback left 0 return rows, 0 registry rows, and 0 report rows.
+- Browser/Edge shared rules, Company Knowledge, and Workflow Engine are kept byte-identical.
+- JavaScript syntax checks passed for technician workflow, shared rules, Company Knowledge, Workflow Engine, app loader, Vision workspace, and service worker.
+
+Current release after this update:
+- technician: `release-qa-v127`
+- loader: `startup-fast-v42`
+- OnSite Vision workspace: `vision-workspace-v27`
+- shared rules: `rules-v8`
+- Company Knowledge: `company-knowledge-v12`
+- Workflow Engine: `workflow-engine-v6`
+- Edge agent: `onsite-vision-agent-v19` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v95`
+- database migrations: 85
+- QA test definitions: 125
