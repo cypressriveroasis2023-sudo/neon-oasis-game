@@ -581,3 +581,45 @@ Current release identifiers:
 - QA test definitions: 108
 
 Known non-blocking project hardening debt remains in Supabase advisors: one mutable-search-path warning and a broader group of legacy anonymous-executable SECURITY DEFINER functions. The functions checked in this QA retain internal role guards, but the broader function-surface cleanup should be handled as a dedicated security-hardening pass rather than mixed into release-flow changes.
+
+
+## Monday-readiness security + AI database hardening (2026-09-19)
+
+Security hardening:
+- Removed anonymous/PUBLIC EXECUTE from all public SECURITY DEFINER functions.
+- Anonymous executable SECURITY DEFINER count is now 0.
+- Existing signed-in Owner/IT/Service RPC access remains available where required.
+- Future public-schema functions no longer inherit anonymous/PUBLIC EXECUTE by default.
+- `normalize_unit_key(text)` now has `search_path = public, pg_temp`.
+- Live migration `security_hardening_owner_health_v1` is recorded; migration count is 80.
+- Repo migration file: `20260920_security_hardening_owner_health_v1.sql`.
+
+Owner System Health:
+- Added Owner-only `get_owner_system_health_v1()`.
+- Health distinguishes hard data-integrity errors from normal workflow review items.
+- Current production health is HEALTHY with 0 hard errors.
+- Integrity checks cover closed jobs with active assignments, inactive assignees on active work, released camera-family gate violations, closed Ranger work missing field Victron verification, closed Sniper/Spotter/Recon II SWAPs missing returns, and unit-registry mismatches.
+- Workflow review surfaces released IT handoffs waiting for Service, unlinked active assignments, profile-name ambiguity, failed Vision actions, and managed-knowledge drafts.
+- Current profile ambiguity includes duplicate full-name records; these are surfaced rather than guessed.
+
+Vision / Company Brain:
+- System Health is available as a Vision quick action and deterministic fallback.
+- Edge agent exposes read-only `get_system_health`.
+- Health displays Company Knowledge baseline, shared rules, workflow engine, agent version, equipment-definition count, and known gap products.
+- Managed knowledge counts are explicitly separated from the verified code baseline.
+- Known product gaps remain explicit; Vision must return MISSING INFORMATION rather than invent undocumented procedures.
+
+Current release:
+- technician: `release-qa-v124`
+- loader: `startup-fast-v38`
+- OnSite Vision workspace: `vision-workspace-v23`
+- shared rules: `rules-v6`
+- Company Knowledge: `company-knowledge-v7`
+- Workflow Engine: `workflow-engine-v5`
+- Edge agent: `onsite-vision-agent-v14` ACTIVE with JWT verification
+- service worker: `tech-check-field-shell-v88`
+- database migrations: 80
+- QA test definitions: 111
+
+Known remaining hardening item from Supabase Auth advisor:
+- Leaked-password protection is disabled in Supabase Auth. The available Supabase connector does not expose an Auth-settings mutation action, so this remains an account-level setting to enable separately.
