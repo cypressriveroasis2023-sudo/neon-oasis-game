@@ -82,7 +82,7 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-shade{display:none}.vision-mobile-only{display:none}
 @media(max-width:1180px){:root{--sidebar:230px;--order:305px}}
 @media(max-width:900px){
-  html,body{height:100%;overflow:hidden;overscroll-behavior:none} body{position:fixed;inset:0;width:100%}.vision-app,.vision-app.has-order{position:fixed;inset:0;height:auto;min-height:0;grid-template-columns:1fr}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}.vision-app,.vision-app.has-order{position:fixed;inset:0;height:auto;min-height:0;grid-template-columns:1fr}
   .vision-sidebar{position:fixed;top:0;bottom:0;left:0;width:min(88vw,350px);z-index:30;transition:transform .22s ease,opacity .18s ease;box-shadow:0 0 52px rgba(0,0,0,.42);opacity:1;pointer-events:auto;transform:translateX(-104%)}
   .vision-order-panel{position:fixed;left:12px;right:12px;top:max(72px,calc(env(safe-area-inset-top) + 58px));bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-width:560px;margin:0 auto;z-index:30;border:1px solid #31475b;border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;pointer-events:none;transform:translateY(24px) scale(.985);transition:transform .22s ease,opacity .18s ease;overflow:auto;-webkit-overflow-scrolling:touch;background:rgba(9,17,26,.985)}
   .vision-app.sidebar-open .vision-sidebar{transform:translateX(0)}
