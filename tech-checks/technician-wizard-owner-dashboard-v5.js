@@ -4474,6 +4474,13 @@ async function ownerVerifyHeliosFinal(prepId){
   if(typeof window.refreshData==='function')await window.refreshData();
   alert('Helios deployment final verified and Tech Check closed.');
 }
+function ownerAssignmentTechOptions(role='it'){
+  const wanted=String(role||'it').toLowerCase();
+  const label=wanted==='service'?'Service Department Queue — any Service Tech can claim':'IT Department Queue — any IT Tech can claim';
+  return "<option value=''>"+label+"</option>"+ownerAssignmentProfiles
+    .filter(p=>String(p.role||'').toLowerCase()===wanted&&p.active!==false&&!p.archived_at)
+    .map(p=>"<option value='"+esc(p.user_id)+"'>"+esc(p.full_name||p.username||'Technician')+"</option>").join('');
+}
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p=ownerAssignmentProgress(a,prep,solarCheck),aiState=ownerLiveAIStatus(a,prep,solarCheck).state,pct=Math.max(8,Math.min(100,p.step/5*100));
   const heliosFinal=prepHasHeliosField(prep)&&prep?.status==='released'&&solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at
