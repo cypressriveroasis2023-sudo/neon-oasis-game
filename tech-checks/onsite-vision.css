@@ -84,9 +84,9 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 @media(max-width:900px){
   html,body{height:100%;overflow:hidden;overscroll-behavior:none}.vision-app,.vision-app.has-order{position:fixed;inset:0;height:auto;min-height:0;grid-template-columns:1fr}
   .vision-sidebar{position:fixed;top:0;bottom:0;left:0;width:min(88vw,350px);z-index:30;transition:transform .22s ease,opacity .18s ease;box-shadow:0 0 52px rgba(0,0,0,.42);opacity:1;pointer-events:auto;transform:translateX(-104%)}
-  .vision-order-panel{position:fixed;left:12px;right:12px;top:max(72px,calc(env(safe-area-inset-top) + 58px));bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-width:560px;margin:0 auto;z-index:30;border:1px solid #31475b;border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;pointer-events:none;transform:translateY(24px) scale(.985);transition:transform .22s ease,opacity .18s ease;overflow:auto;-webkit-overflow-scrolling:touch;background:rgba(9,17,26,.985)}
+  .vision-order-panel{position:fixed;left:10px;right:10px;top:auto;bottom:max(10px,env(safe-area-inset-bottom));width:auto;max-width:560px;max-height:min(68dvh,720px);margin:0 auto;z-index:30;border:1px solid #31475b;border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(calc(100% + 28px));transition:transform .22s ease,opacity .18s ease,visibility 0s linear .22s;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;background:rgba(9,17,26,.985)}
   .vision-app.sidebar-open .vision-sidebar{transform:translateX(0)}
-  .vision-app.order-open .vision-order-panel{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}
+  .vision-app.order-open .vision-order-panel{transform:translateY(0);opacity:1;visibility:visible;pointer-events:auto;transition:transform .22s ease,opacity .18s ease,visibility 0s}
   .vision-app.sidebar-open .vision-shade,.vision-app.order-open .vision-shade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(4px);z-index:25}
   .vision-mobile-only{display:inline-flex}.vision-live-status{display:none}
   .vision-topbar{min-height:62px;padding:max(9px,env(safe-area-inset-top)) 10px 8px}
@@ -534,4 +534,11 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   .vision-knowledge-head span{display:none}
   .vision-knowledge-row{grid-template-columns:1fr}
   .vision-knowledge-editor textarea{min-height:135px}
+}
+
+/* Mobile drawer recovery v29 */
+@media(max-width:900px){
+ #visionOrderClose{position:relative;z-index:4;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+ .vision-app:not(.order-open) .vision-order-panel{pointer-events:none!important;visibility:hidden!important}
+ .vision-app:not(.sidebar-open):not(.order-open) .vision-shade{display:none!important;pointer-events:none!important}
 }
