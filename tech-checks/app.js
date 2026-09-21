@@ -2017,7 +2017,7 @@ async function ownerAppNavigate(route){
 function ownerInteractionSafety(){
   if(state.profile?.role!=='owner')return;
   document.body.classList.remove('busy');
-  const support=document.getElementById('ownerLegacyMounts');
+  const support=document.getElementById('ownerSupportMounts');
   if(support){
     support.setAttribute('aria-hidden','true');
     support.style.display='none';
