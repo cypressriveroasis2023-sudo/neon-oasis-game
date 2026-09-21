@@ -85,7 +85,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-interactions-v206')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-interactions-v207')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1949,6 +1949,11 @@ async function ownerAppRender(){
   const host=document.getElementById('ownerAppPage');if(!host)return;
   const version=++ownerAppRenderVersion;
   const route=ownerAppRoute;
+  // Data refreshes must not detach the active form or steal keyboard focus.
+  if(route==='assign' && host.querySelector('#ownerJobAssignments #ownerAssignTicket')) {
+    ownerInteractionSafety();
+    return;
+  }
   // Move authoritative nodes back before replacing the route, never copy IDs.
   for(const [node,home] of ownerAppMountHomes) {
     if(host.contains(node)) home.append(node);
