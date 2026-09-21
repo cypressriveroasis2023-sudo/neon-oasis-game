@@ -4490,7 +4490,39 @@ function ownerAINotificationKey(a,status){
 function ownerAIIsAcknowledged(a,status){
   const id=String(a?.id||a?.ticket_no||'');
   const key=ownerAINotificationKey(a,status);
-  return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key&&!r.resolved_at);
+  return ownerAIAckRows.some(r=>String(r.assignment_id)===id&&r.alert_key===key&&!r.resolved_at&&r.acknowledged_by&&r.acknowledged_at);
+}
+async function ownerAISyncDetectedAlerts(aiStates){
+  const now=new Date().toISOString();
+  const active=(aiStates||[]).filter(x=>x?.s?.state==='attention');
+  for(const x of active){
+    const assignmentId=String(x?.a?.id||x?.a?.ticket_no||'');
+    const alertKey=ownerAINotificationKey(x.a,x.s);
+    const existing=ownerAIAckRows.find(r=>String(r.assignment_id)===assignmentId&&r.alert_key===alertKey&&!r.resolved_at);
+    if(existing){
+      existing.last_seen_at=now;
+      const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({last_seen_at:now,alert_detail:String(x.s.detail||'Vision detected a workflow issue.'),ticket_no:String(x?.a?.ticket_no||'')}).eq('id',existing.id).is('resolved_at',null);
+      if(error)console.warn('Could not refresh Owner AI alert',error);
+      continue;
+    }
+    const row={
+      assignment_id:assignmentId,
+      alert_key:alertKey,
+      ticket_no:String(x?.a?.ticket_no||''),
+      alert_detail:String(x.s.detail||'Vision detected a workflow issue.'),
+      acknowledged_by:null,
+      acknowledged_by_name:null,
+      acknowledged_at:null,
+      detected_at:now,
+      last_seen_at:now
+    };
+    const {data,error}=await liveDb.from('owner_ai_alert_acknowledgements').insert(row).select('*').single();
+    if(error){
+      if(String(error.code||'')!=='23505')console.warn('Could not record Owner AI alert',error);
+      continue;
+    }
+    ownerAIAckRows.unshift(data);
+  }
 }
 async function ownerAISyncResolutions(aiStates){
   const activeKeys=new Set((aiStates||[]).filter(x=>x?.s?.state==='attention').map(x=>ownerAINotificationKey(x.a,x.s)));
@@ -4498,28 +4530,46 @@ async function ownerAISyncResolutions(aiStates){
   if(!unresolved.length)return;
   const now=new Date().toISOString();
   for(const row of unresolved){
-    const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({resolved_at:now,resolution_note:'Workflow condition cleared in live Tech Check data.'}).eq('id',row.id).is('resolved_at',null);
+    const {error}=await liveDb.from('owner_ai_alert_acknowledgements').update({resolved_at:now,last_seen_at:now,resolution_note:'Workflow condition cleared in live Tech Check data.'}).eq('id',row.id).is('resolved_at',null);
     if(error)console.warn('Could not resolve Owner AI alert',error);
-    else {row.resolved_at=now;row.resolution_note='Workflow condition cleared in live Tech Check data.';}
+    else {row.resolved_at=now;row.last_seen_at=now;row.resolution_note='Workflow condition cleared in live Tech Check data.';}
   }
 }
 async function ownerAIAcknowledge(assignmentId,alertKey,detail,ticketNo){
   try{
-    if(ownerAIAckRows.some(r=>String(r.assignment_id)===String(assignmentId)&&r.alert_key===alertKey&&!r.resolved_at))return;
-    const identity=await currentTechIdentity();
-    const row={assignment_id:String(assignmentId||''),alert_key:String(alertKey||''),ticket_no:String(ticketNo||''),alert_detail:String(detail||'AI Attention alert'),acknowledged_by:identity.id,acknowledged_by_name:identity.name};
-    const {data,error}=await liveDb.from('owner_ai_alert_acknowledgements').insert(row).select('*').single();
-    if(error)throw error;
-    ownerAIAckRows.unshift(data);
+    const identity=await currentTechIdentity(),now=new Date().toISOString();
+    const existing=ownerAIAckRows.find(r=>String(r.assignment_id)===String(assignmentId)&&r.alert_key===alertKey&&!r.resolved_at);
+    if(existing?.acknowledged_by&&existing?.acknowledged_at)return;
+    if(existing){
+      const {data,error}=await liveDb.from('owner_ai_alert_acknowledgements').update({
+        acknowledged_by:identity.id,
+        acknowledged_by_name:identity.name,
+        acknowledged_at:now,
+        last_seen_at:now
+      }).eq('id',existing.id).is('resolved_at',null).select('*').single();
+      if(error)throw error;
+      Object.assign(existing,data||{acknowledged_by:identity.id,acknowledged_by_name:identity.name,acknowledged_at:now,last_seen_at:now});
+    }else{
+      const row={assignment_id:String(assignmentId||''),alert_key:String(alertKey||''),ticket_no:String(ticketNo||''),alert_detail:String(detail||'AI Attention alert'),acknowledged_by:identity.id,acknowledged_by_name:identity.name,acknowledged_at:now,detected_at:now,last_seen_at:now};
+      const {data,error}=await liveDb.from('owner_ai_alert_acknowledgements').insert(row).select('*').single();
+      if(error)throw error;
+      ownerAIAckRows.unshift(data);
+    }
     scheduleOwnerRefresh(true,0);
   }catch(error){alert(error?.message||'Could not acknowledge this AI alert.');}
 }
 function ownerAIAlertHistoryHtml(a,prep,solarCheck=null){
   const id=String(a?.id||a?.ticket_no||''), current=ownerLiveAIStatus(a,prep,solarCheck), rows=ownerAIAckRows.filter(r=>String(r.assignment_id)===id);
   if(!rows.length&&current.state!=='attention')return '';
-  const items=rows.map(r=>{const active=current.state==='attention'&&ownerAINotificationKey(a,current)===r.alert_key&&!r.resolved_at;return `<div class='wl-ai-history-row'><div><b>${active?'🔴 ACTIVE':'✓ RESOLVED'}</b><span>${esc(r.alert_detail||'AI Attention alert')}</span></div><div class='small'>Acknowledged by <b>${esc(r.acknowledged_by_name||'Owner/Admin')}</b>${r.acknowledged_at?' · '+esc(ownerTimelineWhen(r.acknowledged_at)):''}</div>${r.resolved_at?`<div class='small'><b>Resolved:</b> ${esc(ownerTimelineWhen(r.resolved_at))}${r.resolution_note?' · '+esc(r.resolution_note):''}</div>`:''}</div>`}).join('');
-  const unacked=current.state==='attention'&&!ownerAIIsAcknowledged(a,current)?`<div class='wl-ai-history-row active'><div><b>🔴 ACTIVE · NOT ACKNOWLEDGED</b><span>${esc(current.detail)}</span></div></div>`:'';
-  return `<details class='wl-ai-alert-history'><summary>🔔 AI Alert History <span class='pill'>${rows.length+(unacked?1:0)}</span></summary><div>${unacked}${items||"<div class='small'>No acknowledged alerts yet.</div>"}</div></details>`;
+  const items=rows.map(r=>{
+    const active=current.state==='attention'&&ownerAINotificationKey(a,current)===r.alert_key&&!r.resolved_at;
+    const acknowledged=Boolean(r.acknowledged_by&&r.acknowledged_at);
+    const stateLabel=active?(acknowledged?'🟠 ACTIVE · ACKNOWLEDGED':'🔴 ACTIVE · NOT ACKNOWLEDGED'):'✓ RESOLVED';
+    return `<div class='wl-ai-history-row ${active?'active':''}'><div><b>${stateLabel}</b><span>${esc(r.alert_detail||'AI Attention alert')}</span></div><div class='small'><b>Detected:</b> ${esc(ownerTimelineWhen(r.detected_at||r.acknowledged_at)||'Time not recorded')}</div>${acknowledged?`<div class='small'>Acknowledged by <b>${esc(r.acknowledged_by_name||'Owner/Admin')}</b> · ${esc(ownerTimelineWhen(r.acknowledged_at))}</div>`:''}${r.resolved_at?`<div class='small'><b>Resolved:</b> ${esc(ownerTimelineWhen(r.resolved_at))}${r.resolution_note?' · '+esc(r.resolution_note):''}</div>`:''}</div>`;
+  }).join('');
+  const hasCurrentRow=rows.some(r=>!r.resolved_at&&current.state==='attention'&&r.alert_key===ownerAINotificationKey(a,current));
+  const virtual=current.state==='attention'&&!hasCurrentRow?`<div class='wl-ai-history-row active'><div><b>🔴 ACTIVE · DETECTION PENDING SAVE</b><span>${esc(current.detail)}</span></div></div>`:'';
+  return `<details class='wl-ai-alert-history'><summary>🔔 AI Alert History <span class='pill'>${rows.length+(virtual?1:0)}</span></summary><div>${virtual}${items||"<div class='small'>No alert history yet.</div>"}</div></details>`;
 }
 async function ownerOpenHeliosFinalReview(prepId){
   const prep=await getPrep(prepId),check=await loadServiceSolarCheck(prepId),evidence=await serviceSolarEvidenceRows(prepId),returns=await loadHeliosSwapReturns(prep?.ticket_no),units=heliosFieldItems(prep);
@@ -4634,16 +4684,25 @@ async function installOwnerAssignments(force = false) {
   const itCount = active.filter(a => a.assigned_role === 'it').length;
   const svcCount = active.filter(a => a.assigned_role === 'service').length;
   const aiStates=active.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
+  await ownerAISyncDetectedAlerts(aiStates);
   await ownerAISyncResolutions(aiStates);
   const aiAttention=aiStates.filter(x=>x.s.state==='attention').length, aiWaiting=aiStates.filter(x=>x.s.state==='waiting').length, aiWorking=aiStates.filter(x=>x.s.state==='working').length, aiOnTrack=aiStates.filter(x=>x.s.state==='healthy').length;
   const aiNotices=aiStates.filter(x=>x.s.state==='attention').map(x=>({...x,key:ownerAINotificationKey(x.a,x.s),ack:ownerAIIsAcknowledged(x.a,x.s)})); const aiUnread=aiNotices.filter(x=>!x.ack).length;
+  window.dispatchEvent(new CustomEvent('techcheck:owner-ai-alerts',{detail:{alerts:aiNotices.map(x=>({
+    assignment_id:String(x.a?.id||x.a?.ticket_no||''),
+    ticket_no:String(x.a?.ticket_no||''),
+    detail:String(x.s?.detail||'Vision detected a workflow issue.'),
+    flags:Array.isArray(x.s?.flags)?x.s.flags.map(String):[],
+    key:String(x.key||''),
+    acknowledged:Boolean(x.ack)
+  }))}}));
   const todayKey=techCheckDateKey(new Date());
   const tomorrowDate=new Date();tomorrowDate.setDate(tomorrowDate.getDate()+1);const tomorrowKey=techCheckDateKey(tomorrowDate);
   const tomorrowJobs=all.filter(a=>String(a.scheduled_for||'')===tomorrowKey&&a.status!=='completed');
   const tomorrowStates=tomorrowJobs.map(a=>({a,s:ownerLiveAIStatus(a,prepMap.get(a.prep_ticket_id),solarCheckMap.get(a.prep_ticket_id))}));
 
   const completedToday=all.filter(a=>a.status==='completed'&&techCheckDateKey(new Date(a.completed_at||a.updated_at||a.assigned_at))===todayKey);
-  const alertsToday=ownerAIAckRows.filter(r=>techCheckDateKey(new Date(r.acknowledged_at))===todayKey);
+  const alertsToday=ownerAIAckRows.filter(r=>techCheckDateKey(new Date(r.detected_at||r.acknowledged_at))===todayKey);
   const resolvedToday=ownerAIAckRows.filter(r=>r.resolved_at&&techCheckDateKey(new Date(r.resolved_at))===todayKey);
   const outstandingAlerts=aiStates.filter(x=>x.s.state==='attention');
   const ownerReviewJobs=all.filter(a=>{
