@@ -4849,27 +4849,34 @@ function ensureOwnerCommandCenter(){
   if(!card){
     card=document.createElement('section');
     card.id='ownerCommandCenter';
-    card.className='ownerCommandCenter card';
+    card.className='ownerCommandCenter';
     card.innerHTML=`
-      <div class="ownerCommandHead">
-        <div><small>OWNER COMMAND CENTER</small><b>Today at Cameras On Site</b><span>See what is moving, what needs you, and what is ready for review.</span></div>
-        <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt="">Ask Vision</a>
+      <div class="ownerCommandHero">
+        <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>See what is moving, what needs you, and what is ready for Owner review.</p></div>
+        <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask what needs attention or change a job.</small></span><strong>OPEN →</strong></a>
       </div>
-      <div class="ownerCommandGrid">
-        <button type="button" data-owner-command="daily"><strong id="ownerCommandTodayCount">0</strong><b>Today</b><span>Jobs & team</span></button>
-        <button type="button" data-owner-command="attention"><strong id="ownerCommandAttentionCount">0</strong><b>Needs Attention</b><span>Issues & blockers</span></button>
-        <button type="button" data-owner-command="review"><strong>→</strong><b>Owner Review</b><span>Closeouts & corrections</span></button>
-        <button type="button" data-owner-command="equipment"><strong id="ownerCommandEquipmentCount">0</strong><b>Team & Equipment</b><span>Units, returns & custody</span></button>
+      <div class="ownerCommandStats">
+        <button type="button" data-owner-command="daily"><span>Today</span><b id="ownerCommandTodayCount">0</b><small>active assignments</small></button>
+        <button type="button" data-owner-command="attention"><span>Needs Attention</span><b id="ownerCommandAttentionCount">0</b><small>issues & blockers</small></button>
+        <button type="button" data-owner-command="review"><span>Owner Review</span><b>→</b><small>closeouts & corrections</small></button>
+        <button type="button" data-owner-command="equipment"><span>Equipment</span><b id="ownerCommandEquipmentCount">0</b><small>tracked units</small></button>
       </div>
-      <div class="ownerCommandFlow"><span>OWNER ASSIGNMENT</span><i>→</i><span>IT</span><i>→</i><span>HANDOFF</span><i>→</i><span>SERVICE</span><i>→</i><span class="ownerFinal">OWNER CLOSEOUT</span></div>`;
+      <div class="ownerCommandQuick">
+        <button type="button" data-owner-command="assign">+ Send Job to Tech</button>
+        <button type="button" data-owner-command="returns">Returns / Intake</button>
+        <button type="button" data-owner-command="units">Unit Search</button>
+        <button type="button" data-owner-command="team">Team</button>
+      </div>`;
     card.addEventListener('click',event=>{
       const btn=event.target.closest('[data-owner-command]');
       if(!btn)return;
       const action=btn.dataset.ownerCommand;
-      if(action==='daily') return ownerShowGroup('Jobs');
+      if(action==='daily'||action==='review') return ownerShowGroup('Jobs');
       if(action==='attention') return ownerShowGroup('Attention');
-      if(action==='review') return ownerShowGroup('Jobs');
-      if(action==='equipment') return ownerShowGroup('Units');
+      if(action==='equipment'||action==='units') return ownerShowGroup('Units');
+      if(action==='assign') return ownerShowGroup('Assign');
+      if(action==='returns') return ownerShowGroup('Returns');
+      if(action==='team') return ownerShowGroup('Team');
     });
     view.prepend(card);
   }
@@ -4880,7 +4887,8 @@ function ensureOwnerCommandCenter(){
   set('ownerCommandTodayCount',assignments);
   set('ownerCommandAttentionCount',attention);
   set('ownerCommandEquipmentCount',units);
-  card.classList.toggle('hasAttention',attention>0);
+  const attentionButton=card.querySelector('[data-owner-command="attention"]');
+  attentionButton?.classList.toggle('alert',attention>0);
   return card;
 }
 
