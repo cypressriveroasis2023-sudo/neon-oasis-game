@@ -4916,3 +4916,52 @@ body.busy #view-owner{pointer-events:auto!important}
     gap:10px!important;
   }
 }
+
+
+/* Owner Needs Attention readable dark cards v220 */
+#view-owner #ownerAppPage .ownerNextAction,
+#view-owner #ownerAppPage .ownerNextAction.clear,
+#view-owner #ownerAppPage .ownerAttentionRow,
+#view-owner #ownerAppPage .ownerAttentionRow.urgent,
+#view-owner #ownerAppPage .ownerAttentionStats span{
+  background:#111f27!important;
+  border-color:#435b67!important;
+  color:#f7fafb!important;
+}
+#view-owner #ownerAppPage .ownerAttentionRow.urgent{
+  background:#26171a!important;
+  border-color:#a23b42!important;
+}
+#view-owner #ownerAppPage .ownerNextAction b,
+#view-owner #ownerAppPage .ownerAttentionRow b,
+#view-owner #ownerAppPage .ownerAttentionRow strong,
+#view-owner #ownerAppPage .ownerAttentionStats b{
+  color:#fff!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage .ownerNextAction span,
+#view-owner #ownerAppPage .ownerNextAction p,
+#view-owner #ownerAppPage .ownerNextAction .small,
+#view-owner #ownerAppPage .ownerAttentionRow span,
+#view-owner #ownerAppPage .ownerAttentionRow p,
+#view-owner #ownerAppPage .ownerAttentionRow .small,
+#view-owner #ownerAppPage .ownerAttentionStats span{
+  color:#c8d3d8!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage .ownerNextKicker,
+#view-owner #ownerAppPage .wl-next-kicker{
+  color:#ff555b!important;
+}
+#view-owner #ownerAppPage .ownerAttentionRow .mini{
+  background:#e31b23!important;
+  border:1px solid #ff555b!important;
+  color:#fff!important;
+  font-weight:900!important;
+}
+#view-owner #ownerAppPage .ownerAttentionStats{
+  gap:10px!important;
+}
+#view-owner #ownerAppPage .ownerAttentionStats span{
+  padding:12px 14px!important;
+}
