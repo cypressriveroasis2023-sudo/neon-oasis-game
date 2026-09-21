@@ -1601,13 +1601,33 @@ async function completeServiceFieldAssignment(id) {
 async function syncServiceAssignmentAfterReturn(ticket,techId) {
   const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','service').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
   const a=rows?.[0];if(!a)return {completed:false,count:0,required:0};
-  const {data:returns}=await liveDb.from('unit_returns').select('id').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
-  const count=(returns||[]).length;
+  const {data:returns}=await liveDb.from('unit_returns').select('id,equipment_type').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
+  const returnRows=returns||[];
+  const count=returnRows.length;
   const {data:preps}=await liveDb.from('prep_tickets').select('id,status,prep_items(equipment_type,purpose)').eq('ticket_no',String(ticket||'')).eq('status','released').order('released_at',{ascending:false}).limit(5);
-  const heliosSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>i.equipment_type==='Helios'&&i.purpose==='SWAP'));
-  if(heliosSwapPrep){const required=(heliosSwapPrep.prep_items||[]).filter(i=>i.equipment_type==='Helios'&&i.purpose==='SWAP').length;return {completed:false,count,required,fieldPending:true};}
+
+  // A SWAP return accounts for the OLD field unit. Do not complete Service
+  // while the replacement-unit handoff / field workflow is still open.
+  const swapTypes=new Set(['Helios','Sniper','Spotter','Recon 2']);
+  const activeSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>swapTypes.has(i.equipment_type)&&i.purpose==='SWAP'));
+  if(activeSwapPrep){
+    const swapItems=(activeSwapPrep.prep_items||[]).filter(i=>swapTypes.has(i.equipment_type)&&i.purpose==='SWAP');
+    const required=swapItems.length;
+    const byType={};
+    swapItems.forEach(i=>{byType[i.equipment_type]=(byType[i.equipment_type]||0)+1;});
+    let matching=0;
+    Object.entries(byType).forEach(([type,needed])=>{
+      matching+=Math.min(Number(needed||0),returnRows.filter(r=>r.equipment_type===type).length);
+    });
+    return {completed:false,count:matching,required,fieldPending:true};
+  }
+
   const required=assignmentEquipmentCount(a);
-  if(count>=required){const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});if(error)console.warn('Return saved but Service assignment could not be completed',error);else return {completed:true,count,required};}
+  if(count>=required){
+    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
+    if(error)console.warn('Return saved but Service assignment could not be completed',error);
+    else return {completed:true,count,required};
+  }
   return {completed:false,count,required};
 }
 async function syncITReturnAssignmentAfterIntake(ticket,techId) {
