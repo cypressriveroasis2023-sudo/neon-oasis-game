@@ -152,6 +152,10 @@ function shiftDateKey(key,days) {
 function dateLabel(key) {
   return new Intl.DateTimeFormat(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'}).format(dateFromKey(key));
 }
+function serviceInspectionRequiredForDate(key) {
+  const day=dateFromKey(key).getDay();
+  return day>=1 && day<=5;
+}
 
 function requiredBattery(item) {
   const meta = BATTERY[item?.equipment_type];
@@ -1321,19 +1325,20 @@ function renderOwnerTechOverview() {
   const today=localDateKey(new Date());
   const isToday=ownerDailyDate===today;
   const isPast=ownerDailyDate<today;
+  const inspectionRequired=serviceInspectionRequiredForDate(ownerDailyDate);
   const techs=(state.profiles || [])
     .filter(p => p.active && !p.archived_at && (p.role==='it' || p.role==='service'))
     .sort((a,b) => (a.role===b.role ? String(a.full_name || a.username).localeCompare(String(b.full_name || b.username)) : a.role==='service' ? -1 : 1));
   const assignments=(state.ownerAssignments || []).filter(a => a.status !== 'cancelled');
   const inspectionMap=new Map();
   (state.dailyInspections || []).forEach(row => { if (!inspectionMap.has(row.service_tech_id)) inspectionMap.set(row.service_tech_id,row); });
-  const missingService=techs.filter(t => t.role==='service' && !inspectionMap.has(t.user_id));
+  const missingService=inspectionRequired ? techs.filter(t => t.role==='service' && !inspectionMap.has(t.user_id)) : [];
   const queue=assignments.filter(a => !a.assignee_user_id && a.status==='assigned');
   const badge=$('ownerTechOverviewBadge');
   if (badge) {
-    badge.textContent=isToday && missingService.length ? missingService.length + ' DUE' : String(techs.length);
-    badge.classList.toggle('alert',isToday && missingService.length>0);
-    badge.classList.toggle('neutral',!(isToday && missingService.length>0));
+    badge.textContent=isToday && inspectionRequired && missingService.length ? missingService.length + ' DUE' : String(techs.length);
+    badge.classList.toggle('alert',isToday && inspectionRequired && missingService.length>0);
+    badge.classList.toggle('neutral',!(isToday && inspectionRequired && missingService.length>0));
   }
   const techCards=techs.map(tech => {
     const name=ownerTechRoleName(tech);
@@ -1345,6 +1350,8 @@ function renderOwnerTechOverview() {
     if (tech.role==='service') {
       if (ins) {
         dailyStatus=`<div class='ownerDailyCheck ${ins.failed ? 'fail' : 'pass'}'><b>Daily Truck / Trailer Check · ${ins.failed ? 'NEEDS REVIEW' : 'SUBMITTED'}</b><span>Truck: ${esc(ins.truck)} · Trailer: ${esc(ins.trailer)} · Load: ${esc(ins.load)} · ${new Date(inspection.submitted_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div>`;
+      } else if (!inspectionRequired) {
+        dailyStatus=`<div class='ownerDailyCheck info'><b>Daily Truck / Trailer Check · NOT REQUIRED</b><span>Weekend — Service inspections are Monday through Friday only.</span></div>`;
       } else {
         const label=isToday ? 'DUE TODAY' : isPast ? 'NOT SUBMITTED' : 'UPCOMING';
         dailyStatus=`<div class='ownerDailyCheck ${isToday || isPast ? 'missing' : ''}'><b>Daily Truck / Trailer Check · ${label}</b><span>${isToday ? 'Waiting for this Service Tech to submit the daily inspection.' : isPast ? 'No submitted inspection was found for this date.' : 'Daily inspection will be due on the selected work date.'}</span></div>`;
@@ -1369,7 +1376,7 @@ function renderOwnerTechOverview() {
       <span><b>${techs.length}</b> active techs</span>
       <span><b>${assignments.length}</b> scheduled tickets</span>
       <span><b>${queue.length}</b> unclaimed</span>
-      <span><b>${missingService.length}</b> Service checks ${isToday ? 'due' : 'missing'}</span>
+      <span><b>${missingService.length}</b> Service checks ${inspectionRequired && !isToday ? 'missing' : 'due'}</span>
     </div>
     ${queueHtml}
     <div class='ownerTechDayGrid'>${techCards || '<div class="warn">No active IT or Service technicians.</div>'}</div>`;
