@@ -4508,3 +4508,96 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerJobAssignments .wl-unit-area label,
 #view-owner #ownerJobAssignments .wl-stand-area label,
 #view-owner #ownerJobAssignments .wl-equipment-number-block label{color:#dce5e9!important}
+
+
+/* Owner desktop centered workspace + contrast v214 */
+@media (min-width:900px){
+  #view-owner #ownerApp .ownerAppWorkspace{min-width:0!important}
+  #view-owner #ownerApp #ownerAppPage{
+    width:100%!important;
+    max-width:none!important;
+    padding-left:clamp(28px,4vw,76px)!important;
+    padding-right:clamp(28px,4vw,76px)!important;
+    box-sizing:border-box!important
+  }
+  #view-owner #ownerAppPage>.ownerAppPageHead,
+  #view-owner #ownerAppPage>#ownerJobAssignments,
+  #view-owner #ownerAppPage>.ownerAppPageBody,
+  #view-owner #ownerAppPage>.ownerAppPageContent{
+    width:min(100%,1280px)!important;
+    max-width:1280px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    box-sizing:border-box!important
+  }
+  #view-owner #ownerJobAssignments .ownerDashBody>*{
+    max-width:none!important;
+    width:100%!important;
+    box-sizing:border-box!important
+  }
+}
+#view-owner{
+ --oa-bg:#081117!important;
+ --oa-panel:#0d1920!important;
+ --oa-panel2:#111f27!important;
+ --oa-line:#38505c!important;
+ --oa-text:#f7fafb!important;
+ --oa-muted:#b7c3c9!important;
+ --oa-red:#e31b23!important
+}
+#view-owner #ownerAppPage,
+#view-owner #ownerJobAssignments{background:var(--oa-bg)!important;color:var(--oa-text)!important}
+#view-owner #ownerJobAssignments .ownerDashBody,
+#view-owner #ownerJobAssignments .owner-simple-step,
+#view-owner #ownerJobAssignments .item,
+#view-owner #ownerJobAssignments .ok,
+#view-owner #ownerJobAssignments .warn,
+#view-owner #ownerJobAssignments [class*="area"],
+#view-owner #ownerJobAssignments [class*="Area"],
+#view-owner #ownerJobAssignments [class*="equipment"],
+#view-owner #ownerJobAssignments [class*="Equipment"],
+#view-owner #ownerJobAssignments [class*="parts"],
+#view-owner #ownerJobAssignments [class*="Parts"]{
+ background:var(--oa-panel)!important;
+ color:var(--oa-text)!important;
+ border-color:var(--oa-line)!important
+}
+#view-owner #ownerJobAssignments label,
+#view-owner #ownerJobAssignments legend,
+#view-owner #ownerJobAssignments h1,
+#view-owner #ownerJobAssignments h2,
+#view-owner #ownerJobAssignments h3,
+#view-owner #ownerJobAssignments h4,
+#view-owner #ownerJobAssignments b,
+#view-owner #ownerJobAssignments strong{color:#f8fafb!important}
+#view-owner #ownerJobAssignments p,
+#view-owner #ownerJobAssignments small,
+#view-owner #ownerJobAssignments .small,
+#view-owner #ownerJobAssignments .muted,
+#view-owner #ownerJobAssignments .help{color:#b9c5cb!important}
+#view-owner #ownerJobAssignments input,
+#view-owner #ownerJobAssignments textarea,
+#view-owner #ownerJobAssignments select{
+ background:#071219!important;
+ color:#fff!important;
+ border:1px solid #46616e!important
+}
+#view-owner #ownerJobAssignments input::placeholder,
+#view-owner #ownerJobAssignments textarea::placeholder{color:#9cabb3!important;opacity:1!important}
+#view-owner #ownerJobAssignments button:not(.danger):not(.btn):not(.active):not(.selected):not([aria-pressed="true"]){
+ background:#111f27!important;color:#f5f8f9!important;border:1px solid #3c535f!important
+}
+#view-owner #ownerJobAssignments button.active,
+#view-owner #ownerJobAssignments button.selected,
+#view-owner #ownerJobAssignments button[aria-pressed="true"],
+#view-owner #ownerJobAssignments .btn,
+#view-owner #ownerJobAssignments .danger{background:#e31b23!important;border-color:#f0444b!important;color:#fff!important}
+#view-owner #ownerJobAssignments .warn,
+#view-owner #ownerJobAssignments .ownerReviewStep.pending,
+#view-owner #ownerJobAssignments .ownerReviewStep.missing{
+ background:#211417!important;
+ border-color:#8d3439!important;
+ color:#fff!important
+}
+#view-owner #ownerJobAssignments .warn *,
+#view-owner #ownerJobAssignments .ownerReviewStep *{color:#f8fafb!important;opacity:1!important}
