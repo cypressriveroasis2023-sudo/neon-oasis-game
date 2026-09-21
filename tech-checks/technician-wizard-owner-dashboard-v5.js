@@ -4850,45 +4850,39 @@ function ensureOwnerCommandCenter(){
     card=document.createElement('section');
     card.id='ownerCommandCenter';
     card.className='ownerCommandCenter';
-    card.innerHTML=`
-      <div class="ownerCommandHero">
-        <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>See what is moving, what needs you, and what is ready for Owner review.</p></div>
-        <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask what needs attention or change a job.</small></span><strong>OPEN →</strong></a>
-      </div>
-      <div class="ownerCommandStats">
-        <button type="button" data-owner-command="daily"><span>Today</span><b id="ownerCommandTodayCount">0</b><small>active assignments</small></button>
-        <button type="button" data-owner-command="attention"><span>Needs Attention</span><b id="ownerCommandAttentionCount">0</b><small>issues & blockers</small></button>
-        <button type="button" data-owner-command="review"><span>Owner Review</span><b>→</b><small>closeouts & corrections</small></button>
-        <button type="button" data-owner-command="equipment"><span>Equipment</span><b id="ownerCommandEquipmentCount">0</b><small>tracked units</small></button>
-      </div>
-      <div class="ownerCommandQuick">
-        <button type="button" data-owner-command="assign">+ Send Job to Tech</button>
-        <button type="button" data-owner-command="returns">Returns / Intake</button>
-        <button type="button" data-owner-command="units">Unit Search</button>
-        <button type="button" data-owner-command="team">Team</button>
-      </div>`;
+    card.innerHTML=`<div class="ownerCommandHero"><div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div><a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a></div><div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite"><button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button><button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button><button type="button" data-owner-command="review"><span>Ready for Review</span><b>—</b><small>returns / handoffs</small></button><button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>active techs / assets</small></button></div><div class="ownerCommandQuick"><button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button></div>`;
+    view.prepend(card);
+  }
+  if(!card.dataset.commandBound){
+    card.dataset.commandBound='1';
     card.addEventListener('click',event=>{
       const btn=event.target.closest('[data-owner-command]');
       if(!btn)return;
       const action=btn.dataset.ownerCommand;
-      if(action==='daily'||action==='review') return ownerShowGroup('Jobs');
+      if(action==='today') return ownerShowGroup('Jobs');
       if(action==='attention') return ownerShowGroup('Attention');
-      if(action==='equipment'||action==='units') return ownerShowGroup('Units');
-      if(action==='assign') return ownerShowGroup('Assign');
-      if(action==='returns') return ownerShowGroup('Returns');
+      if(action==='review') return ownerShowGroup('Returns');
       if(action==='team') return ownerShowGroup('Team');
+      if(action==='assign') return ownerShowGroup('Assign');
+      if(action==='units') return ownerShowGroup('Units');
+      if(action==='handoffs') return ownerShowGroup('Equipment');
+      if(action==='activity') return ownerShowGroup('Activity');
     });
-    view.prepend(card);
   }
+  const stat=(action,value)=>{
+    const btn=card.querySelector('[data-owner-command="'+action+'"]');
+    const b=btn?.querySelector('b');
+    if(b)b.textContent=String(value??0);
+    return btn;
+  };
   const attention=ownerBadgeNumber('ownerAttentionBadge');
-  const assignments=ownerBadgeNumber('ownerAssignmentBadge');
-  const units=ownerBadgeNumber('ownerUnitStatusBadge');
-  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value||0);};
-  set('ownerCommandTodayCount',assignments);
-  set('ownerCommandAttentionCount',attention);
-  set('ownerCommandEquipmentCount',units);
-  const attentionButton=card.querySelector('[data-owner-command="attention"]');
-  attentionButton?.classList.toggle('alert',attention>0);
+  const today=ownerBadgeNumber('ownerTechOverviewBadge') || ownerBadgeNumber('ownerAssignmentBadge');
+  const review=ownerBadgeNumber('ownerHandoffsBadge');
+  const team=ownerBadgeNumber('ownerAccountsBadge') + ownerBadgeNumber('ownerUnitStatusBadge');
+  stat('today',today);
+  stat('attention',attention)?.classList.toggle('alert',attention>0);
+  stat('review',review);
+  stat('team',team);
   return card;
 }
 
