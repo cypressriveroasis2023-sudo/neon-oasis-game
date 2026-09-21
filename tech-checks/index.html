@@ -424,6 +424,8 @@
               <button type="button" data-owner-command="units">Units</button>
               <button type="button" data-owner-command="handoffs">Handoffs</button>
               <button type="button" data-owner-command="history">History</button>
+              <button type="button" data-owner-command="activity">Activity</button>
+              <button type="button" data-owner-command="accounts">Technician Accounts</button>
             </aside>
             <main class="ownerWorkspaceMain">
               <div class="ownerWorkspaceTop"><div><span>OWNER COMMAND CENTER</span><h2>What do you need?</h2></div><span class="ownerWorkspaceLive">● LIVE</span></div>
@@ -446,7 +448,7 @@
               </div>
             </main>
           </div>
-          <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
+          <div id="ownerWorkspaceContent" class="ownerWorkspaceContent">          <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
             <summary class="ownerDashSummary"><div><b>Today & Team Board</b><span>Daily schedule, inspections, assignments, and equipment by technician</span></div><span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span></summary>
             <div class="ownerDashBody"><div id="ownerTechOverview"><div class="small">Loading today’s team board…</div></div></div>
           </details>
@@ -582,7 +584,7 @@
               <h3>Current Users</h3>
               <div id="userList"></div>
             </div>
-          </details>
+          </details></div>
         </section>
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
