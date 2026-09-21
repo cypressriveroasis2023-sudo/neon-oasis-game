@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "production-qa-20260921a",
-  "service_worker": "tech-check-production-qa-20260921a",
+  "runtime_version": "production-qa-20260921b",
+  "service_worker": "tech-check-production-qa-20260921b",
   "generated_for": "Unified Owner application + IT/Service workflow production readiness",
   "production_safety": {
     "default_mode": "non-destructive",
