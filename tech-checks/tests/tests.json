@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v129",
-  "service_worker": "v134",
+  "runtime_version": "release-qa-v130",
+  "service_worker": "v135",
   "generated_for": "OnSite Vision live offline escalation answers + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2909,16 +2909,18 @@
       "destructive": false,
       "scenario": "Vision answers who last worked on an offline-unit history using permanent Company History",
       "steps": [
+        "Ask “Who last worked on this unit?” as a follow-up after Vision resolves one offline unit",
         "Ask who last worked on a numbered unit with recorded history",
         "Resolve the unit through get_company_history_v1",
         "Verify the most recent attributable event is used"
       ],
       "expected": [
+        "A single resolved offline-unit answer preserves the unit/ticket conversation context for the follow-up",
         "The answer comes from permanent Unit History, not a guessed current assignment",
         "Offline escalation events remain eligible history after resolution",
         "Unknown history returns MISSING INFORMATION instead of an invented technician"
       ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Current/offline questions use unresolved records only; detail/history questions may inspect resolved escalations. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Current/offline questions use unresolved records only; detail/history questions may inspect resolved escalations. A single offline-unit result is remembered for “this unit” follow-ups. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
