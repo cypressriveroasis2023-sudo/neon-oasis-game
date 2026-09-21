@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v138",
-  "service_worker": "v148",
+  "runtime_version": "release-qa-v139",
+  "service_worker": "v151",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3479,7 +3479,95 @@
         "Service worker caches the same app/module versions",
         "Older cached command-center JavaScript cannot silently remain the active shell"
       ]
+    },
+    {
+      "id": "VISION-WORKLOAD-RESET-NAMED-TECH-01",
+      "area": "OnSite Vision · workload context",
+      "role": "owner",
+      "mode": "source + live data",
+      "destructive": false,
+      "scenario": "A fresh broad workload question does not inherit a previously named technician",
+      "steps": [
+        "Ask how many jobs a named technician has today",
+        "Then ask How many jobs today? or How many jobs are scheduled today?"
+      ],
+      "expected": [
+        "Second question is company-wide",
+        "Prior technician name is cleared from workload subject memory",
+        "Vision does not repeat the named technician answer"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-COMPANY-TOTAL-01",
+      "area": "OnSite Vision · workload context",
+      "role": "owner",
+      "mode": "live data",
+      "destructive": false,
+      "scenario": "Broad workload wording returns distinct company-wide Tech Check tickets",
+      "steps": [
+        "Ask How many total jobs do I have today?",
+        "Ask How many jobs are scheduled today?"
+      ],
+      "expected": [
+        "Vision counts distinct non-cancelled Tech Check ticket numbers across IT and Service",
+        "Vision reports remaining/completed",
+        "IT and Service involvement counts may overlap and are labeled as such",
+        "MHelpDesk remains separate"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-BOTH-DEPTS-01",
+      "area": "OnSite Vision · workload context",
+      "role": "owner",
+      "mode": "source + live data",
+      "destructive": false,
+      "scenario": "Speech-to-text wording that mentions both Service and IT reports both departments rather than retaining a technician",
+      "steps": [
+        "Ask How many jobs are scheduled today for the Service department and the IT department?",
+        "Repeat with speech-like wording Service department in the IT department"
+      ],
+      "expected": [
+        "Vision treats both department mentions as a combined company workload request",
+        "Vision reports total distinct tickets plus IT-involved and Service-involved ticket counts",
+        "No technician is inferred from prior conversation"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-REFERENTIAL-FOLLOWUP-01",
+      "area": "OnSite Vision · workload context",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "True named-technician follow-ups still preserve conversational context",
+      "steps": [
+        "Ask how many jobs Abel has today",
+        "Then ask What about him tomorrow? or And tomorrow?"
+      ],
+      "expected": [
+        "Vision keeps the named technician only for explicit referential language or a terse date continuation",
+        "The date changes while technician context remains intact"
+      ]
+    },
+    {
+      "id": "OWNER-IT-SERVICE-FLOW-VISIBILITY-01",
+      "area": "Cross-role flow · Owner → IT → Service",
+      "role": "owner/it/service",
+      "mode": "live RLS + rollback structure",
+      "destructive": false,
+      "scenario": "A shared ticket remains visible to the correct IT and Service sides without duplicate ticket counting",
+      "steps": [
+        "Create or inspect a Delivery/Swap ticket with both IT and Service assignment rows",
+        "Read it through IT and Service workload views",
+        "Count company workload by distinct ticket number"
+      ],
+      "expected": [
+        "IT sees its assignment",
+        "Service sees its assignment",
+        "Company total counts the shared MHelpDesk ticket once",
+        "Department involvement can count the same shared ticket in both IT and Service",
+        "IT → Service handoff remains the required transition"
+      ]
     }
   ],
-  "last_release_qa_note": "Service and IT command centers are freeze-hardened. Both render an immediate loading shell, use independent settled live-data requests with bounded waits, preserve usable sections if one source fails, protect against stale async repaint races, and provide retry/STATUS UNAVAILABLE recovery instead of hanging. IT per-ticket workflow-gate checks are independently bounded. Release assets are aligned to app v65, technician module v148, shared cache v148."
+  "last_release_qa_note": "Fixed OnSite Vision workload subject stickiness shown in mobile QA. Broad questions such as How many jobs today?, How many total jobs do I have today?, and How many jobs are scheduled today? now reset prior named-technician context and return the company-wide distinct Tech Check ticket total. Questions naming both IT and Service report total tickets plus department involvement counts, while explicit referential follow-ups such as him or And tomorrow preserve the named technician. Edge agent v30 follows the same rule."
 }
