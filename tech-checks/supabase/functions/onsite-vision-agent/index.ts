@@ -422,6 +422,22 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_workload',
+    description: 'Read live Tech Check scheduled job assignments for a date, department, or specific technician. Use for natural questions like how many jobs IT has today, what Service has Monday, or how many jobs a named technician has.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'YYYY-MM-DD date.' },
+        role: { type: 'string', enum: ['', 'it', 'service'] },
+        technician_name: { type: 'string', description: 'Technician name or username, or empty string.' }
+      },
+      required: ['date','role','technician_name'],
+      additionalProperties: false
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -516,7 +532,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v25',
+        agent_version: 'onsite-vision-agent-v26',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -678,7 +694,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v25',
+            agent_version: 'onsite-vision-agent-v26',
           }
         } as Json
       }
@@ -879,6 +895,29 @@ Deno.serve(async (req) => {
         } as Json
       }
 
+      if (name === 'get_workload') {
+        const date=clean(args.date),role=clean(args.role).toLowerCase(),technicianName=clean(args.technician_name)
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('A YYYY-MM-DD workload date is required.')
+        if(!['','it','service'].includes(role))throw new Error('Invalid workload role.')
+        let technician:any=null
+        if(technicianName){
+          const {data:profiles,error:profileError}=await userClient.from('profiles').select('user_id,full_name,username,role,active').eq('active',true).limit(100)
+          if(profileError)throw profileError
+          const q=technicianName.toLowerCase()
+          technician=(Array.isArray(profiles)?profiles:[]).find((p:any)=>[p.full_name,p.username].filter(Boolean).some((v:any)=>clean(v).toLowerCase()===q))
+            ||(Array.isArray(profiles)?profiles:[]).find((p:any)=>[p.full_name,p.username].filter(Boolean).some((v:any)=>clean(v).toLowerCase().includes(q)||q.includes(clean(v).toLowerCase())))
+          if(!technician)return {date,role,technician_name:technicianName,count:0,assignments:[],missing_information:'No active Tech Check technician matched that name.'} as Json
+        }
+        let query=userClient.from('job_assignments').select('id,ticket_no,site,assigned_role,assignee_user_id,assignee_name,status,scheduled_for,scheduled_time,work_type,unit_summary,job_description,requires_it_handoff,equipment_manifest,requested_unit_count,updated_at').eq('scheduled_for',date).not('status','in','("completed","cancelled")').order('scheduled_time',{ascending:true,nullsFirst:false}).limit(250)
+        if(role)query=query.eq('assigned_role',role)
+        if(technician?.user_id)query=query.eq('assignee_user_id',technician.user_id)
+        const {data,error}=await query
+        if(error)throw error
+        const assignments=Array.isArray(data)?data:[]
+        const tickets=[...new Set(assignments.map((row:any)=>clean(row.ticket_no)).filter(Boolean))]
+        return {date,role,technician:technician?{user_id:technician.user_id,full_name:technician.full_name,username:technician.username,role:technician.role}:null,count:tickets.length,tickets,assignments,mhelpdesk_separate:true} as Json
+      }
+
       if (name === 'get_company_knowledge') {
         const topic=clean(args.topic)
         const baseline=knowledgeForTopic(topic)
@@ -921,6 +960,7 @@ Deno.serve(async (req) => {
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
       '- For truck readiness, departure readiness, battery minimums, or backup-unit readiness, call get_departure_readiness before answering. Never assume unrecorded equipment is on the truck.',
+      '- For questions about how many jobs IT, Service, or a named technician has on a date, call get_workload. Count distinct Tech Check ticket numbers, not assignment rows, because one ticket can have both IT and Service assignments. MHelpDesk remains separate.',
       '- A live needs_replacement hold means the unit is NOT available Shop Inventory. Do not say it may return to Shop Inventory through a generic path while that hold exists.',
       '- Treat Owner notification as VERIFIED DATABASE FACT only when the matching app_notifications row is present. A permanent report alone does not prove the notification row is still recorded.',
       '- The final repair/replacement disposition is MISSING INFORMATION unless a documented Cameras On Site procedure and completed outcome are present. Do not invent a repair, purchase, retirement, or return-to-shop decision.',
@@ -1048,7 +1088,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v25',
+      agent_version: 'onsite-vision-agent-v26',
       model,
       tool_trace: toolTrace,
       ...parsed,
