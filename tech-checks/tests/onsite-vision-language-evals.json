@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v3",
-  "description": "Owner-style language regression bank for OnSite Vision, including multi-step operations orchestration and audited multi-action planning. No case may execute a write; expected action means proposed action only.",
+  "version": "onsite-vision-language-evals-v4",
+  "description": "Owner-style language regression bank for OnSite Vision, including voice-style apostrophe-free date phrases, operations orchestration, and audited multi-action planning. No case may execute a write.",
   "categories": [
     "workload",
     "workload_followup",
@@ -614,6 +614,27 @@
       ],
       "intent": "multi_action_plan",
       "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "v07",
+      "utterance": "show me todays jobs",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "v08",
+      "utterance": "show me tomorrows jobs",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "v09",
+      "utterance": "what are mondays jobs",
+      "intent": "workload",
+      "tool": "get_workload",
       "action": "none"
     }
   ]
