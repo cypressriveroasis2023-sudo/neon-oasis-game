@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-command-v121" />
+    <link rel="stylesheet" href="./styles.css?v=owner-command-v122" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -425,7 +425,7 @@
             </div>
             <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, review operations, and use permanent company history</small></span><strong>Open →</strong></a>
             <div class="ownerCommandQuick">
-              <button type="button" data-owner-command="assign">+ Assign Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
+              <button type="button" data-owner-command="assign">+ Assign Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="history">Company History</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
             </div>
           </div>
           <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
@@ -447,6 +447,22 @@
             </summary>
             <div class="ownerDashBody">
               <div id="ownerReviewQueue"><div class="small">Loading Owner Review queue…</div></div>
+            </div>
+          </details>
+
+          <details id="ownerCompanyHistoryCard" class="card ownerDashSection ownerCompanyHistoryCard">
+            <summary class="ownerDashSummary">
+              <div><b>Company History</b><span>Permanent Technician, Unit, and Customer / Site history</span></div>
+              <span class="ownerDashBadge neutral">HISTORY</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div class="ownerHistorySearch">
+                <label><span>History type</span><select id="ownerCompanyHistoryKind" onchange="ownerCompanyHistoryKindChanged()"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select></label>
+                <label class="ownerHistoryQuery"><span>Search</span><input id="ownerCompanyHistoryQuery" placeholder="Technician name or username" onkeydown="if(event.key==='Enter'){event.preventDefault();ownerCompanyHistorySearch()}"></label>
+                <button class="btn" type="button" onclick="ownerCompanyHistorySearch()">Search History</button>
+              </div>
+              <div class="small top8">History is built automatically from recorded Tech Check activity and remains after job closeout or inventory return.</div>
+              <div id="ownerCompanyHistoryResults" class="ownerCompanyHistoryResults"><div class="small">Choose a history type and search by technician, unit number, or exact customer / site name.</div></div>
             </div>
           </details>
 
@@ -554,10 +570,10 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v8"></script>
-    <script type="module" src="./app.js?v=owner-command-v52"></script>
+    <script type="module" src="./app.js?v=owner-command-v53"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=113', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=114', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
