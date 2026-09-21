@@ -1928,10 +1928,19 @@ function ownerAppHistory(){
 async function ownerAppRunHistory(){
   const kind=document.getElementById('ownerAppHistoryKind')?.value||'technician', value=document.getElementById('ownerAppHistoryQuery')?.value.trim()||'';
   const h=document.getElementById('ownerAppHistoryResults');if(!value){if(h)h.innerHTML=ownerAppEmpty('ENTER A SEARCH TO VIEW HISTORY');return;}
-  const r=await db.rpc('get_company_history_v1',{p_kind:kind,p_value:value,p_limit:100});
-  if(r.error){h.innerHTML='<div class="warn"><b>History could not be loaded.</b><div class="small">'+esc(r.error.message)+'</div></div>';return;}
-  const events=Array.isArray(r.data?.events)?r.data.events:[];
-  h.innerHTML=events.length?events.map(ownerCompanyHistoryEventHtml).join(''):ownerAppEmpty('NO MATCHING HISTORY FOUND');
+  if(!h)return;
+  h.innerHTML='<div class="ownerAppEmpty"><b>SEARCHING HISTORY…</b><span>Please wait.</span></div>';
+  try{
+    const r=await Promise.race([
+      db.rpc('get_company_history_v1',{p_kind:kind,p_value:value,p_limit:100}),
+      new Promise(resolve=>setTimeout(()=>resolve({error:{message:'History search timed out. Please try again.'}}),12000))
+    ]);
+    if(r.error){h.innerHTML='<div class="warn"><b>History could not be loaded.</b><div class="small">'+esc(r.error.message||'Try again.')+'</div></div>';return;}
+    const events=Array.isArray(r.data?.events)?r.data.events:[];
+    h.innerHTML=events.length?events.map(ownerCompanyHistoryEventHtml).join(''):ownerAppEmpty('NO MATCHING HISTORY FOUND');
+  }catch(error){
+    h.innerHTML='<div class="warn"><b>History could not be loaded.</b><div class="small">'+esc(error?.message||'Try again.')+'</div></div>';
+  }
 }
 function ownerAppActivity(){
   const rows=(state.reports||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
