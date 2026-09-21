@@ -474,8 +474,8 @@ async function auditedActionCard(action,userMessage=''){
       ['solar_panel_qty','Solar panels'],
       ['battery_replacement_qty','Replacement batteries'],
       ['camera_replacement_qty','Replacement cameras'],
-      ['sim_replacement_qty','SIM cards'],
-      ['micro_sd_qty','Micro SD cards']
+      ['sim_replacement_qty','SIM Card Swap'],
+      ['micro_sd_qty','SD / Micro SD Card Replacement']
     ];
     const rows=defs.map(([key,label])=>{
       const before=Number(current?.[key]||0),after=Number(canonical?.[key]||0);
@@ -1081,8 +1081,8 @@ function visionPartDefinitions(){
     {key:'solar_panel_qty',label:'Solar panels',token:'solar_panel'},
     {key:'battery_replacement_qty',label:'Replacement batteries',token:'replacement_battery'},
     {key:'camera_replacement_qty',label:'Replacement cameras',token:'replacement_camera'},
-    {key:'sim_replacement_qty',label:'SIM cards',token:'sim_card'},
-    {key:'micro_sd_qty',label:'Micro SD cards',token:'micro_sd_card'}
+    {key:'sim_replacement_qty',label:'SIM Card Swap',token:'sim_card'},
+    {key:'micro_sd_qty',label:'SD / Micro SD Card Replacement',token:'micro_sd_card'}
   ];
 }
 function normalizePartsCommandText(value){
@@ -1210,8 +1210,8 @@ function draftPartsParse(text){
     {key:'solar_panel_qty',aliases:['solar panel','solar panels']},
     {key:'battery_replacement_qty',aliases:['replacement battery','replacement batteries','battery replacement','battery replacements']},
     {key:'camera_replacement_qty',aliases:['replacement camera','replacement cameras','camera replacement','camera replacements']},
-    {key:'sim_replacement_qty',aliases:['replacement sim','replacement sims','sim replacement','sim replacements','sim card','sim cards']},
-    {key:'micro_sd_qty',aliases:['micro sd','micro sds','micro sd card','micro sd cards']}
+    {key:'sim_replacement_qty',aliases:['replacement sim','replacement sims','sim replacement','sim replacements','sim card','sim cards','sim swap','sim card swap','simetry sim','simmetry sim','simetry card','simmetry card']},
+    {key:'micro_sd_qty',aliases:['micro sd','micro sds','micro sd card','micro sd cards','sd card','sd cards','sd replacement','sd card replacement']}
   ];
   const parts={};
   for(const def of defs){
@@ -1238,6 +1238,15 @@ function draftPartsParse(text){
     const swappedBattery=s.match(/\b(?:swap(?:\s+out)?|replace|change)\s+(?:the\s+)?(?:(\d+)\s+)?batter(?:y|ies)\b/i);
     if(swappedBattery)parts.battery_replacement_qty=Number(swappedBattery[1]||1);
   }
+  if(!parts.sim_replacement_qty){
+    const swappedSim=s.match(/\b(?:swap(?:\s+out)?|replace|change)\s+(?:the\s+)?(?:(\d+)\s+)?sim(?:\s+card)?s?\b/i);
+    if(swappedSim)parts.sim_replacement_qty=Number(swappedSim[1]||1);
+    else if(/\b(?:simetry|simmetry)\b[\s\S]{0,24}\b(?:sim|card)\b|\b(?:sim|card)\b[\s\S]{0,24}\b(?:simetry|simmetry)\b/i.test(s))parts.sim_replacement_qty=1;
+  }
+  if(!parts.micro_sd_qty){
+    const swappedSd=s.match(/\b(?:swap(?:\s+out)?|replace|change)\s+(?:the\s+)?(?:(\d+)\s+)?(?:micro\s*)?sd(?:\s+card)?s?\b/i);
+    if(swappedSd)parts.micro_sd_qty=Number(swappedSd[1]||1);
+  }
   return parts;
 }
 function draftPartsText(d){
@@ -1245,8 +1254,8 @@ function draftPartsText(d){
   if(Number(p.solar_panel_qty||0)>0)rows.push(p.solar_panel_qty+' solar panel'+(Number(p.solar_panel_qty)===1?'':'s'));
   if(Number(p.battery_replacement_qty||0)>0)rows.push(p.battery_replacement_qty+' replacement batter'+(Number(p.battery_replacement_qty)===1?'y':'ies'));
   if(Number(p.camera_replacement_qty||0)>0)rows.push(p.camera_replacement_qty+' replacement camera'+(Number(p.camera_replacement_qty)===1?'':'s'));
-  if(Number(p.sim_replacement_qty||0)>0)rows.push(p.sim_replacement_qty+' SIM card'+(Number(p.sim_replacement_qty)===1?'':'s'));
-  if(Number(p.micro_sd_qty||0)>0)rows.push(p.micro_sd_qty+' micro SD card'+(Number(p.micro_sd_qty)===1?'':'s'));
+  if(Number(p.sim_replacement_qty||0)>0)rows.push(p.sim_replacement_qty+' SIM Card Swap'+(Number(p.sim_replacement_qty)===1?'':'s')+' · IT supplies');
+  if(Number(p.micro_sd_qty||0)>0)rows.push(p.micro_sd_qty+' SD / Micro SD Card Replacement'+(Number(p.micro_sd_qty)===1?'':'s')+' · IT supplies');
   if(!d.parts_answered)return rows.length?'Needs confirmation · '+rows.join(', '):'Not answered';
   return rows.join(', ')||'None';
 }
@@ -1311,7 +1320,7 @@ function draftChoiceHtml(key,d){
     return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="1 Helios">1 Helios</button><button type="button" data-vision-prompt="1 Solar Spotter">1 Solar Spotter</button><button type="button" data-vision-prompt="1 Ranger">1 Ranger</button><button type="button" data-vision-prompt="1 Sniper">1 Sniper</button>'+noEq+'</div>';
   }
   if(key==='equipment_numbers')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No equipment numbers yet">No numbers yet</button></div>';
-  if(key==='parts')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No additional parts">No additional parts</button></div>';
+  if(key==='parts')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="No other replacement items">No other replacement items</button></div>';
   if(key==='assignment'){
     const people=state.techs.filter(t=>d.role==='it_service'||d.role==='service_it'||t.role===d.role).slice(0,8);
     return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="Use department queues">Department queues</button>'+people.map(t=>'<button type="button" data-vision-prompt="Assign '+esc(t.full_name||t.username)+'">'+esc((t.role==='it'?'IT: ':'Service: ')+(t.full_name||t.username))+'</button>').join('')+'</div>';
@@ -1356,7 +1365,7 @@ function draftQuestion(key,d){
   if(key==='equipment_manifest')return d.work_type==='service'?'Does this Service job need any equipment from the shop?':'What equipment is required, and how many?';
   if(key==='equipment_numbers')return'Do you have the specific unit / stand numbers from MHelpDesk? Type them, or choose “No numbers yet.”';
   if(key==='job_description')return'What should the technician actually do on this work order?';
-  if(key==='parts')return'Are any extra parts or supplies required — solar panels, replacement batteries, cameras, SIM cards, or micro SD cards?';
+  if(key==='parts')return'Any replacement / swap items? SIM Card Swap and SD / Micro SD Card Replacement are supplied by IT and handed to Service.';
   if(key==='assignment')return'Who should this work be assigned to? Choose a technician or leave each step in its department queue.';
   if(key==='notes')return'Any additional owner notes for the technicians?';
   return'';
@@ -1396,14 +1405,19 @@ function draftApplyInput(d,text,initial=false){
   const parts=draftPartsParse(raw);
   if(Object.keys(parts).length){
     d.parts={...(d.parts||{}),...parts};
-    // Parts mentioned while answering an earlier guided question are useful
-    // prefill, but they do not silently complete the future Parts step.
-    // The Owner still gets Question 9 to confirm/edit those parts.
+    const explicitSwapLanguage=/\b(?:swap(?:\s+out)?|replace|change)\b/i.test(raw);
+    const itSuppliedCard=Number(parts.sim_replacement_qty||0)>0||Number(parts.micro_sd_qty||0)>0;
     const explicitlyAnsweringParts=expected==='parts'||/\bparts?\s*(?:are|is|:|=)\b/i.test(raw);
-    if(explicitlyAnsweringParts)d.parts_answered=true;
+    // If the work description already clearly says to replace/swap a SIM or SD
+    // card, that IS the replacement category answer. Do not ask the Owner the
+    // same parts question again.
+    if(explicitlyAnsweringParts||(expected==='job_description'&&explicitSwapLanguage&&itSuppliedCard))d.parts_answered=true;
+    // SIM and SD/micro SD cards are supplied by IT. If Service is involved,
+    // automatically use IT → Service so the cards are physically handed off.
+    if(d.work_type!=='pickup'&&itSuppliedCard&&(d.role==='service'||d.role==='service_it'))d.role='it_service';
   }
   if(expected==='parts'&&/\b(yes|correct|confirmed|that'?s all|those are all)\b/i.test(raw)&&Object.keys(d.parts||{}).length)d.parts_answered=true;
-  if((expected==='parts'&&/\b(no additional parts|no parts|none|skip)\b/i.test(raw))||/\b(no parts|no extra parts|no additional parts)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
+  if((expected==='parts'&&/\b(no additional parts|no other replacement items|no parts|none|skip)\b/i.test(raw))||/\b(no parts|no extra parts|no additional parts|no other replacement items)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
   const techs=draftMatchedTechs(raw);
   if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give|put)\b/i.test(raw))d.assignment_answered=true;}
   const queueAssignment=/\b(department queues?|leave (?:it|them|both|each).*queue|unassigned|no preference|doesn'?t matter|any (?:it|service)?\s*(?:tech|technician)|anyone (?:in|from) (?:it|service)|anybody (?:in|from) (?:it|service)|whoever(?:'s| is)? (?:available|open|free)|first available (?:it|service)?\s*(?:tech|technician))\b/i.test(raw);
