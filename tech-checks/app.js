@@ -619,6 +619,8 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     renderOwnerTechOverview();
     renderOwnerAttention();
     renderOwnerReview();
+    bindOwnerAppRouter();
+    await ownerAppRender();
     renderPasswordResetRequests();
     renderUsers();
   }
@@ -1786,6 +1788,153 @@ async function saveOwnerPrepParts(prepId) {
   alert('Parts list updated.');
 }
 
+
+let ownerAppRoute='today';
+function ownerAppHeader(kicker,title,description){
+  return '<header class="ownerAppPageHeader"><span>'+esc(kicker)+'</span><h1>'+esc(title)+'</h1><p>'+esc(description)+'</p></header>';
+}
+function ownerAppEmpty(text,detail=''){
+  return '<div class="ownerAppEmpty"><b>✓ '+esc(text)+'</b>'+(detail?'<span>'+esc(detail)+'</span>':'')+'</div>';
+}
+function ownerAppJobRow(a){
+  const who=a.assignee_name||a.assigned_to_name||(a.assignment_scope==='department'?(a.assigned_role==='it'?'IT Department Queue':'Service Department Queue'):'Unassigned');
+  return '<div class="ownerAppJobRow"><div><b>MHelpDesk #'+esc(a.ticket_no||'—')+'</b><span>'+esc(a.site||'Customer / site not recorded')+'</span></div><div><b>'+esc(a.work_type||'Service')+'</b><span>'+esc(a.job_description||'No description recorded')+'</span></div><div><b>'+esc(who)+'</b><span>'+esc(a.status==='started'?'Working now':a.status==='completed'?'Complete':'Waiting')+'</span></div></div>';
+}
+function ownerAppToday(){
+  const today=localDateKey(new Date());
+  const rows=(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');
+  const groups=[
+    ['Needs Assignment',a=>!a.assignee_user_id&&a.assignment_scope!=='department'&&a.status!=='completed'],
+    ['Waiting for IT',a=>a.assigned_role==='it'&&a.status==='assigned'],
+    ['IT Working',a=>a.assigned_role==='it'&&a.status==='started'],
+    ['Waiting for Service',a=>a.assigned_role==='service'&&a.status==='assigned'],
+    ['Service Working',a=>a.assigned_role==='service'&&a.status==='started'],
+    ['Complete',a=>a.status==='completed']
+  ];
+  const body=groups.map(([label,fn])=>{const x=rows.filter(fn);return x.length?'<section class="ownerAppGroup"><h2>'+label+' <span>'+x.length+'</span></h2>'+x.map(ownerAppJobRow).join('')+'</section>':''}).join('');
+  return ownerAppHeader('TODAY','Today','Today’s Tech Check work, ownership, current step, and what is waiting.')+(body||ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'));
+}
+function ownerAppAttention(){
+  renderOwnerAttention();
+  const src=document.getElementById('ownerAttention');
+  return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+(src?.innerHTML?.trim()||ownerAppEmpty('NOTHING NEEDS YOUR ATTENTION'));
+}
+function ownerAppReview(){
+  renderOwnerReview();
+  const src=document.getElementById('ownerReviewQueue');
+  return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+(src?.innerHTML?.trim()||ownerAppEmpty('NO JOBS WAITING FOR OWNER REVIEW'));
+}
+function ownerAppTeam(){
+  const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
+  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled'&&a.status!=='completed');
+  const assets=state.assetInventory||[];
+  const body=techs.map(t=>{
+    const tj=jobs.filter(a=>a.assignee_user_id===t.user_id), ta=assets.filter(a=>a.assigned_to===t.user_id&&a.availability_status==='assigned');
+    const current=tj.find(a=>a.status==='started')||tj[0];
+    return '<button class="ownerAppTeamRow" type="button" onclick="ownerAppShowTechHistory(\''+t.user_id+'\')"><div><b>'+esc(t.full_name||t.username)+'</b><span>'+esc(t.role==='it'?'IT TECHNICIAN':'SERVICE TECHNICIAN')+'</span></div><div><b>'+(current?'MHelpDesk #'+esc(current.ticket_no):'No current job')+'</b><span>'+esc(current?(current.status==='started'?'Working now':'Waiting to start'):'Available')+'</span></div><div><b>'+ta.length+' assigned</b><span>'+esc(ta.map(a=>a.unit_tag).join(', ')||'No assigned equipment')+'</span></div></button>';
+  }).join('');
+  return ownerAppHeader('TEAM','Team','Active IT and Service technicians, current work, and assigned equipment.')+(body||ownerAppEmpty('NO ACTIVE TECHNICIANS'));
+}
+function ownerAppShowTechHistory(id){
+  const t=(state.profiles||[]).find(p=>p.user_id===id);if(!t)return;
+  const q=document.getElementById('ownerCompanyHistoryQuery'),k=document.getElementById('ownerCompanyHistoryKind');
+  if(k)k.value='technician';if(q)q.value=t.full_name||t.username||'';
+  ownerAppNavigate('history');ownerCompanyHistorySearch();
+}
+function ownerAppUnits(){
+  renderOwnerUnitSearch();
+  const rows=(state.unitRegistry||[]);
+  return ownerAppHeader('EQUIPMENT','Units','Search a unit and see location, technician, status, last activity, and MHelpDesk reference.')
+    +'<div class="ownerAppSearch"><input id="ownerAppUnitSearch" type="search" placeholder="Search unit number / tag" oninput="ownerAppFilterUnits(this.value)"></div>'
+    +'<div id="ownerAppUnitResults">'+ownerAppUnitRows(rows.slice(0,30))+'</div>';
+}
+function ownerAppUnitRows(rows){
+  if(!rows.length)return ownerAppEmpty('NO UNITS MATCH YOUR SEARCH');
+  return rows.map(r=>'<div class="ownerAppUnitRow"><div><b>'+esc(r.equipment_type||'Equipment')+' · '+esc(r.unit_tag||'—')+'</b><span>'+esc(unitLifecycleLabel(r.lifecycle_status))+'</span></div><div><b>'+esc(r.current_holder_name||'No technician assigned')+'</b><span>'+esc(r.last_event||'No activity recorded')+'</span></div><div><b>'+(r.ticket_no?'MHelpDesk #'+esc(r.ticket_no):'No MHelpDesk ticket')+'</b><span>'+esc(r.current_site||'Location not recorded')+'</span></div></div>').join('');
+}
+function ownerAppFilterUnits(q){
+  q=String(q||'').trim().toLowerCase();
+  const rows=(state.unitRegistry||[]).filter(r=>!q||String(r.unit_tag||'').toLowerCase().includes(q)||String(r.equipment_type||'').toLowerCase().includes(q));
+  const h=document.getElementById('ownerAppUnitResults');if(h)h.innerHTML=ownerAppUnitRows(rows.slice(0,100));
+}
+function ownerAppHandoffs(){
+  const active=(state.preps||[]).filter(p=>p.status!=='closed'), done=(state.preps||[]).filter(p=>p.status==='closed').slice(-20).reverse();
+  const card=p=>'<div class="ownerAppHandoffRow"><div><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Site not recorded')+'</span></div><div><b>'+esc(p.status==='draft'?'IT preparing':'IT → Service handoff')+'</b><span>'+esc((p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+eqLabel(i.equipment_type)).join(' | ')||'No equipment recorded')+'</span></div></div>';
+  let body='';
+  const waiting=active.filter(p=>p.status==='released'), preparing=active.filter(p=>p.status==='draft');
+  if(waiting.length)body+='<section class="ownerAppGroup"><h2>Waiting for Service acceptance <span>'+waiting.length+'</span></h2>'+waiting.map(card).join('')+'</section>';
+  if(preparing.length)body+='<section class="ownerAppGroup"><h2>IT preparing <span>'+preparing.length+'</span></h2>'+preparing.map(card).join('')+'</section>';
+  if(done.length)body+='<section class="ownerAppGroup"><h2>Completed <span>'+done.length+'</span></h2>'+done.map(card).join('')+'</section>';
+  return ownerAppHeader('IT → SERVICE','Handoffs','Equipment being prepared, waiting for Service, and completed handoffs.')+(body||ownerAppEmpty('NO ACTIVE HANDOFFS'));
+}
+function ownerAppHistory(){
+  return ownerAppHeader('PERMANENT RECORD','History','Search permanent Technician, Unit, Customer / Site, or MHelpDesk history.')
+    +'<div class="ownerAppHistoryControls"><select id="ownerAppHistoryKind"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select><input id="ownerAppHistoryQuery" placeholder="Search history"><button class="btn" type="button" onclick="ownerAppRunHistory()">Search History</button></div><div id="ownerAppHistoryResults">'+ownerAppEmpty('ENTER A SEARCH TO VIEW HISTORY')+'</div>';
+}
+async function ownerAppRunHistory(){
+  const kind=document.getElementById('ownerAppHistoryKind')?.value||'technician', value=document.getElementById('ownerAppHistoryQuery')?.value.trim()||'';
+  const h=document.getElementById('ownerAppHistoryResults');if(!value){if(h)h.innerHTML=ownerAppEmpty('ENTER A SEARCH TO VIEW HISTORY');return;}
+  const r=await db.rpc('get_company_history_v1',{p_kind:kind,p_value:value,p_limit:100});
+  if(r.error){h.innerHTML='<div class="warn"><b>History could not be loaded.</b><div class="small">'+esc(r.error.message)+'</div></div>';return;}
+  const events=Array.isArray(r.data?.events)?r.data.events:[];
+  h.innerHTML=events.length?events.map(ownerCompanyHistoryEventHtml).join(''):ownerAppEmpty('NO MATCHING HISTORY FOUND');
+}
+function ownerAppActivity(){
+  const rows=(state.reports||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  return ownerAppHeader('COMPANY LOG','Activity','Chronological Tech Check activity from recorded production events.')
+    +(rows.length?rows.slice(0,100).map(r=>'<div class="ownerAppActivityRow"><div><b>'+esc(ownerWorkflowDisplayText(r.kind))+'</b><span>'+new Date(r.created_at).toLocaleString()+'</span></div><p>'+esc(ownerWorkflowDisplayText(r.text))+'</p></div>').join(''):ownerAppEmpty('NO ACTIVITY RECORDED'));
+}
+function ownerAppAccounts(){
+  renderPasswordResetRequests();renderUsers();
+  const resets=document.getElementById('passwordResetRequests')?.innerHTML||'';
+  const users=document.getElementById('userList')?.innerHTML||'';
+  return ownerAppHeader('ACCESS','Technician Accounts','Create technician logins and manage existing access.')
+    +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>'
+    +'<section class="ownerAppGroup"><h2>Password Reset Requests</h2>'+resets+'</section><section class="ownerAppGroup"><h2>Current Users</h2>'+users+'</section>';
+}
+async function ownerAppCreateTech(){
+  const map=[['ownerAppNewTechName','newTechName'],['ownerAppNewTechUsername','newTechUsername'],['ownerAppNewTechRole','newTechRole'],['ownerAppNewTechPassword','newTechPassword']];
+  map.forEach(([a,b])=>{const x=document.getElementById(a),y=document.getElementById(b);if(x&&y)y.value=x.value;});
+  await createTech();ownerAppRender();
+}
+async function ownerAppAssign(){
+  if(typeof window.installOwnerAssignments==='function') await window.installOwnerAssignments(true);
+  else if(typeof installOwnerAssignments==='function') await installOwnerAssignments(true);
+  const legacy=document.getElementById('ownerJobAssignments');
+  const body=legacy?.querySelector('.ownerDashBody');
+  return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.')
+    +(body?.innerHTML||'<div class="ownerAppEmpty"><b>Loading the assignment form…</b></div>');
+}
+async function ownerAppRender(){
+  if(state.profile?.role!=='owner')return;
+  const host=document.getElementById('ownerAppPage');if(!host)return;
+  let html='';
+  if(ownerAppRoute==='today')html=ownerAppToday();
+  else if(ownerAppRoute==='attention')html=ownerAppAttention();
+  else if(ownerAppRoute==='review')html=ownerAppReview();
+  else if(ownerAppRoute==='team')html=ownerAppTeam();
+  else if(ownerAppRoute==='units')html=ownerAppUnits();
+  else if(ownerAppRoute==='handoffs')html=ownerAppHandoffs();
+  else if(ownerAppRoute==='history')html=ownerAppHistory();
+  else if(ownerAppRoute==='activity')html=ownerAppActivity();
+  else if(ownerAppRoute==='accounts')html=ownerAppAccounts();
+  else if(ownerAppRoute==='assign')html=await ownerAppAssign();
+  host.innerHTML=html;
+  document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===ownerAppRoute));
+  if(ownerAppRoute==='assign'){
+    // The production assignment installer binds to the legacy form. Move the
+    // actual form nodes into the visible workspace so the same handlers/IDs work.
+    const legacy=document.getElementById('ownerJobAssignments');
+    const body=legacy?.querySelector('.ownerDashBody');
+    if(body){const header=host.querySelector('.ownerAppPageHeader');host.innerHTML='';if(header)host.append(header);host.append(body);}
+  }
+}
+async function ownerAppNavigate(route){ownerAppRoute=route;await ownerAppRender();}
+function bindOwnerAppRouter(){
+  const app=document.getElementById('ownerApp');if(!app||app.dataset.bound==='1')return;
+  app.dataset.bound='1';
+  app.addEventListener('click',e=>{const b=e.target.closest('[data-owner-route]');if(b)ownerAppNavigate(b.dataset.ownerRoute);});
+}
 function ownerCommandOpen(id) {
   const el=document.getElementById(id);
   if (!el) return;
@@ -2183,6 +2332,11 @@ Object.assign(window, {
   ownerReviewPasswordReset,
   ownerCompanyHistoryKindChanged,
   ownerCompanyHistorySearch,
+  ownerAppNavigate,
+  ownerAppRunHistory,
+  ownerAppFilterUnits,
+  ownerAppShowTechHistory,
+  ownerAppCreateTech,
   ownerJump,
   ownerOpenReturn,
   setOwnerDailyDate,
