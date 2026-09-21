@@ -542,12 +542,15 @@ async function refreshData(options = {}) {
     });
   return refreshInFlight;
 }
+function appTimeout(promise,label,ms=15000){
+  return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+' timed out after '+Math.round(ms/1000)+'s')),ms))]);
+}
 async function loadPrepSnapshot(initial=false) {
   const historyLimit = initial ? 35 : 120;
-  const [activeQ, recentQ] = await Promise.all([
+  const [activeQ, recentQ] = await appTimeout(Promise.all([
     db.from('prep_tickets').select('*,prep_items(*)').neq('status','closed').order('created_at',{ascending:true}),
     db.from('prep_tickets').select('*,prep_items(*)').eq('status','closed').order('created_at',{ascending:false}).limit(historyLimit)
-  ]);
+  ]),'Prep snapshot');
   if (activeQ.error && recentQ.error) return null;
   const byId = new Map();
   for (const row of (activeQ.data || [])) byId.set(row.id,row);
@@ -583,7 +586,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     const reportLimit = initial ? 60 : 250;
     const historyLimit = initial ? 80 : 300;
     const registryLimit = initial ? 180 : 500;
-    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries] = await Promise.all([
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries] = await appTimeout(Promise.all([
       db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
@@ -598,7 +601,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.rpc('owner_review_queue_v1',{p_limit:40}),
       db.from('field_escalations').select('id,ticket_no,site,unit_tag,equipment_type,status,service_tech_name,it_tech_name,original_problem,service_troubleshooting_notes,it_troubleshooting_notes,owner_summary,created_at,updated_at').is('resolved_at',null).order('updated_at',{ascending:false}).limit(100),
       db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true})
-    ]);
+    ]),'Owner production data');
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
     if (!resets.error) state.resetRequests = resets.data || [];
