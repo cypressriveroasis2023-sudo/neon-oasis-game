@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v130",
-  "service_worker": "v135",
-  "generated_for": "OnSite Vision live offline escalation answers + technician shared Tech Check rule parity",
+  "runtime_version": "release-qa-v131",
+  "service_worker": "v136",
+  "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -2920,7 +2920,101 @@
         "Offline escalation events remain eligible history after resolution",
         "Unknown history returns MISSING INFORMATION instead of an invented technician"
       ]
+    },
+    {
+      "id": "VISION-DAMAGE-LIVE-01",
+      "area": "OnSite Vision · damaged equipment",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision answers which equipment currently needs replacement or repair attention",
+      "steps": [
+        "Seed rollback-only waiting_it and historical damaged returns",
+        "Use it_mark_return_needs_replacement_v1 on one return",
+        "Ask Vision what damaged equipment needs replacement"
+      ],
+      "expected": [
+        "Only active needs_replacement returns appear in the current damaged-equipment list",
+        "The asset is reported as held out of available Shop Inventory",
+        "MHelpDesk remains separate",
+        "Rollback leaves zero QA residue"
+      ]
+    },
+    {
+      "id": "VISION-DAMAGE-DOCUMENTATION-01",
+      "area": "OnSite Vision · IT damage documentation",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision reports the damage IT actually documented",
+      "steps": [
+        "Create a rollback Needs Replacement hold with IT damage notes and an Intake photo",
+        "Ask what damage IT documented on the unit"
+      ],
+      "expected": [
+        "Damage notes, IT technician, Intake evidence count, and return notes come from unit_returns",
+        "Any unrecorded requested field is MISSING INFORMATION",
+        "Vision does not invent a repair diagnosis"
+      ]
+    },
+    {
+      "id": "VISION-DAMAGE-NOTIFICATION-01",
+      "area": "OnSite Vision · Owner damage notification",
+      "role": "owner",
+      "mode": "authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision verifies Owner damage notification from the actual notification ledger",
+      "steps": [
+        "Create a rollback Needs Replacement hold through the IT RPC",
+        "Verify the authenticated IT session cannot read Owner notification rows",
+        "Verify the authenticated Owner session can read matching Damaged equipment needs replacement notifications",
+        "Ask Vision whether the Owner was notified"
+      ],
+      "expected": [
+        "Vision says Owner notification is VERIFIED DATABASE FACT only when matching app_notifications rows exist",
+        "A permanent damage report alone is not substituted for missing notification evidence",
+        "RLS continues protecting Owner notification rows from IT",
+        "Retrying the same damage escalation does not duplicate notifications"
+      ]
+    },
+    {
+      "id": "VISION-DAMAGE-SHOP-GUARD-01",
+      "area": "OnSite Vision · Shop Inventory protection",
+      "role": "owner",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "Vision answers whether a damaged unit can return to Shop Inventory",
+      "steps": [
+        "Create a rollback Needs Replacement hold",
+        "Verify asset_inventory status becomes maintenance",
+        "Attempt owner_set_inventory_asset_status(..., shop, ...) and verify rejection",
+        "Ask Vision if the unit can go back to Shop Inventory"
+      ],
+      "expected": [
+        "Vision answers no while needs_replacement is active",
+        "The answer cites the live hold and company rule rather than guessing",
+        "The generic Shop Inventory path remains blocked",
+        "Final repair/replacement disposition remains MISSING INFORMATION"
+      ]
+    },
+    {
+      "id": "VISION-DAMAGE-STATUS-01",
+      "area": "OnSite Vision · repair/replacement status",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision separates recorded damage status from undefined final disposition",
+      "steps": [
+        "Seed an active Needs Replacement return and a historical completed return with damage notes",
+        "Ask for the repair/replacement status of the active unit",
+        "Ask for recorded damage detail on the historical unit"
+      ],
+      "expected": [
+        "Active state reports needs_replacement and Maintenance when recorded",
+        "Historical damage may still be read for detail without appearing in the active hold list",
+        "Vision says MISSING INFORMATION for the normal final repair/replacement procedure or outcome when it has not been defined/recorded"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Current/offline questions use unresolved records only; detail/history questions may inspect resolved escalations. A single offline-unit result is remembered for “this unit” follow-ups. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "OnSite Vision now answers live damaged-equipment Needs Replacement questions in addition to offline-unit questions. Damage answers use unit_returns, asset inventory, Owner notification records, and permanent reports. An active Needs Replacement hold is not available Shop Inventory. Owner notification is only VERIFIED DATABASE FACT when a matching notification row exists. Final repair/replacement disposition remains MISSING INFORMATION until Cameras On Site defines/completes it. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
