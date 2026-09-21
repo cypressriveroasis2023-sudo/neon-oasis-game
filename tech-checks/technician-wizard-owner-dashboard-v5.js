@@ -4863,9 +4863,11 @@ function organizeOwnerDashboard(){
   }
 
   const order=[
+    'ownerCommandCenter',
+    'ownerTechOverviewCard',
+    'ownerAttentionCard',
     'ownerJobAssignments',
     'ownerLiveJobProgress',
-    'ownerAttentionCard',
     'ownerIntakeTracking',
     'ownerUnitStatusCard',
     'ownerHandoffsCard',
