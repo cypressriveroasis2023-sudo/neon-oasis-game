@@ -1952,63 +1952,78 @@ let ownerAppRenderVersion = 0;
 async function ownerAppRender(){
   if(state.profile?.role!=='owner')return;
   const host=document.getElementById('ownerAppPage');if(!host)return;
-  const version=++ownerAppRenderVersion;
-  const route=ownerAppRoute;
-  // Data refreshes must not detach the active form or steal keyboard focus.
-  if(route==='assign' && host.querySelector('#ownerJobAssignments #ownerAssignTicket')) {
-    ownerInteractionSafety();
-    return;
+  const version=++ownerAppRenderVersion, route=ownerAppRoute;
+  // Assign Job is the one production control surface that must retain its
+  // authoritative DOM node because its existing handlers are scoped to it.
+  if(route==='assign' && host.querySelector('#ownerJobAssignments #ownerAssignTicket')){
+    ownerInteractionSafety();return;
   }
-  // Move authoritative nodes back before replacing the route, never copy IDs.
-  for(const [node,home] of ownerAppMountHomes) {
-    if(host.contains(node)) home.append(node);
+  const mounted=host.querySelector('#ownerJobAssignments');
+  if(mounted){
+    const home=document.getElementById('ownerLegacyMounts');
+    if(home)home.append(mounted);
+    mounted.classList.remove('ownerAppMountedAssign');
+    mounted.setAttribute('aria-hidden','true');
   }
   let html='';
-  if(ownerAppRoute==='today')html=ownerAppToday();
-  else if(ownerAppRoute==='calendar')html=ownerAppCalendar();
-  else if(ownerAppRoute==='attention')html=ownerAppAttention();
-  else if(ownerAppRoute==='review')html=ownerAppReview();
-  else if(ownerAppRoute==='team')html=ownerAppTeam();
-  else if(ownerAppRoute==='units')html=ownerAppUnits();
-  else if(ownerAppRoute==='handoffs')html=ownerAppHandoffs();
-  else if(ownerAppRoute==='history')html=ownerAppHistory();
-  else if(ownerAppRoute==='activity')html=ownerAppActivity();
-  else if(ownerAppRoute==='accounts')html=ownerAppAccounts();
-  else if(ownerAppRoute==='assign')html=await ownerAppAssign();
-  if(version!==ownerAppRenderVersion || route!==ownerAppRoute)return;
+  if(route==='today')html=ownerAppToday();
+  else if(route==='calendar')html=ownerAppCalendar();
+  else if(route==='attention')html=ownerAppAttention();
+  else if(route==='review')html=ownerAppReview();
+  else if(route==='team')html=ownerAppTeam();
+  else if(route==='units')html=ownerAppUnits();
+  else if(route==='handoffs')html=ownerAppHandoffs();
+  else if(route==='history')html=ownerAppHistory();
+  else if(route==='activity')html=ownerAppActivity();
+  else if(route==='accounts')html=ownerAppAccounts();
+  else if(route==='assign')html=await ownerAppAssign();
+  if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
   host.innerHTML=html;
-  for(const slot of host.querySelectorAll('[data-owner-mount]')) {
-    const node=document.getElementById(slot.dataset.ownerMount);
-    if(!node)continue;
-    if(!ownerAppMountHomes.has(node))ownerAppMountHomes.set(node,node.parentElement);
+  // Never move legacy dashboard sections into the desktop workspace. Only
+  // mount the single authoritative Assign Job form and the two account lists.
+  for(const slot of host.querySelectorAll('[data-owner-mount]')){
+    const id=slot.dataset.ownerMount;
+    if(!['ownerJobAssignments','passwordResetRequests','userList'].includes(id)){slot.remove();continue;}
+    const node=document.getElementById(id);if(!node){slot.remove();continue;}
     slot.replaceWith(node);
   }
-  document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===ownerAppRoute));
-  if(ownerAppRoute==='assign'){
-    // Mount the COMPLETE production form, not only its inner body. Production
-    // handlers/readers depend on #ownerJobAssignments being the form ancestor.
-    const legacy=document.getElementById('ownerJobAssignments');
-    if(legacy){
-      legacy.open=true;
-      legacy.classList.add('ownerAppMountedAssign');
-      legacy.removeAttribute('aria-hidden');
+  document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===route));
+  if(route==='assign'){
+    const form=document.getElementById('ownerJobAssignments');
+    if(form){
+      form.open=true;form.classList.add('ownerAppMountedAssign');
+      form.removeAttribute('aria-hidden');
     }
   }
   ownerInteractionSafety();
 }
-async function ownerAppNavigate(route){ownerInteractionSafety();ownerAppRoute=route;await ownerAppRender();ownerInteractionSafety();}
+async function ownerAppNavigate(route){
+  if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
+  ownerInteractionSafety();ownerAppRoute=route;await ownerAppRender();ownerInteractionSafety();
+}
 function ownerInteractionSafety(){
   if(state.profile?.role!=='owner')return;
   document.body.classList.remove('busy');
-  const app=document.getElementById('ownerApp'); if(app)app.style.pointerEvents='auto';
-  const ws=document.querySelector('#view-owner .ownerAppWorkspace'); if(ws)ws.style.pointerEvents='auto';
+  const legacy=document.getElementById('ownerLegacyMounts');
+  if(legacy){
+    legacy.setAttribute('aria-hidden','true');
+    legacy.style.display='none';
+    legacy.style.pointerEvents='none';
+  }
+  const app=document.getElementById('ownerApp');if(app)app.style.pointerEvents='auto';
+  const ws=document.querySelector('#view-owner .ownerAppWorkspace');if(ws)ws.style.pointerEvents='auto';
   const form=document.getElementById('ownerJobAssignments');
-  if(form && form.closest('#ownerAppPage')) form.removeAttribute('aria-hidden');
+  if(form&&form.closest('#ownerAppPage')){
+    form.removeAttribute('aria-hidden');form.style.pointerEvents='auto';
+  }
 }
 function bindOwnerAppRouter(){
   const app=document.getElementById('ownerApp');if(!app||app.dataset.bound==='1')return;
   app.dataset.bound='1';
-  app.addEventListener('click',e=>{const b=e.target.closest('[data-owner-route]');if(b)ownerAppNavigate(b.dataset.ownerRoute);});
+  app.addEventListener('click',e=>{
+    const b=e.target.closest('[data-owner-route]');
+    if(!b)return;e.preventDefault();e.stopPropagation();ownerAppNavigate(b.dataset.ownerRoute);
+  });
 }
 function ownerCommandOpen(id) {
   const el=document.getElementById(id);
