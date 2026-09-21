@@ -1431,8 +1431,8 @@ function renderOwnerReview() {
   const host=$('ownerReviewQueue');
   if (!host) return;
   const rows=state.ownerReviewQueue || [];
-  const ready=rows.filter(r=>r.review_status==='ready');
-  const corrections=rows.filter(r=>r.review_status==='correction_requested');
+  const ready=rows.filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed');
+  const corrections=rows.filter(r=>r.review_status==='correction_requested'&&r.ready_for_owner_review!==true);
   const badge=$('ownerReviewBadge');
   if (badge) {
     badge.textContent=String(ready.length);
@@ -1448,11 +1448,11 @@ function renderOwnerReview() {
   host.innerHTML=rows.map(r=>{
     const ticket=esc(r.ticket_no || '');
     const site=esc(r.site || 'Site not recorded');
-    if (r.review_status==='correction_requested') {
+    if (r.review_status==='correction_requested'&&r.ready_for_owner_review!==true) {
       return '<div class="ownerReviewRow correction"><div class="ownerReviewHead"><div><b>MHelpDesk #'+ticket+' · '+site+'</b><span>RETURNED FOR CORRECTION</span></div></div>'
         +ownerReviewOverviewHtml(r)
-        +'<div class="warn top8"><b>'+esc(String(r.correction_role || 'service').toUpperCase())+' correction requested</b><div class="small">'+esc(r.correction_reason || 'Owner correction requested')+'</div></div>'
-        +'<div class="row top8"><button class="mini" type="button" onclick="ownerCommandAction(\'assign\')">Assign Correction →</button><a class="mini" href="./onsite-vision.html">Ask Vision</a></div></div>';
+        +'<div class="warn top8"><b>'+esc(String(r.correction_role || 'service').toUpperCase())+' correction active</b><div class="small">Automatically routed to the '+esc(String(r.correction_role || 'service').toUpperCase())+' Department queue · '+esc(r.correction_reason || 'Owner correction requested')+'</div></div>'
+        +'<div class="row top8"><button class="mini" type="button" onclick="ownerJump(\'vision\')">Open Correction →</button><a class="mini" href="./onsite-vision.html">Ask Vision</a></div></div>';
     }
     return '<div class="ownerReviewRow ready"><div class="ownerReviewHead"><div><b>MHelpDesk #'+ticket+' · '+site+'</b><span>READY FOR OWNER REVIEW</span></div></div>'
       +ownerReviewOverviewHtml(r)
@@ -1478,7 +1478,7 @@ async function ownerReturnJobForCorrection(ticketNo) {
   const role=String(target).trim().toLowerCase();
   if (!['it','service'].includes(role)) return alert('Enter IT or Service.');
   setBusy(true);
-  const { error }=await db.rpc('owner_return_job_for_correction_v1',{
+  const { data,error }=await db.rpc('owner_return_job_for_correction_v1',{
     p_ticket_no:String(ticketNo),
     p_reason:String(reason).trim(),
     p_role:role
@@ -1486,14 +1486,15 @@ async function ownerReturnJobForCorrection(ticketNo) {
   setBusy(false);
   if (error) return alert(error.message);
   await refreshData();
-  alert('Correction request recorded permanently. Use Assign Job to Tech to route the correction; prior completion history was preserved.');
+  const queue=data?.correction_queue || (role==='it'?'IT Department':'Service Department');
+  alert('Correction recorded and routed to '+queue+'. Prior completion history was preserved. MHelpDesk was not changed.');
 }
 
 function renderOwnerAttention() {
   if (state.profile?.role !== 'owner') return;
   const host = $('ownerAttention'); if (!host) return;
   const returns = state.ownerReturns || [];
-  const corrections = (state.ownerReviewQueue || []).filter(r => r.review_status === 'correction_requested');
+  const corrections = (state.ownerReviewQueue || []).filter(r => r.review_status === 'correction_requested' && r.ready_for_owner_review !== true);
   const visionAlerts = state.ownerAIAlerts || [];
   const drafts = state.preps.filter(p => p.status === 'draft');
   const released = state.preps.filter(p => p.status === 'released');
@@ -1520,7 +1521,7 @@ function renderOwnerAttention() {
   if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
   const row = (kind,title,detail,target,urgent=false) => `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini' onclick="ownerJump('${target}')">Open →</button></div>`;
-  const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Route correction for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>${esc(String(corrections[0].correction_role || 'service').toUpperCase())} correction requested · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerCommandAction('review')">Open Owner Review →</button></div>` : visionAlerts[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>ONSITE VISION ALERT</div><b>Review MHelpDesk #${esc(visionAlerts[0].ticket_no || '—')}</b><div class='small'>${esc(visionAlerts[0].detail || 'Vision detected an active workflow issue.')}${visionAlerts[0].acknowledged?' · ACKNOWLEDGED — remains active until resolved':''}</div><button class='btn top10' onclick="ownerJump('vision')">Open Vision Alert →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
+  const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Correction active for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>Automatically routed to the ${esc(String(corrections[0].correction_role || 'service').toUpperCase())} Department queue · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerJump('vision')">Open Correction →</button></div>` : visionAlerts[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>ONSITE VISION ALERT</div><b>Review MHelpDesk #${esc(visionAlerts[0].ticket_no || '—')}</b><div class='small'>${esc(visionAlerts[0].detail || 'Vision detected an active workflow issue.')}${visionAlerts[0].acknowledged?' · ACKNOWLEDGED — remains active until resolved':''}</div><button class='btn top10' onclick="ownerJump('vision')">Open Vision Alert →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
   const parts = [];
   if (replacements.length) parts.push(row('replacement',`${replacements.length} damaged equipment item${replacements.length===1?'':'s'} need replacement / repair`,replacements.map(r => `${r.equipment_type || 'Equipment'} ${r.unit_tag || ''} · #${r.ticket_no}`).join(' | '),'returns',true));
   if (corrections.length) parts.push(row('correction',`${corrections.length} job${corrections.length===1?'':'s'} returned for correction`,corrections.map(r => `#${r.ticket_no} · ${String(r.correction_role || 'service').toUpperCase()} · ${r.correction_reason || 'Owner correction requested'}`).join(' | '),'review',true));
@@ -1742,7 +1743,7 @@ function renderOwnerCommandCenter() {
   const returns=state.ownerReturns||[];
   const reviewRows=state.ownerReviewQueue||[];
   const readyReview=reviewRows.filter(r=>r.review_status==='ready').length;
-  const correctionReview=reviewRows.filter(r=>r.review_status==='correction_requested').length;
+  const correctionReview=reviewRows.filter(r=>r.review_status==='correction_requested'&&r.ready_for_owner_review!==true).length;
   const waitingIt=returns.filter(r=>r.status==='waiting_it').length;
   const replacementCount=returns.filter(r=>r.status==='needs_replacement').length;
   const resetPending=(state.resetRequests||[]).filter(r=>r.status==='pending'&&new Date(r.expires_at).getTime()>Date.now()).length;
