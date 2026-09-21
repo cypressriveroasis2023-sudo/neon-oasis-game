@@ -2536,7 +2536,28 @@
         "MHelpDesk is explicitly separate",
         "Unknown or unrecorded information is never invented"
       ]
+    },
+    {
+      "id": "OWNER-VISION-ALERT-STABLE-KEY-01",
+      "area": "Owner Command Center · OnSite Vision alert identity",
+      "role": "owner",
+      "mode": "source + production-data verification",
+      "destructive": false,
+      "scenario": "An unresolved workflow issue keeps one stable alert identity while elapsed-time display text changes",
+      "steps": [
+        "Generate the semantic key for an assigned-not-started alert at two different elapsed display times",
+        "Verify both times produce the same assignment-scoped alert key",
+        "Verify an IT-handoff-waiting condition adds its own stable fingerprint without embedding elapsed time",
+        "Verify current active alert rows use stable fingerprints rather than 14h/1d display strings",
+        "Verify live alert_detail and last_seen_at may continue updating without creating a new active row"
+      ],
+      "expected": [
+        "One active row represents one semantic issue per assignment",
+        "Changing elapsed-time wording does not create false resolved-history entries",
+        "IT and Service assignments on the same MHelpDesk ticket remain separate alerts",
+        "Acknowledgement and final resolution remain attached to the same stable alert row"
+      ]
     }
   ],
-  "last_release_qa_note": "Current release QA covers OnSite Vision Q8→Q9 draft progression, persistent Owner Vision alerts, authenticated Owner Close Job, automatic correction routing, permanent Company History, and Help/workflow alignment. Service Help now matches the enforced 4 × 12V 110Ah + 2 × LiTime 12V 100Ah charged truck gate and checked-out backup rule; Owner Help matches alert, closeout, correction, and history behavior. Rollback QA left zero synthetic production residue."
+  "last_release_qa_note": "Current release QA covers OnSite Vision Q8→Q9, stable persistent Owner Vision alerts, authenticated Owner closeout/correction routing, permanent Company History, and Help alignment. Vision alert keys now fingerprint the semantic issue rather than elapsed-time display text, so one unresolved assignment issue remains one active alert while detail/last-seen updates. Legacy elapsed-key rows were retained with an explicit superseded-by-normalization note rather than falsely claiming the workflow condition cleared."
 }
