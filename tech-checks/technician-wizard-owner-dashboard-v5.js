@@ -434,7 +434,7 @@ async function prepCounts() {
   const drafts = rows.filter(r => r.status === 'draft');
   return { draft: drafts.length, released: rows.filter(r => r.status === 'released').length, closed: rows.filter(r => r.status === 'closed').length, nextDraft: drafts[0] || null };
 }
-async function returnCounts() { const { data } = await liveDb.from('unit_returns').select('id,status,ticket_no,unit_tag,equipment_type,returned_at').order('returned_at',{ascending:true}); const rows=data||[]; const waitingRows=rows.filter(r=>r.status==='waiting_it'); return { waiting:waitingRows.length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, completed:rows.filter(r=>r.status==='completed').length, nextWaiting:waitingRows[0]||null }; }
+async function returnCounts() { const { data } = await liveDb.from('unit_returns').select('id,status,ticket_no,unit_tag,equipment_type,returned_at').order('returned_at',{ascending:true}); const rows=data||[]; const waitingRows=rows.filter(r=>r.status==='waiting_it'); return { waiting:waitingRows.length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, replacement:rows.filter(r=>r.status==='needs_replacement').length, completed:rows.filter(r=>r.status==='completed').length, nextWaiting:waitingRows[0]||null }; }
 async function returnRows() { const { data,error }=await liveDb.from('unit_returns').select('*').order('returned_at',{ascending:false}); if(error) throw error; return data||[]; }
 async function returnPhotoHtml(paths) {
   const items = await Promise.all((paths || []).map(async path => {
@@ -444,7 +444,7 @@ async function returnPhotoHtml(paths) {
   }));
   return items.join('');
 }
-async function myReturnCounts() { const { data: { session } } = await liveDb.auth.getSession(); if (!session?.user?.id) return { waiting:0, inventory:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', session.user.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, completed:rows.filter(r=>r.status==='completed').length }; }
+async function myReturnCounts() { const { data: { session } } = await liveDb.auth.getSession(); if (!session?.user?.id) return { waiting:0, inventory:0, replacement:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', session.user.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, replacement:rows.filter(r=>r.status==='needs_replacement').length, completed:rows.filter(r=>r.status==='completed').length }; }
 async function releasedPrepCount() { const { data } = await liveDb.from('prep_tickets').select('id').eq('status','released'); return (data||[]).length; }
 async function myTruckSpareData() {
   const { data:{ session } }=await liveDb.auth.getSession();
@@ -1552,7 +1552,7 @@ async function syncITReturnAssignmentAfterIntake(ticket,techId) {
   const a=rows?.[0]; if(!a)return;
   const required=assignmentEquipmentCount(a);
   const {data:returns}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',String(ticket||''));
-  const processed=(returns||[]).filter(r=>['pending_mhelp_inventory','completed'].includes(r.status)).length;
+  const processed=(returns||[]).filter(r=>['pending_mhelp_inventory','needs_replacement','completed'].includes(r.status)).length;
   if(processed>=required){
     const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
     if(error)console.warn('IT Intake saved but IT assignment could not be completed',error);
@@ -4180,7 +4180,7 @@ async function showServiceReturnHistory() {
   serviceReturnRows = new Map(rows.map(r => [r.id, r]));
   let card = document.getElementById('wlSvcReturnHistory');
   if (!card) { card = document.createElement('div'); card.id = 'wlSvcReturnHistory'; card.className = 'card'; viewSvc().append(card); }
-  const statusText = r => r.status === 'waiting_it' ? 'WAITING FOR IT INTAKE' : r.status === 'pending_mhelp_inventory' ? 'IT COMPLETE — PENDING MHELPDESK INVENTORY' : 'COMPLETED — BACK IN SHOP INVENTORY';
+  const statusText = r => r.status === 'waiting_it' ? 'WAITING FOR IT INTAKE' : r.status === 'pending_mhelp_inventory' ? 'IT COMPLETE — PENDING MHELPDESK INVENTORY' : r.status === 'needs_replacement' ? 'NEEDS REPLACEMENT — OWNER NOTIFIED' : 'COMPLETED — BACK IN SHOP INVENTORY';
   const item = r => `<details class='ownerFold' data-svc-return='${r.id}'><summary><span><b>${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span></span><span class='pill ${r.status === 'completed' ? 'delivery' : 'amber'}'>${statusText(r)}</span></summary><div class='ownerFoldBody'><div class='small'><b>Status:</b> ${statusText(r)}</div><div class='wl-return-gallery top8' data-svc-return-photos='${r.id}'><div class='wl-note'>Photos load when this return is opened.</div></div></div></details>`;
   const active = rows.filter(r => r.status !== 'completed');
   const completed = rows.filter(r => r.status === 'completed');
@@ -4255,12 +4255,13 @@ async function submitServiceReturn() {
     const scan=!is110VStandReturn() && serviceReturn.tagScan && ['match','mismatch','unreadable'].includes(serviceReturn.tagScan.status) ? serviceReturn.tagScan : null;
     let error=null;
     if (is110VStandReturn()) {
-      ({error}=await liveDb.rpc('service_return_110v_stand_to_shop_v1',{
+      ({error}=await liveDb.rpc('service_return_110v_stand_to_shop_v3',{
         p_ticket_no:serviceReturn.ticket,
         p_unit_tag:String(serviceReturn.unit||'').trim()||null,
         p_notes:serviceReturn.notes||null,
         p_return_photo_paths:uploadedPaths,
-        p_return_id:returnId
+        p_return_id:returnId,
+        p_damage_found:(serviceReturn.damagePhotos || []).length>0
       }));
     } else {
       ({error}=await liveDb.from('unit_returns').insert({
