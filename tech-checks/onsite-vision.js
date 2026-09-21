@@ -970,12 +970,16 @@ function startDraft(text){
   const current=ensureChat();current.ticket='';current.draft=d;saveChats();renderOrder();
   return draftResponseHtml(d,true);
 }
-function continueDraft(text){
+async function continueDraft(text){
   const current=ensureChat();
   if(!current.draft)return'';
   const d=normalizeDraftState(current.draft);
   if(/\b(cancel|never\s+mind|nevermind|discard|stop)\b/i.test(text)){
-    current.draft=null;saveChats();
+    current.draft=null;current.updatedAt=now();saveChats();
+    if(persistenceReady&&db){
+      clearTimeout(conversationSyncTimer);
+      try{await visionPersistence()?.save?.(current);}catch(error){console.warn('Vision draft cancel cloud sync',error);queueConversationSync();}
+    }
     return '<div class="vision-answer-title">Draft cancelled.</div><div class="vision-answer-copy">No Tech Check job was created.</div>';
   }
   const before=draftMissingKey(d);
@@ -989,6 +993,12 @@ function continueDraft(text){
   current.draft=d;
   current.updatedAt=now();
   saveChats();
+  // Save accepted wizard state before the next question is rendered. Local
+  // storage is already synchronous; this also closes the cloud-sync race.
+  if(persistenceReady&&db){
+    clearTimeout(conversationSyncTimer);
+    try{await visionPersistence()?.save?.(current);}catch(error){console.warn('Vision draft answer cloud sync',error);queueConversationSync();}
+  }
   return draftResponseHtml(d,false,{before,after,advanced});
 }
 async function createDraftJob(d){
@@ -1144,7 +1154,7 @@ async function answer(text){
       const side=await serverAgentAnswer(raw);
       if(side)return side;
     }
-    return continueDraft(raw);
+    return await continueDraft(raw);
   }
   if(isCreateRequest(raw))return startDraft(raw);
 
