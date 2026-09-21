@@ -3940,3 +3940,49 @@ select {
   #view-owner .ownerReviewActions .btn,
   #view-owner .ownerReviewActions .mini{width:100%;min-width:0}
 }
+
+
+/* Service truck load gate v122 */
+.truckLoadGate{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid #d4dee6;
+  border-left:5px solid #172839;
+  border-radius:12px;
+  background:#f7f9fb;
+}
+.truckLoadGate .subhead{margin-bottom:4px}
+.truckLoadGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+  margin-top:10px;
+}
+.truckLoadGrid label{
+  display:grid;
+  gap:5px;
+  align-content:start;
+}
+.truckLoadGrid label>span{
+  color:#41586b;
+  font-size:11px;
+  font-weight:850;
+}
+.truckLoadGrid input[type="number"]{
+  width:100%;
+  margin:0;
+}
+.truckLoadCheck{
+  grid-template-columns:auto minmax(0,1fr)!important;
+  align-items:center!important;
+  align-content:center!important;
+  border:1px solid #d8e1e7;
+  border-radius:10px;
+  padding:9px 10px;
+  background:#fff;
+}
+.truckLoadCheck input{margin:0}
+.truckLoadCheck span{font-size:11px!important}
+@media(max-width:680px){
+  .truckLoadGrid{grid-template-columns:1fr}
+}
