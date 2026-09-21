@@ -1802,9 +1802,19 @@ function ownerCommandAction(action) {
     assign:'ownerJobAssignments',
     units:'ownerUnitStatusCard',
     handoffs:'ownerHandoffsCard',
-    activity:'ownerActivityCard'
+    activity:'ownerActivityCard',
+    accounts:'ownerAccountsCard'
   };
-  ownerCommandOpen(map[action]);
+  const targetId=map[action];
+  const content=document.getElementById('ownerWorkspaceContent');
+  if(content && targetId){
+    content.classList.add('active');
+    content.querySelectorAll(':scope > details.ownerDashSection').forEach(section=>{
+      section.classList.toggle('ownerWorkspaceSelected',section.id===targetId);
+      section.open=section.id===targetId;
+    });
+  }
+  ownerCommandOpen(targetId);
   if(action==='units') requestAnimationFrame(()=>document.getElementById('ownerUnitSearch')?.focus());
 }
 function bindOwnerCommandCenter() {
