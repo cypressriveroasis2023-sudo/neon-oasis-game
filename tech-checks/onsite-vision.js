@@ -641,6 +641,47 @@ function dateJobs(k){
   }
   return tickets.length?'<div class="vision-answer-title">'+tickets.length+' job'+(tickets.length===1?'':'s')+' on '+esc(dateLabel(k))+'</div><div class="vision-answer-copy">I pulled the live Tech Check schedule and assignments.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No Tech Check jobs are scheduled for '+esc(dateLabel(k))+'.</div>';
 }
+
+function workloadIntent(text){
+  const raw=String(text||'').trim(),s=raw.toLowerCase();
+  const jobCue=/\b(job|jobs|ticket|tickets|work|workload|schedule|scheduled|assignment|assignments|run|runs|route|day)\b/.test(s);
+  const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|busy|on deck|lined up|going on)\b/.test(s);
+  const role=/\bservice\b/.test(s)?'service':/\bit\b/.test(s)?'it':'';
+  const tech=findTech(raw,role)||findTech(raw);
+  if(!jobCue||!askCue||(!role&&!tech))return null;
+  // A date-free workload question means today in ordinary conversation.
+  const date=dateFrom(raw)||dayKey(new Date());
+  return{date,role:tech?.role||role,tech};
+}
+function workloadHtml(intent){
+  if(!intent)return'';
+  const rows=state.jobs.filter(j=>{
+    if(j.status==='completed'||String(j.scheduled_for||'')!==String(intent.date))return false;
+    if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
+    if(intent.tech){
+      const uid=String(intent.tech.user_id||'');
+      const rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||'');
+      const rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
+      const names=[intent.tech.full_name,intent.tech.username].filter(Boolean).map(v=>String(v).trim().toLowerCase());
+      if(uid&&rowUid)return rowUid===uid;
+      return names.includes(rowName);
+    }
+    return true;
+  });
+  const tickets=[...new Set(rows.map(j=>String(j.ticket_no||'')).filter(Boolean))];
+  const subject=intent.tech
+    ?(intent.tech.full_name||intent.tech.username||'That technician')
+    :(intent.role==='it'?'IT':'Service');
+  const label=dateLabel(intent.date);
+  if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(intent.date===dayKey(new Date())?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">That answer came from the live Tech Check schedule. MHelpDesk remains separate.</div>';
+  if(tickets.length===1){
+    state.currentTicket=tickets[0];
+    const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);
+  }
+  return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(intent.date===dayKey(new Date())?'today':'on '+esc(label))+'.</div>'
+    +'<div class="vision-answer-copy">I pulled the live Tech Check assignments. MHelpDesk remains separate.</div>'
+    +tickets.slice(0,12).map(jobCard).join('');
+}
 function findTech(text,role=''){
   const s=String(text||'').toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role),exact=pool.find(t=>[t.full_name,t.username].filter(Boolean).some(v=>s.includes(String(v).toLowerCase())));if(exact)return exact;
   return pool.find(t=>{const first=String(t.full_name||'').trim().split(/\s+/)[0].toLowerCase();return first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(s);})||null;
@@ -659,9 +700,16 @@ function assignIntent(text){
 function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||t)&&/\b(move|change|set|make|schedule|reschedule|put)\b/i.test(text)?{kind:'schedule',date:d,time:t}:null;}
 
 function isCreateRequest(text){
-  const s=String(text||'').toLowerCase();
-  return /\b(create|make|start|prepare|set\s*up|setup)\b[\s\S]{0,45}\b(ticket|job|assignment)\b/.test(s)
-    || /\b(create|make|start|prepare)\b[\s\S]{0,25}\b(delivery|pickup|swap|service)\b[\s\S]{0,20}\b(ticket|job)\b/.test(s);
+  const s=String(text||'').toLowerCase().replace(/pick\s*-?\s*up/g,'pickup');
+  const type=/\b(delivery|deliver|deployment|deploy|pickup|swap|service)\b/.test(s);
+  const object=/\b(ticket|job|work\s*order|assignment)\b/.test(s);
+  const action=/\b(create|make|start|prepare|set\s*up|setup|add|open|build|put\s+in|write\s+up|need|want)\b/.test(s);
+  const workloadQuestion=/\b(how many|what|which|show|list|does|do|has|have|got)\b[\s\S]{0,35}\b(ticket|job|work|schedule)\b/.test(s);
+  return !workloadQuestion&&(
+    /\b(create|make|start|prepare|set\s*up|setup|add|open|build|put\s+in|write\s+up)\b[\s\S]{0,55}\b(ticket|job|work\s*order|assignment)\b/.test(s)
+    || (type&&object&&action)
+    || /\b(?:i\s+)?(?:need|want)\s+(?:to\s+)?(?:do|put\s+in|set\s+up|make)?\s*(?:a|an)?\s*(delivery|pickup|swap|service)\b/.test(s)
+  );
 }
 function draftWorkType(text){
   const s=String(text||'').toLowerCase();
@@ -1528,6 +1576,9 @@ async function answer(text){
   if(isCreateRequest(raw))return startDraft(raw);
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
+
+  const workload=workloadIntent(raw);
+  if(workload)return workloadHtml(workload);
 
   const reviewQueue=await ownerReviewQueueHtml(raw);if(reviewQueue)return reviewQueue;
   const damageHold=await damageHoldHtml(raw);if(damageHold)return damageHold;
