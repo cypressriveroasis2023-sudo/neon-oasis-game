@@ -1145,12 +1145,121 @@ async function personLookupHtml(raw){
   const note=rows.length>1?'<div class="vision-answer-copy">I found '+rows.length+' profile records with that name, so I am showing each one instead of guessing which account you meant.</div>':'<div class="vision-answer-copy">This is from the live Tech Check profile record.</div>';
   return '<div class="vision-answer-title">'+esc(rows[0].full_name||wanted)+'</div>'+note+cards;
 }
+
+function historyCue(raw){
+  return /\b(history|historical|previous|previously|past|before|last\s+worked|worked\s+on|problems?|issues?|repairs?|damage|what\s+happened)\b/i.test(String(raw||''));
+}
+function knownSiteFromText(raw){
+  const text=String(raw||'').toLowerCase();
+  const sites=[...new Set([
+    ...(state.jobs||[]).map(x=>String(x.site||'').trim()),
+    ...(state.preps||[]).map(x=>String(x.site||'').trim())
+  ].filter(Boolean))].sort((a,b)=>b.length-a.length);
+  return sites.find(site=>text.includes(site.toLowerCase()))||'';
+}
+function historyIntent(raw){
+  const text=String(raw||'').trim();
+  if(!historyCue(text))return null;
+  const unit=unitHint(text);
+  if(unit)return{kind:'unit',value:unit.type+' '+unit.tag,unit};
+  const tech=findTech(text);
+  if(tech&&/\b(tech|technician|worked|history|previous|past)\b/i.test(text)){
+    return{kind:'technician',value:tech.user_id||tech.full_name||tech.username,tech};
+  }
+  const knownSite=knownSiteFromText(text);
+  if(knownSite)return{kind:'site',value:knownSite};
+  const siteMatch=
+    text.match(/\b(?:site|customer)\s+(?:history|problems?|issues?)\s*(?:for|at|of)?\s*[:=-]?\s*(.+?)[?.!]*$/i)||
+    text.match(/\b(?:history|problems?|issues?)\s+(?:for|at|of)\s+(.+?)[?.!]*$/i)||
+    text.match(/\bwhat\s+(?:problems?|issues)\s+has\s+(.+?)\s+had[?.!]*$/i)||
+    text.match(/\bwhat\s+happened\s+at\s+(.+?)[?.!]*$/i);
+  if(siteMatch?.[1])return{kind:'site',value:String(siteMatch[1]).trim()};
+  return null;
+}
+function historyDate(value){
+  if(!value)return'';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?String(value):d.toLocaleString([], {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+}
+function historyEventHtml(event){
+  const e=event||{},meta=[
+    e.ticket_no?'MHelpDesk #'+e.ticket_no:'',
+    e.site||'',
+    e.unit_tag?'Unit '+e.unit_tag:'',
+    historyDate(e.event_at)
+  ].filter(Boolean);
+  return '<div class="vision-context-row"><b>'+esc(e.actor_name||String(e.event_type||'History event').replaceAll('_',' '))+'</b>'
+    +'<span>'+esc(e.detail||String(e.event_type||'record').replaceAll('_',' '))+'</span>'
+    +(meta.length?'<span>'+meta.map(esc).join(' · ')+'</span>':'')+'</div>';
+}
+async function companyHistoryHtml(raw){
+  const intent=historyIntent(raw);
+  if(!intent)return'';
+  const layer=visionLiveData();
+  if(!layer?.getCompanyHistory)return '<div class="vision-direct warn"><b>Company History is updating.</b>Refresh OnSite Vision and try that history question again.</div>';
+  const result=await layer.getCompanyHistory(intent.kind,intent.value,{limit:100});
+  if(!result?.found){
+    return '<div class="vision-answer-title">No permanent '+esc(intent.kind)+' history found.</div>'
+      +'<div class="vision-answer-copy">I checked the Company History read model for '+esc(intent.value)+'. No matching Tech Check history is recorded yet.</div>';
+  }
+  const events=Array.isArray(result.events)?result.events:[];
+  const subject=result.subject||{};
+  const title=intent.kind==='technician'
+    ?(subject.full_name||subject.username||intent.tech?.full_name||intent.value)
+    :intent.kind==='unit'
+      ?(subject.unit_tag?((subject.equipment_type||'Unit')+' '+subject.unit_tag):intent.value)
+      :(subject.site||intent.value);
+  if(intent.kind==='unit'&&/\bwho\s+(?:last|previously)?\s*worked|\bwho\s+worked\s+on/i.test(raw)){
+    const workEvent=events.find(e=>e?.actor_name&&['it_verification','service_return','it_intake','unit_work','job_assignment'].includes(String(e.event_type||'')))
+      ||events.find(e=>e?.actor_name);
+    if(workEvent){
+      return '<div class="vision-answer-title">'+esc(workEvent.actor_name)+' is the latest recorded person on '+esc(title)+'.</div>'
+        +'<div class="vision-answer-copy">'+esc(workEvent.detail||'Recorded company-history event')+(workEvent.ticket_no?' · MHelpDesk #'+esc(workEvent.ticket_no):'')+(workEvent.event_at?' · '+esc(historyDate(workEvent.event_at)):'')+'</div>'
+        +'<div class="vision-context-block"><h3>Recent unit history</h3><div class="vision-context-list">'+events.slice(0,8).map(historyEventHtml).join('')+'</div></div>';
+    }
+  }
+  const kindLabel=intent.kind==='technician'?'Technician History':intent.kind==='unit'?'Unit History':'Customer / Site History';
+  return '<div class="vision-answer-title">'+esc(kindLabel)+' · '+esc(title)+'</div>'
+    +'<div class="vision-answer-copy">'+esc(String(result.event_count??events.length))+' permanent history event'+((Number(result.event_count??events.length)===1)?'':'s')+' found. Closed jobs and returned equipment remain in this history.</div>'
+    +(events.length?'<div class="vision-context-block"><h3>Most recent activity</h3><div class="vision-context-list">'+events.slice(0,12).map(historyEventHtml).join('')+'</div></div>':'<div class="vision-system-note">The subject exists, but there are no dated history events yet.</div>');
+}
+function ownerReviewIntent(raw){
+  return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
+}
+async function ownerReviewQueueHtml(raw){
+  if(!ownerReviewIntent(raw))return'';
+  const layer=visionLiveData();
+  if(!layer?.getOwnerReviewQueue)return '<div class="vision-direct warn"><b>Owner Review is updating.</b>Refresh OnSite Vision and try again.</div>';
+  const rows=await layer.getOwnerReviewQueue({limit:60});
+  if(!rows.length)return '<div class="vision-answer-title">Nothing is waiting for Owner Review.</div><div class="vision-answer-copy">The live closeout queue has no completed jobs ready for your review or returned for correction.</div>';
+  const card=row=>{
+    const o=row.overview||{};
+    const items=[
+      ['Owner assigned',o.owner_assigned],
+      ['IT completed',o.it_completed],
+      ['Handoff completed',o.handoff_completed],
+      ['Service completed',o.service_completed],
+      ['Equipment / returns',o.equipment_returns_accounted_for],
+      ['Evidence',o.evidence_complete]
+    ];
+    return '<div class="vision-context-block"><h3>MHelpDesk #'+esc(row.ticket_no||'—')+' · '+esc(row.site||'No site')+'</h3>'
+      +'<div class="vision-context-grid">'+items.map(([k,v])=>'<div><span>'+esc(k)+'</span><b>'+esc(v||'MISSING INFORMATION')+'</b></div>').join('')+'</div>'
+      +(row.review_status==='correction_requested'?'<div class="vision-system-note"><b>RETURNED FOR CORRECTION:</b> '+esc(row.correction_reason||'Reason not recorded')+'</div>':'')
+      +'</div>';
+  };
+  return '<div class="vision-answer-title">'+rows.length+' job'+(rows.length===1?'':'s')+' in Ready for Owner Review</div>'
+    +'<div class="vision-answer-copy">This is the permanent closeout view: Owner assigned → IT completed → handoff completed → Service completed → equipment/returns accounted for → evidence complete.</div>'
+    +rows.slice(0,12).map(card).join('');
+}
+
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   const current=chat();
   if(current?.draft){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
     if(sideQuestion){
+      const review=await ownerReviewQueueHtml(raw);if(review)return review;
+      const history=await companyHistoryHtml(raw);if(history)return history;
       const side=await serverAgentAnswer(raw);
       if(side)return side;
     }
@@ -1159,6 +1268,9 @@ async function answer(text){
   if(isCreateRequest(raw))return startDraft(raw);
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
+
+  const reviewQueue=await ownerReviewQueueHtml(raw);if(reviewQueue)return reviewQueue;
+  const companyHistory=await companyHistoryHtml(raw);if(companyHistory)return companyHistory;
 
   // Resolve an explicit Tech Check ticket/unit before profile lookup or the
   // conversational agent. This prevents a named ticket from being mistaken for
