@@ -135,6 +135,44 @@ function injectStyles() {
     .wl-issue-list{display:grid;gap:8px;margin-top:10px}.wl-issue-link{width:100%;border:1px solid #e5aaa6;border-radius:11px;background:#fff;color:#9e2119;padding:11px 12px;text-align:left;font-weight:850;cursor:pointer}.wl-issue-link:hover{background:#fff5f4}.wl-issue-link b{display:block;color:#741b15}.wl-issue-link span{display:block;font-size:12px;margin-top:2px;color:#9e2119}
     .wl-live-stage{margin:8px 0;padding:9px 10px;border-radius:10px;background:#f4f7f9}.wl-live-stage>b{display:block;font-size:12px;letter-spacing:.35px}.wl-live-stage>span{display:block;font-size:12px;color:#596875;margin-top:2px}.wl-live-track{height:6px;background:#dfe5e9;border-radius:999px;overflow:hidden;margin-top:7px}.wl-live-track i{display:block;height:100%;background:#d20b12;border-radius:999px}
     .wl-assigned-inventory{margin:12px 0;padding:12px;border:1px solid #cfdce5;border-radius:13px;background:#f3f7fa}.wl-assigned-inventory-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.wl-assigned-inventory-list span{display:inline-block;border:1px solid #d4dee6;border-radius:999px;background:#fff;padding:7px 9px;font-size:12px;color:#526472}.wl-assigned-inventory-list b{color:#102a40}
+    .wl-svc-command{display:grid;gap:13px}
+    .wl-svc-command-hero{background:linear-gradient(145deg,#101820,#243441);color:#fff;border-radius:17px;padding:17px 16px;box-shadow:0 8px 24px rgba(11,28,43,.16)}
+    .wl-svc-command-kicker{font-size:9px;font-weight:950;letter-spacing:.16em;color:#ffb1b4;text-transform:uppercase}
+    .wl-svc-command-hero h2{margin:4px 0 3px!important;color:#fff!important;font-size:25px!important;line-height:1.05}
+    .wl-svc-command-hero p{margin:0;color:#d6e0e7;font-size:12px;line-height:1.4}
+    .wl-svc-command-state{display:flex;align-items:center;gap:9px;margin-top:13px;padding:10px 11px;border-radius:12px;background:rgba(255,255,255,.1);font-size:12px;font-weight:900}
+    .wl-svc-command-state i{width:10px;height:10px;border-radius:999px;background:#6ad893;box-shadow:0 0 0 4px rgba(106,216,147,.13);flex:none}
+    .wl-svc-command-state.due i,.wl-svc-command-state.issue i{background:#ffcf5b;box-shadow:0 0 0 4px rgba(255,207,91,.13)}
+    .wl-svc-command-state.blocked i{background:#ff7f7f;box-shadow:0 0 0 4px rgba(255,127,127,.13)}
+    .wl-svc-command-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+    .wl-svc-command-stat{min-width:0;border:1px solid #dbe3e9;border-radius:12px;background:#fff;padding:10px 8px;text-align:center}
+    .wl-svc-command-stat b{display:block;color:#102333;font-size:21px;line-height:1}
+    .wl-svc-command-stat span{display:block;margin-top:5px;color:#627381;font-size:8px;font-weight:850;line-height:1.15;text-transform:uppercase;letter-spacing:.04em}
+    .wl-svc-command-next{border:2px solid #d20b12;border-radius:14px;background:#fff;padding:14px}
+    .wl-svc-command-next.clear{border-color:#8bc6a1;background:#f2fbf5}
+    .wl-svc-command-next.wait{border-color:#e1b454;background:#fff9e9}
+    .wl-svc-command-next .wl-next-kicker{margin-bottom:4px}
+    .wl-svc-command-next>b{display:block;font-size:19px;color:#152637;line-height:1.15}
+    .wl-svc-command-next .small{margin-top:5px}
+    .wl-svc-command-section{border:1px solid #dbe3e9;border-radius:14px;background:#fff;padding:13px}
+    .wl-svc-command-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+    .wl-svc-command-section-head b{font-size:16px;color:#152637}
+    .wl-svc-command-section-head span{font-size:10px;font-weight:900;color:#687987}
+    .wl-svc-job{border:1px solid #dce4e9;border-radius:12px;padding:12px;margin-top:8px;background:#fbfcfd}
+    .wl-svc-job:first-child{margin-top:0}
+    .wl-svc-job-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .wl-svc-job-top b{font-size:16px;color:#152637}
+    .wl-svc-job-top span{flex:none;padding:4px 7px;border-radius:999px;background:#eaf6ee;color:#17643c;font-size:8px;font-weight:950;text-transform:uppercase}
+    .wl-svc-job-top span.wait{background:#fff0ca;color:#805600}
+    .wl-svc-job-top span.attn{background:#ffe4e2;color:#9e2119}
+    .wl-svc-job-meta{display:flex;flex-wrap:wrap;gap:5px 9px;margin-top:5px;color:#60717e;font-size:10px}
+    .wl-svc-job-desc{margin-top:7px;color:#263744;font-size:11px;line-height:1.35}
+    .wl-svc-command-closeout{display:grid;gap:7px}
+    .wl-svc-command-close-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:10px;background:#f5f7f9;font-size:11px}
+    .wl-svc-command-close-row b{color:#263744}.wl-svc-command-close-row span{font-weight:900;color:#5d6e7c}
+    .wl-svc-command-close-row.pending{background:#fff4e2}.wl-svc-command-close-row.pending span{color:#895900}
+    .wl-svc-command-close-row.issue{background:#ffe9e7}.wl-svc-command-close-row.issue span{color:#9f2119}
+    @media(max-width:380px){.wl-svc-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-svc-command-hero h2{font-size:22px!important}}
     .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
     /* Tech Check Help Center v91 */
     .wl-help-sheet{background:#f5f7f9!important;color:#172839!important}
@@ -3142,6 +3180,7 @@ async function showSvcHome() {
     home.className='card wl-home';
     viewSvc().prepend(home);
   }
+
   const [r,work,phoneAlerts,assignedAssets,truckSpares,offlineRows]=await Promise.all([
     myReturnCounts(),
     serviceWorkData(),
@@ -3150,57 +3189,153 @@ async function showSvcHome() {
     myTruckSpareData(),
     fieldEscalationRows()
   ]);
+
   const alertBanner=phoneAlertBanner(phoneAlerts);
   const assignments=work.assignments||[];
   const ownerViewingService=roleText().includes('Owner/Admin');
-  const serviceAssigneeLabel=a=>a.assignee_user_id?(a.assignee_name||a.assigned_to_name||'Assigned Service Tech'):(a.assignment_scope==='department'?'Service Department Queue':'Unassigned');
+  const todayKey=techCheckDateKey();
+  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingService?'Service Team':'Service Tech');
+  const todayLabel=new Date().toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'});
   const releasedTickets=new Set((work.released||[]).map(p=>norm(p.ticket_no)));
-  const handoffCount=work.released.length;
-  const returnCount=r.waiting+r.inventory;
+  const fieldTickets=new Set((work.deployed||[]).map(p=>norm(p.ticket_no)));
+  const handoffKnown=ticket=>releasedTickets.has(norm(ticket))||fieldTickets.has(norm(ticket));
+  const activeOffline=(offlineRows||[]).filter(row=>!row.resolved_at);
+  const actionableOffline=activeOffline.filter(row=>['waiting_it','joint_troubleshooting','backup_swap_authorized'].includes(String(row.status||'')));
+  const returnCount=r.waiting+r.inventory+r.replacement;
   const deployedCount=(work.deployed||[]).length;
   const truckSpareCount=(truckSpares.units||[]).length+(truckSpares.batteries||[]).length;
-  const assignmentCards=assignments.map((a,i)=>{
-    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
-    const handoffReady=releasedTickets.has(norm(a.ticket_no));
-    const state=pickup ? 'Ready for Service pickup / return workflow'
-      : a.requires_it_handoff ? (handoffReady ? 'IT handoff ready — verify exact ticket' : 'Waiting for IT handoff')
-      : 'Service task ready — exact ticket verification required';
-    const queue=!a.assignee_user_id && a.assignment_scope==='department';
-    return `<div class='wl-it-flow-card wl-service-assignment-card'><div class='wl-next-kicker'>${i===0?'NEXT SERVICE TASK':'UPCOMING SERVICE TASK'}</div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div><div class='small'><b>${esc(String(a.work_type||'service').toUpperCase())}</b> · ${esc(state)}</div>${ownerViewingService?`<div class='small'><b>Assigned to:</b> ${esc(serviceAssigneeLabel(a))}</div>`:''}${queue?`<div class='small'><b>Service Department queue</b> · claim requires the exact ticket number</div>`:''}${a.job_description?`<div class='small'><b>Work:</b> ${esc(a.job_description)}</div>`:''}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${techCheckAIHtml(a,'service')}<button class='wl-big wl-blue top10' data-wl-service-open-job>Verify Ticket & Open →</button></div>`;
-  }).join('');
-  const assigned=assignments[0]||null;
-  const nextAction=assigned
-    ? `<div class='wl-next-action wl-assigned-next wl-service-next'><div class='wl-next-kicker'>ASSIGNED / AVAILABLE SERVICE WORK</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site||'No customer / site')}</div><div class='small'>Enter the exact current MHelpDesk ticket before Tech Check will open or claim this job.</div><button class='wl-big wl-blue top10' data-wl-service-open-job>Open Service Job →</button></div>`
-    : `<div class='wl-next-action clear wl-service-next'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No Service work is currently assigned or waiting in your department queue.</b><div class='small'>When the Owner assigns work, it will appear here. IT handoffs remain locked behind the exact MHelpDesk ticket.</div></div>`;
 
-  home.innerHTML=`${alertBanner}
-    <div class='wl-mode-pills'>
-      <button type='button' class='on wl-mode-card'><span class='wl-mode-title'>Field Work</span><span class='wl-mode-sub'>Find & verify assigned jobs</span><span class='wl-mode-badge'>${assignments.length}</span></button>
-      <button type='button' class='wl-mode-card' data-wl-svc='returns'><span class='wl-mode-title'>Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${returnCount}</span></button>
-    </div>
-    <div class='wl-title'>${ownerViewingService?'Service Team Work Today':'My Work Today'}</div>
-    <div class='wl-sub'>${ownerViewingService?'Owner view — each Service job shows the technician or Service Department queue it is assigned to.':'Owner-assigned Service work and department-queue work appear here. Opening or claiming a job still requires the exact current MHelpDesk ticket.'}</div>
-    ${nextAction}
-    <div class='wl-workstrip'>
-      <span><b>${assignments.length}</b> active / available jobs</span>
-      <span><b>${handoffCount}</b> IT handoffs ready</span>
-      <span><b>${deployedCount}</b> units in field</span>
-      <span><b>${r.waiting}</b> returns waiting IT</span>
-      <span><b>${truckSpareCount}</b> truck spares to resolve</span>
-    </div>
-    ${fieldEscalationServiceHtml(offlineRows)}
-    ${truckSpareServiceHtml(truckSpares)}
-    ${assignmentCards}
-    ${assignedInventoryHtml(assignedAssets)}
-    <div class='wl-menu'>
-      <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
-      <button class='${deployedCount ? "wl-red" : "wl-gray"}' data-wl-service-return>↩ Return Unit to IT Intake <span class='wl-count'>${deployedCount}</span></button>
-      <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
-      ${work.inspectionRequired
-        ? `<button class='wl-gray' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>`
-        : `<div class='wl-gray' style='padding:13px 14px;border-radius:12px'><b>Truck / Trailer Inspection · NOT REQUIRED</b><div class='small'>Weekend — inspections are Monday through Friday only.</div></div>`}
-      <button class='wl-gray' data-wl-svc='history'>☰ Status & History <span class='wl-count'>${r.completed}</span></button>
+  const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
+  const overdueAssignments=assignments.filter(a=>dateKey(a)&&dateKey(a)<todayKey);
+  const todayAssignments=assignments.filter(a=>dateKey(a)===todayKey);
+  const unscheduledAssignments=assignments.filter(a=>!dateKey(a));
+  const upcomingAssignments=assignments.filter(a=>dateKey(a)>todayKey);
+  const commandAssignments=[...overdueAssignments,...todayAssignments,...unscheduledAssignments];
+  const waitingHandoffAssignments=commandAssignments.filter(a=>a.requires_it_handoff&&!handoffKnown(a.ticket_no)&&String(a.work_type||'').toLowerCase()!=='pickup');
+  const readyAssignments=commandAssignments.filter(a=>{
+    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
+    return pickup||!a.requires_it_handoff||handoffKnown(a.ticket_no);
+  });
+  const handoffCount=commandAssignments.filter(a=>a.requires_it_handoff&&handoffKnown(a.ticket_no)).length;
+  const inspectionDue=Boolean(work.inspectionRequired&&!work.inspectionDone);
+  const readinessComplete=!work.inspectionRequired||Boolean(work.inspectionDone);
+
+  function assignmentState(a){
+    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
+    const overdue=dateKey(a)&&dateKey(a)<todayKey;
+    if(overdue)return {label:'OVERDUE / OPEN',tone:'attn',detail:'This Service job is still open from an earlier work date.'};
+    if(pickup)return {label:'READY — PICKUP',tone:'',detail:'Service starts the pickup / return workflow.'};
+    if(a.requires_it_handoff&&!handoffKnown(a.ticket_no))return {label:'WAITING ON IT',tone:'wait',detail:'IT has not created the Service handoff yet.'};
+    if(a.requires_it_handoff&&handoffKnown(a.ticket_no))return {label:'HANDOFF READY',tone:'',detail:'IT handoff is ready or has already been accepted for field work.'};
+    return {label:'READY',tone:'',detail:'Service task can be opened after exact MHelpDesk verification.'};
+  }
+
+  function assignmentCard(a){
+    const state=assignmentState(a);
+    const queue=!a.assignee_user_id&&a.assignment_scope==='department';
+    return `<div class='wl-svc-job'>
+      <div class='wl-svc-job-top'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div></div><span class='${state.tone}'>${esc(state.label)}</span></div>
+      <div class='wl-svc-job-meta'><span>${esc(String(a.work_type||'service').toUpperCase())}</span><span>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</span>${queue?'<span>Service Department Queue</span>':''}</div>
+      <div class='wl-svc-job-desc'>${esc(state.detail)}${a.job_description?'<br><b>Work:</b> '+esc(a.job_description):''}</div>
+      ${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${techCheckAIHtml(a,'service')}
+      <button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-service-open-job>Verify Exact Ticket & Open →</button>
     </div>`;
+  }
+
+  let commandState='READY FOR FIELD WORK',commandTone='',commandDetail='Morning readiness is complete. Work the next verified Service job.';
+  if(inspectionDue){commandState='START-DAY CHECK REQUIRED';commandTone='due';commandDetail='Complete the weekday Truck / Trailer Inspection before departure.';}
+  else if(actionableOffline.length){commandState='ACTIVE FIELD ISSUE';commandTone='issue';commandDetail='An offline-unit case is still open with Service + IT.';}
+  else if(overdueAssignments.length){commandState='OPEN WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one Service assignment is still open from an earlier work date.';}
+  else if(!readyAssignments.length&&waitingHandoffAssignments.length){commandState='WAITING ON IT HANDOFF';commandTone='due';commandDetail='Today’s available Service work is waiting for IT to create the handoff.';}
+  else if(!commandAssignments.length){commandState='NO ACTIVE SERVICE WORK TODAY';commandTone='';commandDetail='No Service assignment is due, overdue, or unscheduled right now.';}
+
+  let nextAction='';
+  if(inspectionDue){
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Complete the Truck / Trailer Inspection</b><div class='small'>Weekday departure readiness is not complete yet.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-svc='inspect'>Start Morning Inspection →</button></div>`;
+  }else if(actionableOffline.length){
+    const issue=actionableOffline[0];
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Continue Offline Unit / IT Troubleshooting</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Keep the issue open until IT records the decision. If IT authorized the backup, use the action in the Field Issue card below.</div></div>`;
+  }else if(readyAssignments.length){
+    const next=readyAssignments[0];
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-service-open-job>Verify Exact Ticket & Open →</button></div>`;
+  }else if(waitingHandoffAssignments.length){
+    const waiting=waitingHandoffAssignments[0];
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Waiting for IT handoff — MHelpDesk #${esc(waiting.ticket_no)}</b><div class='small'>${esc(waiting.site||'No customer / site')}. The job stays visible here; Service cannot take the equipment until IT creates the handoff.</div></div>`;
+  }else if(truckSpareCount){
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DAY CLOSEOUT</div><b>Resolve ${truckSpareCount} truck spare${truckSpareCount===1?'':'s'}</b><div class='small'>Mark each backup used or return it unused through IT Intake; check in spare batteries below.</div></div>`;
+  }else{
+    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ Service command center is clear.</b><div class='small'>No immediate Service action is waiting in Tech Check.</div></div>`;
+  }
+
+  const closeoutClear=!assignments.length&&!activeOffline.length&&!truckSpareCount;
+  const upcomingHtml=upcomingAssignments.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming Service Work</b><span>${upcomingAssignments.length} scheduled</span></div>${upcomingAssignments.slice(0,8).map(assignmentCard).join('')}</div>`:'';
+
+  home.innerHTML=`${alertBanner}<div class='wl-svc-command'>
+    <div class='wl-svc-command-hero'>
+      <div class='wl-svc-command-kicker'>SERVICE TECH COMMAND CENTER</div>
+      <h2>${esc(ownerViewingService?'Service Team':techName)} · ${esc(todayLabel)}</h2>
+      <p>Start day → verify exact MHelpDesk work → receive IT handoffs → field work → returns / troubleshooting → closeout.</p>
+      <div class='wl-svc-command-state ${commandTone}'><i></i><span><b>${esc(commandState)}</b><br>${esc(commandDetail)}</span></div>
+    </div>
+
+    <div class='wl-svc-command-stats'>
+      <div class='wl-svc-command-stat'><b>${todayAssignments.length}</b><span>Today’s jobs</span></div>
+      <div class='wl-svc-command-stat'><b>${readyAssignments.length}</b><span>Ready / actionable</span></div>
+      <div class='wl-svc-command-stat'><b>${waitingHandoffAssignments.length}</b><span>Waiting on IT</span></div>
+      <div class='wl-svc-command-stat'><b>${deployedCount}</b><span>Units in field</span></div>
+      <div class='wl-svc-command-stat'><b>${activeOffline.length}</b><span>Field issues</span></div>
+      <div class='wl-svc-command-stat'><b>${truckSpareCount}</b><span>Truck spares out</span></div>
+    </div>
+
+    ${nextAction}
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>Start-Day Readiness</b><span>${readinessComplete?'READY':'ACTION REQUIRED'}</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row ${inspectionDue?'pending':''}'><b>Truck / Trailer Inspection</b><span>${work.inspectionRequired?(work.inspectionDone?'SUBMITTED':'DUE'):'NOT REQUIRED — WEEKEND'}</span></div>
+        <div class='wl-svc-command-close-row ${waitingHandoffAssignments.length?'pending':''}'><b>IT → Service handoffs</b><span>${handoffCount} ready · ${waitingHandoffAssignments.length} waiting</span></div>
+        <div class='wl-svc-command-close-row ${activeOffline.length?'issue':''}'><b>Offline-unit escalations</b><span>${activeOffline.length?activeOffline.length+' ACTIVE':'CLEAR'}</span></div>
+      </div>
+      ${work.inspectionRequired&&!work.inspectionDone?"<button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-svc='inspect'>Complete Start-Day Inspection →</button>":''}
+    </div>
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>Today / Needs Action</b><span>${commandAssignments.length} open</span></div>
+      ${commandAssignments.length?commandAssignments.map(assignmentCard).join(''):"<div class='ok'><b>✓ No due, overdue, or unscheduled Service jobs.</b></div>"}
+    </div>
+
+    ${activeOffline.length?fieldEscalationServiceHtml(offlineRows):''}
+    ${truckSpareCount?truckSpareServiceHtml(truckSpares):''}
+    ${upcomingHtml}
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>Returns & Equipment</b><span>Live Tech Check</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row'><b>Units currently in field</b><span>${deployedCount}</span></div>
+        <div class='wl-svc-command-close-row'><b>Returns already handed to IT / Owner flow</b><span>${returnCount}</span></div>
+        <div class='wl-svc-command-close-row ${truckSpareCount?'pending':''}'><b>Truck spares still unresolved</b><span>${truckSpareCount}</span></div>
+      </div>
+      ${assignedInventoryHtml(assignedAssets)}
+      <div class='wl-menu top10'>
+        <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
+        <button class='${deployedCount?"wl-red":"wl-gray"}' data-wl-service-return>↩ Return Unit to IT Intake <span class='wl-count'>${deployedCount}</span></button>
+        <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
+        <button class='wl-gray' data-wl-offline-start>⚠ Offline Unit — Call IT</button>
+        <button class='wl-gray' data-wl-svc='history'>☰ Status & History <span class='wl-count'>${r.completed}</span></button>
+      </div>
+    </div>
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>End-of-Day Closeout</b><span>${closeoutClear?'CLEAR':'OPEN ITEMS'}</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row ${assignments.length?'pending':''}'><b>Open Service assignments</b><span>${assignments.length}</span></div>
+        <div class='wl-svc-command-close-row ${activeOffline.length?'issue':''}'><b>Unresolved field issues</b><span>${activeOffline.length}</span></div>
+        <div class='wl-svc-command-close-row ${truckSpareCount?'pending':''}'><b>Truck spares to resolve</b><span>${truckSpareCount}</span></div>
+      </div>
+      <div class='small top8'>A return already handed to IT can stay in IT / Owner processing without blocking the Service Tech’s closeout. MHelpDesk remains separate.</div>
+    </div>
+  </div>`;
+
   hideChildren(viewSvc(),[home]);
   resetWizardPosition();
 }
