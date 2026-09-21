@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v128",
-  "service_worker": "v133",
+  "runtime_version": "release-qa-v129",
+  "service_worker": "v134",
   "generated_for": "OnSite Vision live offline escalation answers + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -2920,5 +2920,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Current/offline questions use unresolved records only; detail/history questions may inspect resolved escalations. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
