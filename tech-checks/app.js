@@ -1790,7 +1790,11 @@ function ownerCommandOpen(id) {
   const el=document.getElementById(id);
   if (!el) return;
   if (el.tagName==='DETAILS') el.open=true;
-  requestAnimationFrame(()=>el.scrollIntoView({behavior:'smooth',block:'start'}));
+  if(window.matchMedia('(max-width:720px)').matches){
+    requestAnimationFrame(()=>el.scrollIntoView({behavior:'smooth',block:'start'}));
+  }else{
+    requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'instant'}));
+  }
 }
 function ownerCommandAction(action) {
   const map={
