@@ -532,7 +532,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v26',
+        agent_version: 'onsite-vision-agent-v27',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -694,7 +694,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v26',
+            agent_version: 'onsite-vision-agent-v27',
           }
         } as Json
       }
@@ -899,23 +899,73 @@ Deno.serve(async (req) => {
         const date=clean(args.date),role=clean(args.role).toLowerCase(),technicianName=clean(args.technician_name)
         if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('A YYYY-MM-DD workload date is required.')
         if(!['','it','service'].includes(role))throw new Error('Invalid workload role.')
+
         let technician:any=null
+        let technicianMatches:any[]=[]
         if(technicianName){
-          const {data:profiles,error:profileError}=await userClient.from('profiles').select('user_id,full_name,username,role,active').eq('active',true).limit(100)
+          const {data:profiles,error:profileError}=await userClient
+            .from('profiles')
+            .select('user_id,full_name,username,role,active,archived_at')
+            .eq('active',true)
+            .is('archived_at',null)
+            .in('role',['it','service'])
+            .limit(100)
           if(profileError)throw profileError
-          const q=technicianName.toLowerCase()
-          technician=(Array.isArray(profiles)?profiles:[]).find((p:any)=>[p.full_name,p.username].filter(Boolean).some((v:any)=>clean(v).toLowerCase()===q))
-            ||(Array.isArray(profiles)?profiles:[]).find((p:any)=>[p.full_name,p.username].filter(Boolean).some((v:any)=>clean(v).toLowerCase().includes(q)||q.includes(clean(v).toLowerCase())))
-          if(!technician)return {date,role,technician_name:technicianName,count:0,assignments:[],missing_information:'No active Tech Check technician matched that name.'} as Json
+          const pool=(Array.isArray(profiles)?profiles:[]).filter((p:any)=>!role||clean(p.role).toLowerCase()===role)
+          const q=technicianName.toLowerCase().trim()
+          const exact=pool.filter((p:any)=>[p.full_name,p.username].filter(Boolean).some((v:any)=>clean(v).toLowerCase()===q))
+          const loose=pool.filter((p:any)=>{
+            const names=[p.full_name,p.username].filter(Boolean).map((v:any)=>clean(v).toLowerCase())
+            const first=clean(p.full_name).toLowerCase().split(/\s+/)[0]
+            return names.some((v:string)=>v.includes(q)||q.includes(v)) || (q.length>=3&&first===q)
+          })
+          technicianMatches=(exact.length?exact:loose).filter((p:any,i:number,arr:any[])=>arr.findIndex((x:any)=>clean(x.user_id)===clean(p.user_id))===i)
+          if(technicianMatches.length>1){
+            return {
+              date,role,technician_name:technicianName,
+              ambiguous:true,
+              matches:technicianMatches.map((p:any)=>({full_name:p.full_name,username:p.username,role:p.role})),
+              missing_information:'More than one active technician matched that name. Ask which technician the Owner means.'
+            } as Json
+          }
+          technician=technicianMatches[0]||null
+          if(!technician)return {date,role,technician_name:technicianName,scheduled_ticket_count:0,remaining_ticket_count:0,completed_ticket_count:0,assignments:[],missing_information:'No active Tech Check technician matched that name.'} as Json
         }
-        let query=userClient.from('job_assignments').select('id,ticket_no,site,assigned_role,assignee_user_id,assignee_name,status,scheduled_for,scheduled_time,work_type,unit_summary,job_description,requires_it_handoff,equipment_manifest,requested_unit_count,updated_at').eq('scheduled_for',date).not('status','in','("completed","cancelled")').order('scheduled_time',{ascending:true,nullsFirst:false}).limit(250)
+
+        let query=userClient
+          .from('job_assignments')
+          .select('id,ticket_no,site,assigned_role,assignee_user_id,assignee_name,status,scheduled_for,scheduled_time,work_type,unit_summary,job_description,requires_it_handoff,equipment_manifest,requested_unit_count,updated_at')
+          .eq('scheduled_for',date)
+          .neq('status','cancelled')
+          .order('scheduled_time',{ascending:true,nullsFirst:false})
+          .limit(250)
         if(role)query=query.eq('assigned_role',role)
         if(technician?.user_id)query=query.eq('assignee_user_id',technician.user_id)
         const {data,error}=await query
         if(error)throw error
         const assignments=Array.isArray(data)?data:[]
-        const tickets=[...new Set(assignments.map((row:any)=>clean(row.ticket_no)).filter(Boolean))]
-        return {date,role,technician:technician?{user_id:technician.user_id,full_name:technician.full_name,username:technician.username,role:technician.role}:null,count:tickets.length,tickets,assignments,mhelpdesk_separate:true} as Json
+        const grouped=new Map<string,any[]>()
+        for(const row of assignments){
+          const ticket=clean(row.ticket_no)
+          if(!ticket)continue
+          if(!grouped.has(ticket))grouped.set(ticket,[])
+          grouped.get(ticket)!.push(row)
+        }
+        const tickets=[...grouped.keys()]
+        const completedTickets=tickets.filter((ticket)=>grouped.get(ticket)!.every((row:any)=>clean(row.status).toLowerCase()==='completed'))
+        const remainingTickets=tickets.filter((ticket)=>!completedTickets.includes(ticket))
+        return {
+          date,role,
+          technician:technician?{full_name:technician.full_name,username:technician.username,role:technician.role}:null,
+          scheduled_ticket_count:tickets.length,
+          remaining_ticket_count:remainingTickets.length,
+          completed_ticket_count:completedTickets.length,
+          tickets,
+          remaining_tickets:remainingTickets,
+          completed_tickets:completedTickets,
+          assignments,
+          mhelpdesk_separate:true
+        } as Json
       }
 
       if (name === 'get_company_knowledge') {
@@ -976,6 +1026,17 @@ Deno.serve(async (req) => {
       '- Distinguish VERIFIED DATABASE FACT, COMPANY RULE, AI INFERENCE, and MISSING INFORMATION.',
       '- Historical raw work_type can be stale. Prefer summary.effective_work_type from live job context.',
       '- MHelpDesk is separate from Tech Check; never claim you changed MHelpDesk.',
+      '',
+      'PLAIN TALK / DICTATION:',
+      '- Treat the Owner’s message like normal spoken conversation, not command syntax. Understand slang, shorthand, missing punctuation, speech-to-text wording, and reasonable typos when the intended meaning is clear.',
+      '- Infer a workload question from a department or technician plus normal phrases such as "got", "have", "doing", "busy", "lined up", "on deck", "taking", or "handling" even when the Owner never says "job" or "ticket". Examples: "what’s IT got today?", "what does Josh have?", "is Service busy tomorrow?". Use get_workload.',
+      '- For workload answers, scheduled_ticket_count means all non-cancelled Tech Check tickets scheduled for that day; also tell the Owner how many remain and how many are completed when useful.',
+      '- Resolve a partial technician name only when it uniquely matches one active IT or Service technician. If more than one matches, ask one short natural clarification instead of guessing.',
+      '- Understand assignment phrasing such as "put Josh on this", "have Josh handle it", "give this to IT", or "let Mike take that one" as assignment intent.',
+      '- Understand creation phrasing such as "make me a delivery", "throw in a pickup tomorrow", "start a swap", or "I need a service call" as create_job intent even if the words job or ticket are omitted.',
+      '- For create_job, fill proposed_action.work_type, date, time, and technician_name whenever the Owner already supplied or clearly implied them. The client’s guided draft will ask only for required details that are still missing, including MHelpDesk number, site, equipment, unit numbers, work description, parts, assignment, and notes.',
+      '- For questions about how Tech Check is programmed or why its workflow behaves a certain way, use live database facts, get_company_knowledge, workflow rules, and system health. Clearly distinguish code/company rules from live job data. If source-level implementation detail is not available through these tools, say that detail is not exposed here instead of inventing it.',
+      '- Keep conversational context across follow-ups such as "him", "her", "that one", "this job", "move it to tomorrow", and "give it to Service" when the prior messages make the referent clear.',
       '',
       'ACTION SAFETY:',
       '- This server agent is READ ONLY. It has no mutation tools.',
@@ -1088,7 +1149,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v26',
+      agent_version: 'onsite-vision-agent-v27',
       model,
       tool_trace: toolTrace,
       ...parsed,
