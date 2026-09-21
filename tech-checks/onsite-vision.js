@@ -751,16 +751,23 @@ function draftPartsParse(text){
       if(after){parts[def.key]=Number(after[1]);break;}
     }
   }
+  // In a work-order sentence, "swap/replace/change [the] battery" means a
+  // replacement battery. Keep generic battery wording out of other contexts
+  // so Vision does not invent replacement parts from normal battery mentions.
+  if(!parts.battery_replacement_qty){
+    const swappedBattery=s.match(/\b(?:swap(?:\s+out)?|replace|change)\s+(?:the\s+)?(?:(\d+)\s+)?batter(?:y|ies)\b/i);
+    if(swappedBattery)parts.battery_replacement_qty=Number(swappedBattery[1]||1);
+  }
   return parts;
 }
 function draftPartsText(d){
-  if(!d.parts_answered)return'Not answered';
   const p=d.parts||{},rows=[];
   if(Number(p.solar_panel_qty||0)>0)rows.push(p.solar_panel_qty+' solar panel'+(Number(p.solar_panel_qty)===1?'':'s'));
   if(Number(p.battery_replacement_qty||0)>0)rows.push(p.battery_replacement_qty+' replacement batter'+(Number(p.battery_replacement_qty)===1?'y':'ies'));
   if(Number(p.camera_replacement_qty||0)>0)rows.push(p.camera_replacement_qty+' replacement camera'+(Number(p.camera_replacement_qty)===1?'':'s'));
   if(Number(p.sim_replacement_qty||0)>0)rows.push(p.sim_replacement_qty+' SIM card'+(Number(p.sim_replacement_qty)===1?'':'s'));
   if(Number(p.micro_sd_qty||0)>0)rows.push(p.micro_sd_qty+' micro SD card'+(Number(p.micro_sd_qty)===1?'':'s'));
+  if(!d.parts_answered)return rows.length?'Needs confirmation · '+rows.join(', '):'Not answered';
   return rows.join(', ')||'None';
 }
 function draftMatchedTechs(text){
@@ -877,7 +884,15 @@ function draftApplyInput(d,text,initial=false){
   const descMatch=raw.match(/\bdescription\s*(?:is|:|=)\s*([^;\n]+)/i);
   if(descMatch)d.job_description=String(descMatch[1]||'').trim();
   const parts=draftPartsParse(raw);
-  if(Object.keys(parts).length){d.parts={...(d.parts||{}),...parts};d.parts_answered=true;}
+  if(Object.keys(parts).length){
+    d.parts={...(d.parts||{}),...parts};
+    // Parts mentioned while answering an earlier guided question are useful
+    // prefill, but they do not silently complete the future Parts step.
+    // The Owner still gets Question 9 to confirm/edit those parts.
+    const explicitlyAnsweringParts=expected==='parts'||/\bparts?\s*(?:are|is|:|=)\b/i.test(raw);
+    if(explicitlyAnsweringParts)d.parts_answered=true;
+  }
+  if(expected==='parts'&&/\b(yes|correct|confirmed|that'?s all|those are all)\b/i.test(raw)&&Object.keys(d.parts||{}).length)d.parts_answered=true;
   if(expected==='parts'&&/\b(no additional parts|no parts|none|skip)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
   const techs=draftMatchedTechs(raw);
   if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give)\b/i.test(raw))d.assignment_answered=true;}
