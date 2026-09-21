@@ -4,6 +4,7 @@ let db=null;
 const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown',knowledgeEntries:[],knowledgeEditingId:''};
 let conversationSyncTimer=null;
 let persistenceReady=false;
+let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -1878,9 +1879,102 @@ function openOrderDrawer(){
 function toggleOrderDrawer(){
   if($('visionApp')?.classList.contains('order-open')) closeDrawers(); else openOrderDrawer();
 }
-function voice(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addMessage('assistant','', '<div class="vision-system-note">Use the iPhone keyboard microphone for voice dictation on this device.</div>');renderThread();return;}
-  const r=new SR();r.lang='en-US';r.interimResults=false;r.maxAlternatives=1;r.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';if(text)send(text);};r.start();
+function setVoiceStatus(text='',kind=''){
+  const node=$('visionVoiceStatus'),button=$('visionVoiceButton');
+  if(node){node.textContent=String(text||'');node.className='vision-voice-status'+(kind?' '+kind:'')+(text?'':' hidden');}
+  if(button){
+    button.classList.toggle('recording',kind==='recording');
+    button.classList.toggle('busy',kind==='busy');
+    button.setAttribute('aria-pressed',kind==='recording'?'true':'false');
+    button.textContent=kind==='recording'?'■':'🎙';
+  }
+  syncVisualViewport();
+}
+function stopVoiceTracks(){
+  clearTimeout(voiceStopTimer);voiceStopTimer=null;
+  try{voiceStream?.getTracks?.().forEach(track=>track.stop());}catch{}
+  voiceStream=null;
+}
+function browserVoiceFallback(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    setVoiceStatus('');
+    addMessage('assistant','', '<div class="vision-system-note">Voice recording is not available on this device. You can still use the iPhone keyboard microphone.</div>');
+    renderThread();return;
+  }
+  try{
+    const r=new SR();r.lang='en-US';r.interimResults=false;r.maxAlternatives=1;
+    setVoiceStatus('Listening with device dictation…','recording');
+    r.onresult=e=>{const text=String(e.results?.[0]?.[0]?.transcript||'').trim();setVoiceStatus('');if(text)send(text);};
+    r.onerror=()=>setVoiceStatus('');
+    r.onend=()=>{if($('visionVoiceStatus')?.classList.contains('recording'))setVoiceStatus('');};
+    r.start();
+  }catch(error){
+    setVoiceStatus('');
+    console.warn('Vision browser voice fallback',error);
+  }
+}
+async function transcribeVoiceBlob(blob,mimeType){
+  const ext=/mp4|m4a/i.test(mimeType)?'m4a':/ogg/i.test(mimeType)?'ogg':/wav/i.test(mimeType)?'wav':'webm';
+  const form=new FormData();
+  form.append('audio',new File([blob],'onsite-vision-voice.'+ext,{type:mimeType||blob.type||'audio/webm'}));
+  setVoiceStatus('Understanding what you said…','busy');
+  const result=await db.functions.invoke('onsite-vision-transcribe',{body:form});
+  if(result.error||!result.data?.ok)throw new Error(result.data?.error||result.error?.message||'Voice transcription failed.');
+  const transcript=String(result.data.transcript||'').trim();
+  if(!transcript)throw new Error('I could not hear enough speech to transcribe.');
+  setVoiceStatus('Heard: “'+transcript.slice(0,110)+(transcript.length>110?'…':'')+'”','heard');
+  setTimeout(()=>setVoiceStatus(''),1800);
+  await send(transcript);
+}
+async function voice(){
+  if(voiceBusy)return;
+  if(voiceRecorder?.state==='recording'){
+    setVoiceStatus('Finishing…','busy');
+    try{voiceRecorder.stop();}catch{}
+    return;
+  }
+  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
+    browserVoiceFallback();return;
+  }
+  try{
+    voiceBusy=true;
+    voiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const candidates=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm'];
+    const mimeType=candidates.find(type=>MediaRecorder.isTypeSupported?.(type))||'';
+    voiceChunks=[];
+    voiceRecorder=mimeType?new MediaRecorder(voiceStream,{mimeType}):new MediaRecorder(voiceStream);
+    const actualType=voiceRecorder.mimeType||mimeType||'audio/webm';
+    voiceRecorder.ondataavailable=e=>{if(e.data?.size)voiceChunks.push(e.data);};
+    voiceRecorder.onerror=e=>{
+      console.warn('Vision MediaRecorder',e);
+      stopVoiceTracks();voiceRecorder=null;voiceBusy=false;setVoiceStatus('');
+    };
+    voiceRecorder.onstop=async()=>{
+      const blob=new Blob(voiceChunks,{type:actualType});
+      voiceChunks=[];stopVoiceTracks();voiceRecorder=null;
+      try{
+        if(blob.size<120)throw new Error('I could not hear enough speech to transcribe.');
+        await transcribeVoiceBlob(blob,actualType);
+      }catch(error){
+        setVoiceStatus('');
+        addMessage('assistant','', '<div class="vision-direct warn"><b>I could not understand that voice clip.</b>'+esc(error?.message||'Please try again or type your request.')+'</div>');
+        renderThread();
+      }finally{voiceBusy=false;}
+    };
+    voiceRecorder.start(250);
+    voiceBusy=false;
+    setVoiceStatus('Listening… tap the microphone again when you are done.','recording');
+    voiceStopTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording'){setVoiceStatus('Finishing…','busy');voiceRecorder.stop();}},45000);
+  }catch(error){
+    voiceBusy=false;stopVoiceTracks();voiceRecorder=null;setVoiceStatus('');
+    if(String(error?.name||'')==='NotAllowedError'){
+      addMessage('assistant','', '<div class="vision-direct warn"><b>Microphone access is off.</b>Allow microphone access for this site, then tap the microphone again.</div>');renderThread();
+    }else{
+      console.warn('Vision voice start',error);
+      browserVoiceFallback();
+    }
+  }
 }
 document.addEventListener('click',async e=>{
   const c=e.target.closest('[data-chat-id]');if(c)return openChat(c.dataset.chatId);
