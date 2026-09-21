@@ -1536,6 +1536,48 @@ function renderOwnerAttention() {
 }
 function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
 function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'assigned_to_tech' ? 'delivery' : status === 'maintenance' || status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'retired' ? 'neutral' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
+function ownerCompanyHistoryKindChanged() {
+  const kind=String($('ownerCompanyHistoryKind')?.value || 'technician');
+  const input=$('ownerCompanyHistoryQuery');
+  if (!input) return;
+  input.placeholder=kind==='unit' ? 'Unit number or asset tag' : kind==='site' ? 'Exact customer / site name' : 'Technician name or username';
+  input.value='';
+  const host=$('ownerCompanyHistoryResults');
+  if (host) host.innerHTML='<div class="small">Enter the '+esc(kind==='site'?'customer / site':kind)+' to view its permanent Tech Check history.</div>';
+}
+function ownerCompanyHistorySubject(result) {
+  const kind=String(result?.kind || '');
+  const subject=result?.subject || {};
+  if (kind==='technician') return subject.full_name || subject.username || result.query || 'Technician';
+  if (kind==='unit') return 'Unit ' + String(subject.unit_tag || result.unit_key || result.query || '');
+  return subject.site || result.query || 'Customer / Site';
+}
+function ownerCompanyHistoryEventHtml(event) {
+  const when=event?.event_at ? new Date(event.event_at).toLocaleString() : 'Date not recorded';
+  const refs=[event?.ticket_no ? 'MHelpDesk #'+event.ticket_no : '',event?.unit_tag ? 'Unit '+event.unit_tag : '',event?.site || '',event?.actor_name || ''].filter(Boolean);
+  return '<div class="ownerCompanyHistoryEvent"><div><b>'+esc(String(event?.event_type || 'history').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(when)+'</span></div>'
+    +(refs.length?'<div class="small">'+refs.map(esc).join(' · ')+'</div>':'')
+    +'<p>'+esc(event?.detail || 'Recorded Tech Check activity')+'</p></div>';
+}
+async function ownerCompanyHistorySearch() {
+  if (state.profile?.role !== 'owner') return;
+  const kind=String($('ownerCompanyHistoryKind')?.value || 'technician');
+  const value=String($('ownerCompanyHistoryQuery')?.value || '').trim();
+  const host=$('ownerCompanyHistoryResults');
+  if (!host) return;
+  if (!value) { host.innerHTML='<div class="warn"><b>Enter what you want to find.</b><div class="small">Use a technician name or username, unit number, or exact customer / site name.</div></div>'; return; }
+  host.innerHTML='<div class="small">Loading permanent company history…</div>';
+  const response=await db.rpc('get_company_history_v1',{p_kind:kind,p_value:value,p_limit:100});
+  if (response.error) { host.innerHTML='<div class="warn"><b>History could not be loaded.</b><div class="small">'+esc(response.error.message || 'Try again.')+'</div></div>'; return; }
+  const result=response.data || {};
+  const events=Array.isArray(result.events) ? result.events : [];
+  if (!result.found) {
+    host.innerHTML='<div class="warn"><b>MISSING INFORMATION</b><div class="small">No recorded '+esc(kind)+' history matched “'+esc(value)+'”. Vision and the Owner dashboard will not invent activity that is not in Tech Check.</div></div>';
+    return;
+  }
+  host.innerHTML='<div class="ownerCompanyHistoryHead"><div><span>'+esc(kind.toUpperCase())+' HISTORY</span><b>'+esc(ownerCompanyHistorySubject(result))+'</b></div><strong>'+events.length+' event'+(events.length===1?'':'s')+'</strong></div>'
+    +(events.length?events.map(ownerCompanyHistoryEventHtml).join(''):'<div class="warn"><b>MISSING INFORMATION</b><div class="small">The record exists, but no Tech Check history events are recorded yet.</div></div>');
+}
 function renderOwnerUnitSearch() {
   if (state.profile?.role !== 'owner') return;
   const unitBadge = $('ownerUnitStatusBadge');
@@ -1713,6 +1755,7 @@ function ownerCommandAction(action) {
     today:'ownerTechOverviewCard',
     attention:'ownerAttentionCard',
     review:'ownerReviewCard',
+    history:'ownerCompanyHistoryCard',
     team:'ownerTechOverviewCard',
     assign:'ownerJobAssignments',
     units:'ownerUnitStatusCard',
@@ -2026,6 +2069,8 @@ Object.assign(window, {
   restoreUser,
   resetUserPassword,
   ownerReviewPasswordReset,
+  ownerCompanyHistoryKindChanged,
+  ownerCompanyHistorySearch,
   ownerJump,
   ownerOpenReturn,
   setOwnerDailyDate,
