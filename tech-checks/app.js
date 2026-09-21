@@ -85,7 +85,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-structural-v200')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-structural-v204')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1947,6 +1947,10 @@ async function ownerAppAssign(){
 async function ownerAppRender(){
   if(state.profile?.role!=='owner')return;
   const host=document.getElementById('ownerAppPage');if(!host)return;
+  // Keep the real assignment form alive between routes. Its production logic
+  // intentionally scopes queries to #ownerJobAssignments.
+  const mountedAssign=host.querySelector('#ownerJobAssignments');
+  if(mountedAssign) document.getElementById('ownerLegacyMounts')?.append(mountedAssign);
   let html='';
   if(ownerAppRoute==='today')html=ownerAppToday();
   else if(ownerAppRoute==='calendar')html=ownerAppCalendar();
@@ -1962,11 +1966,17 @@ async function ownerAppRender(){
   host.innerHTML=html;
   document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===ownerAppRoute));
   if(ownerAppRoute==='assign'){
-    // The production assignment installer binds to the legacy form. Move the
-    // actual form nodes into the visible workspace so the same handlers/IDs work.
+    // Mount the COMPLETE production form, not only its inner body. Production
+    // handlers/readers depend on #ownerJobAssignments being the form ancestor.
     const legacy=document.getElementById('ownerJobAssignments');
-    const body=legacy?.querySelector('.ownerDashBody');
-    if(body){const header=host.querySelector('.ownerAppPageHeader');host.innerHTML='';if(header)host.append(header);host.append(body);}
+    if(legacy){
+      legacy.open=true;
+      legacy.classList.add('ownerAppMountedAssign');
+      const header=host.querySelector('.ownerAppPageHeader');
+      host.innerHTML='';
+      if(header)host.append(header);
+      host.append(legacy);
+    }
   }
 }
 async function ownerAppNavigate(route){ownerAppRoute=route;await ownerAppRender();}
