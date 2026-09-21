@@ -1818,8 +1818,12 @@ function ownerCommandAction(action) {
       section.open=section.id===targetId;
     });
   }
+  document.querySelectorAll('#view-owner [data-owner-command]').forEach(button=>{
+    button.classList.toggle('ownerNavActive',button.dataset.ownerCommand===action);
+  });
   ownerCommandOpen(targetId);
   if(action==='units') requestAnimationFrame(()=>document.getElementById('ownerUnitSearch')?.focus());
+  if(action==='history') requestAnimationFrame(()=>document.getElementById('ownerCompanyHistoryQuery')?.focus());
 }
 function bindOwnerCommandCenter() {
   const host=document.getElementById('ownerCommandCenter');
