@@ -376,17 +376,17 @@
         <section id="view-owner" class="hidden">
           <div id="ownerCommandCenter" class="ownerCommandCenter" aria-label="Owner Command Center">
             <div class="ownerCommandHero">
-              <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div>
-              <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a>
+              <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Today → Needs Attention → Ready for Owner Review → Team / Equipment → OnSite Vision.</p></div>
             </div>
             <div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite">
               <button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button>
               <button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button>
-              <button type="button" data-owner-command="review"><span>Ready for Review</span><b>—</b><small>returns / handoffs</small></button>
-              <button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>active techs / assets</small></button>
+              <button type="button" data-owner-command="review"><span>Ready for Owner Review</span><b>—</b><small>ready for owner review</small></button>
+              <button type="button" data-owner-command="team"><span>Team / Equipment</span><b>—</b><small>active techs / assets</small></button>
             </div>
+            <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, review operations, and use permanent company history</small></span><strong>Open →</strong></a>
             <div class="ownerCommandQuick">
-              <button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
+              <button type="button" data-owner-command="assign">+ Assign Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
             </div>
           </div>
           <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
@@ -395,7 +395,7 @@
           </details>
           <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
             <summary class="ownerDashSummary">
-              <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
+              <div><b>Assign Job to Tech</b><span>Create and manage technician assignments</span></div>
               <span id="ownerAssignmentBadge" class="ownerDashBadge">0</span>
             </summary>
             <div class="ownerDashBody"><div class="small">Loading active technicians and assignments…</div></div>
@@ -505,10 +505,10 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v8"></script>
-    <script type="module" src="./app.js?v=owner-command-v45"></script>
+    <script type="module" src="./app.js?v=owner-command-v46"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=106', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=107', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
