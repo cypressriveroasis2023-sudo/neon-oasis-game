@@ -341,6 +341,7 @@ function auditActionLabel(action){
   if(type==='schedule')return'Confirm schedule change';
   if(type==='cancel')return'Confirm cancellation';
   if(type==='owner_approve')return'Confirm Owner approval';
+  if(type==='parts_update')return'Approve parts change';
   return'Confirm action';
 }
 function normalizedPlanAction(step){
@@ -355,6 +356,11 @@ function normalizedPlanAction(step){
     date:String(step?.date||'').trim(),
     time:String(step?.time||'').trim(),
     summary:String(step?.summary||'').trim(),
+    solar_panel_qty:Number(step?.solar_panel_qty||0),
+    battery_replacement_qty:Number(step?.battery_replacement_qty||0),
+    camera_replacement_qty:Number(step?.camera_replacement_qty||0),
+    sim_replacement_qty:Number(step?.sim_replacement_qty||0),
+    micro_sd_qty:Number(step?.micro_sd_qty||0),
     requires_confirmation:true
   };
 }
@@ -365,7 +371,7 @@ async function actionPlanHtml(plan,userMessage=''){
   const planId=id();
   const prepared=[];
   const rows=[];
-  const executableTypes=new Set(['assign','schedule','cancel','owner_approve']);
+  const executableTypes=new Set(['assign','schedule','cancel','owner_approve','parts_update']);
 
   for(let i=0;i<steps.length;i++){
     const step=steps[i]||{},mode=String(step.execution_mode||'needs_input');
@@ -445,7 +451,9 @@ async function auditedActionCard(action,userMessage=''){
     auditActionId:String(result.action_id||''),
     ticket:String(canonical.ticket_no||action?.ticket_no||state.currentTicket||''),
     actionType:String(canonical.type||action?.type||''),
-    canonical
+    canonical,
+    requestedAction:{...(action||{}),...canonical},
+    userMessage:String(userMessage||'')
   });
   const summary=action?.summary||(
     canonical.type==='assign'
@@ -456,8 +464,25 @@ async function auditedActionCard(action,userMessage=''){
           ?('Cancel '+String(canonical.role||'').toUpperCase()+' assignment')
           :canonical.type==='owner_approve'
             ?'Final Owner verification'
-            :String(canonical.type||'Action').replaceAll('_',' ')
+            :canonical.type==='parts_update'
+              ?'Update ticket parts / supplies'
+              :String(canonical.type||'Action').replaceAll('_',' ')
   );
+  if(canonical.type==='parts_update'){
+    const current=canonical.current_parts||result?.validation?.current_parts||{};
+    const defs=[
+      ['solar_panel_qty','Solar panels'],
+      ['battery_replacement_qty','Replacement batteries'],
+      ['camera_replacement_qty','Replacement cameras'],
+      ['sim_replacement_qty','SIM cards'],
+      ['micro_sd_qty','Micro SD cards']
+    ];
+    const rows=defs.map(([key,label])=>{
+      const before=Number(current?.[key]||0),after=Number(canonical?.[key]||0);
+      return '<label class="vision-parts-row"><span><b>'+esc(label)+'</b><small>Current '+before+' → proposed '+after+'</small></span><input type="number" min="0" max="999" step="1" inputmode="numeric" data-vision-part-key="'+esc(key)+'" value="'+esc(String(after))+'"></label>';
+    }).join('');
+    return '<div class="vision-action-card audited vision-parts-card" data-vision-parts-card="'+esc(localId)+'"><small>OWNER PARTS OVERRIDE · AUDITED</small><b>'+esc(summary)+'</b><p>MHelpDesk #'+esc(canonical.ticket_no||'')+' · Edit any quantity below before approving. Set a part to <b>0</b> to remove it. Nothing changes until you approve.</p><div class="vision-parts-grid">'+rows+'</div><div class="vision-system-note">Your final edited quantities are revalidated against the live ticket immediately before Tech Check is changed. MHelpDesk remains separate.</div><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(localId)+'">Approve final parts</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(localId)+'">Cancel</button></div></div>';
+  }
   return '<div class="vision-action-card audited"><small>AUDITED PROPOSED ACTION</small><b>'+esc(summary)+'</b><p>Ticket #'+esc(canonical.ticket_no||'')+' · Nothing changes until you confirm.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(localId)+'">'+esc(auditActionLabel(canonical))+'</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(localId)+'">Cancel</button></div></div>';
 }
 
@@ -2028,8 +2053,34 @@ async function execute(actionId){
 
   if(a.kind==='audited'){
     const layer=visionActions();
-    if(!layer?.execute)throw new Error('Vision action layer is unavailable.');
-    const result=await layer.execute(a.auditActionId);
+    if(!layer?.execute||!layer?.prepare)throw new Error('Vision action layer is unavailable.');
+    let auditActionId=a.auditActionId;
+    if(a.actionType==='parts_update'){
+      const card=document.querySelector('[data-vision-parts-card="'+String(actionId).replaceAll('"','')+'"]');
+      if(!card)throw new Error('The parts approval card expired. Ask Vision to prepare the parts change again.');
+      const override={...(a.requestedAction||{}),type:'parts_update',ticket_no:String(a.ticket||a.canonical?.ticket_no||'')};
+      for(const input of card.querySelectorAll('[data-vision-part-key]')){
+        const key=input.getAttribute('data-vision-part-key');
+        const value=Number(input.value);
+        if(!Number.isInteger(value)||value<0)throw new Error('Every part quantity must be a whole number of 0 or more.');
+        override[key]=value;
+      }
+      try{if(auditActionId)await layer.cancel?.(auditActionId);}catch{}
+      const fresh=await layer.prepare({
+        conversation_id:state.chatId||'',
+        action:override,
+        user_message:(a.userMessage||'')+' [Owner final parts override/approval]'
+      });
+      if(!fresh?.executable){
+        state.pending.delete(actionId);
+        const reason=fresh?.validation?.reason||'The final parts list no longer requires a change.';
+        addMessage('assistant','', '<div class="vision-direct good"><b>No parts change was needed.</b>'+esc(reason)+'</div>');
+        renderThread();return;
+      }
+      auditActionId=String(fresh.action_id||'');
+      a.canonical=fresh.canonical_action||override;
+    }
+    const result=await layer.execute(auditActionId);
     state.pending.delete(actionId);
     if(result?.status!=='succeeded')throw new Error(result?.error||'The audited action was not completed.');
 
@@ -2050,6 +2101,7 @@ async function execute(actionId){
     else if(a.actionType==='schedule')label='Schedule updated in Tech Check.';
     else if(a.actionType==='cancel')label='Assignment cancelled in Tech Check.';
     else if(a.actionType==='owner_approve')label='Owner final verification saved in Tech Check.';
+    else if(a.actionType==='parts_update')label='Parts / supplies updated in Tech Check.';
 
     let context=null;
     try{if(ticket)context=await liveContext(ticket,true);}catch{}
