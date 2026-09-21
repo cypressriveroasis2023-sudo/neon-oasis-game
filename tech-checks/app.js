@@ -84,7 +84,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-command-v144')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-command-v145')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1445,6 +1445,13 @@ function renderOwnerReview() {
     badge.textContent=String(ready.length);
     badge.classList.toggle('alert',ready.length>0);
     badge.classList.toggle('neutral',ready.length===0);
+  }
+  const commandCenter=$('ownerCommandCenter');
+  if (commandCenter) {
+    commandCenter.dataset.readyReview=String(ready.length);
+    const reviewButton=commandCenter.querySelector('[data-owner-command="review"]');
+    const reviewCount=reviewButton?.querySelector('b');
+    if (reviewCount) reviewCount.textContent=String(ready.length);
   }
   const card=$('ownerReviewCard');
   if (card?.tagName==='DETAILS' && (ready.length || corrections.length)) card.open=true;
