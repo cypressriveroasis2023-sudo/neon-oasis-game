@@ -2597,7 +2597,9 @@
         "Attempt needs_replacement → completed on unit_returns and verify it is rejected",
         "Attempt to remove the needs_replacement tracking row and verify it is rejected",
         "Verify the Owner UI shows the damage hold as NOT SHOP INVENTORY and does not render Remove from Tracking for that damaged record",
-        "Rollback and verify zero synthetic return, inventory, registry, notification, or report residue"
+        "Rollback and verify zero synthetic return, inventory, registry, notification, or report residue",
+        "Submit the exact same IT Needs Replacement escalation a second time and verify the existing damage hold is reused without duplicate Owner notifications, reports, or inventory-history events",
+        "Verify a normal Maintenance asset with no open needs_replacement return can still be returned to Shop Inventory by the Owner"
       ],
       "expected": [
         "Damage notes and intake photo are required before IT can escalate",
@@ -2606,9 +2608,11 @@
         "The damaged unit remains unavailable Shop Inventory",
         "Generic Owner or direct-table paths cannot clear, complete, or delete the damage hold",
         "Final repair / replacement disposition remains MISSING INFORMATION until the Owner defines that normal procedure",
-        "Rollback QA leaves no synthetic production data"
+        "Rollback QA leaves no synthetic production data",
+        "Network/mobile retries are idempotent: one damage hold produces one escalation report, one inventory-history event, and one notification per active Owner",
+        "The Shop Inventory guard blocks only active damage holds and does not prevent a legitimate repaired/non-held asset from returning to Shop"
       ]
     }
   ],
-  "last_release_qa_note": "Damage workflow QA now covers Service Return → IT Intake → Needs Replacement → Owner notification → Shop Inventory protection. IT escalation requires damage notes + intake photo, moves both asset_inventory and unit_registry to Maintenance, writes permanent report/history, and notifies every active Owner. Database guards now block generic Owner Shop status, direct Shop updates, needs_replacement completion, and deletion of the damage record. Owner UI shows a locked Damage Hold. Final repair/replacement disposition remains MISSING INFORMATION until defined."
+  "last_release_qa_note": "Damaged-equipment QA is complete through retry behavior. Service Return → IT Intake → Needs Replacement moves return/inventory/registry into protected damage state, creates one report/history event, and notifies each active Owner. Four Shop/clear/delete bypass routes are blocked at the database layer. Repeating the IT escalation is idempotent and does not duplicate alerts/history. A normal Maintenance asset without an open damage hold can still return to Shop. Final repair/replacement disposition remains MISSING INFORMATION until the Owner defines it."
 }
