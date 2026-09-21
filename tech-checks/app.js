@@ -1863,8 +1863,20 @@ function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div data-owner-mount="ownerAttention"></div>';
 }
 function ownerAppReview(){
-  renderOwnerReview();
-  return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+'<div data-owner-mount="ownerReviewQueue"></div>';
+  const rows=state.ownerReviewQueue||[];
+  const ready=rows.filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed');
+  const corrections=rows.filter(r=>r.review_status==='correction_requested'&&r.ready_for_owner_review!==true);
+  const rowHtml=r=>{
+    const ticket=esc(r.ticket_no||''),site=esc(r.site||'Site not recorded');
+    if(r.review_status==='correction_requested'&&r.ready_for_owner_review!==true){
+      return '<article class="ownerAppReviewRow correction"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>RETURNED FOR CORRECTION</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewNote"><b>'+esc(String(r.correction_role||'service').toUpperCase())+' correction active</b><span>'+esc(r.correction_reason||'Owner correction requested')+'</span></div></article>';
+    }
+    return '<article class="ownerAppReviewRow ready"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>READY FOR OWNER REVIEW</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewActions"><button class="btn" type="button" onclick="ownerCloseJob(\''+ticket+'\')">Close Job</button><button class="mini danger" type="button" onclick="ownerReturnJobForCorrection(\''+ticket+'\')">Return for Correction</button></div><p>Closing here finalizes Tech Check only. MHelpDesk remains separate.</p></article>';
+  };
+  let body='';
+  if(ready.length)body+='<section class="ownerAppGroup"><h2>Ready for your review <span>'+ready.length+'</span></h2>'+ready.map(rowHtml).join('')+'</section>';
+  if(corrections.length)body+='<section class="ownerAppGroup"><h2>Corrections in progress <span>'+corrections.length+'</span></h2>'+corrections.map(rowHtml).join('')+'</section>';
+  return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+(body||ownerAppEmpty('NOTHING IS WAITING FOR OWNER REVIEW','Completed jobs appear here after the required Tech Check workflow is finished.'));
 }
 function ownerAppTeam(){
   const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
