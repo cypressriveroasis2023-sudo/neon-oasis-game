@@ -1934,14 +1934,19 @@ async function showITHome() {
   }));
   const alertBanner=(partialLoad?"<div class='wl-tech-partial'><b>Partial live-data load.</b> The IT command center is usable, but one live check did not answer. Retry before starting any item marked STATUS UNAVAILABLE.</div>":"")+phoneAlertBanner(phoneAlerts);
   const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
-  const overdue=assignmentRows.filter(({a})=>dateKey(a)&&dateKey(a)<todayKey);
-  const today=assignmentRows.filter(({a})=>dateKey(a)===todayKey);
-  const unscheduled=assignmentRows.filter(({a})=>!dateKey(a));
-  const upcoming=assignmentRows.filter(({a})=>dateKey(a)>todayKey);
+  const overdueAll=assignmentRows.filter(({a})=>dateKey(a)&&dateKey(a)<todayKey);
+  const todayAll=assignmentRows.filter(({a})=>dateKey(a)===todayKey);
+  const unscheduledAll=assignmentRows.filter(({a})=>!dateKey(a));
+  const upcomingAll=assignmentRows.filter(({a})=>dateKey(a)>todayKey);
+  const deferred=[...overdueAll,...todayAll,...unscheduledAll].filter(({gate})=>!gate.ready);
+  const overdue=overdueAll.filter(({gate})=>gate.ready);
+  const today=todayAll.filter(({gate})=>gate.ready);
+  const unscheduled=unscheduledAll.filter(({gate})=>gate.ready);
+  const upcoming=upcomingAll.filter(({gate})=>gate.ready);
   const needsAction=[...overdue,...today,...unscheduled];
-  const ready=needsAction.filter(({gate})=>gate.ready);
-  const blocked=needsAction.filter(({gate})=>!gate.ready);
-  const queueCount=(assignments||[]).filter(a=>!a.assignee_user_id&&a.assignment_scope==='department').length;
+  const ready=needsAction;
+  const blocked=deferred;
+  const queueCount=needsAction.filter(({a})=>!a.assignee_user_id&&a.assignment_scope==='department').length;
 
   function itAssignmentState(row){
     const {a,gate}=row;
@@ -1970,8 +1975,7 @@ async function showITHome() {
   else if(overdue.length){commandState='OPEN IT WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one IT assignment is still open from an earlier work date.';}
   else if(ready.length){commandState='IT JOB READY';commandDetail='An IT assignment is ready to work now.';}
   else if(prepSummary.draft){commandState='UNFINISHED IT PREP';commandTone='due';commandDetail='An equipment prep draft is still incomplete.';}
-  else if(blocked.length){commandState='WAITING ON PRIOR WORKFLOW STEP';commandTone='due';commandDetail='Assigned IT work is waiting on Service or another required step.';}
-  else if(!needsAction.length){commandState='NO ACTIVE IT WORK TODAY';commandDetail='No due, overdue, or unscheduled IT assignment is waiting right now.';}
+  else if(!needsAction.length){commandState='NO ACTIVE IT WORK TODAY';commandDetail='Only work that is ready for IT appears here. Future workflow steps stay hidden until they are released to IT.';}
 
   let nextAction='';
   if(offlineIT.length){
@@ -1984,11 +1988,8 @@ async function showITHome() {
     nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-start-assignment='${next.id}'>${next.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`;
   }else if(prepSummary.nextDraft){
     nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Finish IT Prep · MHelpDesk #${esc(prepSummary.nextDraft.ticket_no)}</b><div class='small'>${esc(prepSummary.nextDraft.site||'No customer / site')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-open-it='${prepSummary.nextDraft.id}'>Continue Equipment Prep →</button></div>`;
-  }else if(blocked.length){
-    const first=blocked[0],a=first.a;
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>WAITING</div><b>${esc(first.gate.label||'Prior workflow step required')} · MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(first.gate.detail||'This IT task will remain visible until the required prior step is complete.')}</div></div>`;
   }else{
-    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ IT command center is clear.</b><div class='small'>No immediate IT action is waiting in Tech Check.</div></div>`;
+    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ IT command center is clear.</b><div class='small'>No IT task is currently released and ready to work.</div></div>`;
   }
 
   const upcomingHtml=upcoming.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming IT Work</b><span>${upcoming.length} scheduled</span></div>${upcoming.slice(0,8).map(itAssignmentCard).join('')}</div>`:'';
@@ -2005,7 +2006,7 @@ async function showITHome() {
     <div class='wl-svc-command-stats'>
       <div class='wl-svc-command-stat'><b>${today.length}</b><span>Today’s IT jobs</span></div>
       <div class='wl-svc-command-stat'><b>${ready.length}</b><span>Ready / actionable</span></div>
-      <div class='wl-svc-command-stat'><b>${blocked.length}</b><span>Waiting / blocked</span></div>
+      <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Released to IT Intake</span></div>
       <div class='wl-svc-command-stat'><b>${prepSummary.draft}</b><span>Pending prep</span></div>
       <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Returns waiting IT</span></div>
       <div class='wl-svc-command-stat'><b>${offlineIT.length}</b><span>Service needs IT</span></div>
@@ -2042,9 +2043,9 @@ async function showITHome() {
       </div>
       ${assignedInventoryHtml(assignedAssets)}
       <div class='wl-menu top10'>
-        <button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button>
-        <button class='${prepSummary.draft?"wl-red":"wl-gray"}' data-wl-it='pending'>▶ Continue Pending Prep <span class='wl-count'>${prepSummary.draft}</span></button>
-        <button class='${returns.waiting?"wl-red":"wl-gray"}' data-wl-mode='intake'>↩ Intake & Returns <span class='wl-count'>${returns.waiting+returns.inventory+returns.replacement}</span></button>
+        ${ownerViewingIT?"<button class='wl-blue' data-wl-it='new'>＋ Owner: Start New Equipment Prep</button>":""}
+        <button class='${prepSummary.draft?"wl-red":"wl-gray"}' data-wl-it='pending' ${prepSummary.draft?'':'disabled'}>▶ Continue Pending Prep <span class='wl-count'>${prepSummary.draft}</span></button>
+        <button class='${returns.waiting?"wl-red":"wl-gray"}' data-wl-mode='intake' ${returns.waiting?'':'disabled'}>↩ Intake & Returns <span class='wl-count'>${returns.waiting+returns.inventory+returns.replacement}</span></button>
         <button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${prepSummary.released+prepSummary.closed}</span></button>
       </div>
     </div>
@@ -2052,7 +2053,7 @@ async function showITHome() {
     <div class='wl-svc-command-section'>
       <div class='wl-svc-command-section-head'><b>End-of-Day IT Closeout</b><span>${closeoutClear?'CLEAR':'OPEN ITEMS'}</span></div>
       <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${assignments.length?'pending':''}'><b>Open IT assignments</b><span>${assignments.length}</span></div>
+        <div class='wl-svc-command-close-row ${needsAction.length?'pending':''}'><b>Ready IT assignments</b><span>${needsAction.length}</span></div>
         <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Unfinished equipment prep</b><span>${prepSummary.draft}</span></div>
         <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
         <div class='wl-svc-command-close-row ${offlineIT.length?'issue':''}'><b>Service troubleshooting waiting on IT</b><span>${offlineIT.length}</span></div>
@@ -4951,18 +4952,21 @@ function ownerAssignmentProgress(a, prep, solarCheck=null) {
 function ownerAIElapsed(v){if(!v)return null;const t=new Date(v).getTime();return Number.isFinite(t)?Math.max(0,Date.now()-t):null;}
 function ownerAIElapsedText(ms){if(ms==null)return '';const m=Math.floor(ms/60000);if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h '+(m%60)+'m';return Math.floor(h/24)+'d '+(h%24)+'h';}
 function ownerAIStallCheck(a,prep,solarCheck=null){
-  const p=ownerAssignmentProgress(a,prep,solarCheck), role=String(a?.assigned_role||''), flags=[];let since=a?.assigned_at,label='assigned';
+  const p=ownerAssignmentProgress(a,prep,solarCheck), role=String(a?.assigned_role||''), type=String(a?.work_type||prep?.work_type||'service').toLowerCase(), flags=[];let since=a?.assigned_at,label='assigned';
+  const intentionallyDormant=type==='pickup'&&role==='it'&&a?.status==='assigned';
   if(a?.status==='started'){since=a?.started_at||a?.updated_at||a?.assigned_at;label='in progress';}
   if(prep?.status==='draft'){since=a?.started_at||prep?.updated_at||a?.updated_at||a?.assigned_at;label='IT Tech Check';}
   if(prep?.status==='released'&&role==='service'){since=prep?.released_at||a?.updated_at;label='waiting for Service';}
   const elapsed=ownerAIElapsed(since);
-  if(a?.status==='assigned'&&elapsed!=null&&elapsed>4*60*60*1000)flags.push('Assigned '+ownerAIElapsedText(elapsed)+' ago and has not been started.');
+  if(!intentionallyDormant&&a?.status==='assigned'&&elapsed!=null&&elapsed>4*60*60*1000)flags.push('Assigned '+ownerAIElapsedText(elapsed)+' ago and has not been started.');
   if(prep?.status==='draft'&&elapsed!=null&&elapsed>4*60*60*1000)flags.push('IT Tech Check has been open about '+ownerAIElapsedText(elapsed)+'.');
   if(prep?.status==='released'&&role==='service'&&elapsed!=null&&elapsed>2*60*60*1000)flags.push('IT handoff has been waiting for Service about '+ownerAIElapsedText(elapsed)+'.');
   return {flags,elapsed,label,p};
 }
 function ownerLiveAIStatus(a,prep,solarCheck=null){
-  const p=ownerAssignmentProgress(a,prep,solarCheck), flags=[], type=String(a?.work_type||prep?.work_type||'service').toLowerCase(), stall=ownerAIStallCheck(a,prep,solarCheck); flags.push(...stall.flags);
+  const p=ownerAssignmentProgress(a,prep,solarCheck), flags=[], type=String(a?.work_type||prep?.work_type||'service').toLowerCase(), role=String(a?.assigned_role||'');
+  if(type==='pickup'&&role==='it'&&a?.status==='assigned')return {state:'waiting',label:'WAITING NORMALLY',detail:'IT remains locked until Service returns/checks in the pickup equipment.',flags:[]};
+  const stall=ownerAIStallCheck(a,prep,solarCheck); flags.push(...stall.flags);
   if(!String(a?.ticket_no||'').trim())flags.push('Missing MHelpDesk reference.');
   if(!String(a?.site||'').trim())flags.push('Customer / Site is missing.');
   if(!String(a?.job_description||'').trim())flags.push('Work description is missing.');
@@ -5148,12 +5152,51 @@ function ownerAssignmentTechOptions(role='it'){
     .filter(p=>String(p.role||'').toLowerCase()===wanted&&p.active!==false&&!p.archived_at)
     .map(p=>"<option value='"+esc(p.user_id)+"'>"+esc(p.full_name||p.username||'Technician')+"</option>").join('');
 }
+function ownerEquipmentEditorHtml(a){
+  const manifest=normalizedEquipmentManifest(a?.equipment_manifest||[]);
+  const categories=['device','stand'];
+  const sections=categories.map(category=>{
+    const current=manifest.filter(r=>r.category===category);
+    const defaults=ownerEquipmentTypeList(category);
+    const labels=[...new Set([...defaults,...current.map(r=>r.label)].filter(Boolean))];
+    const rows=labels.map(label=>{
+      const qty=current.find(r=>r.label===label)?.qty||0;
+      return `<label class='wl-owner-equipment-qty'><span>${esc(equipmentDisplayLabel(label))}</span><input type='number' inputmode='numeric' min='0' max='999' step='1' value='${qty}' data-owner-live-equipment-qty data-category='${esc(category)}' data-label='${esc(label)}'></label>`;
+    }).join('');
+    return `<div class='wl-requirement-section ${category==='device'?'unitArea':'standArea'}'><div class='wl-requirement-heading'>${category==='device'?'UNITS / DEVICES':'STANDS / POLES'}</div><div class='wl-owner-equipment-grid top8'>${rows}</div></div>`;
+  }).join('');
+  return `<div class='wl-owner-live-equipment-editor hidden' data-owner-equipment-editor='${esc(a.ticket_no)}'><div class='wl-review top8'><b>Owner Equipment Override</b><div class='small'>Change the live Tech Check quantities here. Set an item to 0 to remove it. This updates the active IT and Service records for the ticket; MHelpDesk remains separate.</div></div>${sections}<div class='wl-nav top10'><button class='wl-prev' type='button' data-owner-cancel-equipment>Edit Cancel</button><button class='wl-next' type='button' data-owner-save-equipment='${esc(a.ticket_no)}'>Save Equipment Quantities →</button></div></div>`;
+}
+async function ownerSaveEquipmentQuantities(button){
+  const row=button?.closest('.wl-assignment-row');
+  const editor=row?.querySelector('[data-owner-equipment-editor]');
+  const ticket=String(button?.dataset?.ownerSaveEquipment||editor?.dataset?.ownerEquipmentEditor||'').trim();
+  if(!ticket||!editor)return;
+  const manifest=[...editor.querySelectorAll('[data-owner-live-equipment-qty]')].map(input=>({
+    category:String(input.dataset.category||'other'),
+    label:String(input.dataset.label||'').trim(),
+    qty:cleanPartQty(input.value)
+  })).filter(x=>x.label&&x.qty>0);
+  const summary=manifest.map(x=>x.qty+' × '+equipmentDisplayLabel(x.label)).join(', ')||'No equipment';
+  if(!confirm('Save these Tech Check equipment quantities for MHelpDesk #'+ticket+'?\n\n'+summary+'\n\nMHelpDesk will not be changed.'))return;
+  button.disabled=true;button.textContent='Saving…';
+  try{
+    const {error}=await liveDb.rpc('owner_update_ticket_equipment_v1',{p_ticket_no:ticket,p_equipment_manifest:manifest});
+    if(error)throw error;
+    await installOwnerAssignments(true);
+    if(typeof window.refreshData==='function')await window.refreshData();
+    alert('Equipment quantities updated for MHelpDesk #'+ticket+'.');
+  }catch(error){
+    button.disabled=false;button.textContent='Save Equipment Quantities →';
+    alert(error?.message||'Could not update the equipment quantities.');
+  }
+}
 function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
   const p=ownerAssignmentProgress(a,prep,solarCheck),aiState=ownerLiveAIStatus(a,prep,solarCheck).state,pct=Math.max(8,Math.min(100,p.step/5*100));
   const heliosFinal=prepHasHeliosField(prep)&&prep?.status==='released'&&solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at
     ? `<div class='warn top10'><b>HELIOS FIELD INSTALL SUBMITTED</b><div class='small'>${signatureStamp(solarCheck.helios_field_completed_by_name||'Service Tech',solarCheck.helios_field_completed_at)}</div><button class='mini top8' data-wl-owner-helios-review='${esc(prep.id)}'>Review & Final Verify Helios</button></div>`:'';
   const visionUrl='./onsite-vision.html?ticket='+encodeURIComponent(String(a.ticket_no||''));
-  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role==='it'?'IT':'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id?'Assigned to:':'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site?`<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>`:''}${a.work_type?`<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>`:''}${a.scheduled_for?`<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for+'T12:00:00').toLocaleDateString()}</div>`:''}${a.requested_unit_count!=null?`<div class='small'><b>${String(a.work_type||'').toLowerCase()==='pickup'?'Units Being Picked Up':'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>`:''}${a.unit_summary?`<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>`:''}${a.job_description?`<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>`:''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${heliosFinal}${a.notes?`<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}<div class='ownerVisionRowAction'><a class='mini ownerVisionTicketLink' href='${esc(visionUrl)}'>Open in OnSite Vision →</a></div></div>${a.status==='completed'?'':`<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
+  return `<div class='wl-assignment-row' data-owner-ai-state='${aiState}'><div class='wl-assignment-main'><div class='row'><b>MHelpDesk Ref #${esc(a.ticket_no)}</b><span class='pill'>${a.assigned_role==='it'?'IT':'SERVICE'}</span></div><div class='wl-live-stage'><b>${esc(p.label)}</b><span>${esc(p.detail)}</span><div class='wl-live-track'><i style='width:${pct}%'></i></div></div><div class='small'><b>${a.assignee_user_id?'Assigned to:':'Queue:'}</b> ${esc(a.assignee_name)}</div>${a.site?`<div class='small'><b>Customer / Site:</b> ${esc(a.site)}</div>`:''}${a.work_type?`<div class='small'><b>Job Type:</b> ${esc(a.work_type.toUpperCase())}</div>`:''}${a.scheduled_for?`<div class='small'><b>Work Date:</b> ${new Date(a.scheduled_for+'T12:00:00').toLocaleDateString()}</div>`:''}${a.requested_unit_count!=null?`<div class='small'><b>${String(a.work_type||'').toLowerCase()==='pickup'?'Units Being Picked Up':'Units Required'}:</b> ${Number(a.requested_unit_count)}</div>`:''}${a.unit_summary?`<div class='small'><b>Unit / Equipment Notes:</b> ${esc(a.unit_summary)}</div>`:''}${a.job_description?`<div class='small'><b>Work Description:</b> ${esc(a.job_description)}</div>`:''}${ownerLiveAIHtml(a,prep,solarCheck)}${ownerAIJobTimeline(a,prep,solarCheck)}${ownerAIAlertHistoryHtml(a,prep,solarCheck)}${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${heliosFinal}${a.notes?`<div class='small'><b>Owner Notes:</b> ${esc(a.notes)}</div>`:''}<div class='ownerVisionRowAction'>${a.status==='completed'?'':`<button class='mini' type='button' data-owner-edit-equipment='${esc(a.ticket_no)}'>Edit Equipment / Quantities</button>`}<a class='mini ownerVisionTicketLink' href='${esc(visionUrl)}'>Open in OnSite Vision →</a></div>${a.status==='completed'?'':ownerEquipmentEditorHtml(a)}</div>${a.status==='completed'?'':`<button class='mini danger' data-wl-cancel-assignment='${a.id}'>Cancel</button>`}</div>`;
 }
 
 async function installOwnerAssignments(force = false) {
@@ -6447,6 +6490,7 @@ async function ownerAssignJob() {
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
   const rolesToSend = targets.map(t => t.role);
   const assignmentIds = [];
+  const pushAssignmentIds = [];
   for (const target of targets) {
     const targetRole = target.role;
     const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
@@ -6475,13 +6519,16 @@ async function ownerAssignJob() {
       const { error: timeError } = await liveDb.from('job_assignments').update({ scheduled_time: scheduledTime, updated_at:new Date().toISOString() }).eq('id', assignmentId);
       if (timeError) { document.body.classList.remove('busy'); return alert(timeError.message); }
     }
-    if (assignmentId) assignmentIds.push(assignmentId);
+    if (assignmentId) {
+      assignmentIds.push(assignmentId);
+      if (!(workType==='pickup' && targetRole==='it')) pushAssignmentIds.push(assignmentId);
+    }
   }
   document.body.classList.remove('busy');
 
   let pushMessage = '';
   let pushed = 0;
-  for (const assignmentId of assignmentIds) {
+  for (const assignmentId of pushAssignmentIds) {
     try {
       const { data: pushResult, error: pushError } = await liveDb.functions.invoke('send-techcheck-push', { body: { assignment_id: assignmentId } });
       if (pushError) throw pushError;
@@ -6649,6 +6696,20 @@ document.addEventListener('click', async e => {
     return renderHelpWalkthrough();
   }
   if (e.target.closest('[data-wl-help-close]')) { document.getElementById('wlHelpOverlay')?.classList.add('hidden'); document.getElementById('wlHelpCoachToast')?.classList.remove('show'); return; }
+  const ownerEditEquipment=e.target.closest('[data-owner-edit-equipment]');
+  if(ownerEditEquipment){
+    const row=ownerEditEquipment.closest('.wl-assignment-row');
+    const editor=row?.querySelector('[data-owner-equipment-editor]');
+    if(editor)editor.classList.toggle('hidden');
+    return;
+  }
+  if(e.target.closest('[data-owner-cancel-equipment]')){
+    const editor=e.target.closest('[data-owner-equipment-editor]');
+    if(editor)editor.classList.add('hidden');
+    return;
+  }
+  const ownerSaveEquipment=e.target.closest('[data-owner-save-equipment]');
+  if(ownerSaveEquipment)return ownerSaveEquipmentQuantities(ownerSaveEquipment);
   const heliosReview=e.target.closest('[data-wl-owner-helios-review]'); if(heliosReview) return ownerOpenHeliosFinalReview(heliosReview.dataset.wlOwnerHeliosReview);
   const heliosVerify=e.target.closest('[data-wl-owner-helios-verify]'); if(heliosVerify) return ownerVerifyHeliosFinal(heliosVerify.dataset.wlOwnerHeliosVerify);
   if(e.target.closest('[data-wl-owner-helios-close]')) { document.getElementById('ownerHeliosFinalReview')?.remove(); return; }
