@@ -60,6 +60,7 @@ let state = {
   ownerAssignments: [],
   ownerReviewQueue: [],
   ownerAIAlerts: [],
+  ownerFieldEscalations: [],
   dailyInspections: [],
   matched: [],
   sessionClosed: [],
@@ -229,7 +230,8 @@ function showAuth() {
     assetHistory: [],
     accessHistory: [],
     ownerReviewQueue: [],
-  ownerAIAlerts: [],
+    ownerAIAlerts: [],
+    ownerFieldEscalations: [],
     matched: [],
     sessionClosed: [],
   };
@@ -514,6 +516,11 @@ function setupRealtime() {
       { event: '*', schema: 'public', table: 'owner_job_reviews' },
       scheduleRefreshData
     )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'field_escalations' },
+      scheduleRefreshData
+    )
     .subscribe(s => {
       $('syncStatus').textContent = !navigator.onLine ? 'Offline — unsent field drafts stay on this device' : s === 'SUBSCRIBED' ? 'Live shared data connected' : 'Connecting shared data…';
     });
@@ -576,7 +583,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     const reportLimit = initial ? 60 : 250;
     const historyLimit = initial ? 80 : 300;
     const registryLimit = initial ? 180 : 500;
-    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, truckSpareBatteries] = await Promise.all([
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries] = await Promise.all([
       db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
@@ -589,6 +596,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.from('asset_inventory_history').select('*').order('created_at',{ascending:false}).limit(historyLimit),
       db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(initial ? 40 : 100),
       db.rpc('owner_review_queue_v1',{p_limit:40}),
+      db.from('field_escalations').select('id,ticket_no,site,unit_tag,equipment_type,status,service_tech_name,it_tech_name,original_problem,service_troubleshooting_notes,it_troubleshooting_notes,owner_summary,created_at,updated_at').is('resolved_at',null).order('updated_at',{ascending:false}).limit(100),
       db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true})
     ]);
     if (!rep.error) state.reports = rep.data || [];
@@ -603,6 +611,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     if (!assetHistory.error) state.assetHistory = assetHistory.data || [];
     if (!accessHistory.error) state.accessHistory = accessHistory.data || [];
     if (!ownerReviewQueue.error) state.ownerReviewQueue = Array.isArray(ownerReviewQueue.data) ? ownerReviewQueue.data : [];
+    if (!fieldEscalations.error) state.ownerFieldEscalations = fieldEscalations.data || [];
     if (!truckSpareBatteries.error) state.truckSpareBatteries = truckSpareBatteries.data || [];
     renderOwner();
     renderOwnerUnitSearch();
@@ -1385,6 +1394,8 @@ function renderOwnerTechOverview() {
 function ownerJump(target) {
   const el = target === 'vision'
     ? document.getElementById('ownerLiveJobProgress')
+    : target === 'offline'
+      ? document.getElementById('ownerFieldEscalations')
     : target === 'returns'
       ? document.getElementById('ownerIntakeTracking')
     : target === 'accounts'
@@ -1510,6 +1521,8 @@ function renderOwnerAttention() {
   const returns = state.ownerReturns || [];
   const corrections = (state.ownerReviewQueue || []).filter(r => r.review_status === 'correction_requested' && r.ready_for_owner_review !== true);
   const visionAlerts = state.ownerAIAlerts || [];
+  const offlineEscalations = state.ownerFieldEscalations || [];
+  const offlineOwnerRequired = offlineEscalations.filter(r => r.status === 'unresolved_owner');
   const drafts = state.preps.filter(p => p.status === 'draft');
   const released = state.preps.filter(p => p.status === 'released');
   const waitingIt = returns.filter(r => r.status === 'waiting_it');
@@ -1522,7 +1535,7 @@ function renderOwnerAttention() {
   const overdueReleased = released.filter(p => ownerAgeHours(p.released_at || p.created_at) >= 24);
   const overdueReturns = waitingIt.filter(r => ownerAgeHours(r.returned_at) >= 24);
   const overdueManager = manager.filter(r => ownerAgeHours(r.it_received_at || r.updated_at) >= 24);
-  const ownerActions = manager.length + replacements.length + resetPending.length + failedInspections.length + corrections.length + visionAlerts.length;
+  const ownerActions = manager.length + replacements.length + resetPending.length + failedInspections.length + corrections.length + visionAlerts.length + offlineEscalations.length;
   const overdueCount = overdueDrafts.length + overdueReleased.length + overdueReturns.length + overdueManager.length;
   const attentionCount = ownerActions + overdueCount;
   const attentionBadge = $('ownerAttentionBadge');
@@ -1535,8 +1548,15 @@ function renderOwnerAttention() {
   if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
   const row = (kind,title,detail,target,urgent=false) => `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini' onclick="ownerJump('${target}')">Open →</button></div>`;
-  const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Correction active for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>Automatically routed to the ${esc(String(corrections[0].correction_role || 'service').toUpperCase())} Department queue · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerJump('vision')">Open Correction →</button></div>` : visionAlerts[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>ONSITE VISION ALERT</div><b>Review MHelpDesk #${esc(visionAlerts[0].ticket_no || '—')}</b><div class='small'>${esc(visionAlerts[0].detail || 'Vision detected an active workflow issue.')}${visionAlerts[0].acknowledged?' · ACKNOWLEDGED — remains active until resolved':''}</div><button class='btn top10' onclick="ownerJump('vision')">Open Vision Alert →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
+  const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : offlineOwnerRequired[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Offline Unit ${esc(offlineOwnerRequired[0].unit_tag || '')} needs your decision</b><div class='small'>MHelpDesk #${esc(offlineOwnerRequired[0].ticket_no || '—')} · Service and IT could not determine a solution.</div><button class='btn top10' onclick="ownerJump('offline')">Open Complete Summary →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Correction active for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>Automatically routed to the ${esc(String(corrections[0].correction_role || 'service').toUpperCase())} Department queue · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerJump('vision')">Open Correction →</button></div>` : visionAlerts[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>ONSITE VISION ALERT</div><b>Review MHelpDesk #${esc(visionAlerts[0].ticket_no || '—')}</b><div class='small'>${esc(visionAlerts[0].detail || 'Vision detected an active workflow issue.')}${visionAlerts[0].acknowledged?' · ACKNOWLEDGED — remains active until resolved':''}</div><button class='btn top10' onclick="ownerJump('vision')">Open Vision Alert →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
   const parts = [];
+  if (offlineEscalations.length) parts.push(row(
+    'offline',
+    `${offlineEscalations.length} offline-unit escalation${offlineEscalations.length===1?'':'s'} active`,
+    offlineEscalations.map(r => `Unit ${r.unit_tag || '—'} · #${r.ticket_no || '—'} · ${String(r.status || '').replaceAll('_',' ').toUpperCase()}${r.status==='unresolved_owner'?' · OWNER DECISION REQUIRED':''}`).join(' | '),
+    'offline',
+    offlineOwnerRequired.length>0
+  ));
   if (replacements.length) parts.push(row('replacement',`${replacements.length} damaged equipment item${replacements.length===1?'':'s'} need replacement / repair`,replacements.map(r => `${r.equipment_type || 'Equipment'} ${r.unit_tag || ''} · #${r.ticket_no}`).join(' | '),'returns',true));
   if (corrections.length) parts.push(row('correction',`${corrections.length} job${corrections.length===1?'':'s'} returned for correction`,corrections.map(r => `#${r.ticket_no} · ${String(r.correction_role || 'service').toUpperCase()} · ${r.correction_reason || 'Owner correction requested'}`).join(' | '),'review',true));
   if (visionAlerts.length) parts.push(row('vision',`OnSite Vision detected ${visionAlerts.length} active issue${visionAlerts.length===1?'':'s'}`,visionAlerts.map(r => `#${r.ticket_no || '—'} · ${r.detail || 'Workflow issue'}${r.acknowledged?' · ACKNOWLEDGED':''}`).join(' | '),'vision',true));
@@ -1546,7 +1566,7 @@ function renderOwnerAttention() {
   if (waitingIt.length) parts.push(row('intake',`${waitingIt.length} returned unit${waitingIt.length===1?'':'s'} waiting for IT intake`,waitingIt.map(r => `Unit ${r.unit_tag}${ownerAgeHours(r.returned_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',overdueReturns.length>0));
   if (drafts.length) parts.push(row('prep',`${drafts.length} MHelpDesk ticket${drafts.length===1?'':'s'} still in IT prep`,drafts.map(p => `#${p.ticket_no}${ownerAgeHours(p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueDrafts.length>0));
   if (released.length) parts.push(row('service',`${released.length} IT handoff${released.length===1?'':'s'} ready for Service`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
-  host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
+  host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length + Math.max(0,offlineEscalations.length-offlineOwnerRequired.length)}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
 }
 function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
 function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'assigned_to_tech' ? 'delivery' : status === 'maintenance' || status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'retired' ? 'neutral' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
