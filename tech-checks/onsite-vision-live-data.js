@@ -11,6 +11,7 @@
   const escalationCache=new Map();
   const damageCache=new Map();
   const departureCache=new Map();
+  const workloadCache=new Map();
   const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','unresolved_owner'];
   const TTL_MS=15000;
 
@@ -204,6 +205,33 @@
   }
 
 
+
+  async function getWorkload(filters={},options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const date=String(filters.date||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('A YYYY-MM-DD workload date is required.');
+    const role=String(filters.role||'').trim().toLowerCase();
+    const techId=String(filters.tech_id||'').trim();
+    const techName=String(filters.tech_name||'').trim().toLowerCase();
+    const cacheKey=JSON.stringify({date,role,techId,techName});
+    const cached=workloadCache.get(cacheKey),force=Boolean(options.force);
+    if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
+    let query=client.from('job_assignments').select([
+      'id','ticket_no','site','assigned_role','assignee_user_id','assignee_name','status','scheduled_for','scheduled_time',
+      'work_type','unit_summary','job_description','requires_it_handoff','equipment_manifest','requested_unit_count','updated_at'
+    ].join(',')).eq('scheduled_for',date).not('status','in','("completed","cancelled")').order('scheduled_time',{ascending:true,nullsFirst:false}).limit(250);
+    if(role)query=query.eq('assigned_role',role);
+    if(techId)query=query.eq('assignee_user_id',techId);
+    const response=await query;
+    if(response.error)throw response.error;
+    let rows=Array.isArray(response.data)?response.data:[];
+    if(techName&&!techId)rows=rows.filter(row=>String(row.assignee_name||'').toLowerCase().includes(techName));
+    const tickets=[...new Set(rows.map(row=>String(row.ticket_no||'').trim()).filter(Boolean))];
+    const value={date,role,tech_id:techId,tech_name:techName,count:tickets.length,tickets,assignments:rows};
+    workloadCache.set(cacheKey,{at:Date.now(),value});
+    return value;
+  }
+
   async function getDepartureReadiness(filters={},options={}){
     if(!client) throw new Error('OnSite Vision live data is not configured.');
     const ticketNo=String(filters.ticket_no||'').trim();
@@ -277,6 +305,7 @@
     escalationCache.clear();
     damageCache.clear();
     departureCache.clear();
+    workloadCache.clear();
   }
 
   function forWorkflowEngine(context){
@@ -312,7 +341,7 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v5',
+    version:'live-data-v6',
     configure,
     getJobContext,
     getCompanyHistory,
@@ -320,6 +349,7 @@
     getOfflineEscalations,
     getDamageHolds,
     getDepartureReadiness,
+    getWorkload,
     prime,
     invalidate,
     invalidateAll,
