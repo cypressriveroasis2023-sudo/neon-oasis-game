@@ -436,7 +436,16 @@
       </div>
     </aside>
     <main class="ownerAppWorkspace">
-      <div id="ownerAppPage" class="ownerAppPage" aria-live="polite"><div class="ownerAppEmpty"><b>Loading Owner workspace…</b></div></div>
+      <div id="ownerAppPage" class="ownerAppPage" aria-live="polite">
+        <div id="ownerRouteView"><div class="ownerAppEmpty"><b>Loading Owner workspace…</b></div></div>
+        <div id="ownerPersistentControls" aria-live="off">
+          <details id="ownerJobAssignments" aria-hidden="true"><span id="ownerAssignmentBadge"></span></details>
+          <section id="ownerPersistentAccounts" aria-hidden="true">
+            <div class="ownerAppGroup"><h2>Password Reset Requests</h2><div id="passwordResetRequests"></div></div>
+            <div class="ownerAppGroup"><h2>Current Users</h2><div id="userList"></div></div>
+          </section>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -446,21 +455,20 @@
     <details id="ownerAttentionCard"><div id="ownerAttention"></div><span id="ownerAttentionBadge"></span></details>
     <details id="ownerReviewCard"><div id="ownerReviewQueue"></div><span id="ownerReviewBadge"></span></details>
     <details id="ownerCompanyHistoryCard"><select id="ownerCompanyHistoryKind"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select><input id="ownerCompanyHistoryQuery"><div id="ownerCompanyHistoryResults"></div></details>
-    <details id="ownerJobAssignments"><span id="ownerAssignmentBadge"></span></details>
     <details id="ownerUnitStatusCard"><span id="ownerUnitStatusBadge"></span><input id="ownerUnitSearch"><div id="ownerUnitSearchResults"></div></details>
     <details id="ownerHandoffsCard"><span id="ownerHandoffsBadge"></span><div id="ownerPrepSummary"></div><div id="ownerPrepStatus"></div><span id="ownerPrepHistoryCount"></span><div id="ownerPrepHistory"></div></details>
     <details id="ownerActivityCard"><span id="ownerActivityBadge"></span><div id="reports"></div><button id="ownerReportsMore"></button></details>
-    <details id="ownerAccountsCard"><span id="ownerAccountsBadge"></span><input id="newTechName"><input id="newTechUsername"><select id="newTechRole"><option value="service">Service</option><option value="it">IT</option></select><input id="newTechPassword"><div id="userMessage"></div><div id="passwordResetRequests"></div><div id="userList"></div></details>
+    <details id="ownerAccountsCard"><span id="ownerAccountsBadge"></span><input id="newTechName"><input id="newTechUsername"><select id="newTechRole"><option value="service">Service</option><option value="it">IT</option></select><input id="newTechPassword"><div id="userMessage"></div></details>
   </div>
 </section>
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v10"></script>
-    <script type="module" src="./app.js?v=owner-routing-fix-v218"></script>
+    <script type="module" src="./app.js?v=owner-unified-shell-v222"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=221', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=222', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
