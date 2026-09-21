@@ -172,6 +172,12 @@ function injectStyles() {
     .wl-svc-command-close-row b{color:#263744}.wl-svc-command-close-row span{font-weight:900;color:#5d6e7c}
     .wl-svc-command-close-row.pending{background:#fff4e2}.wl-svc-command-close-row.pending span{color:#895900}
     .wl-svc-command-close-row.issue{background:#ffe9e7}.wl-svc-command-close-row.issue span{color:#9f2119}
+    .wl-tech-load{display:grid;place-items:center;min-height:280px;padding:34px 18px;text-align:center}
+    .wl-tech-load-ring{width:42px;height:42px;border:4px solid #dfe6eb;border-top-color:#d20b12;border-radius:999px;animation:wlTechSpin .8s linear infinite}
+    .wl-tech-load h3{margin:15px 0 5px!important;color:#172839!important;font-size:20px!important}.wl-tech-load p{margin:0;max-width:310px;color:#667786;font-size:12px;line-height:1.45}
+    .wl-tech-load-error{border:1px solid #e2b4b0;background:#fff5f4;border-radius:14px;padding:16px;text-align:left}.wl-tech-load-error b{color:#9e2119}.wl-tech-load-error button{margin-top:12px}
+    .wl-tech-partial{border:1px solid #e4c77b;background:#fff9e9;color:#6e5100;border-radius:12px;padding:10px 12px;font-size:11px;line-height:1.4}
+    @keyframes wlTechSpin{to{transform:rotate(360deg)}}
     .wl-it-command .wl-svc-command-hero{background:linear-gradient(145deg,#0d2233,#1f4b68)}
     .wl-it-command .wl-svc-command-kicker{color:#9bdcff}
     .wl-it-command .wl-svc-command-next{border-color:#277ca8}
@@ -1855,25 +1861,54 @@ async function showITHome() {
     home.className='card wl-home';
     viewIT().prepend(home);
   }
+  const loadToken=++itDashboardLoadToken;
+  home.innerHTML=techDashboardLoadingHtml('Loading IT Technician Command Center…');
+  hideChildren(viewIT(),[home]);
+  resetWizardPosition();
 
-  const [prepSummary,returns,assignments,phoneAlerts,assignedAssets,offlineRows]=await Promise.all([
-    prepCounts(),
-    returnCounts(),
-    myActiveAssignments('it'),
-    pushAlertState(),
-    myAssignedInventoryAssets(),
-    fieldEscalationRows()
+  const settled=await Promise.allSettled([
+    techDashboardTimeout(prepCounts(),{draft:0,released:0,closed:0,nextDraft:null}),
+    techDashboardTimeout(returnCounts(),{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null}),
+    techDashboardTimeout(myActiveAssignments('it'),[]),
+    techDashboardTimeout(pushAlertState(),{supported:false,permission:'unknown',subscribed:false,ready:false}),
+    techDashboardTimeout(myAssignedInventoryAssets(),[]),
+    techDashboardTimeout(fieldEscalationRows(),[])
   ]);
+  if(loadToken!==itDashboardLoadToken)return;
+  const values=settled.map(r=>r.status==='fulfilled'?r.value:null);
+  const prepSummary=values[0]||{draft:0,released:0,closed:0,nextDraft:null};
+  const returns=values[1]||{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null};
+  const assignments=values[2]||[];
+  const phoneAlerts=values[3]||{supported:false,permission:'unknown',subscribed:false,ready:false};
+  const assignedAssets=values[4]||[];
+  const offlineRows=values[5]||[];
+  let partialLoad=techDashboardSettled(settled);
 
-  const alertBanner=phoneAlertBanner(phoneAlerts);
   const ownerViewingIT=roleText().includes('Owner/Admin');
   const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingIT?'IT / Owner':'IT Technician');
   const todayKey=techCheckDateKey();
   const todayLabel=new Date().toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'});
   const offlineIT=(offlineRows||[]).filter(row=>!row.resolved_at&&['waiting_it','joint_troubleshooting'].includes(String(row.status||'')));
-  const offlineITHtml=await fieldEscalationITHtml(offlineRows);
 
-  const assignmentRows=await Promise.all((assignments||[]).map(async a=>({a,gate:await assignmentGateState(a)})));
+  const offlineHtmlResult=await Promise.allSettled([techDashboardTimeout(fieldEscalationITHtml(offlineRows),'')]);
+  if(loadToken!==itDashboardLoadToken)return;
+  if(techDashboardSettled(offlineHtmlResult))partialLoad=true;
+  const offlineITHtml=offlineHtmlResult[0]?.status==='fulfilled'?(offlineHtmlResult[0].value||''):'';
+
+  const gateResults=await Promise.allSettled((assignments||[]).map(a=>techDashboardTimeout(
+    assignmentGateState(a),
+    {ready:false,label:'STATUS UNAVAILABLE',detail:'Live workflow status did not finish loading. Retry the dashboard before starting this task.'},
+    5000
+  )));
+  if(loadToken!==itDashboardLoadToken)return;
+  if(techDashboardSettled(gateResults))partialLoad=true;
+  const assignmentRows=(assignments||[]).map((a,index)=>({
+    a,
+    gate:gateResults[index]?.status==='fulfilled'
+      ? gateResults[index].value
+      : {ready:false,label:'STATUS UNAVAILABLE',detail:'Retry the dashboard before starting this task.'}
+  }));
+  const alertBanner=(partialLoad?"<div class='wl-tech-partial'><b>Partial live-data load.</b> The IT command center is usable, but one live check did not answer. Retry before starting any item marked STATUS UNAVAILABLE.</div>":"")+phoneAlertBanner(phoneAlerts);
   const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
   const overdue=assignmentRows.filter(({a})=>dateKey(a)&&dateKey(a)<todayKey);
   const today=assignmentRows.filter(({a})=>dateKey(a)===todayKey);
@@ -3320,6 +3355,29 @@ async function showITStatus() {
   card.innerHTML = `${progress('Status & History', 'Equipment handoff history', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows || '<div class="warn">No history yet.</div>'}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
 }
+let serviceDashboardLoadToken=0;
+let itDashboardLoadToken=0;
+function techDashboardLoadingHtml(label){
+  return "<div class='wl-tech-load'><div><div class='wl-tech-load-ring'></div><h3>"+esc(label)+"</h3><p>Loading live Tech Check work. You can leave this screen at any time; the app will not lock up.</p></div></div>";
+}
+function techDashboardErrorHtml(role,message){
+  const label=role==='it'?'IT Technician':'Service Tech';
+  return "<div class='wl-tech-load'><div class='wl-tech-load-error'><b>"+esc(label)+" dashboard could not finish loading.</b><div class='small top8'>"+esc(message||'A live data request did not complete.')+"</div><button class='wl-big wl-blue' data-wl-dashboard-retry='"+esc(role)+"'>Retry Dashboard →</button></div></div>";
+}
+function techDashboardTimeout(promise,fallback,ms=7000){
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timed out loading live data.')),ms);})
+  ]).then(value=>{clearTimeout(timer);return value;},error=>{clearTimeout(timer);throw error;}).catch(error=>{
+    console.warn('Tech dashboard partial-load fallback',error);
+    return fallback;
+  });
+}
+function techDashboardSettled(results){
+  return results.some(r=>r.status==='rejected');
+}
+
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
   let home=document.getElementById('wlSvcHome');
@@ -3329,17 +3387,30 @@ async function showSvcHome() {
     home.className='card wl-home';
     viewSvc().prepend(home);
   }
+  const loadToken=++serviceDashboardLoadToken;
+  home.innerHTML=techDashboardLoadingHtml('Loading Service Tech Command Center…');
+  hideChildren(viewSvc(),[home]);
+  resetWizardPosition();
 
-  const [r,work,phoneAlerts,assignedAssets,truckSpares,offlineRows]=await Promise.all([
-    myReturnCounts(),
-    serviceWorkData(),
-    pushAlertState(),
-    myAssignedInventoryAssets(),
-    myTruckSpareData(),
-    fieldEscalationRows()
+  const settled=await Promise.allSettled([
+    techDashboardTimeout(myReturnCounts(),{waiting:0,inventory:0,replacement:0,completed:0}),
+    techDashboardTimeout(serviceWorkData(),{assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]}),
+    techDashboardTimeout(pushAlertState(),{supported:false,permission:'unknown',subscribed:false,ready:false}),
+    techDashboardTimeout(myAssignedInventoryAssets(),[]),
+    techDashboardTimeout(myTruckSpareData(),{units:[],batteries:[]}),
+    techDashboardTimeout(fieldEscalationRows(),[])
   ]);
+  if(loadToken!==serviceDashboardLoadToken)return;
+  const values=settled.map(r=>r.status==='fulfilled'?r.value:null);
+  const r=values[0]||{waiting:0,inventory:0,replacement:0,completed:0};
+  const work=values[1]||{assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]};
+  const phoneAlerts=values[2]||{supported:false,permission:'unknown',subscribed:false,ready:false};
+  const assignedAssets=values[3]||[];
+  const truckSpares=values[4]||{units:[],batteries:[]};
+  const offlineRows=values[5]||[];
+  const partialLoad=techDashboardSettled(settled);
 
-  const alertBanner=phoneAlertBanner(phoneAlerts);
+  const alertBanner=(partialLoad?"<div class='wl-tech-partial'><b>Partial live-data load.</b> The command center is usable, but one data source did not answer. Refresh or tap Retry if a count looks incomplete.</div>":"")+phoneAlertBanner(phoneAlerts);
   const assignments=work.assignments||[];
   const ownerViewingService=roleText().includes('Owner/Admin');
   const todayKey=techCheckDateKey();
@@ -4126,6 +4197,11 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('click', async e => {
+  const dashboardRetry=e.target.closest('[data-wl-dashboard-retry]');
+  if(dashboardRetry){
+    if(dashboardRetry.dataset.wlDashboardRetry==='it')return showITHome();
+    return showSvcHome();
+  }
   if(e.target.closest('[data-owner-ai-new-chat]')) { ownerAIConversationClear(); return; }
   const aiChip=e.target.closest('[data-owner-ai-chip]');
   if(aiChip){
