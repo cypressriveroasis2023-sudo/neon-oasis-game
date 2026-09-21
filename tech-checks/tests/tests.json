@@ -2770,7 +2770,29 @@
         "No activity is invented when no record exists"
       ],
       "manual_device": true
+    },
+    {
+      "id": "OWNER-OFFLINE-ATTENTION-PERSISTENCE-01",
+      "area": "Owner Needs Attention",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Active offline-unit escalations remain in Needs Attention until resolved",
+      "steps": [
+        "Create a rollback-only unresolved_owner escalation with complete Service + IT notes",
+        "Confirm it is returned by the Owner active escalation query",
+        "Record the Owner decision",
+        "Refresh Owner Needs Attention and resolved escalation history"
+      ],
+      "expected": [
+        "Active Service/IT troubleshooting remains visible as an in-progress issue",
+        "Unresolved Service + IT cases count as an Owner action and open the complete summary",
+        "Saving the Owner decision removes the active alert",
+        "The escalation and Owner decision remain in permanent history and reports",
+        "No MHelpDesk record is changed"
+      ],
+      "manual_device": false
     }
   ],
-  "last_release_qa_note": "Owner Review now uses the authoritative database closeout gate in both the review card and Command Center count. Unit Lookup includes offline Service + IT escalation history. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "Offline-unit escalation is now integrated into Owner Needs Attention. Active Service/IT work remains visible, unresolved cases become an Owner action, and resolution clears the active alert while preserving permanent history. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
