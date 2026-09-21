@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v131",
-  "service_worker": "v136",
+  "runtime_version": "release-qa-v132",
+  "service_worker": "v138",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3014,7 +3014,74 @@
         "Historical damage may still be read for detail without appearing in the active hold list",
         "Vision says MISSING INFORMATION for the normal final repair/replacement procedure or outcome when it has not been defined/recorded"
       ]
+    },
+    {
+      "id": "VISION-DEPARTURE-BATTERY-01",
+      "area": "OnSite Vision · departure readiness",
+      "role": "owner",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Vision checks both truck battery minimums from live Tech Check records",
+      "steps": [
+        "Ask if the truck is ready to leave",
+        "Read unresolved truck_spare_batteries records"
+      ],
+      "expected": [
+        "Requires at least 4 charged/ready IT-checked-out 12V 110Ah batteries",
+        "Requires at least 2 charged/ready IT-checked-out LiTime 12V 100Ah batteries",
+        "Unrecorded batteries are MISSING INFORMATION"
+      ]
+    },
+    {
+      "id": "VISION-DEPARTURE-BACKUP-01",
+      "area": "OnSite Vision · departure readiness",
+      "role": "owner",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Vision requires an IT-checked-out backup unit for the day",
+      "steps": [
+        "Ask whether Service has the required backup",
+        "Read active spare prep_items"
+      ],
+      "expected": [
+        "Eligible types are Spotter, Sniper, or Solar Spotter",
+        "Backup must be verified, safe/function/power checked, IT checked out, and checked out for Service",
+        "Solar Pole is retired and never qualifies"
+      ]
+    },
+    {
+      "id": "VISION-DEPARTURE-BLOCKERS-01",
+      "area": "OnSite Vision · departure readiness",
+      "role": "owner",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Vision explains exactly what is missing before Service leaves",
+      "steps": [
+        "Ask if Service is ready to leave when one or more minimums are absent"
+      ],
+      "expected": [
+        "Vision does not declare ready",
+        "Each missing battery quantity or backup unit is named as a blocker",
+        "Nothing absent from Tech Check is assumed present"
+      ]
+    },
+    {
+      "id": "VISION-DEPARTURE-RLS-01",
+      "area": "OnSite Vision · departure readiness",
+      "role": "owner",
+      "mode": "security review",
+      "destructive": false,
+      "scenario": "Departure readiness respects existing role-scoped truck and prep-item RLS",
+      "steps": [
+        "Inspect truck_spare_batteries, prep_items, and prep_tickets RLS",
+        "Query through authenticated Owner context"
+      ],
+      "expected": [
+        "RLS remains enabled",
+        "Owner can inspect operational readiness",
+        "Service remains limited to its permitted records"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision now answers live damaged-equipment Needs Replacement questions in addition to offline-unit questions. Damage answers use unit_returns, asset inventory, Owner notification records, and permanent reports. An active Needs Replacement hold is not available Shop Inventory. Owner notification is only VERIFIED DATABASE FACT when a matching notification row exists. Final repair/replacement disposition remains MISSING INFORMATION until Cameras On Site defines/completes it. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "OnSite Vision now answers truck/day departure readiness from live Tech Check records: 4 x charged 12V 110Ah, 2 x charged LiTime 12V 100Ah, and one IT-checked-out Spotter/Sniper/Solar Spotter backup. Unrecorded items are MISSING INFORMATION. Solar Pole remains retired."
 }
