@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v13
+ * Version: company-knowledge-v16
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v15",
+  "version": "company-knowledge-v16",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -772,6 +772,19 @@
         "condition_checks",
         "inventory_confirmation",
         "completion"
+      ]
+    },
+    "unit_swap_resolution": {
+      "label": "Unit SWAP field outcome",
+      "rules": [
+        "Every prepared SWAP replacement unit gets one Service field decision after the IT → Service handoff: YES — SWAP HAPPENED or NO — DID NOT USE IT.",
+        "If Service answers NO, the exact unused replacement unit returns through Service Return → IT Intake before it can become Shop Inventory again.",
+        "If Service answers YES, the replacement unit remains at the customer/site and the OLD field unit must return through Service Return → IT Intake.",
+        "A YES answer records the replacement unit at the ticket/customer site in Tech Check and creates a ready-only IT site-registration task.",
+        "IT confirms the site-registration task only after Service says the SWAP happened. IT must not see or perform that site-registration task before the Service field decision.",
+        "The Tech Check cannot close a SWAP while a replacement unit still has no YES/NO outcome or while a required unit return is missing.",
+        "An unused SWAP replacement does not require field installation checks that only apply to an installed replacement.",
+        "The old field unit return and an unused replacement-unit return are different records. Tech Check must not count the replacement unit as the old unit."
       ]
     },
     "it_supplied_card_replacements": {
