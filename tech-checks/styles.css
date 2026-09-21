@@ -4316,3 +4316,18 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
 #view-owner #ownerAppPage>.ownerAppMountedAssign>summary{display:none!important}
 #view-owner #ownerAppPage>.ownerAppMountedAssign>.ownerDashBody{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:transparent!important}
 #view-owner #ownerAppPage>.ownerAppMountedAssign .owner-simple-step{max-width:none!important}
+
+/* Owner interaction safety v205
+   Never let the global async "busy" state disable the entire application.
+   Individual submit controls already protect their own operations. */
+body.busy{pointer-events:auto!important}
+body.busy #view-owner{pointer-events:auto!important}
+#view-owner .ownerAppShell,
+#view-owner .ownerAppSidebar,
+#view-owner .ownerAppWorkspace,
+#view-owner .ownerAppPage,
+#view-owner #ownerJobAssignments,
+#view-owner #ownerJobAssignments .ownerDashBody{pointer-events:auto!important}
+#view-owner .ownerAppSidebar{z-index:70!important}
+#view-owner .ownerAppWorkspace{position:relative;z-index:1}
+#view-owner .ownerAppPage{position:relative;z-index:2}
