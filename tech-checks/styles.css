@@ -4533,8 +4533,11 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
 #view-owner #ownerRouteView,#view-owner #ownerPersistentControls{pointer-events:auto!important}
 #view-owner #ownerAppPage{background:var(--oa-bg)!important;color:var(--oa-text)!important}
 #view-owner #ownerAppPage h1,#view-owner #ownerAppPage h2,#view-owner #ownerAppPage h3,#view-owner #ownerAppPage h4,
-#view-owner #ownerAppPage label,#view-owner #ownerAppPage b,#view-owner #ownerAppPage strong{color:var(--oa-text)!important;opacity:1!important}
-#view-owner #ownerAppPage p,#view-owner #ownerAppPage small,#view-owner #ownerAppPage .small{color:var(--oa-muted)!important;opacity:1!important}
+#view-owner #ownerAppPage label,#view-owner #ownerAppPage b,#view-owner #ownerAppPage strong{opacity:1!important}
+#view-owner #ownerAppPage .ownerAppPageHeader h1,#view-owner #ownerAppPage .ownerAppPageHeader h2,
+#view-owner #ownerAppPage .ownerAppGroup>h2,#view-owner #ownerAppPage>h2{color:var(--oa-text)!important}
+#view-owner #ownerAppPage .ownerAppPageHeader p,#view-owner #ownerAppPage .ownerAppPageHeader small{color:var(--oa-muted)!important}
+#view-owner #ownerAppPage p,#view-owner #ownerAppPage small,#view-owner #ownerAppPage .small{opacity:1!important}
 #view-owner #ownerAppPage input,#view-owner #ownerAppPage select,#view-owner #ownerAppPage textarea{
   background:#0b171e!important;color:#fff!important;border:1px solid #4b6571!important;box-shadow:none!important;
 }
@@ -4552,8 +4555,10 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
   background:var(--oa-panel2)!important;border-color:var(--oa-line)!important;color:var(--oa-text)!important;
 }
 #view-owner #ownerAppPage .ownerAttentionRow.urgent{background:#26171a!important;border-color:#a23b42!important}
-#view-owner #ownerAppPage .ownerAttentionRow span,#view-owner #ownerAppPage .ownerAttentionRow p,
-#view-owner #ownerAppPage .ownerNextAction span,#view-owner #ownerAppPage .ownerNextAction p{color:#c8d3d8!important;opacity:1!important}
+#view-owner #ownerAppPage .ownerAttentionRow b,#view-owner #ownerAppPage .ownerAttentionRow strong,
+#view-owner #ownerAppPage .ownerNextAction b,#view-owner #ownerAppPage .ownerNextAction strong{color:#f7fafb!important}
+#view-owner #ownerAppPage .ownerAttentionRow span,#view-owner #ownerAppPage .ownerAttentionRow p,#view-owner #ownerAppPage .ownerAttentionRow .small,
+#view-owner #ownerAppPage .ownerNextAction span,#view-owner #ownerAppPage .ownerNextAction p,#view-owner #ownerAppPage .ownerNextAction .small{color:#c8d3d8!important;opacity:1!important}
 #view-owner #ownerAppPage .ownerAttentionRow .mini{background:var(--oa-red)!important;border-color:#ff555b!important;color:#fff!important}
 #view-owner #ownerJobAssignments{width:100%!important;max-width:none!important;margin:0!important}
 #view-owner #ownerJobAssignments>.ownerDashSummary{display:none!important}
@@ -4594,6 +4599,9 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
   #view-owner .ownerAppSidebar nav button.active{background:var(--oa-red)!important;border-color:#ff555b!important;color:#fff!important}
   #view-owner .ownerAppWorkspace{flex:1 1 auto!important;min-width:0!important;min-height:0!important;width:100%!important;height:auto!important;overflow-x:hidden!important;overflow-y:auto!important;background:var(--oa-bg)!important}
   #view-owner #ownerAppPage{width:100%!important;max-width:none!important;min-height:100%!important;margin:0!important;padding:18px 12px calc(44px + env(safe-area-inset-bottom))!important}
+  #view-owner #ownerRouteView{display:block!important}
+  #view-owner #ownerRouteView>*{float:none!important;position:relative!important;inset:auto!important}
+  #view-owner #ownerRouteView>.ownerAppAttentionHost{display:block!important;clear:both!important}
   #view-owner #ownerRouteView>*,#view-owner #ownerPersistentControls>*{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important}
   #view-owner .ownerAppPageHeader{margin-bottom:18px!important;padding-bottom:14px!important}
   #view-owner .ownerAppPageHeader h1{font-size:26px!important;line-height:1.1!important}
