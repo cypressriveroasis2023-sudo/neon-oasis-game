@@ -4310,3 +4310,9 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
 #view-owner .ownerCalAgendaJob b{font-size:10px}.ownerCalAgendaJob span{font-size:9px;color:#7f929e;margin-top:2px}
 #view-owner .ownerCalAgendaJob em{font-style:normal;font-size:8px;font-weight:900;letter-spacing:.06em;color:#a8c9da}
 @media(max-width:1200px){#view-owner .ownerCalLayout{grid-template-columns:1fr}#view-owner .ownerCalAgenda{position:static}.ownerCalWeek .ownerCalDay{min-height:280px}}
+
+/* Structural Owner Assign functional mount v204 */
+#view-owner #ownerAppPage>.ownerAppMountedAssign{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
+#view-owner #ownerAppPage>.ownerAppMountedAssign>summary{display:none!important}
+#view-owner #ownerAppPage>.ownerAppMountedAssign>.ownerDashBody{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:transparent!important}
+#view-owner #ownerAppPage>.ownerAppMountedAssign .owner-simple-step{max-width:none!important}
