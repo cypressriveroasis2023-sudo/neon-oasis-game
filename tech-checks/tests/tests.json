@@ -2459,7 +2459,33 @@
         "The top Owner Needs Attention count includes active Vision issues",
         "Rollback QA leaves no synthetic alert records"
       ]
+    },
+    {
+      "id": "OWNER-COMPANY-HISTORY-01",
+      "area": "Owner Command Center · permanent company history",
+      "role": "owner",
+      "mode": "source + authenticated read-only UI",
+      "destructive": false,
+      "scenario": "Owner can directly search interconnected Technician, Unit, and Customer / Site history without changing operational records",
+      "steps": [
+        "Open Company History from the Owner Command Center quick actions",
+        "Search Technician history by exact full name or username",
+        "Search Unit history by unit number or asset tag",
+        "Search Customer / Site history by the exact recorded site name",
+        "Verify each result is read from get_company_history_v1 and includes recorded ticket, unit, actor, event, and timestamp context when available",
+        "Search for an unknown value and verify the UI returns MISSING INFORMATION",
+        "Verify the search performs no writes and job closeout or Shop Inventory return does not erase prior events",
+        "Verify the three-column search collapses to a usable one-column mobile layout"
+      ],
+      "expected": [
+        "Technician, Unit, and Customer / Site history are available directly from the Owner dashboard",
+        "History remains interconnected through recorded tickets, units, sites, and technicians",
+        "The dashboard does not invent history or company procedures",
+        "Unknown or empty recorded history is labeled MISSING INFORMATION",
+        "History lookup is Owner-only and read-only",
+        "Mobile input and results remain inside the viewport"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision guided draft Q8→Q9 regression fixed and verified against the current production parser/state machine. Exact Poco Loco Ranger/solar-panel/battery wording now persists as the work description, prefills parts without skipping Question 9, and the complete 11-question flow reaches review. Owner Vision alerts now use an Owner-only detected → acknowledged → resolved lifecycle, stay in Needs Attention until resolved, and preserve resolved history. Rollback alert QA left zero production residue."
+  "last_release_qa_note": "OnSite Vision guided draft Q8→Q9 regression fixed and verified against the current production parser/state machine. Exact Poco Loco Ranger/solar-panel/battery wording now persists as the work description, prefills parts without skipping Question 9, and the complete 11-question flow reaches review. Owner Vision alerts now use an Owner-only detected → acknowledged → resolved lifecycle, stay in Needs Attention until resolved, and preserve resolved history. Rollback alert QA left zero production residue. Owner Command Center now provides direct read-only Technician, Unit, and Customer / Site history search through the authoritative company-history RPC and labels unknown history MISSING INFORMATION."
 }
