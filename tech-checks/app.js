@@ -1821,6 +1821,12 @@ function ownerCommandAction(action) {
   document.querySelectorAll('#view-owner [data-owner-command]').forEach(button=>{
     button.classList.toggle('ownerNavActive',button.dataset.ownerCommand===action);
   });
+  const moduleHead=targetId ? document.querySelector('#'+targetId+' .ownerModuleHead') : null;
+  if(moduleHead && (action==='today'||action==='team')){
+    moduleHead.innerHTML=action==='team'
+      ? '<span>TEAM</span><h1>Team</h1><p>See each active technician, what they have, and what they are working on.</p>'
+      : '<span>TODAY</span><h1>Today</h1><p>See today’s work, who has each job, and what is waiting.</p>';
+  }
   ownerCommandOpen(targetId);
   if(action==='units') requestAnimationFrame(()=>document.getElementById('ownerUnitSearch')?.focus());
   if(action==='history') requestAnimationFrame(()=>document.getElementById('ownerCompanyHistoryQuery')?.focus());
