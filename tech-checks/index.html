@@ -374,6 +374,25 @@
         </section>
 
         <section id="view-owner" class="hidden">
+          <div id="ownerCommandCenter" class="ownerCommandCenter" aria-label="Owner Command Center">
+            <div class="ownerCommandHero">
+              <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div>
+              <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a>
+            </div>
+            <div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite">
+              <button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button>
+              <button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button>
+              <button type="button" data-owner-command="review"><span>Ready for Review</span><b>—</b><small>returns / handoffs</small></button>
+              <button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>active techs / assets</small></button>
+            </div>
+            <div class="ownerCommandQuick">
+              <button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
+            </div>
+          </div>
+          <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
+            <summary class="ownerDashSummary"><div><b>Today & Team Board</b><span>Daily schedule, inspections, assignments, and equipment by technician</span></div><span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span></summary>
+            <div class="ownerDashBody"><div id="ownerTechOverview"><div class="small">Loading today’s team board…</div></div></div>
+          </details>
           <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
             <summary class="ownerDashSummary">
               <div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div>
