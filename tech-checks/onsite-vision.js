@@ -695,6 +695,7 @@ function timeFrom(text){
 }
 function dateLabel(k){const d=new Date(k+'T12:00:00');return Number.isNaN(d.getTime())?k:d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});}
 function dateJobs(k){
+  mergeWorkingMemory({date:String(k||''),current_subject:'schedule'});
   const tickets=[...new Set(state.jobs.filter(j=>j.status!=='cancelled'&&String(j.scheduled_for||'')===String(k)).map(j=>String(j.ticket_no||'')))].filter(Boolean);
   if(tickets.length===1){
     state.currentTicket=tickets[0];
@@ -706,14 +707,22 @@ function dateJobs(k){
   return tickets.length?'<div class="vision-answer-title">'+tickets.length+' job'+(tickets.length===1?'':'s')+' on '+esc(dateLabel(k))+'</div><div class="vision-answer-copy">I pulled the live Tech Check schedule and assignments.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No Tech Check jobs are scheduled for '+esc(dateLabel(k))+'.</div>';
 }
 function workloadIntent(text){
-  const raw=String(text||'').trim(),s=raw.toLowerCase();
+  const raw=String(text||'').trim(),s=raw.toLowerCase(),memory=cleanMemory(chat()?.memory);
   const jobCue=/\b(job|jobs|ticket|tickets|work|workload|schedule|scheduled|assignment|assignments|run|runs|route|day|calls?|stops?)\b/.test(s);
-  const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|doing|busy|on deck|lined up|going on|anything|much)\b/.test(s);
-  const role=/\bservice(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'service':/\bit(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'it':'';
-  const tech=findTech(raw,role)||findTech(raw);
+  const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|doing|busy|on deck|lined up|going on|anything|much|what about|how about)\b/.test(s);
+  let role=/\bservice(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'service':/\bit(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'it':'';
+  let tech=findTech(raw,role)||findTech(raw);
+  const followup=/\b(what about|how about|and|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(s)&&String(memory.current_subject||'').startsWith('workload:');
+  if(followup&&!tech&&Array.isArray(memory.technician_names)&&memory.technician_names.length){
+    tech=findTech(memory.technician_names[memory.technician_names.length-1])||null;
+  }
+  if(followup&&!role&&!tech){
+    const remembered=String(memory.current_subject||'').match(/^workload:(it|service)$/);
+    if(remembered)role=remembered[1];
+  }
   const dateCue=Boolean(dateFrom(raw))||/\b(today|tomorrow|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(s);
-  const conversationalWorkCue=/\b(got|have|has|doing|working|busy|lined up|on deck|on today|taking|handling)\b/.test(s);
-  const impliedWork=Boolean((role||tech)&&(dateCue||conversationalWorkCue));
+  const conversationalWorkCue=/\b(got|have|has|doing|working|busy|lined up|on deck|on today|taking|handling|what about|how about)\b/.test(s);
+  const impliedWork=Boolean((role||tech)&&(dateCue||conversationalWorkCue||followup));
   if((!jobCue&&!impliedWork)||!askCue||(!role&&!tech))return null;
   const date=dateFrom(raw)||dayKey(new Date());
   return{date,role:tech?.role||role,tech};
@@ -721,6 +730,11 @@ function workloadIntent(text){
 async function workloadHtml(intent){
   if(!intent)return'';
   const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
+  mergeWorkingMemory({
+    date:intent.date,
+    current_subject:'workload:'+(intent.tech?'technician':intent.role||''),
+    technician_names:intent.tech?[intent.tech.full_name||intent.tech.username||'']:[]
+  });
   const label=dateLabel(intent.date),when=intent.date===dayKey(new Date())?'today':'on '+label;
   const layer=visionLiveData();
   if(layer?.getWorkload){
@@ -1708,7 +1722,7 @@ async function answer(text){
   if(ticket){
     const context=await liveContext(ticket,true);
     if(!context?.found&&!group(ticket).length&&!prep(ticket))return ticketAnswer(ticket);
-    state.currentTicket=ticket;ensureChat().ticket=ticket;saveChats();renderOrder();
+    state.currentTicket=ticket;ensureChat().ticket=ticket;mergeWorkingMemory({active_ticket:ticket,current_subject:'ticket'});saveChats();renderOrder();
     const a=assignIntent(raw);
     if(a){
       if(a.kind==='choose-tech')return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
