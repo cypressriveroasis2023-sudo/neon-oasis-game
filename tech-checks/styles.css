@@ -4368,3 +4368,59 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner .ownerAppReviewActions{display:flex;gap:8px;margin-top:14px}
 #view-owner .ownerAppReviewNote{display:flex;flex-direction:column;gap:3px;margin-top:12px;padding:11px;background:#23191a;border:1px solid #61302f;border-radius:5px}
 #view-owner .ownerAppReviewNote span{color:#cda8a6}
+
+/* Owner dark theme completion v210 — theme nested production controls, no structural changes */
+#view-owner #ownerJobAssignments .ok,
+#view-owner #ownerJobAssignments .warn,
+#view-owner #ownerJobAssignments .item,
+#view-owner #ownerJobAssignments .owner-simple-step,
+#view-owner #ownerJobAssignments .ownerWorkflowFirst,
+#view-owner #ownerJobAssignments .wl-equipment-number-block,
+#view-owner #ownerJobAssignments .wl-unit-area,
+#view-owner #ownerJobAssignments .wl-stand-area,
+#view-owner #ownerJobAssignments [class*="equipment"],
+#view-owner #ownerJobAssignments [class*="Equipment"],
+#view-owner #ownerJobAssignments [class*="parts"],
+#view-owner #ownerJobAssignments [class*="Parts"]{background:#111d24!important;color:#eef5f8!important;border-color:#2a3d49!important;box-shadow:none!important}
+#view-owner #ownerJobAssignments .ok,
+#view-owner #ownerJobAssignments .warn{border-left:4px solid #3c9bd1!important}
+#view-owner #ownerJobAssignments button:not(.danger):not(.btn),
+#view-owner #ownerJobAssignments [role="button"]{background:#162630!important;color:#dce8ee!important;border-color:#385260!important;box-shadow:none!important}
+#view-owner #ownerJobAssignments button:hover{border-color:#3c9bd1!important;background:#1b3240!important;color:#fff!important}
+#view-owner #ownerJobAssignments button[aria-pressed="true"],
+#view-owner #ownerJobAssignments button.selected,
+#view-owner #ownerJobAssignments .selected button,
+#view-owner #ownerJobAssignments .active button{background:#267fad!important;border-color:#55b0df!important;color:#fff!important}
+#view-owner #ownerJobAssignments .danger,
+#view-owner #ownerJobAssignments button.danger{background:#d71920!important;border-color:#ef4338!important;color:#fff!important}
+#view-owner #ownerJobAssignments input,
+#view-owner #ownerJobAssignments textarea,
+#view-owner #ownerJobAssignments select{background:#0e1920!important;color:#eef5f8!important;border-color:#35505f!important}
+#view-owner #ownerJobAssignments input::placeholder,
+#view-owner #ownerJobAssignments textarea::placeholder{color:#718692!important}
+#view-owner #ownerJobAssignments hr{border-color:#2a3d49!important}
+#view-owner #ownerJobAssignments table,
+#view-owner #ownerJobAssignments tbody,
+#view-owner #ownerJobAssignments tr,
+#view-owner #ownerJobAssignments td,
+#view-owner #ownerJobAssignments th{background:#111d24!important;color:#eef5f8!important;border-color:#2a3d49!important}
+#view-owner #ownerJobAssignments .small,
+#view-owner #ownerJobAssignments small,
+#view-owner #ownerJobAssignments .muted{color:#8297a4!important}
+#view-owner #ownerJobAssignments .ownerPartsChips span,
+#view-owner #ownerJobAssignments .wl-parts-chips span,
+#view-owner #ownerJobAssignments .wl-tech-pill{background:#172630!important;color:#dce8ee!important;border-color:#38505d!important}
+#view-owner #ownerAppPage .ownerAppAccountCreate,
+#view-owner #ownerAppPage .ownerAppAccountRow,
+#view-owner #ownerAppPage .ownerAppJobRow,
+#view-owner #ownerAppPage .ownerAppUnitRow,
+#view-owner #ownerAppPage .ownerAppHandoffRow,
+#view-owner #ownerAppPage .ownerAppTeamRow,
+#view-owner #ownerAppPage .ownerCompanyHistoryEvent,
+#view-owner #ownerAppPage .ownerReviewRow,
+#view-owner #ownerAppPage .ownerReviewStep{background:#111d24!important;color:#eef5f8!important;border-color:#2a3d49!important;box-shadow:none!important}
+#view-owner #ownerAppPage .ownerReviewRow.correction{background:#23191a!important;border-left-color:#ef4338!important}
+#view-owner #ownerAppPage .ownerReviewStep.complete{background:#15271f!important}
+#view-owner #ownerAppPage .ownerReviewStep.pending{background:#2a2517!important}
+#view-owner #ownerAppPage .ownerReviewStep.missing{background:#2b191b!important}
+#view-owner #ownerAppPage .ownerCompanyHistoryHead{background:#132735!important;color:#eef5f8!important;border-color:#31566e!important}
