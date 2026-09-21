@@ -59,6 +59,14 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-direct{padding:12px 13px;border:1px solid #2d4358;border-radius:12px;background:#0f1b27;margin:10px 0;color:#c7d3dc}.vision-direct.good{border-color:rgba(85,200,135,.42);background:rgba(85,200,135,.075)}.vision-direct.warn{border-color:rgba(226,184,90,.46);background:rgba(226,184,90,.075)}.vision-direct b{display:block;color:#fff;margin-bottom:4px}
 .vision-action-card{margin-top:12px;border:1px solid #354d62;border-radius:14px;background:linear-gradient(145deg,#13212e,#0f1a25);padding:13px}.vision-action-card small{display:block;color:#8092a3;font-weight:900;text-transform:uppercase;letter-spacing:.09em;font-size:8px}.vision-action-card b{display:block;margin:5px 0;color:#fff;font-size:14px}.vision-action-card p{margin:0;color:#9bacbb;font-size:10px;line-height:1.5}
 .vision-action-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.vision-action-buttons button{min-height:38px;border-radius:9px;padding:0 12px;font-size:10px;font-weight:950}.vision-confirm{border:1px solid var(--red);background:var(--red);color:#fff}.vision-cancel{border:1px solid #384d61;background:#182635;color:#c7d2db}
+.vision-parts-card p b{display:inline;margin:0;color:#fff;font-size:inherit}
+.vision-parts-grid{display:grid;gap:7px;margin-top:12px}
+.vision-parts-row{display:grid;grid-template-columns:minmax(0,1fr) 86px;gap:10px;align-items:center;border:1px solid #2e4458;border-radius:11px;background:#0f1b26;padding:9px 10px}
+.vision-parts-row span{min-width:0}.vision-parts-row b{display:block;margin:0;color:#edf4f8;font-size:11px}.vision-parts-row small{display:block;margin-top:2px;color:#7990a2;font-size:8px;text-transform:none;letter-spacing:0}
+.vision-parts-row input{box-sizing:border-box;width:100%;height:40px;border:1px solid #45627a;border-radius:9px;background:#09131d;color:#fff;padding:0 10px;text-align:center;font:inherit;font-size:15px;font-weight:900;outline:none}
+.vision-parts-row input:focus{border-color:#ff5157;box-shadow:0 0 0 2px rgba(255,81,87,.14)}
+@media(max-width:520px){.vision-parts-row{grid-template-columns:minmax(0,1fr) 76px}.vision-parts-row input{height:42px}}
+
 
 .vision-tech-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
 .vision-tech-choice-grid button{min-height:40px;border:1px solid #3a5269;border-radius:10px;background:#172737;color:#eef3f7;font-size:10px;font-weight:900;text-align:left;padding:0 11px}
