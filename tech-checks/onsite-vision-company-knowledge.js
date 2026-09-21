@@ -1,11 +1,11 @@
 /* Cameras On Site — OnSite Vision Company Knowledge
- * Version: company-knowledge-v12
+ * Version: company-knowledge-v13
  * Read-only browser knowledge foundation. Database triggers/RPCs remain authoritative.
  */
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v12",
+  "version": "company-knowledge-v13",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -815,7 +815,68 @@
       "OWNER_APPROVE"
     ]
   }
-};
+};,
+  "operations_governance": {
+    "owner_closeout": {
+      "rule": "Technicians complete their required IT and Service work; the Owner is the final closeout authority.",
+      "owner_summary": "Before closeout, present a simple chronological overview: Owner assignment → IT prep/verification → IT → Service handoff → Service field work → equipment/returns accounted for → evidence complete → Owner review.",
+      "owner_actions": ["CLOSE JOB", "RETURN FOR CORRECTION"],
+      "correction_rule": "Return for Correction keeps the job open and routes it back to the responsible IT or Service stage. Corrected work returns to Owner review.",
+      "audit_rule": "Owner overrides and corrections never erase history."
+    },
+    "owner_override": {
+      "rule": "The established workflow is always the default. The Owner may intentionally change or override a workflow state when needed.",
+      "audit": "Record the prior state, new state, Owner identity, timestamp, and reason/context as an Owner override.",
+      "ai_limit": "OnSite Vision must not independently waive a required workflow step."
+    },
+    "damage_escalation": {
+      "rule": "IT or Service documents damaged equipment and tells the Owner what equipment or part needs replacement.",
+      "inventory_gate": "Damaged or unresolved equipment is not cleared as ready Shop Inventory.",
+      "parts_policy": "Cameras On Site does not maintain a general replacement-parts stock. Replacement parts are purchased as needed.",
+      "ai_limit": "Do not tell a technician to take a replacement part from inventory unless live Tech Check data confirms one exists."
+    },
+    "unresolved_troubleshooting": {
+      "rule": "Service troubleshoots and verifies power, then calls IT. If Service and IT still cannot find a solution, escalate to the Owner.",
+      "owner_view": "Show MHelpDesk ticket/job, unit, original problem, Service checks, IT checks/actions, and what remains unresolved."
+    },
+    "proactive_alerting": {
+      "rule": "OnSite Vision proactively notifies the Owner of detected issues and also keeps each issue visible on the Owner dashboard until resolved.",
+      "resolution": "Resolved alerts remain in permanent audit history."
+    },
+    "permanent_history": {
+      "technician": "Keep permanent work history for each IT and Service Tech from forward-going Tech Check activity.",
+      "unit": "Keep a permanent lifecycle history for every numbered surveillance unit. Returning to Shop Inventory never erases history.",
+      "customer_site": "Build permanent customer/site history from forward-going Tech Check activity.",
+      "linkage": "Normal workflow should automatically connect Technician History ↔ Unit History ↔ Customer/Site History without duplicate technician data entry."
+    },
+    "inventory_location": {
+      "canonical_ready_location": "Shop Inventory",
+      "rule": "Workflow/custody states such as IT Intake, IT → Service handoff, and Service truck are not separate ready-inventory locations unless explicitly documented."
+    },
+    "truck_readiness": {
+      "service_owner": "Service Tech",
+      "battery_baseline": [
+        "4 × 12V 110Ah batteries on truck at all times",
+        "2 × LiTime batteries on truck at all times"
+      ],
+      "spare_unit_rule": "Carry 1 spare Spotter, Sniper, or Solar Spotter depending on the jobs/places scheduled for that day.",
+      "predeparture": "Service Tech verifies required truck batteries are charged before leaving and updates Tech Check.",
+      "gate": "If required battery readiness/count is not met, replace/correct it before the Service Tech can move on.",
+      "used_battery_rule": "When batteries are used/swapped, record how many in Tech Check and MHelpDesk. Returned swapped batteries go to the charging station and begin charging.",
+      "unused_spare_return": "A spare unit that returns unused still comes back and is checked into IT Intake because transport may have damaged it. IT verifies it works before returning it to Shop Inventory."
+    },
+    "delivery_signage": {
+      "rule": "Every delivery requires 4 Cameras On Site surveillance signs.",
+      "placement": ["2 large signs on the customer/site fence", "2 small signs on the surveillance unit"],
+      "evidence": "Final Tech Check evidence must show required signs installed."
+    },
+    "direct_transfer": {
+      "rule": "A direct Pickup Ticket A → Delivery Ticket B transfer must link the correct destination MHelpDesk delivery ticket.",
+      "verification": "Pickup condition/tag evidence carries forward. IT verifies the unit still works and deployment requirements are met before transfer clearance.",
+      "failure": "If verification fails, the direct transfer stops.",
+      "destination": "Site B still requires the full installation and evidence process."
+    }
+  }
   const shared=root.TechCheckRules;
   if(shared){
     data.shared_rules_version=shared.version;
