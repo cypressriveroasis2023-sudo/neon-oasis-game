@@ -413,20 +413,38 @@
         </section>
 
         <section id="view-owner" class="hidden">
-          <div id="ownerCommandCenter" class="ownerCommandCenter" aria-label="Owner Command Center">
-            <div class="ownerCommandHero">
-              <div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Today → Needs Attention → Ready for Owner Review → Team / Equipment → OnSite Vision.</p></div>
-            </div>
-            <div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite">
-              <button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button>
-              <button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button>
-              <button type="button" data-owner-command="review"><span>Ready for Owner Review</span><b>—</b><small>ready for owner review</small></button>
-              <button type="button" data-owner-command="team"><span>Team / Equipment</span><b>—</b><small>active techs / assets</small></button>
-            </div>
-            <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, review operations, and use permanent company history</small></span><strong>Open →</strong></a>
-            <div class="ownerCommandQuick">
-              <button type="button" data-owner-command="assign">+ Assign Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="history">Company History</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button>
-            </div>
+          <div id="ownerCommandCenter" class="ownerCommandCenter ownerWorkspace" aria-label="Owner Command Center">
+            <aside class="ownerWorkspaceRail">
+              <div class="ownerWorkspaceBrand"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>TECH CHECK</b><small>OWNER</small></span></div>
+              <button type="button" data-owner-command="today">Today</button>
+              <button type="button" data-owner-command="attention">Needs Attention</button>
+              <button type="button" data-owner-command="review">Owner Review</button>
+              <button type="button" data-owner-command="assign">Assign Job</button>
+              <button type="button" data-owner-command="team">Team</button>
+              <button type="button" data-owner-command="units">Units</button>
+              <button type="button" data-owner-command="handoffs">Handoffs</button>
+              <button type="button" data-owner-command="history">History</button>
+            </aside>
+            <main class="ownerWorkspaceMain">
+              <div class="ownerWorkspaceTop"><div><span>OWNER COMMAND CENTER</span><h2>What do you need?</h2></div><span class="ownerWorkspaceLive">● LIVE</span></div>
+              <a class="ownerVisionPrompt" href="./onsite-vision.html">
+                <div class="ownerVisionOrb"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""></div>
+                <div><b>Ask OnSite Vision</b><span>Ask about jobs, technicians, equipment, returns, or create an assignment.</span></div>
+                <strong>Ask →</strong>
+              </a>
+              <div id="ownerCommandStats" class="ownerCommandStats ownerWorkspaceStats" aria-live="polite">
+                <button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button>
+                <button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button>
+                <button type="button" data-owner-command="review"><span>Owner Review</span><b>—</b><small>ready</small></button>
+                <button type="button" data-owner-command="team"><span>Team</span><b>—</b><small>active techs</small></button>
+              </div>
+              <div class="ownerWorkspaceActions">
+                <button type="button" class="primary" data-owner-command="assign">+ CREATE / ASSIGN JOB</button>
+                <button type="button" data-owner-command="units">SEARCH UNIT</button>
+                <button type="button" data-owner-command="handoffs">HANDOFFS</button>
+                <button type="button" data-owner-command="activity">ACTIVITY</button>
+              </div>
+            </main>
           </div>
           <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
             <summary class="ownerDashSummary"><div><b>Today & Team Board</b><span>Daily schedule, inspections, assignments, and equipment by technician</span></div><span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span></summary>
