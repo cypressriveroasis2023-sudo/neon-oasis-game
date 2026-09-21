@@ -4878,15 +4878,13 @@ async function installOwnerAssignments(force = false) {
   const alertsToday=ownerAIAckRows.filter(r=>techCheckDateKey(new Date(r.detected_at||r.acknowledged_at))===todayKey);
   const resolvedToday=ownerAIAckRows.filter(r=>r.resolved_at&&techCheckDateKey(new Date(r.resolved_at))===todayKey);
   const outstandingAlerts=aiStates.filter(x=>x.s.state==='attention');
-  const ownerReviewJobs=all.filter(a=>{
-    const prep=prepMap.get(a.prep_ticket_id), solar=solarCheckMap.get(a.prep_ticket_id);
-    if(a.status!=='completed' && prep?.status!=='closed')return false;
-    if(prepHasHeliosField(prep))return Boolean(solar?.helios_field_completed_at&&!solar?.helios_owner_verified_at);
-    return true;
-  });
+  // The database closeout summary is the single authority for Owner Review.
+  // Do not infer readiness here: open returns, missing evidence, correction work,
+  // and unresolved offline-unit escalations can all block closeout.
+  const ownerReviewBadgeCount=Number(String(document.getElementById('ownerReviewBadge')?.textContent||'0').match(/\d+/)?.[0]||0);
   const commandCenter=ensureOwnerCommandCenter();
   if(commandCenter){
-    commandCenter.dataset.readyReview=String(ownerReviewJobs.length);
+    commandCenter.dataset.readyReview=String(ownerReviewBadgeCount);
     commandCenter.dataset.activeTechs=String(ownerAssignmentProfiles.length);
     commandCenter.dataset.activeAssets=String(ownerAssignmentAssets.length);
   }
@@ -5008,18 +5006,19 @@ async function ownerLookupUnitHistory(){
   const input=document.getElementById('ownerUnitLookupInput'),out=document.getElementById('ownerUnitLookupResult');
   const tag=String(input?.value||'').trim();if(!out)return;if(!tag){out.innerHTML="<div class='small'>Enter a unit number to view its Tech Check history.</div>";return;}
   out.innerHTML="<div class='wl-owner-unit-loading'>Searching Tech Check history…</div>";
-  const [retQ,itemQ]=await Promise.all([
+  const [retQ,itemQ,fieldQ]=await Promise.all([
     liveDb.from('unit_returns').select('unit_tag,equipment_type,ticket_no,status,service_tech_name,returned_at,it_tech_name,it_received_at,completed_at,damage_notes,return_notes,created_at').ilike('unit_tag',tag).order('created_at',{ascending:false}).limit(100),
-    liveDb.from('prep_items').select('id,prep_ticket_id,equipment_type,purpose,unit_tag,verified_at,service_verified_at,required_battery_count,battery_count,service_battery_count,power_ok,functions_ok,safe_ok').ilike('unit_tag',tag).order('verified_at',{ascending:false}).limit(100)
+    liveDb.from('prep_items').select('id,prep_ticket_id,equipment_type,purpose,unit_tag,verified_at,service_verified_at,required_battery_count,battery_count,service_battery_count,power_ok,functions_ok,safe_ok').ilike('unit_tag',tag).order('verified_at',{ascending:false}).limit(100),
+    liveDb.from('field_escalations').select('ticket_no,site,unit_tag,equipment_type,status,service_tech_name,service_started_at,original_problem,service_troubleshooting_notes,it_tech_name,it_troubleshooting_notes,backup_unit_tag,owner_resolution,owner_resolved_at,resolved_at,updated_at').ilike('unit_tag',tag).order('updated_at',{ascending:false}).limit(100)
   ]);
-  if(retQ.error||itemQ.error){out.innerHTML="<div class='wl-ai-warn'>Unable to load unit history right now.</div>";return;}
-  const returns=retQ.data||[],items=itemQ.data||[],prepIds=[...new Set(items.map(x=>x.prep_ticket_id).filter(Boolean))];
+  if(retQ.error||itemQ.error||fieldQ.error){out.innerHTML="<div class='wl-ai-warn'>Unable to load unit history right now.</div>";return;}
+  const returns=retQ.data||[],items=itemQ.data||[],fieldEscalations=fieldQ.data||[],prepIds=[...new Set(items.map(x=>x.prep_ticket_id).filter(Boolean))];
   let prepMap=new Map();
   if(prepIds.length){
     const {data}=await liveDb.from('prep_tickets').select('id,ticket_no,site,status,work_type,released_at,closed_at,created_at').in('id',prepIds);
     prepMap=new Map((data||[]).map(x=>[x.id,x]));
   }
-  if(!returns.length&&!items.length){out.innerHTML=`<div class='wl-owner-unit-empty'><b>No Tech Check history for ${esc(tag)}</b><span>This unit has not been recorded in a completed IT/Service check or return/intake yet.</span></div>`;return;}
+  if(!returns.length&&!items.length&&!fieldEscalations.length){out.innerHTML=`<div class='wl-owner-unit-empty'><b>No Tech Check history for ${esc(tag)}</b><span>This unit has not been recorded in an IT/Service check, offline escalation, or return/intake yet.</span></div>`;return;}
   const recurring=equipmentRecurringIssueAnalysis(returns);
   const events=[];
   items.forEach(x=>{const p=prepMap.get(x.prep_ticket_id)||{};const base='MHelpDesk #'+(p.ticket_no||'—')+(p.site?' · '+p.site:'');
@@ -5035,11 +5034,28 @@ async function ownerLookupUnitHistory(){
     if(x.damage_notes||x.return_notes)events.push({when:x.returned_at||x.it_received_at||x.created_at,title:'Issue / return notes',detail:x.damage_notes||x.return_notes,issue:true});
     if(x.completed_at)events.push({when:x.completed_at,title:'IT Intake completed',detail:'MHelpDesk #'+(x.ticket_no||'—')});
   });
+  fieldEscalations.forEach(f=>{
+    const base='MHelpDesk #'+(f.ticket_no||'—')+(f.site?' · '+f.site:'');
+    events.push({
+      when:f.service_started_at||f.updated_at,
+      title:'Service verified power and called IT',
+      detail:base+' · '+(f.original_problem||'Problem not recorded')+(f.service_tech_name?' · Service: '+f.service_tech_name:'')+(f.service_troubleshooting_notes?' · '+f.service_troubleshooting_notes:''),
+      issue:true
+    });
+    if(f.it_troubleshooting_notes||f.status!=='waiting_it'){
+      events.push({
+        when:f.owner_resolved_at||f.resolved_at||f.updated_at,
+        title:'Offline-unit escalation · '+String(f.status||'').replaceAll('_',' ').toUpperCase(),
+        detail:base+(f.it_tech_name?' · IT: '+f.it_tech_name:'')+(f.it_troubleshooting_notes?' · '+f.it_troubleshooting_notes:'')+(f.backup_unit_tag?' · Backup '+f.backup_unit_tag:'')+(f.owner_resolution?' · Owner: '+f.owner_resolution:''),
+        issue:!f.resolved_at
+      });
+    }
+  });
   events.sort((a,b)=>new Date(b.when||0)-new Date(a.when||0));
-  const latest=events[0],types=[...new Set([...items.map(x=>x.equipment_type),...returns.map(x=>x.equipment_type)].filter(Boolean))];
+  const latest=events[0],types=[...new Set([...items.map(x=>x.equipment_type),...returns.map(x=>x.equipment_type),...fieldEscalations.map(x=>x.equipment_type)].filter(Boolean))];
   out.innerHTML=`<div class='wl-owner-unit-profile'>
-    <div class='wl-owner-unit-profile-head'><div><span>UNIT HISTORY</span><h3>${esc(tag)}</h3><p>${types.length?esc(types.join(' · ')):'Equipment type not recorded'}</p></div><div class='wl-owner-unit-score'><b>${returns.length+items.length}</b><span>records</span></div></div>
-    <div class='wl-owner-unit-statrow'><div><b>${items.length}</b><span>IT / Service checks</span></div><div><b>${returns.length}</b><span>Return / intake records</span></div><div class='${recurring.length?'attention':''}'><b>${recurring.length}</b><span>Recurring patterns</span></div></div>
+    <div class='wl-owner-unit-profile-head'><div><span>UNIT HISTORY</span><h3>${esc(tag)}</h3><p>${types.length?esc(types.join(' · ')):'Equipment type not recorded'}</p></div><div class='wl-owner-unit-score'><b>${returns.length+items.length+fieldEscalations.length}</b><span>records</span></div></div>
+    <div class='wl-owner-unit-statrow'><div><b>${items.length}</b><span>IT / Service checks</span></div><div><b>${returns.length}</b><span>Return / intake records</span></div><div class='${fieldEscalations.some(f=>!f.resolved_at)?'attention':''}'><b>${fieldEscalations.length}</b><span>Offline escalations</span></div></div>
     ${latest?`<div class='wl-owner-unit-last'><span>Latest activity</span><b>${esc(latest.title)}</b><small>${esc(ownerTimelineWhen(latest.when))}</small></div>`:''}
     ${recurring.length?`<div class='wl-owner-unit-patterns'><b>✨ AI History Patterns</b>${recurring.map(x=>`<span>⚠ ${esc(x.name)} · ${x.count} prior mentions</span>`).join('')}<small>Advisory only — current equipment checks are still required.</small></div>`:''}
     <details class='wl-owner-unit-timeline' open><summary>Full Tech Check timeline <span class='pill'>${events.length}</span></summary><div>${events.slice(0,40).map(e=>`<div class='wl-owner-unit-event ${e.issue?'issue':''}'><i></i><div><b>${esc(e.title)}</b><span>${e.when?esc(ownerTimelineWhen(e.when)):'Date not recorded'}</span><p>${esc(e.detail||'')}</p></div></div>`).join('')}</div></details>
