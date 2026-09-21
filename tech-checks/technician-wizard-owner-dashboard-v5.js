@@ -5498,7 +5498,9 @@ async function installOwnerAssignments(force = false) {
   const progressRows = inProgress.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const doneRows = completed.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
 
-  host.innerHTML = `
+  // A live refresh must not replace focused fields or discard in-flight typing.
+  const buildAssignmentForm = !host.querySelector('#ownerAssignTicket');
+  if (buildAssignmentForm) host.innerHTML = `
     <summary class='ownerDashSummary'>
       <div><b>Create / Assign Job</b><span>Create a new Tech Check assignment from the current MHelpDesk ticket</span></div>
       <span class='ownerDashBadge neutral'>＋</span>
@@ -5629,7 +5631,7 @@ async function installOwnerAssignments(force = false) {
 
   host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
-  if(!ownerRestoreAssignDraft()){
+  if(buildAssignmentForm && !ownerRestoreAssignDraft()){
     refreshOwnerAutoServicePlan();
     refreshOwnerWorkTypeLabels();
     ownerAIReview();
@@ -7178,7 +7180,7 @@ async function runOwnerRefresh(force=false) {
     const message=esc(error?.message||'Could not load live Tech Check data.');
     const host=document.getElementById('ownerJobAssignments');
     const live=document.getElementById('ownerLiveJobProgress');
-    if(host)host.innerHTML="<summary class='ownerDashSummary'><div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div><span class='ownerDashBadge alert'>!</span></summary><div class='ownerDashBody'><div class='bad'><b>Could not load assignments.</b><div class='small'>"+message+"</div><button class='mini top8' type='button' data-owner-retry-live>Retry now</button></div></div>";
+    if(host && !host.querySelector('#ownerAssignTicket'))host.innerHTML="<summary class='ownerDashSummary'><div><b>Send Job to Tech</b><span>Create and manage technician assignments</span></div><span class='ownerDashBadge alert'>!</span></summary><div class='ownerDashBody'><div class='bad'><b>Could not load assignments.</b><div class='small'>"+message+"</div><button class='mini top8' type='button' data-owner-retry-live>Retry now</button></div></div>";
     if(live)live.innerHTML="<summary class='ownerDashSummary'><div><b>Live Job Progress</b><span>See what is assigned, who has it, and what is currently being worked</span></div><span class='ownerDashBadge alert'>!</span></summary><div class='ownerDashBody'><div class='bad'><b>Live data did not finish loading.</b><div class='small'>"+message+"</div><button class='mini top8' type='button' data-owner-retry-live>Retry now</button></div></div>";
   } finally {
     ownerRefreshInFlight=false;
