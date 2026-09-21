@@ -1685,21 +1685,19 @@ async function startAssignedJob(id) {
   if (!gate.ready) return alert(gate.label + '\n\n' + gate.detail);
 
   if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
-    const enteredTicket=prompt('ENTER MHELPDESK TICKET # TO CLAIM THIS JOB\n\nEnter the exact ticket number before this job can be assigned to you:');
-    if(enteredTicket===null) return;
-    const normalizeTicket=v=>String(v||'').trim().replace(/^#\s*/,'').toLowerCase();
-    if(!enteredTicket.trim()) return alert('MHelpDesk ticket number is required. This job was not claimed.');
-    if(normalizeTicket(enteredTicket)!==normalizeTicket(assignment.ticket_no)) return alert('Ticket number does not match.\n\nThis job was NOT assigned to you and nothing was changed.');
-    if(!confirm('Ticket #'+assignment.ticket_no+' matches.\n\nClaim this '+String(assignment.assigned_role||'').toUpperCase()+' job?')) return;
+    if(assignment.assigned_role==='service'){
+      return showServiceJobLookup();
+    }
+    if(!confirm('ACCEPT IT JOB\n\nMHelpDesk #'+assignment.ticket_no+'\n'+(assignment.site||'')+'\n\nMake this job yours?')) return;
     const { error: claimError } = await liveDb.rpc('claim_my_department_assignment', { p_assignment_id: id });
     if (claimError) {
-      alert(claimError.message || 'Another technician already claimed this department task.');
-      if (assignment.assigned_role === 'it') showITHome(); else showSvcHome();
+      alert(claimError.message || 'Another IT Tech already accepted this job.');
+      showITHome();
       return;
     }
     ({ data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1));
     assignment = rows?.[0];
-    if (!assignment) return alert('The claimed assignment could not be reopened.');
+    if (!assignment) return alert('The accepted IT assignment could not be reopened.');
   }
 
   if (assignment.assigned_role === 'it') {
