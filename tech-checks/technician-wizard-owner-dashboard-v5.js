@@ -5644,6 +5644,10 @@ async function installOwnerAssignments(force = false) {
   organizeOwnerDashboard();
   syncOwnerCompactDashboard();
 }
+// Unified Owner router calls this when Assign Job is opened before/after deferred module load.
+// Expose only the authoritative installer; it hydrates the single persistent #ownerJobAssignments.
+window.installOwnerAssignments = installOwnerAssignments;
+
 async function ownerLookupUnitHistory(){
   const input=document.getElementById('ownerUnitLookupInput'),out=document.getElementById('ownerUnitLookupResult');
   const tag=String(input?.value||'').trim();if(!out)return;if(!tag){out.innerHTML="<div class='small'>Enter a unit number to view its Tech Check history.</div>";return;}
