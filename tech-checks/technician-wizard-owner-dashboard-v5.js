@@ -4163,9 +4163,23 @@ async function resolveSwapUnitOutcome(itemId,used){
   const {data,error}=await liveDb.rpc('service_resolve_swap_unit_v1',{p_item_id:itemId,p_used:Boolean(used)});
   if(error)return alert(error.message);
   activeSvcPrep=await getPrep(activeSvcPrep.id);
-  if(used)alert(`SWAP recorded. ${item.equipment_type} ${item.unit_tag||''} stays at the customer site. The OLD unit must return through IT Intake; IT now has the site-registration task.`);
-  else alert(`Not used. ${item.equipment_type} ${item.unit_tag||''} is routed back through IT Intake.`);
-  return renderSvcPrep();
+  if(used){
+    alert(`SWAP recorded. ${item.equipment_type} ${item.unit_tag||''} stays at the customer site. The OLD unit must return through IT Intake; IT now has the site-registration task.`);
+    return renderSvcPrep();
+  }
+  alert(`Not used. Return ${item.equipment_type} ${item.unit_tag||''} now through Service Return → IT Intake.`);
+  await clearDeviceDraft('service-return');
+  serviceReturn={
+    step:1,
+    ticket:String(activeSvcPrep?.ticket_no||''),
+    unit:String(item.unit_tag||''),
+    type:String(item.equipment_type||''),
+    notes:'Prepared replacement not used on SWAP — returning to IT Intake.',
+    noTag:false,photo:null,tagScan:null,conditionPhotos:[],damagePhotos:[],knownUnits:[]
+  };
+  serviceReturnRecovered=false;
+  await saveServiceReturnDraft();
+  return renderServiceReturn();
 }
 async function startSwapOldUnitReturn(type){
   const saved=await loadDeviceDraft('service-return');
