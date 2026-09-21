@@ -791,8 +791,14 @@ function ticketByUnit(h){
   for(const p of state.preps){if((p.prep_items||[]).some(x=>{const digits=String(x.unit_tag||'').replace(/\D/g,'');return(!h.type||String(x.equipment_type||'').toLowerCase()===h.type.toLowerCase())&&digits&&String(Number(digits))===want;}))return String(p.ticket_no||'');}
   return '';
 }
+function normalizeSpokenDateText(text){
+  return String(text||'').toLowerCase()
+    .replace(/\b(today|tomorrow)(?:'s|s)\b/g,'$1')
+    .replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?:'s|s)\b/g,'$1')
+    .replace(/\b(this\s+(?:morning|afternoon|evening))(?:'s|s)\b/g,'$1');
+}
 function dateFrom(text){
-  const s=String(text||'').toLowerCase(),base=new Date();
+  const s=normalizeSpokenDateText(text),base=new Date();
   if(/\b(today|tonight|later\s+today|this\s+(?:morning|afternoon|evening))\b/.test(s))return dayKey(base);
   if(/\btomorrow\b/.test(s)){const d=new Date(base);d.setDate(d.getDate()+1);return dayKey(d);}
   const days={sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6},m=s.match(/\b(?:(?:next|this)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
@@ -1813,7 +1819,8 @@ async function departureReadinessHtml(raw){
 }
 
 function operationsOverviewIntent(raw){
-  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+deal\s+with|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief|daily\s+brief|today(?:'s)?\s+brief|run\s+the\s+company)\b/i.test(String(raw||''));
+  const text=normalizeSpokenDateText(raw);
+  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+deal\s+with|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief|daily\s+brief|today\s+brief|run\s+the\s+company)\b/i.test(text);
 }
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
