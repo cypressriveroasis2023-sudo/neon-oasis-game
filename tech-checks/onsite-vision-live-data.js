@@ -229,7 +229,7 @@
     const tickets=[...new Set(rows.map(row=>String(row.ticket_no||'').trim()).filter(Boolean))];
     const grouped=new Map();
     rows.forEach(row=>{const ticket=String(row.ticket_no||'').trim();if(!ticket)return;if(!grouped.has(ticket))grouped.set(ticket,[]);grouped.get(ticket).push(row);});
-    const completed=tickets.filter(ticket=>(grouped.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed').length;
+    const completed=tickets.filter(ticket=>(grouped.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length;
     const value={date,role,tech_id:techId,tech_name:techName,count:tickets.length,remaining:Math.max(0,tickets.length-completed),completed,tickets,assignments:rows};
     workloadCache.set(cacheKey,{at:Date.now(),value});
     return value;
