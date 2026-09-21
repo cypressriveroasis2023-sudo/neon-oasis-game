@@ -91,7 +91,7 @@
   const RANGER_PROFILE=Object.freeze({
     battery:'1 × LiTime 12V 110Ah',
     ports:STANDARD_CAMERA_PORTS,
-    shop_test:'IT tests the Ranger with its battery attached and verifies charging through the MPPT.',
+    shop_test:'IT updates/tests the Ranger MPPT configuration in the shop. IT does not connect a solar panel or perform PV charging verification; Service performs the solar-panel / charging check after the IT → Service handoff.',
     storage_sequence:'Verify the camera records first, then format the internal SD card and leave it ready.',
     monitoring:'Send all required information to Central Station and confirm customer shared-email access.',
     service_field:'In the field, Service verifies the Ranger is up to date in the Victron Bluetooth app before the Tech Check can close.'
@@ -144,7 +144,10 @@
     manifest_rule:'Truck spares stay separate from the customer/job equipment manifest.',
     unused_unit_rule:'Unused complete backup units return through Service Return → IT Intake so IT can verify them after transport before they become available Shop Inventory again.',
     used_unit_rule:'If a spare unit is used for a swap, return the failed/replaced field unit through the normal Service Return → IT Intake flow.',
-    battery_resolution_rule:'Service records the quantity used; any remainder is returned unused.'
+    battery_resolution_rule:'Service records the quantity used; any remainder is returned unused.',
+    morning_required:false,
+    start_day_gate:false,
+    optional_job_contingency:true
   });
 
   function text(v){return String(v??'').trim();}
@@ -342,7 +345,6 @@
     if(type==='Ranger'){
       steps.push({kind:'bool',field:'solar_mppt_updated_ok',label:'Is the MPPT firmware / configuration on '+unit+' updated?'});
       steps.push({kind:'bool',field:'solar_mppt_tested_ok',label:'Was the MPPT on '+unit+' tested and working correctly?'});
-      steps.push({kind:'bool',field:'solar_pv_charging_ok',label:'With the LiTime 12V 110Ah battery attached and a solar panel connected to '+unit+', did you verify the battery is charging through the MPPT?'});
       if(['DELIVERY','SWAP','BACKUP'].includes(purpose)){
         steps.push({kind:'bool',field:'delivery_sim_ok',label:'Is the Ranger network / SIM connection online and ready?'});
         steps.push({kind:'bool',field:'delivery_camera_app_ok',label:'Is the Ranger camera visible and working in the camera app?'});
@@ -412,7 +414,7 @@
 
     if(type==='Spotter'&&!(item.unit_programmed_ok&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
     if(type==='Recon 2'&&!(item.unit_programmed_ok&&Number(item.recon_camera_count||0)>=1&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
-    if(type==='Ranger'&&!(item.solar_mppt_updated_ok&&item.solar_mppt_tested_ok&&item.solar_pv_charging_ok&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
+    if(type==='Ranger'&&!(item.solar_mppt_updated_ok&&item.solar_mppt_tested_ok&&item.camera_port_81_ok&&item.camera_port_554_ok))return false;
     const customerSwap=['Sniper','Spotter','Recon 2','Ranger'].includes(type)&&purpose==='SWAP';
     if(!['DELIVERY','BACKUP'].includes(purpose)&&!customerSwap)return true;
     const batteryReady=['Solar Spotter','Spotter'].includes(type)||item.delivery_batteries_charged_ok;
