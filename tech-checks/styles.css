@@ -4559,6 +4559,15 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
 #view-owner #ownerAppPage .ownerNextAction b,#view-owner #ownerAppPage .ownerNextAction strong{color:#f7fafb!important}
 #view-owner #ownerAppPage .ownerAttentionRow span,#view-owner #ownerAppPage .ownerAttentionRow p,#view-owner #ownerAppPage .ownerAttentionRow .small,
 #view-owner #ownerAppPage .ownerNextAction span,#view-owner #ownerAppPage .ownerNextAction p,#view-owner #ownerAppPage .ownerNextAction .small{color:#c8d3d8!important;opacity:1!important}
+#view-owner #ownerAppPage .ownerAttentionStats span{color:#c8d3d8!important}
+#view-owner #ownerAppPage .ownerAttentionStats b{color:#fff!important}
+#view-owner #ownerAppPage .ownerNextKicker{color:#ff555b!important}
+#view-owner #ownerAppPage .ownerAttentionRow,#view-owner #ownerAppPage .ownerNextAction,#view-owner #ownerAppPage .ownerAttentionStats span{
+  box-shadow:none!important;
+}
+#view-owner #ownerAppPage .ownerAttentionRow .mini{
+  background:#e31b23!important;border:1px solid #ff555b!important;color:#fff!important;
+}
 #view-owner #ownerAppPage .ownerAttentionRow .mini{background:var(--oa-red)!important;border-color:#ff555b!important;color:#fff!important}
 #view-owner #ownerJobAssignments{width:100%!important;max-width:none!important;margin:0!important}
 #view-owner #ownerJobAssignments>.ownerDashSummary{display:none!important}
