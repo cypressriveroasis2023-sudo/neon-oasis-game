@@ -343,6 +343,89 @@ function auditActionLabel(action){
   if(type==='owner_approve')return'Confirm Owner approval';
   return'Confirm action';
 }
+function normalizedPlanAction(step){
+  const type=String(step?.type||'').toLowerCase();
+  const roleRaw=String(step?.role||'').toLowerCase();
+  return {
+    type,
+    ticket_no:String(step?.ticket_no||'').trim(),
+    work_type:String(step?.work_type||'').trim(),
+    role:roleRaw.includes('service')?'service':roleRaw.includes('it')?'it':'',
+    technician_name:String(step?.technician_name||'').trim(),
+    date:String(step?.date||'').trim(),
+    time:String(step?.time||'').trim(),
+    summary:String(step?.summary||'').trim(),
+    requires_confirmation:true
+  };
+}
+async function actionPlanHtml(plan,userMessage=''){
+  const steps=Array.isArray(plan?.steps)?plan.steps.slice(0,12):[];
+  if(plan?.detected!==true)return'';
+  const layer=visionActions();
+  const planId=id();
+  const prepared=[];
+  const rows=[];
+  const executableTypes=new Set(['assign','schedule','cancel','owner_approve']);
+
+  for(let i=0;i<steps.length;i++){
+    const step=steps[i]||{},mode=String(step.execution_mode||'needs_input');
+    const action=normalizedPlanAction(step);
+    let stateLabel='NEEDS INPUT',stateClass='needs-input',detail=String(step.reason||'More information is required before this can run.');
+    if(mode==='guided'){
+      stateLabel='GUIDED WORKFLOW';stateClass='guided';
+      detail=String(step.reason||'This step requires its existing Tech Check evidence/checklist workflow.');
+    }else if(mode==='audited'&&executableTypes.has(action.type)){
+      try{
+        const result=await layer?.prepare?.({
+          conversation_id:state.chatId||'',
+          action,
+          user_message:(userMessage||'')+' [Plan step '+String(i+1)+': '+String(step.summary||action.type)+']'
+        });
+        const canonical=result?.canonical_action||action;
+        if(result?.executable){
+          prepared.push({
+            auditActionId:String(result.action_id||''),
+            requestedAction:action,
+            canonical,
+            ticket:String(canonical.ticket_no||action.ticket_no||''),
+            actionType:String(canonical.type||action.type||''),
+            summary:String(step.summary||action.summary||canonical.type||'Action'),
+            sequence:Number(step.sequence||i+1)
+          });
+          stateLabel='READY';stateClass='ready';
+          detail=String(step.reason||'Validated through the Vision audit layer and ready for Owner confirmation.');
+        }else{
+          stateLabel='GUIDED WORKFLOW';stateClass='guided';
+          detail=String(result?.validation?.reason||step.reason||'This step requires its existing guided Tech Check workflow.');
+        }
+      }catch(error){
+        stateLabel='NEEDS INPUT';stateClass='needs-input';
+        detail=String(error?.message||step.reason||'This step could not pass audit validation.');
+      }
+    }else if(mode==='audited'){
+      stateLabel='GUIDED WORKFLOW';stateClass='guided';
+      detail='This action is not eligible for one-click execution and must stay inside its existing Tech Check workflow.';
+    }
+    rows.push('<div class="vision-plan-step '+stateClass+'"><div class="vision-plan-step-num">'+esc(String(step.sequence||i+1))+'</div><div><small>'+esc(stateLabel)+'</small><b>'+esc(step.summary||action.summary||String(action.type||'Action').replaceAll('_',' '))+'</b><span>'+esc(detail)+'</span>'+(action.ticket_no?'<em>MHelpDesk #'+esc(action.ticket_no)+'</em>':'')+'</div></div>');
+  }
+
+  state.pending.set(planId,{
+    kind:'multi-audited',
+    prepared,
+    originalSteps:prepared.map(x=>x.requestedAction),
+    userMessage:String(userMessage||''),
+    summary:String(plan?.summary||'Vision action plan'),
+    preparedAt:Date.now()
+  });
+
+  const notes=Array.isArray(plan?.notes)&&plan.notes.length
+    ?'<div class="vision-plan-notes">'+plan.notes.slice(0,6).map(n=>'<span>'+esc(n)+'</span>').join('')+'</div>'
+    :'';
+  const buttons=prepared.length
+    ?'<div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(planId)+'">Confirm '+prepared.length+' planned change'+(prepared.length===1?'':'s')+'</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(planId)+'">Cancel plan</button></div>'
+    :'<div class="vision-system-note">No plan steps are eligible for direct execution yet. Complete the guided items or give Vision the missing decision first.</div>';
+  return '<div class="vision-action-card audited vision-plan-card"><small>MULTI-ACTION PLAN · OWNER CONFIRMATION REQUIRED</small><b>'+esc(plan?.summary||'Proposed Tech Check plan')+'</b><p>Vision has not changed Tech Check. Each READY step was checked through the existing audit validator. MHelpDesk remains separate.</p><div class="vision-plan-steps">'+rows.join('')+'</div>'+notes+buttons+'</div>';
+}
 async function auditedActionCard(action,userMessage=''){
   const layer=visionActions();
   if(!layer?.prepare)return agentProposalHtml(action);
@@ -390,7 +473,8 @@ async function serverAgentAnswer(raw){
   }
 
   const p={...(result.proposed_action||{type:'none'})};
-  if(p.type==='create_job'){
+  const plan=result.action_plan&&typeof result.action_plan==='object'?result.action_plan:{detected:false,steps:[]};
+  if(plan.detected!==true&&p.type==='create_job'){
     const seeded=[
       p.work_type||'',
       p.date?('date '+p.date):'',
@@ -402,6 +486,12 @@ async function serverAgentAnswer(raw){
   }
 
   let html='<div class="vision-agent-answer">'+esc(result.answer||'').replace(/\n/g,'<br>')+'</div>'+agentFactsHtml(result.facts||[]);
+  if(plan.detected===true){
+    try{html+=await actionPlanHtml(plan,raw);}
+    catch(error){html+='<div class="vision-direct warn"><b>Vision could not prepare the full plan.</b>'+esc(error?.message||'Please review the requested changes and try again.')+'</div>';}
+    html+=correctionProposalHtml(result.knowledge_proposal,raw);
+    return html;
+  }
   const ticket=String(p.ticket_no||result.active_ticket||state.currentTicket||'');
   if(ticket&&!p.ticket_no)p.ticket_no=ticket;
 
@@ -1870,6 +1960,65 @@ async function execute(actionId){
     return;
   }
 
+  if(a.kind==='multi-audited'){
+    const layer=visionActions();
+    if(!layer?.prepare||!layer?.execute)throw new Error('Vision action layer is unavailable.');
+    const items=Array.isArray(a.prepared)?a.prepared:[];
+    if(!items.length){state.pending.delete(actionId);throw new Error('No executable plan steps remain.');}
+
+    // Expire the displayed proposals and revalidate each Owner-approved step against live state immediately before execution.
+    for(const item of items){try{if(item.auditActionId)await layer.cancel?.(item.auditActionId);}catch{}}
+
+    const completed=[],failed=[];
+    for(let i=0;i<items.length;i++){
+      const item=items[i],action=item.requestedAction||{};
+      let fresh;
+      try{
+        fresh=await layer.prepare({
+          conversation_id:state.chatId||'',
+          action,
+          user_message:(a.userMessage||'')+' [Confirmed plan step '+String(i+1)+': '+String(item.summary||action.type||'action')+']'
+        });
+      }catch(error){
+        failed.push({summary:item.summary||action.type||'Action',error:error?.message||'Validation failed.'});
+        break;
+      }
+      if(!fresh?.executable){
+        failed.push({summary:item.summary||action.type||'Action',error:fresh?.validation?.reason||'This step is no longer executable.'});
+        break;
+      }
+      const result=await layer.execute(String(fresh.action_id||''));
+      if(result?.status!=='succeeded'){
+        failed.push({summary:item.summary||action.type||'Action',error:result?.error||'Execution failed.'});
+        break;
+      }
+      const canonical=fresh.canonical_action||action;
+      const ticket=String(canonical.ticket_no||result.ticket_no||'');
+      if(String(canonical.type||'')==='assign'&&canonical?.create_new_assignment&&ticket){
+        try{
+          const rows=result.after_state?.assignments||[];
+          const role=canonical?.role||'';
+          const assignment=[...rows].reverse().find(x=>x.assigned_role===role&&['assigned','started'].includes(x.status));
+          if(assignment?.id)await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignment.id}});
+        }catch{}
+      }
+      completed.push({summary:item.summary||action.summary||canonical.type||'Action',ticket});
+      visionLiveData()?.invalidate?.(ticket);
+    }
+
+    state.pending.delete(actionId);
+    await loadData();
+    const doneHtml=completed.length
+      ?'<div class="vision-direct good"><b>'+completed.length+' planned change'+(completed.length===1?'':'s')+' completed.</b>'+completed.map(x=>esc(x.summary)+(x.ticket?' · #'+esc(x.ticket):'')).join('<br>')+'</div>'
+      :'';
+    const failHtml=failed.length
+      ?'<div class="vision-direct warn"><b>Plan stopped before the remaining steps.</b>'+esc(failed[0].summary)+': '+esc(failed[0].error)+' No later steps were executed.</div>'
+      :'<div class="vision-system-note">The confirmed plan finished in sequence. MHelpDesk was not changed.</div>';
+    addMessage('assistant','',doneHtml+failHtml);
+    renderThread();renderOrder();
+    return;
+  }
+
   if(a.kind==='audited'){
     const layer=visionActions();
     if(!layer?.execute)throw new Error('Vision action layer is unavailable.');
@@ -2076,10 +2225,17 @@ document.addEventListener('click',async e=>{
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){
     const pending=state.pending.get(cancel.dataset.cancelAction);
-    try{if(pending?.kind==='audited'&&pending.auditActionId)await visionActions()?.cancel?.(pending.auditActionId);}catch(error){console.warn('Vision audit cancel',error);}
+    try{
+      if(pending?.kind==='audited'&&pending.auditActionId)await visionActions()?.cancel?.(pending.auditActionId);
+      if(pending?.kind==='multi-audited'){
+        for(const item of (pending.prepared||[])){if(item.auditActionId)await visionActions()?.cancel?.(item.auditActionId);}
+      }
+    }catch(error){console.warn('Vision audit cancel',error);}
     state.pending.delete(cancel.dataset.cancelAction);
     if(pending?.kind==='approve-knowledge'){
       addMessage('assistant','', '<div class="vision-system-note">That proposed company rule was not saved. Vision will not treat it as company truth.</div>');
+    }else if(pending?.kind==='multi-audited'){
+      addMessage('assistant','', '<div class="vision-system-note">The multi-action plan was cancelled. No plan steps were executed.</div>');
     }else{
       addMessage('assistant','', '<div class="vision-system-note">No changes were made. The proposed Vision action was cancelled.</div>');
     }
