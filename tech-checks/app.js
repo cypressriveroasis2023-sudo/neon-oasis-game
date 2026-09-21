@@ -82,7 +82,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-command-v135')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-command-v136')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -821,8 +821,8 @@ function renderIT() {
                   pending +
                   ' Item' +
                   (pending > 1 ? 's' : '') +
-                  ' & Release Equipment to Service Tech'
-                : 'Release Equipment to Service Tech') +
+                  ' & Complete IT → Service Handoff'
+                : 'Complete IT → Service Handoff') +
               '</button>';
           }
           return (
@@ -863,7 +863,7 @@ async function saveAndRelease(prepId) {
       return alert(
         'Complete the unit tag and all three IT equipment checks for ' +
           eqLabel(item.equipment_type) +
-          ' before release.'
+          ' before completing the IT → Service handoff.'
       );
     }
     if (req > 0 && batt < req) {
@@ -964,7 +964,7 @@ async function findPrep() {
       ? '<div class="warn"><b>Equipment verification for MHelpDesk Ticket #' +
         esc(no) +
         ' is already complete.</b></div>'
-      : '<div class="bad"><b>No released IT equipment prep matches MHelpDesk Ticket #' +
+      : '<div class="bad"><b>No IT → Service handoff is ready for MHelpDesk Ticket #' +
         esc(no) +
         '.</b><div class="small">Confirm the ticket number or contact IT.</div></div>';
     return;
@@ -1001,7 +1001,7 @@ function serviceItem(item) {
     (item.purpose === 'BACKUP'
       ? '<div class="small"><b>Truck Spare:</b> ' + (item.spare_it_checked_out_at ? '✓ IT CHECKED OUT by ' + esc(item.spare_it_checked_out_by_name || 'IT Technician') : 'CHECKOUT PENDING — do not take this spare') + '</div>'
       : item.purpose === 'DELIVERY'
-        ? '<div class="small">IT completed the deploy-ready checks before release.</div>'
+        ? '<div class="small">IT completed the deploy-ready checks before the handoff.</div>'
         : '') +
     '<div class="check"><input id="' +
     exactId(item) +
