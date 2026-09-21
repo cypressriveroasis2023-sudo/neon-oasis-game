@@ -4668,3 +4668,71 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
   #view-owner #ownerJobAssignments .owner-simple-assign{min-height:56px!important}
   #view-owner .ownerAttentionRow{align-items:flex-start!important;gap:10px!important}
 }
+
+
+/* Technician Accounts — unified Owner dark/red theme v223 */
+#view-owner #ownerPersistentAccounts{
+  color:var(--oa-text)!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAppGroup{
+  width:100%!important;max-width:none!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAppGroup>h2,
+#view-owner #ownerPersistentAccounts h2,
+#view-owner #ownerPersistentAccounts h3,
+#view-owner #ownerPersistentAccounts b,
+#view-owner #ownerPersistentAccounts strong{
+  color:#f4f8fa!important;
+}
+#view-owner #ownerPersistentAccounts .small,
+#view-owner #ownerPersistentAccounts p,
+#view-owner #ownerPersistentAccounts span:not(.badge):not(.pill){
+  color:#aebdc6!important;
+}
+#view-owner #ownerPersistentAccounts .usercard{
+  background:#111d24!important;
+  border:1px solid #31434e!important;
+  color:#eef5f8!important;
+  box-shadow:none!important;
+}
+#view-owner #ownerPersistentAccounts .usercard:hover{
+  background:#15242d!important;
+  border-color:#52646e!important;
+}
+#view-owner #ownerPersistentAccounts input,
+#view-owner #ownerPersistentAccounts select,
+#view-owner #ownerPersistentAccounts textarea{
+  background:#0b141a!important;
+  color:#f4f8fa!important;
+  border:1px solid #3a4d58!important;
+}
+#view-owner #ownerPersistentAccounts input::placeholder,
+#view-owner #ownerPersistentAccounts textarea::placeholder{color:#81939e!important;opacity:1!important}
+#view-owner #ownerPersistentAccounts input:focus,
+#view-owner #ownerPersistentAccounts select:focus,
+#view-owner #ownerPersistentAccounts textarea:focus{
+  outline:2px solid var(--oa-red)!important;
+  border-color:var(--oa-red)!important;
+}
+#view-owner #ownerPersistentAccounts .btn{
+  background:var(--oa-red)!important;
+  border-color:var(--oa-red)!important;
+  color:#fff!important;
+}
+#view-owner #ownerPersistentAccounts .sep{background:#2a3d49!important}
+#view-owner #ownerPersistentAccounts .ok{
+  background:#101d19!important;
+  border-color:#315a49!important;
+  color:#dff5e8!important;
+}
+#view-owner #ownerPersistentAccounts .bad,
+#view-owner #ownerPersistentAccounts .danger{
+  background:#241315!important;
+  border-color:#713138!important;
+  color:#ffd9dc!important;
+}
+#view-owner #ownerPersistentAccounts .badge,
+#view-owner #ownerPersistentAccounts .pill{
+  border-color:#42535d!important;
+  color:#eaf1f4!important;
+}
