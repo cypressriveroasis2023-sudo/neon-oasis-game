@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v136",
-  "service_worker": "v144",
+  "runtime_version": "release-qa-v137",
+  "service_worker": "v145",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3304,7 +3304,94 @@
         "Unresolved truck spares are counted",
         "Returns already handed to IT / Owner processing are informational and do not falsely block Service closeout"
       ]
+    },
+    {
+      "id": "IT-COMMAND-CENTER-TODAY-01",
+      "area": "IT Technician · command center",
+      "role": "it",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "IT home separates current-day work from overdue, unscheduled, and future work",
+      "steps": [
+        "Open IT Technician home",
+        "Load my_available_assignments('it')",
+        "Compare scheduled_for with the local Tech Check date"
+      ],
+      "expected": [
+        "Today’s IT Jobs counts only assignments scheduled for today",
+        "Overdue and unscheduled work remain visible under Today / Needs Action",
+        "Future work appears under Upcoming IT Work"
+      ]
+    },
+    {
+      "id": "IT-COMMAND-CENTER-PRIORITY-01",
+      "area": "IT Technician · command center",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "IT command center chooses the highest-priority operational next action",
+      "steps": [
+        "Evaluate active Service field escalations, returns waiting IT Intake, ready IT assignments, unfinished prep, and blocked IT assignments"
+      ],
+      "expected": [
+        "Service needing IT troubleshooting is surfaced first",
+        "Returned equipment waiting IT Intake is next priority",
+        "Ready IT work is prioritized before unfinished prep",
+        "Blocked work clearly states the prior workflow dependency"
+      ]
+    },
+    {
+      "id": "IT-COMMAND-CENTER-INTAKE-01",
+      "area": "IT Technician · command center",
+      "role": "it",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "IT Intake and inventory-protection state stays visible",
+      "steps": [
+        "Open Equipment Prep & Intake"
+      ],
+      "expected": [
+        "Draft IT preps are counted",
+        "Released handoffs waiting for Service are counted",
+        "Returned units waiting IT Intake are counted",
+        "Needs Replacement holds remain visible and are not presented as Shop Inventory"
+      ]
+    },
+    {
+      "id": "IT-COMMAND-CENTER-OWNER-01",
+      "area": "IT Technician · command center",
+      "role": "owner",
+      "mode": "function-contract",
+      "destructive": false,
+      "scenario": "Owner/Admin can work the IT queue when acting as IT",
+      "steps": [
+        "Call my_available_assignments('it') as Owner/Admin",
+        "Claim an unassigned IT department task through the existing claim_my_department_assignment contract"
+      ],
+      "expected": [
+        "Owner/Admin is permitted to access the IT queue",
+        "Owner/Admin is permitted to claim an unassigned IT department task",
+        "Normal department-role restrictions remain enforced for non-Owner users"
+      ]
+    },
+    {
+      "id": "IT-COMMAND-CENTER-CLOSEOUT-01",
+      "area": "IT Technician · command center",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "End-of-day IT closeout shows work that IT still owns",
+      "steps": [
+        "Open End-of-Day IT Closeout"
+      ],
+      "expected": [
+        "Open IT assignments are counted",
+        "Unfinished equipment prep is counted",
+        "Returns waiting IT Intake are counted",
+        "Service troubleshooting waiting on IT is counted",
+        "Released handoffs with Service and Owner/MHelpDesk inventory confirmation do not falsely block IT closeout"
+      ]
     }
   ],
-  "last_release_qa_note": "Service Tech home is now a daily command center: start-day readiness, today/overdue/unscheduled work, future work, IT handoff state, offline field issues, units in field, returns, truck spares, one prioritized next action, and end-of-day closeout. Weekday inspections are prioritized before departure while weekends remain explicitly not required. Exact MHelpDesk verification and IT → Service handoff controls remain intact."
+  "last_release_qa_note": "IT Technician home is now a daily command center: today/overdue/unscheduled/upcoming assignments, Service field issues needing IT, returns waiting IT Intake, draft equipment prep, queue health, Needs Replacement holds, one prioritized next action, and end-of-day IT closeout. Owner/Admin can also operate the IT department queue through the existing authorized claim contract while MHelpDesk remains separate."
 }
