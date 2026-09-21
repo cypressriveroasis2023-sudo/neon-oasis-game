@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v134",
-  "service_worker": "v140",
+  "runtime_version": "release-qa-v135",
+  "service_worker": "v141",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3095,7 +3095,7 @@
       ],
       "expected": [
         "Vision counts distinct Tech Check ticket numbers, not assignment rows",
-        "Completed and cancelled assignments are excluded",
+        "Cancelled assignments are excluded; completed jobs remain part of the day's total and are reported separately from remaining work",
         "MHelpDesk remains separate"
       ]
     },
@@ -3219,5 +3219,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision natural-language job creation now accepts broader conversational start phrases plus explicit no-preference technician language such as any IT tech, any Service tech, whoever is available, or no preference. Explicit no-parts/no-notes/no-unit-number answers can be supplied up front, and confirmed Delivery creation was rollback-tested through owner_assign_job_v8 with the expected IT + Service handoff structure and zero residue."
+  "last_release_qa_note": "Natural-language job creation hardening is complete. Vision accepts no-preference technician language such as any IT tech, any Service tech, whoever is available, first available tech, and no preference without inventing a person. Explicit no-parts/no-notes/no-unit-number answers can be supplied up front. A concurrent malformed date regex was corrected, live workload queries were preserved and now report total scheduled jobs with remaining/completed counts, and Delivery creation was rollback-tested through owner_assign_job_v8 with zero residue."
 }
