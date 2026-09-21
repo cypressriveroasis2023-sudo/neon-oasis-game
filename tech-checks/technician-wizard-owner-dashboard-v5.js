@@ -5393,6 +5393,7 @@ function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
 
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
+  const structuralOwner=Boolean(document.getElementById('ownerApp'));
   let host = document.getElementById('ownerJobAssignments');
   if(host?.querySelector?.('#ownerAssignTicket')) ownerSaveAssignDraftNow();
   if (!host) {
@@ -5404,6 +5405,7 @@ async function installOwnerAssignments(force = false) {
   }
 
   let liveHost = document.getElementById('ownerLiveJobProgress');
+  if(structuralOwner && !liveHost){ liveHost=document.createElement('details'); liveHost.id='ownerLiveJobProgress'; liveHost.className='ownerLegacyLiveMount'; document.getElementById('ownerLegacyMounts')?.append(liveHost); }
   let liveNeedsHydration = false;
   if (!liveHost) {
     liveHost = document.createElement('details');
