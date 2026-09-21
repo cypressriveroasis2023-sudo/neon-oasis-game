@@ -1535,9 +1535,10 @@ function renderOwnerAttention() {
   const overdueReleased = released.filter(p => ownerAgeHours(p.released_at || p.created_at) >= 24);
   const overdueReturns = waitingIt.filter(r => ownerAgeHours(r.returned_at) >= 24);
   const overdueManager = manager.filter(r => ownerAgeHours(r.it_received_at || r.updated_at) >= 24);
-  const ownerActions = manager.length + replacements.length + resetPending.length + failedInspections.length + corrections.length + visionAlerts.length + offlineEscalations.length;
+  const ownerActions = manager.length + replacements.length + resetPending.length + failedInspections.length + corrections.length + visionAlerts.length + offlineOwnerRequired.length;
+  const offlineInProgress = Math.max(0,offlineEscalations.length-offlineOwnerRequired.length);
   const overdueCount = overdueDrafts.length + overdueReleased.length + overdueReturns.length + overdueManager.length;
-  const attentionCount = ownerActions + overdueCount;
+  const attentionCount = ownerActions + offlineInProgress + overdueCount;
   const attentionBadge = $('ownerAttentionBadge');
   if (attentionBadge) {
     attentionBadge.textContent = String(attentionCount);
@@ -1566,7 +1567,7 @@ function renderOwnerAttention() {
   if (waitingIt.length) parts.push(row('intake',`${waitingIt.length} returned unit${waitingIt.length===1?'':'s'} waiting for IT intake`,waitingIt.map(r => `Unit ${r.unit_tag}${ownerAgeHours(r.returned_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',overdueReturns.length>0));
   if (drafts.length) parts.push(row('prep',`${drafts.length} MHelpDesk ticket${drafts.length===1?'':'s'} still in IT prep`,drafts.map(p => `#${p.ticket_no}${ownerAgeHours(p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueDrafts.length>0));
   if (released.length) parts.push(row('service',`${released.length} IT handoff${released.length===1?'':'s'} ready for Service`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
-  host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length + Math.max(0,offlineEscalations.length-offlineOwnerRequired.length)}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
+  host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length + offlineInProgress}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
 }
 function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
 function unitLifecycleClass(status) { return status === 'shop_inventory' ? 'green' : status === 'assigned_to_tech' ? 'delivery' : status === 'maintenance' || status === 'it_prep' || status === 'waiting_manager' ? 'amber' : status === 'retired' ? 'neutral' : status === 'deployed' ? 'delivery' : status === 'returned_waiting_it' ? 'swap' : 'green'; }
