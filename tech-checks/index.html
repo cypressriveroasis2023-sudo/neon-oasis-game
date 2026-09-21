@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-command-v120" />
+    <link rel="stylesheet" href="./styles.css?v=owner-command-v121" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -365,6 +365,45 @@
               <div class="subhead">Trailer Inspection</div>
               <div id="trailerChecks"></div>
             </div>
+            <div class="truckLoadGate">
+              <div class="subhead">Required Truck Batteries & Backup</div>
+              <div class="small">
+                Before departure, physically verify at least 4 × 12V 110Ah batteries and
+                2 × LiTime 12V 100Ah batteries are on the Service truck and charged.
+                Missing or not-charged batteries must be replaced with charged batteries first.
+              </div>
+              <div class="truckLoadGrid">
+                <label>
+                  <span>12V 110Ah batteries</span>
+                  <input id="truck110Qty" type="number" min="0" inputmode="numeric" placeholder="4 minimum" oninput="updateMorningStatus()" />
+                </label>
+                <label class="truckLoadCheck">
+                  <input id="truck110Charged" type="checkbox" onchange="updateMorningStatus()" />
+                  <span>Physically verified charged</span>
+                </label>
+                <label>
+                  <span>LiTime 12V 100Ah batteries</span>
+                  <input id="truckLiTime100Qty" type="number" min="0" inputmode="numeric" placeholder="2 minimum" oninput="updateMorningStatus()" />
+                </label>
+                <label class="truckLoadCheck">
+                  <input id="truckLiTime100Charged" type="checkbox" onchange="updateMorningStatus()" />
+                  <span>Physically verified charged</span>
+                </label>
+              </div>
+              <label class="top8">
+                <span>Complete backup unit appropriate to today’s work</span>
+                <select id="truckBackupType" onchange="updateMorningStatus()">
+                  <option value="">Choose backup unit</option>
+                  <option value="Spotter">Spotter</option>
+                  <option value="Sniper">Sniper</option>
+                  <option value="Solar Spotter">Solar Spotter</option>
+                </select>
+              </label>
+              <div class="small top8">
+                Tech Check will confirm the selected backup is an active unit that IT checked out
+                and the Service Tech accepted. An unused backup returns through IT Intake at the end of the day.
+              </div>
+            </div>
             <div id="truckStatus"></div>
             <button class="btn" onclick="submitMorning()">
               Finish & Submit Morning Check
@@ -515,10 +554,10 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v8"></script>
-    <script type="module" src="./app.js?v=owner-command-v48"></script>
+    <script type="module" src="./app.js?v=owner-command-v49"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=109', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=110', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
