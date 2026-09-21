@@ -4339,3 +4339,32 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerApp .ownerAppWorkspace,
 #view-owner #ownerApp #ownerAppPage{visibility:visible!important;pointer-events:auto!important}
 #view-owner #ownerAppPage>#ownerJobAssignments.ownerAppMountedAssign{display:block!important;visibility:visible!important;position:static!important;width:100%!important;height:auto!important;overflow:visible!important;pointer-events:auto!important;z-index:auto!important}
+
+/* Owner unified dark red/blue visual system v209 */
+#view-owner{--oa-bg:#0b141a;--oa-panel:#111d24;--oa-panel2:#15242d;--oa-line:#2a3d49;--oa-text:#eef5f8;--oa-muted:#8297a4;--oa-red:#ef4338;--oa-blue:#3c9bd1}
+#view-owner .ownerAppWorkspace,#view-owner .ownerAppPage{background:var(--oa-bg)!important;color:var(--oa-text)!important}
+#view-owner #ownerAppPage input,#view-owner #ownerAppPage select,#view-owner #ownerAppPage textarea{background:#0e1920!important;color:var(--oa-text)!important;border:1px solid #35505f!important;box-shadow:none!important}
+#view-owner #ownerAppPage input:focus,#view-owner #ownerAppPage select:focus,#view-owner #ownerAppPage textarea:focus{outline:2px solid var(--oa-blue)!important;outline-offset:0!important;border-color:var(--oa-blue)!important}
+#view-owner #ownerAppPage label,#view-owner #ownerAppPage .qtext,#view-owner #ownerAppPage b,#view-owner #ownerAppPage h2,#view-owner #ownerAppPage h3{color:var(--oa-text)!important}
+#view-owner #ownerAppPage .small,#view-owner #ownerAppPage p,#view-owner #ownerAppPage label span{color:var(--oa-muted)!important}
+#view-owner #ownerAppPage .btn{background:var(--oa-blue)!important;border:1px solid #5ab0df!important;color:#fff!important;box-shadow:none!important}
+#view-owner #ownerAppPage .btn:hover{background:#3189b9!important}
+#view-owner #ownerAppPage .mini{background:#162630!important;border:1px solid #385260!important;color:#dce8ee!important}
+#view-owner #ownerAppPage .danger{background:#35191b!important;border-color:#8d3634!important;color:#ffaaa5!important}
+#view-owner #ownerAppPage .ok,#view-owner #ownerAppPage .warn,#view-owner #ownerAppPage .item,#view-owner #ownerAppPage .ownerWorkflowFirst,#view-owner #ownerAppPage .wl-equipment-number-block,#view-owner #ownerAppPage .owner-simple-step{background:var(--oa-panel)!important;border-color:var(--oa-line)!important;color:var(--oa-text)!important;box-shadow:none!important}
+#view-owner #ownerAppPage .ownerWorkflowFirst{border-left:4px solid var(--oa-red)!important}
+#view-owner #ownerAppPage .wl-equipment-number-block{border-left:4px solid var(--oa-blue)!important}
+#view-owner #ownerJobAssignments .ownerDashBody>*,#view-owner #ownerJobAssignments .owner-simple-step>*{max-width:1180px}
+#view-owner #ownerJobAssignments .ownerDashBody{color:var(--oa-text)!important}
+#view-owner #ownerJobAssignments .wl-tech-pill,#view-owner #ownerJobAssignments .ownerPartsChips span,#view-owner #ownerJobAssignments .wl-parts-chips span{background:#172630!important;border-color:#38505d!important;color:#dce8ee!important}
+#view-owner .ownerAppReviewRow{max-width:1180px;margin-bottom:10px;padding:16px 18px;background:var(--oa-panel);border:1px solid var(--oa-line);border-left:4px solid var(--oa-blue);border-radius:6px}
+#view-owner .ownerAppReviewRow.correction{border-left-color:var(--oa-red)}
+#view-owner .ownerAppReviewRow header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--oa-line)}
+#view-owner .ownerAppReviewRow header div{display:flex;flex-direction:column;gap:3px}
+#view-owner .ownerAppReviewRow header small{font-size:9px;font-weight:900;letter-spacing:.13em;color:var(--oa-muted)}
+#view-owner .ownerAppReviewRow header b{color:var(--oa-text);font-size:14px}
+#view-owner .ownerAppReviewRow header strong{font-size:9px;letter-spacing:.08em;color:#9ed8ff;background:#17374b;padding:6px 8px;border-radius:4px}
+#view-owner .ownerAppReviewRow.correction header strong{color:#ffaaa5;background:#35191b}
+#view-owner .ownerAppReviewActions{display:flex;gap:8px;margin-top:14px}
+#view-owner .ownerAppReviewNote{display:flex;flex-direction:column;gap:3px;margin-top:12px;padding:11px;background:#23191a;border:1px solid #61302f;border-radius:5px}
+#view-owner .ownerAppReviewNote span{color:#cda8a6}
