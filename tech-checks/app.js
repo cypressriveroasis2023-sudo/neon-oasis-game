@@ -1395,7 +1395,7 @@ function renderOwnerTechOverview() {
 
 function ownerJump(target) {
   if(target==='vision'){ window.location.href='./onsite-vision.html'; return; }
-  const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'review',daily:'team',activity:'activity'};
+  const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'handoffs',daily:'team',activity:'activity'};
   const route=routeMap[target];
   if(route && typeof ownerAppNavigate==='function') ownerAppNavigate(route);
 }
@@ -1889,13 +1889,19 @@ function ownerAppFilterUnits(q){
 }
 function ownerAppHandoffs(){
   const active=(state.preps||[]).filter(p=>p.status!=='closed'), done=(state.preps||[]).filter(p=>p.status==='closed').slice(-20).reverse();
+  const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
+  const escalations=(state.ownerFieldEscalations||[]).filter(r=>!r.resolved_at);
   const card=p=>'<div class="ownerAppHandoffRow"><div><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Site not recorded')+'</span></div><div><b>'+esc(p.status==='draft'?'IT preparing':'IT → Service handoff')+'</b><span>'+esc((p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+eqLabel(i.equipment_type)).join(' | ')||'No equipment recorded')+'</span></div></div>';
+  const returnCard=r=>'<div class="ownerAppHandoffRow '+(r.status==='needs_replacement'?'urgent':'')+'"><div><b>Unit '+esc(r.unit_tag||'—')+' · MHelpDesk #'+esc(r.ticket_no||'—')+'</b><span>'+esc(r.equipment_type||'Returned equipment')+'</span></div><div><b>'+esc(String(r.status||'returned').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(r.status==='needs_replacement'?'Damage hold — not available Shop Inventory':r.status==='waiting_it'?'Waiting for IT Intake':r.status==='pending_mhelp_inventory'?'IT Intake complete — Owner/MHelpDesk inventory action required':'Return in progress')+'</span></div></div>';
+  const escalationCard=r=>'<div class="ownerAppHandoffRow urgent"><div><b>Offline Unit '+esc(r.unit_tag||'—')+' · MHelpDesk #'+esc(r.ticket_no||'—')+'</b><span>'+esc(r.site||'Site not recorded')+'</span></div><div><b>'+esc(String(r.status||'escalated').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(r.status==='unresolved_owner'?'Service and IT could not resolve it — Owner decision required':'Active IT / Service troubleshooting escalation')+'</span></div></div>';
   let body='';
+  if(escalations.length)body+='<section class="ownerAppGroup"><h2>Owner / unresolved escalations <span>'+escalations.length+'</span></h2>'+escalations.map(escalationCard).join('')+'</section>';
+  if(returns.length)body+='<section class="ownerAppGroup"><h2>Returns & IT Intake <span>'+returns.length+'</span></h2>'+returns.map(returnCard).join('')+'</section>';
   const waiting=active.filter(p=>p.status==='released'), preparing=active.filter(p=>p.status==='draft');
   if(waiting.length)body+='<section class="ownerAppGroup"><h2>Waiting for Service acceptance <span>'+waiting.length+'</span></h2>'+waiting.map(card).join('')+'</section>';
   if(preparing.length)body+='<section class="ownerAppGroup"><h2>IT preparing <span>'+preparing.length+'</span></h2>'+preparing.map(card).join('')+'</section>';
-  if(done.length)body+='<section class="ownerAppGroup"><h2>Completed <span>'+done.length+'</span></h2>'+done.map(card).join('')+'</section>';
-  return ownerAppHeader('IT → SERVICE','Handoffs','Equipment being prepared, waiting for Service, and completed handoffs.')+(body||ownerAppEmpty('NO ACTIVE HANDOFFS'));
+  if(done.length)body+='<section class="ownerAppGroup"><h2>Completed handoffs <span>'+done.length+'</span></h2>'+done.map(card).join('')+'</section>';
+  return ownerAppHeader('IT → SERVICE','Handoffs','Equipment preparation, Service acceptance, returns, IT Intake, and unresolved equipment workflow.')+(body||ownerAppEmpty('NO ACTIVE HANDOFF OR RETURN WORK'));
 }
 function ownerAppHistory(){
   return ownerAppHeader('PERMANENT RECORD','History','Search permanent Technician, Unit, Customer / Site, or MHelpDesk history.')
