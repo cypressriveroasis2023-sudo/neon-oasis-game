@@ -4183,3 +4183,65 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
  #view-owner .ownerPageStats{grid-template-columns:1fr}
  #view-owner .ownerPageRow,#view-owner .ownerTeamPageRow{grid-template-columns:1fr}
 }
+/* Structural Owner application shell v200 */
+@media(min-width:721px){
+ body:has(#view-owner:not(.hidden)){margin:0!important;background:#0b1116!important;overflow:hidden!important}
+ body:has(#view-owner:not(.hidden))>.wrap{max-width:none!important;width:100%!important;margin:0!important;padding:0!important}
+ body:has(#view-owner:not(.hidden))>.wrap>.hero,
+ body:has(#view-owner:not(.hidden))>.wrap>.status,
+ body:has(#view-owner:not(.hidden))>.wrap>.tabs{display:none!important}
+ #view-owner{position:fixed!important;inset:0!important;z-index:50!important;margin:0!important;padding:0!important;background:#0b1116!important;overflow:hidden!important}
+ #view-owner .ownerAppShell{display:grid!important;grid-template-columns:224px minmax(0,1fr)!important;width:100vw!important;height:100vh!important}
+ #view-owner .ownerAppSidebar{height:100vh!important;background:#101920!important;border-right:1px solid #26343e!important;padding:18px 10px!important;display:flex!important;flex-direction:column!important;overflow-y:auto!important}
+ #view-owner .ownerAppBrand{display:flex;align-items:center;gap:10px;padding:6px 9px 18px;border-bottom:1px solid #26343e;margin-bottom:10px}
+ #view-owner .ownerAppBrand img{width:26px;height:26px}
+ #view-owner .ownerAppBrand span{display:flex;flex-direction:column}
+ #view-owner .ownerAppBrand b{font-size:15px;letter-spacing:.04em;color:#f4f8fa}
+ #view-owner .ownerAppBrand small{font-size:10px;letter-spacing:.14em;color:#8396a3}
+ #view-owner .ownerAppSidebar nav{display:flex;flex-direction:column;gap:2px}
+ #view-owner .ownerAppSidebar nav button{appearance:none;border:0;border-left:3px solid transparent;background:transparent;color:#c3cdd4;text-align:left;padding:10px 12px;border-radius:3px;font:inherit;font-weight:700;cursor:pointer}
+ #view-owner .ownerAppSidebar nav button:hover{background:#17242d}
+ #view-owner .ownerAppSidebar nav button.active{background:#1b2932;border-left-color:#ef4338;color:#fff}
+ #view-owner .ownerAppSidebarUtility{margin-top:auto;border-top:1px solid #26343e;padding-top:10px;display:grid;gap:3px}
+ #view-owner .ownerAppSidebarUtility a,#view-owner .ownerAppSidebarUtility button{border:0;background:transparent;color:#91a4b0;text-decoration:none;text-align:left;padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}
+ #view-owner .ownerAppWorkspace{min-width:0;height:100vh;overflow:auto;background:#0d151b}
+ #view-owner .ownerAppPage{min-height:100%;padding:34px 42px 70px}
+ #view-owner .ownerLegacyMounts{display:none!important}
+}
+#view-owner .ownerAppPageHeader{max-width:1180px;margin:0 0 26px;padding-bottom:18px;border-bottom:1px solid #26343e}
+#view-owner .ownerAppPageHeader>span{font-size:10px;font-weight:900;letter-spacing:.16em;color:#ef4338}
+#view-owner .ownerAppPageHeader h1{margin:4px 0 3px;font-size:31px;color:#f4f8fa}
+#view-owner .ownerAppPageHeader p{margin:0;color:#8da0ad}
+#view-owner .ownerAppEmpty{max-width:900px;padding:22px;border:1px solid #26343e;background:#121d24;border-radius:7px;display:flex;flex-direction:column;gap:5px;color:#dfe8ed}
+#view-owner .ownerAppEmpty b{font-size:15px;color:#e7f4ec}
+#view-owner .ownerAppEmpty span{color:#8da0ad}
+#view-owner .ownerAppGroup{max-width:1180px;margin:0 0 24px}
+#view-owner .ownerAppGroup>h2{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:15px;color:#dbe4e9}
+#view-owner .ownerAppGroup>h2 span{font-size:11px;padding:2px 7px;border-radius:10px;background:#24333d;color:#9fb0ba}
+#view-owner .ownerAppJobRow,#view-owner .ownerAppUnitRow,#view-owner .ownerAppHandoffRow{display:grid;grid-template-columns:1.1fr 1.5fr 1fr;gap:18px;max-width:1180px;padding:14px 16px;border:1px solid #26343e;border-bottom:0;background:#121d24}
+#view-owner .ownerAppJobRow:first-of-type,#view-owner .ownerAppUnitRow:first-of-type,#view-owner .ownerAppHandoffRow:first-of-type{border-radius:7px 7px 0 0}
+#view-owner .ownerAppJobRow:last-child,#view-owner .ownerAppUnitRow:last-child,#view-owner .ownerAppHandoffRow:last-child{border-bottom:1px solid #26343e;border-radius:0 0 7px 7px}
+#view-owner .ownerAppJobRow div,#view-owner .ownerAppUnitRow div,#view-owner .ownerAppHandoffRow div{display:flex;flex-direction:column;gap:3px}
+#view-owner .ownerAppJobRow b,#view-owner .ownerAppUnitRow b,#view-owner .ownerAppHandoffRow b{color:#edf3f6}
+#view-owner .ownerAppJobRow span,#view-owner .ownerAppUnitRow span,#view-owner .ownerAppHandoffRow span{font-size:12px;color:#8da0ad}
+#view-owner .ownerAppTeamRow{appearance:none;width:100%;max-width:1180px;display:grid;grid-template-columns:1.2fr 1.5fr 1fr;gap:18px;padding:15px 16px;border:1px solid #26343e;border-bottom:0;background:#121d24;text-align:left;cursor:pointer}
+#view-owner .ownerAppTeamRow:hover{background:#17252e}
+#view-owner .ownerAppTeamRow div{display:flex;flex-direction:column;gap:3px}
+#view-owner .ownerAppTeamRow b{color:#edf3f6}.ownerAppTeamRow span{font-size:12px;color:#8da0ad}
+#view-owner .ownerAppSearch,#view-owner .ownerAppHistoryControls{max-width:900px;display:flex;gap:8px;margin-bottom:18px}
+#view-owner .ownerAppSearch input,#view-owner .ownerAppHistoryControls input,#view-owner .ownerAppHistoryControls select{min-height:44px;background:#101a21;border:1px solid #33434e;color:#f4f8fa;border-radius:6px;padding:0 12px}
+#view-owner .ownerAppSearch input,#view-owner .ownerAppHistoryControls input{flex:1}
+#view-owner .ownerAppActivityRow{max-width:1000px;padding:14px 16px;border-bottom:1px solid #26343e}
+#view-owner .ownerAppActivityRow>div{display:flex;justify-content:space-between;gap:20px}
+#view-owner .ownerAppActivityRow b{color:#edf3f6}.ownerAppActivityRow span,#view-owner .ownerAppActivityRow p{color:#8da0ad}.ownerAppActivityRow p{margin:5px 0 0}
+#view-owner .ownerAppAccountCreate{max-width:1100px;padding:20px;margin-bottom:24px;border:1px solid #26343e;background:#121d24;border-radius:7px}
+@media(max-width:720px){
+ #view-owner .ownerAppShell{display:block}
+ #view-owner .ownerAppSidebar{position:sticky;top:0;z-index:5;background:#101920;padding:8px;overflow-x:auto}
+ #view-owner .ownerAppSidebar nav{display:flex;gap:4px;min-width:max-content}
+ #view-owner .ownerAppBrand,#view-owner .ownerAppSidebarUtility{display:none}
+ #view-owner .ownerAppSidebar nav button{padding:8px 10px;border-left:0;border-bottom:2px solid transparent}
+ #view-owner .ownerAppSidebar nav button.active{border-bottom-color:#ef4338}
+ #view-owner .ownerAppPage{padding:18px 12px 50px}
+ #view-owner .ownerAppJobRow,#view-owner .ownerAppUnitRow,#view-owner .ownerAppHandoffRow,#view-owner .ownerAppTeamRow{grid-template-columns:1fr}
+}
