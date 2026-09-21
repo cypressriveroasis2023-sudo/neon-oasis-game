@@ -814,8 +814,7 @@
       "CHECK_IN",
       "OWNER_APPROVE"
     ]
-  }
-};,
+  },
   "operations_governance": {
     "owner_closeout": {
       "rule": "Technicians complete their required IT and Service work; the Owner is the final closeout authority.",
@@ -877,6 +876,7 @@
       "destination": "Site B still requires the full installation and evidence process."
     }
   }
+};
   const shared=root.TechCheckRules;
   if(shared){
     data.shared_rules_version=shared.version;
