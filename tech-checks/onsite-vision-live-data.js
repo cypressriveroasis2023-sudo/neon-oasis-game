@@ -10,6 +10,7 @@
   const reviewCache={at:0,value:null};
   const escalationCache=new Map();
   const damageCache=new Map();
+  const departureCache=new Map();
   const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','unresolved_owner'];
   const TTL_MS=15000;
 
@@ -202,6 +203,61 @@
     return value;
   }
 
+
+  async function getDepartureReadiness(filters={},options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const ticketNo=String(filters.ticket_no||'').trim();
+    const serviceTech=String(filters.service_tech||'').trim().toLowerCase();
+    const force=Boolean(options.force);
+    const cacheKey=JSON.stringify({ticketNo,serviceTech});
+    const cached=departureCache.get(cacheKey);
+    if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
+
+    let batteryQuery=client.from('truck_spare_batteries').select([
+      'id','prep_ticket_id','ticket_no','equipment_type','battery_type','qty_prepared','ready_ok',
+      'prepared_by_name','service_tech_name','status','qty_used','qty_returned','accepted_at',
+      'resolved_at','it_checked_out_at','it_checked_out_by_name','created_at','updated_at'
+    ].join(',')).neq('status','resolved').is('resolved_at',null).order('updated_at',{ascending:false}).limit(250);
+    if(ticketNo)batteryQuery=batteryQuery.eq('ticket_no',ticketNo);
+    const batteryResult=await batteryQuery;
+    if(batteryResult.error)throw batteryResult.error;
+    let batteries=Array.isArray(batteryResult.data)?batteryResult.data:[];
+    if(serviceTech)batteries=batteries.filter(row=>String(row.service_tech_name||'').toLowerCase().includes(serviceTech));
+
+    let spareQuery=client.from('prep_items').select([
+      'id','prep_ticket_id','equipment_type','purpose','unit_tag','power_ok','functions_ok','safe_ok','verified_at',
+      'spare_outcome','spare_checked_out_at','spare_checked_out_to_name','spare_it_checked_out_at','spare_it_checked_out_by_name',
+      'prep_tickets!inner(ticket_no,work_type,status)'
+    ].join(',')).eq('purpose','spare').order('verified_at',{ascending:false}).limit(250);
+    if(ticketNo)spareQuery=spareQuery.eq('prep_tickets.ticket_no',ticketNo);
+    const spareResult=await spareQuery;
+    if(spareResult.error)throw spareResult.error;
+    let spares=(Array.isArray(spareResult.data)?spareResult.data:[]).filter(row=>!['returned','used'].includes(String(row.spare_outcome||'').toLowerCase()));
+    if(serviceTech)spares=spares.filter(row=>String(row.spare_checked_out_to_name||'').toLowerCase().includes(serviceTech));
+
+    const readyBatteries=batteries.filter(row=>row.ready_ok===true&&Boolean(row.it_checked_out_at));
+    const standardQty=readyBatteries.filter(row=>/110\s*ah/i.test(String(row.battery_type||''))).reduce((sum,row)=>sum+Number(row.qty_prepared||0),0);
+    const litimeQty=readyBatteries.filter(row=>/litime/i.test(String(row.battery_type||''))&&/100\s*ah/i.test(String(row.battery_type||''))).reduce((sum,row)=>sum+Number(row.qty_prepared||0),0);
+    const eligibleBackup=spares.filter(row=>
+      ['spotter','sniper','solar spotter'].includes(String(row.equipment_type||'').trim().toLowerCase()) &&
+      row.power_ok===true&&row.functions_ok===true&&row.safe_ok===true&&
+      Boolean(row.verified_at)&&Boolean(row.spare_it_checked_out_at)&&Boolean(row.spare_checked_out_at)
+    );
+    const value={
+      ticket_no:ticketNo,service_tech:serviceTech,batteries,spares,
+      counts:{standard_12v_110ah:standardQty,litime_12v_100ah:litimeQty,eligible_backup_units:eligibleBackup.length},
+      minimums:{standard_12v_110ah:4,litime_12v_100ah:2,eligible_backup_units:1},
+      ready:standardQty>=4&&litimeQty>=2&&eligibleBackup.length>=1,
+      blockers:[
+        ...(standardQty>=4?[]:['Need '+Math.max(0,4-standardQty)+' more IT-checked-out, charged 12V 110Ah batter'+(4-standardQty===1?'y':'ies')+'.']),
+        ...(litimeQty>=2?[]:['Need '+Math.max(0,2-litimeQty)+' more IT-checked-out, charged LiTime 12V 100Ah batter'+(2-litimeQty===1?'y':'ies')+'.']),
+        ...(eligibleBackup.length?[]:['Need one IT-checked-out Spotter, Sniper, or Solar Spotter backup assigned for the day.'])
+      ]
+    };
+    departureCache.set(cacheKey,{at:Date.now(),value});
+    return value;
+  }
+
   function prime(context){
     const k=key(context?.ticket_no);
     if(k) cache.set(k,{at:Date.now(),value:context});
@@ -220,6 +276,7 @@
     reviewCache.value=null;
     escalationCache.clear();
     damageCache.clear();
+    departureCache.clear();
   }
 
   function forWorkflowEngine(context){
@@ -255,13 +312,14 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v4',
+    version:'live-data-v5',
     configure,
     getJobContext,
     getCompanyHistory,
     getOwnerReviewQueue,
     getOfflineEscalations,
     getDamageHolds,
+    getDepartureReadiness,
     prime,
     invalidate,
     invalidateAll,
