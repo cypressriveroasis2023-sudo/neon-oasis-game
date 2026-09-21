@@ -1394,26 +1394,12 @@ function renderOwnerTechOverview() {
 }
 
 function ownerJump(target) {
-  const el = target === 'vision'
-    ? document.getElementById('ownerLiveJobProgress')
-    : target === 'offline'
-      ? document.getElementById('ownerFieldEscalations')
-    : target === 'returns'
-      ? document.getElementById('ownerIntakeTracking')
-    : target === 'accounts'
-      ? document.getElementById('ownerAccountsCard')
-      : target === 'activity'
-        ? document.getElementById('ownerActivityCard')
-        : target === 'daily'
-          ? document.getElementById('ownerTechOverviewCard')
-          : target === 'review'
-            ? document.getElementById('ownerReviewCard')
-            : document.getElementById('ownerHandoffsCard');
-  if (!el) return;
-  if (el.tagName === 'DETAILS') el.open = true;
-  el.scrollIntoView({behavior:'smooth',block:'start'});
-  el.classList.add('ownerAttentionFlash');
-  setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200);
+  const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'attention',vision:'attention',daily:'team',activity:'activity'};
+  const route=routeMap[target];
+  if(route && typeof ownerAppNavigate==='function'){
+    ownerAppNavigate(route);
+    return;
+  }
 }
 function ownerOpenReturn(id) {
   const section = document.getElementById('ownerIntakeTracking');
