@@ -1550,6 +1550,67 @@ async function saveOwnerPrepParts(prepId) {
   alert('Parts list updated.');
 }
 
+function ownerCommandOpen(id) {
+  const el=document.getElementById(id);
+  if (!el) return;
+  if (el.tagName==='DETAILS') el.open=true;
+  requestAnimationFrame(()=>el.scrollIntoView({behavior:'smooth',block:'start'}));
+}
+function ownerCommandAction(action) {
+  const map={
+    today:'ownerTechOverviewCard',
+    attention:'ownerAttentionCard',
+    review:'ownerIntakeTracking',
+    team:'ownerTechOverviewCard',
+    assign:'ownerJobAssignments',
+    units:'ownerUnitStatusCard',
+    handoffs:'ownerHandoffsCard',
+    activity:'ownerActivityCard'
+  };
+  ownerCommandOpen(map[action]);
+  if(action==='units') requestAnimationFrame(()=>document.getElementById('ownerUnitSearch')?.focus());
+}
+function bindOwnerCommandCenter() {
+  const host=document.getElementById('ownerCommandCenter');
+  if(!host || host.dataset.bound==='1') return;
+  host.dataset.bound='1';
+  host.addEventListener('click',event=>{
+    const button=event.target.closest('[data-owner-command]');
+    if(button) ownerCommandAction(button.dataset.ownerCommand);
+  });
+}
+function renderOwnerCommandCenter() {
+  if(state.profile?.role!=='owner') return;
+  const host=document.getElementById('ownerCommandStats');
+  if(!host) return;
+  bindOwnerCommandCenter();
+  const activeTechs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service')).length;
+  const activeAssets=(state.assetInventory||[]).filter(a=>a.availability_status!=='retired').length;
+  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled').length;
+  const returns=state.ownerReturns||[];
+  const readyReview=returns.filter(r=>r.status==='pending_mhelp_inventory').length;
+  const waitingIt=returns.filter(r=>r.status==='waiting_it').length;
+  const resetPending=(state.resetRequests||[]).filter(r=>r.status==='pending'&&new Date(r.expires_at).getTime()>Date.now()).length;
+  const latestInspection=new Map();
+  (state.todayInspections||[]).forEach(row=>{if(!latestInspection.has(row.service_tech_id)) latestInspection.set(row.service_tech_id,row);});
+  const failed=[...latestInspection.values()].filter(row=>Object.values(row.truck_checks||{}).includes(false)||(row.taking_trailer&&Object.values(row.trailer_checks||{}).includes(false))).length;
+  const overdue=(state.preps||[]).filter(p=>p.status!=='closed'&&ownerAgeHours(p.released_at||p.created_at)>=24).length+
+    returns.filter(r=>ownerAgeHours(r.it_received_at||r.returned_at||r.updated_at)>=24).length;
+  const attention=readyReview+resetPending+failed+overdue;
+  const values=[
+    {n:jobs,sub:'scheduled jobs',alert:false},
+    {n:attention,sub:attention===1?'owner action':'owner actions',alert:attention>0},
+    {n:readyReview+waitingIt,sub:'returns / handoffs',alert:readyReview>0},
+    {n:activeTechs,sub:activeAssets+' active assets',alert:false}
+  ];
+  [...host.querySelectorAll('button')].forEach((button,i)=>{
+    const value=values[i]; if(!value)return;
+    const number=button.querySelector('b'), small=button.querySelector('small');
+    if(number) number.textContent=String(value.n);
+    if(small) small.textContent=value.sub;
+    button.classList.toggle('alert',value.alert);
+  });
+}
 function renderOwner() {
   if (state.profile?.role !== 'owner') return;
   const activePreps = state.preps.filter(p => p.status !== 'closed');
@@ -1583,6 +1644,7 @@ function renderOwner() {
   const recentReports = state.reports.slice().sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, ownerReportLimit);
   $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(r.kind) + '</b><span class="small ownerFoldHint">' + esc(ownerActorLabel(r)) + (r.ticket_no ? ' · MHelpDesk #' + esc(r.ticket_no) : '') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(r.text) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
   const more = $('ownerReportsMore'); if (more) { more.classList.toggle('hidden', ownerReportLimit >= state.reports.length); more.textContent = 'Show More Activity (' + Math.max(0, state.reports.length - ownerReportLimit) + ' older)'; more.onclick = () => { ownerReportLimit += 25; renderOwner(); }; }
+  renderOwnerCommandCenter();
   ensureStartFreshCard();
 }
 async function createTech() {
