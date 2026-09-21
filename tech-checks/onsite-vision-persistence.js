@@ -1,5 +1,5 @@
 /* Cameras On Site — OnSite Vision Persistence Layer
- * Version: persistence-v1
+ * Version: persistence-v2
  * Owner-private conversation persistence through audited Supabase RPCs.
  */
 (function(root){
@@ -25,7 +25,7 @@
   }
   async function load(limit=20){
     requireClient();
-    const response=await client.rpc('vision_load_conversations_v1',{p_limit:Number(limit||20)});
+    const response=await client.rpc('vision_load_conversations_v2',{p_limit:Number(limit||20)});
     if(response.error)throw response.error;
     return Array.isArray(response.data)?response.data:[];
   }
@@ -33,11 +33,12 @@
     requireClient();
     if(!chat?.id)return null;
     ensureMessageIds(chat);
-    const response=await client.rpc('vision_save_conversation_v1',{
+    const response=await client.rpc('vision_save_conversation_v2',{
       p_conversation_id:String(chat.id),
       p_title:String(chat.title||'New conversation'),
       p_active_ticket:String(chat.ticket||''),
       p_draft:chat.draft||null,
+      p_working_memory:(chat.memory&&typeof chat.memory==='object'&&!Array.isArray(chat.memory))?chat.memory:{},
       p_messages:(chat.messages||[]).map(m=>({
         id:String(m.id||''),
         role:String(m.role||''),
@@ -62,7 +63,7 @@
   }
 
   const api=Object.freeze({
-    version:'persistence-v1',
+    version:'persistence-v2',
     configure,
     ensureMessageIds,
     load,
