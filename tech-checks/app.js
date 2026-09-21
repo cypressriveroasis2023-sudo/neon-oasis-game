@@ -1807,6 +1807,46 @@ function ownerAppJobRow(a){
     +'<div class="ownerTodayOwner"><b>'+esc(who)+'</b><span>'+esc(a.status==='started'?'Working now':a.status==='completed'?'Work complete':'Waiting to start')+'</span></div>'
     +'<div class="ownerTodayState"><span class="'+(a.status==='started'?'working':a.status==='completed'?'complete':'waiting')+'">'+status+'</span></div></article>';
 }
+
+let ownerCalendarDate=new Date(), ownerCalendarMode='month';
+function ownerCalendarJobsForDate(d){
+  const key=localDateKey(d);return (state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===key&&a.status!=='cancelled');
+}
+function ownerCalendarShift(n){
+  const d=new Date(ownerCalendarDate);
+  if(ownerCalendarMode==='month')d.setMonth(d.getMonth()+n);
+  else if(ownerCalendarMode==='week')d.setDate(d.getDate()+7*n);
+  else d.setFullYear(d.getFullYear()+n);
+  ownerCalendarDate=d;ownerAppRender();
+}
+function ownerCalendarSetMode(m){ownerCalendarMode=m;ownerAppRender();}
+function ownerCalendarToday(){ownerCalendarDate=new Date();ownerAppRender();}
+function ownerCalendarDayCell(d,inMonth=true){
+  const jobs=ownerCalendarJobsForDate(d),today=localDateKey(d)===localDateKey(new Date());
+  return '<div class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+'"><div class="ownerCalDate">'+d.getDate()+'</div>'
+    +jobs.slice(0,4).map(j=>'<div class="ownerCalEvent '+(j.assigned_role==='it'?'it':'service')+'"><b>#'+esc(j.ticket_no||'—')+'</b> '+esc(j.work_type||'Job')+'<span>'+esc(j.site||'')+'</span></div>').join('')
+    +(jobs.length>4?'<small>+'+(jobs.length-4)+' more</small>':'')+'</div>';
+}
+function ownerCalendarMonth(){
+  const y=ownerCalendarDate.getFullYear(),m=ownerCalendarDate.getMonth(),first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());
+  let cells='';for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(d,d.getMonth()===m);}
+  return '<div class="ownerCalWeekdays">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>'<b>'+x+'</b>').join('')+'</div><div class="ownerCalMonth">'+cells+'</div>';
+}
+function ownerCalendarWeek(){
+  const d=new Date(ownerCalendarDate),start=new Date(d);start.setDate(d.getDate()-d.getDay());
+  let cells='';for(let i=0;i<7;i++){const x=new Date(start);x.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(x,true);}
+  return '<div class="ownerCalWeekdays">'+Array.from({length:7},(_,i)=>{const x=new Date(start);x.setDate(start.getDate()+i);return '<b>'+x.toLocaleDateString(undefined,{weekday:'short',month:'numeric',day:'numeric'})+'</b>';}).join('')+'</div><div class="ownerCalWeek">'+cells+'</div>';
+}
+function ownerCalendarYear(){
+  const y=ownerCalendarDate.getFullYear();
+  return '<div class="ownerCalYear">'+Array.from({length:12},(_,m)=>{const jobs=(state.ownerAssignments||[]).filter(a=>{const x=new Date(String(a.scheduled_for||'')+'T12:00:00');return x.getFullYear()===y&&x.getMonth()===m&&a.status!=='cancelled'});return '<button type="button" onclick="ownerCalendarDate=new Date('+y+','+m+',1);ownerCalendarSetMode(\'month\')"><b>'+new Date(y,m,1).toLocaleDateString(undefined,{month:'long'})+'</b><strong>'+jobs.length+'</strong><span>Tech Check jobs</span></button>';}).join('')+'</div>';
+}
+function ownerAppCalendar(){
+  const label=ownerCalendarMode==='year'?String(ownerCalendarDate.getFullYear()):ownerCalendarDate.toLocaleDateString(undefined,ownerCalendarMode==='month'?{month:'long',year:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
+  return ownerAppHeader('SCHEDULE','Calendar','See Tech Check work across month, week, or year.')
+   +'<div class="ownerCalToolbar"><div><button onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div><div class="ownerCalModes"><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='year'?'active':'')+'" onclick="ownerCalendarSetMode(\'year\')">Year</button></div></div>'
+   +(ownerCalendarMode==='month'?ownerCalendarMonth():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarYear());
+}
 function ownerAppToday(){
   const today=localDateKey(new Date());
   const rows=(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');
@@ -1919,6 +1959,7 @@ async function ownerAppRender(){
   const host=document.getElementById('ownerAppPage');if(!host)return;
   let html='';
   if(ownerAppRoute==='today')html=ownerAppToday();
+  else if(ownerAppRoute==='calendar')html=ownerAppCalendar();
   else if(ownerAppRoute==='attention')html=ownerAppAttention();
   else if(ownerAppRoute==='review')html=ownerAppReview();
   else if(ownerAppRoute==='team')html=ownerAppTeam();
@@ -2342,6 +2383,9 @@ Object.assign(window, {
   ownerCompanyHistoryKindChanged,
   ownerCompanyHistorySearch,
   ownerAppNavigate,
+  ownerCalendarShift,
+  ownerCalendarSetMode,
+  ownerCalendarToday,
   ownerAppRunHistory,
   ownerAppFilterUnits,
   ownerAppShowTechHistory,
