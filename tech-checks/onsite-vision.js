@@ -1237,7 +1237,7 @@ function offlineEscalationIntent(raw){
   const offlineCue=/\boffline\b/.test(lower);
   const waitingIt=/\b(waiting\s+(?:for|on)\s+it|cases?\s+(?:waiting|need(?:ing)?)\s+(?:for\s+)?it)\b/i.test(text);
   const ownerDecision=/\b(owner\s+decision|need(?:s|ing)?\s+(?:my|the\s+owner'?s?)\s+decision|cases?\s+(?:for|needing)\s+owner)\b/i.test(text);
-  const troubleshooting=/\b(troubleshoot(?:ing)?|already\s+(?:tried|attempted|checked)|what\s+(?:has|have)\s+.*(?:tried|attempted|checked))\b/i.test(text);
+  const troubleshooting=/\b(?:already\s+(?:tried|attempted|checked|done)|what\s+troubleshooting\s+(?:has|have)\s+(?:already\s+)?been\s+(?:attempted|tried|done|recorded)|what\s+(?:has|have|did)\s+.*(?:tried|attempted|checked|done)|troubleshooting\b.*\b(?:already|attempted|tried|done|recorded))\b/i.test(text);
   const backup=/\b(backup\s+swap|swap\s+authorized|backup\s+authorized|authorized\s+backup)\b/i.test(text);
   const intake=/\b(failed\s+unit.*(?:it\s+intake|intake)|(?:reach|reached|enter|entered|make\s+it\s+to).*it\s+intake|it\s+intake.*failed\s+unit)\b/i.test(text);
   if(!offlineCue&&!waitingIt&&!ownerDecision&&!backup&&!intake&&!(troubleshooting&&(/\bunit\b/i.test(text)||state.currentTicket)))return null;
@@ -1252,7 +1252,7 @@ function offlineEscalationIntent(raw){
   let detail='';
   if(waitingIt)scope='waiting_it';
   else if(ownerDecision)scope='owner_decision';
-  else if(troubleshooting||backup||intake||unitReference||ticket)scope='all';
+  else if(troubleshooting||backup||intake)scope='all';
   if(troubleshooting)detail='troubleshooting';
   else if(backup)detail='backup';
   else if(intake)detail='intake';
