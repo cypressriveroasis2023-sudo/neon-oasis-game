@@ -172,6 +172,14 @@ function injectStyles() {
     .wl-svc-command-close-row b{color:#263744}.wl-svc-command-close-row span{font-weight:900;color:#5d6e7c}
     .wl-svc-command-close-row.pending{background:#fff4e2}.wl-svc-command-close-row.pending span{color:#895900}
     .wl-svc-command-close-row.issue{background:#ffe9e7}.wl-svc-command-close-row.issue span{color:#9f2119}
+    .wl-it-command .wl-svc-command-hero{background:linear-gradient(145deg,#0d2233,#1f4b68)}
+    .wl-it-command .wl-svc-command-kicker{color:#9bdcff}
+    .wl-it-command .wl-svc-command-next{border-color:#277ca8}
+    .wl-it-command .wl-svc-command-next.clear{border-color:#8bc6a1}
+    .wl-it-command .wl-svc-command-next.wait{border-color:#e1b454}
+    .wl-it-command .wl-svc-job-top span{background:#e6f4fb;color:#195f83}
+    .wl-it-command .wl-svc-job-top span.wait{background:#fff0ca;color:#805600}
+    .wl-it-command .wl-svc-job-top span.attn{background:#ffe4e2;color:#9e2119}
     @media(max-width:380px){.wl-svc-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-svc-command-hero h2{font-size:22px!important}}
     .wl-help-overlay{position:fixed;inset:0;background:rgba(4,17,29,.62);z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-help-overlay.hidden{display:none!important}.wl-help-sheet{width:min(720px,100%);max-height:92vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-help-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#f7f9fb;padding:14px 0 10px;z-index:2}.wl-help-head h2{margin:2px 0 0;font-size:24px}.wl-help-progress{height:8px;background:#dfe5ea;border-radius:999px;overflow:hidden}.wl-help-progress span{display:block;height:100%;background:#d20b12}.wl-help-step-count{text-align:right;font-size:12px;color:#65727e;margin-top:5px}.wl-help-card{background:#fff;border:1px solid #dce3e8;border-radius:16px;padding:20px;margin-top:12px}.wl-help-card h2{font-size:26px;margin:6px 0 12px}.wl-help-copy{font-size:16px;line-height:1.5;color:#263440}.wl-help-copy p{margin:0 0 12px}.wl-help-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#edf2f5;border-radius:12px;padding:12px;font-size:12px}.wl-help-flow span{color:#d20b12;font-weight:950}.wl-help-nav{display:grid;grid-template-columns:1fr auto 1.5fr;gap:8px;align-items:center;margin-top:14px}.wl-help-nav button{min-height:52px;border-radius:12px;font-weight:900}.wl-help-skip{border:0;background:transparent;color:#596875;text-decoration:underline}.helpMini{white-space:nowrap}
     /* Tech Check Help Center v91 */
@@ -1840,20 +1848,161 @@ async function completeAuthorizedOfflineSwap(id,backupItemId) {
 
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
-  let home = document.getElementById('wlItHome');
-  if (!home) { home = document.createElement('div'); home.id = 'wlItHome'; home.className = 'card wl-home'; viewIT().prepend(home); }
-  const [c,r,assignments,phoneAlerts,assignedAssets,offlineRows] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it'), pushAlertState(), myAssignedInventoryAssets(), fieldEscalationRows()]);
-  const offlineITHtml=await fieldEscalationITHtml(offlineRows);
-  const assigned = assignments[0] || null;
+  let home=document.getElementById('wlItHome');
+  if(!home){
+    home=document.createElement('div');
+    home.id='wlItHome';
+    home.className='card wl-home';
+    viewIT().prepend(home);
+  }
+
+  const [prepSummary,returns,assignments,phoneAlerts,assignedAssets,offlineRows]=await Promise.all([
+    prepCounts(),
+    returnCounts(),
+    myActiveAssignments('it'),
+    pushAlertState(),
+    myAssignedInventoryAssets(),
+    fieldEscalationRows()
+  ]);
+
+  const alertBanner=phoneAlertBanner(phoneAlerts);
   const ownerViewingIT=roleText().includes('Owner/Admin');
-  const assignmentOwnerLabel=a=>a.assignee_user_id?(a.assignee_name||a.assigned_to_name||'Assigned technician'):(a.assignment_scope==='department'?'IT Department Queue':'Unassigned');
-  const assignmentCards=assignments.map((a,i)=>`<div class='wl-it-flow-card'><div class='wl-next-kicker'>${i===0?'NEXT IT TASK':'UPCOMING IT TASK'}</div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div>${ownerViewingIT?`<div class='small'><b>Assigned to:</b> ${esc(assignmentOwnerLabel(a))}</div>`:''}<div class='small'><b>${String(a.work_type||'service').toUpperCase()}</b> · ${a.requires_it_handoff?'Waiting on Service / handoff step':'Ready for IT'}</div>${equipmentManifestInlineHtml(a)}${techCheckAIHtml(a,'it')}<button class='wl-big wl-blue top10' data-wl-start-assignment='${a.id}'>${a.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`).join('');
-  const alertBanner = phoneAlertBanner(phoneAlerts);
-  const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
-  const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.work_type ? `<div class='small'><b>Job Type:</b> ${esc(assigned.work_type.toUpperCase())}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>${String(assigned.work_type || '').toLowerCase() === 'pickup' ? 'Units Being Picked Up' : 'Units Required From MHelpDesk'}:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${automaticServiceSolarPlanHtml(assigned.equipment_manifest,assigned.work_type)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : (!assigned.assignee_user_id && assigned.assignment_scope === 'department' ? 'Enter Ticket # & Claim Job' : 'Open Assigned Job')} →</button></div>` : '';
-  const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
-  home.innerHTML = `${alertBanner}<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & hand off equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>${ownerViewingIT?'IT Team Work Today':'My Work Today'}</div><div class='wl-sub'>${ownerViewingIT?'Owner view — each job shows the technician or department queue it is assigned to.':'Owner-assigned jobs appear here first, followed by the next workflow action.'}</div>${assignments.length?`<div class='wl-it-flow-wrap'><div class='small'><b>IT Job Flow</b> · Swipe left/right to see assigned and waiting tickets.</div><div class='wl-it-flow-strip'>${assignmentCards}</div></div>`:nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> ${ownerViewingIT?'active IT jobs':'assigned to me'}</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div>${offlineITHtml}${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
-  hideChildren(viewIT(), [home]);
+  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingIT?'IT / Owner':'IT Technician');
+  const todayKey=techCheckDateKey();
+  const todayLabel=new Date().toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'});
+  const offlineIT=(offlineRows||[]).filter(row=>!row.resolved_at&&['waiting_it','joint_troubleshooting'].includes(String(row.status||'')));
+  const offlineITHtml=await fieldEscalationITHtml(offlineRows);
+
+  const assignmentRows=await Promise.all((assignments||[]).map(async a=>({a,gate:await assignmentGateState(a)})));
+  const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
+  const overdue=assignmentRows.filter(({a})=>dateKey(a)&&dateKey(a)<todayKey);
+  const today=assignmentRows.filter(({a})=>dateKey(a)===todayKey);
+  const unscheduled=assignmentRows.filter(({a})=>!dateKey(a));
+  const upcoming=assignmentRows.filter(({a})=>dateKey(a)>todayKey);
+  const needsAction=[...overdue,...today,...unscheduled];
+  const ready=needsAction.filter(({gate})=>gate.ready);
+  const blocked=needsAction.filter(({gate})=>!gate.ready);
+  const queueCount=(assignments||[]).filter(a=>!a.assignee_user_id&&a.assignment_scope==='department').length;
+
+  function itAssignmentState(row){
+    const {a,gate}=row;
+    const overdueFlag=dateKey(a)&&dateKey(a)<todayKey;
+    if(overdueFlag)return {label:'OVERDUE / OPEN',tone:'attn',detail:'This IT assignment is still open from an earlier work date.'};
+    if(!gate.ready)return {label:gate.label||'WAITING',tone:'wait',detail:gate.detail||'A required prior workflow step is not complete.'};
+    if(a.status==='started')return {label:'IN PROCESS',tone:'',detail:'Continue the IT workflow already started for this ticket.'};
+    return {label:'READY',tone:'',detail:'This IT assignment is ready to open after exact MHelpDesk verification.'};
+  }
+
+  function itAssignmentCard(row){
+    const {a}=row,state=itAssignmentState(row);
+    const queue=!a.assignee_user_id&&a.assignment_scope==='department';
+    return `<div class='wl-svc-job'>
+      <div class='wl-svc-job-top'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div></div><span class='${state.tone}'>${esc(state.label)}</span></div>
+      <div class='wl-svc-job-meta'><span>${esc(String(a.work_type||'service').toUpperCase())}</span><span>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</span>${queue?'<span>IT Department Queue</span>':''}</div>
+      <div class='wl-svc-job-desc'>${esc(state.detail)}${a.job_description?'<br><b>Work:</b> '+esc(a.job_description):''}</div>
+      ${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${a.notes?'<div class="small top8"><b>Owner Notes:</b> '+esc(a.notes)+'</div>':''}${techCheckAIHtml(a,'it')}
+      <button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-start-assignment='${a.id}' ${state.tone==='wait'?'disabled':''}>${a.status==='started'?'Continue IT Task':'Open IT Task'} →</button>
+    </div>`;
+  }
+
+  let commandState='IT WORKFLOW READY',commandTone='',commandDetail='Work the highest-priority IT task shown below.';
+  if(offlineIT.length){commandState='SERVICE NEEDS IT SUPPORT';commandTone='issue';commandDetail='A field unit is waiting for Service + IT troubleshooting.';}
+  else if(returns.waiting){commandState='IT INTAKE WAITING';commandTone='due';commandDetail='Returned equipment is waiting for IT Intake.';}
+  else if(overdue.length){commandState='OPEN IT WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one IT assignment is still open from an earlier work date.';}
+  else if(ready.length){commandState='IT JOB READY';commandDetail='An IT assignment is ready to work now.';}
+  else if(prepSummary.draft){commandState='UNFINISHED IT PREP';commandTone='due';commandDetail='An equipment prep draft is still incomplete.';}
+  else if(blocked.length){commandState='WAITING ON PRIOR WORKFLOW STEP';commandTone='due';commandDetail='Assigned IT work is waiting on Service or another required step.';}
+  else if(!needsAction.length){commandState='NO ACTIVE IT WORK TODAY';commandDetail='No due, overdue, or unscheduled IT assignment is waiting right now.';}
+
+  let nextAction='';
+  if(offlineIT.length){
+    const issue=offlineIT[0];
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Help Service troubleshoot ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.site||'No site')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Review Service’s power check, troubleshoot together, and record the IT decision in the field-issue card below.</div></div>`;
+  }else if(returns.nextWaiting){
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Start IT Intake · Unit ${esc(returns.nextWaiting.unit_tag||'Unknown')}</b><div class='small'>${esc(returns.nextWaiting.equipment_type||'Returned unit')} · MHelpDesk #${esc(returns.nextWaiting.ticket_no||'—')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-next-it-intake='${returns.nextWaiting.id}'>Start / Continue IT Intake →</button></div>`;
+  }else if(ready.length){
+    const next=ready[0].a;
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-start-assignment='${next.id}'>${next.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`;
+  }else if(prepSummary.nextDraft){
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Finish IT Prep · MHelpDesk #${esc(prepSummary.nextDraft.ticket_no)}</b><div class='small'>${esc(prepSummary.nextDraft.site||'No customer / site')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-open-it='${prepSummary.nextDraft.id}'>Continue Equipment Prep →</button></div>`;
+  }else if(blocked.length){
+    const first=blocked[0],a=first.a;
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>WAITING</div><b>${esc(first.gate.label||'Prior workflow step required')} · MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(first.gate.detail||'This IT task will remain visible until the required prior step is complete.')}</div></div>`;
+  }else{
+    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ IT command center is clear.</b><div class='small'>No immediate IT action is waiting in Tech Check.</div></div>`;
+  }
+
+  const upcomingHtml=upcoming.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming IT Work</b><span>${upcoming.length} scheduled</span></div>${upcoming.slice(0,8).map(itAssignmentCard).join('')}</div>`:'';
+  const closeoutClear=!assignments.length&&!prepSummary.draft&&!returns.waiting&&!offlineIT.length;
+
+  home.innerHTML=`${alertBanner}<div class='wl-svc-command wl-it-command'>
+    <div class='wl-svc-command-hero'>
+      <div class='wl-svc-command-kicker'>IT TECHNICIAN COMMAND CENTER</div>
+      <h2>${esc(ownerViewingIT?techName+' · IT':techName)} · ${esc(todayLabel)}</h2>
+      <p>Assignments → equipment prep → Service handoff → field support → IT Intake → inventory protection.</p>
+      <div class='wl-svc-command-state ${commandTone}'><i></i><span><b>${esc(commandState)}</b><br>${esc(commandDetail)}</span></div>
+    </div>
+
+    <div class='wl-svc-command-stats'>
+      <div class='wl-svc-command-stat'><b>${today.length}</b><span>Today’s IT jobs</span></div>
+      <div class='wl-svc-command-stat'><b>${ready.length}</b><span>Ready / actionable</span></div>
+      <div class='wl-svc-command-stat'><b>${blocked.length}</b><span>Waiting / blocked</span></div>
+      <div class='wl-svc-command-stat'><b>${prepSummary.draft}</b><span>Pending prep</span></div>
+      <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Returns waiting IT</span></div>
+      <div class='wl-svc-command-stat'><b>${offlineIT.length}</b><span>Service needs IT</span></div>
+    </div>
+
+    ${nextAction}
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>IT Queue Health</b><span>${needsAction.length} open now</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row ${overdue.length?'issue':''}'><b>Overdue IT assignments</b><span>${overdue.length}</span></div>
+        <div class='wl-svc-command-close-row ${queueCount?'pending':''}'><b>IT Department queue jobs</b><span>${queueCount}</span></div>
+        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Equipment prep drafts</b><span>${prepSummary.draft}</span></div>
+        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
+        <div class='wl-svc-command-close-row ${returns.replacement?'issue':''}'><b>Needs Replacement holds</b><span>${returns.replacement}</span></div>
+      </div>
+    </div>
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>Today / Needs Action</b><span>${needsAction.length} open</span></div>
+      ${needsAction.length?needsAction.map(itAssignmentCard).join(''):"<div class='ok'><b>✓ No due, overdue, or unscheduled IT assignments.</b></div>"}
+    </div>
+
+    ${offlineITHtml}
+    ${upcomingHtml}
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>Equipment Prep & Intake</b><span>Live Tech Check</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Draft IT preps</b><span>${prepSummary.draft}</span></div>
+        <div class='wl-svc-command-close-row'><b>Handoffs waiting for Service</b><span>${prepSummary.released}</span></div>
+        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returned units waiting IT</b><span>${returns.waiting}</span></div>
+        <div class='wl-svc-command-close-row'><b>Intake awaiting Owner / MHelpDesk inventory</b><span>${returns.inventory}</span></div>
+      </div>
+      ${assignedInventoryHtml(assignedAssets)}
+      <div class='wl-menu top10'>
+        <button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button>
+        <button class='${prepSummary.draft?"wl-red":"wl-gray"}' data-wl-it='pending'>▶ Continue Pending Prep <span class='wl-count'>${prepSummary.draft}</span></button>
+        <button class='${returns.waiting?"wl-red":"wl-gray"}' data-wl-mode='intake'>↩ Intake & Returns <span class='wl-count'>${returns.waiting+returns.inventory+returns.replacement}</span></button>
+        <button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${prepSummary.released+prepSummary.closed}</span></button>
+      </div>
+    </div>
+
+    <div class='wl-svc-command-section'>
+      <div class='wl-svc-command-section-head'><b>End-of-Day IT Closeout</b><span>${closeoutClear?'CLEAR':'OPEN ITEMS'}</span></div>
+      <div class='wl-svc-command-closeout'>
+        <div class='wl-svc-command-close-row ${assignments.length?'pending':''}'><b>Open IT assignments</b><span>${assignments.length}</span></div>
+        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Unfinished equipment prep</b><span>${prepSummary.draft}</span></div>
+        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
+        <div class='wl-svc-command-close-row ${offlineIT.length?'issue':''}'><b>Service troubleshooting waiting on IT</b><span>${offlineIT.length}</span></div>
+      </div>
+      <div class='small top8'>Released handoffs may remain with Service, and completed intake may remain in Owner / MHelpDesk inventory confirmation without falsely blocking IT closeout. MHelpDesk remains separate.</div>
+    </div>
+  </div>`;
+
+  hideChildren(viewIT(),[home]);
   injectEquipmentMemory(wizard).catch(()=>{});
   resetWizardPosition();
 }
