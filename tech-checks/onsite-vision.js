@@ -1356,6 +1356,131 @@ async function offlineEscalationHtml(raw){
     +rows.slice(0,20).map(offlineEscalationCard).join('');
 }
 
+
+function damageHoldIntent(raw){
+  const text=String(raw||'').trim(),lower=text.toLowerCase();
+  const needsReplacement=/\b(needs?\s+replacement|need(?:s|ing)?\s+to\s+be\s+replaced|replacement\s+hold|damaged\s+equipment)\b/i.test(text);
+  const damageDetail=/\b(what\s+damage|damage\s+(?:did|does|was)|damage\s+notes?|documented\s+damage|what\s+did\s+it\s+document)\b/i.test(text);
+  const ownerNotification=/\b(owner\s+(?:was\s+)?notified|notify\s+(?:me|owner)|notification.*damage|damage.*notification|has\s+(?:the\s+)?owner\s+been\s+notified)\b/i.test(text);
+  const shopInventory=/\b(back\s+to\s+shop|shop\s+inventory|available\s+(?:in|for)\s+shop|return.*shop)\b/i.test(text);
+  const repairStatus=/\b(repair\s+status|replacement\s+status|repair\/replacement|repair\s+or\s+replacement|what\s+happens\s+next.*(?:damage|replacement)|status.*(?:damage|replacement))\b/i.test(text);
+  const damageCue=/\b(damage(?:d)?|replacement|repair|maintenance)\b/i.test(text);
+  if(!needsReplacement&&!damageDetail&&!ownerNotification&&!(shopInventory&&damageCue)&&!repairStatus)return null;
+
+  const hinted=unitHint(text);
+  const generic=text.match(/\bunit\s*(?:#|number|no\.?)*\s*([a-z0-9._-]+)\b/i);
+  let unitReference=hinted?(hinted.type+' '+hinted.tag):(generic?.[1]||'');
+  if(!unitReference&&/\b(?:this|that)\s+unit\b/i.test(text)&&state.currentUnitReference){
+    unitReference=String(state.currentUnitReference);
+  }
+  const explicitTicket=ticketFrom(text);
+  const contextualTicket=!explicitTicket&&state.currentTicket&&/\b(this|that|it|unit|ticket|return|damage|replacement|repair)\b/i.test(text)
+    ?String(state.currentTicket):'';
+  const ticket=explicitTicket||contextualTicket||'';
+
+  let detail='';
+  if(damageDetail)detail='damage';
+  else if(ownerNotification)detail='owner_notification';
+  else if(shopInventory)detail='shop_inventory';
+  else if(repairStatus)detail='repair_status';
+  const scope=detail?'all':'active';
+  return{scope,detail,unitReference,ticket};
+}
+function damageHoldCard(row){
+  const r=row||{};
+  const meta=[
+    r.ticket_no?'MHelpDesk #'+r.ticket_no:'',
+    r.it_tech_name?'IT: '+r.it_tech_name:'',
+    r.it_received_at?historyDate(r.it_received_at):''
+  ].filter(Boolean);
+  const ownerStatus=r.owner_notified===true?'RECORDED':(r.permanent_damage_report_present?'MISSING INFORMATION':'NOT RECORDED');
+  return '<div class="vision-context-block"><h3>'+esc((r.equipment_type||'Equipment')+' '+(r.unit_tag||'MISSING INFORMATION'))+'</h3>'
+    +'<div class="vision-context-grid"><div><span>RETURN STATUS</span><b>'+esc(String(r.status||'MISSING INFORMATION').replaceAll('_',' ').toUpperCase())+'</b></div>'
+    +'<div><span>INVENTORY STATUS</span><b>'+esc(String(r.asset_inventory_status||'MISSING INFORMATION').replaceAll('_',' ').toUpperCase())+'</b></div>'
+    +'<div><span>OWNER NOTIFICATION</span><b>'+esc(ownerStatus)+'</b></div>'
+    +'<div><span>SHOP AVAILABLE</span><b>'+esc(r.shop_inventory_blocked?'NO — HOLD ACTIVE':'MISSING INFORMATION')+'</b></div></div>'
+    +(meta.length?'<div class="vision-system-note">'+meta.map(esc).join(' · ')+'</div>':'')
+    +'</div>';
+}
+async function damageHoldHtml(raw){
+  const intent=damageHoldIntent(raw);
+  if(!intent)return'';
+  const layer=visionLiveData();
+  if(!layer?.getDamageHolds)return '<div class="vision-direct warn"><b>Damage-hold data is updating.</b>Refresh OnSite Vision and try again.</div>';
+  const result=await layer.getDamageHolds({
+    scope:intent.scope,
+    unit_reference:intent.unitReference,
+    ticket_no:intent.ticket
+  },{force:true,limit:100});
+  const rows=Array.isArray(result?.rows)?result.rows:[];
+
+  if(rows.length===1){
+    const remembered=rows[0]||{};
+    if(remembered.unit_tag)state.currentUnitReference=[remembered.equipment_type,remembered.unit_tag].filter(Boolean).join(' ');
+    if(remembered.ticket_no){
+      state.currentTicket=String(remembered.ticket_no);
+      const current=ensureChat();current.ticket=state.currentTicket;saveChats();renderOrder();
+    }
+  }
+
+  if(!rows.length){
+    if(!intent.detail){
+      return '<div class="vision-answer-title">No active damaged-equipment Needs Replacement holds are recorded right now.</div>'
+        +'<div class="vision-answer-copy">I checked the live Tech Check return records. MHelpDesk remains separate.</div>';
+    }
+    return '<div class="vision-answer-title">No matching damage-hold record was found.</div>'
+      +'<div class="vision-direct warn"><b>MISSING INFORMATION</b>The requested damage/replacement detail is not recorded in a matching Tech Check return.</div>'
+      +'<div class="vision-answer-copy">I am not inferring repair or Shop Inventory status from an absent record.</div>';
+  }
+
+  if(intent.detail){
+    const r=rows[0]||{};
+    if(intent.detail==='damage'){
+      const photoCount=Array.isArray(r.intake_photo_paths)?r.intake_photo_paths.length:0;
+      return '<div class="vision-answer-title">IT damage documentation</div>'
+        +'<div class="vision-context-block"><h3>'+esc((r.equipment_type||'Equipment')+' '+(r.unit_tag||'MISSING INFORMATION'))+'</h3><div class="vision-context-list">'
+        +'<div class="vision-context-row"><b>IT damage notes</b><span>'+esc(r.damage_notes||'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>IT technician</b><span>'+esc(r.it_tech_name||'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>IT Intake evidence</b><span>'+esc(photoCount?photoCount+' photo'+(photoCount===1?'':'s'):'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>Return notes</b><span>'+esc(r.return_notes||'MISSING INFORMATION')+'</span></div>'
+        +'</div></div>'+damageHoldCard(r);
+    }
+    if(intent.detail==='owner_notification'){
+      if(r.owner_notified){
+        return '<div class="vision-answer-title">Yes — an Owner damage notification is recorded.</div>'
+          +'<div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>'+esc(String(r.owner_notification_count||1))+' Owner notification record'+(Number(r.owner_notification_count||1)===1?' is':'s are')+' stored for this damage hold'
+          +(r.owner_notification_latest_at?' · latest '+esc(historyDate(r.owner_notification_latest_at)):'')+'.</div>'
+          +damageHoldCard(r);
+      }
+      return '<div class="vision-answer-title">Owner notification cannot be verified from the notification records.</div>'
+        +'<div class="vision-direct warn"><b>MISSING INFORMATION</b>No matching stored Owner notification row was found for this damage hold.</div>'
+        +(r.permanent_damage_report_present?'<div class="vision-system-note">A permanent DAMAGED EQUIPMENT NEEDS REPLACEMENT report is recorded, but I will not substitute that for a missing notification record.</div>':'')
+        +damageHoldCard(r);
+    }
+    if(intent.detail==='shop_inventory'){
+      if(r.status==='needs_replacement'){
+        return '<div class="vision-answer-title">No — this unit cannot return to available Shop Inventory while the damage hold is active.</div>'
+          +'<div class="vision-direct warn"><b>COMPANY RULE</b>A Needs Replacement return is held in Maintenance and the database blocks the generic Shop Inventory path until the damage hold is resolved.</div>'
+          +'<div class="vision-direct warn"><b>MISSING INFORMATION</b>The normal final repair/replacement disposition has not been defined or recorded yet.</div>'
+          +damageHoldCard(r);
+      }
+      return '<div class="vision-answer-title">No active Needs Replacement hold is shown on this damage record.</div>'
+        +'<div class="vision-direct warn"><b>MISSING INFORMATION</b>That alone does not prove the unit is eligible for Shop Inventory; current workflow and inventory state must also allow it.</div>'
+        +damageHoldCard(r);
+    }
+    if(intent.detail==='repair_status'){
+      return '<div class="vision-answer-title">'+esc(r.status==='needs_replacement'?'This unit is on an active Needs Replacement hold.':'Recorded damage / replacement status')+'</div>'
+        +'<div class="vision-direct '+(r.status==='needs_replacement'?'warn':'good')+'"><b>VERIFIED DATABASE FACT</b>Return status: '+esc(String(r.status||'MISSING INFORMATION').replaceAll('_',' '))+'. Inventory status: '+esc(String(r.asset_inventory_status||'MISSING INFORMATION').replaceAll('_',' '))+'.</div>'
+        +'<div class="vision-direct warn"><b>MISSING INFORMATION</b>The final repair/replacement disposition procedure and outcome are not recorded as completed company procedure.</div>'
+        +damageHoldCard(r);
+    }
+  }
+
+  return '<div class="vision-answer-title">'+rows.length+' damaged unit'+(rows.length===1?'':'s')+' currently need replacement / repair attention</div>'
+    +'<div class="vision-answer-copy">These are live Tech Check Needs Replacement holds. They are not available Shop Inventory.</div>'
+    +rows.slice(0,20).map(damageHoldCard).join('');
+}
+
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
 }
@@ -1392,6 +1517,7 @@ async function answer(text){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
     if(sideQuestion){
       const review=await ownerReviewQueueHtml(raw);if(review)return review;
+      const damage=await damageHoldHtml(raw);if(damage)return damage;
       const history=await companyHistoryHtml(raw);if(history)return history;
       const offline=await offlineEscalationHtml(raw);if(offline)return offline;
       const side=await serverAgentAnswer(raw);
@@ -1404,6 +1530,7 @@ async function answer(text){
   if(systemHealthIntent(raw))return await systemHealthHtml();
 
   const reviewQueue=await ownerReviewQueueHtml(raw);if(reviewQueue)return reviewQueue;
+  const damageHold=await damageHoldHtml(raw);if(damageHold)return damageHold;
   const companyHistory=await companyHistoryHtml(raw);if(companyHistory)return companyHistory;
   const offlineEscalation=await offlineEscalationHtml(raw);if(offlineEscalation)return offlineEscalation;
 
