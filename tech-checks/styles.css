@@ -3855,3 +3855,88 @@ select {
 @media(max-width:680px){
   #view-owner .ownerCommandStats button small{font-size:8px;line-height:1.25}
 }
+
+
+/* Owner Review closeout v121 */
+#view-owner .ownerReviewCard > .ownerDashSummary{
+  background:#f5f8fb;
+  border-left:6px solid #172839;
+}
+#view-owner .ownerReviewRow{
+  border:1px solid #d6e0e7;
+  border-radius:14px;
+  padding:13px;
+  background:#fff;
+  margin-top:10px;
+}
+#view-owner .ownerReviewRow:first-child{margin-top:0}
+#view-owner .ownerReviewRow.ready{border-left:5px solid #1f7a5a}
+#view-owner .ownerReviewRow.correction{border-left:5px solid #b1080e;background:#fffafa}
+#view-owner .ownerReviewHead{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+#view-owner .ownerReviewHead b{display:block;color:#142d42;font-size:15px}
+#view-owner .ownerReviewHead span{
+  display:block;
+  margin-top:3px;
+  color:#687887;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.06em;
+}
+#view-owner .ownerReviewSteps{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  margin-top:11px;
+}
+#view-owner .ownerReviewStep{
+  border:1px solid #d9e1e7;
+  border-radius:10px;
+  padding:9px 10px;
+  background:#f8fafb;
+}
+#view-owner .ownerReviewStep span,
+#view-owner .ownerReviewStep b{display:block}
+#view-owner .ownerReviewStep span{
+  color:#6a7986;
+  font-size:9px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+#view-owner .ownerReviewStep b{
+  margin-top:3px;
+  color:#21384b;
+  font-size:11px;
+  line-height:1.35;
+}
+#view-owner .ownerReviewStep.complete{background:#f0faf4;border-color:#b9dfc8}
+#view-owner .ownerReviewStep.complete b{color:#166b40}
+#view-owner .ownerReviewStep.pending{background:#fff9ea;border-color:#ead39f}
+#view-owner .ownerReviewStep.pending b{color:#765718}
+#view-owner .ownerReviewStep.missing{background:#fff1f1;border-color:#ebb8ba}
+#view-owner .ownerReviewStep.missing b{color:#9d1117}
+#view-owner .ownerReviewActions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+#view-owner .ownerReviewActions .btn,
+#view-owner .ownerReviewActions .mini{min-width:150px}
+#view-owner .ownerReviewRow a.mini{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+@media(max-width:680px){
+  #view-owner .ownerReviewSteps{grid-template-columns:1fr}
+  #view-owner .ownerReviewActions{display:grid;grid-template-columns:1fr}
+  #view-owner .ownerReviewActions .btn,
+  #view-owner .ownerReviewActions .mini{width:100%;min-width:0}
+}
