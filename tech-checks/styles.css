@@ -4572,6 +4572,29 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
 #view-owner #ownerJobAssignments{width:100%!important;max-width:none!important;margin:0!important}
 #view-owner #ownerJobAssignments>.ownerDashSummary{display:none!important}
 #view-owner #ownerJobAssignments>.ownerDashBody{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-intro,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-step,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-review,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-summary span,
+#view-owner #ownerAppPage #ownerJobAssignments .wl-owner-equipment-qty,
+#view-owner #ownerAppPage #ownerJobAssignments .wl-review,
+#view-owner #ownerAppPage #ownerJobAssignments .wl-note{
+  background:var(--oa-panel2)!important;border-color:var(--oa-line)!important;color:var(--oa-text)!important;box-shadow:none!important;
+}
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-step-head b,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-review h3,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-intro b{color:#fff!important}
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-step-head span,
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-review p{color:var(--oa-muted)!important}
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-pills button{
+  background:#101c23!important;border-color:#435b67!important;color:#e7eef1!important;
+}
+#view-owner #ownerAppPage #ownerJobAssignments .owner-simple-pills button.selected{
+  background:var(--oa-red)!important;border-color:#ff555b!important;color:#fff!important;
+}
+#view-owner #ownerAppPage #ownerJobAssignments #ownerAssignDraftStatus{
+  background:#111f27!important;color:#c8d3d8!important;border:1px solid var(--oa-line)!important;
+}
 
 @media(min-width:721px){
   body:has(#view-owner:not(.hidden)){margin:0!important;background:var(--oa-bg)!important;overflow:hidden!important}
@@ -4599,8 +4622,11 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
     position:relative!important;top:auto!important;z-index:20!important;flex:0 0 auto!important;width:100%!important;height:auto!important;
     padding:8px!important;border:0!important;border-bottom:1px solid #2c3c46!important;background:#101920!important;overflow-x:auto!important;overflow-y:hidden!important;
   }
-  #view-owner .ownerAppBrand,#view-owner .ownerAppSidebarUtility{display:none!important}
-  #view-owner .ownerAppSidebar nav{display:flex!important;flex-direction:row!important;gap:5px!important;width:max-content!important;min-width:100%!important}
+  #view-owner .ownerAppBrand{display:none!important}
+  #view-owner .ownerAppSidebar{display:flex!important;align-items:center!important;gap:6px!important}
+  #view-owner .ownerAppSidebar nav{display:flex!important;flex-direction:row!important;gap:5px!important;width:max-content!important;min-width:max-content!important}
+  #view-owner .ownerAppSidebarUtility{display:flex!important;flex:0 0 auto!important;gap:5px!important;margin:0!important;padding:0!important;border:0!important}
+  #view-owner .ownerAppSidebarUtility a,#view-owner .ownerAppSidebarUtility button{display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;padding:9px 12px!important;border:1px solid #2f424d!important;border-radius:8px!important;background:#111f27!important;color:#f7fafb!important;font-size:12px!important;font-weight:800!important;white-space:nowrap!important;text-decoration:none!important}
   #view-owner .ownerAppSidebar nav button{
     flex:0 0 auto!important;min-height:44px!important;padding:9px 12px!important;border:1px solid #2f424d!important;border-radius:8px!important;
     background:#111f27!important;color:#dce5e9!important;font-size:12px!important;font-weight:800!important;white-space:nowrap!important;touch-action:manipulation!important;
