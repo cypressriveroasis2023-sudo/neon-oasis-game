@@ -4842,11 +4842,54 @@ function ownerShowGroup(name){
 }
 function ownerCompactOpenGroup(name){ return ownerShowGroup(name); }
 function ownerFeaturePageHtml(){ return ''; }
+function ensureOwnerCommandCenter(){
+  const view=document.getElementById('view-owner');
+  if(!view)return null;
+  let card=document.getElementById('ownerCommandCenter');
+  if(!card){
+    card=document.createElement('section');
+    card.id='ownerCommandCenter';
+    card.className='ownerCommandCenter card';
+    card.innerHTML=`
+      <div class="ownerCommandHead">
+        <div><small>OWNER COMMAND CENTER</small><b>Today at Cameras On Site</b><span>See what is moving, what needs you, and what is ready for review.</span></div>
+        <a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt="">Ask Vision</a>
+      </div>
+      <div class="ownerCommandGrid">
+        <button type="button" data-owner-command="daily"><strong id="ownerCommandTodayCount">0</strong><b>Today</b><span>Jobs & team</span></button>
+        <button type="button" data-owner-command="attention"><strong id="ownerCommandAttentionCount">0</strong><b>Needs Attention</b><span>Issues & blockers</span></button>
+        <button type="button" data-owner-command="review"><strong>→</strong><b>Owner Review</b><span>Closeouts & corrections</span></button>
+        <button type="button" data-owner-command="equipment"><strong id="ownerCommandEquipmentCount">0</strong><b>Team & Equipment</b><span>Units, returns & custody</span></button>
+      </div>
+      <div class="ownerCommandFlow"><span>OWNER ASSIGNMENT</span><i>→</i><span>IT</span><i>→</i><span>HANDOFF</span><i>→</i><span>SERVICE</span><i>→</i><span class="ownerFinal">OWNER CLOSEOUT</span></div>`;
+    card.addEventListener('click',event=>{
+      const btn=event.target.closest('[data-owner-command]');
+      if(!btn)return;
+      const action=btn.dataset.ownerCommand;
+      if(action==='daily') return ownerShowGroup('Jobs');
+      if(action==='attention') return ownerShowGroup('Attention');
+      if(action==='review') return ownerShowGroup('Jobs');
+      if(action==='equipment') return ownerShowGroup('Units');
+    });
+    view.prepend(card);
+  }
+  const attention=ownerBadgeNumber('ownerAttentionBadge');
+  const assignments=ownerBadgeNumber('ownerAssignmentBadge');
+  const units=ownerBadgeNumber('ownerUnitStatusBadge');
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value||0);};
+  set('ownerCommandTodayCount',assignments);
+  set('ownerCommandAttentionCount',attention);
+  set('ownerCommandEquipmentCount',units);
+  card.classList.toggle('hasAttention',attention>0);
+  return card;
+}
+
 function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner');
   if(!view || !roleText().includes('Owner/Admin')) return;
 
   document.getElementById('ownerVisionWorkspaceCard')?.remove();
+  ensureOwnerCommandCenter();
 
   let visionButton=document.getElementById('ownerVisionHeaderButton');
   if(!visionButton){
