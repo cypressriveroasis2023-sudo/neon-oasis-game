@@ -902,9 +902,13 @@ function draftApplyInput(d,text,initial=false){
   const equipment=draftEquipmentParse(raw);
   if(equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
   if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;d.equipment_numbers_answered=true;}
-  const unitMatch=raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
+  const unitMatch=expected==='equipment_numbers'
+    ? raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i)
+    : raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
   if(unitMatch){d.unit_numbers=unitMatch[1].trim();d.equipment_numbers_answered=true;}
-  const standMatch=raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
+  const standMatch=expected==='equipment_numbers'
+    ? raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i)
+    : raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
   if(standMatch){d.stand_numbers=standMatch[1].trim();d.equipment_numbers_answered=true;}
   if(expected==='equipment_numbers'&&/\b(no equipment numbers|no numbers|not yet|unknown|skip|none)\b/i.test(raw))d.equipment_numbers_answered=true;
   const descMatch=raw.match(/\bdescription\s*(?:is|:|=)\s*([^;\n]+)/i);
