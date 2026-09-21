@@ -1,0 +1,505 @@
+{
+  "version": "onsite-vision-language-evals-v1",
+  "description": "Owner-style language regression bank for OnSite Vision. No case may execute a write; expected action means proposed action only.",
+  "categories": [
+    "workload",
+    "workload_followup",
+    "create_job",
+    "assign",
+    "schedule",
+    "ticket_next",
+    "ticket_blocker",
+    "ticket_assignment",
+    "ticket_equipment",
+    "ticket_evidence",
+    "history",
+    "damage",
+    "owner_review",
+    "offline",
+    "departure",
+    "company_knowledge",
+    "source_code",
+    "owner_correction"
+  ],
+  "cases": [
+    {
+      "id": "w01",
+      "utterance": "what's IT got today",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w02",
+      "utterance": "how busy is service tomorrow",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w03",
+      "utterance": "what does Josh have today",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w04",
+      "utterance": "whats josh got goin on",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w05",
+      "utterance": "who's got stuff lined up monday",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w06",
+      "utterance": "anything for IT this afternoon",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w07",
+      "utterance": "what about tomorrow",
+      "context": [
+        "what does Josh have today"
+      ],
+      "intent": "workload_followup",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "w08",
+      "utterance": "and service",
+      "context": [
+        "what's IT got today"
+      ],
+      "intent": "workload_followup",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "c01",
+      "utterance": "make me a delivery",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c02",
+      "utterance": "throw in a pickup tomorrow",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c03",
+      "utterance": "I need a swap",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c04",
+      "utterance": "start me a service call",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c05",
+      "utterance": "book a delivery for monday at 8",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c06",
+      "utterance": "need a pickup for abc tomorrow morning",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c07",
+      "utterance": "put in a swap 22984 tomorrow 10am",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c08",
+      "utterance": "service call for xyz at 2",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "a01",
+      "utterance": "put Josh on this",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "a02",
+      "utterance": "have Mike handle that one",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "a03",
+      "utterance": "give this to IT",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "none",
+      "action": "assign"
+    },
+    {
+      "id": "a04",
+      "utterance": "let Abel take it",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "a05",
+      "utterance": "stick that in service queue",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "none",
+      "action": "assign"
+    },
+    {
+      "id": "a06",
+      "utterance": "move him to 22712",
+      "context": [
+        "We were talking about Josh"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "s01",
+      "utterance": "move it to tomorrow",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "s02",
+      "utterance": "make that 3 pm",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "s03",
+      "utterance": "push that job to monday morning",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "t01",
+      "utterance": "what still needs to happen on 22712",
+      "intent": "ticket_next",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "t02",
+      "utterance": "what's holding 22712 up",
+      "intent": "ticket_blocker",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "t03",
+      "utterance": "who has 22712",
+      "intent": "ticket_assignment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "t04",
+      "utterance": "what equipment is on 22712",
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "t05",
+      "utterance": "show me the proof on that one",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "ticket_evidence",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "t06",
+      "utterance": "why can't this close",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "ticket_blocker",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "h01",
+      "utterance": "has unit 12 had this problem before",
+      "intent": "history",
+      "tool": "get_company_history",
+      "action": "none"
+    },
+    {
+      "id": "h02",
+      "utterance": "what happened last time at ABC",
+      "intent": "history",
+      "tool": "get_company_history",
+      "action": "none"
+    },
+    {
+      "id": "h03",
+      "utterance": "show me Josh's history",
+      "intent": "history",
+      "tool": "get_company_history",
+      "action": "none"
+    },
+    {
+      "id": "d01",
+      "utterance": "what damaged equipment is waiting on us",
+      "intent": "damage",
+      "tool": "get_damage_holds",
+      "action": "none"
+    },
+    {
+      "id": "d02",
+      "utterance": "can unit 14 go back to shop inventory",
+      "intent": "damage",
+      "tool": "get_damage_holds",
+      "action": "none"
+    },
+    {
+      "id": "o01",
+      "utterance": "what's ready for me to review",
+      "intent": "owner_review",
+      "tool": "get_owner_review_queue",
+      "action": "none"
+    },
+    {
+      "id": "o02",
+      "utterance": "anything waiting on owner closeout",
+      "intent": "owner_review",
+      "tool": "get_owner_review_queue",
+      "action": "none"
+    },
+    {
+      "id": "f01",
+      "utterance": "what units are offline waiting on IT",
+      "intent": "offline",
+      "tool": "get_offline_escalations",
+      "action": "none"
+    },
+    {
+      "id": "f02",
+      "utterance": "what did IT already try on that offline one",
+      "context": [
+        "We're discussing an offline escalation"
+      ],
+      "intent": "offline",
+      "tool": "get_offline_escalations",
+      "action": "none"
+    },
+    {
+      "id": "r01",
+      "utterance": "are we ready to leave the shop",
+      "intent": "departure",
+      "tool": "get_departure_readiness",
+      "action": "none"
+    },
+    {
+      "id": "r02",
+      "utterance": "does service have enough batteries to roll",
+      "intent": "departure",
+      "tool": "get_departure_readiness",
+      "action": "none"
+    },
+    {
+      "id": "k01",
+      "utterance": "what are the helios swap rules",
+      "intent": "company_knowledge",
+      "tool": "get_company_knowledge",
+      "action": "none"
+    },
+    {
+      "id": "k02",
+      "utterance": "what ports does the IP speaker need",
+      "intent": "company_knowledge",
+      "tool": "get_company_knowledge",
+      "action": "none"
+    },
+    {
+      "id": "k03",
+      "utterance": "does a ranger take removable solar panels",
+      "intent": "company_knowledge",
+      "tool": "get_company_knowledge",
+      "action": "none"
+    },
+    {
+      "id": "p01",
+      "utterance": "where is the helios port check programmed",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "p02",
+      "utterance": "why does the app make IT hand it off before service",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "p03",
+      "utterance": "what file controls owner review",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "p04",
+      "utterance": "show me the code that decides ready for service",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "x01",
+      "utterance": "no when i say inspections i mean truck inspections",
+      "intent": "owner_correction",
+      "tool": "none",
+      "action": "none",
+      "knowledge_proposal": true
+    },
+    {
+      "id": "x02",
+      "utterance": "we don't do inspections on weekends",
+      "intent": "owner_correction",
+      "tool": "none",
+      "action": "none",
+      "knowledge_proposal": true
+    },
+    {
+      "id": "x03",
+      "utterance": "from now on call it a handoff not release",
+      "intent": "owner_correction",
+      "tool": "none",
+      "action": "none",
+      "knowledge_proposal": true
+    },
+    {
+      "id": "x04",
+      "utterance": "for this ticket put Josh on it",
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign",
+      "knowledge_proposal": false
+    },
+    {
+      "id": "x05",
+      "utterance": "tomorrow only move this one to 9",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule",
+      "knowledge_proposal": false
+    },
+    {
+      "id": "v01",
+      "utterance": "wats eye tee got today",
+      "intent": "workload",
+      "tool": "get_workload",
+      "action": "none"
+    },
+    {
+      "id": "v02",
+      "utterance": "make me a deelivery for tomorow",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "v03",
+      "utterance": "put josh on dat one",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "v04",
+      "utterance": "wuts holdin this up",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "ticket_blocker",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "v05",
+      "utterance": "show me hellios rules",
+      "intent": "company_knowledge",
+      "tool": "get_company_knowledge",
+      "action": "none"
+    },
+    {
+      "id": "v06",
+      "utterance": "where's that coded at",
+      "context": [
+        "We were discussing the Helios handoff rule"
+      ],
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    }
+  ]
+}
