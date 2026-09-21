@@ -751,6 +751,14 @@ function draftPartsParse(text){
       if(after){parts[def.key]=Number(after[1]);break;}
     }
   }
+  // A natural work-order instruction such as "swap the solar panel" means
+  // one replacement panel even when the Owner does not repeat the quantity.
+  // Keep this limited to explicit swap/replace/change language so an ordinary
+  // mention of a panel does not invent a part requirement.
+  if(!parts.solar_panel_qty){
+    const swappedPanel=s.match(/\b(?:swap(?:\s+out)?|replace|change)\s+(?:the\s+)?(?:(\d+)\s+)?solar\s+panels?\b/i);
+    if(swappedPanel)parts.solar_panel_qty=Number(swappedPanel[1]||1);
+  }
   // In a work-order sentence, "swap/replace/change [the] battery" means a
   // replacement battery. Keep generic battery wording out of other contexts
   // so Vision does not invent replacement parts from normal battery mentions.
