@@ -3806,3 +3806,40 @@ select {
     font-size:11px;
   }
 }
+
+
+/* Owner Command Center v119 */
+#view-owner .ownerCommandCenter{margin:12px 0 14px;display:grid;gap:10px}
+#view-owner .ownerCommandHero{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,.7fr);gap:12px;align-items:stretch;padding:17px;border-radius:18px;background:linear-gradient(135deg,#101820 0%,#183247 100%);color:#fff;box-shadow:0 10px 28px rgba(16,24,32,.14)}
+#view-owner .ownerCommandKicker{display:block;color:#ff3b41;font-size:9px;font-weight:950;letter-spacing:.16em}
+#view-owner .ownerCommandHero h2{margin:4px 0 5px;color:#fff;font-size:26px;line-height:1.05}
+#view-owner .ownerCommandHero p{margin:0;color:#bdcbd6;font-size:12px;line-height:1.4;font-weight:650}
+#view-owner .ownerCommandVision{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid rgba(255,255,255,.17);border-radius:14px;background:rgba(255,255,255,.07);color:#fff;text-decoration:none}
+#view-owner .ownerCommandVision img{width:36px;height:36px;border-radius:10px}
+#view-owner .ownerCommandVision b,#view-owner .ownerCommandVision small{display:block}
+#view-owner .ownerCommandVision b{font-size:13px}.ownerCommandVision small{margin-top:2px;color:#bdcbd6;font-size:9px}
+#view-owner .ownerCommandVision strong{padding:8px 9px;border-radius:999px;background:#d20b12;font-size:9px;white-space:nowrap}
+#view-owner .ownerCommandStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+#view-owner .ownerCommandStats button{min-width:0;min-height:88px;padding:11px;border:1px solid #d8e0e6;border-radius:14px;background:#fff;color:#172839;text-align:left;box-shadow:0 3px 10px rgba(16,24,32,.045)}
+#view-owner .ownerCommandStats button span,#view-owner .ownerCommandStats button b,#view-owner .ownerCommandStats button small{display:block}
+#view-owner .ownerCommandStats button span{color:#657585;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+#view-owner .ownerCommandStats button b{margin-top:3px;color:#101820;font-size:27px;line-height:1;font-weight:950}
+#view-owner .ownerCommandStats button small{margin-top:5px;color:#71808d;font-size:9px;font-weight:700}
+#view-owner .ownerCommandStats button.alert{border-color:#e3a2a5;background:#fff7f7}
+#view-owner .ownerCommandStats button.alert span,#view-owner .ownerCommandStats button.alert b{color:#b1080e}
+#view-owner .ownerCommandQuick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+#view-owner .ownerCommandQuick button{min-height:44px;padding:8px 10px;border:1px solid #ccd6de;border-radius:11px;background:#fff;color:#25394a;font-size:10px;font-weight:900}
+#view-owner .ownerCommandQuick button:first-child{border-color:#d20b12;background:#d20b12;color:#fff}
+#view-owner .ownerTechOverviewCard{border-top:4px solid #172839!important}
+@media(max-width:680px){
+  #view-owner .ownerCommandCenter{margin-top:8px}
+  #view-owner .ownerCommandHero{grid-template-columns:1fr;padding:14px}
+  #view-owner .ownerCommandHero h2{font-size:22px}
+  #view-owner .ownerCommandVision{grid-template-columns:34px minmax(0,1fr) auto}
+  #view-owner .ownerCommandVision img{width:32px;height:32px}
+  #view-owner .ownerCommandStats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view-owner .ownerCommandStats button{min-height:80px;padding:10px}
+  #view-owner .ownerCommandStats button b{font-size:24px}
+  #view-owner .ownerCommandQuick{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view-owner .ownerCommandQuick button{min-height:46px}
+}
