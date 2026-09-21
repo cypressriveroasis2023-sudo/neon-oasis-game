@@ -254,6 +254,25 @@ function renderKnowledgeList(){
       +'<p>'+esc(entry.content||'')+'</p><span class="vision-knowledge-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</span></button>';
   }).join('');
 }
+async function runLanguageEval(){
+  const button=$('visionLanguageEval'),status=$('visionLanguageEvalStatus');
+  if(!db||!status)return;
+  if(button)button.disabled=true;
+  status.classList.remove('hidden','good','warn');
+  status.innerHTML='<b>Running language QA…</b><span>Checking slang, voice-like wording, follow-ups, actions, programming questions, and Owner corrections.</span>';
+  try{
+    const result=await db.functions.invoke('onsite-vision-language-eval',{body:{limit:60}});
+    if(result.error||!result.data?.ok)throw new Error(result.data?.error||result.error?.message||'Language QA failed.');
+    const data=result.data,mismatches=Array.isArray(data.mismatches)?data.mismatches:[];
+    status.classList.add(Number(data.failed||0)===0?'good':'warn');
+    status.innerHTML='<b>'+esc(String(data.passed||0))+' / '+esc(String(data.total||0))+' passed · '+esc(String(data.pass_rate||0))+'%</b>'
+      +'<span>Suite '+esc(data.suite_version||'')+' · '+esc(data.model||'')+'</span>'
+      +(mismatches.length?'<div class="vision-eval-mismatches">'+mismatches.slice(0,8).map(x=>'<div><strong>'+esc(x.id||'')+'</strong> '+esc(x.utterance||'')+'<small>Expected '+esc(x.expected?.intent||'')+' / '+esc(x.expected?.tool||'')+' · got '+esc(x.actual?.intent||'')+' / '+esc(x.actual?.tool||'')+'</small></div>').join('')+'</div>':'<span>No language-routing mismatches were found in this run.</span>');
+  }catch(error){
+    status.classList.add('warn');
+    status.innerHTML='<b>Language QA could not finish.</b><span>'+esc(error?.message||'Please try again.')+'</span>';
+  }finally{if(button)button.disabled=false;}
+}
 async function loadKnowledgeEntries(){
   const admin=visionKnowledgeAdmin();if(!admin?.list)return;
   const filter=knowledgeValue('visionKnowledgeFilter');
@@ -2000,6 +2019,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#visionTeachButton')){await openKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeClose')){closeKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeNew')){resetKnowledgeForm();return;}
+  if(e.target.closest('#visionLanguageEval')){await runLanguageEval();return;}
   if(e.target.closest('#visionKnowledgeSaveDraft')){
     try{await saveKnowledgeEntry('draft');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not save draft.';}}return;
   }
