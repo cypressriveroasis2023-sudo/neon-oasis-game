@@ -4101,3 +4101,44 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
  #view-owner .ownerWorkspaceContent:not(.active)>.ownerDashSection{display:none!important}
  #view-owner .ownerWorkspaceContent.active+.ownerDashSection{display:none!important}
 }
+/* Owner visual consistency v163 — dark workspace across every module */
+@media(min-width:721px){
+ body:has(#view-owner:not(.hidden)),#view-owner:not(.hidden),#view-owner .ownerWorkspaceContent,#view-owner .ownerWorkspaceContent.active{background:#101820!important;color:#eaf1f5!important}
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected,
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected>.ownerDashBody,
+ #view-owner .ownerWorkspaceContent .ownerDashBody{background:#101820!important;color:#eaf1f5!important}
+ #view-owner .ownerWorkspaceContent .card,
+ #view-owner .ownerWorkspaceContent .item,
+ #view-owner .ownerWorkspaceContent .ownerFold,
+ #view-owner .ownerWorkspaceContent .ok,
+ #view-owner .ownerWorkspaceContent .warn,
+ #view-owner .ownerWorkspaceContent .err,
+ #view-owner .ownerWorkspaceContent .ownerCommandCard,
+ #view-owner .ownerWorkspaceContent details,
+ #view-owner .ownerWorkspaceContent table,
+ #view-owner .ownerWorkspaceContent thead,
+ #view-owner .ownerWorkspaceContent tbody,
+ #view-owner .ownerWorkspaceContent tr,
+ #view-owner .ownerWorkspaceContent td,
+ #view-owner .ownerWorkspaceContent th{background:#151f28!important;color:#eaf1f5!important;border-color:#2c3a45!important;box-shadow:none!important}
+ #view-owner .ownerWorkspaceContent .warn,#view-owner .ownerWorkspaceContent .err{border-left:3px solid #d71920!important}
+ #view-owner .ownerWorkspaceContent .ok{border-left:3px solid #2da56c!important}
+ #view-owner .ownerWorkspaceContent button:not(.danger):not(.primary),
+ #view-owner .ownerWorkspaceContent .btn:not(.danger){background:#1a2731!important;color:#edf4f7!important;border-color:#344653!important;box-shadow:none!important}
+ #view-owner .ownerWorkspaceContent button:hover{filter:brightness(1.12)}
+ #view-owner .ownerWorkspaceContent input,
+ #view-owner .ownerWorkspaceContent textarea,
+ #view-owner .ownerWorkspaceContent select{background:#0c151d!important;color:#f0f5f8!important;border:1px solid #344653!important}
+ #view-owner .ownerWorkspaceContent label,
+ #view-owner .ownerWorkspaceContent h1,
+ #view-owner .ownerWorkspaceContent h2,
+ #view-owner .ownerWorkspaceContent h3,
+ #view-owner .ownerWorkspaceContent h4,
+ #view-owner .ownerWorkspaceContent b,
+ #view-owner .ownerWorkspaceContent strong{color:#edf4f7!important}
+ #view-owner .ownerWorkspaceContent .small,
+ #view-owner .ownerWorkspaceContent small,
+ #view-owner .ownerWorkspaceContent p{color:#91a1ae!important}
+ #view-owner .ownerWorkspaceContent .ownerDashBadge{background:#1d2a34!important;color:#dce7ed!important;border-color:#354854!important}
+ #view-owner .ownerWorkspaceContent .ownerDashBadge.alert{background:#d71920!important;color:#fff!important;border-color:#d71920!important}
+}
