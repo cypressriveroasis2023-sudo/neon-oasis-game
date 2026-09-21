@@ -219,7 +219,7 @@
     let query=client.from('job_assignments').select([
       'id','ticket_no','site','assigned_role','assignee_user_id','assignee_name','status','scheduled_for','scheduled_time',
       'work_type','unit_summary','job_description','requires_it_handoff','equipment_manifest','requested_unit_count','updated_at'
-    ].join(',')).eq('scheduled_for',date).not('status','in','("completed","cancelled")').order('scheduled_time',{ascending:true,nullsFirst:false}).limit(250);
+    ].join(',')).eq('scheduled_for',date).neq('status','cancelled').order('scheduled_time',{ascending:true,nullsFirst:false}).limit(250);
     if(role)query=query.eq('assigned_role',role);
     if(techId)query=query.eq('assignee_user_id',techId);
     const response=await query;
@@ -227,7 +227,10 @@
     let rows=Array.isArray(response.data)?response.data:[];
     if(techName&&!techId)rows=rows.filter(row=>String(row.assignee_name||'').toLowerCase().includes(techName));
     const tickets=[...new Set(rows.map(row=>String(row.ticket_no||'').trim()).filter(Boolean))];
-    const value={date,role,tech_id:techId,tech_name:techName,count:tickets.length,tickets,assignments:rows};
+    const grouped=new Map();
+    rows.forEach(row=>{const ticket=String(row.ticket_no||'').trim();if(!ticket)return;if(!grouped.has(ticket))grouped.set(ticket,[]);grouped.get(ticket).push(row);});
+    const completed=tickets.filter(ticket=>(grouped.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed').length;
+    const value={date,role,tech_id:techId,tech_name:techName,count:tickets.length,remaining:Math.max(0,tickets.length-completed),completed,tickets,assignments:rows};
     workloadCache.set(cacheKey,{at:Date.now(),value});
     return value;
   }
@@ -341,7 +344,7 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v6',
+    version:'live-data-v7',
     configure,
     getJobContext,
     getCompanyHistory,
