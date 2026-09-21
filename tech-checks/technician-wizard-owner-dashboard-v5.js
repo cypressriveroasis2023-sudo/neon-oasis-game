@@ -2009,9 +2009,8 @@ async function showITHome() {
     return `<div class='wl-svc-job'>
       <div class='wl-svc-job-top'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div></div><span class='${state.tone}'>${esc(state.label)}</span></div>
       <div class='wl-svc-job-meta'><span>${esc(String(a.work_type||'service').toUpperCase())}</span><span>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</span>${queue?'<span>IT Department Queue</span>':''}</div>
-      <div class='wl-svc-job-desc'>${esc(state.detail)}${a.job_description?'<br><b>Work:</b> '+esc(a.job_description):''}</div>
-      ${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${automaticServiceSolarPlanHtml(a.equipment_manifest,a.work_type)}${a.notes?'<div class="small top8"><b>Owner Notes:</b> '+esc(a.notes)+'</div>':''}${techCheckAIHtml(a,'it')}
-      <button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-start-assignment='${a.id}' ${state.tone==='wait'?'disabled':''}>${a.status==='started'?'Continue IT Task':'Open IT Task'} →</button>
+      <div class='wl-svc-job-desc'>${a.job_description?esc(a.job_description):esc(state.detail)}</div>
+      <button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-start-assignment='${a.id}' ${state.tone==='wait'?'disabled':''}>${a.status==='started'?'CONTINUE →':'ACCEPT JOB'}</button>
     </div>`;
   }
 
