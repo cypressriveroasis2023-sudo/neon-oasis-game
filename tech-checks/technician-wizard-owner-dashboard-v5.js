@@ -5629,11 +5629,15 @@ async function installOwnerAssignments(force = false) {
       ${doneRows ? `<details class='ownerHistoryFold'><summary>Completed in the last 24 hours <span class='pill'>${completed.length}</span></summary><div>${doneRows}</div></details>` : ''}
     </div>`;
 
-  host.open = wasOpen;
+  if(buildAssignmentForm) host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
   if(buildAssignmentForm && !ownerRestoreAssignDraft()){
     refreshOwnerAutoServicePlan();
     refreshOwnerWorkTypeLabels();
+    ownerAIReview();
+  } else if(!buildAssignmentForm) {
+    refreshOwnerWorkTypeLabels();
+    syncOwnerSimplePills();
     ownerAIReview();
   }
   if(host.open)liveHost.open=false;
