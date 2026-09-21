@@ -2485,7 +2485,34 @@
         "History lookup is Owner-only and read-only",
         "Mobile input and results remain inside the viewport"
       ]
+    },
+    {
+      "id": "OWNER-CORRECTION-AUTO-ROUTE-01",
+      "area": "Owner Closeout · Return for Correction",
+      "role": "owner+it+service",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "Return for Correction creates one new department-queue correction assignment without rewriting completed history",
+      "steps": [
+        "Create a rollback-only completed Service job and verify it is ready for Owner Review",
+        "Return the job for IT correction with a reason",
+        "Verify one new active IT Department correction assignment is created and prior completed Service assignment remains completed",
+        "Repeat the same Return for Correction request and verify the active correction assignment is reused rather than duplicated",
+        "Verify the job is not ready for Owner Review while the correction assignment is active",
+        "Complete the correction assignment and verify ready_for_owner_review becomes true again",
+        "Verify the Owner UI prioritizes ready_for_owner_review over the historical correction_requested status",
+        "Rollback and confirm zero assignment, review, report, and notification residue"
+      ],
+      "expected": [
+        "Correction routing is automatic to the selected IT or Service Department queue",
+        "Existing completion records are never reopened or erased",
+        "Network retries do not create duplicate active correction assignments",
+        "Active correction work keeps the job out of final closeout",
+        "Completed correction returns the job to Ready for Owner Review",
+        "MHelpDesk remains separate and is never reported as changed",
+        "Rollback QA leaves no synthetic records"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision guided draft Q8→Q9 regression fixed and verified against the current production parser/state machine. Exact Poco Loco Ranger/solar-panel/battery wording now persists as the work description, prefills parts without skipping Question 9, and the complete 11-question flow reaches review. Owner Vision alerts now use an Owner-only detected → acknowledged → resolved lifecycle, stay in Needs Attention until resolved, and preserve resolved history. Rollback alert QA left zero production residue. Owner Command Center now provides direct read-only Technician, Unit, and Customer / Site history search through the authoritative company-history RPC and labels unknown history MISSING INFORMATION."
+  "last_release_qa_note": "OnSite Vision Q8→Q9 draft flow, Owner Vision alert lifecycle, Owner Close Job, and automatic Return for Correction routing are verified. Exact Ranger/solar-panel/battery Q8 wording advances to Parts confirmation; active Vision alerts persist through acknowledgement until resolution; correction requests create/reuse one department-queue assignment while preserving old completions; closeout returns to Ready after correction. Authenticated Owner rollback QA left zero production residue."
 }
