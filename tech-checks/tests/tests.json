@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v133",
-  "service_worker": "v139",
+  "runtime_version": "release-qa-v134",
+  "service_worker": "v140",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3150,7 +3150,74 @@
         "The answer states the date context",
         "Date-free department workload questions default to today"
       ]
+    },
+    {
+      "id": "VISION-CREATE-NATURAL-01",
+      "area": "OnSite Vision · conversational job creation",
+      "role": "owner",
+      "mode": "source + rollback RPC",
+      "destructive": false,
+      "scenario": "Owner can start Delivery, Pickup, Swap, or Service work in normal conversational wording",
+      "steps": [
+        "Say create/make/start/open/put in a Delivery, Pickup, Swap, or Service ticket",
+        "Allow Vision to start the guided draft"
+      ],
+      "expected": [
+        "Vision identifies the requested work type without command syntax",
+        "The existing work-order interview is used instead of creating a second workflow",
+        "MHelpDesk remains separate"
+      ]
+    },
+    {
+      "id": "VISION-CREATE-ASSIGN-ANY-01",
+      "area": "OnSite Vision · conversational job creation",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Natural no-preference technician wording is accepted during creation",
+      "steps": [
+        "At assignment step say any IT tech, any Service tech, whoever is available, first available tech, or no preference"
+      ],
+      "expected": [
+        "Vision treats the answer as an intentional department-queue assignment",
+        "No technician identity is invented",
+        "Delivery/Swap retain IT → Service handoff wording"
+      ]
+    },
+    {
+      "id": "VISION-CREATE-ONE-SHOT-01",
+      "area": "OnSite Vision · conversational job creation",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Answers supplied in the original request are not unnecessarily asked again",
+      "steps": [
+        "Include explicit no parts, no notes, no unit numbers, and assignment preference in the initial creation request"
+      ],
+      "expected": [
+        "Those explicit answers are retained in the draft",
+        "Vision asks only for genuinely missing required information",
+        "Final creation still requires Owner confirmation"
+      ]
+    },
+    {
+      "id": "VISION-CREATE-RPC-ROLLBACK-01",
+      "area": "OnSite Vision · conversational job creation",
+      "role": "owner",
+      "mode": "authenticated rollback",
+      "destructive": false,
+      "scenario": "Confirmed Delivery creation produces the expected IT and Service assignment structure",
+      "steps": [
+        "As authenticated Owner call owner_assign_job_v8 for IT and Service inside a rollback transaction",
+        "Use the same Delivery ticket and schedule date"
+      ],
+      "expected": [
+        "Exactly two assignment rows are created in the transaction",
+        "IT and Service each have one row",
+        "Service row requires IT handoff",
+        "Rollback leaves zero QA residue"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision workload questions now query live job_assignments instead of relying only on browser state. Natural questions for IT, Service, or a named technician count distinct open Tech Check tickets for the requested date. Completed/cancelled assignments are excluded and MHelpDesk remains separate."
+  "last_release_qa_note": "OnSite Vision natural-language job creation now accepts broader conversational start phrases plus explicit no-preference technician language such as any IT tech, any Service tech, whoever is available, or no preference. Explicit no-parts/no-notes/no-unit-number answers can be supplied up front, and confirmed Delivery creation was rollback-tested through owner_assign_job_v8 with the expected IT + Service handoff structure and zero residue."
 }
