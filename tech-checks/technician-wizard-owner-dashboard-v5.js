@@ -462,6 +462,40 @@ function injectStyles() {
       #view-owner .ownerBackHome{min-height:48px!important;font-size:14px!important}
     }
 
+    /* Simple Owner job builder v162 */
+    #view-owner #ownerJobAssignments .ownerDashBody{max-width:1180px;margin:0 auto!important}
+    #view-owner .owner-simple-intro{margin:0 0 10px;padding:10px 12px;border:1px solid #d9e1e7;border-radius:12px;background:#f8fafb;color:#566978;font-size:10px;line-height:1.4}
+    #view-owner .owner-simple-intro b{color:#1b2d3c}
+    #view-owner .owner-simple-step{margin-top:11px;padding:15px;border:1px solid #d8e0e6;border-radius:15px;background:#fff;box-shadow:0 2px 8px rgba(15,35,52,.04)}
+    #view-owner .owner-simple-step-head{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+    #view-owner .owner-simple-step-num{width:31px;height:31px;display:grid;place-items:center;flex:none;border-radius:999px;background:#101820;color:#fff;font-size:12px;font-weight:950}
+    #view-owner .owner-simple-step-head b{display:block;color:#152838;font-size:16px;line-height:1.05}
+    #view-owner .owner-simple-step-head span{display:block;margin-top:3px;color:#71818e;font-size:9px;line-height:1.25}
+    #view-owner .owner-simple-pills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:0 0 10px}
+    #view-owner .owner-simple-pills button{min-height:48px;border:1px solid #ced8df;border-radius:999px;background:#f7f9fa;color:#344b5c;font-size:11px;font-weight:900}
+    #view-owner .owner-simple-pills button.selected{border-color:#d20b12;background:#d20b12;color:#fff;box-shadow:0 3px 10px rgba(210,11,18,.18)}
+    #view-owner .owner-simple-pills.role-pills button{border-radius:12px;min-height:57px;padding:8px}
+    #view-owner .owner-simple-pills.role-pills button small{display:block;margin-top:2px;font-size:7px;font-weight:700;opacity:.78}
+    #view-owner .owner-simple-hidden-select{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+    #view-owner .owner-simple-review{border:2px solid #d8e0e6;border-radius:14px;padding:13px;background:#f8fafb}
+    #view-owner .owner-simple-review.ready{border-color:#82c39a;background:#eff9f2}
+    #view-owner .owner-simple-review.pending{border-color:#e2b353;background:#fff9e9}
+    #view-owner .owner-simple-review h3{margin:0!important;font-size:16px!important;color:#152838!important}
+    #view-owner .owner-simple-review p{margin:4px 0 0;color:#617481;font-size:10px;line-height:1.4}
+    #view-owner .owner-simple-review-list{display:grid;gap:6px;margin-top:9px}
+    #view-owner .owner-simple-review-list div{display:flex;align-items:flex-start;gap:7px;padding:8px 9px;border-radius:9px;background:#fff;color:#4c6070;font-size:10px;font-weight:750}
+    #view-owner .owner-simple-review-list i{font-style:normal;color:#b06e00;font-weight:950}
+    #view-owner .owner-simple-summary{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+    #view-owner .owner-simple-summary span{padding:6px 8px;border:1px solid #d7e0e6;border-radius:999px;background:#fff;color:#435867;font-size:8px;font-weight:900}
+    #view-owner .owner-simple-assign{width:100%;min-height:58px!important;margin-top:10px!important;border-radius:999px!important;font-size:15px!important;font-weight:950!important}
+    #view-owner #ownerAssignDraftStatus{padding:7px 10px;border-radius:9px;background:#edf5fb;color:#426177;font-weight:750}
+    #view-owner #ownerAssignParts .wl-owner-equipment-qty{border-radius:11px!important}
+    #view-owner #ownerAssignParts .wl-owner-equipment-qty input{min-height:42px!important;font-size:15px!important;font-weight:900!important}
+    @media(max-width:720px){
+      #view-owner .owner-simple-pills{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #view-owner .owner-simple-step{padding:12px}
+    }
+
     /* Classic Owner dashboard restore v86 */
     #view-owner #ownerCompactShell,
     #view-owner .ownerFeaturePage,
@@ -4225,7 +4259,7 @@ document.addEventListener('click', async e => {
   const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
-  if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('.wl-tech-pill')?.remove(); ownerSaveAssignDraftNow(); return; }
+  if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('.wl-tech-pill')?.remove(); ownerSaveAssignDraftNow(); ownerAIReview(); return; }
   if(e.target.closest('[data-wl-offline-start]')) return showOfflineUnitForm();
   if(e.target.closest('[data-wl-offline-submit]')) return submitOfflineUnitForm();
   const offlineItSave=e.target.closest('[data-wl-offline-it-save]'); if(offlineItSave)return saveOfflineITDecision(offlineItSave.dataset.wlOfflineItSave);
@@ -5310,46 +5344,72 @@ async function installOwnerAssignments(force = false) {
       <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
-      <div class='warn manualReferenceNotice'>
-        <b>MHelpDesk is separate from Tech Check.</b>
-        <div class='small'>Use the current MHelpDesk ticket as the source of truth every time. Enter the MHelpDesk reference, unit count, equipment, and work exactly as shown there. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
-      </div>
-      <div id='ownerAssignDraftStatus' class='small top8'>Draft autosaves as you type. You can leave this screen and come back without losing it.</div>
-      <div class='ownerWorkflowFirst'>
-        <div class='qtext'>1. What kind of MHelpDesk job is this?</div>
-        <div class='grid top8'>
-          <div><label>Job Type</label><select id='ownerAssignWorkType'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select></div>
-          <div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;-webkit-appearance:none;appearance:none;'><label class='top8'>Work Time <span class='small'>(optional)</span></label><input id='ownerAssignTime' type='time' step='900' style='display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;'></div>
+      <div class='owner-simple-intro'><b>Copy the MHelpDesk job here.</b> Tech Check will save your draft automatically. MHelpDesk itself is not changed.</div>
+      <div id='ownerAssignDraftStatus' class='small'>Draft autosaves as you type. You can leave this screen and come back without losing it.</div>
+
+      <section class='owner-simple-step'>
+        <div class='owner-simple-step-head'><span class='owner-simple-step-num'>1</span><div><b>Job</b><span>What is it, where is it, and when?</span></div></div>
+        <div class='owner-simple-pills'>
+          <button type='button' data-owner-work-pill='delivery'>Delivery</button>
+          <button type='button' data-owner-work-pill='pickup'>Pickup</button>
+          <button type='button' data-owner-work-pill='swap'>Swap</button>
+          <button type='button' data-owner-work-pill='service'>Service</button>
         </div>
-        <div id='ownerFlowHint' class='small top8'>Choose the job type first. The equipment and department flow below will update for that job.</div>
-      </div>
-      <div class='grid top10'>
-        <div><label>MHelpDesk Reference #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Reference / ticket #'></div>
-        <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
-      </div>
-      <div class='grid top10'>
-        <div><label>Job Description</label><input id='ownerAssignDescription' placeholder='What needs to be done?'></div>
-        <div><label>Owner Notes <span class='small'>(optional)</span></label><input id='ownerAssignNotes' placeholder='Anything else the tech should know'></div>
-      </div>
-      <div id='ownerAssignParts' class='wl-ticket-parts-setup top10'>
-        <div class='qtext' id='ownerEquipmentTotalHeading'>Total Equipment Required</div>
-        <div class='small' id='ownerEquipmentTotalHelp'>Enter the total quantity of each equipment type for this job. Enter the specific MHelpDesk equipment numbers below.</div>
-        ${ownerEquipmentManifestInputsHtml()}
-        <div class='wl-equipment-number-block top10'>
-  <div class='wl-requirement-heading'>Equipment Numbers (from MHelpDesk)</div>
-  <div class='small'>Enter the actual unit and stand / solar stand / pole numbers from MHelpDesk once. No need to repeat them in the job description.</div>
-  <div class='wl-equipment-number-grid top8'>
-    <div><label>Unit #s</label><input id='ownerAssignUnitNumbers' placeholder='e.g. 058, 103, 221, 390'></div>
-    <div><label>Stand / Solar Stand / Pole #s</label><input id='ownerAssignStandNumbers' placeholder='e.g. 047, 050, SS-12, SP-4'></div>
-  </div>
-</div><div id='ownerAutoServicePlan' class='hidden'></div>
-        <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
-      </div>
-      <div class='grid top10'>
-        <div><label>Assign Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
-        <div><label>Assign Technician(s)</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small'>Choose one tech, tap +, then add another if needed. Leave blank for the department queue.</div></div>
-      </div>
-      <div id='ownerAIReviewBox' class='wl-ai-panel hidden top10'></div><div class='owner-ai-actions'><button type='button' class='btn wl-ai-review-btn' data-owner-ai-review>✨ AI Review Before Assigning</button><button class='btn ownerDispatchButton' data-wl-owner-assign>Assign Tech Check Job</button></div>
+        <select id='ownerAssignWorkType' class='owner-simple-hidden-select' aria-label='Job type'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select>
+        <div class='grid'>
+          <div><label>MHelpDesk #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='Ticket #'></div>
+          <div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site'></div>
+        </div>
+        <div class='grid top10'>
+          <div><label>What needs to be done?</label><input id='ownerAssignDescription' placeholder='Short job description'></div>
+          <div><label>Owner note <span class='small'>(optional)</span></label><input id='ownerAssignNotes' placeholder='Anything important for the tech'></div>
+        </div>
+        <div class='grid top10'>
+          <div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div>
+          <div class='ownerWorkDateField'><label>Work Time <span class='small'>(optional)</span></label><input id='ownerAssignTime' type='time' step='900'></div>
+        </div>
+        <div id='ownerFlowHint' class='small top8'></div>
+      </section>
+
+      <section class='owner-simple-step'>
+        <div class='owner-simple-step-head'><span class='owner-simple-step-num'>2</span><div><b>Equipment & Parts</b><span>Only enter what this job actually needs.</span></div></div>
+        <div id='ownerAssignParts' class='wl-ticket-parts-setup'>
+          <div class='qtext' id='ownerEquipmentTotalHeading'>Equipment</div>
+          <div class='small' id='ownerEquipmentTotalHelp'>Choose the equipment type and quantity from MHelpDesk.</div>
+          ${ownerEquipmentManifestInputsHtml()}
+          <div class='wl-equipment-number-block top10'>
+            <div class='wl-requirement-heading'>Equipment Numbers</div>
+            <div class='small'>Enter the unit/stand numbers if MHelpDesk lists them.</div>
+            <div class='wl-equipment-number-grid top8'>
+              <div><label>Unit #s</label><input id='ownerAssignUnitNumbers' placeholder='058, 103, 221'></div>
+              <div><label>Stand / Solar Stand / Pole #s</label><input id='ownerAssignStandNumbers' placeholder='047, SS-12, SP-4'></div>
+            </div>
+          </div>
+          <div id='ownerAutoServicePlan' class='hidden'></div>
+          <div class='wl-requirement-section'><div class='wl-requirement-heading'>Extra Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
+        </div>
+      </section>
+
+      <section class='owner-simple-step'>
+        <div class='owner-simple-step-head'><span class='owner-simple-step-num'>3</span><div><b>Who gets it?</b><span>Choose the workflow. Tech Check controls when each department can see the job.</span></div></div>
+        <div class='owner-simple-pills role-pills'>
+          <button type='button' data-owner-role-pill='it'>IT only<small>IT does the work</small></button>
+          <button type='button' data-owner-role-pill='service'>Service only<small>Service does the work</small></button>
+          <button type='button' data-owner-role-pill='it_service'>IT → Service<small>IT first, then handoff</small></button>
+          <button type='button' data-owner-role-pill='service_it'>Service → IT<small>Service first, then IT</small></button>
+        </div>
+        <select id='ownerAssignRole' class='owner-simple-hidden-select' aria-label='Department flow'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select>
+        <label>Technician <span class='small'>(optional — leave blank for department queue)</span></label>
+        <div id='ownerAssignedTechPills' class='wl-tech-pills'></div>
+        <div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div>
+        <div id='ownerAssignTechHint' class='small top8'></div>
+      </section>
+
+      <section class='owner-simple-step'>
+        <div class='owner-simple-step-head'><span class='owner-simple-step-num'>4</span><div><b>Review & Assign</b><span>Tech Check tells you only what is still missing.</span></div></div>
+        <div id='ownerAIReviewBox' class='owner-simple-review pending'></div>
+        <button class='btn ownerDispatchButton owner-simple-assign' data-wl-owner-assign>Assign Job →</button>
+      </section>
     </div>`;
 
   liveHost.innerHTML = `
@@ -5412,7 +5472,9 @@ async function installOwnerAssignments(force = false) {
   if(!ownerRestoreAssignDraft()){
     refreshOwnerAutoServicePlan();
     refreshOwnerWorkTypeLabels();
+    ownerAIReview();
   }
+  if(host.open)liveHost.open=false;
   organizeOwnerDashboard();
   syncOwnerCompactDashboard();
 }
@@ -5588,6 +5650,7 @@ function ownerRestoreAssignDraft(){
     }
     refreshOwnerWorkTypeLabels();
     refreshOwnerAutoServicePlan();
+    ownerAIReview();
     const when=d.saved_at?new Date(d.saved_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'earlier';
     ownerAssignDraftStatus('Draft restored automatically · last saved '+when);
     return true;
@@ -5603,7 +5666,7 @@ function addOwnerTechPill() {
   const label=select.options[select.selectedIndex]?.textContent?.trim() || 'Technician';
   const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id;
   pill.innerHTML=`<span>${esc(label)}</span><button type='button' data-owner-remove-tech aria-label='Remove ${esc(label)}'>×</button>`;
-  pills.appendChild(pill); select.value=''; ownerSaveAssignDraftNow();
+  pills.appendChild(pill); select.value=''; ownerSaveAssignDraftNow(); ownerAIReview();
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
@@ -5626,6 +5689,7 @@ function refreshOwnerAssignmentTechOptions() {
 }
 function refreshOwnerWorkTypeLabels() {
   const type = document.getElementById('ownerAssignWorkType')?.value || 'service';
+  syncOwnerSimplePills();
   const pickup = type === 'pickup';
   const swap = type === 'swap';
   const delivery = type === 'delivery';
@@ -6547,24 +6611,49 @@ async function openOwnerAIDispatch() {
   document.querySelector('.ownerAIDispatchPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 }
 function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',scheduled_for:document.getElementById('ownerAssignDate')?.value||'',scheduled_time:document.getElementById('ownerAssignTime')?.value||'',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
+function syncOwnerSimplePills(){
+  const work=document.getElementById('ownerAssignWorkType')?.value||'service';
+  const role=document.getElementById('ownerAssignRole')?.value||'it';
+  document.querySelectorAll('[data-owner-work-pill]').forEach(b=>b.classList.toggle('selected',b.dataset.ownerWorkPill===work));
+  document.querySelectorAll('[data-owner-role-pill]').forEach(b=>b.classList.toggle('selected',b.dataset.ownerRolePill===role));
+}
 function ownerAIReview(){
-  const a=ownerAIDraft(),x=techCheckAIAnalysis(a,'owner'),issues=[...x.warnings],role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it';
+  const a=ownerAIDraft(),role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it',issues=[];
+  const manifest=normalizedEquipmentManifest(a.equipment_manifest||[]);
+  const deviceCount=equipmentManifestDeviceTotal(manifest),standCount=equipmentManifestStandTotal(manifest);
+  const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean);
+  const sn=(document.getElementById('ownerAssignStandNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean);
+  const parts=readTicketPartInputs('ownerPart');
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
-  if(!a.site)issues.push('Customer / Site is blank.');
-  if(!a.job_description)issues.push('Job description is missing.');
-  if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Assign it to Service or Service + IT.');
-  if(type==='pickup'&&role==='it_service')issues.push('Pickup will be forced to Service first, then IT Intake.');
-  if((role==='it'||dual)&&!x.equipment.length)issues.push('IT is included but no equipment quantity is listed.');
-  const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),
-        sn=(document.getElementById('ownerAssignStandNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),
-        dt=equipmentManifestDeviceTotal(a.equipment_manifest),st=equipmentManifestStandTotal(a.equipment_manifest);
-  if(dt&&un.length&&dt!==un.length)issues.push('Device quantity is '+dt+' but '+un.length+' unit numbers are entered.');
-  if(st&&sn.length&&st!==sn.length)issues.push('Stand quantity is '+st+' but '+sn.length+' stand/pole numbers are entered.');
+  if(!a.job_description)issues.push('Add a short description of what needs to be done.');
+  if(type==='pickup'&&role==='it')issues.push('Pickup must start with Service. Choose Service only or Service → IT.');
+  if((role==='it'||dual)&&deviceCount+standCount<1)issues.push('Choose the equipment IT will work on in Step 2.');
+  const autoSolarPlan=automaticServiceSolarPlan(manifest,type);
+  if(autoSolarPlan.spotters>0&&manifestQty(manifest,'Solar Stand')>0)issues.push('Remove Solar Stand from the IT list. Service gets it automatically after the IT handoff.');
+  if(deviceCount&&un.length&&deviceCount!==un.length)issues.push('The unit quantity and the number of Unit #s do not match.');
+  if(standCount&&sn.length&&standCount!==sn.length)issues.push('The stand quantity and the number of Stand #s do not match.');
   const box=document.getElementById('ownerAIReviewBox');if(!box)return;
-  box.classList.remove('hidden');
-  box.classList.toggle('is-ready',issues.length===0);
-  box.classList.toggle('is-pending',issues.length>0);
-  box.innerHTML=`<div class='wl-ai-result-head'><div class='wl-ai-brand-title'><span class='wl-ai-brand-icon small'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><span><small>ONSITE VISION</small><b>Preflight Review</b></span></div><span class='wl-ai-state ${issues.length?'pending':'ready'}'>${issues.length?'PENDING':'READY'}</span></div><div class='wl-ai-preflight-summary'><b>MHelpDesk #${esc(a.ticket_no||'—')}</b><span>${esc(type.toUpperCase())}</span></div>${x.equipment.length?`<div class='wl-ai-line'><b>Equipment:</b> ${esc(x.equipment.join(', '))}</div>`:''}<div class='wl-ai-line'><b>Expected flow:</b> ${type==='pickup'?'Service → field pickup → IT Intake':role==='it_service'?'IT → Service handoff':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only'}</div>${issues.length?`<div class='wl-ai-pending-box'><b>Pending review</b>${issues.map(v=>'<span>⚠ '+esc(v)+'</span>').join('')}</div>`:`<div class='wl-ai-good'>✓ Ticket setup looks consistent with the selected workflow.</div>`}<div class='wl-ai-advisory'>OnSite Vision Preflight is advisory only. It does not change or send the ticket.</div>`;
+  box.classList.remove('hidden','is-ready','is-pending');
+  box.classList.toggle('ready',issues.length===0);
+  box.classList.toggle('pending',issues.length>0);
+  const flow=type==='pickup'?'Service pickup → IT Intake':role==='it_service'?'IT → Service':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only';
+  const equipmentText=manifest.length?manifest.map(r=>r.qty+' × '+equipmentDisplayLabel(r.label)).join(', '):'No equipment selected';
+  const partTotal=Object.values(parts).reduce((sum,v)=>sum+Number(v||0),0);
+  const summary=[
+    type.toUpperCase(),
+    flow,
+    equipmentText,
+    partTotal?partTotal+' extra part'+(partTotal===1?'':'s'):null
+  ].filter(Boolean);
+  box.innerHTML=issues.length
+    ? `<h3>${issues.length===1?'Almost done — one thing left':'Almost done — '+issues.length+' things left'}</h3><p>Fix the item${issues.length===1?'':'s'} below, then assign the job.</p><div class='owner-simple-review-list'>${issues.slice(0,4).map(v=>'<div><i>→</i><span>'+esc(v)+'</span></div>').join('')}</div><div class='owner-simple-summary'>${summary.map(v=>'<span>'+esc(v)+'</span>').join('')}</div>`
+    : `<h3>✓ Ready to assign</h3><p>Everything Tech Check needs is here.</p><div class='owner-simple-summary'>${summary.map(v=>'<span>'+esc(v)+'</span>').join('')}</div>`;
+  const assign=document.querySelector('[data-wl-owner-assign]');
+  if(assign){
+    assign.textContent=issues.length?'Fix the item'+(issues.length===1?'':'s')+' above':'Assign Job →';
+    assign.classList.toggle('wl-gray',issues.length>0);
+    assign.classList.toggle('wl-red',issues.length===0);
+  }
 }
 async function ownerAssignJob() {
   const ticket = document.getElementById('ownerAssignTicket')?.value.trim() || '';
@@ -6856,6 +6945,18 @@ document.addEventListener('click', async e => {
       if(form){form.dataset.ownerExplicitOpen='1';form.open=true;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
       return;
     }
+    const ownerWorkPill=e.target.closest('[data-owner-work-pill]');
+    if(ownerWorkPill){
+      const input=document.getElementById('ownerAssignWorkType');
+      if(input){input.value=ownerWorkPill.dataset.ownerWorkPill||'service';input.dataset.ownerConfirmed='1';refreshOwnerWorkTypeLabels();refreshOwnerAutoServicePlan();refreshOwnerAssignmentTechOptions();ownerSaveAssignDraftNow();ownerAIReview();}
+      return;
+    }
+    const ownerRolePill=e.target.closest('[data-owner-role-pill]');
+    if(ownerRolePill){
+      const input=document.getElementById('ownerAssignRole');
+      if(input){input.value=ownerRolePill.dataset.ownerRolePill||'it';input.dataset.ownerConfirmed='1';refreshOwnerAssignmentTechOptions();syncOwnerSimplePills();ownerSaveAssignDraftNow();ownerAIReview();}
+      return;
+    }
     if (e.target.closest('[data-owner-compact-attention]')) {
       ownerShowGroup('Jobs');
       const card=document.getElementById('ownerAttentionCard');
@@ -6876,14 +6977,17 @@ document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
-  if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) ownerSaveAssignDraftNow();
+  if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();}
 });
 
-document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) ownerSaveAssignDraftNow(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();} if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if(e.target?.id==='wlOfflineKnownUnit'){const card=document.getElementById('wlOfflineUnitForm');let units=[];try{units=JSON.parse(card?.dataset.units||'[]');}catch{}const u=units[Number(e.target.value)]||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};set('wlOfflineTicket',u.ticket_no);set('wlOfflineSite',u.site);set('wlOfflineUnit',u.unit_tag);set('wlOfflineType',u.equipment_type);} if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
-document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
+document.addEventListener('toggle', e => {
+  if(e.target?.id==='ownerJobAssignments'&&e.target.open){const live=document.getElementById('ownerLiveJobProgress');if(live)live.open=false;}
+  if(e.target?.id==='ownerLiveJobProgress'&&e.target.open){const create=document.getElementById('ownerJobAssignments');if(create)create.open=false;}
+  const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
 let ownerRefreshTimer=null;
 let ownerRefreshInFlight=false;
 let ownerRefreshQueued=false;
