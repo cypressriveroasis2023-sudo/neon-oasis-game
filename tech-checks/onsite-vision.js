@@ -1170,6 +1170,9 @@ function historyIntent(raw){
   if(!historyCue(text))return null;
   const unit=unitHint(text);
   if(unit)return{kind:'unit',value:unit.type+' '+unit.tag,unit};
+  if(/\b(?:this|that)\s+unit\b/i.test(text)&&state.currentUnitReference){
+    return{kind:'unit',value:String(state.currentUnitReference)};
+  }
   const tech=findTech(text);
   if(tech&&/\b(tech|technician|worked|history|previous|past)\b/i.test(text)){
     return{kind:'technician',value:tech.user_id||tech.full_name||tech.username,tech};
@@ -1289,6 +1292,17 @@ async function offlineEscalationHtml(raw){
     ticket_no:intent.ticket
   },{force:true,limit:100});
   const rows=Array.isArray(result?.rows)?result.rows:[];
+  if(rows.length===1){
+    const remembered=rows[0]||{};
+    if(remembered.unit_tag)state.currentUnitReference=[remembered.equipment_type,remembered.unit_tag].filter(Boolean).join(' ');
+    if(remembered.ticket_no){
+      state.currentTicket=String(remembered.ticket_no);
+      const current=ensureChat();
+      current.ticket=state.currentTicket;
+      saveChats();
+      renderOrder();
+    }
+  }
 
   if(!rows.length){
     let title='No unresolved offline-unit escalations are recorded right now.';
