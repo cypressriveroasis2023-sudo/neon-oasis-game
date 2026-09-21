@@ -413,179 +413,45 @@
         </section>
 
         <section id="view-owner" class="hidden">
-          <div id="ownerCommandCenter" class="ownerCommandCenter ownerWorkspace" aria-label="Owner Command Center">
-            <aside class="ownerWorkspaceRail">
-              <div class="ownerWorkspaceBrand"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>TECH CHECK</b><small>OWNER</small></span></div>
-              <button type="button" data-owner-command="today">Today</button>
-              <button type="button" data-owner-command="attention">Needs Attention</button>
-              <button type="button" data-owner-command="review">Owner Review</button>
-              <button type="button" data-owner-command="assign">Assign Job</button>
-              <button type="button" data-owner-command="team">Team</button>
-              <button type="button" data-owner-command="units">Units</button>
-              <button type="button" data-owner-command="handoffs">Handoffs</button>
-              <button type="button" data-owner-command="history">History</button>
-              <button type="button" data-owner-command="activity">Activity</button>
-              <button type="button" data-owner-command="accounts">Technician Accounts</button>
-            </aside>
-            <main class="ownerWorkspaceMain">
-              <div class="ownerWorkspaceTop"><div><span>OWNER COMMAND CENTER</span><h2>What do you need?</h2></div><span class="ownerWorkspaceLive">● LIVE</span></div>
-              <a class="ownerVisionPrompt" href="./onsite-vision.html">
-                <div class="ownerVisionOrb"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""></div>
-                <div><b>Ask OnSite Vision</b><span>Ask about jobs, technicians, equipment, returns, or create an assignment.</span></div>
-                <strong>Ask →</strong>
-              </a>
-              <div id="ownerCommandStats" class="ownerCommandStats ownerWorkspaceStats" aria-live="polite">
-                <button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button>
-                <button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button>
-                <button type="button" data-owner-command="review"><span>Owner Review</span><b>—</b><small>ready</small></button>
-                <button type="button" data-owner-command="team"><span>Team</span><b>—</b><small>active techs</small></button>
-              </div>
-              <div class="ownerWorkspaceActions">
-                <button type="button" class="primary" data-owner-command="assign">+ CREATE / ASSIGN JOB</button>
-                <button type="button" data-owner-command="units">SEARCH UNIT</button>
-                <button type="button" data-owner-command="handoffs">HANDOFFS</button>
-                <button type="button" data-owner-command="activity">ACTIVITY</button>
-              </div>
-            </main>
-          </div>
-          <div id="ownerWorkspaceContent" class="ownerWorkspaceContent">          <details id="ownerTechOverviewCard" class="card ownerDashSection ownerTechOverviewCard" open>
-            <summary class="ownerDashSummary"><div><b>Today & Team Board</b><span>Daily schedule, inspections, assignments, and equipment by technician</span></div><span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span></summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>TODAY</span><h1>Today & Team</h1><p>See today’s work, who has each job, and what is waiting.</p></div><div id="ownerTechOverview"><div class="small">Loading today’s team board…</div></div></div>
-          </details>
-          <details id="ownerAttentionCard" class="card ownerDashSection ownerAttentionCard">
-            <summary class="ownerDashSummary">
-              <div><b>Needs Attention</b><span>Owner actions, blocked work, and overdue items</span></div>
-              <span id="ownerAttentionBadge" class="ownerDashBadge">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>OWNER ACTION</span><h1>Needs Attention</h1><p>Only the items that need you right now.</p></div><div id="ownerAttention"></div></div>
-          </details>
+  <div id="ownerApp" class="ownerAppShell">
+    <aside class="ownerAppSidebar" aria-label="Owner navigation">
+      <div class="ownerAppBrand"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>TECH CHECK</b><small>OWNER</small></span></div>
+      <nav>
+        <button type="button" data-owner-route="today">Today</button>
+        <button type="button" data-owner-route="attention">Needs Attention</button>
+        <button type="button" data-owner-route="review">Owner Review</button>
+        <button type="button" data-owner-route="assign">Assign Job</button>
+        <button type="button" data-owner-route="team">Team</button>
+        <button type="button" data-owner-route="units">Units</button>
+        <button type="button" data-owner-route="handoffs">Handoffs</button>
+        <button type="button" data-owner-route="history">History</button>
+        <button type="button" data-owner-route="activity">Activity</button>
+        <button type="button" data-owner-route="accounts">Technician Accounts</button>
+      </nav>
+      <div class="ownerAppSidebarUtility">
+        <a href="./onsite-vision.html">OnSite Vision</a>
+        <button type="button" onclick="refreshData()">Refresh</button>
+        <button type="button" onclick="logout()">Sign Out</button>
+      </div>
+    </aside>
+    <main class="ownerAppWorkspace">
+      <div id="ownerAppPage" class="ownerAppPage" aria-live="polite"><div class="ownerAppEmpty"><b>Loading Owner workspace…</b></div></div>
+    </main>
+  </div>
 
-          <details id="ownerReviewCard" class="card ownerDashSection ownerReviewCard">
-            <summary class="ownerDashSummary">
-              <div><b>Ready for Owner Review</b><span>Complete workflow overview, final closeout, or return for correction</span></div>
-              <span id="ownerReviewBadge" class="ownerDashBadge neutral">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>FINAL REVIEW</span><h1>Owner Review</h1><p>Review completed work, corrections, and final closeout.</p></div>
-              <div id="ownerReviewQueue"><div class="small">Loading Owner Review queue…</div></div>
-            </div>
-          </details>
-
-          <details id="ownerCompanyHistoryCard" class="card ownerDashSection ownerCompanyHistoryCard">
-            <summary class="ownerDashSummary">
-              <div><b>Company History</b><span>Permanent Technician, Unit, and Customer / Site history</span></div>
-              <span class="ownerDashBadge neutral">HISTORY</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>PERMANENT RECORD</span><h1>History</h1><p>Search technician, unit, customer, and site history.</p></div>
-              <div class="ownerHistorySearch">
-                <label><span>History type</span><select id="ownerCompanyHistoryKind" onchange="ownerCompanyHistoryKindChanged()"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select></label>
-                <label class="ownerHistoryQuery"><span>Search</span><input id="ownerCompanyHistoryQuery" placeholder="Technician name or username" onkeydown="if(event.key==='Enter'){event.preventDefault();ownerCompanyHistorySearch()}"></label>
-                <button class="btn" type="button" onclick="ownerCompanyHistorySearch()">Search History</button>
-              </div>
-              <div class="small top8">History is built automatically from recorded Tech Check activity and remains after job closeout or inventory return.</div>
-              <div id="ownerCompanyHistoryResults" class="ownerCompanyHistoryResults"><div class="small">Choose a history type and search by technician, unit number, or exact customer / site name.</div></div>
-            </div>
-          </details>
-
-          <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
-            <summary class="ownerDashSummary">
-              <div><b>Assign Job to Tech</b><span>Create and manage technician assignments</span></div>
-              <span id="ownerAssignmentBadge" class="ownerDashBadge">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>DISPATCH</span><h1>Create / Assign Job</h1><p>Create the Tech Check job that matches your MHelpDesk ticket and assign the first department.</p></div><div class="small">Loading active technicians and assignments…</div></div>
-          </details>
-
-          <details id="ownerUnitStatusCard" class="card ownerDashSection">
-            <summary class="ownerDashSummary">
-              <div><b>Unit Status & Search</b><span>Find a unit, ticket, status, or last technician</span></div>
-              <span id="ownerUnitStatusBadge" class="ownerDashBadge neutral">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>EQUIPMENT</span><h1>Units</h1><p>Find a unit and immediately see where it is, who has it, and its latest status.</p></div>
-              <input id="ownerUnitSearch" type="search" placeholder="Search Unit 008, MHelpDesk #, Helios, deployed…" oninput="renderOwnerUnitSearch()" />
-              <div id="ownerUnitSearchResults"></div>
-            </div>
-          </details>
-
-          <details id="ownerHandoffsCard" class="card ownerDashSection">
-            <summary class="ownerDashSummary">
-              <div><b>Equipment Handoffs</b><span>IT prep, Service checkout, and completed history</span></div>
-              <span id="ownerHandoffsBadge" class="ownerDashBadge">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>IT → SERVICE</span><h1>Handoffs</h1><p>See equipment being prepared, waiting for acceptance, physically verified, or completed.</p></div>
-              <div id="ownerPrepSummary"></div>
-              <div id="ownerPrepStatus"></div>
-              <details class="ownerHistoryFold"><summary>Completed Equipment History <span id="ownerPrepHistoryCount" class="pill">0</span></summary><div id="ownerPrepHistory"></div></details>
-            </div>
-          </details>
-
-          <details id="ownerActivityCard" class="card ownerDashSection">
-            <summary class="ownerDashSummary">
-              <div><b>Recent Activity</b><span>Newest technician activity and reports</span></div>
-              <span id="ownerActivityBadge" class="ownerDashBadge neutral">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>COMPANY LOG</span><h1>Activity</h1><p>See the newest technician actions and recorded Tech Check events.</p></div>
-              <div class="small">The newest technician activity appears first. Use Show More only when you need older records.</div>
-              <div id="reports"></div>
-              <button id="ownerReportsMore" class="mini top8 hidden" type="button">Show More Activity</button>
-            </div>
-          </details>
-
-          <details id="ownerAccountsCard" class="card ownerDashSection">
-            <summary class="ownerDashSummary">
-              <div><b>Technician Accounts</b><span>Create logins, manage access, and review resets</span></div>
-              <span id="ownerAccountsBadge" class="ownerDashBadge neutral">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="ownerModuleHead"><span>ACCESS</span><h1>Technician Accounts</h1><p>Create technician logins and manage access from one place.</p></div>
-              <div class="small">
-                Only the Owner can create or change technician access. Techs sign
-                in with their own username and password. No company email address
-                is required.
-              </div>
-              <h3>Create Technician</h3>
-              <div class="grid4">
-                <div>
-                  <label>Full Name</label
-                  ><input id="newTechName" placeholder="Technician name" />
-                </div>
-                <div>
-                  <label>Username</label
-                  ><input
-                    id="newTechUsername"
-                    type="text"
-                    autocapitalize="none"
-                    spellcheck="false"
-                    placeholder="Username"
-                  />
-                </div>
-                <div>
-                  <label>Role</label
-                  ><select id="newTechRole">
-                    <option value="service">Service Tech</option>
-                    <option value="it">IT Technician</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Temporary Password</label
-                  ><input
-                    id="newTechPassword"
-                    type="password"
-                    placeholder="8+ characters"
-                  />
-                </div>
-              </div>
-              <button class="btn" onclick="createTech()">
-                Create Technician Login
-              </button>
-              <div id="userMessage"></div>
-              <div class="sep"></div>
-              <h3>Password Reset Requests</h3>
-              <div class="small">Techs can request a reset without exposing a private password. Approve a request and the system will issue a one-time temporary password back to the requesting device.</div>
-              <div id="passwordResetRequests"></div>
-              <div class="sep"></div>
-              <h3>Current Users</h3>
-              <div id="userList"></div>
-            </div>
-          </details></div>
-        </section>
+  <div id="ownerLegacyMounts" class="ownerLegacyMounts" aria-hidden="true">
+    <div id="ownerCommandCenter"></div><div id="ownerCommandStats"></div><div id="ownerWorkspaceContent"></div>
+    <details id="ownerTechOverviewCard"><div id="ownerTechOverview"></div><span id="ownerTechOverviewBadge"></span></details>
+    <details id="ownerAttentionCard"><div id="ownerAttention"></div><span id="ownerAttentionBadge"></span></details>
+    <details id="ownerReviewCard"><div id="ownerReviewQueue"></div><span id="ownerReviewBadge"></span></details>
+    <details id="ownerCompanyHistoryCard"><select id="ownerCompanyHistoryKind"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select><input id="ownerCompanyHistoryQuery"><div id="ownerCompanyHistoryResults"></div></details>
+    <details id="ownerJobAssignments"><span id="ownerAssignmentBadge"></span></details>
+    <details id="ownerUnitStatusCard"><span id="ownerUnitStatusBadge"></span><input id="ownerUnitSearch"><div id="ownerUnitSearchResults"></div></details>
+    <details id="ownerHandoffsCard"><span id="ownerHandoffsBadge"></span><div id="ownerPrepSummary"></div><div id="ownerPrepStatus"></div><span id="ownerPrepHistoryCount"></span><div id="ownerPrepHistory"></div></details>
+    <details id="ownerActivityCard"><span id="ownerActivityBadge"></span><div id="reports"></div><button id="ownerReportsMore"></button></details>
+    <details id="ownerAccountsCard"><span id="ownerAccountsBadge"></span><input id="newTechName"><input id="newTechUsername"><select id="newTechRole"><option value="service">Service</option><option value="it">IT</option></select><input id="newTechPassword"><div id="userMessage"></div><div id="passwordResetRequests"></div><div id="userList"></div></details>
+  </div>
+</section>
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
