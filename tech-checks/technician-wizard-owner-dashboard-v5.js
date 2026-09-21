@@ -3555,11 +3555,9 @@ async function showSvcHome() {
     const issue=actionableOffline[0];
     nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Continue Offline Unit / IT Troubleshooting</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Keep the issue open until IT records the decision. If IT authorized the backup, use the action in the Field Issue card below.</div></div>`;
   }else if(readyAssignments.length){
-    const next=readyAssignments[0];
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-service-open-job>Verify Exact Ticket & Open →</button></div>`;
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>ENTER MHELPDESK #</b><div class='small'>Service jobs stay hidden until you enter the exact ticket number.</div><button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>`;
   }else if(waitingHandoffAssignments.length){
-    const waiting=waitingHandoffAssignments[0];
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Waiting for IT handoff — MHelpDesk #${esc(waiting.ticket_no)}</b><div class='small'>${esc(waiting.site||'No customer / site')}. The job stays visible here; Service cannot take the equipment until IT creates the handoff.</div></div>`;
+    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>ENTER MHELPDESK #</b><div class='small'>If IT has not completed the handoff yet, Tech Check will tell you after the exact ticket is entered.</div><button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>`;
   }else if(truckSpareCount){
     nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DAY CLOSEOUT</div><b>Resolve ${truckSpareCount} truck spare${truckSpareCount===1?'':'s'}</b><div class='small'>Mark each backup used or return it unused through IT Intake; check in spare batteries below.</div></div>`;
   }else{
@@ -3599,8 +3597,8 @@ async function showSvcHome() {
     </div>
 
     <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Today’s Tasks</b><span>${commandAssignments.length} open</span></div>
-      ${commandAssignments.length?commandAssignments.map(assignmentCard).join(''):"<div class='ok'><b>✓ No due, overdue, or unscheduled Service jobs.</b></div>"}
+      <div class='wl-svc-command-section-head'><b>Service Jobs</b><span>Ticket required</span></div>
+      <div class='wl-question'><div class='qtext'>ENTER MHELPDESK # TO OPEN A JOB</div><button class='wl-big wl-blue top10' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>
     </div>
 
     ${activeOffline.length?fieldEscalationServiceHtml(offlineRows):''}
