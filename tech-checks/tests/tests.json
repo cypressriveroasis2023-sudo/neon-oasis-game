@@ -2410,7 +2410,56 @@
         "Other equipment retains the normal tag and IT Intake return controls",
         "Rollback QA leaves no return, registry, or report residue"
       ]
+    },
+    {
+      "id": "VISION-DRAFT-Q8-Q9-01",
+      "area": "OnSite Vision · guided ticket builder",
+      "role": "owner",
+      "mode": "source + state-machine regression",
+      "destructive": false,
+      "scenario": "Accepted Question 8 work description advances to Question 9 even when the same sentence mentions replacement parts",
+      "steps": [
+        "Start a SWAP draft through Question 8 with MHelpDesk #22825-style context: site, schedule, 1 Ranger, and equipment-number step already answered",
+        "Answer Question 8 exactly: Swap the Ranger unit swap the solar panel swap the battery.",
+        "Verify the exact answer persists as job_description",
+        "Verify solar_panel_qty=1 and battery_replacement_qty=1 may be prefilled from the instruction",
+        "Verify parts_answered remains false and the next missing field is parts / Question 9",
+        "Confirm the prefilled parts at Question 9 and continue through assignment and notes",
+        "Verify all earlier answers remain present through final review"
+      ],
+      "expected": [
+        "Question 8 never renders again after the accepted answer",
+        "Question 9 is the next guided question rather than Question 10",
+        "Detected parts are helpful prefill only until Question 9 is explicitly confirmed",
+        "The 11-question flow reaches final review without losing prior answers or duplicating the draft state"
+      ]
+    },
+    {
+      "id": "OWNER-VISION-ALERT-LIFECYCLE-01",
+      "area": "Owner Command Center · OnSite Vision alerts",
+      "role": "owner",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "Vision alerts persist from detection through acknowledgement and resolution and remain in Needs Attention while active",
+      "steps": [
+        "Create a rollback-only active Vision alert as the authenticated Owner with acknowledged_at null",
+        "Verify the detected alert is readable only through Owner-authorized RLS",
+        "Acknowledge the same active row rather than creating a duplicate alert",
+        "Verify acknowledgement does not mark the alert resolved",
+        "Resolve the alert only after the live workflow condition clears",
+        "Verify the resolved row remains in permanent alert history",
+        "Verify the Owner Command Center receives active Vision alerts and includes them in Needs Attention whether acknowledged or not",
+        "Rollback the database QA row and confirm zero QA residue"
+      ],
+      "expected": [
+        "A detected alert is recorded before acknowledgement",
+        "Only one unresolved instance exists for the same assignment and alert key",
+        "Acknowledged active alerts stay visible until resolved",
+        "Resolved alerts remain auditable history",
+        "The top Owner Needs Attention count includes active Vision issues",
+        "Rollback QA leaves no synthetic alert records"
+      ]
     }
   ],
-  "last_release_qa_note": "Solar Pole retired end-to-end at Owner request. Removed from shared rules, Company Brain, Owner/IT/Service UI, Vision catalog, app fallbacks, and active DB workflow functions. Database retirement triggers reject stale manifests/direct inserts. Rollback rejection tests pass with zero Solar Pole records. Edge v15 / rules v7 / knowledge v8 / technician v125 / Vision v25 / SW90 / migration 83."
+  "last_release_qa_note": "OnSite Vision guided draft Q8→Q9 regression fixed and verified against the current production parser/state machine. Exact Poco Loco Ranger/solar-panel/battery wording now persists as the work description, prefills parts without skipping Question 9, and the complete 11-question flow reaches review. Owner Vision alerts now use an Owner-only detected → acknowledged → resolved lifecycle, stay in Needs Attention until resolved, and preserve resolved history. Rollback alert QA left zero production residue."
 }
