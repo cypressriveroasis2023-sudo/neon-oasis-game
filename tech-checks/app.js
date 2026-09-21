@@ -567,8 +567,8 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
       db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
-      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
-      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
+      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,truck_12v_110ah_qty,truck_12v_110ah_charged,truck_litime_12v_100ah_qty,truck_litime_12v_100ah_charged,backup_unit_type,backup_unit_tag,backup_it_checkout_verified,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
+      db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,truck_12v_110ah_qty,truck_12v_110ah_charged,truck_litime_12v_100ah_qty,truck_litime_12v_100ah_charged,backup_unit_type,backup_unit_tag,backup_it_checkout_verified,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
       db.from('job_assignments').select('*').eq('scheduled_for',ownerDailyDate).order('assigned_at',{ascending:true}),
       db.from('unit_registry').select('unit_key,unit_tag,equipment_type,lifecycle_status,ticket_no,current_holder_name,last_event,updated_at').order('updated_at',{ascending:false}).limit(registryLimit),
       db.from('asset_inventory').select('*').order('asset_category',{ascending:true}).order('unit_tag',{ascending:true}),
@@ -1154,6 +1154,14 @@ function trailerComplete() {
   const boxes = [...document.querySelectorAll('.trailerBox')];
   return boxes.length === 7 && boxes.every(x => x.checked);
 }
+function truckLoadComplete() {
+  const qty110=Math.max(0,Number($('truck110Qty')?.value || 0));
+  const qtyLi=Math.max(0,Number($('truckLiTime100Qty')?.value || 0));
+  const backup=String($('truckBackupType')?.value || '');
+  return qty110>=4 && Boolean($('truck110Charged')?.checked)
+    && qtyLi>=2 && Boolean($('truckLiTime100Charged')?.checked)
+    && ['Spotter','Sniper','Solar Spotter'].includes(backup);
+}
 function toggleTrailer() {
   $('trailerArea').classList.toggle('hidden', !$('takingTrailer').checked);
   updateMorningStatus();
@@ -1170,6 +1178,13 @@ function updateMorningStatus() {
         ' still incomplete'
     );
   if (!truckComplete()) issues.push('Truck inspection incomplete');
+  const qty110=Math.max(0,Number($('truck110Qty')?.value || 0));
+  const qtyLi=Math.max(0,Number($('truckLiTime100Qty')?.value || 0));
+  if (qty110<4) issues.push('Need at least 4 × 12V 110Ah truck batteries');
+  if (!$('truck110Charged')?.checked) issues.push('Physically verify the 12V 110Ah batteries are charged');
+  if (qtyLi<2) issues.push('Need at least 2 × LiTime 12V 100Ah truck batteries');
+  if (!$('truckLiTime100Charged')?.checked) issues.push('Physically verify the LiTime 12V 100Ah batteries are charged');
+  if (!['Spotter','Sniper','Solar Spotter'].includes(String($('truckBackupType')?.value || ''))) issues.push('Choose the complete backup unit for today’s work');
   if (!trailerComplete()) issues.push('Trailer inspection incomplete');
   $('truckStatus').innerHTML = issues.length
     ? '<div class="warn"><b>Morning check not complete</b><div class="small">' +
@@ -1193,6 +1208,8 @@ async function submitMorning() {
     );
   if (!truckComplete())
     return msg('morningMessage', 'Complete all 8 truck checks.', 'bad');
+  if (!truckLoadComplete())
+    return msg('morningMessage', 'Verify the permanent truck battery minimum, confirm the batteries are charged, and choose today’s checked-out backup unit.', 'bad');
   if (!trailerComplete())
     return msg('morningMessage', 'Complete all 7 trailer checks.', 'bad');
   const truck = {};
@@ -1204,12 +1221,17 @@ async function submitMorning() {
     .querySelectorAll('.trailerBox')
     .forEach((x, i) => (trailer['trailer_' + (i + 1)] = x.checked));
   setBusy(true);
-  const { error } = await db.rpc('submit_morning_check', {
+  const { error } = await db.rpc('submit_morning_check_v2', {
     p_mhelp_reviewed: true,
     p_truck_checks: truck,
     p_taking_trailer: $('takingTrailer').checked,
     p_trailer_checks: trailer,
     p_closed_ticket_nos: state.sessionClosed,
+    p_truck_12v_110ah_qty: Math.max(0,Number($('truck110Qty')?.value || 0)),
+    p_truck_12v_110ah_charged: Boolean($('truck110Charged')?.checked),
+    p_truck_litime_12v_100ah_qty: Math.max(0,Number($('truckLiTime100Qty')?.value || 0)),
+    p_truck_litime_12v_100ah_charged: Boolean($('truckLiTime100Charged')?.checked),
+    p_backup_unit_type: String($('truckBackupType')?.value || ''),
   });
   setBusy(false);
   if (error) return msg('morningMessage', error.message, 'bad');
@@ -1229,6 +1251,11 @@ function resetMorningInputs() {
   document
     .querySelectorAll('.truckBox,.trailerBox')
     .forEach(x => (x.checked = false));
+  if ($('truck110Qty')) $('truck110Qty').value='';
+  if ($('truck110Charged')) $('truck110Charged').checked=false;
+  if ($('truckLiTime100Qty')) $('truckLiTime100Qty').value='';
+  if ($('truckLiTime100Charged')) $('truckLiTime100Charged').checked=false;
+  if ($('truckBackupType')) $('truckBackupType').value='';
   $('lookupMessage').innerHTML = '';
   renderSessionClosed();
   updateMorningStatus();
@@ -1250,10 +1277,19 @@ function inspectionSummary(row) {
   const trailerValues=Object.values(row.trailer_checks || {}).filter(v => typeof v === 'boolean');
   const truckFail=truckValues.includes(false);
   const trailerFail=Boolean(row.taking_trailer) && trailerValues.includes(false);
+  const loadPass=Number(row.truck_12v_110ah_qty||0)>=4
+    && row.truck_12v_110ah_charged===true
+    && Number(row.truck_litime_12v_100ah_qty||0)>=2
+    && row.truck_litime_12v_100ah_charged===true
+    && row.backup_it_checkout_verified===true
+    && ['Spotter','Sniper','Solar Spotter'].includes(String(row.backup_unit_type||''));
   return {
-    failed: truckFail || trailerFail,
+    failed: truckFail || trailerFail || !loadPass,
     truck: truckFail ? 'FAILED' : 'PASS',
     trailer: !row.taking_trailer ? 'Not taking trailer' : trailerFail ? 'FAILED' : 'PASS',
+    load: loadPass
+      ? Number(row.truck_12v_110ah_qty||0)+' × 12V 110Ah + '+Number(row.truck_litime_12v_100ah_qty||0)+' × LiTime 12V 100Ah · '+String(row.backup_unit_type||'Backup')+' '+String(row.backup_unit_tag||'')
+      : 'NOT VERIFIED'
   };
 }
 function ownerAssignmentStatusLabel(a) {
@@ -1297,7 +1333,7 @@ function renderOwnerTechOverview() {
     let dailyStatus='';
     if (tech.role==='service') {
       if (ins) {
-        dailyStatus=`<div class='ownerDailyCheck ${ins.failed ? 'fail' : 'pass'}'><b>Daily Truck / Trailer Check · ${ins.failed ? 'NEEDS REVIEW' : 'SUBMITTED'}</b><span>Truck: ${esc(ins.truck)} · Trailer: ${esc(ins.trailer)} · ${new Date(inspection.submitted_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div>`;
+        dailyStatus=`<div class='ownerDailyCheck ${ins.failed ? 'fail' : 'pass'}'><b>Daily Truck / Trailer Check · ${ins.failed ? 'NEEDS REVIEW' : 'SUBMITTED'}</b><span>Truck: ${esc(ins.truck)} · Trailer: ${esc(ins.trailer)} · Load: ${esc(ins.load)} · ${new Date(inspection.submitted_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div>`;
       } else {
         const label=isToday ? 'DUE TODAY' : isPast ? 'NOT SUBMITTED' : 'UPCOMING';
         dailyStatus=`<div class='ownerDailyCheck ${isToday || isPast ? 'missing' : ''}'><b>Daily Truck / Trailer Check · ${label}</b><span>${isToday ? 'Waiting for this Service Tech to submit the daily inspection.' : isPast ? 'No submitted inspection was found for this date.' : 'Daily inspection will be due on the selected work date.'}</span></div>`;
