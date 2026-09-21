@@ -632,7 +632,7 @@ function dateFrom(text){
   if(/\btomorrow\b/.test(s)){const d=new Date(base);d.setDate(d.getDate()+1);return dayKey(d);}
   const days={sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6},m=s.match(/\b(?:(?:next|this)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
   if(m){const d=new Date(base),n=(days[m[1]]-d.getDay()+7)%7||7;d.setDate(d.getDate()+n);return dayKey(d);}
-  const iso=s.match(/\b(20\d{2}-\d{2}-\d{2})\b);return iso?.[1]||'';
+  const iso=s.match(/\b(20\d{2}-\d{2}-\d{2})\b/);return iso?.[1]||'';
 }
 function timeFrom(text){
   const s=String(text||''),m=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i)||s.match(/\b(?:at|to|for)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i);if(!m)return '';
@@ -663,15 +663,31 @@ function workloadIntent(text){
   const date=dateFrom(raw)||dayKey(new Date());
   return{date,role:tech?.role||role,tech};
 }
-function workloadHtml(intent){
+async function workloadHtml(intent){
   if(!intent)return'';
+  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
+  const label=dateLabel(intent.date),when=intent.date===dayKey(new Date())?'today':'on '+label;
+  const layer=visionLiveData();
+  if(layer?.getWorkload){
+    const live=await layer.getWorkload({
+      date:intent.date,
+      role:intent.role||'',
+      tech_id:intent.tech?.user_id||'',
+      tech_name:intent.tech&&!intent.tech?.user_id?(intent.tech.full_name||intent.tech.username||''):''
+    },{force:true});
+    const tickets=Array.isArray(live?.tickets)?live.tickets:[];
+    const completed=Number(live?.completed||0),remaining=Number(live?.remaining??Math.max(0,tickets.length-completed));
+    if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div><div class="vision-answer-copy">I checked the live Tech Check schedule. MHelpDesk remains separate.</div>';
+    if(tickets.length===1){state.currentTicket=tickets[0];const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);}
+    return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div>'
+      +'<div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. I checked the live Tech Check schedule and assignments. MHelpDesk remains separate.</div>'
+      +tickets.slice(0,12).map(ticket=>jobCard(ticket)).join('');
+  }
   const rows=state.jobs.filter(j=>{
     if(j.status==='cancelled'||String(j.scheduled_for||'')!==String(intent.date))return false;
     if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
     if(intent.tech){
-      const uid=String(intent.tech.user_id||'');
-      const rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||'');
-      const rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
+      const uid=String(intent.tech.user_id||''),rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||''),rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
       const names=[intent.tech.full_name,intent.tech.username].filter(Boolean).map(v=>String(v).trim().toLowerCase());
       if(uid&&rowUid)return rowUid===uid;
       return names.includes(rowName);
@@ -679,24 +695,11 @@ function workloadHtml(intent){
     return true;
   });
   const byTicket=new Map();
-  for(const row of rows){
-    const ticket=String(row.ticket_no||'');if(!ticket)continue;
-    if(!byTicket.has(ticket))byTicket.set(ticket,[]);
-    byTicket.get(ticket).push(row);
-  }
-  const tickets=[...byTicket.keys()];
-  const completed=tickets.filter(ticket=>(byTicket.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length;
-  const remaining=Math.max(0,tickets.length-completed);
-  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
-  const label=dateLabel(intent.date),when=intent.date===dayKey(new Date())?'today':'on '+label;
-  if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div><div class="vision-answer-copy">That answer came from the live Tech Check schedule. MHelpDesk remains separate.</div>';
-  if(tickets.length===1){
-    state.currentTicket=tickets[0];
-    const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);
-  }
-  return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div>'
-    +'<div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. I pulled the live Tech Check schedule and assignments. MHelpDesk remains separate.</div>'
-    +tickets.slice(0,12).map(jobCard).join('');
+  rows.forEach(row=>{const ticket=String(row.ticket_no||'');if(!ticket)return;if(!byTicket.has(ticket))byTicket.set(ticket,[]);byTicket.get(ticket).push(row);});
+  const tickets=[...byTicket.keys()],completed=tickets.filter(ticket=>(byTicket.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length,remaining=Math.max(0,tickets.length-completed);
+  return tickets.length
+    ?'<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div><div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. Live-query support was unavailable, so I used the currently loaded Tech Check assignments. MHelpDesk remains separate.</div>'+tickets.slice(0,12).map(jobCard).join('')
+    :'<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div>';
 }
 function findTech(text,role=''){
   const s=String(text||'').toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role),exact=pool.find(t=>[t.full_name,t.username].filter(Boolean).some(v=>s.includes(String(v).toLowerCase())));if(exact)return exact;
