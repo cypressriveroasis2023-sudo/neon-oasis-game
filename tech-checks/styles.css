@@ -4054,3 +4054,35 @@ select {
  #view-owner .ownerWorkspaceStats{grid-template-columns:repeat(2,1fr)!important}
  #view-owner .ownerWorkspaceActions{grid-template-columns:1fr 1fr}
 }
+/* Owner full-screen workspace v161 */
+body:has(#view-owner:not(.hidden)){background:#0f161e!important}
+body:has(#view-owner:not(.hidden)) .wrap{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}
+body:has(#view-owner:not(.hidden)) .hero,
+body:has(#view-owner:not(.hidden)) .techStatusRow,
+body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
+#view-owner:not(.hidden){display:grid!important;grid-template-columns:210px minmax(0,1fr)!important;grid-template-rows:minmax(100vh,auto)!important;background:#10171f!important;color:#edf4f8!important;min-height:100vh!important}
+#view-owner>.ownerWorkspace{display:contents!important}
+#view-owner .ownerWorkspaceRail{grid-column:1;grid-row:1;position:sticky!important;top:0!important;height:100vh!important;overflow:auto!important;padding:22px 13px!important;background:#0a1118!important;border-right:1px solid #25313c!important;z-index:5}
+#view-owner .ownerWorkspaceMain{grid-column:2;grid-row:1;align-self:start;max-width:980px!important;width:100%!important;margin:0 auto!important;padding:70px 48px 40px!important}
+#view-owner .ownerWorkspaceContent{grid-column:2;grid-row:1;align-self:start;max-width:1180px;width:calc(100% - 72px);margin:500px auto 60px;padding:0}
+#view-owner .ownerWorkspaceContent.active{margin-top:42px}
+#view-owner .ownerWorkspaceContent.active~*{display:none}
+#view-owner .ownerWorkspaceContent.active>.ownerDashSection{display:none!important}
+#view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected{display:block!important}
+#view-owner .ownerWorkspaceContent>.ownerDashSection{background:#151f28!important;border:1px solid #2b3945!important;color:#edf4f8!important;box-shadow:none!important}
+#view-owner .ownerWorkspaceContent .ownerDashSummary{background:#17222b!important;color:#edf4f8!important;border-left:0!important}
+#view-owner .ownerWorkspaceContent .ownerDashSummary span,
+#view-owner .ownerWorkspaceContent .small{color:#8fa0ae!important}
+#view-owner .ownerWorkspaceContent .ownerDashBody{background:#111a22!important;color:#e8eff4!important}
+#view-owner .ownerWorkspaceContent input,
+#view-owner .ownerWorkspaceContent select{background:#0e171f!important;color:#eef4f7!important;border-color:#344451!important}
+#view-owner .ownerWorkspaceContent .card,
+#view-owner .ownerWorkspaceContent .item,
+#view-owner .ownerWorkspaceContent .ownerFold{background:#16212a!important;color:#edf4f8!important;border-color:#30404d!important}
+@media(max-width:720px){
+ #view-owner:not(.hidden){grid-template-columns:1fr!important;grid-template-rows:auto auto!important}
+ #view-owner .ownerWorkspaceRail{grid-column:1;grid-row:1;position:sticky!important;height:auto!important;top:0!important;display:grid!important;grid-template-columns:repeat(4,1fr)!important}
+ #view-owner .ownerWorkspaceMain{grid-column:1;grid-row:2;padding:28px 15px!important}
+ #view-owner .ownerWorkspaceContent{grid-column:1;grid-row:3;width:calc(100% - 24px);margin:0 12px 30px!important}
+ #view-owner .ownerWorkspaceContent.active{margin-top:12px!important}
+}
