@@ -4251,12 +4251,23 @@ async function renderSvcPrep() {
     const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
     const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
     const heliosNeedsAcceptance=heliosHandoff.length>0&&!solarCheck?.handoff_accepted_at;
-    const swapReady=heliosNeedsAcceptance ? nonHeliosSwaps.length===0||(!nonHeliosSwaps.some(i=>!i.swap_outcome)&&swapState.ready) : swapState.ready;
+    const nonHeliosInstalled=nonHeliosSwaps.filter(i=>i.swap_outcome==='installed');
+    const nonHeliosByType=nonHeliosInstalled.reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{});
+    const nonHeliosReady=!nonHeliosSwaps.some(i=>!i.swap_outcome)
+      && !nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&swapState.unusedMissing.some(m=>m.id===i.id))
+      && !Object.entries(nonHeliosByType).some(([type,needed])=>swapState.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
+    const swapReady=heliosNeedsAcceptance ? nonHeliosReady : swapState.ready;
     const ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
     const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
     const heliosNotice=heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`<div class='warn top10'><b>HELIOS HANDOFF FIRST</b><div>Accept the IT → Service handoff. At the site, Service will answer whether the SWAP replacement was actually installed.</div></div>`:'';
     const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each installed Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
-    const swapNotice=allSwaps.length?(swapReady?`<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`:`<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`):'';
+    const pendingHeliosFieldDecision=heliosNeedsAcceptance&&allSwaps.some(i=>i.equipment_type==='Helios'&&!i.swap_outcome);
+    const swapNotice=allSwaps.length?(pendingHeliosFieldDecision
+      ? `<div class='warn top10'><b>HELIOS SWAP RESULT COMES NEXT</b><div>Accept the handoff first. At the site, Service will answer YES — SWAP HAPPENED or NO — DID NOT USE IT.</div></div>`
+      : swapReady
+        ? `<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`
+        : `<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`
+    ):'';
     wizard.innerHTML=progress('Final Step',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios handoff — field result comes next':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-green' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
