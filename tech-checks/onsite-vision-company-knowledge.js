@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v14",
+  "version": "company-knowledge-v15",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -772,6 +772,22 @@
         "condition_checks",
         "inventory_confirmation",
         "completion"
+      ]
+    },
+    "it_supplied_card_replacements": {
+      "label": "IT-supplied SIM / SD replacements",
+      "categories": [
+        "SIM Card Swap",
+        "SD / Micro SD Card Replacement"
+      ],
+      "rules": [
+        "SIM Card Swap means remove the old SIM card and install the new SIM card.",
+        "SD / Micro SD Card Replacement means remove the old card and install the replacement card.",
+        "Replacement SIM and SD/micro SD cards are supplied by the IT Department.",
+        "When Service performs the field work, SIM and SD/micro SD replacement jobs follow IT → Service.",
+        "IT prepares the exact replacement card quantity and includes it in the Tech Check handoff.",
+        "Service physically verifies the exact SIM / SD card quantity received from IT before leaving the shop.",
+        "A Service-only path must not bypass IT supply when a replacement SIM or SD/micro SD card is required."
       ]
     },
     "handoff": {
