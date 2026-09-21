@@ -85,7 +85,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=production-qa-20260921b')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=production-qa-20260921c')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1944,10 +1944,13 @@ async function ownerAppCreateTech(){
 }
 async function ownerAppAssign(){
   if(!document.getElementById('ownerAssignTicket')) {
+    // Assign Job must work even when the deferred Owner workflow module has not loaded yet.
+    await loadDeferredModules();
     if(typeof window.installOwnerAssignments==='function') await window.installOwnerAssignments(false);
-    else if(typeof installOwnerAssignments==='function') await installOwnerAssignments(false);
   }
-  return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.');
+  const ready=Boolean(document.getElementById('ownerAssignTicket'));
+  return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.')
+    +(ready?'':'<div class="ownerAppEmpty"><b>Loading Assign Job…</b><span>The production assignment form is being prepared. It will appear here without leaving this page.</span></div>');
 }
 let ownerAppRenderVersion = 0;
 function ownerSetPersistentSurface(route){
