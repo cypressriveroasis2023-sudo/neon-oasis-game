@@ -967,7 +967,7 @@ function draftApplyInput(d,text,initial=false){
   if(type){d.work_type=type;d.role=draftDefaultRole(type);}
   const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
   if(explicitTicket||bareTicket)d.ticket_no=explicitTicket||bareTicket;
-  const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|:|=|-)\s*([^,.;\n]+)/i);
+  const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i);
   if(siteMatch)d.site=String(siteMatch[1]||'').trim();
   const when=dateFrom(raw);if(when)d.scheduled_for=when;
   const clock=timeFrom(raw);if(clock){d.scheduled_time=clock;d.time_answered=true;}
@@ -983,7 +983,7 @@ function draftApplyInput(d,text,initial=false){
     ? raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i)
     : raw.match(/\b(?:stand|stands|solar\s+stand|solar\s+stands|pole|poles)\s*(?:#s?|numbers?|tags?)\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i);
   if(standMatch){d.stand_numbers=standMatch[1].trim();d.equipment_numbers_answered=true;}
-  if(expected==='equipment_numbers'&&/\b(no equipment numbers|no numbers|not yet|unknown|skip|none)\b/i.test(raw))d.equipment_numbers_answered=true;
+  if((expected==='equipment_numbers'&&/\b(no equipment numbers|no numbers|not yet|unknown|skip|none)\b/i.test(raw))||/\b(no unit numbers?|no equipment numbers?|unit numbers? (?:unknown|not known|not yet))\b/i.test(raw))d.equipment_numbers_answered=true;
   const descMatch=raw.match(/\bdescription\s*(?:is|:|=)\s*([^;\n]+)/i);
   if(descMatch)d.job_description=String(descMatch[1]||'').trim();
   const parts=draftPartsParse(raw);
@@ -996,13 +996,14 @@ function draftApplyInput(d,text,initial=false){
     if(explicitlyAnsweringParts)d.parts_answered=true;
   }
   if(expected==='parts'&&/\b(yes|correct|confirmed|that'?s all|those are all)\b/i.test(raw)&&Object.keys(d.parts||{}).length)d.parts_answered=true;
-  if(expected==='parts'&&/\b(no additional parts|no parts|none|skip)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
+  if((expected==='parts'&&/\b(no additional parts|no parts|none|skip)\b/i.test(raw))||/\b(no parts|no extra parts|no additional parts)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
   const techs=draftMatchedTechs(raw);
-  if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give)\b/i.test(raw))d.assignment_answered=true;}
-  if(expected==='assignment'&&/\b(department queues?|queue|leave.*queue|unassigned)\b/i.test(raw)){d.assignees=d.assignees||{};d.assignment_answered=true;}
+  if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give|put)\b/i.test(raw))d.assignment_answered=true;}
+  const queueAssignment=/\b(department queues?|leave (?:it|them|both|each).*queue|unassigned|no preference|doesn'?t matter|any (?:it|service)?\s*(?:tech|technician)|anyone (?:in|from) (?:it|service)|anybody (?:in|from) (?:it|service)|whoever(?:'s| is)? (?:available|open|free)|first available (?:it|service)?\s*(?:tech|technician))\b/i.test(raw);
+  if((expected==='assignment'&&queueAssignment)||(queueAssignment&&/\b(assign|assignment|tech|technician|queue|whoever|anyone|anybody|available|preference)\b/i.test(raw))){d.assignees=d.assignees||{};d.assignment_answered=true;}
   const notesMatch=raw.match(/\bnotes?\s*(?:are|is|:|=)\s*([^;\n]+)/i);
   if(notesMatch){d.notes=String(notesMatch[1]||'').trim();d.notes_answered=true;}
-  if(expected==='notes'&&/\b(no additional notes|no notes|none|skip)\b/i.test(raw)){d.notes='';d.notes_answered=true;}
+  if((expected==='notes'&&/\b(no additional notes|no notes|none|skip)\b/i.test(raw))||/\b(no notes|no additional notes|nothing else to add)\b/i.test(raw)){d.notes='';d.notes_answered=true;}
   const recognized=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||unitMatch||standMatch||descMatch||Object.keys(parts).length||techs.length||notesMatch);
   // Guided interview answers belong to the question currently being asked even
   // when the same sentence also mentions recognizable equipment or parts.
