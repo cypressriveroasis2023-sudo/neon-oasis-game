@@ -55,7 +55,7 @@
       'Submit the completed Sniper work for finalization so the Owner can review it in the Owner app.'
     ]),
     swap_rule:'A Sniper SWAP prepares the replacement Sniper the same way as a DELIVERY. After the swap, the old field Sniper must be brought back and recorded through Service Return → IT Intake.',
-    spare_rule:'A Sniper BACKUP / truck spare is prepared hardware-ready. If unused, return it to Shop Inventory and remove it from the Service truck. If it is used for a swap, the replaced field unit follows Service Return → IT Intake.',
+    spare_rule:'A Sniper BACKUP / truck spare is prepared hardware-ready. If unused, return it through Service Return → IT Intake so IT can verify it after transport before it becomes available Shop Inventory again. If it is used for a swap, the replaced field unit follows Service Return → IT Intake.',
     remaining_unknowns:Object.freeze([
       'Exact Avigilon ES appliance model, if model-specific behavior matters.',
       'Exact Avigilon bullet camera model(s), if model-specific behavior matters.',
@@ -142,7 +142,7 @@
     battery_ready_required:true,
     it_battery_checkout_required:true,
     manifest_rule:'Truck spares stay separate from the customer/job equipment manifest.',
-    unused_unit_rule:'Unused truck spare units return directly to Shop Inventory and do not create an IT Intake return.',
+    unused_unit_rule:'Unused complete backup units return through Service Return → IT Intake so IT can verify them after transport before they become available Shop Inventory again.',
     used_unit_rule:'If a spare unit is used for a swap, return the failed/replaced field unit through the normal Service Return → IT Intake flow.',
     battery_resolution_rule:'Service records the quantity used; any remainder is returned unused.'
   });
