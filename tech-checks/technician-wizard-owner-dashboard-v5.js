@@ -51,7 +51,7 @@ async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey
 async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (!key) return null; try { const value=JSON.parse(localStorage.getItem(key)||'null'); if (!value) return null; if (Date.now()-Number(value.savedAt||0)>FIELD_DRAFT_TTL) { localStorage.removeItem(key); return null; } return value; } catch { return null; } }
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
 function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer], load:{...(inspection.load||{})} }); }
-function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag) }); }
+function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag), offlineEscalationId:serviceReturn.offlineEscalationId||null }); }
 const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
 let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
 let ownerReturnRows = new Map();
@@ -1669,11 +1669,143 @@ async function openAssignmentFromNotification(id) {
   return startAssignedJob(id);
 }
 
+
+async function fieldEscalationRows() {
+  const {data,error}=await liveDb.from('field_escalations').select('*').order('created_at',{ascending:false}).limit(100);
+  if(error)throw error;
+  return data||[];
+}
+function fieldEscalationStatusLabel(status) {
+  return ({
+    waiting_it:'WAITING FOR IT',
+    joint_troubleshooting:'SERVICE + IT TROUBLESHOOTING',
+    repaired_onsite:'REPAIRED ONSITE',
+    backup_swap_authorized:'IT AUTHORIZED BACKUP SWAP',
+    failed_unit_in_it_intake:'FAILED UNIT IN IT INTAKE',
+    unresolved_owner:'OWNER DECISION REQUIRED',
+    owner_resolved:'OWNER RESOLVED'
+  })[status]||String(status||'').replaceAll('_',' ').toUpperCase();
+}
+function fieldEscalationHistoryHtml(row) {
+  return '<div class="small top8"><b>Original problem:</b> '+esc(row.original_problem||'—')+'</div>'+
+    '<div class="small"><b>Service power/troubleshooting:</b> '+esc(row.service_troubleshooting_notes||'—')+'</div>'+
+    (row.it_troubleshooting_notes?'<div class="small"><b>IT troubleshooting:</b> '+esc(row.it_troubleshooting_notes)+'</div>':'')+
+    (row.backup_unit_tag?'<div class="small"><b>Authorized backup:</b> '+esc(row.backup_equipment_type||'Unit')+' '+esc(row.backup_unit_tag)+'</div>':'')+
+    (row.owner_summary?'<div class="small"><b>Owner summary:</b> '+esc(row.owner_summary)+'</div>':'')+
+    (row.owner_resolution?'<div class="small"><b>Owner decision:</b> '+esc(row.owner_resolution)+'</div>':'');
+}
+function fieldEscalationServiceHtml(rows) {
+  const active=(rows||[]).filter(r=>!r.resolved_at);
+  const cards=active.map(r=>{
+    let action='';
+    if(r.status==='backup_swap_authorized') action="<button class='wl-big wl-red top10' data-wl-offline-complete-swap='"+r.id+"' data-wl-offline-backup='"+(r.backup_prep_item_id||"")+"'>USE AUTHORIZED BACKUP & RETURN FAILED UNIT →</button>";
+    return "<div class='wl-ticket'><b>Unit "+esc(r.unit_tag)+" · "+esc(fieldEscalationStatusLabel(r.status))+"</b><div class='small'>MHelpDesk #"+esc(r.ticket_no)+" · "+esc(r.site||"No site")+"</div>"+fieldEscalationHistoryHtml(r)+action+"</div>";
+  }).join('');
+  return "<div class='wl-review top10'><b>OFFLINE UNIT / IT TROUBLESHOOTING</b><div class='small'>Service verifies power first, then Service and IT troubleshoot together. Equipment-specific troubleshooting that has not been taught remains <b>MISSING INFORMATION</b>.</div>"+(cards||"<div class='small top8'>No active offline-unit escalation.</div>")+"<button class='wl-big wl-blue top10' data-wl-offline-start>＋ Offline Unit — Call IT</button></div>";
+}
+async function showOfflineUnitForm() {
+  const work=await serviceWorkData();
+  const units=(work.deployed||[]);
+  const first=units[0]||{};
+  let card=document.getElementById('wlOfflineUnitForm');
+  if(!card){card=document.createElement('div');card.id='wlOfflineUnitForm';card.className='card';viewSvc().append(card);}
+  const options=units.map((u,i)=>"<option value='"+i+"'>MHelpDesk #"+esc(u.ticket_no)+" · "+esc(u.equipment_type)+" "+esc(u.unit_tag)+"</option>").join('');
+  card.innerHTML=progress('Offline Unit','Service power check → call IT',1,1)+
+    "<button class='wl-back' data-wl-home='svc'>← Service Home</button>"+
+    "<div class='wl-stop'><b>VERIFY POWER BEFORE CALLING IT</b><div>Service checks the unit and verifies power first. Then Service calls IT and both troubleshoot together.</div></div>"+
+    (units.length?"<label>Choose unit currently in the field</label><select id='wlOfflineKnownUnit'>"+options+"</select>":"<div class='warn'><b>No deployed unit was found automatically.</b><div>Enter the exact current MHelpDesk and unit information below.</div></div>")+
+    "<div class='grid top10'><label>MHelpDesk Ticket #<input id='wlOfflineTicket' value='"+esc(first.ticket_no||"")+"'></label><label>Customer / Site<input id='wlOfflineSite' value='"+esc(first.site||"")+"'></label><label>Offline Unit Tag<input id='wlOfflineUnit' value='"+esc(first.unit_tag||"")+"'></label><label>Equipment Type<input id='wlOfflineType' value='"+esc(first.equipment_type||"")+"'></label></div>"+
+    "<label>Original problem<textarea id='wlOfflineProblem' rows='3' placeholder='What is the unit doing or not doing?'></textarea></label>"+
+    "<label class='check top8'><input id='wlOfflinePower' type='checkbox'><span>I physically verified power at the unit before calling IT.</span></label>"+
+    "<label>Service checks completed before calling IT<textarea id='wlOfflineServiceNotes' rows='4' placeholder='Record the power check and general troubleshooting completed. Do not invent equipment-specific steps.'></textarea></label>"+
+    "<button class='wl-big wl-red top10' data-wl-offline-submit>CALL IT / START JOINT TROUBLESHOOTING →</button>";
+  card.dataset.units=JSON.stringify(units);
+  hideChildren(viewSvc(),[card]);resetWizardPosition();
+}
+async function submitOfflineUnitForm() {
+  const button=document.querySelector('[data-wl-offline-submit]');
+  if(button){button.disabled=true;button.textContent='Notifying IT…';}
+  const {error}=await liveDb.rpc('service_start_offline_escalation_v1',{
+    p_ticket_no:document.getElementById('wlOfflineTicket')?.value||'',
+    p_site:document.getElementById('wlOfflineSite')?.value||'',
+    p_unit_tag:document.getElementById('wlOfflineUnit')?.value||'',
+    p_equipment_type:document.getElementById('wlOfflineType')?.value||'',
+    p_original_problem:document.getElementById('wlOfflineProblem')?.value||'',
+    p_power_verified:Boolean(document.getElementById('wlOfflinePower')?.checked),
+    p_service_notes:document.getElementById('wlOfflineServiceNotes')?.value||''
+  });
+  if(error){if(button){button.disabled=false;button.textContent='CALL IT / START JOINT TROUBLESHOOTING →';}return alert(error.message);}
+  await showSvcHome();
+  alert('IT was notified. Keep this issue open while Service and IT troubleshoot together.');
+}
+async function fieldEscalationITData(rows) {
+  const ticketSet=new Set((rows||[]).map(r=>norm(r.ticket_no)));
+  if(!ticketSet.size)return new Map();
+  const {data,error}=await liveDb.from('prep_tickets')
+    .select('ticket_no,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,spare_it_checked_out_at,spare_checked_out_to)')
+    .eq('status','closed').order('closed_at',{ascending:false}).limit(100);
+  if(error)throw error;
+  const map=new Map();
+  (data||[]).forEach(p=>{
+    if(!ticketSet.has(norm(p.ticket_no)))return;
+    (p.prep_items||[]).filter(i=>i.purpose==='BACKUP'&&i.spare_it_checked_out_at&&!i.spare_outcome).forEach(i=>{
+      const key=norm(p.ticket_no);if(!map.has(key))map.set(key,[]);map.get(key).push(i);
+    });
+  });
+  return map;
+}
+async function fieldEscalationITHtml(rows) {
+  const active=(rows||[]).filter(r=>['waiting_it','joint_troubleshooting'].includes(r.status));
+  if(!active.length)return '';
+  const backups=await fieldEscalationITData(active);
+  return "<div class='wl-stop top10'><b>SERVICE NEEDS IT TROUBLESHOOTING · "+active.length+"</b><div>Review the Service power check, work together, and record the IT decision.</div>"+active.map(r=>{
+    const opts=(backups.get(norm(r.ticket_no))||[]).filter(i=>i.spare_checked_out_to===r.service_tech_id).map(i=>"<option value='"+i.id+"'>"+esc(i.equipment_type)+" Unit "+esc(i.unit_tag||"")+"</option>").join('');
+    return "<div class='wl-ticket top10'><b>Unit "+esc(r.unit_tag)+" · MHelpDesk #"+esc(r.ticket_no)+"</b><div class='small'>Service Tech: "+esc(r.service_tech_name)+"</div>"+fieldEscalationHistoryHtml(r)+
+      "<label>IT checks / actions<textarea id='wlOfflineItNotes_"+r.id+"' rows='4' placeholder='Record what IT and Service checked together.'></textarea></label>"+
+      "<label>Outcome<select id='wlOfflineItAction_"+r.id+"'><option value='continue_troubleshooting'>Continue Service + IT troubleshooting</option><option value='repaired_onsite'>Repaired onsite</option><option value='authorize_backup_swap'>Authorize checked-out backup swap</option><option value='unresolved_owner'>No solution — escalate to Owner</option></select></label>"+
+      "<label>Checked-out backup unit<select id='wlOfflineItBackup_"+r.id+"'><option value=''>Choose only when authorizing a swap</option>"+opts+"</select></label>"+
+      (!opts?"<div class='small'><b>No active checked-out backup is recorded for this ticket and Service Tech.</b></div>":"")+
+      "<button class='wl-big wl-blue top10' data-wl-offline-it-save='"+r.id+"'>Save IT Decision →</button></div>";
+  }).join('')+"</div>";
+}
+async function saveOfflineITDecision(id) {
+  const button=document.querySelector("[data-wl-offline-it-save='"+id+"']");
+  if(button){button.disabled=true;button.textContent='Saving…';}
+  const action=document.getElementById('wlOfflineItAction_'+id)?.value||'';
+  const backup=document.getElementById('wlOfflineItBackup_'+id)?.value||null;
+  const {error}=await liveDb.rpc('it_update_offline_escalation_v1',{
+    p_escalation_id:id,
+    p_it_notes:document.getElementById('wlOfflineItNotes_'+id)?.value||'',
+    p_action:action,
+    p_backup_prep_item_id:backup||null
+  });
+  if(error){if(button){button.disabled=false;button.textContent='Save IT Decision →';}return alert(error.message);}
+  await showITHome();
+  alert(action==='unresolved_owner'?'Owner was notified with the complete Service + IT summary.':'IT troubleshooting decision saved.');
+}
+async function completeAuthorizedOfflineSwap(id,backupItemId) {
+  const {data:existing,error:returnError}=await liveDb.from('unit_returns').select('id,ticket_no,unit_tag').limit(100);
+  if(returnError)return alert(returnError.message);
+  const rows=await fieldEscalationRows(), row=rows.find(r=>r.id===id);
+  if(!row)return alert('Offline-unit escalation not found.');
+  const match=(existing||[]).find(r=>norm(r.ticket_no)===norm(row.ticket_no)&&norm(r.unit_tag)===norm(row.unit_tag));
+  if(match){
+    const {error}=await liveDb.rpc('service_link_offline_failed_return_v1',{p_escalation_id:id,p_return_id:match.id});
+    if(error)return alert(error.message);
+    return showSvcHome();
+  }
+  const {error:spareError}=await liveDb.rpc('resolve_my_truck_spare_unit',{p_item_id:backupItemId,p_outcome:'used'});
+  if(spareError&&!/already been resolved/i.test(spareError.message||''))return alert(spareError.message);
+  serviceReturn={step:3,ticket:String(row.ticket_no||''),unit:String(row.unit_tag||''),type:String(row.equipment_type||''),notes:'Failed unit returned after IT-authorized backup swap.',noTag:false,photo:null,tagScan:null,conditionPhotos:[],damagePhotos:[],knownUnits:[],offlineEscalationId:id};
+  serviceReturnRecovered=false;await saveServiceReturnDraft();return renderServiceReturn();
+}
+
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
   let home = document.getElementById('wlItHome');
   if (!home) { home = document.createElement('div'); home.id = 'wlItHome'; home.className = 'card wl-home'; viewIT().prepend(home); }
-  const [c,r,assignments,phoneAlerts,assignedAssets] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it'), pushAlertState(), myAssignedInventoryAssets()]);
+  const [c,r,assignments,phoneAlerts,assignedAssets,offlineRows] = await Promise.all([prepCounts(), returnCounts(), myActiveAssignments('it'), pushAlertState(), myAssignedInventoryAssets(), fieldEscalationRows()]);
+  const offlineITHtml=await fieldEscalationITHtml(offlineRows);
   const assigned = assignments[0] || null;
   const ownerViewingIT=roleText().includes('Owner/Admin');
   const assignmentOwnerLabel=a=>a.assignee_user_id?(a.assignee_name||a.assigned_to_name||'Assigned technician'):(a.assignment_scope==='department'?'IT Department Queue':'Unassigned');
@@ -1682,7 +1814,7 @@ async function showITHome() {
   const resumeLabel = c.draft === 1 && c.nextDraft ? `▶ Resume MHelpDesk #${esc(c.nextDraft.ticket_no)}` : '▶ Continue Pending Prep';
   const assignmentAction = assigned ? `<div class='wl-next-action wl-assigned-next'><div class='wl-next-kicker'>ASSIGNED TO ME · FROM OWNER</div><b>MHelpDesk Ref #${esc(assigned.ticket_no)}</b><div class='small'>${esc(assigned.site || 'No customer / site entered')}</div>${assigned.work_type ? `<div class='small'><b>Job Type:</b> ${esc(assigned.work_type.toUpperCase())}</div>` : ''}${assigned.scheduled_for ? `<div class='small'><b>Work Date:</b> ${new Date(assigned.scheduled_for + 'T12:00:00').toLocaleDateString()}</div>` : ''}${assigned.requested_unit_count != null ? `<div class='small'><b>${String(assigned.work_type || '').toLowerCase() === 'pickup' ? 'Units Being Picked Up' : 'Units Required From MHelpDesk'}:</b> ${Number(assigned.requested_unit_count)}</div>` : ''}${assigned.unit_summary ? `<div class='small'><b>Unit / Equipment Notes:</b> ${esc(assigned.unit_summary)}</div>` : ''}${assigned.job_description ? `<div class='small'><b>Work:</b> ${esc(assigned.job_description)}</div>` : ''}${equipmentManifestInlineHtml(assigned)}${ticketPartsInlineHtml(assigned)}${automaticServiceSolarPlanHtml(assigned.equipment_manifest,assigned.work_type)}${assigned.notes ? `<div class='small'><b>Owner Notes:</b> ${esc(assigned.notes)}</div>` : ''}<button class='wl-big wl-blue top10' data-wl-start-assignment='${assigned.id}'>${assigned.status === 'started' ? 'Continue Assigned Job' : (!assigned.assignee_user_id && assigned.assignment_scope === 'department' ? 'Enter Ticket # & Claim Job' : 'Open Assigned Job')} →</button></div>` : '';
   const nextAction = assignmentAction || (r.nextWaiting ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>IT Intake · Unit ${esc(r.nextWaiting.unit_tag)}</b><div class='small'>${esc(r.nextWaiting.equipment_type || 'Returned unit')} · MHelpDesk #${esc(r.nextWaiting.ticket_no)}</div><button class='wl-big wl-blue top10' data-wl-next-it-intake='${r.nextWaiting.id}'>Start / Continue IT Intake →</button></div>` : c.nextDraft ? `<div class='wl-next-action'><div class='wl-next-kicker'>NEXT ACTION</div><b>Finish IT Prep · MHelpDesk #${esc(c.nextDraft.ticket_no)}</b><div class='small'>${esc(c.nextDraft.site || 'No site / description')}</div><button class='wl-big wl-blue top10' data-wl-open-it='${c.nextDraft.id}'>Continue Exact Ticket →</button></div>` : `<div class='wl-next-action clear'><div class='wl-next-kicker'>NEXT ACTION</div><b>✓ No IT work is currently waiting.</b><div class='small'>Start a new equipment prep when the next MHelpDesk job is ready.</div></div>`);
-  home.innerHTML = `${alertBanner}<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & hand off equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>${ownerViewingIT?'IT Team Work Today':'My Work Today'}</div><div class='wl-sub'>${ownerViewingIT?'Owner view — each job shows the technician or department queue it is assigned to.':'Owner-assigned jobs appear here first, followed by the next workflow action.'}</div>${assignments.length?`<div class='wl-it-flow-wrap'><div class='small'><b>IT Job Flow</b> · Swipe left/right to see assigned and waiting tickets.</div><div class='wl-it-flow-strip'>${assignmentCards}</div></div>`:nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> ${ownerViewingIT?'active IT jobs':'assigned to me'}</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div>${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
+  home.innerHTML = `${alertBanner}<div class='wl-mode-pills'><button class='on wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & hand off equipment</span></button><button class='wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${r.waiting+r.inventory}</span></button></div><div class='wl-title'>${ownerViewingIT?'IT Team Work Today':'My Work Today'}</div><div class='wl-sub'>${ownerViewingIT?'Owner view — each job shows the technician or department queue it is assigned to.':'Owner-assigned jobs appear here first, followed by the next workflow action.'}</div>${assignments.length?`<div class='wl-it-flow-wrap'><div class='small'><b>IT Job Flow</b> · Swipe left/right to see assigned and waiting tickets.</div><div class='wl-it-flow-strip'>${assignmentCards}</div></div>`:nextAction}<div class='wl-workstrip'><span><b>${assignments.length}</b> ${ownerViewingIT?'active IT jobs':'assigned to me'}</span><span><b>${c.draft}</b> pending prep</span><span><b>${r.waiting}</b> returns waiting</span></div>${offlineITHtml}${assignedInventoryHtml(assignedAssets)}<div class='wl-menu'><button class='wl-blue' data-wl-it='new'>＋ Start New Equipment Prep</button><button class='${c.draft ? 'wl-red' : 'wl-gray'}' data-wl-it='pending'>${resumeLabel} <span class='wl-count'>${c.draft}</span></button><button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${c.released + c.closed}</span></button></div>`;
   hideChildren(viewIT(), [home]);
   injectEquipmentMemory(wizard).catch(()=>{});
   resetWizardPosition();
@@ -3010,12 +3142,13 @@ async function showSvcHome() {
     home.className='card wl-home';
     viewSvc().prepend(home);
   }
-  const [r,work,phoneAlerts,assignedAssets,truckSpares]=await Promise.all([
+  const [r,work,phoneAlerts,assignedAssets,truckSpares,offlineRows]=await Promise.all([
     myReturnCounts(),
     serviceWorkData(),
     pushAlertState(),
     myAssignedInventoryAssets(),
-    myTruckSpareData()
+    myTruckSpareData(),
+    fieldEscalationRows()
   ]);
   const alertBanner=phoneAlertBanner(phoneAlerts);
   const assignments=work.assignments||[];
@@ -3055,6 +3188,7 @@ async function showSvcHome() {
       <span><b>${r.waiting}</b> returns waiting IT</span>
       <span><b>${truckSpareCount}</b> truck spares to resolve</span>
     </div>
+    ${fieldEscalationServiceHtml(offlineRows)}
     ${truckSpareServiceHtml(truckSpares)}
     ${assignmentCards}
     ${assignedInventoryHtml(assignedAssets)}
@@ -3724,6 +3858,10 @@ document.addEventListener('click', async e => {
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
   if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); return; }
+  if(e.target.closest('[data-wl-offline-start]')) return showOfflineUnitForm();
+  if(e.target.closest('[data-wl-offline-submit]')) return submitOfflineUnitForm();
+  const offlineItSave=e.target.closest('[data-wl-offline-it-save]'); if(offlineItSave)return saveOfflineITDecision(offlineItSave.dataset.wlOfflineItSave);
+  const offlineSwap=e.target.closest('[data-wl-offline-complete-swap]'); if(offlineSwap)return completeAuthorizedOfflineSwap(offlineSwap.dataset.wlOfflineCompleteSwap,offlineSwap.dataset.wlOfflineBackup);
   const nextItIntake = e.target.closest('[data-wl-next-it-intake]'); if (nextItIntake) return startITIntake(nextItIntake.dataset.wlNextItIntake);
   const nextSvcReceive = e.target.closest('[data-wl-next-svc-receive]'); if (nextSvcReceive) return openServiceTicket(nextSvcReceive.dataset.wlNextSvcReceive);
   if (e.target.closest('[data-wl-next-svc-inspect]')) return startInspection();
@@ -4227,7 +4365,7 @@ document.addEventListener('click', async e => {
 });
 async function showServiceReturn() {
   const saved=await loadDeviceDraft('service-return');
-  if (saved?.ticket) { serviceReturn={ step:Math.min(Number(saved.step||0),3), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
+  if (saved?.ticket) { serviceReturn={ step:Math.min(Number(saved.step||0),3), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[], offlineEscalationId:saved.offlineEscalationId||null }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
   else { serviceReturn={ step:0, ticket:'', unit:'', type:'', notes:'', noTag:false, photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; serviceReturnRecovered=false; }
   return renderServiceReturn();
 }
@@ -4361,6 +4499,12 @@ async function submitServiceReturn() {
       }));
     }
     if (error) throw error;
+    let offlineLinkError=null;
+    if (!is110VStandReturn() && serviceReturn.offlineEscalationId) {
+      const link=await liveDb.rpc('service_link_offline_failed_return_v1',{p_escalation_id:serviceReturn.offlineEscalationId,p_return_id:returnId});
+      offlineLinkError=link.error||null;
+      if(!offlineLinkError)serviceReturn.offlineEscalationId=null;
+    }
     const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
     const card=serviceReturnCard();
@@ -4377,7 +4521,7 @@ async function submitServiceReturn() {
       ? (direct110Damage
         ? `${progress('110V Stand Returned', 'Damage requires Owner action', 1, 1)}<div class='warn'><b>⚠ ${esc(serviceReturnLabel())} needs replacement / repair.</b><div>The damaged stand is held in Maintenance and is NOT available in Shop Inventory. The Owner was notified with the photos and notes for MHelpDesk #${esc(serviceReturn.ticket)}. IT Intake is not required for this 110V Stand.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`
         : `${progress('110V Stand Returned', 'Back in Shop', 1, 1)}<div class='ok'><b>✓ ${esc(serviceReturnLabel())} is back in Shop.</b><div>Service returned the stand directly to Shop under MHelpDesk #${esc(serviceReturn.ticket)}. ${isTagless110VReturn()?'No physical tag was required.':'The stand tag was recorded.'} IT Intake is not required.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`)
-      : `${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`)
+      : `${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}${offlineLinkError?`<div class="warn"><b>Return saved, but the offline escalation still needs linking.</b><div>${esc(offlineLinkError.message||"Open Service Home and finish the authorized swap again.")}</div></div>`:""}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`)
       + continuationHtml + actionHtml;
     resetWizardPosition();
   } catch(err) {
@@ -6004,6 +6148,30 @@ async function ownerCancelAssignment(id) {
   await installOwnerAssignments(true);
 }
 
+
+async function installOwnerFieldEscalations(force=false) {
+  if(!roleText().includes('Owner/Admin'))return;
+  let host=document.getElementById('ownerFieldEscalations');
+  if(host&&host.dataset.loaded==='1'&&!force)return;
+  if(!host){host=document.createElement('details');host.id='ownerFieldEscalations';host.className='card ownerDashSection';const view=document.getElementById('view-owner');const attention=document.getElementById('ownerAttentionCard');if(attention)attention.after(host);else view?.prepend(host);}
+  const wasOpen=host.open;host.dataset.loaded='1';
+  const rows=await fieldEscalationRows();
+  const active=rows.filter(r=>!r.resolved_at), ownerNeeded=active.filter(r=>r.status==='unresolved_owner');
+  const render=r=>"<div class='wl-ticket'><b>Unit "+esc(r.unit_tag)+" · "+esc(fieldEscalationStatusLabel(r.status))+"</b><div class='small'>MHelpDesk #"+esc(r.ticket_no)+" · "+esc(r.site||"No site")+"</div>"+fieldEscalationHistoryHtml(r)+(r.status==='unresolved_owner'?"<label>Owner decision<textarea id='wlOfflineOwnerResolution_"+r.id+"' rows='3' placeholder='Record the decision / next action.'></textarea></label><button class='wl-big wl-red top10' data-wl-offline-owner-resolve='"+r.id+"'>SAVE OWNER DECISION →</button>":"")+"</div>";
+  host.innerHTML="<summary class='ownerDashSummary'><div><b>Offline Unit Escalations</b><span>Service power check → IT troubleshooting → backup / Owner decision</span></div><span class='ownerDashBadge "+(ownerNeeded.length?"alert":"neutral")+"'>"+active.length+"</span></summary><div class='ownerDashBody'>"+
+    (ownerNeeded.length?"<div class='wl-stop'><b>OWNER DECISION REQUIRED · "+ownerNeeded.length+"</b><div>These remain visible until you record the decision.</div></div>":"")+
+    (active.map(render).join('')||"<div class='ok'><b>✓ No active offline-unit escalation.</b></div>")+
+    "<details class='ownerHistoryFold'><summary>Resolved Offline-Unit History <span class='pill'>"+rows.filter(r=>r.resolved_at).length+"</span></summary><div>"+(rows.filter(r=>r.resolved_at).slice(0,30).map(render).join('')||"<div class='small'>No resolved escalation history yet.</div>")+"</div></details></div>";
+  host.open=wasOpen||ownerNeeded.length>0;
+}
+async function resolveOfflineOwnerDecision(id) {
+  const button=document.querySelector("[data-wl-offline-owner-resolve='"+id+"']");
+  if(button){button.disabled=true;button.textContent='Saving…';}
+  const {error}=await liveDb.rpc('owner_resolve_offline_escalation_v1',{p_escalation_id:id,p_resolution:document.getElementById('wlOfflineOwnerResolution_'+id)?.value||''});
+  if(error){if(button){button.disabled=false;button.textContent='SAVE OWNER DECISION →';}return alert(error.message);}
+  await installOwnerFieldEscalations(true);scheduleOwnerRefresh(true,0);
+}
+
 async function installOwnerIntake(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerIntakeTracking');
@@ -6071,6 +6239,7 @@ async function installOwnerIntake(force = false) {
 }
 
 document.addEventListener('click', async e => {
+  const offlineOwner=e.target.closest('[data-wl-offline-owner-resolve]');if(offlineOwner)return resolveOfflineOwnerDecision(offlineOwner.dataset.wlOfflineOwnerResolve);
   const ownerSummary=e.target.closest('#view-owner summary.ownerDashSummary');
   if(ownerSummary){
     const details=ownerSummary.parentElement;
@@ -6139,7 +6308,7 @@ document.addEventListener('change', e => {
 });
 
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
-document.addEventListener('change', e => { if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('change', e => { if(e.target?.id==='wlOfflineKnownUnit'){const card=document.getElementById('wlOfflineUnitForm');let units=[];try{units=JSON.parse(card?.dataset.units||'[]');}catch{}const u=units[Number(e.target.value)]||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};set('wlOfflineTicket',u.ticket_no);set('wlOfflineSite',u.site);set('wlOfflineUnit',u.unit_tag);set('wlOfflineType',u.equipment_type);} if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
 document.addEventListener('toggle', e => { const ownerDetails = e.target?.matches?.('details[data-owner-return]') ? e.target : null; if (ownerDetails?.open) loadOwnerReturnPhotos(ownerDetails); const serviceDetails = e.target?.matches?.('details[data-svc-return]') ? e.target : null; if (serviceDetails?.open) loadServiceReturnPhotos(serviceDetails); }, true);
@@ -6154,7 +6323,7 @@ async function runOwnerRefresh(force=false) {
   if (ownerRefreshInFlight) { ownerRefreshQueued=true; return; }
   ownerRefreshInFlight=true;
   try {
-    await Promise.all([installOwnerAssignments(force), installOwnerIntake(force)]);
+    await Promise.all([installOwnerAssignments(force), installOwnerIntake(force), installOwnerFieldEscalations(force)]);
     organizeOwnerDashboard();
     ownerLastRefreshAt=Date.now();
   } catch (error) {
