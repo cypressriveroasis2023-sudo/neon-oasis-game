@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v2",
-  "description": "Owner-style language regression bank for OnSite Vision, including multi-step operations orchestration. No case may execute a write; expected action means proposed action only.",
+  "version": "onsite-vision-language-evals-v3",
+  "description": "Owner-style language regression bank for OnSite Vision, including multi-step operations orchestration and audited multi-action planning. No case may execute a write; expected action means proposed action only.",
   "categories": [
     "workload",
     "workload_followup",
@@ -20,7 +20,8 @@
     "company_knowledge",
     "source_code",
     "owner_correction",
-    "operations_snapshot"
+    "operations_snapshot",
+    "multi_action_plan"
   ],
   "cases": [
     {
@@ -555,6 +556,63 @@
       "id": "op08",
       "utterance": "tell me everything i need to know about today",
       "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp01",
+      "utterance": "take care of everything you can from that rundown",
+      "context": [
+        "Vision just gave the Owner a live operations rundown"
+      ],
+      "intent": "multi_action_plan",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp02",
+      "utterance": "do all of that safely",
+      "context": [
+        "Vision listed several live operations changes and blockers"
+      ],
+      "intent": "multi_action_plan",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp03",
+      "utterance": "make all those changes",
+      "context": [
+        "Vision listed several proposed Tech Check operations changes"
+      ],
+      "intent": "multi_action_plan",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp04",
+      "utterance": "fix everything you safely can today",
+      "intent": "multi_action_plan",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp05",
+      "utterance": "handle all of those but don't bypass the workflow",
+      "context": [
+        "Vision gave the Owner today's operations rundown"
+      ],
+      "intent": "multi_action_plan",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "mp06",
+      "utterance": "do it all in one go",
+      "context": [
+        "Vision listed multiple safe Tech Check changes from today's rundown"
+      ],
+      "intent": "multi_action_plan",
       "tool": "get_operations_snapshot",
       "action": "none"
     }
