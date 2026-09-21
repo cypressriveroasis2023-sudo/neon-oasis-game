@@ -479,7 +479,8 @@ function truckSpareServiceHtml(spares) {
 
 async function serviceWorkData() {
   const { data:{ session } } = await liveDb.auth.getSession();
-  if (!session?.user?.id) return { assignments:[], released:[], inspectionDone:false, deployed:[] };
+  const inspectionRequired=serviceInspectionRequiredToday();
+  if (!session?.user?.id) return { assignments:[], released:[], inspectionDone:false, inspectionRequired, deployed:[] };
   const dayStart = new Date(); dayStart.setHours(0,0,0,0);
   const [assignments,releasedQ,returnedQ,deployedQ,inspectionQ] = await Promise.all([
     myActiveAssignments('service'),
@@ -496,7 +497,7 @@ async function serviceWorkData() {
     if (i.purpose==='BACKUP') return i.spare_outcome==='used';
     return true;
   }).map(i => ({ prep_item_id:i.id, ticket_no:p.ticket_no, site:p.site, closed_at:p.closed_at, unit_tag:i.unit_tag, equipment_type:i.equipment_type, purpose:i.purpose, spare_outcome:i.spare_outcome })));
-  return { assignments:assignments||[], released, inspectionDone:(inspectionQ.data||[]).length>0, deployed };
+  return { assignments:assignments||[], released, inspectionDone:(inspectionQ.data||[]).length>0, inspectionRequired, deployed };
 }
 async function loadOwnerReturnPhotos(details) { if (!details?.open || details.dataset.photosLoaded === '1') return; const row = ownerReturnRows.get(details.dataset.ownerReturn); if (!row) return; details.dataset.photosLoaded = '1'; const service = details.querySelector('[data-owner-service-photos]'); const intake = details.querySelector('[data-owner-intake-photos]'); if (service) { service.innerHTML = `<div class='wl-note'>Loading Service photos…</div>`; service.innerHTML = await returnPhotoHtml(row.return_photo_paths) || `<div class='wl-note'>No Service return photos saved.</div>`; } if (intake) { intake.innerHTML = `<div class='wl-note'>Loading IT photo…</div>`; intake.innerHTML = await returnPhotoHtml(row.intake_photo_paths) || `<div class='wl-note'>No IT intake photo saved.</div>`; } }
 async function loadServiceReturnPhotos(details) { if (!details?.open || details.dataset.photosLoaded === '1') return; const row = serviceReturnRows.get(details.dataset.svcReturn); if (!row) return; details.dataset.photosLoaded = '1'; const host = details.querySelector('[data-svc-return-photos]'); if (!host) return; host.innerHTML = `<div class='wl-note'>Loading return photos…</div>`; host.innerHTML = `${await returnPhotoHtml(row.return_photo_paths)}${await returnPhotoHtml(row.intake_photo_paths)}` || `<div class='wl-note'>No return photos saved.</div>`; }
@@ -609,12 +610,17 @@ function techCheckDateKey(value = new Date()) {
   const d=value instanceof Date ? value : new Date(value);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+function serviceInspectionRequiredToday(value = new Date()) {
+  const d=value instanceof Date ? value : new Date(value);
+  const day=d.getDay();
+  return day>=1 && day<=5;
+}
 
 function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be assigned directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
-    { kicker:'BEFORE DEPARTURE', title:'Verify the permanent truck load before leaving', body:`<p>Complete the Truck / Trailer Inspection and physically verify the Service truck has at least <b>4 × 12V 110Ah batteries</b> and <b>2 × LiTime 12V 100Ah batteries</b>. Both battery groups must be charged. If anything is missing or not charged, replace it with a charged battery before you proceed.</p><p>Also take <b>one complete backup unit appropriate to today’s work</b>: Spotter, Sniper, or Solar Spotter. IT must properly check out that backup and you must accept it before Tech Check will let the morning check pass. If the complete backup is unused, return it through <b>IT Intake</b> at the end of the day.</p>` },
+    { kicker:'BEFORE DEPARTURE', title:'Verify the permanent truck load before leaving', body:`<p><b>Monday–Friday only:</b> complete the Truck / Trailer Inspection and physically verify the Service truck has at least <b>4 × 12V 110Ah batteries</b> and <b>2 × LiTime 12V 100Ah batteries</b>. Both battery groups must be charged. If anything is missing or not charged, replace it with a charged battery before you proceed.</p><p>Also take <b>one complete backup unit appropriate to today’s work</b>: Spotter, Sniper, or Solar Spotter. IT must properly check out that backup and you must accept it before Tech Check will let the morning check pass. If the complete backup is unused, return it through <b>IT Intake</b> at the end of the day.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
@@ -697,7 +703,7 @@ function helpTopicsForRole(role){
     {id:'solar',icon:'☀',title:'Solar / Helios checkout',desc:'Solar Stand, batteries, MPPT, charging proof, Ranger, and Helios.',body:"<p><b>Solar Spotter delivery:</b> Service verifies the assigned Solar Stand, required batteries, MPPT update/test, and active charging with the solar panel + batteries + MPPT connected. Upload the stand tag and charging/reading proof.</p><p><b>Ranger:</b> verify the required solar panel and charging. <b>Helios:</b> physically verify the required battery box, then complete the Service-side Cerbo/MPPT verification and proof photos.</p>"},
     {id:'field',icon:'→',title:'Complete the field work',desc:'Delivery, service, swap, or pickup using the current ticket.',body:"<p>Work from the current MHelpDesk job. The MHelpDesk ticket changes from job to job, but the unit number remains universal inside Tech Check so history follows the equipment.</p>"},
     {id:'return',icon:'↩',title:'Return a unit to IT',desc:'Record the ticket, unit, condition, notes, and photos.',body:"<p>Use <b>Return Unit to IT Intake</b> when equipment comes back from the field. The return is recorded under your Service Tech name, then IT receives it through Intake.</p>"},
-    {id:'inspection',icon:'✓',title:'Truck / Trailer Inspection',desc:'Complete your inspection from your own account.',body:"<p>Complete the inspection from your own Service account so the record reflects the correct technician. Submitted inspections remain available in History.</p>"},
+    {id:'inspection',icon:'✓',title:'Truck / Trailer Inspection',desc:'Complete your inspection from your own account.',body:"<p>Truck / Trailer Inspections are required <b>Monday through Friday only</b>. Complete the inspection from your own Service account so the record reflects the correct technician. Submitted inspections remain available in History.</p>"},
     {id:'alerts',icon:'!',title:'Phone alerts & history',desc:'Enable alerts once and review completed work.',body:"<p>Open <b>Menu → Phone Alerts</b> on your device to enable assignment alerts. Use History to review previously submitted Service work.</p>"}
   ];
   return [
@@ -930,7 +936,7 @@ function helpStepGuide(role, step){
     },
     'service:DAILY TOOLS':{
       steps:[
-        'Tap Truck / Trailer Inspection from your own Service account.',
+        'Monday through Friday, tap Truck / Trailer Inspection from your own Service account. Weekend inspections are not required.',
         'Complete every required inspection item and submit it under your name.',
         'Use History to review previously submitted Service work.',
         'Enable Menu → Phone Alerts once on your phone if you want assignment notifications.'
@@ -3056,7 +3062,9 @@ async function showSvcHome() {
       <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
       <button class='${deployedCount ? "wl-red" : "wl-gray"}' data-wl-service-return>↩ Return Unit to IT Intake <span class='wl-count'>${deployedCount}</span></button>
       <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
-      <button class='wl-gray' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>
+      ${work.inspectionRequired
+        ? `<button class='wl-gray' data-wl-svc='inspect'>Truck / Trailer Inspection <span class='wl-count'>${work.inspectionDone?"✓":"0"}</span></button>`
+        : `<div class='wl-gray' style='padding:13px 14px;border-radius:12px'><b>Truck / Trailer Inspection · NOT REQUIRED</b><div class='small'>Weekend — inspections are Monday through Friday only.</div></div>`}
       <button class='wl-gray' data-wl-svc='history'>☰ Status & History <span class='wl-count'>${r.completed}</span></button>
     </div>`;
   hideChildren(viewSvc(),[home]);
