@@ -1976,10 +1976,20 @@ async function ownerAppRender(){
       host.innerHTML='';
       if(header)host.append(header);
       host.append(legacy);
+      legacy.removeAttribute('aria-hidden');
     }
   }
+  ownerInteractionSafety();
 }
-async function ownerAppNavigate(route){ownerAppRoute=route;await ownerAppRender();}
+async function ownerAppNavigate(route){ownerInteractionSafety();ownerAppRoute=route;await ownerAppRender();ownerInteractionSafety();}
+function ownerInteractionSafety(){
+  if(state.profile?.role!=='owner')return;
+  document.body.classList.remove('busy');
+  const app=document.getElementById('ownerApp'); if(app)app.style.pointerEvents='auto';
+  const ws=document.querySelector('#view-owner .ownerAppWorkspace'); if(ws)ws.style.pointerEvents='auto';
+  const form=document.getElementById('ownerJobAssignments');
+  if(form && form.closest('#ownerAppPage')) form.removeAttribute('aria-hidden');
+}
 function bindOwnerAppRouter(){
   const app=document.getElementById('ownerApp');if(!app||app.dataset.bound==='1')return;
   app.dataset.bound='1';
@@ -2383,6 +2393,7 @@ Object.assign(window, {
   ownerCompanyHistoryKindChanged,
   ownerCompanyHistorySearch,
   ownerAppNavigate,
+  ownerInteractionSafety,
   ownerCalendarShift,
   ownerCalendarSetMode,
   ownerCalendarToday,
