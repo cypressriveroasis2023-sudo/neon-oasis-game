@@ -317,7 +317,7 @@
         "Submit the completed Sniper work for finalization/completion so the Owner can review it in the Owner app."
       ],
       "swap_return_rule": "After a Sniper SWAP, bring the old field Sniper back and record it through the normal Service Return → IT Intake flow.",
-      "truck_spare_rule": "A Sniper BACKUP / truck spare follows the existing checked-out spare workflow. If unused, return it to Shop Inventory and remove it from the Service truck. If used for a swap, the replaced field Sniper returns through Service Return → IT Intake.",
+      "truck_spare_rule": "A Sniper BACKUP / truck spare follows the existing checked-out spare workflow. If unused, return it through Service Return → IT Intake so IT can verify it after transport before it becomes available Shop Inventory again. If used for a swap, the replaced field Sniper returns through Service Return → IT Intake.",
       "evidence": [
         "IT: exactly one clear handoff photo per unit with visible matching unit tag plus IT signature",
         "Service: field pictures of the installed Sniper and unit number/tag",
@@ -603,7 +603,7 @@
       "Matching-tag photo and IT signature are required by the existing prep workflow.",
       "IT explicitly checks out the spare before the IT → Service handoff.",
       "Service resolves the spare after the field call as used or returned_unused.",
-      "Unused spare units return directly to Shop Inventory and do not create an IT Intake return.",
+      "Unused complete backup units return through Service Return → IT Intake so IT can verify them after transport before they become available Shop Inventory again.",
       "If a spare unit is used for a swap, the failed/replaced field unit follows the normal Service Return → IT Intake flow."
     ],
     "battery_batches": [
