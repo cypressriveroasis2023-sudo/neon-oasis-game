@@ -10,7 +10,7 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v8', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=owner-command-v43', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=owner-command-v44', { cache:'reload' })),
       cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=release-qa-v134', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=owner-command-v119', { cache:'reload' })),
