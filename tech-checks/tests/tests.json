@@ -2577,7 +2577,38 @@
         "Permanent audit rows and timestamps are preserved",
         "MHelpDesk remains separate"
       ]
+    },
+    {
+      "id": "DAMAGE-INTAKE-OWNER-SHOP-PROTECTION-01",
+      "area": "Service Return → IT Intake → Needs Replacement → Owner",
+      "role": "service+it+owner",
+      "mode": "database rollback + source",
+      "destructive": false,
+      "scenario": "Damaged equipment is documented in IT Intake, escalated to Owner, held in Maintenance, and cannot return to Shop Inventory through generic paths",
+      "steps": [
+        "Create a rollback-only deployed Ranger and submit it from Service as a returned unit waiting for IT Intake with a damage photo/note",
+        "As IT, call it_mark_return_needs_replacement_v1 with required damage notes and IT Intake photo",
+        "Verify unit_returns.status becomes needs_replacement",
+        "Verify asset_inventory.availability_status becomes maintenance and unit_registry.lifecycle_status becomes maintenance",
+        "Verify one permanent damage report and one damage_needs_replacement inventory-history event are written",
+        "Verify every active Owner receives the Damaged equipment needs replacement notification",
+        "Attempt owner_set_inventory_asset_status(..., shop, ...) and verify it is rejected",
+        "Attempt a direct asset_inventory update to shop and verify the database trigger rejects it",
+        "Attempt needs_replacement → completed on unit_returns and verify it is rejected",
+        "Attempt to remove the needs_replacement tracking row and verify it is rejected",
+        "Verify the Owner UI shows the damage hold as NOT SHOP INVENTORY and does not render Remove from Tracking for that damaged record",
+        "Rollback and verify zero synthetic return, inventory, registry, notification, or report residue"
+      ],
+      "expected": [
+        "Damage notes and intake photo are required before IT can escalate",
+        "Owner notification is automatic",
+        "Damaged equipment is held in Maintenance / Needs Replacement",
+        "The damaged unit remains unavailable Shop Inventory",
+        "Generic Owner or direct-table paths cannot clear, complete, or delete the damage hold",
+        "Final repair / replacement disposition remains MISSING INFORMATION until the Owner defines that normal procedure",
+        "Rollback QA leaves no synthetic production data"
+      ]
     }
   ],
-  "last_release_qa_note": "Current release QA covers OnSite Vision Q8→Q9, stable persistent Owner Vision alerts, authenticated Owner closeout/correction routing, permanent Company History, and Help alignment. Vision alert keys now fingerprint the semantic issue rather than elapsed-time display text, so one unresolved assignment issue remains one active alert while detail/last-seen updates. Legacy elapsed-key rows were retained with an explicit superseded-by-normalization note rather than falsely claiming the workflow condition cleared."
+  "last_release_qa_note": "Damage workflow QA now covers Service Return → IT Intake → Needs Replacement → Owner notification → Shop Inventory protection. IT escalation requires damage notes + intake photo, moves both asset_inventory and unit_registry to Maintenance, writes permanent report/history, and notifies every active Owner. Database guards now block generic Owner Shop status, direct Shop updates, needs_replacement completion, and deletion of the damage record. Owner UI shows a locked Damage Hold. Final repair/replacement disposition remains MISSING INFORMATION until defined."
 }
