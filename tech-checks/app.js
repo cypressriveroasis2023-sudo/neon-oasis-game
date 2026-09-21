@@ -1948,54 +1948,47 @@ function ownerAppActivity(){
 }
 function ownerAppAccounts(){
   renderPasswordResetRequests();renderUsers();
-  const resets='<div data-owner-mount="passwordResetRequests"></div>';
-  const users='<div data-owner-mount="userList"></div>';
   return ownerAppHeader('ACCESS','Technician Accounts','Create technician logins and manage existing access.')
-    +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>'
-    +'<section class="ownerAppGroup"><h2>Password Reset Requests</h2>'+resets+'</section><section class="ownerAppGroup"><h2>Current Users</h2>'+users+'</section>';
+    +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>';
 }
 async function ownerAppCreateTech(){
   const map=[['ownerAppNewTechName','newTechName'],['ownerAppNewTechUsername','newTechUsername'],['ownerAppNewTechRole','newTechRole'],['ownerAppNewTechPassword','newTechPassword']];
   map.forEach(([a,b])=>{const x=document.getElementById(a),y=document.getElementById(b);if(x&&y)y.value=x.value;});
-  await createTech();ownerAppRender();
+  await createTech();await ownerAppRender();
 }
 async function ownerAppAssign(){
   if(!document.getElementById('ownerAssignTicket')) {
     if(typeof window.installOwnerAssignments==='function') await window.installOwnerAssignments(false);
     else if(typeof installOwnerAssignments==='function') await installOwnerAssignments(false);
   }
-  return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.')
-    +'<div data-owner-mount="ownerJobAssignments"></div>';
+  return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.');
 }
-const ownerAppMountHomes = new Map();
 let ownerAppRenderVersion = 0;
+function ownerSetPersistentSurface(route){
+  const form=document.getElementById('ownerJobAssignments');
+  const accounts=document.getElementById('ownerPersistentAccounts');
+  const assignActive=route==='assign', accountsActive=route==='accounts';
+  if(form){
+    form.classList.toggle('ownerAppMountedAssign',assignActive);
+    form.open=assignActive;
+    form.setAttribute('aria-hidden',assignActive?'false':'true');
+    form.style.display=assignActive?'block':'none';
+    form.style.visibility=assignActive?'visible':'hidden';
+    form.style.pointerEvents=assignActive?'auto':'none';
+  }
+  if(accounts){
+    accounts.setAttribute('aria-hidden',accountsActive?'false':'true');
+    accounts.style.display=accountsActive?'block':'none';
+    accounts.style.visibility=accountsActive?'visible':'hidden';
+    accounts.style.pointerEvents=accountsActive?'auto':'none';
+  }
+}
 async function ownerAppRender(){
   if(state.profile?.role!=='owner')return;
-  const host=document.getElementById('ownerAppPage');if(!host)return;
+  const page=document.getElementById('ownerAppPage');
+  const host=document.getElementById('ownerRouteView');
+  if(!page||!host)return;
   const version=++ownerAppRenderVersion, route=ownerAppRoute;
-  // Assign Job is the one production control surface that must retain its
-  // authoritative DOM node because its existing handlers are scoped to it.
-  if(route==='assign' && host.querySelector('#ownerJobAssignments #ownerAssignTicket')){
-    const form=host.querySelector('#ownerJobAssignments');
-    form.open=true;
-    form.classList.add('ownerAppMountedAssign');
-    form.removeAttribute('aria-hidden');
-    form.style.display='block';
-    form.style.visibility='visible';
-    form.style.pointerEvents='auto';
-    document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute==='assign'));
-    ownerInteractionSafety();
-    return;
-  }
-  const mounted=host.querySelector('#ownerJobAssignments');
-  // Keep the authoritative Assign Job DOM mounted when leaving the page.
-  // Moving it into the hidden legacy container caused the form to appear to
-  // disappear and risked breaking state/handlers. Hide it in place instead.
-  if(mounted && route!=='assign'){
-    mounted.classList.remove('ownerAppMountedAssign');
-    mounted.setAttribute('aria-hidden','true');
-    mounted.style.display='none';
-  }
   let html='';
   if(route==='today')html=ownerAppToday();
   else if(route==='calendar')html=ownerAppCalendar();
@@ -2009,70 +2002,40 @@ async function ownerAppRender(){
   else if(route==='accounts')html=ownerAppAccounts();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
-  if(mounted && route!=='assign'){
-    // Preserve the live form node and its entered values while rendering the
-    // requested Owner page beside it.
-    [...host.children].forEach(child=>{ if(child!==mounted) child.remove(); });
-    host.insertAdjacentHTML('beforeend',html);
-  }else{
-    host.innerHTML=html;
-  }
-  // Never move legacy dashboard sections into the desktop workspace. Only
-  // mount the single authoritative Assign Job form and the two account lists.
-  for(const slot of host.querySelectorAll('[data-owner-mount]')){
-    const id=slot.dataset.ownerMount;
-    if(!['ownerJobAssignments','passwordResetRequests','userList'].includes(id)){slot.remove();continue;}
-    const node=document.getElementById(id);if(!node){slot.remove();continue;}
-    slot.replaceWith(node);
-  }
+  host.innerHTML=html;
+  ownerSetPersistentSurface(route);
   document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===route));
-  if(route==='assign'){
-    const form=document.getElementById('ownerJobAssignments');
-    if(form){
-      form.open=true;form.classList.add('ownerAppMountedAssign');
-      form.removeAttribute('aria-hidden');form.style.display='block';form.style.visibility='visible';form.style.pointerEvents='auto';
-    }
-  }
-  if(route==='attention') renderOwnerAttention();
+  if(route==='attention')renderOwnerAttention();
+  if(route==='accounts'){renderPasswordResetRequests();renderUsers();}
   ownerInteractionSafety();
 }
 async function ownerAppNavigate(route){
   if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
-  ownerInteractionSafety();ownerAppRoute=route;await ownerAppRender();ownerInteractionSafety();
+  ownerAppRoute=route;
+  await ownerAppRender();
 }
 function ownerInteractionSafety(){
   if(state.profile?.role!=='owner')return;
   document.body.classList.remove('busy');
-  const legacy=document.getElementById('ownerLegacyMounts');
-  if(legacy){
-    legacy.setAttribute('aria-hidden','true');
-    legacy.style.display='none';
-    legacy.style.pointerEvents='none';
+  const support=document.getElementById('ownerLegacyMounts');
+  if(support){
+    support.setAttribute('aria-hidden','true');
+    support.style.display='none';
+    support.style.pointerEvents='none';
   }
   const app=document.getElementById('ownerApp');if(app)app.style.pointerEvents='auto';
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');if(ws)ws.style.pointerEvents='auto';
-  const form=document.getElementById('ownerJobAssignments');
-  if(form&&form.closest('#ownerAppPage')){
-    const active=ownerAppRoute==='assign';
-    if(active){
-      form.removeAttribute('aria-hidden');
-      form.style.display='block';
-      form.style.visibility='visible';
-      form.style.pointerEvents='auto';
-    }else{
-      form.setAttribute('aria-hidden','true');
-      form.style.display='none';
-      form.style.visibility='hidden';
-      form.style.pointerEvents='none';
-    }
-  }
+  ownerSetPersistentSurface(ownerAppRoute);
 }
 function bindOwnerAppRouter(){
   const app=document.getElementById('ownerApp');if(!app||app.dataset.bound==='1')return;
   app.dataset.bound='1';
   app.addEventListener('click',e=>{
     const b=e.target.closest('[data-owner-route]');
-    if(!b)return;e.preventDefault();e.stopPropagation();ownerAppNavigate(b.dataset.ownerRoute);
+    if(!b)return;
+    e.preventDefault();
+    e.stopPropagation();
+    ownerAppNavigate(b.dataset.ownerRoute);
   });
 }
 function ownerCommandOpen(id) {
