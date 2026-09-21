@@ -21,6 +21,22 @@ const json = (body: unknown, status = 200) =>
 const clean = (value: unknown) => String(value ?? '').trim()
 const lower = (value: unknown) => clean(value).toLowerCase()
 
+const SOURCE_REPO = 'cypressriveroasis2023-sudo/neon-oasis-game'
+const SOURCE_FILES = [
+  'tech-checks/onsite-vision.js',
+  'tech-checks/onsite-vision-live-data.js',
+  'tech-checks/onsite-vision-actions.js',
+  'tech-checks/onsite-vision-persistence.js',
+  'tech-checks/onsite-vision-knowledge-admin.js',
+  'tech-checks/onsite-vision-workflow-engine.js',
+  'tech-checks/onsite-vision-company-knowledge.js',
+  'tech-checks/tech-check-rules.js',
+  'tech-checks/app.js',
+  'tech-checks/technician-wizard-owner-dashboard-v5.js',
+  'tech-checks/index.html',
+  'tech-checks/sw.js',
+]
+
 const unitNumber = (value: unknown) => {
   const digits = clean(value).match(/\d+/g)?.join('') || ''
   return digits ? String(Number(digits)) : ''
@@ -49,6 +65,13 @@ const todayCentral = () =>
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+  }).format(new Date())
+const timeCentral = () =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Chicago',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date())
 
 function stripNulls(value: any): any {
@@ -438,6 +461,36 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_operations_snapshot',
+    description: 'Build one read-only Owner operations snapshot for a date. It combines scheduled workload, technician load, overdue active work, workflow blockers/next steps, Owner Review, active offline escalations, and damaged-equipment holds. Use first for broad questions like what needs attention today, give me the rundown, what is behind, who has room, what do I need to deal with, or how are operations looking.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'YYYY-MM-DD date to review.' },
+        include_overdue: { type: 'boolean', description: 'Include active jobs scheduled before today and jobs whose scheduled time has passed today.' }
+      },
+      required: ['date','include_overdue'],
+      additionalProperties: false
+    },
+  },
+  {
+    type: 'function',
+    name: 'search_app_source',
+    description: 'Search the current GitHub main-branch Tech Check source code read-only. Use for questions about programming, exact implementation, why a UI/workflow behaves a certain way, which file/function controls behavior, cache/version wiring, or whether code contains a rule.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Plain-language or code search terms.' },
+        file_hint: { type: 'string', description: 'Optional exact allowlisted repo path, or empty string to search the Tech Check source allowlist.' }
+      },
+      required: ['query','file_hint'],
+      additionalProperties: false
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -462,7 +515,7 @@ const outputSchema = {
         properties: {
           certainty: {
             type: 'string',
-            enum: ['VERIFIED DATABASE FACT', 'COMPANY RULE', 'AI INFERENCE', 'MISSING INFORMATION'],
+            enum: ['VERIFIED DATABASE FACT', 'VERIFIED SOURCE CODE FACT', 'COMPANY RULE', 'AI INFERENCE', 'MISSING INFORMATION'],
           },
           statement: { type: 'string' },
         },
@@ -489,8 +542,42 @@ const outputSchema = {
       required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'summary', 'requires_confirmation'],
       additionalProperties: false,
     },
+    working_memory_update: {
+      type: 'object',
+      properties: {
+        active_ticket: { type: 'string' },
+        site: { type: 'string' },
+        work_type: { type: 'string' },
+        date: { type: 'string' },
+        time: { type: 'string' },
+        current_subject: { type: 'string' },
+        workflow_stage: { type: 'string' },
+        technician_names: { type: 'array', items: { type: 'string' } },
+        unit_references: { type: 'array', items: { type: 'string' } },
+        unresolved_reference: { type: 'string' },
+        notes: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['active_ticket','site','work_type','date','time','current_subject','workflow_stage','technician_names','unit_references','unresolved_reference','notes'],
+      additionalProperties: false,
+    },
+    knowledge_proposal: {
+      type: 'object',
+      properties: {
+        detected: { type: 'boolean' },
+        title: { type: 'string' },
+        domain: { type: 'string', enum: ['technical','product','workflow','sop','troubleshooting','configuration','safety','operations'] },
+        equipment_type: { type: 'string' },
+        workflow_type: { type: 'string' },
+        topic: { type: 'string' },
+        content: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        rationale: { type: 'string' },
+      },
+      required: ['detected','title','domain','equipment_type','workflow_type','topic','content','tags','rationale'],
+      additionalProperties: false,
+    },
   },
-  required: ['answer', 'active_ticket', 'facts', 'proposed_action'],
+  required: ['answer', 'active_ticket', 'facts', 'proposed_action', 'working_memory_update', 'knowledge_proposal'],
   additionalProperties: false,
 }
 
@@ -532,7 +619,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v27',
+        agent_version: 'onsite-vision-agent-v30',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -541,6 +628,10 @@ Deno.serve(async (req) => {
         shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
         write_tools_enabled: false,
         managed_knowledge_enabled: true,
+        working_memory_enabled: true,
+        source_code_search_enabled: true,
+        owner_correction_learning_enabled: true,
+        operations_orchestration_enabled: true,
       })
     }
 
@@ -549,6 +640,9 @@ Deno.serve(async (req) => {
     if (message.length > 12000) return json({ error: 'Message is too long.' }, 400)
 
     const activeTicket = clean(body.active_ticket)
+    const workingMemory = body.working_memory && typeof body.working_memory === 'object' && !Array.isArray(body.working_memory)
+      ? stripNulls(body.working_memory)
+      : {}
     const history = Array.isArray(body.history)
       ? body.history.slice(-10)
           .filter((m: any) => ['user', 'assistant'].includes(m?.role) && clean(m?.content))
@@ -694,7 +788,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v27',
+            agent_version: 'onsite-vision-agent-v30',
           }
         } as Json
       }
@@ -954,17 +1048,197 @@ Deno.serve(async (req) => {
         const tickets=[...grouped.keys()]
         const completedTickets=tickets.filter((ticket)=>grouped.get(ticket)!.every((row:any)=>clean(row.status).toLowerCase()==='completed'))
         const remainingTickets=tickets.filter((ticket)=>!completedTickets.includes(ticket))
+        const departmentTicketCounts={
+          it:new Set(assignments.filter((row:any)=>clean(row.assigned_role).toLowerCase()==='it').map((row:any)=>clean(row.ticket_no)).filter(Boolean)).size,
+          service:new Set(assignments.filter((row:any)=>clean(row.assigned_role).toLowerCase()==='service').map((row:any)=>clean(row.ticket_no)).filter(Boolean)).size
+        }
         return {
           date,role,
           technician:technician?{full_name:technician.full_name,username:technician.username,role:technician.role}:null,
           scheduled_ticket_count:tickets.length,
           remaining_ticket_count:remainingTickets.length,
           completed_ticket_count:completedTickets.length,
+          department_ticket_counts:departmentTicketCounts,
           tickets,
           remaining_tickets:remainingTickets,
           completed_tickets:completedTickets,
           assignments,
           mhelpdesk_separate:true
+        } as Json
+      }
+
+      if (name === 'get_operations_snapshot') {
+        const date=clean(args.date)
+        const includeOverdue=args.include_overdue===true
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('A YYYY-MM-DD operations date is required.')
+
+        const [workloadRaw,techniciansRaw,reviewsRaw,offlineRaw,damageRaw,activeRaw]=await Promise.all([
+          toolCall('get_workload',{date,role:'',technician_name:''}),
+          toolCall('list_technicians',{role:'all'}),
+          toolCall('get_owner_review_queue',{}),
+          toolCall('get_offline_escalations',{scope:'active',unit_reference:'',ticket_no:''}),
+          toolCall('get_damage_holds',{scope:'active',unit_reference:'',ticket_no:''}),
+          toolCall('list_active_jobs',{})
+        ])
+        const workload:any=workloadRaw||{}
+        const technicians:any[]=(techniciansRaw as any)?.technicians||[]
+        const assignments:any[]=Array.isArray(workload.assignments)?workload.assignments:[]
+        const scheduledTickets:string[]=Array.isArray(workload.tickets)?workload.tickets:[]
+        const currentDate=todayCentral(),currentTime=timeCentral()
+
+        const analyses:any[]=[]
+        for(const ticket of scheduledTickets.slice(0,20)){
+          const context=await getContext(ticket)
+          if(!context?.found)continue
+          const ec=engineContext(context)
+          const activeAssignments=(context.assignments||[]).filter((row:any)=>clean(row.status).toLowerCase()!=='cancelled')
+          analyses.push(stripNulls({
+            ticket_no:clean(ticket),
+            site:context?.summary?.site||activeAssignments[0]?.site||'',
+            work_type:context?.summary?.effective_work_type||context?.prep?.work_type||activeAssignments[0]?.work_type||'',
+            statuses:activeAssignments.map((row:any)=>({
+              role:row.assigned_role,
+              technician:row.assignee_name||'Department queue',
+              status:row.status,
+              scheduled_time:row.scheduled_time
+            })),
+            blockers:ENGINE?.getWorkflowBlockers?.(ec)||[],
+            next_step:ENGINE?.getWorkflowNextStep?.(ec)||null
+          }))
+        }
+
+        const activeRows:any[]=(activeRaw as any)?.jobs||[]
+        const overdueMap=new Map<string,any[]>()
+        if(includeOverdue){
+          for(const row of activeRows){
+            const ticket=clean(row.ticket_no),scheduledFor=clean(row.scheduled_for),scheduledTime=clean(row.scheduled_time).slice(0,5)
+            if(!ticket)continue
+            const oldDate=Boolean(scheduledFor&&scheduledFor<currentDate)
+            const lateToday=Boolean(scheduledFor===currentDate&&scheduledTime&&scheduledTime<currentTime)
+            if(!oldDate&&!lateToday)continue
+            if(!overdueMap.has(ticket))overdueMap.set(ticket,[])
+            overdueMap.get(ticket)!.push(row)
+          }
+        }
+        const overdue=[...overdueMap.entries()].map(([ticket,rows])=>({
+          ticket_no:ticket,
+          site:rows[0]?.site||'',
+          scheduled_for:rows[0]?.scheduled_for||'',
+          scheduled_time:rows[0]?.scheduled_time||'',
+          assignments:rows.map((row:any)=>({role:row.assigned_role,technician:row.assignee_name||'Department queue',status:row.status}))
+        }))
+
+        const groupedByTech=new Map<string,{tech:any,tickets:Set<string>,remaining:Set<string>}>()
+        for(const tech of technicians){
+          const key=clean(tech.user_id)||lower(tech.full_name||tech.username)
+          groupedByTech.set(key,{tech,tickets:new Set(),remaining:new Set()})
+        }
+        for(const row of assignments){
+          const ticket=clean(row.ticket_no)
+          if(!ticket)continue
+          const key=clean(row.assignee_user_id)||lower(row.assignee_name)
+          const bucket=groupedByTech.get(key)
+          if(!bucket)continue
+          bucket.tickets.add(ticket)
+          if(clean(row.status).toLowerCase()!=='completed')bucket.remaining.add(ticket)
+        }
+        const technicianLoads=[...groupedByTech.values()].map(bucket=>({
+          name:bucket.tech.full_name||bucket.tech.username||'',
+          username:bucket.tech.username||'',
+          role:bucket.tech.role,
+          scheduled_ticket_count:bucket.tickets.size,
+          remaining_ticket_count:bucket.remaining.size
+        })).sort((a,b)=>a.remaining_ticket_count-b.remaining_ticket_count||a.scheduled_ticket_count-b.scheduled_ticket_count||clean(a.name).localeCompare(clean(b.name)))
+
+        const queueCounts={it:0,service:0}
+        for(const row of assignments){
+          if(clean(row.status).toLowerCase()==='completed')continue
+          const assigned=Boolean(clean(row.assignee_user_id)||clean(row.assignee_name))
+          const role=clean(row.assigned_role).toLowerCase()
+          if(!assigned&&(role==='it'||role==='service'))queueCounts[role as 'it'|'service']++
+        }
+
+        const reviews:any[]=(reviewsRaw as any)?.reviews||[]
+        const offline:any[]=(offlineRaw as any)?.escalations||[]
+        const damage:any[]=(damageRaw as any)?.damage_holds||[]
+        const blocked=analyses.filter(row=>Array.isArray(row.blockers)&&row.blockers.length>0)
+        const ownerDecisionOffline=offline.filter(row=>clean(row.status).toLowerCase()==='unresolved_owner')
+
+        return {
+          snapshot_version:'operations-snapshot-v1',
+          date,
+          generated_date:currentDate,
+          generated_time_central:currentTime,
+          workload:{
+            scheduled_ticket_count:Number(workload.scheduled_ticket_count||0),
+            remaining_ticket_count:Number(workload.remaining_ticket_count||0),
+            completed_ticket_count:Number(workload.completed_ticket_count||0),
+            tickets:scheduledTickets,
+            assignments
+          },
+          workflow_analysis:{
+            analyzed_ticket_count:analyses.length,
+            blocked_ticket_count:blocked.length,
+            tickets:analyses
+          },
+          overdue:{count:overdue.length,tickets:overdue},
+          team:{
+            technicians:technicianLoads,
+            department_queue_remaining:queueCounts,
+            capacity_note:'Technician load reflects only Tech Check tickets on this date. It does not prove travel, PTO, skill fit, or real-world availability.'
+          },
+          owner_attention:{
+            owner_review_count:reviews.length,
+            owner_reviews:reviews,
+            offline_active_count:offline.length,
+            offline_owner_decision_count:ownerDecisionOffline.length,
+            offline_escalations:offline,
+            damage_hold_count:damage.length,
+            damage_holds:damage
+          },
+          mhelpdesk_separate:true
+        } as Json
+      }
+
+      if (name === 'search_app_source') {
+        const queryText=clean(args.query)
+        const fileHint=clean(args.file_hint)
+        if(!queryText)throw new Error('Source search query is required.')
+        const requested=fileHint ? SOURCE_FILES.filter(path=>path===fileHint) : SOURCE_FILES
+        if(fileHint && !requested.length){
+          return {query:queryText,file_hint:fileHint,matches:[],missing_information:'That file is not in the approved Tech Check source-search allowlist.'} as Json
+        }
+        const words=lower(queryText).split(/\s+/).map((x:string)=>x.replace(/[^a-z0-9_]+/g,'')).filter((x:string)=>x.length>=2)
+        const matches:any[]=[]
+        for(const path of requested){
+          if(matches.length>=18)break
+          try{
+            const url='https://raw.githubusercontent.com/'+SOURCE_REPO+'/main/'+path+'?vision='+Date.now()
+            const response=await fetch(url,{headers:{'Cache-Control':'no-cache'}})
+            if(!response.ok)continue
+            const source=(await response.text()).slice(0,450000)
+            const lines=source.split('\n')
+            for(let i=0;i<lines.length;i++){
+              const lineLower=lines[i].toLowerCase()
+              const exact=lineLower.includes(queryText.toLowerCase())
+              const score=words.reduce((n:number,w:string)=>n+(lineLower.includes(w)?1:0),0)
+              if(!exact && score<Math.min(2,Math.max(1,words.length)))continue
+              matches.push({
+                path,
+                line:i+1,
+                snippet:lines.slice(Math.max(0,i-2),Math.min(lines.length,i+3)).map((line:string,j:number)=>String(Math.max(0,i-2)+j+1)+': '+line).join('\n')
+              })
+              if(matches.length>=18)break
+            }
+          }catch(_error){}
+        }
+        return {
+          query:queryText,
+          file_hint:fileHint,
+          branch:'main',
+          repository:SOURCE_REPO,
+          matches,
+          note:'Read-only source search of the current GitHub main branch. A match proves source text, not that a workflow database row currently has that state.'
         } as Json
       }
 
@@ -1000,6 +1274,7 @@ Deno.serve(async (req) => {
       'Your job is to help run technical operations from beginning to end using Cameras On Site company rules and live Tech Check data.',
       'Current local date for Cameras On Site (America/Chicago): ' + currentDate + '.',
       activeTicket ? 'Current conversation ticket context: MHelpDesk #' + activeTicket + '.' : 'There is no current ticket context.',
+      'Conversation working memory (context, not company truth): ' + JSON.stringify(workingMemory).slice(0, 7000),
       '',
       'GROUNDING RULES:',
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
@@ -1010,7 +1285,7 @@ Deno.serve(async (req) => {
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
       '- For truck readiness, departure readiness, battery minimums, or backup-unit readiness, call get_departure_readiness before answering. Never assume unrecorded equipment is on the truck.',
-      '- For questions about how many jobs IT, Service, or a named technician has on a date, call get_workload. Count distinct Tech Check ticket numbers, not assignment rows, because one ticket can have both IT and Service assignments. MHelpDesk remains separate.',
+      '- For questions about how many jobs are scheduled on a date, call get_workload. If the current message names a technician, filter to that technician. If it names only IT or Service, filter to that department. If it asks broadly how many jobs today / total jobs / jobs scheduled today with no explicit technician or department, use role="" and technician_name="" for the company-wide distinct-ticket total. Do NOT inherit a previously named technician from working memory for a new broad workload question. If both IT and Service are named, use the company-wide result and department_ticket_counts; explain that department counts can overlap because one ticket can flow through both. MHelpDesk remains separate.',
       '- A live needs_replacement hold means the unit is NOT available Shop Inventory. Do not say it may return to Shop Inventory through a generic path while that hold exists.',
       '- Treat Owner notification as VERIFIED DATABASE FACT only when the matching app_notifications row is present. A permanent report alone does not prove the notification row is still recorded.',
       '- The final repair/replacement disposition is MISSING INFORMATION unless a documented Cameras On Site procedure and completed outcome are present. Do not invent a repair, purchase, retirement, or return-to-shop decision.',
@@ -1026,10 +1301,20 @@ Deno.serve(async (req) => {
       '- Distinguish VERIFIED DATABASE FACT, COMPANY RULE, AI INFERENCE, and MISSING INFORMATION.',
       '- Historical raw work_type can be stale. Prefer summary.effective_work_type from live job context.',
       '- MHelpDesk is separate from Tech Check; never claim you changed MHelpDesk.',
+      '- For source-code/programming questions, call search_app_source. Treat exact matched implementation as VERIFIED SOURCE CODE FACT. Source code tells you implementation; live database tools tell you current operational state.',
+      '',
+      'OPERATIONS ORCHESTRATION:',
+      '- For broad Owner requests such as "what needs attention today", "give me the rundown", "what is behind", "who has room", "who can take this", "what do I need to deal with", "how are operations looking", or a daily/morning operations brief, call get_operations_snapshot FIRST for the relevant date.',
+      '- The operations snapshot is intentionally broad: scheduled work, workflow blockers, overdue work, team Tech Check load, Owner Review, offline escalations, and damage holds. Use it to synthesize one coherent answer instead of making the Owner ask each subsystem separately.',
+      '- If the snapshot identifies one ticket whose exact details matter, then call analyze_job or get_job_context for that ticket before making a ticket-specific factual claim.',
+      '- Prioritize concrete Owner action items: unresolved Owner decisions, damaged-equipment holds, Owner Review/corrections, overdue jobs, then workflow blockers. Do not manufacture urgency when the data does not show it.',
+      '- When asked who can take additional work, compare technician_loads only as recorded Tech Check workload. Say "lighter Tech Check load" rather than claiming someone is truly free or available. Travel, PTO, geography, and skill fit are MISSING INFORMATION unless recorded elsewhere.',
+      '- If the Owner asks you to actually assign one of those technicians, prepare the normal confirmed assign action; the operations snapshot itself never writes.',
+      '- MHelpDesk remains separate throughout any operations brief.',
       '',
       'PLAIN TALK / DICTATION:',
       '- Treat the Owner’s message like normal spoken conversation, not command syntax. Understand slang, shorthand, missing punctuation, speech-to-text wording, and reasonable typos when the intended meaning is clear.',
-      '- Infer a workload question from a department or technician plus normal phrases such as "got", "have", "doing", "busy", "lined up", "on deck", "taking", or "handling" even when the Owner never says "job" or "ticket". Examples: "what’s IT got today?", "what does Josh have?", "is Service busy tomorrow?". Use get_workload.',
+      '- Infer workload questions from normal speech. Examples: "what’s IT got today?", "what does Josh have?", "is Service busy tomorrow?", "how many jobs today?", "how many total jobs do I have today?", and "how many jobs are scheduled today?". Use get_workload. A fresh broad question resets the named-technician subject unless the Owner explicitly refers back with language such as "him", "her", "that tech", "same tech", or a terse continuation such as "and tomorrow?".',
       '- For workload answers, scheduled_ticket_count means all non-cancelled Tech Check tickets scheduled for that day; also tell the Owner how many remain and how many are completed when useful.',
       '- Resolve a partial technician name only when it uniquely matches one active IT or Service technician. If more than one matches, ask one short natural clarification instead of guessing.',
       '- Understand assignment phrasing such as "put Josh on this", "have Josh handle it", "give this to IT", or "let Mike take that one" as assignment intent.',
@@ -1037,6 +1322,18 @@ Deno.serve(async (req) => {
       '- For create_job, fill proposed_action.work_type, date, time, and technician_name whenever the Owner already supplied or clearly implied them. The client’s guided draft will ask only for required details that are still missing, including MHelpDesk number, site, equipment, unit numbers, work description, parts, assignment, and notes.',
       '- For questions about how Tech Check is programmed or why its workflow behaves a certain way, use live database facts, get_company_knowledge, workflow rules, and system health. Clearly distinguish code/company rules from live job data. If source-level implementation detail is not available through these tools, say that detail is not exposed here instead of inventing it.',
       '- Keep conversational context across follow-ups such as "him", "her", "that one", "this job", "move it to tomorrow", and "give it to Service" when the prior messages make the referent clear.',
+      '',
+      'WORKING MEMORY:',
+      '- Populate working_memory_update on every answer with useful context learned or confirmed in this turn. Preserve stable context from the supplied working memory unless the Owner corrects it.',
+      '- Working memory may contain the active ticket, site, workflow type, date/time, named technicians, numbered units, current subject, workflow stage, and a short unresolved reference. Do not put passwords, tokens, secrets, or speculative facts in memory.',
+      '- Empty strings/arrays mean no new value for that field; do not erase good prior context merely because the current turn did not mention it.',
+      '',
+      'OWNER CORRECTION LEARNING:',
+      '- Set knowledge_proposal.detected=true only when the Owner explicitly corrects Vision or defines a reusable Cameras On Site rule, term, convention, workflow, configuration, or SOP that should apply beyond the current one-off job.',
+      '- Examples: "No, when I say inspections I mean truck inspections", "we do not do inspections on weekends", or "from now on call this a handoff".',
+      '- Do NOT propose permanent knowledge for a temporary ticket instruction, one-time schedule, technician assignment, customer-specific fact, or ordinary question.',
+      '- A detected correction is only a DRAFT proposal. Never say it is learned/published yet. The client requires Owner approval before it becomes approved company knowledge.',
+      '- Make the proposed content concise, operational, and faithful to exactly what the Owner established. If the correction is ambiguous, ask a clarification and set detected=false.',
       '',
       'ACTION SAFETY:',
       '- This server agent is READ ONLY. It has no mutation tools.',
@@ -1060,8 +1357,14 @@ Deno.serve(async (req) => {
       { role: 'user', content: message },
     ]
 
+    const broadOperations=/\b(operations?|ops|rundown|what needs attention|needs attention|behind|who can take|who has room|what do i need to deal with|how are we looking|how are operations|morning brief|daily brief|today'?s brief|run the company)\b/i.test(message)
+    const reasoningEffort = broadOperations || /\b(code|program|programming|implementation|source|why|root cause|analy[sz]e|review everything|compare|workflow blocker|system health|database health|troubleshoot|what happened|history)\b/i.test(message)
+      ? 'high'
+      : 'medium'
+    const maxToolTurns=broadOperations?8:6
+
     let response: any = null
-    for (let turn = 0; turn < 6; turn++) {
+    for (let turn = 0; turn < maxToolTurns; turn++) {
       const apiResponse = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
@@ -1075,7 +1378,7 @@ Deno.serve(async (req) => {
           tools,
           tool_choice: 'auto',
           parallel_tool_calls: false,
-          reasoning: { effort: 'medium' },
+          reasoning: { effort: reasoningEffort },
           text: {
             format: {
               type: 'json_schema',
@@ -1084,7 +1387,7 @@ Deno.serve(async (req) => {
               schema: outputSchema,
             },
           },
-          max_output_tokens: 2200,
+          max_output_tokens: 3200,
           store: false,
         }),
       })
@@ -1144,12 +1447,27 @@ Deno.serve(async (req) => {
           summary: '',
           requires_confirmation: false,
         },
+        working_memory_update: {
+          active_ticket:'',site:'',work_type:'',date:'',time:'',current_subject:'',workflow_stage:'',
+          technician_names:[],unit_references:[],unresolved_reference:'',notes:[]
+        },
+        knowledge_proposal: {
+          detected:false,title:'',domain:'operations',equipment_type:'',workflow_type:'',topic:'',content:'',tags:[],rationale:''
+        },
       }
+    }
+
+    parsed.working_memory_update = parsed.working_memory_update || {
+      active_ticket:'',site:'',work_type:'',date:'',time:'',current_subject:'',workflow_stage:'',
+      technician_names:[],unit_references:[],unresolved_reference:'',notes:[]
+    }
+    parsed.knowledge_proposal = parsed.knowledge_proposal || {
+      detected:false,title:'',domain:'operations',equipment_type:'',workflow_type:'',topic:'',content:'',tags:[],rationale:''
     }
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v27',
+      agent_version: 'onsite-vision-agent-v30',
       model,
       tool_trace: toolTrace,
       ...parsed,
