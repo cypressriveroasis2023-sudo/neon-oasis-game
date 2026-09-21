@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
-  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v30">
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v31">
 </head>
 <body>
   <div id="visionLoading" class="vision-loading">
@@ -51,10 +51,11 @@
       <section id="visionThread" class="vision-thread"></section>
       <footer class="vision-composer-wrap">
         <div class="vision-composer">
-          <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision">🎙</button>
+          <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision" aria-pressed="false">🎙</button>
           <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision…" enterkeyhint="send"></textarea>
           <button id="visionSendButton" class="vision-send" type="button" aria-label="Send">➜</button>
         </div>
+        <div id="visionVoiceStatus" class="vision-voice-status hidden" aria-live="polite"></div>
         <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
       </footer>
     </main>
@@ -165,6 +166,8 @@
               <option value="retired">Retired</option>
             </select>
           </div>
+          <button id="visionLanguageEval" class="vision-language-eval-button" type="button">Run language QA</button>
+          <div id="visionLanguageEvalStatus" class="vision-language-eval-status hidden"></div>
           <div id="visionKnowledgeList" class="vision-knowledge-list">
             <div class="vision-system-note">Loading knowledge…</div>
           </div>
@@ -180,10 +183,10 @@
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-workspace-v48" defer></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v49" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=134', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=135', { scope: './', updateViaCache: 'none' }).catch(console.warn));
     }
   </script>
 </body>
