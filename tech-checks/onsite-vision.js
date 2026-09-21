@@ -870,10 +870,14 @@ function draftApplyInput(d,text,initial=false){
   if(notesMatch){d.notes=String(notesMatch[1]||'').trim();d.notes_answered=true;}
   if(expected==='notes'&&/\b(no additional notes|no notes|none|skip)\b/i.test(raw)){d.notes='';d.notes_answered=true;}
   const recognized=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||unitMatch||standMatch||descMatch||Object.keys(parts).length||techs.length||notesMatch);
-  if(!initial&&!recognized){
-    if(expected==='site')d.site=raw;
-    else if(expected==='job_description')d.job_description=raw;
-    else if(expected==='notes'){d.notes=raw;d.notes_answered=true;}
+  // Guided interview answers belong to the question currently being asked even
+  // when the same sentence also mentions recognizable equipment or parts.
+  // Example: "Swap the Ranger, solar panel and battery" must satisfy the
+  // work-description step instead of getting stuck because parts were parsed.
+  if(!initial){
+    if(expected==='site'&&!siteMatch)d.site=raw;
+    else if(expected==='job_description'&&!descMatch)d.job_description=raw;
+    else if(expected==='notes'&&!notesMatch){d.notes=raw;d.notes_answered=true;}
   }
   return d;
 }
