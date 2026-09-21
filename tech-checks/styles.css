@@ -4718,3 +4718,201 @@ body.busy #view-owner{pointer-events:auto!important}
   visibility:visible!important;
   pointer-events:auto!important;
 }
+
+
+/* Owner mobile application parity v219
+   Same Owner routes and live controls as desktop, adapted for phones. */
+@media (max-width:720px){
+  body:has(#view-owner:not(.hidden)){
+    margin:0!important;
+    background:#081117!important;
+    overflow:auto!important;
+  }
+  body:has(#view-owner:not(.hidden))>.wrap{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+  }
+  body:has(#view-owner:not(.hidden))>.wrap>.hero,
+  body:has(#view-owner:not(.hidden))>.wrap>.status,
+  body:has(#view-owner:not(.hidden))>.wrap>.tabs{display:none!important}
+  #view-owner{
+    position:fixed!important;
+    inset:0!important;
+    z-index:50!important;
+    margin:0!important;
+    padding:0!important;
+    overflow:hidden!important;
+    background:#081117!important;
+  }
+  #view-owner .ownerAppShell{
+    display:flex!important;
+    flex-direction:column!important;
+    width:100vw!important;
+    height:100dvh!important;
+    min-height:100vh!important;
+    background:#081117!important;
+  }
+  #view-owner .ownerAppSidebar{
+    position:relative!important;
+    top:auto!important;
+    z-index:20!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    height:auto!important;
+    padding:8px 8px 7px!important;
+    border:0!important;
+    border-bottom:1px solid #2c3c46!important;
+    background:#101920!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #view-owner .ownerAppSidebar nav{
+    display:flex!important;
+    flex-direction:row!important;
+    gap:5px!important;
+    width:max-content!important;
+    min-width:100%!important;
+  }
+  #view-owner .ownerAppSidebar nav button{
+    flex:0 0 auto!important;
+    min-height:42px!important;
+    padding:9px 12px!important;
+    border:1px solid #2f424d!important;
+    border-radius:8px!important;
+    background:#111f27!important;
+    color:#dce5e9!important;
+    font-size:12px!important;
+    font-weight:800!important;
+    white-space:nowrap!important;
+    touch-action:manipulation!important;
+  }
+  #view-owner .ownerAppSidebar nav button.active{
+    background:#e31b23!important;
+    border-color:#ff4a50!important;
+    color:#fff!important;
+  }
+  #view-owner .ownerAppWorkspace{
+    flex:1 1 auto!important;
+    min-width:0!important;
+    min-height:0!important;
+    width:100%!important;
+    height:auto!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch;
+    background:#081117!important;
+  }
+  #view-owner #ownerAppPage{
+    width:100%!important;
+    max-width:none!important;
+    min-height:100%!important;
+    margin:0!important;
+    padding:18px 12px calc(44px + env(safe-area-inset-bottom))!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner #ownerAppPage>.ownerAppPageHeader,
+  #view-owner #ownerAppPage>.ownerAppGroup,
+  #view-owner #ownerAppPage>#ownerJobAssignments,
+  #view-owner #ownerAppPage>.ownerAppEmpty,
+  #view-owner #ownerAppPage>.ownerTodayGroup,
+  #view-owner #ownerAppPage>.ownerTodaySummary{
+    width:100%!important;
+    max-width:none!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner .ownerAppPageHeader{margin-bottom:18px!important;padding-bottom:14px!important}
+  #view-owner .ownerAppPageHeader h1{font-size:26px!important;line-height:1.1!important}
+  #view-owner .ownerAppPageHeader p{font-size:12px!important;line-height:1.45!important}
+  #view-owner .ownerTodaySummary{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;margin-top:0!important}
+  #view-owner .ownerTodaySummary>div{min-width:0!important;padding:11px!important}
+  #view-owner .ownerAppJobRow,
+  #view-owner .ownerAppUnitRow,
+  #view-owner .ownerAppHandoffRow,
+  #view-owner .ownerAppTeamRow,
+  #view-owner .ownerPageRow,
+  #view-owner .ownerTeamPageRow{
+    width:100%!important;
+    max-width:none!important;
+    grid-template-columns:1fr!important;
+    gap:9px!important;
+    padding:13px!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner .ownerAppSearch,
+  #view-owner .ownerAppHistoryControls{
+    width:100%!important;
+    max-width:none!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+  }
+  #view-owner #ownerJobAssignments.ownerAppMountedAssign{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+    visibility:visible!important;
+    pointer-events:auto!important;
+  }
+  #view-owner #ownerJobAssignments.ownerAppMountedAssign>.ownerDashSummary{display:none!important}
+  #view-owner #ownerJobAssignments.ownerAppMountedAssign>.ownerDashBody{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+  }
+  #view-owner #ownerJobAssignments .owner-simple-step{
+    width:100%!important;
+    margin:10px 0 0!important;
+    padding:12px!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner #ownerJobAssignments .owner-simple-pills{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  #view-owner #ownerJobAssignments .grid,
+  #view-owner #ownerJobAssignments .grid2,
+  #view-owner #ownerJobAssignments .wl-equipment-number-grid,
+  #view-owner #ownerJobAssignments .wl-owner-equipment-grid{
+    grid-template-columns:1fr!important;
+    width:100%!important;
+  }
+  #view-owner #ownerJobAssignments input,
+  #view-owner #ownerJobAssignments select,
+  #view-owner #ownerJobAssignments textarea,
+  #view-owner #ownerAppPage input,
+  #view-owner #ownerAppPage select,
+  #view-owner #ownerAppPage textarea{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    min-height:46px!important;
+    box-sizing:border-box!important;
+    font-size:16px!important;
+  }
+  #view-owner #ownerJobAssignments button,
+  #view-owner #ownerAppPage button{
+    min-height:44px;
+    touch-action:manipulation!important;
+  }
+  #view-owner #ownerJobAssignments .owner-simple-assign{min-height:56px!important}
+  #view-owner .ownerAppAttentionHost,
+  #view-owner .ownerAttentionRow,
+  #view-owner .ownerNextAction,
+  #view-owner .ownerAppReviewRow{
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner .ownerAttentionRow{
+    align-items:flex-start!important;
+    gap:10px!important;
+  }
+}
