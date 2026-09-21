@@ -2693,7 +2693,46 @@
         "Input remains usable and the screen does not jump or disappear"
       ],
       "manual_device": true
+    },
+    {
+      "id": "OFFLINE-ESCALATION-HISTORY-01",
+      "area": "Permanent Histories",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Offline-unit work survives in Technician, Unit, and Customer/Site history",
+      "steps": [
+        "Create a rollback-only offline escalation with Service power verification",
+        "Read the Service technician, unit, and site histories",
+        "Resolve or roll back the synthetic record"
+      ],
+      "expected": [
+        "All three histories include a field_escalations event",
+        "Service and IT troubleshooting, status, backup, and Owner resolution remain attributable when present",
+        "The history remains available independently of job closeout or inventory return"
+      ],
+      "manual_device": false
+    },
+    {
+      "id": "OFFLINE-ESCALATION-CLOSEOUT-01",
+      "area": "Owner Closeout",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "An unresolved offline-unit escalation blocks Ready for Owner Review",
+      "steps": [
+        "Add a rollback-only waiting_it escalation to an existing QA-safe ticket",
+        "Request Owner closeout summary",
+        "Verify equipment/returns overview and ready state"
+      ],
+      "expected": [
+        "Open offline escalation count is included",
+        "Equipment/returns status explains the unresolved escalation",
+        "ready_for_owner_review is false until the escalation is resolved",
+        "Rollback leaves no QA residue"
+      ],
+      "manual_device": false
     }
   ],
-  "last_release_qa_note": "Offline-unit Service + IT escalation passed production rollback verification; authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "Offline escalation passed role/workflow rollback verification and permanent Technician/Unit/Site history plus Owner closeout rollback verification. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
