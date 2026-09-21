@@ -1529,6 +1529,24 @@ async function damageHoldHtml(raw){
     +rows.slice(0,20).map(damageHoldCard).join('');
 }
 
+
+function departureReadinessIntent(raw){
+  return /\b(truck\s+(?:ready|readiness|minimums?|spares?)|ready\s+to\s+(?:leave|depart|roll|go)|departure\s+readiness|enough\s+(?:charged\s+)?batteries|backup\s+unit.*(?:truck|day)|what.*(?:truck|service).*need.*(?:leave|day))\b/i.test(String(raw||''));
+}
+async function departureReadinessHtml(raw){
+  if(!departureReadinessIntent(raw))return'';
+  const layer=visionLiveData();
+  if(!layer?.getDepartureReadiness)return '<div class="vision-direct warn"><b>Departure-readiness data is updating.</b>Refresh OnSite Vision and try again.</div>';
+  const result=await layer.getDepartureReadiness({ticket_no:ticketFrom(raw)||''},{force:true});
+  const counts=result?.counts||{},minimums=result?.minimums||{},blockers=Array.isArray(result?.blockers)?result.blockers:[];
+  const rows=[['12V 110Ah charged batteries',counts.standard_12v_110ah??0,minimums.standard_12v_110ah??4],['LiTime 12V 100Ah charged batteries',counts.litime_12v_100ah??0,minimums.litime_12v_100ah??2],['IT-checked-out backup unit',counts.eligible_backup_units??0,minimums.eligible_backup_units??1]];
+  return '<div class="vision-answer-title">'+esc(result.ready?'Truck departure minimums are recorded as ready.':'Truck departure minimums are NOT fully recorded as ready.')+'</div>'
+    +'<div class="vision-context-block"><h3>Required before Service leaves</h3><div class="vision-context-list">'+rows.map(([label,have,need])=>'<div class="vision-context-row"><b>'+esc(label)+'</b><span>'+esc(String(have))+' / '+esc(String(need))+(Number(have)>=Number(need)?' · READY':' · BLOCKED')+'</span></div>').join('')+'</div></div>'
+    +(blockers.length?'<div class="vision-direct warn"><b>BLOCKERS</b>'+blockers.map(esc).join(' ')+'</div>':'<div class="vision-direct good"><b>VERIFIED DATABASE FACT</b>The recorded truck minimums are satisfied.</div>')
+    +'<div class="vision-system-note">Battery readiness requires charged/ready plus IT checkout. Backup readiness requires an IT-verified and IT-checked-out Spotter, Sniper, or Solar Spotter checked out for Service. Solar Pole is retired and does not qualify.</div>'
+    +'<div class="vision-answer-copy">Anything not recorded in Tech Check is MISSING INFORMATION, not assumed to be on the truck.</div>';
+}
+
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
 }
@@ -1565,6 +1583,7 @@ async function answer(text){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
     if(sideQuestion){
       const review=await ownerReviewQueueHtml(raw);if(review)return review;
+      const departure=await departureReadinessHtml(raw);if(departure)return departure;
       const damage=await damageHoldHtml(raw);if(damage)return damage;
       const history=await companyHistoryHtml(raw);if(history)return history;
       const offline=await offlineEscalationHtml(raw);if(offline)return offline;
@@ -1581,6 +1600,7 @@ async function answer(text){
   if(workload)return workloadHtml(workload);
 
   const reviewQueue=await ownerReviewQueueHtml(raw);if(reviewQueue)return reviewQueue;
+  const departureReadiness=await departureReadinessHtml(raw);if(departureReadiness)return departureReadiness;
   const damageHold=await damageHoldHtml(raw);if(damageHold)return damageHold;
   const companyHistory=await companyHistoryHtml(raw);if(companyHistory)return companyHistory;
   const offlineEscalation=await offlineEscalationHtml(raw);if(offlineEscalation)return offlineEscalation;
