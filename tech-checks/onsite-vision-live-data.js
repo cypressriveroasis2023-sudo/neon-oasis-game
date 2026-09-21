@@ -9,6 +9,7 @@
   const historyCache=new Map();
   const reviewCache={at:0,value:null};
   const escalationCache=new Map();
+  const damageCache=new Map();
   const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','unresolved_owner'];
   const TTL_MS=15000;
 
@@ -123,6 +124,84 @@
     return value;
   }
 
+
+  async function getDamageHolds(filters={},options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const scope=String(filters.scope||'active').trim().toLowerCase();
+    const unitReference=String(filters.unit_reference||'').trim();
+    const ticketNo=String(filters.ticket_no||'').trim();
+    const limit=Math.max(1,Math.min(Number(options.limit||100),250));
+    const force=Boolean(options.force);
+    if(!['active','all'].includes(scope))throw new Error('Damage hold scope must be active or all.');
+    const cacheKey=JSON.stringify({scope,unitReference:unitReference.toLowerCase(),ticketNo,limit});
+    const cached=damageCache.get(cacheKey);
+    if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
+
+    let query=client.from('unit_returns').select([
+      'id','ticket_no','unit_tag','equipment_type','service_tech_name','returned_at','return_notes',
+      'status','it_tech_name','it_received_at','physical_condition_ok','accessories_ok','batteries_ok',
+      'sd_cards_ok','electronics_ok','power_functions_ok','damage_notes','intake_photo_paths',
+      'mhelp_inventory_confirmed','mhelp_confirmed_at','completed_at','created_at','updated_at'
+    ].join(',')).order('updated_at',{ascending:false}).limit(limit);
+    if(scope==='active')query=query.eq('status','needs_replacement');
+    else query=query.not('damage_notes','is',null);
+    if(ticketNo)query=query.eq('ticket_no',ticketNo);
+    const returnResult=await query;
+    if(returnResult.error)throw returnResult.error;
+    const rows=(Array.isArray(returnResult.data)?returnResult.data:[]).filter(row=>matchesUnit(row,unitReference));
+
+    const tickets=[...new Set(rows.map(row=>String(row.ticket_no||'').trim()).filter(Boolean))];
+    const tags=[...new Set(rows.map(row=>String(row.unit_tag||'').trim()).filter(Boolean))];
+    let assets=[],notifications=[],reports=[];
+    if(tags.length){
+      const assetResult=await client.from('asset_inventory')
+        .select('unit_key,unit_tag,asset_type,availability_status,last_event,notes,updated_at')
+        .in('unit_tag',tags).limit(Math.max(20,tags.length*3));
+      if(assetResult.error)throw assetResult.error;
+      assets=Array.isArray(assetResult.data)?assetResult.data:[];
+    }
+    if(tickets.length){
+      const notificationResult=await client.from('app_notifications')
+        .select('id,recipient_user_id,kind,title,ticket_no,unit_tag,read_at,created_at')
+        .eq('title','Damaged equipment needs replacement')
+        .in('ticket_no',tickets).order('created_at',{ascending:false}).limit(250);
+      if(notificationResult.error)throw notificationResult.error;
+      notifications=Array.isArray(notificationResult.data)?notificationResult.data:[];
+
+      const reportResult=await client.from('reports')
+        .select('id,kind,ticket_no,actor_name,text,created_at')
+        .eq('kind','DAMAGED EQUIPMENT NEEDS REPLACEMENT')
+        .in('ticket_no',tickets).order('created_at',{ascending:false}).limit(250);
+      if(reportResult.error)throw reportResult.error;
+      reports=Array.isArray(reportResult.data)?reportResult.data:[];
+    }
+
+    const enriched=rows.map(row=>{
+      const tag=String(row.unit_tag||'').trim();
+      const ticket=String(row.ticket_no||'').trim();
+      const asset=assets.find(a=>String(a.unit_tag||'').trim()===tag)||null;
+      const rowNotifications=notifications.filter(n=>
+        String(n.ticket_no||'').trim()===ticket &&
+        (!tag || !n.unit_tag || String(n.unit_tag||'').trim()===tag)
+      );
+      const rowReports=reports.filter(r=>String(r.ticket_no||'').trim()===ticket);
+      return {
+        ...row,
+        asset_inventory_status:asset?.availability_status||null,
+        asset_last_event:asset?.last_event||null,
+        owner_notified:rowNotifications.length>0,
+        owner_notification_count:rowNotifications.length,
+        owner_notification_latest_at:rowNotifications[0]?.created_at||null,
+        permanent_damage_report_present:rowReports.length>0,
+        permanent_damage_report_at:rowReports[0]?.created_at||null,
+        shop_inventory_blocked:row.status==='needs_replacement'
+      };
+    });
+    const value={scope,unit_reference:unitReference,ticket_no:ticketNo,count:enriched.length,rows:enriched};
+    damageCache.set(cacheKey,{at:Date.now(),value});
+    return value;
+  }
+
   function prime(context){
     const k=key(context?.ticket_no);
     if(k) cache.set(k,{at:Date.now(),value:context});
@@ -140,6 +219,7 @@
     reviewCache.at=0;
     reviewCache.value=null;
     escalationCache.clear();
+    damageCache.clear();
   }
 
   function forWorkflowEngine(context){
@@ -175,12 +255,13 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v3',
+    version:'live-data-v4',
     configure,
     getJobContext,
     getCompanyHistory,
     getOwnerReviewQueue,
     getOfflineEscalations,
+    getDamageHolds,
     prime,
     invalidate,
     invalidateAll,
