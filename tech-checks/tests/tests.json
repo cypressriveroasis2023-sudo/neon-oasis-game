@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v132",
-  "service_worker": "v138",
+  "runtime_version": "release-qa-v133",
+  "service_worker": "v139",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3081,7 +3081,76 @@
         "Owner can inspect operational readiness",
         "Service remains limited to its permitted records"
       ]
+    },
+    {
+      "id": "VISION-WORKLOAD-IT-TODAY-01",
+      "area": "OnSite Vision · conversational workload",
+      "role": "owner",
+      "mode": "live RLS + source",
+      "destructive": false,
+      "scenario": "Owner asks in plain language how many jobs IT has today",
+      "steps": [
+        "Ask How many jobs does IT have today?",
+        "Query live job_assignments for today's IT assignments"
+      ],
+      "expected": [
+        "Vision counts distinct Tech Check ticket numbers, not assignment rows",
+        "Completed and cancelled assignments are excluded",
+        "MHelpDesk remains separate"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-SERVICE-TODAY-01",
+      "area": "OnSite Vision · conversational workload",
+      "role": "owner",
+      "mode": "live RLS + source",
+      "destructive": false,
+      "scenario": "Owner asks what Service has today using ordinary wording",
+      "steps": [
+        "Ask What does Service have today?",
+        "Query live scheduled Service assignments"
+      ],
+      "expected": [
+        "Current live ticket count is returned",
+        "Scheduled jobs can be shown without requiring exact command wording",
+        "No stale browser-only count is substituted when live data is available"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-TECHNICIAN-01",
+      "area": "OnSite Vision · conversational workload",
+      "role": "owner",
+      "mode": "live RLS + source",
+      "destructive": false,
+      "scenario": "Owner asks how many jobs a specific technician has",
+      "steps": [
+        "Use an active technician name in a workload question",
+        "Resolve the technician against active Tech Check profiles",
+        "Filter live job assignments by technician user id"
+      ],
+      "expected": [
+        "Vision returns that technician's distinct scheduled Tech Check tickets",
+        "A name that cannot be matched is not guessed",
+        "Department and technician filters can coexist"
+      ]
+    },
+    {
+      "id": "VISION-WORKLOAD-DATE-01",
+      "area": "OnSite Vision · conversational workload",
+      "role": "owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Natural workload questions support today and named dates",
+      "steps": [
+        "Ask about today",
+        "Ask about Monday or another parsed date"
+      ],
+      "expected": [
+        "Date is resolved before querying assignments",
+        "The answer states the date context",
+        "Date-free department workload questions default to today"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision now answers truck/day departure readiness from live Tech Check records: 4 x charged 12V 110Ah, 2 x charged LiTime 12V 100Ah, and one IT-checked-out Spotter/Sniper/Solar Spotter backup. Unrecorded items are MISSING INFORMATION. Solar Pole remains retired."
+  "last_release_qa_note": "OnSite Vision workload questions now query live job_assignments instead of relying only on browser state. Natural questions for IT, Service, or a named technician count distinct open Tech Check tickets for the requested date. Completed/cancelled assignments are excluded and MHelpDesk remains separate."
 }
