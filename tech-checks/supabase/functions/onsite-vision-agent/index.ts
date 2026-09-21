@@ -542,6 +542,42 @@ const outputSchema = {
       required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'summary', 'requires_confirmation'],
       additionalProperties: false,
     },
+    action_plan: {
+      type: 'object',
+      properties: {
+        detected: { type: 'boolean' },
+        summary: { type: 'string' },
+        steps: {
+          type: 'array',
+          maxItems: 12,
+          items: {
+            type: 'object',
+            properties: {
+              sequence: { type: 'integer', minimum: 1, maximum: 12 },
+              type: {
+                type: 'string',
+                enum: ['create_job', 'assign', 'schedule', 'update', 'handoff', 'verify', 'complete', 'cancel', 'return', 'check_out', 'check_in', 'owner_approve'],
+              },
+              ticket_no: { type: 'string' },
+              work_type: { type: 'string' },
+              role: { type: 'string' },
+              technician_name: { type: 'string' },
+              date: { type: 'string' },
+              time: { type: 'string' },
+              summary: { type: 'string' },
+              reason: { type: 'string' },
+              execution_mode: { type: 'string', enum: ['audited', 'guided', 'needs_input'] },
+              requires_confirmation: { type: 'boolean' },
+            },
+            required: ['sequence','type','ticket_no','work_type','role','technician_name','date','time','summary','reason','execution_mode','requires_confirmation'],
+            additionalProperties: false,
+          },
+        },
+        notes: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['detected','summary','steps','notes'],
+      additionalProperties: false,
+    },
     working_memory_update: {
       type: 'object',
       properties: {
@@ -577,7 +613,7 @@ const outputSchema = {
       additionalProperties: false,
     },
   },
-  required: ['answer', 'active_ticket', 'facts', 'proposed_action', 'working_memory_update', 'knowledge_proposal'],
+  required: ['answer', 'active_ticket', 'facts', 'proposed_action', 'action_plan', 'working_memory_update', 'knowledge_proposal'],
   additionalProperties: false,
 }
 
@@ -619,7 +655,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v30',
+        agent_version: 'onsite-vision-agent-v31',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -632,6 +668,7 @@ Deno.serve(async (req) => {
         source_code_search_enabled: true,
         owner_correction_learning_enabled: true,
         operations_orchestration_enabled: true,
+        multi_action_planning_enabled: true,
       })
     }
 
@@ -788,7 +825,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v30',
+            agent_version: 'onsite-vision-agent-v31',
           }
         } as Json
       }
@@ -1312,6 +1349,19 @@ Deno.serve(async (req) => {
       '- If the Owner asks you to actually assign one of those technicians, prepare the normal confirmed assign action; the operations snapshot itself never writes.',
       '- MHelpDesk remains separate throughout any operations brief.',
       '',
+      'MULTI-ACTION PLANNING:',
+      '- When the Owner asks to handle several changes together, says "take care of everything you can", "do all of that", "make those changes", "fix everything you safely can", or gives multiple assignment/schedule/cancel/Owner-approval instructions in one message, create action_plan.detected=true.',
+      '- Re-read the relevant live state before building the plan. For a broad operations request, call get_operations_snapshot again rather than relying on an older conversational rundown.',
+      '- action_plan.steps must be ordered so prerequisites come before dependent steps. Keep the plan to at most 12 concrete steps.',
+      '- execution_mode="audited" only for actions that can safely go through the existing Vision audit validator: assign, schedule, cancel, and owner_approve. The client will prepare each audited step and the Owner will see one explicit confirmation before execution.',
+      '- execution_mode="guided" for create_job, handoff, verify, complete, return, check_out, check_in, or update when the existing Tech Check workflow requires evidence/checklists or guided data collection.',
+      '- execution_mode="needs_input" when a required decision is missing, such as which technician, which ticket, a date/time, exact unit, or an Owner judgment that cannot be derived from company rules.',
+      '- Do not pick a named technician solely because they have a lighter recorded workload unless the Owner explicitly authorizes load-based assignment in this request. A lighter Tech Check load is not proof of travel, PTO, geography, skill fit, or true availability.',
+      '- You MAY propose a department-queue assignment when live workflow rules clearly require IT or Service next and no named technician is required. You MAY propose final Owner approval only when live data indicates the item is actually in the Owner review path; the audit validator still rechecks eligibility.',
+      '- If action_plan.detected=true, set proposed_action.type="none" so the client does not render a duplicate single-action card.',
+      '- Never claim the plan has executed. The plan is a proposal until the Owner presses the plan confirmation button. The client executes audited steps sequentially and stops on the first failure.',
+      '- MHelpDesk remains separate from every plan step.',
+      '',
       'PLAIN TALK / DICTATION:',
       '- Treat the Owner’s message like normal spoken conversation, not command syntax. Understand slang, shorthand, missing punctuation, speech-to-text wording, and reasonable typos when the intended meaning is clear.',
       '- Infer workload questions from normal speech. Examples: "what’s IT got today?", "what does Josh have?", "is Service busy tomorrow?", "how many jobs today?", "how many total jobs do I have today?", and "how many jobs are scheduled today?". Use get_workload. A fresh broad question resets the named-technician subject unless the Owner explicitly refers back with language such as "him", "her", "that tech", "same tech", or a terse continuation such as "and tomorrow?".',
@@ -1358,10 +1408,12 @@ Deno.serve(async (req) => {
     ]
 
     const broadOperations=/\b(operations?|ops|rundown|what needs attention|needs attention|behind|who can take|who has room|what do i need to deal with|how are we looking|how are operations|morning brief|daily brief|today'?s brief|run the company)\b/i.test(message)
-    const reasoningEffort = broadOperations || /\b(code|program|programming|implementation|source|why|root cause|analy[sz]e|review everything|compare|workflow blocker|system health|database health|troubleshoot|what happened|history)\b/i.test(message)
+    const multiAction=/\b(take care of everything|everything you can|do all of that|do all that|make those changes|make all those changes|fix everything|handle all of|all of these|all of those|batch|in one go)\b/i.test(message)
+      || ((message.match(/\b(assign|move|schedule|reschedule|cancel|approve)\b/gi)||[]).length>=2)
+    const reasoningEffort = broadOperations || multiAction || /\b(code|program|programming|implementation|source|why|root cause|analy[sz]e|review everything|compare|workflow blocker|system health|database health|troubleshoot|what happened|history)\b/i.test(message)
       ? 'high'
       : 'medium'
-    const maxToolTurns=broadOperations?8:6
+    const maxToolTurns=(broadOperations||multiAction)?8:6
 
     let response: any = null
     for (let turn = 0; turn < maxToolTurns; turn++) {
@@ -1447,6 +1499,9 @@ Deno.serve(async (req) => {
           summary: '',
           requires_confirmation: false,
         },
+        action_plan: {
+          detected:false,summary:'',steps:[],notes:[]
+        },
         working_memory_update: {
           active_ticket:'',site:'',work_type:'',date:'',time:'',current_subject:'',workflow_stage:'',
           technician_names:[],unit_references:[],unresolved_reference:'',notes:[]
@@ -1457,6 +1512,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    parsed.action_plan = parsed.action_plan || {detected:false,summary:'',steps:[],notes:[]}
     parsed.working_memory_update = parsed.working_memory_update || {
       active_ticket:'',site:'',work_type:'',date:'',time:'',current_subject:'',workflow_stage:'',
       technician_names:[],unit_references:[],unresolved_reference:'',notes:[]
@@ -1467,7 +1523,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v30',
+      agent_version: 'onsite-vision-agent-v31',
       model,
       tool_trace: toolTrace,
       ...parsed,
