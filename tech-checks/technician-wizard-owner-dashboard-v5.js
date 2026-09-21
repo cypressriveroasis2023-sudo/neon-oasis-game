@@ -576,7 +576,7 @@ async function serviceWorkData() {
     myActiveAssignments('service'),
     liveDb.from('prep_tickets').select('id,ticket_no,site,released_at,created_at').eq('status','released').order('released_at',{ascending:true}),
     liveDb.from('unit_returns').select('ticket_no,unit_tag').eq('service_tech_id',session.user.id),
-    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,swap_outcome,swap_installed_site,swap_site_registration_status)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
     liveDb.from('morning_checks').select('id').eq('service_tech_id',session.user.id).gte('submitted_at',dayStart.toISOString()).limit(1)
   ]);
   const activeTickets=new Set((assignments||[]).map(a=>norm(a.ticket_no)));
@@ -585,6 +585,7 @@ async function serviceWorkData() {
   const deployed = (deployedQ.data||[]).flatMap(p => (p.prep_items||[]).filter(i => {
     if (!i.unit_tag || returned.has(`${norm(p.ticket_no)}|${norm(i.unit_tag)}`)) return false;
     if (i.purpose==='BACKUP') return i.spare_outcome==='used';
+    if (i.purpose==='SWAP') return i.swap_outcome==='installed';
     return true;
   }).map(i => ({ prep_item_id:i.id, ticket_no:p.ticket_no, site:p.site, closed_at:p.closed_at, unit_tag:i.unit_tag, equipment_type:i.equipment_type, purpose:i.purpose, spare_outcome:i.spare_outcome })));
   return { assignments:assignments||[], released, inspectionDone:(inspectionQ.data||[]).length>0, inspectionRequired, deployed };
@@ -1642,22 +1643,18 @@ async function syncServiceAssignmentAfterReturn(ticket,techId) {
   const {data:returns}=await liveDb.from('unit_returns').select('id,equipment_type').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
   const returnRows=returns||[];
   const count=returnRows.length;
-  const {data:preps}=await liveDb.from('prep_tickets').select('id,status,prep_items(equipment_type,purpose)').eq('ticket_no',String(ticket||'')).eq('status','released').order('released_at',{ascending:false}).limit(5);
+  const {data:preps}=await liveDb.from('prep_tickets').select('id,status,prep_items(id,unit_tag,equipment_type,purpose,swap_outcome)').eq('ticket_no',String(ticket||'')).eq('status','released').order('released_at',{ascending:false}).limit(5);
 
-  // A SWAP return accounts for the OLD field unit. Do not complete Service
-  // while the replacement-unit handoff / field workflow is still open.
-  const swapTypes=new Set(['Helios','Sniper','Spotter','Recon 2']);
-  const activeSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>swapTypes.has(i.equipment_type)&&i.purpose==='SWAP'));
+  // Any SWAP stays in the field-result workflow until Service records whether
+  // the replacement was installed and the required return path is satisfied.
+  const activeSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>i.purpose==='SWAP'));
   if(activeSwapPrep){
-    const swapItems=(activeSwapPrep.prep_items||[]).filter(i=>swapTypes.has(i.equipment_type)&&i.purpose==='SWAP');
-    const required=swapItems.length;
-    const byType={};
-    swapItems.forEach(i=>{byType[i.equipment_type]=(byType[i.equipment_type]||0)+1;});
-    let matching=0;
-    Object.entries(byType).forEach(([type,needed])=>{
-      matching+=Math.min(Number(needed||0),returnRows.filter(r=>r.equipment_type===type).length);
-    });
-    return {completed:false,count:matching,required,fieldPending:true};
+    const swaps=(activeSwapPrep.prep_items||[]).filter(i=>i.purpose==='SWAP');
+    const replacementKeys=new Set(swaps.map(i=>norm(i.unit_tag)).filter(Boolean));
+    const installed=swaps.filter(i=>i.swap_outcome==='installed');
+    const oldReturnRows=returnRows.filter(r=>!replacementKeys.has(norm(r.unit_tag)));
+    const required=installed.length;
+    return {completed:false,count:oldReturnRows.length,required,fieldPending:true};
   }
 
   const required=assignmentEquipmentCount(a);
@@ -1910,6 +1907,21 @@ async function completeAuthorizedOfflineSwap(id,backupItemId) {
   serviceReturnRecovered=false;await saveServiceReturnDraft();return renderServiceReturn();
 }
 
+async function swapSiteRegistrationRows(){
+  const {data,error}=await liveDb.from('prep_tickets')
+    .select('id,ticket_no,site,status,prep_items(id,unit_tag,equipment_type,purpose,swap_outcome,swap_installed_site,swap_site_registration_status)')
+    .in('status',['released','closed'])
+    .order('created_at',{ascending:false})
+    .limit(120);
+  if(error)throw error;
+  return (data||[]).flatMap(prep=>(prep.prep_items||[])
+    .filter(item=>item.purpose==='SWAP'&&item.swap_outcome==='installed'&&item.swap_site_registration_status==='pending_it')
+    .map(item=>({...item,prep_ticket_id:prep.id,ticket_no:prep.ticket_no,site:item.swap_installed_site||prep.site||''})));
+}
+function swapSiteRegistrationHtml(rows){
+  if(!rows?.length)return'';
+  return `<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>SWAP Site Registration</b><span>${rows.length} ready</span></div>${rows.map(row=>`<div class='wl-svc-job'><div class='wl-svc-job-top'><div><b>${esc(row.equipment_type)} ${esc(row.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(row.ticket_no)} · ${esc(row.site||'Customer site')}</div></div><span>READY</span></div><div class='wl-svc-job-desc'>Service confirmed this replacement unit was actually installed. Confirm that IT registered this exact unit to the customer/site.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-confirm-swap-site='${esc(row.id)}' data-wl-swap-site-label='${esc((row.equipment_type||'Unit')+' '+(row.unit_tag||''))}' data-wl-swap-site='${esc(row.site||'Customer site')}'>Confirm Site Registration →</button></div>`).join('')}</div>`;
+}
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
   let home=document.getElementById('wlItHome');
@@ -1930,7 +1942,8 @@ async function showITHome() {
     techDashboardTimeout(myActiveAssignments('it'),[]),
     techDashboardTimeout(pushAlertState(),{supported:false,permission:'unknown',subscribed:false,ready:false}),
     techDashboardTimeout(myAssignedInventoryAssets(),[]),
-    techDashboardTimeout(fieldEscalationRows(),[])
+    techDashboardTimeout(fieldEscalationRows(),[]),
+    techDashboardTimeout(swapSiteRegistrationRows(),[])
   ]);
   if(loadToken!==itDashboardLoadToken)return;
   const values=settled.map(r=>r.status==='fulfilled'?r.value:null);
@@ -1940,6 +1953,7 @@ async function showITHome() {
   const phoneAlerts=values[3]||{supported:false,permission:'unknown',subscribed:false,ready:false};
   const assignedAssets=values[4]||[];
   const offlineRows=values[5]||[];
+  const swapSiteRegs=values[6]||[];
   let partialLoad=techDashboardSettled(settled);
 
   const ownerViewingIT=roleText().includes('Owner/Admin');
@@ -2006,6 +2020,7 @@ async function showITHome() {
   let commandState='IT WORKFLOW READY',commandTone='',commandDetail='Work the highest-priority IT task shown below.';
   if(offlineIT.length){commandState='SERVICE NEEDS IT SUPPORT';commandTone='issue';commandDetail='A field unit is waiting for Service + IT troubleshooting.';}
   else if(returns.waiting){commandState='IT INTAKE WAITING';commandTone='due';commandDetail='Returned equipment is waiting for IT Intake.';}
+  else if(swapSiteRegs.length){commandState='SWAP SITE REGISTRATION READY';commandTone='due';commandDetail='Service confirmed a replacement unit was installed. IT can register it to the customer/site now.';}
   else if(overdue.length){commandState='OPEN IT WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one IT assignment is still open from an earlier work date.';}
   else if(ready.length){commandState='IT JOB READY';commandDetail='An IT assignment is ready to work now.';}
   else if(prepSummary.draft){commandState='UNFINISHED IT PREP';commandTone='due';commandDetail='An equipment prep draft is still incomplete.';}
@@ -2017,6 +2032,9 @@ async function showITHome() {
     nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Help Service troubleshoot ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.site||'No site')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Review Service’s power check, troubleshoot together, and record the IT decision in the field-issue card below.</div></div>`;
   }else if(returns.nextWaiting){
     nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Start IT Intake · Unit ${esc(returns.nextWaiting.unit_tag||'Unknown')}</b><div class='small'>${esc(returns.nextWaiting.equipment_type||'Returned unit')} · MHelpDesk #${esc(returns.nextWaiting.ticket_no||'—')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-next-it-intake='${returns.nextWaiting.id}'>Start / Continue IT Intake →</button></div>`;
+  }else if(swapSiteRegs.length){
+    const reg=swapSiteRegs[0];
+    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Register ${esc(reg.equipment_type)} ${esc(reg.unit_tag||'')} to ${esc(reg.site||'customer site')}</b><div class='small'>MHelpDesk #${esc(reg.ticket_no)} · Service confirmed the SWAP happened.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-confirm-swap-site='${esc(reg.id)}' data-wl-swap-site-label='${esc((reg.equipment_type||'Unit')+' '+(reg.unit_tag||''))}' data-wl-swap-site='${esc(reg.site||'Customer site')}'>Confirm Site Registration →</button></div>`;
   }else if(ready.length){
     const next=ready[0].a;
     nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-start-assignment='${next.id}'>${next.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`;
@@ -2027,7 +2045,7 @@ async function showITHome() {
   }
 
   const upcomingHtml=upcoming.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming IT Work</b><span>${upcoming.length} scheduled</span></div>${upcoming.slice(0,8).map(itAssignmentCard).join('')}</div>`:'';
-  const closeoutClear=!assignments.length&&!prepSummary.draft&&!returns.waiting&&!offlineIT.length;
+  const closeoutClear=!assignments.length&&!prepSummary.draft&&!returns.waiting&&!offlineIT.length&&!swapSiteRegs.length;
 
   home.innerHTML=`${alertBanner}<div class='wl-svc-command wl-it-command'>
     <div class='wl-svc-command-hero'>
@@ -2041,7 +2059,7 @@ async function showITHome() {
       <div class='wl-svc-command-stat'><b>${today.length}</b><span>Today’s IT jobs</span></div>
       <div class='wl-svc-command-stat'><b>${ready.length}</b><span>Ready / actionable</span></div>
       <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Released to IT Intake</span></div>
-      <div class='wl-svc-command-stat'><b>${prepSummary.draft}</b><span>Pending prep</span></div>
+      <div class='wl-svc-command-stat'><b>${swapSiteRegs.length}</b><span>SWAP site registrations</span></div>
       <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Returns waiting IT</span></div>
       <div class='wl-svc-command-stat'><b>${offlineIT.length}</b><span>Service needs IT</span></div>
     </div>
@@ -2056,8 +2074,11 @@ async function showITHome() {
         <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Equipment prep drafts</b><span>${prepSummary.draft}</span></div>
         <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
         <div class='wl-svc-command-close-row ${returns.replacement?'issue':''}'><b>Needs Replacement holds</b><span>${returns.replacement}</span></div>
+        <div class='wl-svc-command-close-row ${swapSiteRegs.length?'pending':''}'><b>SWAP site registration ready</b><span>${swapSiteRegs.length}</span></div>
       </div>
     </div>
+
+    ${swapSiteRegistrationHtml(swapSiteRegs)}
 
     <div class='wl-svc-command-section'>
       <div class='wl-svc-command-section-head'><b>Today / Needs Action</b><span>${needsAction.length} open</span></div>
@@ -2091,6 +2112,7 @@ async function showITHome() {
         <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Unfinished equipment prep</b><span>${prepSummary.draft}</span></div>
         <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
         <div class='wl-svc-command-close-row ${offlineIT.length?'issue':''}'><b>Service troubleshooting waiting on IT</b><span>${offlineIT.length}</span></div>
+        <div class='wl-svc-command-close-row ${swapSiteRegs.length?'pending':''}'><b>SWAP site registrations</b><span>${swapSiteRegs.length}</span></div>
       </div>
       <div class='small top8'>Released handoffs may remain with Service, and completed intake may remain in Owner / MHelpDesk inventory confirmation without falsely blocking IT closeout. MHelpDesk remains separate.</div>
     </div>
@@ -3990,8 +4012,14 @@ function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,serv
   const ready=holds.length===0;
   return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Final Handoff Gate')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
 }
-function heliosFieldItems(prep=activeSvcPrep){
+function allSwapItems(prep=activeSvcPrep){
+  return [...(prep?.prep_items||[])].filter(row=>row.purpose==='SWAP').sort((a,b)=>a.item_order-b.item_order);
+}
+function heliosHandoffItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(row=>row.equipment_type==='Helios'&&['DELIVERY','SWAP'].includes(row.purpose)).sort((a,b)=>a.item_order-b.item_order);
+}
+function heliosFieldItems(prep=activeSvcPrep){
+  return heliosHandoffItems(prep).filter(row=>row.purpose==='DELIVERY'||(row.purpose==='SWAP'&&row.swap_outcome==='installed'));
 }
 function serviceHandoffVerifications(){
   return [...(activeSvcPrep?.prep_items||[])].sort((a,b)=>a.item_order-b.item_order).map(item=>{
@@ -4038,7 +4066,8 @@ function heliosFieldRuleList(){
 function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const units=heliosFieldItems(prep), swaps=units.filter(x=>x.purpose==='SWAP'), installPhotos=serviceSolarEvidenceCount(evidence,'helios_install','photo');
   const installSig=[...(evidence||[])].reverse().find(row=>row.category==='helios_install'&&row.kind==='signature'), submitted=Boolean(check?.helios_field_completed_at), ownerDone=Boolean(check?.helios_owner_verified_at);
-  const returnRows=(returns||[]).filter(r=>r.equipment_type==='Helios');
+  const replacementKeys=new Set(allSwapItems(prep).map(i=>norm(i.unit_tag)).filter(Boolean));
+  const returnRows=(returns||[]).filter(r=>r.equipment_type==='Helios'&&!replacementKeys.has(norm(r.unit_tag)));
   const allChecks=heliosFieldRuleList();
   const checklist=allChecks.map((rule,index)=>`<label class='check top8'><input id='wlHeliosFieldRule${index}' data-wl-helios-field-key='${esc(rule.key)}' type='checkbox' ${check?.[rule.key]?'checked':''} ${submitted?'disabled':''}><span>${esc(rule.label)}</span></label>`).join('');
   const newUnits=units.map(x=>`<div class='ok top8'><b>NEW UNIT OUT · ${esc(x.unit_tag||'Tag missing')}</b><div class='small'>${esc(x.purpose)} Helios${check?.handoff_accepted_at?` · ${signatureStamp(check.handoff_accepted_by_name||'Service Tech',check.handoff_accepted_at)}`:''}</div></div>`).join('');
@@ -4049,8 +4078,9 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
 async function submitHeliosFieldInstall(){
   if(!activeSvcPrep?.id)return;
   const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id), units=heliosFieldItems(activeSvcPrep), swaps=units.filter(x=>x.purpose==='SWAP');
-  const returns=swaps.length?await loadHeliosSwapReturns(activeSvcPrep.ticket_no):[];
-  if(swaps.length&&returns.length<swaps.length)return alert('Document every OLD UNIT RETURNING through Service Return → IT Intake first.');
+  const swapState=await swapWorkflowState(activeSvcPrep);
+  if(swapState.undecided.length)return alert('Answer YES or NO for every Helios SWAP replacement first.');
+  if(swapState.missingOld.some(x=>x.type==='Helios'))return alert('Document every OLD Helios unit returning through Service Return → IT Intake first.');
   if(serviceSolarEvidenceCount(evidence,'helios_install','photo')<units.length)return alert('Upload at least one final installation photo for each Helios.');
   if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return alert('Save the timestamped Service installation signature.');
   const fieldRules=heliosFieldRuleList();
@@ -4062,25 +4092,95 @@ async function submitHeliosFieldInstall(){
   activeSvcPrep=await getPrep(activeSvcPrep.id); alert('Helios field installation submitted to the Owner for final verification.'); return renderSvcPrep();
 }
 function rangerFieldItems(prep=activeSvcPrep){
-  return [...(prep?.prep_items||[])].filter(i=>i.equipment_type==='Ranger'&&['DELIVERY','SWAP'].includes(i.purpose));
+  return [...(prep?.prep_items||[])].filter(i=>i.equipment_type==='Ranger'&&(i.purpose==='DELIVERY'||(i.purpose==='SWAP'&&i.swap_outcome==='installed')));
 }
 function rangerFieldReady(prep=activeSvcPrep){
   const rows=rangerFieldItems(prep);
   return !rows.length||rows.every(i=>i.ranger_field_victron_updated_ok===true);
 }
-function standardSwapItems(prep=activeSvcPrep){
-  return [...(prep?.prep_items||[])].filter(i=>['Sniper','Spotter','Recon 2'].includes(i.equipment_type)&&i.purpose==='SWAP');
-}
-async function standardSwapReturnState(prep=activeSvcPrep){
-  const swaps=standardSwapItems(prep), returns=(await returnRows()).filter(r=>norm(r.ticket_no)===norm(prep?.ticket_no));
-  const types=['Sniper','Spotter','Recon 2'], byType={};
-  types.forEach(type=>{
-    const required=swaps.filter(i=>i.equipment_type===type).length;
-    const returned=returns.filter(r=>r.equipment_type===type).length;
-    byType[type]={required,returned,missing:Math.max(0,required-returned)};
+async function swapWorkflowState(prep=activeSvcPrep){
+  const swaps=allSwapItems(prep);
+  const returns=(await returnRows()).filter(r=>norm(r.ticket_no)===norm(prep?.ticket_no));
+  const replacementKeys=new Set(swaps.map(i=>norm(i.unit_tag)).filter(Boolean));
+  const undecided=swaps.filter(i=>!i.swap_outcome);
+  const installed=swaps.filter(i=>i.swap_outcome==='installed');
+  const returnedUnused=swaps.filter(i=>i.swap_outcome==='returned_unused');
+  const unusedMissing=returnedUnused.filter(item=>!returns.some(r=>
+    String(r.prep_item_id||'')===String(item.id) || norm(r.unit_tag)===norm(item.unit_tag)
+  ));
+  const oldReturns=returns.filter(r=>!replacementKeys.has(norm(r.unit_tag)));
+  const byType={};
+  installed.forEach(item=>{
+    const type=item.equipment_type||'Unit';
+    if(!byType[type])byType[type]={required:0,returned:0,missing:0};
+    byType[type].required++;
   });
-  const missing=types.flatMap(type=>Array(byType[type].missing).fill(type));
-  return{swaps,returns,byType,missing,ready:missing.length===0};
+  Object.keys(byType).forEach(type=>{
+    byType[type].returned=oldReturns.filter(r=>r.equipment_type===type).length;
+    byType[type].missing=Math.max(0,byType[type].required-byType[type].returned);
+  });
+  const missingOld=Object.entries(byType).flatMap(([type,row])=>Array(row.missing).fill(null).map(()=>({type})));
+  const pendingSiteRegistration=installed.filter(i=>i.swap_site_registration_status==='pending_it');
+  const completedSiteRegistration=installed.filter(i=>i.swap_site_registration_status==='completed');
+  return{
+    swaps,returns,replacementKeys,undecided,installed,returnedUnused,unusedMissing,
+    oldReturns,byType,missingOld,pendingSiteRegistration,completedSiteRegistration,
+    ready:undecided.length===0&&unusedMissing.length===0&&missingOld.length===0
+  };
+}
+function swapResultHtml(prep,state,{heliosOnly=false}={}){
+  const scope=heliosOnly?state.swaps.filter(i=>i.equipment_type==='Helios'):state.swaps.filter(i=>i.equipment_type!=='Helios');
+  if(!scope.length)return'';
+  const undecided=scope.find(i=>!i.swap_outcome);
+  const site=prep?.site||'the customer site';
+  const resolved=scope.filter(i=>i.swap_outcome).map(item=>{
+    if(item.swap_outcome==='returned_unused'){
+      return `<div class='warn top8'><b>↩ DID NOT USE · ${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><div class='small'>This exact replacement unit is routed back through IT Intake before Shop Inventory.</div></div>`;
+    }
+    const registration=item.swap_site_registration_status==='completed'
+      ? '✓ IT site registration complete'
+      : 'IT site registration is ready for IT';
+    return `<div class='ok top8'><b>✓ SWAP HAPPENED · ${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><div class='small'>Replacement stays at ${esc(item.swap_installed_site||site)} · ${esc(registration)}</div></div>`;
+  }).join('');
+  if(undecided){
+    return `${progress('Swap Result','One simple field decision',1,1)}<div class='wl-review'><b>MHelpDesk #${esc(prep.ticket_no)}</b><div class='small'>Replacement unit: ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'Tag missing')} · Site: ${esc(site)}</div></div>${resolved}<div class='wl-question top10'><div class='qtext'>Did you actually install/use replacement ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'')} at ${esc(site)}?</div><div class='wl-options'><button class='pass' data-wl-swap-used='${esc(undecided.id)}'>YES — SWAP HAPPENED</button><button class='fail' data-wl-swap-unused='${esc(undecided.id)}'>NO — DID NOT USE IT</button></div><div class='wl-note'>YES: replacement stays at the site, IT gets a site-registration task, and the OLD unit must return through IT Intake.<br>NO: this unused replacement automatically goes back through IT Intake.</div></div>`;
+  }
+  const scopeInstalled=scope.filter(i=>i.swap_outcome==='installed');
+  const neededByType={};
+  scopeInstalled.forEach(i=>neededByType[i.equipment_type]=(neededByType[i.equipment_type]||0)+1);
+  const scopeMissing=Object.entries(neededByType).flatMap(([type,needed])=>{
+    const returned=state.oldReturns.filter(r=>r.equipment_type===type).length;
+    return Array(Math.max(0,Number(needed)-returned)).fill(type);
+  });
+  const oldReturn=scopeMissing[0]||'';
+  const unusedMissing=scope.filter(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id));
+  const complete=!oldReturn&&!unusedMissing.length;
+  return `${progress('Swap Result',complete?'Swap result recorded':'Finish the return path',1,1)}${resolved}${oldReturn?`<div class='wl-stop top10'><b>OLD UNIT MUST RETURN</b><div>The replacement was installed. Bring the OLD ${esc(oldReturn)} back through IT Intake.</div><button class='wl-big wl-red top10' data-wl-swap-old-return='${esc(oldReturn)}'>Return OLD ${esc(oldReturn)} to IT Intake →</button></div>`:''}${unusedMissing.length?`<div class='wl-stop top10'><b>UNUSED REPLACEMENT INTAKE REQUIRED</b><div>The unused replacement has not reached IT Intake yet.</div></div>`:''}${complete?`<div class='ok top10'><b>✓ SWAP RESULT COMPLETE</b><div>Every replacement has a YES/NO outcome and every required unit is in the correct path.</div></div>`:''}`;
+}
+async function resolveSwapUnitOutcome(itemId,used){
+  const item=allSwapItems(activeSvcPrep).find(i=>String(i.id)===String(itemId));
+  if(!item)return alert('This SWAP replacement unit is no longer available.');
+  const {data,error}=await liveDb.rpc('service_resolve_swap_unit_v1',{p_item_id:itemId,p_used:Boolean(used)});
+  if(error)return alert(error.message);
+  activeSvcPrep=await getPrep(activeSvcPrep.id);
+  if(used)alert(`SWAP recorded. ${item.equipment_type} ${item.unit_tag||''} stays at the customer site. The OLD unit must return through IT Intake; IT now has the site-registration task.`);
+  else alert(`Not used. ${item.equipment_type} ${item.unit_tag||''} is routed back through IT Intake.`);
+  return renderSvcPrep();
+}
+async function startSwapOldUnitReturn(type){
+  const saved=await loadDeviceDraft('service-return');
+  if(saved?.ticket)return showServiceReturn();
+  serviceReturn={
+    step:1,
+    ticket:String(activeSvcPrep?.ticket_no||''),
+    unit:'',
+    type:String(type||''),
+    notes:'OLD unit removed during SWAP. Returning through IT Intake.',
+    photo:null,tagScan:null,conditionPhotos:[],damagePhotos:[],knownUnits:[]
+  };
+  serviceReturnRecovered=false;
+  await saveServiceReturnDraft();
+  return renderServiceReturn();
 }
 function rangerFieldHtml(prep){
   const rows=rangerFieldItems(prep);
@@ -4099,14 +4199,7 @@ async function saveRangerFieldVerification(){
   activeSvcPrep=await getPrep(activeSvcPrep.id);
   return renderSvcPrep();
 }
-async function startStandardSwapReturn(type){
-  const saved=await loadDeviceDraft('service-return');
-  if(saved?.ticket)return showServiceReturn();
-  serviceReturn={step:1,ticket:String(activeSvcPrep?.ticket_no||''),unit:'',type:String(type||''),notes:'',photo:null,tagScan:null,conditionPhotos:[],damagePhotos:[],knownUnits:await rememberedUnitsForTicket(activeSvcPrep?.ticket_no||'')};
-  serviceReturnRecovered=false;
-  await saveServiceReturnDraft();
-  return renderServiceReturn();
-}
+async function startStandardSwapReturn(type){ return startSwapOldUnitReturn(type); }
 
 async function renderSvcPrep() {
   if (!activeSvcPrep) return;
@@ -4115,9 +4208,21 @@ async function renderSvcPrep() {
   const forms=svcForms(card),wizard=svcWizardCard(),partsTotal=ticketPartsTotal(activeSvcPrep),hasParts=partsTotal>0;
   const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
   const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null,solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[],solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
-  const heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep),partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,rangerStep=signStep+1,preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  const swapState=await swapWorkflowState(activeSvcPrep);
+  const allSwaps=swapState.swaps,nonHeliosSwaps=allSwaps.filter(i=>i.equipment_type!=='Helios'),heliosHandoff=heliosHandoffItems(activeSvcPrep),heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep);
+  const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
   hideChildren(viewSvc(),[wizard]);base.style.display='none';
-  if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+  if(heliosHandoff.length&&solarCheck?.handoff_accepted_at){
+    const heliosScope=swapState.swaps.filter(i=>i.equipment_type==='Helios');
+    const heliosUnresolved=heliosScope.some(i=>!i.swap_outcome)||swapResultHtml(activeSvcPrep,swapState,{heliosOnly:true}).includes('MUST RETURN');
+    if(heliosScope.length&&!heliosUnresolved){
+      // all Helios swap outcomes/returns are resolved; installed Helios continue to field install
+    }else if(heliosScope.length){
+      wizard.innerHTML=swapResultHtml(activeSvcPrep,swapState,{heliosOnly:true});
+      resetWizardPosition();return;
+    }
+    if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+  }
   if(svcUnitIndex<forms.length){
     const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Verify Parts →':solarRequired?'Solar / Helios Check →':'Compare IT Photos →';
     wizard.innerHTML=progress(`Unit ${svcUnitIndex+1} of ${forms.length}`,q?.label||'Verify this unit',svcQuestionIndex+1,Math.max(1,questions.length))+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`;
@@ -4132,20 +4237,27 @@ async function renderSvcPrep() {
     const itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length;
     wizard.innerHTML=progress('Service Photos',`Take ${requiredPhotos} matching receipt photo${requiredPhotos===1?'':'s'}`,1,1)+await photoOnlyHtml(activeSvcPrep.id,'service',null,requiredPhotos)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
   }else if(svcUnitIndex===signStep){
-    wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${nonHeliosSwaps.length?'Swap Result →':rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+  }else if(nonHeliosSwaps.length&&svcUnitIndex===swapStep){
+    const html=swapResultHtml(activeSvcPrep,swapState);
+    const scopeReady=!nonHeliosSwaps.some(i=>!i.swap_outcome)
+      && !nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&swapState.unusedMissing.some(m=>m.id===i.id))
+      && !Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>swapState.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
+    wizard.innerHTML=html+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${scopeReady?'':'disabled'}>${rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;
   }else if(rangerField.length&&svcUnitIndex===rangerStep){
     wizard.innerHTML=progress('Ranger Field Check','Verify Victron Bluetooth status at the site',1,1)+rangerFieldHtml(activeSvcPrep)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${rangerFieldReady(activeSvcPrep)?'':'disabled'}>Review →</button></div>`;
   }else{
     if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
     const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
-    const swapState=await standardSwapReturnState(activeSvcPrep);
-    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep),swapReady=swapState.ready,ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
+    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
+    const heliosNeedsAcceptance=heliosHandoff.length>0&&!solarCheck?.handoff_accepted_at;
+    const swapReady=heliosNeedsAcceptance ? nonHeliosSwaps.length===0||(!nonHeliosSwaps.some(i=>!i.swap_outcome)&&swapState.ready) : swapState.ready;
+    const ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
     const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
-    const heliosNotice=heliosField.length?`<div class='warn top10'><b>HELIOS IS NOT DEPLOYED YET</b><div>Accept the IT → Service handoff, then complete field install, any OLD UNIT RETURNING, final photos/signature, and Owner final verification.</div></div>`:'';
-    const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
-    const missingSwapType=swapState.missing[0]||'';
-    const swapNotice=swapState.swaps.length?(swapReady?`<div class='ok top10'><b>✓ Replaced SWAP unit return(s) recorded in IT Intake.</b></div>`:`<div class='wl-stop top10'><b>OLD SWAP UNIT RETURN REQUIRED</b><div>${swapState.missing.length} replaced field unit${swapState.missing.length===1?'':'s'} still need to be sent to IT Intake before this Tech Check can close.</div><button class='wl-big wl-red top10' data-wl-standard-swap-return='${esc(missingSwapType)}'>Return ${esc(missingSwapType)} to IT Intake →</button></div>`):'';
-    wizard.innerHTML=progress('Final Step',heliosField.length?'Accept the Helios handoff — field install remains open':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-green' ${heliosField.length?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosField.length?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue to Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    const heliosNotice=heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`<div class='warn top10'><b>HELIOS HANDOFF FIRST</b><div>Accept the IT → Service handoff. At the site, Service will answer whether the SWAP replacement was actually installed.</div></div>`:'';
+    const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each installed Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
+    const swapNotice=allSwaps.length?(swapReady?`<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`:`<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`):'';
+    wizard.innerHTML=progress('Final Step',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios handoff — field result comes next':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-green' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -4589,7 +4701,9 @@ document.addEventListener('click', async e => {
     const proofStep = solarStep + (solarRequired ? 1 : 0);
     const photoStep = proofStep + 1;
     const signStep = proofStep + 2;
-    const rangerStep = signStep + 1;
+    const swapStep = signStep + 1;
+    const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
+    const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
     const rangerField = rangerFieldItems(activeSvcPrep);
     if (svcUnitIndex < forms.length) return advanceSvcVerification();
     if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
@@ -4600,6 +4714,13 @@ document.addEventListener('click', async e => {
     }
     if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
     if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+    if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
+      const state=await swapWorkflowState(activeSvcPrep);
+      const unresolved=nonHeliosSwaps.some(i=>!i.swap_outcome)
+        || nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id))
+        || Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>state.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
+      if(unresolved)return alert('Finish the SWAP YES / NO decision and required IT Intake return before continuing.');
+    }
     if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
     svcUnitIndex++; return renderSvcPrep();
   }
@@ -4608,6 +4729,8 @@ document.addEventListener('click', async e => {
     const forms = svcForms(card);
     const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
     const partStep = forms.length;
+    const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
+    const solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1;
     if (svcUnitIndex < forms.length) {
       if (svcQuestionIndex > 0) { svcQuestionIndex--; return renderSvcPrep(); }
       if (svcUnitIndex > 0) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
@@ -4629,9 +4752,23 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-return-to-active-helios]')) return renderSvcPrep();
   if (e.target.closest('[data-wl-submit-helios-field]')) return submitHeliosFieldInstall();
   if (e.target.closest('[data-wl-save-ranger-field]')) return saveRangerFieldVerification();
+  const swapUsed=e.target.closest('[data-wl-swap-used]');
+  if(swapUsed)return resolveSwapUnitOutcome(swapUsed.dataset.wlSwapUsed,true);
+  const swapUnused=e.target.closest('[data-wl-swap-unused]');
+  if(swapUnused)return resolveSwapUnitOutcome(swapUnused.dataset.wlSwapUnused,false);
+  const swapOldReturn=e.target.closest('[data-wl-swap-old-return]');
+  if(swapOldReturn)return startSwapOldUnitReturn(swapOldReturn.dataset.wlSwapOldReturn);
   const standardSwapReturn=e.target.closest('[data-wl-standard-swap-return]');
-  if(standardSwapReturn)return startStandardSwapReturn(standardSwapReturn.dataset.wlStandardSwapReturn);
+  if(standardSwapReturn)return startSwapOldUnitReturn(standardSwapReturn.dataset.wlStandardSwapReturn);
   if (e.target.closest('[data-wl-return-to-active-standard]')) return renderSvcPrep();
+  const confirmSwapSite=e.target.closest('[data-wl-confirm-swap-site]');
+  if(confirmSwapSite){
+    const label=confirmSwapSite.dataset.wlSwapSiteLabel||'replacement unit',site=confirmSwapSite.dataset.wlSwapSite||'customer site';
+    if(!confirm('Confirm IT registered '+label+' to '+site+'?\n\nThis records the site-registration step in Tech Check.'))return;
+    const {error}=await liveDb.rpc('it_confirm_swap_site_registration_v1',{p_item_id:confirmSwapSite.dataset.wlConfirmSwapSite});
+    if(error)return alert(error.message);
+    return showITHome();
+  }
 
   const solarUpload=e.target.closest('[data-wl-solar-upload]');
   if (solarUpload) {
@@ -4915,7 +5052,7 @@ async function submitServiceReturn() {
       (!is110VStandReturn() && activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP')
         ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-helios>← Continue Helios Swap</button>`
         : '') +
-      (activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && standardSwapItems(activeSvcPrep).some(x=>x.equipment_type===serviceReturn.type)
+      (activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && allSwapItems(activeSvcPrep).some(x=>x.equipment_type===serviceReturn.type)
         ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-standard>← Continue ${esc(serviceReturn.type)} Swap</button>`
         : '');
     const actionHtml=`<button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
