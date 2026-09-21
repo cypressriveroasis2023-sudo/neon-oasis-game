@@ -4225,7 +4225,7 @@ document.addEventListener('click', async e => {
   const aiAck=e.target.closest('[data-owner-ai-ack]'); if(aiAck) return ownerAIAcknowledge(aiAck.dataset.ownerAiAck,aiAck.dataset.ownerAiAckKey,aiAck.dataset.ownerAiAckDetail,aiAck.dataset.ownerAiAckTicket);
   const aiFilter=e.target.closest('[data-owner-ai-filter]'); if(aiFilter) return ownerApplyAIFilter(aiFilter.dataset.ownerAiFilter,aiFilter);
   if (e.target?.closest?.('[data-owner-add-tech]')) { e.preventDefault(); addOwnerTechPill(); return; }
-  if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('[data-tech-id]')?.remove(); return; }
+  if (e.target?.closest?.('[data-owner-remove-tech]')) { e.preventDefault(); e.target.closest('.wl-tech-pill')?.remove(); ownerSaveAssignDraftNow(); return; }
   if(e.target.closest('[data-wl-offline-start]')) return showOfflineUnitForm();
   if(e.target.closest('[data-wl-offline-submit]')) return submitOfflineUnitForm();
   const offlineItSave=e.target.closest('[data-wl-offline-it-save]'); if(offlineItSave)return saveOfflineITDecision(offlineItSave.dataset.wlOfflineItSave);
@@ -5202,6 +5202,7 @@ function ownerAssignmentRowHtml(a, prep, solarCheck=null) {
 async function installOwnerAssignments(force = false) {
   if (!roleText().includes('Owner/Admin')) return;
   let host = document.getElementById('ownerJobAssignments');
+  if(host?.querySelector?.('#ownerAssignTicket')) ownerSaveAssignDraftNow();
   if (!host) {
     host = document.createElement('details');
     host.id = 'ownerJobAssignments';
@@ -5313,6 +5314,7 @@ async function installOwnerAssignments(force = false) {
         <b>MHelpDesk is separate from Tech Check.</b>
         <div class='small'>Use the current MHelpDesk ticket as the source of truth every time. Enter the MHelpDesk reference, unit count, equipment, and work exactly as shown there. A new MHelpDesk ticket stays a new Tech Check job; unit history remains universal inside Tech Check.</div>
       </div>
+      <div id='ownerAssignDraftStatus' class='small top8'>Draft autosaves as you type. You can leave this screen and come back without losing it.</div>
       <div class='ownerWorkflowFirst'>
         <div class='qtext'>1. What kind of MHelpDesk job is this?</div>
         <div class='grid top8'>
@@ -5407,8 +5409,10 @@ async function installOwnerAssignments(force = false) {
 
   host.open = wasOpen;
   liveHost.open = liveWasOpen || active.length > 0;
-  refreshOwnerAutoServicePlan();
-  refreshOwnerWorkTypeLabels();
+  if(!ownerRestoreAssignDraft()){
+    refreshOwnerAutoServicePlan();
+    refreshOwnerWorkTypeLabels();
+  }
   organizeOwnerDashboard();
   syncOwnerCompactDashboard();
 }
@@ -5472,15 +5476,134 @@ async function ownerLookupUnitHistory(){
   </div>`;
 }
 function ownerApplyAIFilter(state,button){const live=document.getElementById('ownerLiveJobProgress');if(!live)return;const off=button.classList.contains('selected');live.querySelectorAll('[data-owner-ai-filter]').forEach(b=>b.classList.remove('selected'));const target=off?'':state;if(!off)button.classList.add('selected');live.querySelectorAll('.wl-assignment-row[data-owner-ai-state]').forEach(row=>row.classList.toggle('wl-ai-filter-hidden',!!target&&row.dataset.ownerAiState!==target));}
+const OWNER_ASSIGN_DRAFT_KEY='cos-techcheck-owner-assign-draft-v1';
+let ownerAssignDraftRestoring=false;
+function ownerAssignDraftStatus(message){
+  const el=document.getElementById('ownerAssignDraftStatus');
+  if(el)el.textContent=message;
+}
+function ownerAssignDraftPayload(){
+  const host=document.getElementById('ownerJobAssignments');
+  if(!host?.querySelector?.('#ownerAssignTicket'))return null;
+  return {
+    version:1,
+    saved_at:new Date().toISOString(),
+    work_type:document.getElementById('ownerAssignWorkType')?.value||'service',
+    scheduled_for:document.getElementById('ownerAssignDate')?.value||techCheckDateKey(new Date()),
+    scheduled_time:document.getElementById('ownerAssignTime')?.value||'',
+    ticket_no:document.getElementById('ownerAssignTicket')?.value||'',
+    site:document.getElementById('ownerAssignSite')?.value||'',
+    description:document.getElementById('ownerAssignDescription')?.value||'',
+    notes:document.getElementById('ownerAssignNotes')?.value||'',
+    unit_numbers:document.getElementById('ownerAssignUnitNumbers')?.value||'',
+    stand_numbers:document.getElementById('ownerAssignStandNumbers')?.value||'',
+    role:document.getElementById('ownerAssignRole')?.value||'it',
+    equipment_manifest:readOwnerEquipmentManifest(),
+    parts:readTicketPartInputs('ownerPart'),
+    assignee_ids:[...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')].map(el=>String(el.dataset.techId||'')).filter(Boolean),
+    service_queue_selected:!!document.querySelector('#ownerAssignedTechPills [data-queue-role="service"]')
+  };
+}
+function ownerAssignDraftMeaningful(d){
+  if(!d)return false;
+  const text=[d.ticket_no,d.site,d.description,d.notes,d.unit_numbers,d.stand_numbers,d.scheduled_time].some(v=>String(v||'').trim());
+  const equipment=Array.isArray(d.equipment_manifest)&&d.equipment_manifest.some(r=>Number(r?.qty||0)>0);
+  const parts=d.parts&&Object.values(d.parts).some(v=>Number(v||0)>0);
+  const people=Array.isArray(d.assignee_ids)&&d.assignee_ids.length>0;
+  const nonDefault=String(d.work_type||'service')!=='service'||String(d.role||'it')!=='it'||String(d.scheduled_for||'')!==techCheckDateKey(new Date())||d.service_queue_selected===true;
+  return text||equipment||parts||people||nonDefault;
+}
+function ownerSaveAssignDraftNow(){
+  if(ownerAssignDraftRestoring)return;
+  const d=ownerAssignDraftPayload();
+  if(!d)return;
+  try{
+    if(ownerAssignDraftMeaningful(d)){
+      localStorage.setItem(OWNER_ASSIGN_DRAFT_KEY,JSON.stringify(d));
+      const when=new Date(d.saved_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      ownerAssignDraftStatus('Draft saved automatically · '+when);
+    }else{
+      localStorage.removeItem(OWNER_ASSIGN_DRAFT_KEY);
+      ownerAssignDraftStatus('Draft autosaves as you type. You can leave this screen and come back without losing it.');
+    }
+  }catch(error){console.warn('Owner assignment draft save failed',error);}
+}
+function ownerClearAssignDraft(){
+  try{localStorage.removeItem(OWNER_ASSIGN_DRAFT_KEY);}catch{}
+}
+function ownerLoadAssignDraft(){
+  try{
+    const raw=localStorage.getItem(OWNER_ASSIGN_DRAFT_KEY);
+    if(!raw)return null;
+    const d=JSON.parse(raw);
+    if(!ownerAssignDraftMeaningful(d))return null;
+    return d;
+  }catch(error){console.warn('Owner assignment draft load failed',error);return null;}
+}
+function ownerRestoreAssignDraft(){
+  const d=ownerLoadAssignDraft();
+  if(!d)return false;
+  const host=document.getElementById('ownerJobAssignments');
+  if(!host?.querySelector?.('#ownerAssignTicket'))return false;
+  ownerAssignDraftRestoring=true;
+  try{
+    const set=(id,value)=>{const el=document.getElementById(id);if(el)el.value=value==null?'':String(value);};
+    set('ownerAssignWorkType',d.work_type||'service');
+    set('ownerAssignDate',d.scheduled_for||techCheckDateKey(new Date()));
+    set('ownerAssignTime',d.scheduled_time||'');
+    set('ownerAssignTicket',d.ticket_no||'');
+    set('ownerAssignSite',d.site||'');
+    set('ownerAssignDescription',d.description||'');
+    set('ownerAssignNotes',d.notes||'');
+    set('ownerAssignUnitNumbers',d.unit_numbers||'');
+    set('ownerAssignStandNumbers',d.stand_numbers||'');
+    set('ownerAssignRole',d.role||'it');
+    refreshOwnerAssignmentTechOptions();
+
+    const manifest=normalizedEquipmentManifest(d.equipment_manifest||[]);
+    document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input=>{
+      const match=manifest.find(row=>String(row.category||'')===String(input.dataset.category||'')&&String(row.label||'').toLowerCase()===String(input.dataset.label||'').toLowerCase());
+      input.value=String(match?.qty||0);
+    });
+    fillTicketPartInputs(d.parts||{},'ownerPart');
+
+    const pills=document.getElementById('ownerAssignedTechPills');
+    if(pills)pills.innerHTML='';
+    (d.assignee_ids||[]).forEach(id=>{
+      const p=ownerAssignmentProfiles.find(row=>String(row.user_id)===String(id));
+      if(!p||!pills)return;
+      const label=(p.full_name||p.username||'Technician')+' — '+(p.role==='it'?'IT':'Service');
+      const el=document.createElement('span');
+      el.className='wl-tech-pill';
+      el.dataset.techId=String(id);
+      el.innerHTML='<span>'+esc(label)+"</span><button type='button' data-owner-remove-tech aria-label='Remove "+esc(label)+"'>×</button>";
+      pills.appendChild(el);
+    });
+    if(d.service_queue_selected&&pills&&!pills.querySelector('[data-queue-role="service"]')){
+      const el=document.createElement('span');
+      el.className='wl-tech-pill';
+      el.dataset.queueRole='service';
+      el.innerHTML="<span>Service Department Queue — any Service Tech can claim</span><button type='button' data-owner-remove-tech aria-label='Remove Service Department Queue'>×</button>";
+      pills.appendChild(el);
+    }
+    refreshOwnerWorkTypeLabels();
+    refreshOwnerAutoServicePlan();
+    const when=d.saved_at?new Date(d.saved_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'earlier';
+    ownerAssignDraftStatus('Draft restored automatically · last saved '+when);
+    return true;
+  }finally{
+    ownerAssignDraftRestoring=false;
+  }
+}
 function addOwnerTechPill() {
   const select=document.getElementById('ownerAssignTech'); const pills=document.getElementById('ownerAssignedTechPills');
   const id=select?.value || ''; if(!id||!pills) return;
-  if(id==='__service_queue__'){ const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.queueRole='service'; pill.innerHTML=`<span>Service Department Queue — any Service Tech can claim</span><button type='button' data-owner-remove-tech aria-label='Remove Service Department Queue'>×</button>`; if(!pills.querySelector('[data-queue-role="service"]')) pills.appendChild(pill); select.value=''; return; }
+  if(id==='__service_queue__'){ const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.queueRole='service'; pill.innerHTML=`<span>Service Department Queue — any Service Tech can claim</span><button type='button' data-owner-remove-tech aria-label='Remove Service Department Queue'>×</button>`; if(!pills.querySelector('[data-queue-role="service"]')) pills.appendChild(pill); select.value=''; ownerSaveAssignDraftNow(); return; }
   if(pills.querySelector(`[data-tech-id="${CSS.escape(id)}"]`)){ select.value=''; return; }
   const label=select.options[select.selectedIndex]?.textContent?.trim() || 'Technician';
   const pill=document.createElement('span'); pill.className='wl-tech-pill'; pill.dataset.techId=id;
   pill.innerHTML=`<span>${esc(label)}</span><button type='button' data-owner-remove-tech aria-label='Remove ${esc(label)}'>×</button>`;
-  pills.appendChild(pill); select.value='';
+  pills.appendChild(pill); select.value=''; ownerSaveAssignDraftNow();
 }
 function refreshOwnerAssignmentTechOptions() {
   const role = document.getElementById('ownerAssignRole')?.value || 'it';
@@ -6092,6 +6215,7 @@ function ownerAIDispatchApply(parsed) {
   });
   refreshOwnerWorkTypeLabels();
   refreshOwnerAutoServicePlan();
+  ownerSaveAssignDraftNow();
 }
 function ownerAIDispatchMissing(parsed) {
   const missing=[], current=ownerAIDraft();
@@ -6539,6 +6663,7 @@ async function ownerAssignJob() {
   }
   pushMessage = pushed > 0 ? ` Phone notifications sent to ${pushed} device${pushed === 1 ? '' : 's'}.` : ' Tech Check inbox alert created.';
 
+  ownerClearAssignDraft();
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitNumbers','ownerAssignStandNumbers','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
   const timeInput=document.getElementById('ownerAssignTime'); if (timeInput) timeInput.value='';
@@ -6749,9 +6874,10 @@ document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
+  if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) ownerSaveAssignDraftNow();
 });
 
-document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) ownerSaveAssignDraftNow(); if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if(e.target?.id==='wlOfflineKnownUnit'){const card=document.getElementById('wlOfflineUnitForm');let units=[];try{units=JSON.parse(card?.dataset.units||'[]');}catch{}const u=units[Number(e.target.value)]||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};set('wlOfflineTicket',u.ticket_no);set('wlOfflineSite',u.site);set('wlOfflineUnit',u.unit_tag);set('wlOfflineType',u.equipment_type);} if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
@@ -6866,6 +6992,7 @@ function refreshAfterResume() {
 }
 document.addEventListener('visibilitychange', refreshAfterResume);
 window.addEventListener('focus', refreshAfterResume);
+window.addEventListener('beforeunload', ownerSaveAssignDraftNow);
 boot();
 
 // ASSIGNMENT_NOTIFICATION_PUBLISH_STAMP_V1
