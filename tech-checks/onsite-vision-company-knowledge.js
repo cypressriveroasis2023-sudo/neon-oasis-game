@@ -241,7 +241,7 @@
         "1 × LiTime 12V 110Ah battery attached/ready",
         "MPPT firmware/configuration updated",
         "MPPT tested",
-        "solar charging verified through the MPPT with the battery attached",
+        "MPPT tested in the shop without requiring a solar-panel hookup; Service verifies PV / solar charging after the IT → Service handoff",
         "camera/network online",
         "router ports 81 and 554 available/configured",
         "camera video works",
@@ -621,6 +621,8 @@
       "Checked-out batches are locked from editing by the existing database workflow."
     ],
     "manifest_rule": "Truck spares remain separate from the customer/job equipment manifest.",
+    "morning_requirement": false,
+    "start_day_rule": "Truck spares are optional job-specific contingency equipment. They are not required to complete the Service Tech morning Truck / Trailer Check.",
     "known_limits": [
       "The current database does not accept a standalone Sniper spare-battery batch.",
       "The current database does not accept a standalone Spotter spare-battery batch.",
@@ -868,15 +870,18 @@
     },
     "truck_readiness": {
       "service_owner": "Service Tech",
-      "battery_baseline": [
-        "4 × 12V 110Ah batteries on truck at all times",
-        "2 × LiTime 12V 100Ah batteries on truck at all times"
+      "current_start_day_rule": "At this time, Tech Check start-day readiness requires only the weekday Truck Check and, when taking one, the Trailer Check.",
+      "start_day_sequence": [
+        "Truck Check",
+        "Trailer Check when taking a trailer",
+        "Today’s Tasks"
       ],
-      "spare_unit_rule": "Carry 1 complete backup unit appropriate to that day’s work: Spotter, Sniper, or Solar Spotter. The backup must complete the proper IT checkout before departure.",
-      "predeparture": "Service Tech verifies required truck batteries are charged before leaving and updates Tech Check.",
-      "gate": "If required battery readiness/count is not met, replace/correct it before the Service Tech can move on.",
-      "used_battery_rule": "When batteries are used/swapped, record how many in Tech Check and MHelpDesk. Returned swapped batteries go to the charging station and begin charging.",
-      "unused_spare_return": "A spare unit that returns unused still comes back and is checked into IT Intake because transport may have damaged it. IT verifies it works before returning it to Shop Inventory."
+      "battery_count_gate": false,
+      "spare_unit_gate": false,
+      "spare_unit_rule": "A truck spare is optional and job-specific. It is not required by the morning Truck / Trailer Check.",
+      "gate": "After the required Truck / Trailer Check is submitted, Service proceeds directly to Today’s Tasks.",
+      "solar_role_rule": "IT does not connect solar panels to units in the shop. Service performs applicable solar-panel / PV charging verification after the IT → Service handoff.",
+      "unused_spare_return": "If an optional spare is actually checked out for a job and returns unused, it still goes through IT Intake before returning to Shop Inventory."
     },
     "delivery_signage": {
       "rule": "Every delivery requires 4 Cameras On Site surveillance signs.",
