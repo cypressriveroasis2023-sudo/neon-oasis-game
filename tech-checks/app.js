@@ -1814,22 +1814,68 @@ function ownerCommandAction(action) {
   if(content && targetId){
     content.classList.add('active');
     content.querySelectorAll(':scope > details.ownerDashSection').forEach(section=>{
-      section.classList.toggle('ownerWorkspaceSelected',section.id===targetId);
-      section.open=section.id===targetId;
+      const selected=section.id===targetId;
+      section.classList.toggle('ownerWorkspaceSelected',selected);
+      section.open=selected;
     });
   }
   document.querySelectorAll('#view-owner [data-owner-command]').forEach(button=>{
     button.classList.toggle('ownerNavActive',button.dataset.ownerCommand===action);
   });
+
+  // Today and Team intentionally share the same live data, but Team gets a
+  // dedicated people-first view instead of an empty/ambiguous workspace.
   const moduleHead=targetId ? document.querySelector('#'+targetId+' .ownerModuleHead') : null;
+  const overview=document.getElementById('ownerTechOverview');
   if(moduleHead && (action==='today'||action==='team')){
     moduleHead.innerHTML=action==='team'
-      ? '<span>TEAM</span><h1>Team</h1><p>See each active technician, what they have, and what they are working on.</p>'
+      ? '<span>TEAM</span><h1>Team</h1><p>See every active technician, their department, assigned work, and equipment.</p>'
       : '<span>TODAY</span><h1>Today</h1><p>See today’s work, who has each job, and what is waiting.</p>';
+    if(action==='team' && overview){
+      const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
+      const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
+      const assets=state.assetInventory||[];
+      overview.innerHTML=techs.length ? techs.map(t=>{
+        const name=t.full_name||t.username||'Technician';
+        const tj=jobs.filter(a=>a.assignee_user_id===t.user_id);
+        const ta=assets.filter(a=>a.assigned_to===t.user_id&&a.availability_status==='assigned');
+        return '<div class="ownerTeamPageRow"><div><b>'+esc(name)+'</b><span>'+esc(t.role==='it'?'IT TECHNICIAN':'SERVICE TECH')+'</span></div><div><b>'+tj.length+'</b><span>active job'+(tj.length===1?'':'s')+'</span></div><div><b>'+ta.length+'</b><span>assigned asset'+(ta.length===1?'':'s')+'</span></div></div>';
+      }).join('') : '<div class="ok"><b>No active technicians.</b></div>';
+    } else if(action==='today') renderOwnerTechOverview();
   }
+
+  // Re-render the selected module at click time. This prevents a module from
+  // looking blank when its data finished loading while it was hidden.
+  if(action==='attention') renderOwnerAttention();
+  if(action==='review') renderOwnerReview();
+  if(action==='units') renderOwnerUnitSearch();
+  if(action==='handoffs') renderOwner();
+  if(action==='activity') renderOwner();
+  if(action==='accounts'){ renderPasswordResetRequests(); renderUsers(); }
+  if(action==='assign') renderOwnerAssignmentWorkspace();
+
   ownerCommandOpen(targetId);
   if(action==='units') requestAnimationFrame(()=>document.getElementById('ownerUnitSearch')?.focus());
   if(action==='history') requestAnimationFrame(()=>document.getElementById('ownerCompanyHistoryQuery')?.focus());
+}
+
+function renderOwnerAssignmentWorkspace(){
+  if(state.profile?.role!=='owner') return;
+  const card=document.getElementById('ownerJobAssignments');
+  const body=card?.querySelector('.ownerDashBody');
+  if(!body) return;
+  const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
+  const rows=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled').slice().sort((a,b)=>new Date(b.assigned_at||0)-new Date(a.assigned_at||0));
+  body.innerHTML='<div class="ownerModuleHead"><span>DISPATCH</span><h1>Create / Assign Job</h1><p>Create the Tech Check job that matches the MHelpDesk ticket, then choose the first department.</p></div>'
+    +'<div class="ownerAssignLaunch"><b>NEW TECH CHECK JOB</b><p>MHelpDesk stays separate. Tech Check uses the same ticket number to control the technician workflow.</p><button class="btn" type="button" onclick="ownerOpenExistingAssignmentCreator()">CREATE / ASSIGN JOB →</button></div>'
+    +'<div class="ownerPageStats"><span><b>'+rows.length+'</b> active jobs</span><span><b>'+techs.filter(t=>t.role==='it').length+'</b> IT techs</span><span><b>'+techs.filter(t=>t.role==='service').length+'</b> Service techs</span></div>'
+    +(rows.length?'<div class="ownerPageList">'+rows.slice(0,20).map(a=>'<div class="ownerPageRow"><div><b>MHelpDesk #'+esc(a.ticket_no)+'</b><span>'+esc(a.site||'Customer / site not recorded')+'</span></div><div><b>'+esc(a.assignee_name||a.assignee_username||(!a.assignee_user_id?'Department queue':'Assigned'))+'</b><span>'+esc(a.assignee_role==='it'?'IT':a.assignee_role==='service'?'SERVICE':String(a.status||'').toUpperCase())+'</span></div></div>').join('')+'</div>':'<div class="ok"><b>No active Tech Check assignments.</b><div class="small">Use CREATE / ASSIGN JOB to start one.</div></div>');
+}
+function ownerOpenExistingAssignmentCreator(){
+  const candidates=[...document.querySelectorAll('button,a')].filter(el=>/create\s*\/\s*assign job|assign job/i.test(el.textContent||'')&&!el.closest('#ownerJobAssignments'));
+  const button=candidates[0];
+  if(button){ button.click(); return; }
+  alert('The existing assignment creator is not available on this screen yet.');
 }
 function bindOwnerCommandCenter() {
   const host=document.getElementById('ownerCommandCenter');
