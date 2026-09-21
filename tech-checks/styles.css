@@ -4086,3 +4086,18 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
  #view-owner .ownerWorkspaceContent{grid-column:1;grid-row:3;width:calc(100% - 24px);margin:0 12px 30px!important}
  #view-owner .ownerWorkspaceContent.active{margin-top:12px!important}
 }
+/* Owner desktop shell v162 — true full-screen fixed navigation, no collapsing sections */
+@media(min-width:721px){
+ html:has(#view-owner:not(.hidden)),body:has(#view-owner:not(.hidden)){margin:0!important;width:100%!important;max-width:none!important;min-height:100%!important;background:#101820!important}
+ body:has(#view-owner:not(.hidden))>.wrap,.wrap:has(#view-owner:not(.hidden)){width:100vw!important;max-width:none!important;margin:0!important;padding:0!important}
+ #view-owner:not(.hidden){width:100vw!important;max-width:none!important;min-height:100vh!important;margin:0!important;padding:0!important;grid-template-columns:220px minmax(0,1fr)!important}
+ #view-owner .ownerWorkspaceRail{width:220px!important;height:100vh!important;position:fixed!important;left:0!important;top:0!important;bottom:0!important;border-radius:0!important}
+ #view-owner .ownerWorkspaceMain{margin-left:220px!important;max-width:none!important;width:calc(100vw - 220px)!important;min-height:100vh!important;padding:56px 64px!important}
+ #view-owner .ownerWorkspaceContent{margin-left:220px!important;max-width:none!important;width:calc(100vw - 220px)!important;padding:36px 52px 60px!important}
+ #view-owner .ownerWorkspaceContent.active{margin-top:0!important;min-height:100vh!important;background:#101820!important}
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected{display:block!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important}
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected>.ownerDashSummary{display:none!important}
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected>.ownerDashBody{display:block!important;padding:0!important;background:transparent!important}
+ #view-owner .ownerWorkspaceContent:not(.active)>.ownerDashSection{display:none!important}
+ #view-owner .ownerWorkspaceContent.active+.ownerDashSection{display:none!important}
+}
