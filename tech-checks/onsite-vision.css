@@ -71,6 +71,14 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
 .vision-composer textarea{width:100%;min-width:0;max-height:150px;min-height:42px;resize:none;border:0;outline:0;overflow-x:hidden;background:transparent;color:#fff;padding:10px 5px;font-size:16px;line-height:1.42}.vision-composer textarea::placeholder{color:#677b8e}
 .vision-compose-icon,.vision-send{width:42px;height:42px;border-radius:12px;border:0;display:grid;place-items:center}.vision-compose-icon{background:#1a2a39;color:#dce5ed}.vision-send{background:var(--red);color:#fff;font-size:19px;box-shadow:0 8px 22px rgba(210,11,18,.25)}
 .vision-compose-note{max-width:810px;margin:6px auto 0;text-align:center;color:#556a7e;font-size:8px}
+.vision-voice-status{max-width:810px;margin:7px auto 0;padding:7px 10px;border-radius:10px;border:1px solid #30465b;background:#101d29;color:#9eb0bf;font-size:9px;font-weight:800;text-align:center;line-height:1.35}
+.vision-voice-status.recording{border-color:rgba(210,11,18,.68);background:rgba(210,11,18,.1);color:#ff777c}
+.vision-voice-status.busy{border-color:rgba(226,184,90,.5);background:rgba(226,184,90,.08);color:#e6c879}
+.vision-voice-status.heard{border-color:rgba(85,200,135,.45);background:rgba(85,200,135,.08);color:#8addaa}
+.vision-compose-icon.recording{background:#a90b11;color:#fff;box-shadow:0 0 0 4px rgba(210,11,18,.15);animation:visionVoicePulse 1.15s infinite}
+.vision-compose-icon.busy{opacity:.72;pointer-events:none}
+@keyframes visionVoicePulse{0%,100%{box-shadow:0 0 0 3px rgba(210,11,18,.12)}50%{box-shadow:0 0 0 8px rgba(210,11,18,.03)}}
+
 
 .vision-order-panel{border-width:0 0 0 1px;overflow:auto;padding:max(18px,env(safe-area-inset-top)) 14px max(18px,env(safe-area-inset-bottom));min-width:0;opacity:0;pointer-events:none;transform:translateX(14px);transition:opacity .18s ease,transform .22s ease}
 .vision-app.has-order .vision-order-panel{opacity:1;pointer-events:auto;transform:translateX(0)}
@@ -322,6 +330,16 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   cursor:pointer;
 }
 .vision-teach-button span{color:#ff3038;font-size:15px}
+.vision-language-eval-button{width:100%;min-height:39px;margin:10px 0 8px;border:1px solid #344b60;border-radius:10px;background:#162636;color:#eef4f8;font-size:10px;font-weight:900}
+.vision-language-eval-button:disabled{opacity:.55;cursor:default}
+.vision-language-eval-status{margin-bottom:10px;border:1px solid #2e4356;border-radius:11px;background:#0f1b27;padding:10px;display:grid;gap:4px}
+.vision-language-eval-status.good{border-color:rgba(85,200,135,.42);background:rgba(85,200,135,.07)}
+.vision-language-eval-status.warn{border-color:rgba(226,184,90,.46);background:rgba(226,184,90,.07)}
+.vision-language-eval-status b{font-size:11px;color:#f4f7f9}.vision-language-eval-status>span{font-size:8px;color:#8296a8;line-height:1.4}
+.vision-eval-mismatches{display:grid;gap:6px;margin-top:5px;max-height:190px;overflow:auto}
+.vision-eval-mismatches>div{border-top:1px solid #273a4c;padding-top:6px;font-size:9px;color:#bac7d1;line-height:1.35}
+.vision-eval-mismatches strong{color:#ff5960;margin-right:4px}.vision-eval-mismatches small{display:block;color:#71869a;margin-top:2px}
+
 .vision-knowledge-modal{
   position:fixed;
   inset:0;
