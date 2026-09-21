@@ -40,7 +40,7 @@ let activeSvcPrep = null;
 let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
-let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
+let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null), load:{qty110:'',charged110:false,qtyLi:'',chargedLi:false,backup:''} };
 let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
 let serviceReturnRecovered = false;
@@ -50,7 +50,7 @@ async function deviceDraftKey(kind) { const { data:{ session } } = await liveDb.
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
 async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (!key) return null; try { const value=JSON.parse(localStorage.getItem(key)||'null'); if (!value) return null; if (Date.now()-Number(value.savedAt||0)>FIELD_DRAFT_TTL) { localStorage.removeItem(key); return null; } return value; } catch { return null; } }
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
-function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer] }); }
+function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer], load:{...(inspection.load||{})} }); }
 function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag) }); }
 const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
 let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
@@ -3594,17 +3594,48 @@ function inspectionQuestion() {
   if (inspection.step < 8) { const i = inspection.step; body = `${progress(`Truck Question ${i + 1} of 8`, truckLabels[i], i + 1, total)}<div class='wl-question'><div class='qtext'>${esc(truckLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.truck[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
   else if (inspection.step === 8) { body = `${progress('Trailer', 'Are you taking a trailer today?', 9, total)}<div class='wl-question'><div class='qtext'>Taking a trailer today?</div><div class='wl-options'><button class='pass ${inspection.takingTrailer === false ? 'on' : ''}' data-wl-trailer='no'>NO TRAILER</button><button class='fail ${inspection.takingTrailer === true ? 'on' : ''}' data-wl-trailer='yes'>YES</button></div></div>`; }
   else if (inspection.takingTrailer === true && inspection.step < 16) { const i = inspection.step - 9; body = `${progress(`Trailer Question ${i + 1} of 7`, trailerLabels[i], inspection.step + 1, total)}<div class='wl-question'><div class='qtext'>${esc(trailerLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.trailer[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
-  else { const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false)); body = `${progress('Final Step', 'Review and submit to Owner', total, total)}<div class='wl-review'><b>Truck:</b> ${inspection.truck.some(v => v === false) ? 'FAILED' : 'PASS'}<br><b>Trailer:</b> ${inspection.takingTrailer === true ? (inspection.trailer.some(v => v === false) ? 'FAILED' : 'PASS') : 'Not taken'}</div>${failed ? `<div class='wl-stop'><b>FAILED ITEM — CALL OPERATIONS MANAGER</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<button class='wl-big ${failed ? 'wl-red' : 'wl-green'} top10' data-wl-submit-inspection>Submit Morning Inspection to Owner</button>`; }
+  else { const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false)); const load=inspection.load||{}; const loadReady=Number(load.qty110||0)>=4&&load.charged110===true&&Number(load.qtyLi||0)>=2&&load.chargedLi===true&&['Spotter','Sniper','Solar Spotter'].includes(String(load.backup||'')); body = `${progress('Final Step', 'Verify truck load and submit to Owner', total, total)}<div class='wl-review'><b>Truck:</b> ${inspection.truck.some(v => v === false) ? 'FAILED' : 'PASS'}<br><b>Trailer:</b> ${inspection.takingTrailer === true ? (inspection.trailer.some(v => v === false) ? 'FAILED' : 'PASS') : 'Not taken'}</div>${failed ? `<div class='wl-stop'><b>FAILED ITEM — CALL OPERATIONS MANAGER</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<div class='wl-question top10'><div class='qtext'>Required batteries & backup before departure</div><div class='wl-note'>Physically verify at least 4 × 12V 110Ah batteries and 2 × LiTime 12V 100Ah batteries are on the truck and charged. Missing/not-charged batteries must be replaced first.</div><label>12V 110Ah battery count</label><input id='wlTruck110Qty' type='number' min='0' inputmode='numeric' value='${esc(load.qty110||'')}' placeholder='4 minimum'><label class='check top8'><input id='wlTruck110Charged' type='checkbox' ${load.charged110?'checked':''}><span>All required 12V 110Ah batteries physically verified charged</span></label><label>LiTime 12V 100Ah battery count</label><input id='wlTruckLiQty' type='number' min='0' inputmode='numeric' value='${esc(load.qtyLi||'')}' placeholder='2 minimum'><label class='check top8'><input id='wlTruckLiCharged' type='checkbox' ${load.chargedLi?'checked':''}><span>Both LiTime 12V 100Ah batteries physically verified charged</span></label><label>Complete backup unit appropriate to today’s work</label><select id='wlTruckBackup'><option value=''>Choose backup</option>${['Spotter','Sniper','Solar Spotter'].map(v=>`<option value='${v}' ${load.backup===v?'selected':''}>${v}</option>`).join('')}</select><div class='small top8'>Tech Check verifies the selected backup was properly checked out by IT to you.</div></div>${!loadReady?`<div class='wl-stop top10'><b>TRUCK LOAD NOT READY</b><div>Complete the battery minimum, charged verification, and backup selection before departure.</div></div>`:''}<button class='wl-big ${failed ? 'wl-red' : 'wl-green'} top10' data-wl-submit-inspection ${loadReady?'':'disabled'}>Submit Morning Inspection to Owner</button>`; }
   const failedNow = inspection.truck.some(v => v === false) || inspection.trailer.some(v => v === false);
   card.innerHTML = `${inspectionRecovered ? `<div class='warn wl-draft-recovered'><b>Recovered unsent inspection from this device.</b><div class='small'>Nothing was submitted while you were offline or away. Continue where you left off.</div></div>` : ''}<button class='wl-back' data-wl-home='svc'>← Service Home</button>${body}${failedNow && inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<div class='wl-stop'><b>A failed item needs immediate attention.</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<div class='wl-nav'><button class='wl-prev' data-wl-inspect-prev ${inspection.step === 0 ? 'disabled' : ''}>Back</button>${inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<button class='wl-next' data-wl-inspect-next>Next →</button>` : '<span></span>'}</div>`;
   hideChildren(viewSvc(), [card]); resetWizardPosition();
 }
-async function startInspection() { const saved=await loadDeviceDraft('inspection'); if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) { inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7) }; while(inspection.truck.length<8) inspection.truck.push(null); while(inspection.trailer.length<7) inspection.trailer.push(null); inspectionRecovered=true; } else { inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null) }; inspectionRecovered=false; } inspectionQuestion(); }
+async function startInspection() { const saved=await loadDeviceDraft('inspection'); if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) { inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7), load:{qty110:saved.load?.qty110||'',charged110:saved.load?.charged110===true,qtyLi:saved.load?.qtyLi||'',chargedLi:saved.load?.chargedLi===true,backup:saved.load?.backup||''} }; while(inspection.truck.length<8) inspection.truck.push(null); while(inspection.trailer.length<7) inspection.trailer.push(null); inspectionRecovered=true; } else { inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null), load:{qty110:'',charged110:false,qtyLi:'',chargedLi:false,backup:''} }; inspectionRecovered=false; } inspectionQuestion(); }
 async function submitInspection() {
-  if (inspection.truck.some(v => v === null)) return alert('Complete every truck question.'); if (inspection.takingTrailer === true && inspection.trailer.some(v => v === null)) return alert('Complete every trailer question.');
+  if (inspection.truck.some(v => v === null)) return alert('Complete every truck question.');
+  if (inspection.takingTrailer === true && inspection.trailer.some(v => v === null)) return alert('Complete every trailer question.');
+  const load=inspection.load||{};
+  if (Number(load.qty110||0)<4) return alert('At least 4 × 12V 110Ah batteries are required on the Service truck.');
+  if (load.charged110!==true) return alert('Physically verify the required 12V 110Ah batteries are charged. Replace any missing/not-charged battery before proceeding.');
+  if (Number(load.qtyLi||0)<2) return alert('At least 2 × LiTime 12V 100Ah batteries are required on the Service truck.');
+  if (load.chargedLi!==true) return alert('Physically verify both LiTime 12V 100Ah batteries are charged. Replace any missing/not-charged battery before proceeding.');
+  if (!['Spotter','Sniper','Solar Spotter'].includes(String(load.backup||''))) return alert('Choose the complete backup unit appropriate to today’s work.');
   if (!navigator.onLine) { await saveInspectionDraft(); return alert('No connection. Your inspection is saved on this device, but it has NOT been submitted to the Owner. Reconnect and tap Submit again.'); }
-  const truck = {}; inspection.truck.forEach((v, i) => truck[`truck_${i + 1}`] = v); const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v); const text = document.getElementById('sessionClosed')?.textContent || ''; const tickets = [...text.matchAll(/MHelpDesk Ticket\s*#([^·\s]+)/gi)].map(m => m[1]);
-  document.body.classList.add('busy'); try { const { error } = await liveDb.rpc('submit_morning_check', { p_mhelp_reviewed: true, p_truck_checks: truck, p_taking_trailer: inspection.takingTrailer === true, p_trailer_checks: trailer, p_closed_ticket_nos: tickets }); if (error) throw error; await clearDeviceDraft('inspection'); inspectionRecovered=false; alert('Morning inspection submitted to the Owner.'); showSvcHome(); } catch(error) { await saveInspectionDraft(); alert(error?.message === 'Failed to fetch' ? 'Connection lost. Your inspection is saved on this device and was not marked submitted. Reconnect and try again.' : (error?.message || 'Could not submit the inspection.')); } finally { document.body.classList.remove('busy'); }
+  const truck = {}; inspection.truck.forEach((v, i) => truck[`truck_${i + 1}`] = v);
+  const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v);
+  const text = document.getElementById('sessionClosed')?.textContent || '';
+  const tickets = [...text.matchAll(/MHelpDesk Ticket\s*#([^·\s]+)/gi)].map(m => m[1]);
+  document.body.classList.add('busy');
+  try {
+    const { error } = await liveDb.rpc('submit_morning_check_v2', {
+      p_mhelp_reviewed:true,
+      p_truck_checks:truck,
+      p_taking_trailer:inspection.takingTrailer===true,
+      p_trailer_checks:trailer,
+      p_closed_ticket_nos:tickets,
+      p_truck_12v_110ah_qty:Number(load.qty110||0),
+      p_truck_12v_110ah_charged:true,
+      p_truck_litime_12v_100ah_qty:Number(load.qtyLi||0),
+      p_truck_litime_12v_100ah_charged:true,
+      p_backup_unit_type:String(load.backup||'')
+    });
+    if (error) throw error;
+    await clearDeviceDraft('inspection'); inspectionRecovered=false;
+    alert('Morning inspection and required truck load submitted to the Owner.');
+    showSvcHome();
+  } catch(error) {
+    await saveInspectionDraft();
+    alert(error?.message === 'Failed to fetch' ? 'Connection lost. Your inspection is saved on this device and was not marked submitted. Reconnect and try again.' : (error?.message || 'Could not submit the inspection.'));
+  } finally { document.body.classList.remove('busy'); }
 }
 async function showInspectionHistory() {
   const { data } = await liveDb.from('morning_checks').select('*').order('submitted_at', { ascending: false }).limit(60); let card = document.getElementById('wlSvcHistory'); if (!card) { card = document.createElement('div'); card.id = 'wlSvcHistory'; card.className = 'card wl-history'; viewSvc().append(card); }
@@ -3629,6 +3660,15 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     ownerAIDispatchBuild();
   }
+});
+document.addEventListener('input', e => {
+  if (e.target?.id==='wlTruck110Qty') { inspection.load.qty110=e.target.value; saveInspectionDraft(); }
+  if (e.target?.id==='wlTruckLiQty') { inspection.load.qtyLi=e.target.value; saveInspectionDraft(); }
+});
+document.addEventListener('change', e => {
+  if (e.target?.id==='wlTruck110Charged') { inspection.load.charged110=e.target.checked; saveInspectionDraft(); }
+  if (e.target?.id==='wlTruckLiCharged') { inspection.load.chargedLi=e.target.checked; saveInspectionDraft(); }
+  if (e.target?.id==='wlTruckBackup') { inspection.load.backup=e.target.value; saveInspectionDraft(); }
 });
 document.addEventListener('change', async e => {
   if (e.target.id === 'wlReturnPhoto') {
@@ -4169,7 +4209,7 @@ document.addEventListener('click', async e => {
   const ans = e.target.closest('[data-wl-answer]'); if (ans) { const val = ans.dataset.wlAnswer === 'pass'; if (inspection.step < 8) inspection.truck[inspection.step] = val; else if (inspection.takingTrailer === true && inspection.step < 16) inspection.trailer[inspection.step - 9] = val; if (val) inspection.step++; saveInspectionDraft(); return inspectionQuestion(); }
   const tr = e.target.closest('[data-wl-trailer]'); if (tr) { inspection.takingTrailer = tr.dataset.wlTrailer === 'yes'; inspection.step = inspection.takingTrailer ? 9 : 16; saveInspectionDraft(); return inspectionQuestion(); }
   if (e.target.closest('[data-wl-inspect-next]')) { if (inspection.step < 8 && inspection.truck[inspection.step] === null) return alert('Choose PASS or FAIL first.'); if (inspection.step === 8 && inspection.takingTrailer === null) return alert('Choose whether you are taking a trailer.'); if (inspection.takingTrailer === true && inspection.step >= 9 && inspection.step < 16 && inspection.trailer[inspection.step - 9] === null) return alert('Choose PASS or FAIL first.'); inspection.step++; if (inspection.step === 9 && inspection.takingTrailer === false) inspection.step = 16; saveInspectionDraft(); return inspectionQuestion(); }
-  if (e.target.closest('[data-wl-inspect-prev]')) { if (inspection.step === 16 && inspection.takingTrailer === false) inspection.step = 8; else inspection.step = Math.max(0, inspection.step - 1); saveInspectionDraft(); return inspectionQuestion(); }
+  if (e.target.closest('[data-wl-inspect-prev]')) { if(document.getElementById('wlTruck110Qty')) { inspection.load.qty110=document.getElementById('wlTruck110Qty').value; inspection.load.charged110=document.getElementById('wlTruck110Charged')?.checked===true; inspection.load.qtyLi=document.getElementById('wlTruckLiQty')?.value||''; inspection.load.chargedLi=document.getElementById('wlTruckLiCharged')?.checked===true; inspection.load.backup=document.getElementById('wlTruckBackup')?.value||''; } if (inspection.step === 16 && inspection.takingTrailer === false) inspection.step = 8; else inspection.step = Math.max(0, inspection.step - 1); saveInspectionDraft(); return inspectionQuestion(); }
   if (e.target.closest('[data-wl-submit-inspection]')) return submitInspection();
 });
 async function showServiceReturn() {
