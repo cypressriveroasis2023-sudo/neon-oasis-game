@@ -1075,6 +1075,135 @@ function draftEquipmentText(d){
   return (d.equipment_manifest||[]).map(x=>x.qty+' × '+x.label).join(', ')||'—';
 }
 
+
+function visionPartDefinitions(){
+  return [
+    {key:'solar_panel_qty',label:'Solar panels',token:'solar_panel'},
+    {key:'battery_replacement_qty',label:'Replacement batteries',token:'replacement_battery'},
+    {key:'camera_replacement_qty',label:'Replacement cameras',token:'replacement_camera'},
+    {key:'sim_replacement_qty',label:'SIM cards',token:'sim_card'},
+    {key:'micro_sd_qty',label:'Micro SD cards',token:'micro_sd_card'}
+  ];
+}
+function normalizePartsCommandText(value){
+  return String(value||'').toLowerCase()
+    .replace(/\bsolar\s+panels?\b/g,'solar_panel')
+    .replace(/\b(?:replacement\s+)?batter(?:y|ies)\b/g,'replacement_battery')
+    .replace(/\b(?:replacement\s+)?cameras?\b/g,'replacement_camera')
+    .replace(/\b(?:replacement\s+)?sims?(?:\s+cards?)?\b/g,'sim_card')
+    .replace(/\bmicro\s*sd(?:\s+cards?)?\b/g,'micro_sd_card')
+    .replace(/\bsd\s+cards?\b/g,'micro_sd_card');
+}
+function parseSimplePartsCommand(raw){
+  const text=normalizePartsCommandText(raw);
+  if(!/\b(add|remove|delete|change|set|make|increase|decrease|take\s+off|take\s+out)\b/i.test(text))return [];
+  const out=[];
+  for(const def of visionPartDefinitions()){
+    const pos=text.indexOf(def.token);
+    if(pos<0)continue;
+    const before=text.slice(Math.max(0,pos-100),pos).trim();
+    const after=text.slice(pos+def.token.length,pos+def.token.length+80).trim();
+    const leftQty=before.match(/(\d+)\s*$/);
+    const rightQty=after.match(/^(?:to\s+)?(\d+)\b/);
+    const qty=Number((leftQty&&leftQty[1])||(rightQty&&rightQty[1])||1);
+    if(/\b(set|change|make)\b/.test(before)&&/^to\s+\d+\b/.test(after)){
+      out.push({key:def.key,label:def.label,mode:'set',qty:Number(rightQty&&rightQty[1]||0)});
+      continue;
+    }
+    if(/\b(add|increase|put|include)\b/.test(before)){
+      out.push({key:def.key,label:def.label,mode:'add',qty});
+      continue;
+    }
+    if(/\b(remove|delete|decrease|take\s+off|take\s+out)\b/.test(before)){
+      out.push({key:def.key,label:def.label,mode:'remove',qty});
+      continue;
+    }
+  }
+  return out;
+}
+function normalizeSiteWords(value){
+  return String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).filter(Boolean);
+}
+function resolvePartsTicketBySite(raw){
+  const explicit=ticketFrom(raw);
+  if(explicit)return{ticket:String(explicit),site:'',ambiguous:[]};
+  const rawWords=new Set(normalizeSiteWords(raw));
+  const ignored=new Set(['remove','delete','change','make','solar','panel','panels','replacement','battery','batteries','camera','cameras','sim','sims','card','cards','micro','from','take','off','out','add','put','include','increase','decrease','set','one','two','three','four','five']);
+  const grouped=new Map();
+  for(const row of (state.jobs||[])){
+    if(String(row.status||'').toLowerCase()==='cancelled')continue;
+    const ticket=String(row.ticket_no||'').trim();
+    const site=String(row.site||'').trim();
+    if(!ticket||!site)continue;
+    const siteWords=normalizeSiteWords(site).filter(w=>w.length>=3&&!ignored.has(w));
+    const score=siteWords.filter(w=>rawWords.has(w)).length;
+    if(score<1)continue;
+    const active=['assigned','started'].includes(String(row.status||'').toLowerCase())?1:0;
+    const prev=grouped.get(ticket);
+    if(!prev||score>prev.score||(score===prev.score&&active>prev.active))grouped.set(ticket,{ticket,site,score,active});
+  }
+  const rows=[...grouped.values()].sort((a,b)=>b.score-a.score||b.active-a.active||a.site.localeCompare(b.site));
+  if(!rows.length)return{ticket:'',site:'',ambiguous:[]};
+  const top=rows[0];
+  const ties=rows.filter(x=>x.score===top.score&&x.active===top.active);
+  if(ties.length>1)return{ticket:'',site:'',ambiguous:ties};
+  return{ticket:top.ticket,site:top.site,ambiguous:[]};
+}
+async function partsUpdateHtml(raw){
+  const changes=parseSimplePartsCommand(raw);
+  if(!changes.length)return'';
+  const target=resolvePartsTicketBySite(raw);
+  if(target.ambiguous&&target.ambiguous.length){
+    return '<div class="vision-answer-title">Which Tech Check job did you mean?</div><div class="vision-answer-copy">I found more than one matching site.</div>'
+      +target.ambiguous.slice(0,6).map(x=>'<button class="vision-inline-choice" type="button" data-vision-prompt="'+esc(raw+' for ticket '+x.ticket)+'">#'+esc(x.ticket)+' · '+esc(x.site)+'</button>').join('');
+  }
+  if(!target.ticket){
+    return '<div class="vision-answer-title">Which Tech Check job should I change?</div><div class="vision-answer-copy">I understood the parts change. Tell me the customer/site name or the MHelpDesk ticket number.</div>';
+  }
+  const ticket=String(target.ticket);
+  const [prepResult,assignmentResult]=await Promise.all([
+    db.from('prep_tickets').select('solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,status,created_at').eq('ticket_no',ticket).in('status',['draft','released']).order('created_at',{ascending:false}).limit(1),
+    db.from('job_assignments').select('solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,status,updated_at').eq('ticket_no',ticket).in('status',['assigned','started']).order('updated_at',{ascending:false,nullsFirst:false}).limit(1)
+  ]);
+  if(prepResult.error)throw prepResult.error;
+  if(assignmentResult.error)throw assignmentResult.error;
+  const base=(prepResult.data||[])[0]||(assignmentResult.data||[])[0];
+  if(!base)return '<div class="vision-direct warn"><b>I found MHelpDesk #'+esc(ticket)+', but there is no active Tech Check parts record to change.</b></div>';
+  const action={
+    type:'parts_update',
+    ticket_no:ticket,
+    work_type:'',
+    role:'',
+    technician_name:'',
+    date:'',
+    time:'',
+    summary:'Update parts / supplies',
+    solar_panel_qty:Number(base.solar_panel_qty||0),
+    battery_replacement_qty:Number(base.battery_replacement_qty||0),
+    camera_replacement_qty:Number(base.camera_replacement_qty||0),
+    sim_replacement_qty:Number(base.sim_replacement_qty||0),
+    micro_sd_qty:Number(base.micro_sd_qty||0),
+    requires_confirmation:true
+  };
+  const notes=[];
+  for(const ch of changes){
+    const before=Number(action[ch.key]||0);
+    const after=ch.mode==='set'?ch.qty:ch.mode==='add'?before+ch.qty:before-ch.qty;
+    if(after<0)return '<div class="vision-direct warn"><b>I cannot remove '+esc(String(ch.qty))+' '+esc(ch.label.toLowerCase())+'.</b>The live Tech Check quantity is '+esc(String(before))+'.</div>';
+    action[ch.key]=after;
+    notes.push(ch.label+': '+before+' → '+after);
+  }
+  state.currentTicket=ticket;
+  ensureChat().ticket=ticket;
+  mergeWorkingMemory({active_ticket:ticket,current_subject:'parts'});
+  saveChats();
+  renderOrder();
+  return '<div class="vision-answer-title">I understood the parts change for '+esc(target.site||('MHelpDesk #'+ticket))+'.</div>'
+    +'<div class="vision-answer-copy">'+esc(notes.join(' · '))+'</div>'
+    +await auditedActionCard(action,raw)
+    +jobCard(ticket);
+}
+
 function draftPartsParse(text){
   const s=numberWords(String(text||'').toLowerCase());
   const defs=[
@@ -1909,6 +2038,7 @@ async function answer(text){
   const damageHold=await damageHoldHtml(raw);if(damageHold)return damageHold;
   const companyHistory=await companyHistoryHtml(raw);if(companyHistory)return companyHistory;
   const offlineEscalation=await offlineEscalationHtml(raw);if(offlineEscalation)return offlineEscalation;
+  const partsReply=await partsUpdateHtml(raw);if(partsReply)return partsReply;
 
   // Resolve an explicit Tech Check ticket/unit before profile lookup or the
   // conversational agent. This prevents a named ticket from being mistaken for
