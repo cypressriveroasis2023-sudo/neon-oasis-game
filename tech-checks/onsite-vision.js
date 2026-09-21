@@ -1231,6 +1231,117 @@ async function companyHistoryHtml(raw){
     +'<div class="vision-answer-copy">'+esc(String(result.event_count??events.length))+' permanent history event'+((Number(result.event_count??events.length)===1)?'':'s')+' found. Closed jobs and returned equipment remain in this history.</div>'
     +(events.length?'<div class="vision-context-block"><h3>Most recent activity</h3><div class="vision-context-list">'+events.slice(0,12).map(historyEventHtml).join('')+'</div></div>':'<div class="vision-system-note">The subject exists, but there are no dated history events yet.</div>');
 }
+
+function offlineEscalationIntent(raw){
+  const text=String(raw||'').trim(),lower=text.toLowerCase();
+  const offlineCue=/\boffline\b/.test(lower);
+  const waitingIt=/\b(waiting\s+(?:for|on)\s+it|cases?\s+(?:waiting|need(?:ing)?)\s+(?:for\s+)?it)\b/i.test(text);
+  const ownerDecision=/\b(owner\s+decision|need(?:s|ing)?\s+(?:my|the\s+owner'?s?)\s+decision|cases?\s+(?:for|needing)\s+owner)\b/i.test(text);
+  const troubleshooting=/\b(troubleshoot(?:ing)?|already\s+(?:tried|attempted|checked)|what\s+(?:has|have)\s+.*(?:tried|attempted|checked))\b/i.test(text);
+  const backup=/\b(backup\s+swap|swap\s+authorized|backup\s+authorized|authorized\s+backup)\b/i.test(text);
+  const intake=/\b(failed\s+unit.*(?:it\s+intake|intake)|(?:reach|reached|enter|entered|make\s+it\s+to).*it\s+intake|it\s+intake.*failed\s+unit)\b/i.test(text);
+  if(!offlineCue&&!waitingIt&&!ownerDecision&&!backup&&!intake&&!(troubleshooting&&(/\bunit\b/i.test(text)||state.currentTicket)))return null;
+
+  const unit=unitHint(text);
+  const explicitTicket=ticketFrom(text);
+  const contextualTicket=!explicitTicket&&state.currentTicket&&/\b(this|that|it|case|unit|job|ticket|escalation|problem|swap|intake)\b/i.test(text)
+    ?String(state.currentTicket):'';
+  const ticket=explicitTicket||contextualTicket||'';
+  const unitReference=unit?(unit.type+' '+unit.tag):'';
+  let scope='active';
+  let detail='';
+  if(waitingIt)scope='waiting_it';
+  else if(ownerDecision)scope='owner_decision';
+  else if(troubleshooting||backup||intake||unitReference||ticket)scope='all';
+  if(troubleshooting)detail='troubleshooting';
+  else if(backup)detail='backup';
+  else if(intake)detail='intake';
+  return{scope,detail,unitReference,ticket};
+}
+function offlineEscalationStatus(value){
+  return String(value||'MISSING INFORMATION').replaceAll('_',' ').toUpperCase();
+}
+function offlineEscalationCard(row){
+  const r=row||{};
+  const meta=[
+    r.ticket_no?'MHelpDesk #'+r.ticket_no:'',
+    r.site||'',
+    r.updated_at?historyDate(r.updated_at):''
+  ].filter(Boolean);
+  const people=[
+    r.service_tech_name?'Service: '+r.service_tech_name:'',
+    r.it_tech_name?'IT: '+r.it_tech_name:''
+  ].filter(Boolean);
+  return '<div class="vision-context-block"><h3>'+esc((r.equipment_type||'Unit')+' '+(r.unit_tag||'MISSING INFORMATION'))+'</h3>'
+    +'<div class="vision-context-grid"><div><span>STATUS</span><b>'+esc(offlineEscalationStatus(r.status))+'</b></div><div><span>POWER VERIFIED</span><b>'+esc(r.service_power_verified===true?'YES':'MISSING INFORMATION')+'</b></div></div>'
+    +(meta.length?'<div class="vision-system-note">'+meta.map(esc).join(' · ')+'</div>':'')
+    +(people.length?'<div class="vision-system-note">'+people.map(esc).join(' · ')+'</div>':'')
+    +'</div>';
+}
+async function offlineEscalationHtml(raw){
+  const intent=offlineEscalationIntent(raw);
+  if(!intent)return'';
+  const layer=visionLiveData();
+  if(!layer?.getOfflineEscalations)return '<div class="vision-direct warn"><b>Offline escalation data is updating.</b>Refresh OnSite Vision and try again.</div>';
+  const result=await layer.getOfflineEscalations({
+    scope:intent.scope,
+    unit_reference:intent.unitReference,
+    ticket_no:intent.ticket
+  },{force:true,limit:100});
+  const rows=Array.isArray(result?.rows)?result.rows:[];
+
+  if(!rows.length){
+    let title='No unresolved offline-unit escalations are recorded right now.';
+    if(intent.scope==='waiting_it')title='No offline-unit cases are currently waiting for IT.';
+    else if(intent.scope==='owner_decision')title='No offline-unit cases currently need an Owner decision.';
+    else if(intent.detail||intent.unitReference||intent.ticket)title='No matching offline-unit escalation is recorded.';
+    return '<div class="vision-answer-title">'+esc(title)+'</div>'
+      +(intent.detail?'<div class="vision-direct warn"><b>MISSING INFORMATION</b>The requested escalation detail was not recorded in a matching Tech Check offline-unit case.</div>':'')
+      +'<div class="vision-answer-copy">MHelpDesk remains separate; this answer uses Tech Check records only.</div>';
+  }
+
+  if(intent.detail){
+    const r=rows[0]||{};
+    let detailHtml='';
+    if(intent.detail==='troubleshooting'){
+      detailHtml='<div class="vision-answer-title">Troubleshooting already recorded</div>'
+        +'<div class="vision-context-block"><h3>'+esc((r.equipment_type||'Unit')+' '+(r.unit_tag||'MISSING INFORMATION'))+'</h3><div class="vision-context-list">'
+        +'<div class="vision-context-row"><b>Original problem</b><span>'+esc(r.original_problem||'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>Service power verification</b><span>'+esc(r.service_power_verified===true?'Verified':'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>Service troubleshooting</b><span>'+esc(r.service_troubleshooting_notes||'MISSING INFORMATION')+'</span></div>'
+        +'<div class="vision-context-row"><b>IT troubleshooting</b><span>'+esc(r.it_troubleshooting_notes||'MISSING INFORMATION')+'</span></div>'
+        +'</div></div>';
+    }else if(intent.detail==='backup'){
+      const authorized=Boolean(r.backup_authorized_at||r.backup_unit_tag);
+      detailHtml='<div class="vision-answer-title">'+(authorized?'A backup swap was authorized.':'No backup swap authorization is recorded on this case.')+'</div>'
+        +'<div class="vision-direct '+(authorized?'good':'warn')+'"><b>VERIFIED DATABASE FACT</b>'
+        +(authorized
+          ?'Authorized backup: '+esc(r.backup_equipment_type||'MISSING INFORMATION')+' '+esc(r.backup_unit_tag||'MISSING INFORMATION')+(r.backup_authorized_at?' · '+esc(historyDate(r.backup_authorized_at)):'')
+          :'The current escalation record has no backup authorization timestamp or backup unit recorded.')
+        +'</div>';
+    }else if(intent.detail==='intake'){
+      const arrived=Boolean(r.failed_return_id)||r.status==='failed_unit_in_it_intake';
+      detailHtml='<div class="vision-answer-title">'+(arrived?'Yes — the failed unit reached IT Intake.':'No linked failed-unit IT Intake return is recorded yet.')+'</div>'
+        +'<div class="vision-direct '+(arrived?'good':'warn')+'"><b>VERIFIED DATABASE FACT</b>'
+        +(arrived
+          ?'Tech Check records the failed unit in Service Return → IT Intake.'
+          :'The offline escalation does not yet have a linked failed-unit return in IT Intake.')
+        +'</div>';
+    }
+    return detailHtml+offlineEscalationCard(r)
+      +'<div class="vision-answer-copy">MHelpDesk remains separate; no MHelpDesk record was changed.</div>';
+  }
+
+  const title=intent.scope==='waiting_it'
+    ?rows.length+' offline case'+(rows.length===1?'':'s')+' waiting for IT'
+    :intent.scope==='owner_decision'
+      ?rows.length+' offline case'+(rows.length===1?'':'s')+' needing an Owner decision'
+      :rows.length+' unresolved offline unit'+(rows.length===1?'':'s');
+  return '<div class="vision-answer-title">'+esc(title)+'</div>'
+    +'<div class="vision-answer-copy">These are live Tech Check offline-unit escalation records. MHelpDesk remains separate.</div>'
+    +rows.slice(0,20).map(offlineEscalationCard).join('');
+}
+
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
 }
@@ -1268,6 +1379,7 @@ async function answer(text){
     if(sideQuestion){
       const review=await ownerReviewQueueHtml(raw);if(review)return review;
       const history=await companyHistoryHtml(raw);if(history)return history;
+      const offline=await offlineEscalationHtml(raw);if(offline)return offline;
       const side=await serverAgentAnswer(raw);
       if(side)return side;
     }
@@ -1279,6 +1391,7 @@ async function answer(text){
 
   const reviewQueue=await ownerReviewQueueHtml(raw);if(reviewQueue)return reviewQueue;
   const companyHistory=await companyHistoryHtml(raw);if(companyHistory)return companyHistory;
+  const offlineEscalation=await offlineEscalationHtml(raw);if(offlineEscalation)return offlineEscalation;
 
   // Resolve an explicit Tech Check ticket/unit before profile lookup or the
   // conversational agent. This prevents a named ticket from being mistaken for
