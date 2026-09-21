@@ -790,6 +790,30 @@ function draftAssignmentText(d){
   return out.join(' · ')||'—';
 }
 function visionWorkflowEngine(){return window.OnSiteVisionWorkflowEngine||null;}
+function normalizeDraftState(d={}){
+  if(!d||typeof d!=='object')d={};
+  if(!Array.isArray(d.equipment_manifest))d.equipment_manifest=[];
+  if(!d.parts||typeof d.parts!=='object'||Array.isArray(d.parts))d.parts={};
+  if(!d.assignees||typeof d.assignees!=='object'||Array.isArray(d.assignees))d.assignees={};
+  d.work_type=String(d.work_type||'');
+  d.role=String(d.role||'');
+  d.ticket_no=String(d.ticket_no||'');
+  d.site=String(d.site||'');
+  d.scheduled_for=String(d.scheduled_for||'');
+  d.scheduled_time=String(d.scheduled_time||'');
+  d.unit_numbers=String(d.unit_numbers||'');
+  d.stand_numbers=String(d.stand_numbers||'');
+  d.job_description=String(d.job_description||'');
+  d.notes=String(d.notes||'');
+  d.time_answered=d.time_answered===true||Boolean(d.scheduled_time);
+  d.equipment_answered=d.equipment_answered===true||d.equipment_manifest.length>0;
+  d.equipment_numbers_answered=d.equipment_numbers_answered===true||Boolean(d.unit_numbers||d.stand_numbers);
+  d.parts_answered=d.parts_answered===true;
+  d.assignment_answered=d.assignment_answered===true;
+  d.notes_answered=d.notes_answered===true;
+  d.draft_version=Math.max(2,Number(d.draft_version||0));
+  return d;
+}
 function draftStepKeys(d={}){
   const engine=visionWorkflowEngine();
   if(engine?.getRequiredFields){
@@ -817,6 +841,7 @@ function draftChoiceHtml(key,d){
 }
 
 function draftMissingKey(d){
+  d=normalizeDraftState(d||{});
   const engine=visionWorkflowEngine();
   if(engine?.getMissingFields){
     const missing=engine.getMissingFields(d||{});
@@ -864,6 +889,7 @@ function draftSummaryHtml(d){
     +(d.notes?'<div class="vision-draft-description"><span>Owner notes</span><b>'+esc(d.notes)+'</b></div>':'')+'</div>';
 }
 function draftApplyInput(d,text,initial=false){
+  d=normalizeDraftState(d||{});
   const raw=String(text||'').trim(),expected=draftMissingKey(d),type=draftWorkType(raw);
   if(type){d.work_type=type;d.role=draftDefaultRole(type);}
   const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
@@ -912,11 +938,20 @@ function draftApplyInput(d,text,initial=false){
   }
   return d;
 }
-function draftResponseHtml(d,started=false){
+function draftResponseHtml(d,started=false,transition=null){
+  d=normalizeDraftState(d||{});
   const missing=draftMissingKey(d);
   if(missing){
     const keys=draftStepKeys(d),step=Math.max(1,keys.indexOf(missing)+1);
-    return '<div class="vision-answer-title">'+(started?'I started the work order. I’ll ask you one thing at a time.':'Got it. Here is the next question.')+'</div>'+draftSummaryHtml(d)
+    const advanced=started||transition?.advanced===true;
+    const title=started
+      ?'I started the work order. I’ll ask you one thing at a time.'
+      :advanced
+        ?'Got it. Here is the next question.'
+        :'I still need this answer before I can move on.';
+    // The full draft summary belongs at the start and final review. Appending it
+    // after every answer duplicated the same draft card in the conversation.
+    return '<div class="vision-answer-title">'+title+'</div>'+(started?draftSummaryHtml(d):'')
       +'<div class="vision-draft-question"><small>QUESTION '+step+' OF '+keys.length+'</small><b>'+esc(draftQuestion(missing,d))+'</b>'+draftChoiceHtml(missing,d)+'</div>'
       +'<div class="vision-system-note">Answer below or tap one of the choices. Vision remembers the answers already in this draft.</div>';
   }
@@ -926,20 +961,31 @@ function draftResponseHtml(d,started=false){
 }
 function startDraft(text){
   state.currentTicket='';
-  const d={work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false};
+  const d={draft_version:2,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
   draftApplyInput(d,text,true);
   const current=ensureChat();current.ticket='';current.draft=d;saveChats();renderOrder();
   return draftResponseHtml(d,true);
 }
 function continueDraft(text){
-  const current=ensureChat(),d=current.draft;
-  if(!d)return'';
+  const current=ensureChat();
+  if(!current.draft)return'';
+  const d=normalizeDraftState(current.draft);
   if(/\b(cancel|never\s+mind|nevermind|discard|stop)\b/i.test(text)){
     current.draft=null;saveChats();
     return '<div class="vision-answer-title">Draft cancelled.</div><div class="vision-answer-copy">No Tech Check job was created.</div>';
   }
-  draftApplyInput(d,text,false);current.draft=d;saveChats();
-  return draftResponseHtml(d,false);
+  const before=draftMissingKey(d);
+  draftApplyInput(d,text,false);
+  const after=draftMissingKey(d);
+  const advanced=Boolean(before&&after!==before);
+  if(advanced){
+    d.last_answered_key=before;
+    d.last_answered_at=now();
+  }
+  current.draft=d;
+  current.updatedAt=now();
+  saveChats();
+  return draftResponseHtml(d,false,{before,after,advanced});
 }
 async function createDraftJob(d){
   const engine=visionWorkflowEngine();
