@@ -3565,7 +3565,7 @@ async function showSvcHome() {
   }
 
   const closeoutClear=!assignments.length&&!activeOffline.length&&!truckSpareCount;
-  const upcomingHtml=upcomingAssignments.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming Service Work</b><span>${upcomingAssignments.length} scheduled</span></div>${upcomingAssignments.slice(0,8).map(assignmentCard).join('')}</div>`:'';
+  const upcomingHtml='';
 
   home.innerHTML=`${alertBanner}<div class='wl-svc-command'>
     <div class='wl-svc-command-hero'>
