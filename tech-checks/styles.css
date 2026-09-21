@@ -4601,3 +4601,23 @@ body.busy #view-owner{pointer-events:auto!important}
 }
 #view-owner #ownerJobAssignments .warn *,
 #view-owner #ownerJobAssignments .ownerReviewStep *{color:#f8fafb!important;opacity:1!important}
+
+
+/* Owner true-center desktop workspace v215
+   Center the working column in the full desktop viewport, not merely in the
+   remaining area beside the left rail. Keep the fixed navigation untouched. */
+@media (min-width:900px){
+  #view-owner #ownerApp #ownerAppPage{
+    padding-left:0!important;
+    padding-right:0!important
+  }
+  #view-owner #ownerAppPage>.ownerAppPageHead,
+  #view-owner #ownerAppPage>#ownerJobAssignments,
+  #view-owner #ownerAppPage>.ownerAppPageBody,
+  #view-owner #ownerAppPage>.ownerAppPageContent{
+    width:min(calc(100vw - 420px),1280px)!important;
+    max-width:1280px!important;
+    margin-left:auto!important;
+    margin-right:auto!important
+  }
+}
