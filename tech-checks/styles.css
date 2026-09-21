@@ -4142,3 +4142,7 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
  #view-owner .ownerWorkspaceContent .ownerDashBadge{background:#1d2a34!important;color:#dce7ed!important;border-color:#354854!important}
  #view-owner .ownerWorkspaceContent .ownerDashBadge.alert{background:#d71920!important;color:#fff!important;border-color:#d71920!important}
 }
+/* Owner sidebar interaction v164 */
+#view-owner .ownerWorkspaceRail button.ownerNavActive{background:#1c2a35!important;color:#fff!important;border-left:3px solid #e3171d!important;padding-left:9px!important}
+#view-owner .ownerWorkspaceRail button:focus-visible{outline:2px solid #4b9fca!important;outline-offset:1px!important}
+#view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected{min-height:calc(100vh - 72px)!important}
