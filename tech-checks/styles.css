@@ -4286,3 +4286,27 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
 #view-owner .ownerCalYear button{text-align:left;min-height:120px;padding:16px;border:1px solid #2c3b45;background:#111c23;border-radius:6px;color:#dfe8ed;cursor:pointer}
 #view-owner .ownerCalYear button:hover{background:#17262f;border-color:#3c718d}.ownerCalYear b{display:block;font-size:15px}.ownerCalYear strong{display:block;font-size:28px;margin-top:14px}.ownerCalYear span{font-size:10px;color:#81939e}
 @media(max-width:1000px){#view-owner .ownerTodayJob{grid-template-columns:1fr 140px}.ownerTodayOwner,.ownerTodayState{display:none}#view-owner .ownerTodaySummary{grid-template-columns:repeat(3,1fr)}}
+
+/* Interactive Owner Calendar v203 */
+#view-owner .ownerCalLayout{display:grid;grid-template-columns:minmax(650px,1fr) 320px;gap:14px;max-width:1500px;align-items:start}
+#view-owner .ownerCalBoard{min-width:0}
+#view-owner button.ownerCalDay{appearance:none;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;border-top:0;border-left:0}
+#view-owner button.ownerCalDay:hover{background:#16262f;border-color:#3b5361}
+#view-owner button.ownerCalDay:focus-visible{outline:2px solid #63b5e3;outline-offset:-2px;z-index:2}
+#view-owner .ownerCalDay.selected{background:#172a35;box-shadow:inset 0 0 0 2px #5aa6cf}
+#view-owner .ownerCalDate{display:flex;justify-content:space-between;align-items:center;gap:6px}
+#view-owner .ownerCalDate b{font-size:12px}
+#view-owner .ownerCalDate span{font-size:8px;font-weight:900;text-transform:uppercase;color:#78909d;background:#18262e;padding:2px 5px;border-radius:10px}
+#view-owner .ownerCalAgenda{position:sticky;top:14px;border:1px solid #2b3b45;background:#101a21;border-radius:6px;min-height:220px;padding:14px}
+#view-owner .ownerCalAgenda>h3{margin:0 0 6px;color:#eef4f7;font-size:16px}
+#view-owner .ownerCalAgenda>p{margin:0;color:#81949f;font-size:11px;line-height:1.5}
+#view-owner .ownerCalAgendaHead{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2b3b45;padding-bottom:11px;margin-bottom:10px}
+#view-owner .ownerCalAgendaHead small{font-size:8px;letter-spacing:.13em;font-weight:900;color:#718792}
+#view-owner .ownerCalAgendaHead h3{margin:3px 0 0;font-size:15px;color:#f1f5f7}
+#view-owner .ownerCalAgendaHead>strong{display:grid;place-items:center;min-width:29px;height:29px;border-radius:50%;background:#20323d;color:#fff}
+#view-owner .ownerCalAgendaJob{width:100%;display:grid;grid-template-columns:1.2fr 1fr auto;gap:8px;align-items:center;text-align:left;border:1px solid #273842;background:#132129;color:#dce6eb;border-radius:5px;padding:10px;margin-bottom:7px;cursor:pointer}
+#view-owner .ownerCalAgendaJob:hover{background:#192b35;border-color:#416071}
+#view-owner .ownerCalAgendaJob b,#view-owner .ownerCalAgendaJob span{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-owner .ownerCalAgendaJob b{font-size:10px}.ownerCalAgendaJob span{font-size:9px;color:#7f929e;margin-top:2px}
+#view-owner .ownerCalAgendaJob em{font-style:normal;font-size:8px;font-weight:900;letter-spacing:.06em;color:#a8c9da}
+@media(max-width:1200px){#view-owner .ownerCalLayout{grid-template-columns:1fr}#view-owner .ownerCalAgenda{position:static}.ownerCalWeek .ownerCalDay{min-height:280px}}
