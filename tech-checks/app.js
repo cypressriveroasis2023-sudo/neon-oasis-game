@@ -1814,7 +1814,12 @@ function ownerCalendarShift(n){const d=new Date(ownerCalendarDate);if(ownerCalen
 function ownerCalendarSetMode(m){ownerCalendarMode=m;ownerCalendarSelected=null;ownerAppRender();}
 function ownerCalendarToday(){ownerCalendarDate=new Date();ownerCalendarSelected=localDateKey(ownerCalendarDate);ownerAppRender();}
 function ownerCalendarSelect(key){ownerCalendarSelected=key;ownerAppRender();}
-function ownerCalendarOpenJob(id){const j=(state.ownerAssignments||[]).find(x=>String(x.id)===String(id));if(!j)return;const key=String(j.scheduled_for||'');ownerCalendarSelected=key;ownerAppRender();}
+function ownerCalendarOpenJob(id){
+ const job=(state.ownerAssignments||[]).find(x=>String(x.id)===String(id));
+ if(!job || !job.ticket_no)return;
+ // Open the existing ticket workspace rather than redrawing the selected day.
+ window.location.href='./onsite-vision.html?ticket='+encodeURIComponent(String(job.ticket_no));
+}
 function ownerCalendarDayCell(d,inMonth=true){
  const key=localDateKey(d),jobs=ownerCalendarJobsForDate(d),today=key===localDateKey(new Date()),sel=key===ownerCalendarSelected;
  return '<button type="button" class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+(sel?'selected ':'')+'" onclick="ownerCalendarSelect(\''+key+'\')"><div class="ownerCalDate"><b>'+d.getDate()+'</b>'+(jobs.length?'<span>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</span>':'')+'</div>'
