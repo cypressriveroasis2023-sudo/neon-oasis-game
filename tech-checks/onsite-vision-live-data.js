@@ -9,7 +9,7 @@
   const historyCache=new Map();
   const reviewCache={at:0,value:null};
   const escalationCache=new Map();
-  const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','failed_unit_in_it_intake','unresolved_owner'];
+  const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','unresolved_owner'];
   const TTL_MS=15000;
 
   function configure(supabaseClient){
@@ -99,12 +99,9 @@
     const cached=escalationCache.get(cacheKey);
     if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
 
-    let statuses=[];
-    if(scope==='active')statuses=ACTIVE_ESCALATION_STATUSES;
-    else if(scope==='waiting_it')statuses=['waiting_it'];
-    else if(scope==='owner_decision')statuses=['unresolved_owner'];
-    else if(scope==='resolved')statuses=['repaired_onsite','owner_resolved'];
-    else if(scope!=='all')throw new Error('Offline escalation scope must be active, waiting_it, owner_decision, resolved, or all.');
+    if(!['active','waiting_it','owner_decision','resolved','all'].includes(scope)){
+      throw new Error('Offline escalation scope must be active, waiting_it, owner_decision, resolved, or all.');
+    }
 
     let query=client.from('field_escalations').select([
       'id','ticket_no','site','unit_tag','equipment_type','service_tech_name','original_problem',
@@ -113,7 +110,10 @@
       'failed_return_id','owner_summary','owner_notified_at','owner_resolution','owner_resolved_by_name',
       'owner_resolved_at','resolved_at','created_at','updated_at'
     ].join(',')).order('updated_at',{ascending:false}).limit(limit);
-    if(statuses.length)query=query.in('status',statuses);
+    if(scope==='active')query=query.in('status',ACTIVE_ESCALATION_STATUSES).is('resolved_at',null);
+    else if(scope==='waiting_it')query=query.eq('status','waiting_it').is('resolved_at',null);
+    else if(scope==='owner_decision')query=query.eq('status','unresolved_owner').is('resolved_at',null);
+    else if(scope==='resolved')query=query.not('resolved_at','is',null);
     if(ticketNo)query=query.eq('ticket_no',ticketNo);
     const response=await query;
     if(response.error)throw response.error;
