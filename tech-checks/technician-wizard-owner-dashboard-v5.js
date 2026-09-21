@@ -4495,9 +4495,25 @@ function ownerAIMorningReadinessHtml(states){
   if(!attention.length)return "<div class='wl-ai-good'><b>Tomorrow readiness:</b> ✓ All assigned jobs are currently on track.</div>";
   return "<div class='wl-ai-warn'><b>Tomorrow readiness:</b> "+attention.length+" job"+(attention.length===1?'':'s')+" need review before work starts.<br>"+attention.slice(0,6).map(x=>'#'+esc(x?.a?.ticket_no||'—')+' — '+esc(x?.s?.detail||'Needs review')).join('<br>')+"</div>";
 }
+function ownerAIAlertFingerprint(flag){
+  const value=String(flag||'').trim();
+  const low=value.toLowerCase();
+  if(/^assigned .+ ago and has not been started\.$/i.test(value))return 'assigned_not_started';
+  if(/^it tech check has been open about /i.test(value))return 'it_tech_check_stalled';
+  if(/^it handoff has been waiting for service about /i.test(value))return 'it_handoff_waiting_service';
+  if(low==='missing mhelpdesk reference.')return 'missing_mhelpdesk_reference';
+  if(low==='customer / site is missing.')return 'missing_customer_site';
+  if(low==='work description is missing.')return 'missing_work_description';
+  if(low==='pickup is waiting on service field return before it intake.')return 'pickup_waiting_service_return';
+  return low
+    .replace(/\b\d+d(?:\s+\d+h)?\b/g,'<elapsed>')
+    .replace(/\b\d+h(?:\s+\d+m)?\b/g,'<elapsed>')
+    .replace(/\b\d+m\b/g,'<elapsed>');
+}
 function ownerAINotificationKey(a,status){
   const id=String(a?.id||a?.ticket_no||'unknown');
-  const detail=[status?.label||'',...(status?.flags||[])].join('|').trim();
+  const fingerprints=(status?.flags||[]).map(ownerAIAlertFingerprint).filter(Boolean).sort();
+  const detail=[status?.label||'',...fingerprints].join('|').trim();
   return id+'::'+detail;
 }
 function ownerAIIsAcknowledged(a,status){
