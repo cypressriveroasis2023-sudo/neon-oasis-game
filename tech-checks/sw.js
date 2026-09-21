@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v117';
+const CACHE_NAME = 'tech-check-field-shell-v118';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -17,11 +17,11 @@ self.addEventListener('install', event => {
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v30', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-company-knowledge.js?v=company-knowledge-v14', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-workflow-engine.js?v=workflow-engine-v6b', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision-live-data.js?v=live-data-v1', { cache:'reload' })),
+      cache.add(new Request('./onsite-vision-live-data.js?v=live-data-v2', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-actions.js?v=action-layer-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-persistence.js?v=persistence-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v36', { cache:'reload' }))
+      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v37', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
