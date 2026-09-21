@@ -49,6 +49,7 @@ async function hydratePersistentChats(){
       if(!existing||b>=a)merged.set(row.id,row);
     }
     state.chats=[...merged.values()].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)).slice(0,20);
+    state.chats.forEach(c=>{c.memory=cleanMemory(c.memory);});
     persistenceReady=true;
     await layer.saveAll?.(state.chats,20);
     try{localStorage.setItem(STORE,JSON.stringify(state.chats));}catch{}
@@ -58,9 +59,36 @@ async function hydratePersistentChats(){
   }
 }
 function chat(){return state.chats.find(x=>x.id===state.chatId)||null;}
+function cleanMemory(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return{};
+  const out={...value};
+  for(const key of ['technician_names','unit_references','notes']){
+    out[key]=Array.isArray(out[key])?out[key].map(x=>String(x||'').trim()).filter(Boolean).slice(-16):[];
+  }
+  return out;
+}
+function mergeWorkingMemory(update){
+  if(!update||typeof update!=='object'||Array.isArray(update))return;
+  const c=ensureChat(),current=cleanMemory(c.memory),next={...current};
+  for(const key of ['active_ticket','site','work_type','date','time','current_subject','workflow_stage','unresolved_reference']){
+    const value=String(update[key]||'').trim();
+    if(value)next[key]=value;
+  }
+  for(const key of ['technician_names','unit_references','notes']){
+    const incoming=Array.isArray(update[key])?update[key].map(x=>String(x||'').trim()).filter(Boolean):[];
+    if(incoming.length)next[key]=[...new Set([...(current[key]||[]),...incoming])].slice(-16);
+  }
+  c.memory=next;
+  if(next.active_ticket){
+    c.ticket=String(next.active_ticket);
+    state.currentTicket=String(next.active_ticket);
+  }
+  c.updatedAt=now();
+  saveChats();
+}
 function ensureChat(){
   let c=chat();if(c)return c;
-  c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',messages:[]};
+  c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',memory:{},messages:[]};
   state.chats.unshift(c);state.chatId=c.id;saveChats();renderHistory();return c;
 }
 async function newChat(){
@@ -71,7 +99,7 @@ async function newChat(){
     catch(error){console.warn('Vision previous conversation save',error);}
   }
   state.currentTicket='';
-  const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',messages:[]};
+  const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',memory:{},messages:[]};
   state.chats.unshift(c);state.chats=state.chats.slice(0,20);state.chatId=c.id;
   saveChats();renderHistory();renderThread();renderOrder();closeDrawers();
   const prompt=$('visionPrompt');if(prompt){prompt.value='';grow(prompt);prompt.blur();}
@@ -130,6 +158,7 @@ async function callVisionAgent(text){
     const result=await db.functions.invoke('onsite-vision-agent',{body:{
       message:String(text||'').trim(),
       active_ticket:state.currentTicket||'',
+      working_memory:cleanMemory(chat()?.memory),
       history:agentHistory(text)
     }});
     if(result.error||!result.data?.ok){
@@ -151,6 +180,29 @@ function agentFactsHtml(facts=[]){
 function agentProposalHtml(p){
   if(!p||p.type==='none')return'';
   return '<div class="vision-action-card"><small>PROPOSED ACTION</small><b>'+esc(p.summary||String(p.type||'').replaceAll('_',' '))+'</b><p>Vision has not changed Tech Check yet.</p></div>';
+}
+function correctionProposalHtml(proposal,raw=''){
+  const p=proposal||{};
+  if(p.detected!==true||!String(p.content||'').trim())return'';
+  const actionId=id();
+  const entry={
+    id:null,
+    title:String(p.title||p.topic||'Owner correction').trim(),
+    domain:String(p.domain||'operations').trim(),
+    equipment_type:String(p.equipment_type||'').trim(),
+    workflow_type:String(p.workflow_type||'').trim(),
+    topic:String(p.topic||'Owner correction').trim(),
+    content:String(p.content||'').trim(),
+    status:'approved',
+    source_kind:'owner',
+    source_ref:'OnSite Vision conversation '+String(state.chatId||''),
+    tags:Array.isArray(p.tags)?p.tags.map(x=>String(x||'').trim()).filter(Boolean):[]
+  };
+  state.pending.set(actionId,{kind:'approve-knowledge',entry,userMessage:String(raw||''),rationale:String(p.rationale||'')});
+  return '<div class="vision-action-card audited"><small>OWNER CORRECTION · PROPOSED KNOWLEDGE</small><b>'+esc(entry.title)+'</b><p>'+esc(entry.content)+'</p>'
+    +(p.rationale?'<div class="vision-system-note">'+esc(p.rationale)+'</div>':'')
+    +'<div class="vision-system-note">This is not company truth yet. Approving it publishes the rule to OnSite Vision managed knowledge.</div>'
+    +'<div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Approve & teach Vision</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Do not save</button></div></div>';
 }
 function knowledgeValue(id){return String($(id)?.value||'').trim();}
 function resetKnowledgeForm(){
@@ -310,6 +362,8 @@ async function serverAgentAnswer(raw){
   const result=await callVisionAgent(raw);
   if(!result)return null;
 
+  mergeWorkingMemory(result.working_memory_update||{});
+
   if(result.active_ticket){
     state.currentTicket=String(result.active_ticket);
     const current=ensureChat();current.ticket=state.currentTicket;saveChats();renderOrder();
@@ -365,6 +419,7 @@ async function serverAgentAnswer(raw){
     try{html+=await auditedActionCard(p,raw);}
     catch(error){html+='<div class="vision-direct warn"><b>Vision could not prepare that action.</b>'+esc(error?.message||'Please check the request and try again.')+'</div>';}
   }
+  html+=correctionProposalHtml(result.knowledge_proposal,raw);
   return html;
 }
 async function loadData(){
@@ -1688,6 +1743,26 @@ async function send(raw=null){
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;
 
+  if(a.kind==='approve-knowledge'){
+    const admin=visionKnowledgeAdmin();
+    if(!admin?.save)throw new Error('Vision knowledge manager is unavailable.');
+    const entry={...(a.entry||{}),status:'approved'};
+    if(!entry.title||!entry.content)throw new Error('The proposed company knowledge is incomplete.');
+    const existing=await admin.list?.('approved',150).catch(()=>[]);
+    const duplicate=(existing||[]).find(x=>
+      String(x.title||'').trim().toLowerCase()===String(entry.title||'').trim().toLowerCase() &&
+      String(x.content||'').trim().toLowerCase()===String(entry.content||'').trim().toLowerCase()
+    );
+    if(!duplicate)await admin.save(entry);
+    state.pending.delete(actionId);
+    await loadKnowledgeEntries().catch(()=>{});
+    addMessage('assistant','',
+      '<div class="vision-direct good"><b>Owner correction approved.</b>'+esc(duplicate?'That company rule was already approved.':'The rule is now approved managed company knowledge and Vision can use it as company truth.')+'</div>'
+    );
+    renderThread();
+    return;
+  }
+
   if(a.kind==='audited'){
     const layer=visionActions();
     if(!layer?.execute)throw new Error('Vision action layer is unavailable.');
@@ -1801,7 +1876,12 @@ document.addEventListener('click',async e=>{
     const pending=state.pending.get(cancel.dataset.cancelAction);
     try{if(pending?.kind==='audited'&&pending.auditActionId)await visionActions()?.cancel?.(pending.auditActionId);}catch(error){console.warn('Vision audit cancel',error);}
     state.pending.delete(cancel.dataset.cancelAction);
-    addMessage('assistant','', '<div class="vision-system-note">No changes were made. The proposed Vision action was cancelled.</div>');renderThread();return;
+    if(pending?.kind==='approve-knowledge'){
+      addMessage('assistant','', '<div class="vision-system-note">That proposed company rule was not saved. Vision will not treat it as company truth.</div>');
+    }else{
+      addMessage('assistant','', '<div class="vision-system-note">No changes were made. The proposed Vision action was cancelled.</div>');
+    }
+    renderThread();return;
   }
   const knowledgeItem=e.target.closest('[data-knowledge-id]');
   if(knowledgeItem){
