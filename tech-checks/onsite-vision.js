@@ -568,7 +568,7 @@ function next(ticket){
   if(type==='pickup')return svc?'Service should complete the field pickup and return the equipment to IT Intake.':'This pickup needs a Service assignment before field work begins.';
   if(it&&p?.status!=='released'&&p?.status!=='closed')return 'IT needs to finish the Tech Check and create the Service handoff.';
   if(p?.status==='released'&&!svc)return 'The IT handoff is ready. Assign a Service Tech or the Service department queue.';
-  if(svc&&svc.requires_it_handoff&&p?.status!=='released'&&p?.status!=='closed')return 'Service is assigned but must wait for IT to release the handoff.';
+  if(svc&&svc.requires_it_handoff&&p?.status!=='released'&&p?.status!=='closed')return 'Service is assigned but must wait for IT to complete the IT → Service handoff.';
   if(svc&&(p?.status==='released'||!svc.requires_it_handoff))return 'Service can open the same MHelpDesk ticket, verify the assignment, and continue the field work.';
   return 'Open the active Tech Check assignment and continue the current workflow.';
 }
@@ -949,7 +949,7 @@ async function createDraftJob(d){
 function actionCard(a,ticket){
   if(a.kind==='choose-tech'){
     const people=state.techs.filter(t=>t.role===a.role);
-    if(!people.length)return '<div class="vision-direct warn"><b>No active '+esc(a.role==='service'?'Service':'IT')+' technicians are available.</b>You can still ask Vision to send this job to the department queue.</div>';
+    if(!people.length)return '<div class="vision-direct warn"><b>No active '+esc(a.role==='service'?'Service':'IT')+' technicians are available.</b>You can still ask Vision to assign this job to the department queue.</div>';
     const choices=people.map(t=>{
       const name=t.full_name||t.username||'Technician';
       return '<button type="button" data-vision-prompt="Assign '+esc(name)+' as the '+esc(a.role==='service'?'Service Tech':'IT Technician')+' for this job">'+esc(name)+'</button>';
@@ -958,7 +958,7 @@ function actionCard(a,ticket){
   }
   const actionId=id();state.pending.set(actionId,{...a,ticket});
   if(a.kind==='assign-tech')return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Assign '+esc(a.tech.full_name||a.tech.username)+' as '+esc(a.role==='service'?'Service Tech':'IT Technician')+'</b><p>Ticket #'+esc(ticket)+' will be assigned directly in Tech Check. MHelpDesk will not be changed.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm assignment</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
-  if(a.kind==='assign-queue')return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Send ticket #'+esc(ticket)+' to the '+esc(a.role==='service'?'Service':'IT')+' department queue</b><p>A technician in that department can claim it using the exact MHelpDesk ticket number.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm department assignment</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
+  if(a.kind==='assign-queue')return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Assign ticket #'+esc(ticket)+' to the '+esc(a.role==='service'?'Service':'IT')+' department queue</b><p>A technician in that department can claim it using the exact MHelpDesk ticket number.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm department assignment</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
   const label=[a.date?dateLabel(a.date):'',a.time||''].filter(Boolean).join(' - ');
   return '<div class="vision-action-card"><small>PROPOSED CHANGE</small><b>Update the Tech Check schedule</b><p>Ticket #'+esc(ticket)+' -> '+esc(label)+'</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Confirm schedule change</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Cancel</button></div></div>';
 }
@@ -1009,7 +1009,7 @@ async function systemHealthHtml(){
     '<div><span>ACTIVE TICKETS</span><b>'+esc(workflow.active_tickets||0)+'</b></div>'+
   '</div></div>';
   if(criticalGroups.length)html+='<div class="vision-context-block"><h3>Critical integrity issues</h3>'+healthRows(criticalGroups)+'</div>';
-  if((workflow.released_without_service||[]).length)html+='<div class="vision-context-block"><h3>Workflow attention</h3><p>Released IT handoffs waiting for Service assignment.</p>'+healthRows(workflow.released_without_service)+'</div>';
+  if((workflow.released_without_service||[]).length)html+='<div class="vision-context-block"><h3>Workflow attention</h3><p>IT handoffs waiting for Service assignment.</p>'+healthRows(workflow.released_without_service)+'</div>';
   if((people.duplicate_active_names||[]).length||(people.duplicate_names_all_profiles||[]).length){
     html+='<div class="vision-context-block"><h3>Profile ambiguity</h3><p>Duplicate names are shown as attention items so Vision does not guess which account is intended.</p>'+healthRows(people.duplicate_active_names,'name')+healthRows(people.duplicate_names_all_profiles,'name')+'</div>';
   }
@@ -1203,7 +1203,7 @@ async function execute(actionId){
       if(x.error)throw x.error;
       if(x.data&&base.scheduled_time){const t=await db.from('job_assignments').update({scheduled_time:base.scheduled_time,updated_at:now()}).eq('id',x.data);if(t.error)throw t.error;}
       try{if(x.data)await db.functions.invoke('send-techcheck-push',{body:{assignment_id:x.data}});}catch{}
-      result=tech?(tech.full_name||tech.username)+' was assigned to MHelpDesk #'+ticket+'.':'MHelpDesk #'+ticket+' was sent to the '+(a.role==='service'?'Service':'IT')+' department queue.';
+      result=tech?(tech.full_name||tech.username)+' was assigned to MHelpDesk #'+ticket+'.':'MHelpDesk #'+ticket+' was assigned to the '+(a.role==='service'?'Service':'IT')+' department queue.';
     }
   }
   await loadData();visionLiveData()?.invalidate?.(ticket);addMessage('assistant','', '<div class="vision-direct good"><b>Saved in Tech Check.</b>'+esc(result)+' MHelpDesk remains separate.</div>'+jobCard(ticket));renderThread();renderOrder();
