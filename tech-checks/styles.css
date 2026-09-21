@@ -4595,6 +4595,19 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
 #view-owner #ownerAppPage #ownerJobAssignments #ownerAssignDraftStatus{
   background:#111f27!important;color:#c8d3d8!important;border:1px solid var(--oa-line)!important;
 }
+#view-owner #ownerAppPage .ownerCalToolbar button:hover,
+#view-owner #ownerAppPage .ownerCalToolbar button.active,
+#view-owner #ownerAppPage .ownerCalDay.selected{
+  background:#26171a!important;border-color:#e31b23!important;color:#fff!important;box-shadow:inset 0 0 0 1px #e31b23!important;
+}
+#view-owner #ownerAppPage .ownerCalEvent,
+#view-owner #ownerAppPage .ownerCalEvent.service{border-left-color:#e31b23!important;background:#171f25!important}
+#view-owner #ownerAppPage button.ownerCalDay:focus-visible{outline-color:#e31b23!important}
+#view-owner #ownerAppPage .ownerAppReviewRow header strong{
+  color:#fff!important;background:#2a1719!important;border:1px solid #7c3035!important;
+}
+#view-owner #ownerAppPage .ownerAppHandoffRow.urgent{background:#26171a!important;border-color:#a23b42!important}
+
 
 @media(min-width:721px){
   body:has(#view-owner:not(.hidden)){margin:0!important;background:var(--oa-bg)!important;overflow:hidden!important}
