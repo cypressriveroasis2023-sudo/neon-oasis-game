@@ -2512,7 +2512,31 @@
         "MHelpDesk remains separate and is never reported as changed",
         "Rollback QA leaves no synthetic records"
       ]
+    },
+    {
+      "id": "HELP-WORKFLOW-ALIGNMENT-01",
+      "area": "Help Center · current production workflow",
+      "role": "owner+service",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Help teaches the same truck departure, Owner closeout, correction, alert, and permanent-history rules that Tech Check enforces",
+      "steps": [
+        "Open Service Help and verify Before Departure teaches at least 4 × 12V 110Ah and 2 × LiTime 12V 100Ah batteries",
+        "Verify Service Help says both battery groups are physically verified charged and missing/not-charged batteries are replaced before proceeding",
+        "Verify Service Help requires one complete Spotter, Sniper, or Solar Spotter backup after proper IT checkout and Service acceptance and sends an unused backup through IT Intake",
+        "Open Owner Help and verify acknowledged Vision alerts remain active until the underlying condition resolves and resolved alerts remain history",
+        "Verify Owner Help teaches the six-stage Ready for Owner Review overview and that Close Job affects Tech Check only",
+        "Verify Return for Correction automatically creates or reuses one IT or Service department-queue correction task while preserving prior completion history",
+        "Verify Company History describes Technician, Unit, and Customer / Site history and uses MISSING INFORMATION instead of invention"
+      ],
+      "expected": [
+        "Help and production gates describe the same Service departure requirements",
+        "Help consistently uses IT → Service handoff terminology",
+        "Owner correction instructions match automatic department routing",
+        "MHelpDesk is explicitly separate",
+        "Unknown or unrecorded information is never invented"
+      ]
     }
   ],
-  "last_release_qa_note": "OnSite Vision Q8→Q9 draft flow, Owner Vision alert lifecycle, Owner Close Job, and automatic Return for Correction routing are verified. Exact Ranger/solar-panel/battery Q8 wording advances to Parts confirmation; active Vision alerts persist through acknowledgement until resolution; correction requests create/reuse one department-queue assignment while preserving old completions; closeout returns to Ready after correction. Authenticated Owner rollback QA left zero production residue."
+  "last_release_qa_note": "Current release QA covers OnSite Vision Q8→Q9 draft progression, persistent Owner Vision alerts, authenticated Owner Close Job, automatic correction routing, permanent Company History, and Help/workflow alignment. Service Help now matches the enforced 4 × 12V 110Ah + 2 × LiTime 12V 100Ah charged truck gate and checked-out backup rule; Owner Help matches alert, closeout, correction, and history behavior. Rollback QA left zero synthetic production residue."
 }
