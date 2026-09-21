@@ -2036,7 +2036,7 @@ async function renderITIntakeWizard() {
     const noCount = intakeWizard.answers.filter(v => v === false).length;
     const ready = noCount === 0 && intakeWizard.answers.every(v => v === true);
     const doc = intakeWizard.meta?.cancellationDoc;
-    card.innerHTML = `${progress(`${row.unit_tag} · IT Intake`, 'Review this unit before MHelpDesk inventory', intakeLabels.length + 2, intakeLabels.length + 2)}${intakeAIReview(row)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready ? `✓ All ${intakeLabels.length} intake checks are YES.` : `${noCount} check${noCount === 1 ? '' : 's'} recorded NO — correct or document the issue before inventory.`}</div>${doc ? `<div class='ok top8'><b>SIM cancellation documentation</b><div>Date: ${esc(doc.simCanceledDate)} · Job: MHelpDesk #${esc(doc.ticket)} · Unit: ${esc(doc.unit)} · IT Initials: ${esc(doc.techInitials)}</div></div>` : ''}</div><label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Add damage, missing items, repairs needed, or other notes'>${esc(intakeWizard.notes)}</textarea>${ready ? `<div class='ok top10'><b>✓ IT INTAKE COMPLETE</b><div>SIM, monitoring, Alibi, customer-email app removal, SD cards, cleaning, 2026 Unit Tracker, damage verification, and shelf readiness are documented. Next: send this exact unit to Pending MHelpDesk Inventory.</div></div>` : `<div class='wl-stop'><b>This unit is not ready for inventory.</b><div>Use Back and correct every NO before finishing intake.</div></div>`}<button class='wl-big wl-green top10' data-wl-intake-finish ${ready ? '' : 'disabled'}>SEND TO PENDING MHELPDESK INVENTORY →</button><div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><span></span></div>`;
+    card.innerHTML = `${progress(`${row.unit_tag} · IT Intake`, 'Review this unit before MHelpDesk inventory', intakeLabels.length + 2, intakeLabels.length + 2)}${intakeAIReview(row)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready ? `✓ All ${intakeLabels.length} intake checks are YES.` : `${noCount} check${noCount === 1 ? '' : 's'} recorded NO — correct or document the issue before inventory.`}</div>${doc ? `<div class='ok top8'><b>SIM cancellation documentation</b><div>Date: ${esc(doc.simCanceledDate)} · Job: MHelpDesk #${esc(doc.ticket)} · Unit: ${esc(doc.unit)} · IT Initials: ${esc(doc.techInitials)}</div></div>` : ''}</div><label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Add damage, missing items, repairs needed, or other notes'>${esc(intakeWizard.notes)}</textarea>${ready ? `<div class='ok top10'><b>✓ IT INTAKE COMPLETE</b><div>SIM, monitoring, Alibi, customer-email app removal, SD cards, cleaning, 2026 Unit Tracker, damage verification, and shelf readiness are documented. Next: send this exact unit to Pending MHelpDesk Inventory.</div></div>` : `<div class='wl-stop'><b>This unit is not ready for inventory.</b><div>If the failed check is because equipment is damaged or cannot be made deployment-ready, document what needs replacement and use the Owner escalation button below. Do not mark it Shop Inventory.</div></div>`}<button class='wl-big wl-green top10' data-wl-intake-finish ${ready ? '' : 'disabled'}>SEND TO PENDING MHELPDESK INVENTORY →</button>${!ready && noCount>0 ? `<button class='wl-big wl-red top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button><div class='small top8'>This holds the unit in Maintenance / Needs Replacement. It will not become available Shop Inventory.</div>` : ''}<div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><span></span></div>`;
   }
   hideChildren(viewIT(), [card]);
   resetWizardPosition();
@@ -3724,6 +3724,32 @@ document.addEventListener('click', async e => {
     return renderITIntakeWizard();
   }
   if (e.target.closest('[data-wl-intake-prev]')) { if (intakeWizard.step === intakeLabels.length + 1) intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || intakeWizard.notes; intakeWizard.step = Math.max(0, intakeWizard.step - 1); return renderITIntakeWizard(); }
+  if (e.target.closest('[data-wl-intake-replacement]')) {
+    intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || intakeWizard.notes || '';
+    const row = intakeWizard.row;
+    if (!row?.id) return alert('This intake record is no longer available.');
+    if (!intakeWizard.notes.trim()) return alert('Describe the damage and what needs replacement before notifying the Owner.');
+    const file = document.getElementById('wlIntakePhoto')?.files?.[0];
+    if (file) intakeWizard.photo = file;
+    let paths = row.intake_photo_paths || [];
+    try {
+      if (intakeWizard.photo) paths = await uploadReturnPhotos([intakeWizard.photo], row.id, 'it-replacement');
+      if (!paths.length) return alert('Take or choose an IT Intake photo showing the damaged equipment first.');
+      const { error } = await liveDb.rpc('it_mark_return_needs_replacement_v1', {
+        p_return_id: row.id,
+        p_damage_notes: intakeWizard.notes.trim(),
+        p_intake_photo_paths: paths
+      });
+      if (error) throw error;
+      const tech = await currentTechIdentity();
+      await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
+      intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
+      alert('Owner notified. This equipment is held in Maintenance / Needs Replacement and is NOT available Shop Inventory.');
+      return showITIntake();
+    } catch (error) {
+      return alert(error?.message || 'Could not mark this equipment as needing replacement.');
+    }
+  }
   if (e.target.closest('[data-wl-intake-finish]')) {
     intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || '';
     const row = intakeWizard.row;
@@ -4293,8 +4319,11 @@ async function submitServiceReturn() {
         ? `<button class='wl-big wl-blue top10' data-wl-return-to-active-standard>← Continue ${esc(serviceReturn.type)} Swap</button>`
         : '');
     const actionHtml=`<button class='wl-big wl-red top10' data-wl-service-return>＋ Add Another Returned Unit</button><button class='wl-back top10' data-wl-home='svc'>Service Home</button>`;
+    const direct110Damage=is110VStandReturn() && (serviceReturn.damagePhotos || []).length>0;
     card.innerHTML=(is110VStandReturn()
-      ? `${progress('110V Stand Returned', 'Back in Shop', 1, 1)}<div class='ok'><b>✓ ${esc(serviceReturnLabel())} is back in Shop.</b><div>Service returned the stand directly to Shop under MHelpDesk #${esc(serviceReturn.ticket)}. ${isTagless110VReturn()?'No physical tag was required.':'The stand tag was recorded.'} IT Intake is not required.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`
+      ? (direct110Damage
+        ? `${progress('110V Stand Returned', 'Damage requires Owner action', 1, 1)}<div class='warn'><b>⚠ ${esc(serviceReturnLabel())} needs replacement / repair.</b><div>The damaged stand is held in Maintenance and is NOT available in Shop Inventory. The Owner was notified with the photos and notes for MHelpDesk #${esc(serviceReturn.ticket)}. IT Intake is not required for this 110V Stand.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`
+        : `${progress('110V Stand Returned', 'Back in Shop', 1, 1)}<div class='ok'><b>✓ ${esc(serviceReturnLabel())} is back in Shop.</b><div>Service returned the stand directly to Shop under MHelpDesk #${esc(serviceReturn.ticket)}. ${isTagless110VReturn()?'No physical tag was required.':'The stand tag was recorded.'} IT Intake is not required.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`)
       : `${progress('Return Submitted', `${serviceReturn.unit} is waiting for IT`, 1, 1)}<div class='ok'><b>✓ Unit ${esc(serviceReturn.unit)} sent to IT Intake.</b><div>The unit tag photo, ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'}, ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'}, and Service notes are saved with ${esc(serviceReturn.unit)} under MHelpDesk #${esc(serviceReturn.ticket)}. IT will see them during intake.</div>${assignmentProgress.required?`<div class='small top8'><b>Assignment progress:</b> ${assignmentProgress.count} of ${assignmentProgress.required} required return${assignmentProgress.required===1?'':'s'} recorded${assignmentProgress.completed?' · Service assignment complete':''}.</div>`:''}</div>`)
       + continuationHtml + actionHtml;
     resetWizardPosition();
@@ -5866,6 +5895,7 @@ async function installOwnerIntake(force = false) {
   ownerReturnRows = new Map(rows.map(r => [r.id, r]));
   const waitingCount = rows.filter(r => r.status === 'waiting_it').length;
   const managerCount = rows.filter(r => r.status === 'pending_mhelp_inventory').length;
+  const replacementCount = rows.filter(r => r.status === 'needs_replacement').length;
   const completedCount = rows.filter(r => r.status === 'completed').length;
   const activeRows = rows.filter(r => r.status !== 'completed');
   const completedRows = rows.filter(r => r.status === 'completed');
@@ -5874,16 +5904,23 @@ async function installOwnerIntake(force = false) {
     const answers = Array.isArray(record.meta?.answers) ? record.meta.answers : [];
     const checks = intakeLabels.map((label, i) => `<div class='small' style='padding:4px 0;border-bottom:1px solid #edf1f4'><b>${answers[i] === true ? '✓ YES' : answers[i] === false ? '✕ NO' : '— PENDING'}</b> · ${esc(label)}</div>`).join('');
     const doc = record.meta?.cancellationDoc;
-    const status = r.status === 'waiting_it' ? 'WAITING FOR IT INTAKE' : r.status === 'pending_mhelp_inventory' ? 'PENDING MHELP INVENTORY' : 'COMPLETED — SHOP INVENTORY';
+    const status = r.status === 'waiting_it' ? 'WAITING FOR IT INTAKE' : r.status === 'pending_mhelp_inventory' ? 'PENDING MHELP INVENTORY' : r.status === 'needs_replacement' ? 'NEEDS REPLACEMENT — NOT SHOP INVENTORY' : 'COMPLETED — SHOP INVENTORY';
     const savedTagScan=returnTagScan(r);
     const savedTagScanHtml=savedTagScan ? tagScanStatusHtml(savedTagScan,r.unit_tag) : '';
     const serviceDone = true;
-    const itDone = r.status === 'pending_mhelp_inventory' || r.status === 'completed';
+    const itDone = ['pending_mhelp_inventory','needs_replacement','completed'].includes(r.status);
     const managerDone = r.status === 'completed';
-    const process = `<div class='ownerProcess'><span class='processStep done'>✓ Service Return</span><span class='processArrow'>→</span><span class='processStep ${itDone ? 'done' : 'current'}'>${itDone ? '✓' : '•'} IT Intake</span><span class='processArrow'>→</span><span class='processStep ${managerDone ? 'done' : itDone ? 'current' : ''}'>${managerDone ? '✓' : '•'} Manager / MHelpDesk</span></div>`;
-    const managerAction = r.status === 'pending_mhelp_inventory' ? `<div class='warn top8'><b>Manager action required</b><div class='small'>IT intake is finished. You now add Unit ${esc(r.unit_tag)} back to Shop Inventory in MHelpDesk.</div><button class='mini top8' data-wl-owner-mhelp-done='${r.id}'>Confirm I Added It to MHelpDesk Inventory</button></div>` : '';
+    const replacement = r.status === 'needs_replacement';
+    const process = replacement
+      ? `<div class='ownerProcess'><span class='processStep done'>✓ Service Return</span><span class='processArrow'>→</span><span class='processStep done'>✓ Damage Verified</span><span class='processArrow'>→</span><span class='processStep current'>• Owner / Replacement</span></div>`
+      : `<div class='ownerProcess'><span class='processStep done'>✓ Service Return</span><span class='processArrow'>→</span><span class='processStep ${itDone ? 'done' : 'current'}'>${itDone ? '✓' : '•'} IT Intake</span><span class='processArrow'>→</span><span class='processStep ${managerDone ? 'done' : itDone ? 'current' : ''}'>${managerDone ? '✓' : '•'} Manager / MHelpDesk</span></div>`;
+    const managerAction = r.status === 'pending_mhelp_inventory'
+      ? `<div class='warn top8'><b>Manager action required</b><div class='small'>IT intake is finished. You now add Unit ${esc(r.unit_tag)} back to Shop Inventory in MHelpDesk.</div><button class='mini top8' data-wl-owner-mhelp-done='${r.id}'>Confirm I Added It to MHelpDesk Inventory</button></div>`
+      : replacement
+        ? `<div class='warn top8'><b>Damaged equipment needs replacement / repair</b><div class='small'>This unit is held in Maintenance and is NOT available Shop Inventory. Review the photos and IT notes below. The final replacement/disposition procedure is MISSING INFORMATION until the Owner defines it.</div></div>`
+        : '';
     const searchText = `${r.unit_tag || ''} ${r.equipment_type || ''} ${r.ticket_no || ''} ${r.service_tech_name || ''} ${r.it_tech_name || ''}`;
-    return `<details class='ownerFold' data-owner-return='${r.id}' data-owner-search='${esc(searchText)}'><summary><span><b>Unit ${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span>${process}</span><span class='pill ${r.status === 'completed' ? 'delivery' : r.status === 'pending_mhelp_inventory' ? 'amber' : 'swap'}'>${status}</span></summary><div class='ownerFoldBody'>${managerAction}${savedTagScanHtml}<div class='wl-review top8'><b>Chain of Custody</b><div class='small'><b>Service Tech:</b> ${esc(r.service_tech_name || 'Not recorded')} · Submitted ${r.returned_at ? new Date(r.returned_at).toLocaleString() : '—'}</div><div class='small'><b>IT Tech:</b> ${esc(r.it_tech_name || 'Not assigned')}${r.it_received_at ? ` · Intake completed ${new Date(r.it_received_at).toLocaleString()}` : ''}</div>${r.completed_at ? `<div class='small'><b>Manager confirmed MHelpDesk inventory:</b> ${new Date(r.completed_at).toLocaleString()}</div>` : ''}</div>${r.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(r.return_notes)}</div></div>` : ''}<div class='wl-review top8'><b>IT Intake Checklist — ${answers.filter(v => v === true).length}/${intakeLabels.length} YES</b>${checks}</div>${doc ? `<div class='ok top8'><b>SIM Cancellation Record</b><div class='small'>Date: ${esc(doc.simCanceledDate)} · MHelpDesk #${esc(doc.ticket)} · Unit ${esc(doc.unit)} · IT Tech: ${esc(doc.techName || r.it_tech_name || 'IT')} (${esc(doc.techInitials)})</div></div>` : ''}${record.notes ? `<div class='wl-note top8'><b>IT intake notes</b><div>${esc(record.notes)}</div></div>` : ''}<div class='small top8'><b>Service Return / Site / Damage Photos</b></div><div class='wl-return-gallery' data-owner-service-photos='${r.id}'><div class='wl-note'>Photos load when this record is opened.</div></div><div class='small top8'><b>IT Intake Photo</b></div><div class='wl-return-gallery' data-owner-intake-photos='${r.id}'><div class='wl-note'>Photo loads when this record is opened.</div></div><button class='mini danger top8' data-wl-owner-remove-return='${r.id}' data-wl-unit='${esc(r.unit_tag)}' data-wl-ticket='${esc(r.ticket_no)}'>Remove from Tracking</button></div></details>`;
+    return `<details class='ownerFold' data-owner-return='${r.id}' data-owner-search='${esc(searchText)}'><summary><span><b>Unit ${esc(r.unit_tag)} · ${esc(r.equipment_type || 'Unit')}</b><span class='small ownerFoldHint'>MHelpDesk #${esc(r.ticket_no)}</span>${process}</span><span class='pill ${r.status === 'completed' ? 'delivery' : r.status === 'needs_replacement' ? 'swap' : r.status === 'pending_mhelp_inventory' ? 'amber' : 'swap'}'>${status}</span></summary><div class='ownerFoldBody'>${managerAction}${savedTagScanHtml}<div class='wl-review top8'><b>Chain of Custody</b><div class='small'><b>Service Tech:</b> ${esc(r.service_tech_name || 'Not recorded')} · Submitted ${r.returned_at ? new Date(r.returned_at).toLocaleString() : '—'}</div><div class='small'><b>IT Tech:</b> ${esc(r.it_tech_name || 'Not assigned')}${r.it_received_at ? ` · Intake completed ${new Date(r.it_received_at).toLocaleString()}` : ''}</div>${r.completed_at ? `<div class='small'><b>Manager confirmed MHelpDesk inventory:</b> ${new Date(r.completed_at).toLocaleString()}</div>` : ''}</div>${r.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(r.return_notes)}</div></div>` : ''}<div class='wl-review top8'><b>IT Intake Checklist — ${answers.filter(v => v === true).length}/${intakeLabels.length} YES</b>${checks}</div>${doc ? `<div class='ok top8'><b>SIM Cancellation Record</b><div class='small'>Date: ${esc(doc.simCanceledDate)} · MHelpDesk #${esc(doc.ticket)} · Unit ${esc(doc.unit)} · IT Tech: ${esc(doc.techName || r.it_tech_name || 'IT')} (${esc(doc.techInitials)})</div></div>` : ''}${record.notes ? `<div class='wl-note top8'><b>IT intake notes</b><div>${esc(record.notes)}</div></div>` : ''}<div class='small top8'><b>Service Return / Site / Damage Photos</b></div><div class='wl-return-gallery' data-owner-service-photos='${r.id}'><div class='wl-note'>Photos load when this record is opened.</div></div><div class='small top8'><b>IT Intake Photo</b></div><div class='wl-return-gallery' data-owner-intake-photos='${r.id}'><div class='wl-note'>Photo loads when this record is opened.</div></div><button class='mini danger top8' data-wl-owner-remove-return='${r.id}' data-wl-unit='${esc(r.unit_tag)}' data-wl-ticket='${esc(r.ticket_no)}'>Remove from Tracking</button></div></details>`;
   };
 
   const activeItems = activeRows.map(renderOwnerReturn);
@@ -5894,7 +5931,7 @@ async function installOwnerIntake(force = false) {
   </summary>
   <div class='ownerDashBody'>
     <div class='ownerWorkTools'>
-      <div class='wl-workstrip'><span><b>${waitingCount}</b> waiting IT</span><span><b>${managerCount}</b> need manager</span><span><b>${completedCount}</b> completed</span></div>
+      <div class='wl-workstrip'><span><b>${waitingCount}</b> waiting IT</span><span><b>${managerCount}</b> need manager</span><span><b>${replacementCount}</b> need replacement</span><span><b>${completedCount}</b> completed</span></div>
       <input id='ownerReturnSearch' value='${esc(currentSearch)}' placeholder='Search unit, MHelpDesk ticket, equipment, or tech'>
     </div>
     <div class='ownerActiveLabel'>Needs Attention / In Progress</div>
