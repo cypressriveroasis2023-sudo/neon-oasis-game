@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v135",
-  "service_worker": "v141",
+  "runtime_version": "release-qa-v136",
+  "service_worker": "v144",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3217,7 +3217,94 @@
         "Service row requires IT handoff",
         "Rollback leaves zero QA residue"
       ]
+    },
+    {
+      "id": "SERVICE-COMMAND-CENTER-TODAY-01",
+      "area": "Service Tech · command center",
+      "role": "service",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Service home separates current-day work from overdue, unscheduled, and future work",
+      "steps": [
+        "Open Service Tech home",
+        "Load my_available_assignments",
+        "Compare scheduled_for to the local Tech Check date"
+      ],
+      "expected": [
+        "Today’s Jobs counts only assignments scheduled for today",
+        "Overdue and unscheduled work remain visible under Today / Needs Action",
+        "Future work appears under Upcoming Service Work instead of inflating Today’s Jobs"
+      ]
+    },
+    {
+      "id": "SERVICE-COMMAND-CENTER-READINESS-01",
+      "area": "Service Tech · command center",
+      "role": "service",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Start-day readiness is the first Service priority on weekdays",
+      "steps": [
+        "Open Service Tech home Monday through Friday before submitting morning inspection",
+        "Review Start-Day Readiness"
+      ],
+      "expected": [
+        "Command center shows START-DAY CHECK REQUIRED",
+        "Truck / Trailer Inspection is marked DUE and offered as the next action",
+        "Saturday and Sunday show inspection NOT REQUIRED rather than missing"
+      ]
+    },
+    {
+      "id": "SERVICE-COMMAND-CENTER-NEXT-01",
+      "area": "Service Tech · command center",
+      "role": "service",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Command center presents one operational next action instead of a flat menu",
+      "steps": [
+        "Evaluate readiness, active offline escalations, ready Service assignments, IT handoff blockers, and truck spares"
+      ],
+      "expected": [
+        "Weekday inspection due is prioritized before departure",
+        "Active Service + IT field troubleshooting is surfaced ahead of ordinary work",
+        "Ready jobs are prioritized over jobs waiting on IT handoff",
+        "Truck-spare resolution becomes the closeout action when field work is clear"
+      ]
+    },
+    {
+      "id": "SERVICE-COMMAND-CENTER-FIELD-01",
+      "area": "Service Tech · command center",
+      "role": "service",
+      "mode": "source + live RLS",
+      "destructive": false,
+      "scenario": "Service command center keeps field problems and IT handoffs visible",
+      "steps": [
+        "Load released handoffs, units in field, and field_escalations",
+        "Open Service command center"
+      ],
+      "expected": [
+        "Ready/accepted IT handoffs are not presented as ordinary unprepared work",
+        "Active offline-unit escalation count is visible",
+        "Offline Unit — Call IT remains directly accessible from the command center",
+        "Exact MHelpDesk verification is still required before taking a normal Service job"
+      ]
+    },
+    {
+      "id": "SERVICE-COMMAND-CENTER-CLOSEOUT-01",
+      "area": "Service Tech · command center",
+      "role": "service",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "End-of-day closeout shows what the Service Tech still owns",
+      "steps": [
+        "Open End-of-Day Closeout"
+      ],
+      "expected": [
+        "Open Service assignments are counted",
+        "Unresolved field issues are counted",
+        "Unresolved truck spares are counted",
+        "Returns already handed to IT / Owner processing are informational and do not falsely block Service closeout"
+      ]
     }
   ],
-  "last_release_qa_note": "Natural-language job creation hardening is complete. Vision accepts no-preference technician language such as any IT tech, any Service tech, whoever is available, first available tech, and no preference without inventing a person. Explicit no-parts/no-notes/no-unit-number answers can be supplied up front. A concurrent malformed date regex was corrected, live workload queries were preserved and now report total scheduled jobs with remaining/completed counts, and Delivery creation was rollback-tested through owner_assign_job_v8 with zero residue."
+  "last_release_qa_note": "Service Tech home is now a daily command center: start-day readiness, today/overdue/unscheduled work, future work, IT handoff state, offline field issues, units in field, returns, truck spares, one prioritized next action, and end-of-day closeout. Weekday inspections are prioritized before departure while weekends remain explicitly not required. Exact MHelpDesk verification and IT → Service handoff controls remain intact."
 }
