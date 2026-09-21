@@ -2612,7 +2612,88 @@
         "Network/mobile retries are idempotent: one damage hold produces one escalation report, one inventory-history event, and one notification per active Owner",
         "The Shop Inventory guard blocks only active damage holds and does not prevent a legitimate repaired/non-held asset from returning to Shop"
       ]
+    },
+    {
+      "id": "OFFLINE-ESCALATION-SERVICE-01",
+      "area": "Service / Field Escalation",
+      "role": "service",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Offline unit requires power verification and creates an IT troubleshooting request",
+      "steps": [
+        "Use an approved QA MHelpDesk ticket and assigned Service account",
+        "Open Offline Unit — Call IT",
+        "Enter site, unit, equipment, original problem, and Service troubleshooting notes",
+        "Attempt submit without power verification, then verify power and submit"
+      ],
+      "expected": [
+        "Submission is blocked until Service verifies power",
+        "One active escalation is saved without changing MHelpDesk",
+        "IT is notified and the Service dashboard keeps the issue visible",
+        "Untaught equipment-specific troubleshooting remains MISSING INFORMATION"
+      ],
+      "manual_device": true
+    },
+    {
+      "id": "OFFLINE-ESCALATION-IT-01",
+      "area": "IT / Field Escalation",
+      "role": "it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "IT records joint troubleshooting and controls backup-swap authorization",
+      "steps": [
+        "Open the QA Service escalation",
+        "Record IT troubleshooting and continue jointly",
+        "Test repaired-onsite and unresolved-to-Owner outcomes on separate rollback records",
+        "For swap, select only a checked-out same-ticket backup assigned to the same Service Tech"
+      ],
+      "expected": [
+        "Service cannot bypass the IT decision",
+        "IT notes and every transition remain in permanent reports",
+        "Only a valid IT-checked-out backup can be authorized",
+        "If Service and IT cannot determine a solution, Owner receives the complete summary"
+      ]
+    },
+    {
+      "id": "OFFLINE-ESCALATION-RETURN-01",
+      "area": "Returns / IT Intake",
+      "role": "service+it",
+      "mode": "safe-test-record",
+      "destructive": true,
+      "scenario": "Authorized backup swap sends the failed unit through IT Intake",
+      "steps": [
+        "Mark the authorized backup used for swap",
+        "Create the failed-unit Service return for the same MHelpDesk ticket and unit",
+        "Link the return to the escalation"
+      ],
+      "expected": [
+        "Failed unit enters waiting IT Intake",
+        "Escalation records the linked return and becomes resolved as failed_unit_in_it_intake",
+        "Unused backups remain governed by the normal IT Intake return path",
+        "No direct available Shop Inventory shortcut is created"
+      ]
+    },
+    {
+      "id": "OFFLINE-ESCALATION-OWNER-MOBILE-01",
+      "area": "Owner / Mobile",
+      "role": "owner",
+      "mode": "manual",
+      "destructive": false,
+      "scenario": "Offline escalation remains readable and actionable on a phone-sized screen",
+      "steps": [
+        "Open the authenticated Owner dashboard on a phone-sized browser",
+        "Review an unresolved escalation and enter an Owner decision",
+        "Review a resolved escalation in history",
+        "Background and resume the app"
+      ],
+      "expected": [
+        "Unresolved issues stay visible until Owner resolves them",
+        "Owner decision does not erase Service or IT troubleshooting history",
+        "Cards, fields, and action buttons fit without horizontal page loss",
+        "Input remains usable and the screen does not jump or disappear"
+      ],
+      "manual_device": true
     }
   ],
-  "last_release_qa_note": "Damaged-equipment QA is complete through retry behavior. Service Return → IT Intake → Needs Replacement moves return/inventory/registry into protected damage state, creates one report/history event, and notifies each active Owner. Four Shop/clear/delete bypass routes are blocked at the database layer. Repeating the IT escalation is idempotent and does not duplicate alerts/history. A normal Maintenance asset without an open damage hold can still return to Shop. Final repair/replacement disposition remains MISSING INFORMATION until the Owner defines it."
+  "last_release_qa_note": "Offline-unit Service + IT escalation passed production rollback verification; authenticated phone-sized visual pass remains in the manual-device queue."
 }
