@@ -317,7 +317,13 @@ async function serverAgentAnswer(raw){
 
   const p={...(result.proposed_action||{type:'none'})};
   if(p.type==='create_job'){
-    const seeded=[p.work_type||'',raw].filter(Boolean).join(' ');
+    const seeded=[
+      p.work_type||'',
+      p.date?('date '+p.date):'',
+      p.time?('at '+p.time):'',
+      p.technician_name?('assign '+p.technician_name):'',
+      raw
+    ].filter(Boolean).join(' ');
     return startDraft(seeded);
   }
 
@@ -437,7 +443,7 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Ask about a job, assign a technician, change the schedule, or work through the next step with Vision. The service order stays in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="What jobs do I have today?">Today\'s jobs</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask what IT or a technician has today, create a Delivery / Pickup / Swap / Service job, assign work, or ask how Tech Check is supposed to work. Vision keeps the service order in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -621,9 +627,12 @@ function ticketByUnit(h){
   return '';
 }
 function dateFrom(text){
-  const s=String(text||'').toLowerCase(),base=new Date();if(/\btoday\b/.test(s))return dayKey(base);if(/\btomorrow\b/.test(s)){const d=new Date(base);d.setDate(d.getDate()+1);return dayKey(d);}
-  const days={sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6},m=s.match(/\b(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
-  if(m){const d=new Date(base),n=(days[m[1]]-d.getDay()+7)%7||7;d.setDate(d.getDate()+n);return dayKey(d);}const iso=s.match(/\b(20\d{2}-\d{2}-\d{2})\b/);return iso?.[1]||'';
+  const s=String(text||'').toLowerCase(),base=new Date();
+  if(/\b(today|tonight|later\s+today|this\s+(?:morning|afternoon|evening))\b/.test(s))return dayKey(base);
+  if(/\btomorrow\b/.test(s)){const d=new Date(base);d.setDate(d.getDate()+1);return dayKey(d);}
+  const days={sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6},m=s.match(/\b(?:(?:next|this)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if(m){const d=new Date(base),n=(days[m[1]]-d.getDay()+7)%7||7;d.setDate(d.getDate()+n);return dayKey(d);}
+  const iso=s.match(/\b(20\d{2}-\d{2}-\d{2})\b);return iso?.[1]||'';
 }
 function timeFrom(text){
   const s=String(text||''),m=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i)||s.match(/\b(?:at|to|for)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i);if(!m)return '';
@@ -631,7 +640,7 @@ function timeFrom(text){
 }
 function dateLabel(k){const d=new Date(k+'T12:00:00');return Number.isNaN(d.getTime())?k:d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});}
 function dateJobs(k){
-  const tickets=[...new Set(state.jobs.filter(j=>j.status!=='completed'&&String(j.scheduled_for||'')===String(k)).map(j=>String(j.ticket_no||'')))].filter(Boolean);
+  const tickets=[...new Set(state.jobs.filter(j=>j.status!=='cancelled'&&String(j.scheduled_for||'')===String(k)).map(j=>String(j.ticket_no||'')))].filter(Boolean);
   if(tickets.length===1){
     state.currentTicket=tickets[0];
     const current=ensureChat();
@@ -641,50 +650,53 @@ function dateJobs(k){
   }
   return tickets.length?'<div class="vision-answer-title">'+tickets.length+' job'+(tickets.length===1?'':'s')+' on '+esc(dateLabel(k))+'</div><div class="vision-answer-copy">I pulled the live Tech Check schedule and assignments.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">No Tech Check jobs are scheduled for '+esc(dateLabel(k))+'.</div>';
 }
-
 function workloadIntent(text){
   const raw=String(text||'').trim(),s=raw.toLowerCase();
-  const jobCue=/\b(job|jobs|ticket|tickets|work|workload|schedule|scheduled|assignment|assignments|run|runs|route|day)\b/.test(s);
-  const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|busy|on deck|lined up|going on)\b/.test(s);
-  const role=/\bservice\b/.test(s)?'service':/\bit\b/.test(s)?'it':'';
+  const jobCue=/\b(job|jobs|ticket|tickets|work|workload|schedule|scheduled|assignment|assignments|run|runs|route|day|calls?|stops?)\b/.test(s);
+  const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|doing|busy|on deck|lined up|going on|anything|much)\b/.test(s);
+  const role=/\bservice(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'service':/\bit(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'it':'';
   const tech=findTech(raw,role)||findTech(raw);
-  if(!jobCue||!askCue||(!role&&!tech))return null;
-  // A date-free workload question means today in ordinary conversation.
+  const dateCue=Boolean(dateFrom(raw))||/\b(today|tomorrow|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(s);
+  const conversationalWorkCue=/\b(got|have|has|doing|working|busy|lined up|on deck|on today|taking|handling)\b/.test(s);
+  const impliedWork=Boolean((role||tech)&&(dateCue||conversationalWorkCue));
+  if((!jobCue&&!impliedWork)||!askCue||(!role&&!tech))return null;
   const date=dateFrom(raw)||dayKey(new Date());
   return{date,role:tech?.role||role,tech};
 }
-async function workloadHtml(intent){
+function workloadHtml(intent){
   if(!intent)return'';
-  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
-  const label=dateLabel(intent.date),today=intent.date===dayKey(new Date());
-  const layer=visionLiveData();
-  if(layer?.getWorkload){
-    const live=await layer.getWorkload({
-      date:intent.date,
-      role:intent.role||'',
-      tech_id:intent.tech?.user_id||'',
-      tech_name:intent.tech&&!intent.tech?.user_id?(intent.tech.full_name||intent.tech.username||''):''
-    },{force:true});
-    const tickets=Array.isArray(live?.tickets)?live.tickets:[];
-    if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(today?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">I checked the live Tech Check assignments. MHelpDesk remains separate.</div>';
-    if(tickets.length===1){state.currentTicket=tickets[0];const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);}
-    return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(today?'today':'on '+esc(label))+'.</div>'
-      +'<div class="vision-answer-copy">I checked the live Tech Check assignments. MHelpDesk remains separate.</div>'
-      +tickets.slice(0,12).map(ticket=>jobCard(ticket)).join('');
-  }
   const rows=state.jobs.filter(j=>{
-    if(j.status==='completed'||j.status==='cancelled'||String(j.scheduled_for||'')!==String(intent.date))return false;
+    if(j.status==='cancelled'||String(j.scheduled_for||'')!==String(intent.date))return false;
     if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
     if(intent.tech){
-      const uid=String(intent.tech.user_id||''),rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||''),rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
+      const uid=String(intent.tech.user_id||'');
+      const rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||'');
+      const rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
       const names=[intent.tech.full_name,intent.tech.username].filter(Boolean).map(v=>String(v).trim().toLowerCase());
       if(uid&&rowUid)return rowUid===uid;
       return names.includes(rowName);
     }
     return true;
   });
-  const tickets=[...new Set(rows.map(j=>String(j.ticket_no||'')).filter(Boolean))];
-  return tickets.length?'<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(today?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">Live-query support was unavailable, so I used the currently loaded Tech Check assignments. MHelpDesk remains separate.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(today?'today':'on '+esc(label))+'.</div>';
+  const byTicket=new Map();
+  for(const row of rows){
+    const ticket=String(row.ticket_no||'');if(!ticket)continue;
+    if(!byTicket.has(ticket))byTicket.set(ticket,[]);
+    byTicket.get(ticket).push(row);
+  }
+  const tickets=[...byTicket.keys()];
+  const completed=tickets.filter(ticket=>(byTicket.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length;
+  const remaining=Math.max(0,tickets.length-completed);
+  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
+  const label=dateLabel(intent.date),when=intent.date===dayKey(new Date())?'today':'on '+label;
+  if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div><div class="vision-answer-copy">That answer came from the live Tech Check schedule. MHelpDesk remains separate.</div>';
+  if(tickets.length===1){
+    state.currentTicket=tickets[0];
+    const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);
+  }
+  return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div>'
+    +'<div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. I pulled the live Tech Check schedule and assignments. MHelpDesk remains separate.</div>'
+    +tickets.slice(0,12).map(jobCard).join('');
 }
 function findTech(text,role=''){
   const s=String(text||'').toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role),exact=pool.find(t=>[t.full_name,t.username].filter(Boolean).some(v=>s.includes(String(v).toLowerCase())));if(exact)return exact;
@@ -692,7 +704,7 @@ function findTech(text,role=''){
 }
 function assignIntent(text){
   const s=String(text||'').toLowerCase();
-  if(!/\b(assign|task|send|put|give|ask)\b/.test(s)||!/\b(job|ticket|this|service|it|tech|technician|to)\b/.test(s))return null;
+  if(!/\b(assign|task|send|put|give|ask|have|let|move|hand|stick)\b/.test(s)||!/\b(job|ticket|this|that|it|service|tech|technician|to|on|handle|take)\b/.test(s))return null;
   const service=/\bservice\b/.test(s),it=/\bit\b/.test(s),tech=findTech(text,service?'service':it?'it':'');
   if(tech)return{kind:'assign-tech',role:tech.role,tech};
   if(service&&/\b(?:a|any|which)?\s*service\s+(?:tech|technician)\b/.test(s))return{kind:'choose-tech',role:'service'};
@@ -706,13 +718,14 @@ function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||
 function isCreateRequest(text){
   const s=String(text||'').toLowerCase().replace(/pick\s*-?\s*up/g,'pickup');
   const type=/\b(delivery|deliver|deployment|deploy|pickup|swap|service)\b/.test(s);
-  const object=/\b(ticket|job|work\s*order|assignment)\b/.test(s);
-  const action=/\b(create|make|start|prepare|set\s*up|setup|add|open|build|put\s+in|write\s+up|need|want)\b/.test(s);
+  const object=/\b(ticket|job|work\s*order|assignment|service\s*call|call|order)\b/.test(s);
+  const action=/\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|need|want|throw\s+in)\b/.test(s);
   const workloadQuestion=/\b(how many|what|which|show|list|does|do|has|have|got)\b[\s\S]{0,35}\b(ticket|job|work|schedule)\b/.test(s);
   return !workloadQuestion&&(
-    /\b(create|make|start|prepare|set\s*up|setup|add|open|build|put\s+in|write\s+up)\b[\s\S]{0,55}\b(ticket|job|work\s*order|assignment)\b/.test(s)
+    /\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|throw\s+in)\b[\s\S]{0,55}\b(ticket|job|work\s*order|assignment|service\s*call|call|order)\b/.test(s)
+    || /\b(create|make|start|open|add|book|put\s+in|set\s*up|setup|throw\s+in)\s+(?:me\s+)?(?:a|an)?\s*(delivery|pickup|swap|service)(?:\s+(?:ticket|job|call|order))?\b/.test(s)
     || (type&&object&&action)
-    || /\b(?:i\s+)?(?:need|want)\s+(?:to\s+)?(?:do|put\s+in|set\s+up|make)?\s*(?:a|an)?\s*(delivery|pickup|swap|service)\b/.test(s)
+    || /\b(?:i\s+)?(?:need|want)\s+(?:to\s+)?(?:do|put\s+in|set\s+up|make|book)?\s*(?:a|an)?\s*(delivery|pickup|swap|service)\b/.test(s)
   );
 }
 function draftWorkType(text){
@@ -1653,6 +1666,8 @@ async function answer(text){
     if(/\b(what happens next|what next|next steps?|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
     if(/\b(show|list|what).*(equipment|unit|units|gear)|\bwhat equipment\b/i.test(raw))return context?.found?liveEquipmentHtml(context):jobCard(ticket);
     if(/\b(show|list|see|what).*(photo|photos|picture|pictures|evidence|signature|signatures)\b/i.test(raw))return context?.found?liveEvidenceHtml(context):'<div class="vision-answer-title">No evidence context is available.</div>';
+    const ticketAgentReply=await serverAgentAnswer(raw);
+    if(ticketAgentReply)return ticketAgentReply;
     return context?.found?'<div class="vision-answer-title">MHelpDesk #'+esc(ticket)+'</div><div class="vision-answer-copy">Here is the current Tech Check context from the live database.</div>'+liveJobCard(context):ticketAnswer(ticket,'Here is the live Tech Check side of this service order.');
   }
   if(assignIntent(raw))return '<div class="vision-answer-title">Which service order?</div><div class="vision-answer-copy">Tell me the MHelpDesk ticket number or unit first, then I can prepare the assignment.</div>';
