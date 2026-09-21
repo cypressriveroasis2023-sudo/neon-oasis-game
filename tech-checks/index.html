@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-command-v119" />
+    <link rel="stylesheet" href="./styles.css?v=owner-command-v120" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -393,20 +393,30 @@
             <summary class="ownerDashSummary"><div><b>Today & Team Board</b><span>Daily schedule, inspections, assignments, and equipment by technician</span></div><span id="ownerTechOverviewBadge" class="ownerDashBadge neutral">0</span></summary>
             <div class="ownerDashBody"><div id="ownerTechOverview"><div class="small">Loading today’s team board…</div></div></div>
           </details>
-          <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
-            <summary class="ownerDashSummary">
-              <div><b>Assign Job to Tech</b><span>Create and manage technician assignments</span></div>
-              <span id="ownerAssignmentBadge" class="ownerDashBadge">0</span>
-            </summary>
-            <div class="ownerDashBody"><div class="small">Loading active technicians and assignments…</div></div>
-          </details>
-
           <details id="ownerAttentionCard" class="card ownerDashSection ownerAttentionCard">
             <summary class="ownerDashSummary">
               <div><b>Needs Attention</b><span>Owner actions, blocked work, and overdue items</span></div>
               <span id="ownerAttentionBadge" class="ownerDashBadge">0</span>
             </summary>
             <div class="ownerDashBody"><div id="ownerAttention"></div></div>
+          </details>
+
+          <details id="ownerReviewCard" class="card ownerDashSection ownerReviewCard">
+            <summary class="ownerDashSummary">
+              <div><b>Ready for Owner Review</b><span>Complete workflow overview, final closeout, or return for correction</span></div>
+              <span id="ownerReviewBadge" class="ownerDashBadge neutral">0</span>
+            </summary>
+            <div class="ownerDashBody">
+              <div id="ownerReviewQueue"><div class="small">Loading Owner Review queue…</div></div>
+            </div>
+          </details>
+
+          <details id="ownerJobAssignments" class="card ownerDashSection ownerDispatchCard">
+            <summary class="ownerDashSummary">
+              <div><b>Assign Job to Tech</b><span>Create and manage technician assignments</span></div>
+              <span id="ownerAssignmentBadge" class="ownerDashBadge">0</span>
+            </summary>
+            <div class="ownerDashBody"><div class="small">Loading active technicians and assignments…</div></div>
           </details>
 
           <details id="ownerUnitStatusCard" class="card ownerDashSection">
@@ -505,10 +515,10 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v8"></script>
-    <script type="module" src="./app.js?v=owner-command-v47"></script>
+    <script type="module" src="./app.js?v=owner-command-v48"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=108', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=109', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
