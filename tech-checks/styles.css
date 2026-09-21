@@ -4166,3 +4166,20 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
  #view-owner .ownerModuleHead h1{margin:5px 0 0;font-size:24px;color:#f4f8fa}
  #view-owner .ownerModuleHead p{margin:6px 0 0;color:#8fa1ae}
 }
+/* Owner functional module pages v166 */
+#view-owner .ownerAssignLaunch{max-width:920px;padding:22px;margin:0 0 18px;border:1px solid #293844;border-radius:10px;background:#15222b}
+#view-owner .ownerAssignLaunch>b{display:block;font-size:15px;color:#f4f8fa}
+#view-owner .ownerAssignLaunch p{margin:7px 0 16px;color:#8fa1ae}
+#view-owner .ownerPageStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:920px;margin:0 0 18px}
+#view-owner .ownerPageStats span{padding:14px;border:1px solid #293844;border-radius:8px;background:#121d25;color:#8fa1ae}
+#view-owner .ownerPageStats b{display:block;color:#f4f8fa;font-size:20px}
+#view-owner .ownerPageList{max-width:920px;display:grid;gap:8px}
+#view-owner .ownerPageRow,#view-owner .ownerTeamPageRow{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:18px;align-items:center;padding:15px 17px;border:1px solid #293844;border-radius:8px;background:#121d25}
+#view-owner .ownerPageRow div,#view-owner .ownerTeamPageRow div{display:flex;flex-direction:column;gap:3px}
+#view-owner .ownerPageRow b,#view-owner .ownerTeamPageRow b{color:#f4f8fa}
+#view-owner .ownerPageRow span,#view-owner .ownerTeamPageRow span{color:#8fa1ae;font-size:12px}
+#view-owner .ownerTeamPageRow{grid-template-columns:minmax(0,2fr) minmax(110px,.6fr) minmax(110px,.6fr);max-width:920px;margin-bottom:8px}
+@media(max-width:720px){
+ #view-owner .ownerPageStats{grid-template-columns:1fr}
+ #view-owner .ownerPageRow,#view-owner .ownerTeamPageRow{grid-template-columns:1fr}
+}
