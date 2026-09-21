@@ -1559,12 +1559,19 @@ function ownerCompanyHistorySubject(result) {
   if (kind==='unit') return 'Unit ' + String(subject.unit_tag || result.unit_key || result.query || '');
   return subject.site || result.query || 'Customer / Site';
 }
+function ownerWorkflowDisplayText(value) {
+  return String(value ?? '')
+    .replace(/equipment workflow\s*·\s*released/gi, 'Equipment workflow · IT → Service handoff completed')
+    .replace(/IT EQUIPMENT SENT TO SERVICE/gi, 'IT → SERVICE HANDOFF COMPLETED')
+    .replace(/sent equipment to Service/gi, 'created the Service handoff')
+    .replace(/sent to Service/gi, 'handed off to Service');
+}
 function ownerCompanyHistoryEventHtml(event) {
   const when=event?.event_at ? new Date(event.event_at).toLocaleString() : 'Date not recorded';
   const refs=[event?.ticket_no ? 'MHelpDesk #'+event.ticket_no : '',event?.unit_tag ? 'Unit '+event.unit_tag : '',event?.site || '',event?.actor_name || ''].filter(Boolean);
-  return '<div class="ownerCompanyHistoryEvent"><div><b>'+esc(String(event?.event_type || 'history').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(when)+'</span></div>'
+  return '<div class="ownerCompanyHistoryEvent"><div><b>'+esc(ownerWorkflowDisplayText(String(event?.event_type || 'history').replaceAll('_',' ').toUpperCase()))+'</b><span>'+esc(when)+'</span></div>'
     +(refs.length?'<div class="small">'+refs.map(esc).join(' · ')+'</div>':'')
-    +'<p>'+esc(event?.detail || 'Recorded Tech Check activity')+'</p></div>';
+    +'<p>'+esc(ownerWorkflowDisplayText(event?.detail || 'Recorded Tech Check activity'))+'</p></div>';
 }
 async function ownerCompanyHistorySearch() {
   if (state.profile?.role !== 'owner') return;
@@ -1849,7 +1856,7 @@ function renderOwner() {
   $('ownerPrepHistoryCount').textContent = String(completedPreps.length);
   $('ownerPrepHistory').innerHTML = completedPreps.length ? completedPreps.map(prepHtml).join('') : '<div class="small">No completed equipment history yet.</div>';
   const recentReports = state.reports.slice().sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, ownerReportLimit);
-  $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(r.kind) + '</b><span class="small ownerFoldHint">' + esc(ownerActorLabel(r)) + (r.ticket_no ? ' · MHelpDesk #' + esc(r.ticket_no) : '') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(r.text) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
+  $('reports').innerHTML = recentReports.length ? recentReports.map(r => '<details class="ownerFold"><summary><span><b>' + esc(ownerWorkflowDisplayText(r.kind)) + '</b><span class="small ownerFoldHint">' + esc(ownerActorLabel(r)) + (r.ticket_no ? ' · MHelpDesk #' + esc(r.ticket_no) : '') + ' · ' + new Date(r.created_at).toLocaleString() + '</span></span><span class="pill">DETAILS</span></summary><div class="ownerFoldBody">' + esc(ownerWorkflowDisplayText(r.text)) + '</div></details>').join('') : '<div class="warn">No reports yet.</div>';
   const more = $('ownerReportsMore'); if (more) { more.classList.toggle('hidden', ownerReportLimit >= state.reports.length); more.textContent = 'Show More Activity (' + Math.max(0, state.reports.length - ownerReportLimit) + ' older)'; more.onclick = () => { ownerReportLimit += 25; renderOwner(); }; }
   renderOwnerCommandCenter();
   ensureStartFreshCard();
