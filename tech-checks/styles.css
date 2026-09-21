@@ -4965,3 +4965,29 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerAppPage .ownerAttentionStats span{
   padding:12px 14px!important;
 }
+
+
+/* Owner mobile shell isolation v221 — prevent legacy dashboard leaking below app */
+@media (max-width:720px){
+  #view-owner>#ownerLegacyMounts,
+  #view-owner .ownerLegacyMounts{
+    display:none!important;
+    visibility:hidden!important;
+    position:absolute!important;
+    width:0!important;
+    height:0!important;
+    overflow:hidden!important;
+    pointer-events:none!important;
+    z-index:-1!important;
+  }
+  #view-owner #ownerApp{
+    display:flex!important;
+    visibility:visible!important;
+    pointer-events:auto!important;
+  }
+  #view-owner #ownerApp .ownerAppWorkspace,
+  #view-owner #ownerApp #ownerAppPage{
+    visibility:visible!important;
+    pointer-events:auto!important;
+  }
+}
