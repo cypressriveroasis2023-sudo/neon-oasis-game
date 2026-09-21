@@ -5405,7 +5405,7 @@ async function installOwnerAssignments(force = false) {
   }
 
   let liveHost = document.getElementById('ownerLiveJobProgress');
-  if(structuralOwner && !liveHost){ liveHost=document.createElement('details'); liveHost.id='ownerLiveJobProgress'; liveHost.className='ownerLegacyLiveMount'; document.getElementById('ownerLegacyMounts')?.append(liveHost); }
+  if(structuralOwner && !liveHost){ liveHost=document.createElement('details'); liveHost.id='ownerLiveJobProgress'; liveHost.className='ownerLegacyLiveMount'; document.getElementById('ownerSupportMounts')?.append(liveHost); }
   let liveNeedsHydration = false;
   if (!liveHost) {
     liveHost = document.createElement('details');
@@ -5996,80 +5996,39 @@ function ensureOwnerCommandCenter(){
 function organizeOwnerDashboard(){
   const view=document.getElementById('view-owner');
   if(!view || !roleText().includes('Owner/Admin')) return;
+  const structuralOwner=document.getElementById('ownerApp');
+  const support=document.getElementById('ownerSupportMounts');
+  if(structuralOwner && support){
+    document.getElementById('ownerVisionWorkspaceCard')?.remove();
+    document.getElementById('ownerCommandCenter')?.remove();
+    document.getElementById('ownerVisionHeaderButton')?.remove();
+    document.getElementById('ownerCompactShell')?.remove();
+    view.querySelectorAll('.ownerFeaturePage,.ownerHomeMain').forEach(el=>el.remove());
+    const supportIds=['ownerTechOverviewCard','ownerAttentionCard','ownerLiveJobProgress','ownerIntakeTracking','ownerFieldEscalations','ownerUnitStatusCard','ownerHandoffsCard','ownerActivityCard','ownerAccountsCard','ownerResetCard'];
+    supportIds.forEach(id=>{const card=document.getElementById(id);if(card&&card.parentElement!==support)support.append(card);});
+    const assign=document.getElementById('ownerJobAssignments');
+    const persistent=document.getElementById('ownerPersistentControls');
+    if(assign&&persistent&&assign.parentElement!==persistent)persistent.prepend(assign);
+    return;
+  }
 
   document.getElementById('ownerVisionWorkspaceCard')?.remove();
   ensureOwnerCommandCenter();
-
   let visionButton=document.getElementById('ownerVisionHeaderButton');
   if(!visionButton){
-    visionButton=document.createElement('a');
-    visionButton.id='ownerVisionHeaderButton';
-    visionButton.className='mini ownerVisionHeaderButton';
-    visionButton.href='./onsite-vision.html';
-    visionButton.innerHTML="<img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span>OnSite Vision</span>";
+    visionButton=document.createElement('a');visionButton.id='ownerVisionHeaderButton';visionButton.className='mini ownerVisionHeaderButton';
+    visionButton.href='./onsite-vision.html';visionButton.innerHTML="<img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span>OnSite Vision</span>";
   }
   const accountActions=document.querySelector('.accountActions');
-  if(accountActions && visionButton.parentElement!==accountActions){
+  if(accountActions&&visionButton.parentElement!==accountActions){
     const refresh=[...accountActions.querySelectorAll('button')].find(btn=>String(btn.textContent||'').trim()==='Refresh');
     accountActions.insertBefore(visionButton,refresh||accountActions.firstChild);
   }
-
-  const order=[
-    'ownerCommandCenter',
-    'ownerTechOverviewCard',
-    'ownerAttentionCard',
-    'ownerJobAssignments',
-    'ownerLiveJobProgress',
-    'ownerIntakeTracking',
-    'ownerUnitStatusCard',
-    'ownerHandoffsCard',
-    'ownerActivityCard',
-    'ownerAccountsCard',
-    'ownerResetCard'
-  ];
-
-  // Repair abandoned custom Owner shells only when one actually exists.
+  const order=['ownerCommandCenter','ownerTechOverviewCard','ownerAttentionCard','ownerJobAssignments','ownerLiveJobProgress','ownerIntakeTracking','ownerUnitStatusCard','ownerHandoffsCard','ownerActivityCard','ownerAccountsCard','ownerResetCard'];
   const shell=document.getElementById('ownerCompactShell');
-  if(shell){
-    order.forEach(id=>{
-      const card=document.getElementById(id);
-      if(card && card.parentElement!==view){
-        card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');
-        view.appendChild(card);
-      }
-    });
-    shell.remove();
-  }
-
-  // Remove abandoned custom wrappers only if they survived a hot reload.
+  if(shell){order.forEach(id=>{const card=document.getElementById(id);if(card&&card.parentElement!==view){card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');view.appendChild(card);}});shell.remove();}
   view.querySelectorAll('.ownerFeaturePage,.ownerHomeMain').forEach(el=>el.remove());
-
-  // Restore Live Job Progress content only if the old compact wrapper still exists.
-  const live=document.getElementById('ownerLiveJobProgress');
-  const liveBody=live?.querySelector('.ownerDashBody');
-  const aiWrap=liveBody?.querySelector('.ownerCompactAIStatus');
-  if(aiWrap){
-    const ai=aiWrap.querySelector('.wl-owner-ai-control-center');
-    if(ai) aiWrap.before(ai);
-    aiWrap.remove();
-  }
-  const misplacedLookup=view.querySelector('.ownerCompactEquipmentLookup');
-  if(misplacedLookup && liveBody){
-    misplacedLookup.classList.remove('ownerCompactEquipmentLookup');
-    liveBody.prepend(misplacedLookup);
-  }
-
-  // Do not re-append cards that are already on the Owner page.
-  // This keeps the dashboard stable and prevents the mutation/boot loop.
-  order.forEach(id=>{
-    const card=document.getElementById(id);
-    if(!card) return;
-    card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');
-    if(card.parentElement!==view) view.appendChild(card);
-    if(!card.dataset.ownerClassicInitialized){
-      card.dataset.ownerClassicInitialized='1';
-    }
-  });
+  order.forEach(id=>{const card=document.getElementById(id);if(!card)return;card.classList.remove('ownerCompactSecondary','ownerCompactAssignForm','ownerCompactAttentionDetail','ownerCompactLivePrimary');if(card.parentElement!==view)view.appendChild(card);if(!card.dataset.ownerClassicInitialized)card.dataset.ownerClassicInitialized='1';});
 }
 let ownerAIDispatchPrepared = false;
 let ownerAIDispatchLastParse = null;
@@ -6968,7 +6927,7 @@ async function installOwnerFieldEscalations(force=false) {
   if(!roleText().includes('Owner/Admin'))return;
   let host=document.getElementById('ownerFieldEscalations');
   if(host&&host.dataset.loaded==='1'&&!force)return;
-  if(!host){host=document.createElement('details');host.id='ownerFieldEscalations';host.className='card ownerDashSection';const view=document.getElementById('view-owner');const attention=document.getElementById('ownerAttentionCard');if(attention)attention.after(host);else view?.prepend(host);}
+  if(!host){host=document.createElement('details');host.id='ownerFieldEscalations';host.className='card ownerDashSection';const view=document.getElementById('view-owner');const support=document.getElementById('ownerSupportMounts');const attention=document.getElementById('ownerAttentionCard');if(document.getElementById('ownerApp')&&support)support.append(host);else if(attention)attention.after(host);else view?.prepend(host);}
   const wasOpen=host.open;host.dataset.loaded='1';
   const rows=await fieldEscalationRows();
   const active=rows.filter(r=>!r.resolved_at), ownerNeeded=active.filter(r=>r.status==='unresolved_owner');
@@ -6996,8 +6955,11 @@ async function installOwnerIntake(force = false) {
     host.id = 'ownerIntakeTracking';
     host.className = 'card ownerDashSection ownerIntakeSection';
     const view = document.getElementById('view-owner');
+    const support = document.getElementById('ownerSupportMounts');
     const attention = document.getElementById('ownerAttentionCard');
-    if (attention) attention.after(host); else if (view) view.prepend(host);
+    if (document.getElementById('ownerApp') && support) support.append(host);
+    else if (attention) attention.after(host);
+    else if (view) view.prepend(host);
   }
   const wasOpen = host.open;
   host.dataset.loaded = '1';
