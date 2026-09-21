@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v140",
-  "service_worker": "v154",
-  "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
+  "runtime_version": "production-qa-20260921a",
+  "service_worker": "tech-check-production-qa-20260921a",
+  "generated_for": "Unified Owner application + IT/Service workflow production readiness",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -66,12 +66,17 @@
       "role": "owner",
       "mode": "manual",
       "destructive": false,
-      "scenario": "Classic stacked dashboard remains responsive",
+      "scenario": "Unified Owner application routes remain responsive",
       "steps": [
-        "Open and close each Owner dashboard section"
+        "Open every Owner route: Today, Calendar, Needs Attention, Owner Review, Assign Job, Team, Units, Handoffs, History, Activity, Technician Accounts",
+        "Navigate away from an unfinished Assign Job and return",
+        "Repeat at desktop and mobile widths"
       ],
       "expected": [
-        "Create / Assign Job, Live Job Progress, Needs Attention, Returns & Intake, Unit Status & Search, Equipment Handoffs, Recent Activity, Technician Accounts, Maintenance all toggle without lag or re-render loop"
+        "One Owner shell and one route workspace remain visible",
+        "No legacy Details/dashboard content appears under the unified app",
+        "The single Assign Job form survives route changes without losing its draft",
+        "Mobile exposes OnSite Vision, Refresh, and Sign Out"
       ],
       "manual_device": true
     },
@@ -3670,5 +3675,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "Full rollback-safe Owner → IT → Service handoff → Service SWAP → old-unit return → IT Intake → Owner Review → Owner closeout QA passed. The test exposed and fixed a client flow bug where recording the old SWAP unit could prematurely complete the Service assignment before the active handoff/field workflow closed. Standard and Helios SWAP returns now remain fieldPending until the actual SWAP workflow completes. Replacement and returned-old-unit identity protections were verified, and rollback residue is zero."
+  "last_release_qa_note": "2026-09-21 production QA source audit: unified Owner legacy rendering disconnected; support mounts isolated; Owner actions no longer scroll hidden legacy DOM; Handoffs now includes returns/intake/escalations; mobile Owner utilities restored; refresh paths timeout-safe. Authenticated device/browser interaction still requires manual/device QA."
 }
