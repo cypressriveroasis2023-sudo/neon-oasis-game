@@ -1797,22 +1797,31 @@ function ownerAppEmpty(text,detail=''){
   return '<div class="ownerAppEmpty"><b>✓ '+esc(text)+'</b>'+(detail?'<span>'+esc(detail)+'</span>':'')+'</div>';
 }
 function ownerAppJobRow(a){
-  const who=a.assignee_name||a.assigned_to_name||(a.assignment_scope==='department'?(a.assigned_role==='it'?'IT Department Queue':'Service Department Queue'):'Unassigned');
-  return '<div class="ownerAppJobRow"><div><b>MHelpDesk #'+esc(a.ticket_no||'—')+'</b><span>'+esc(a.site||'Customer / site not recorded')+'</span></div><div><b>'+esc(a.work_type||'Service')+'</b><span>'+esc(a.job_description||'No description recorded')+'</span></div><div><b>'+esc(who)+'</b><span>'+esc(a.status==='started'?'Working now':a.status==='completed'?'Complete':'Waiting')+'</span></div></div>';
+  const who=a.assignee_name||a.assigned_to_name||(a.assignment_scope==='department'?(a.assigned_role==='it'?'IT Department':'Service Department'):'Unassigned');
+  const status=a.status==='started'?'WORKING':a.status==='completed'?'COMPLETE':'WAITING';
+  const role=a.assigned_role==='it'?'IT':'SERVICE';
+  const type=String(a.work_type||'service').toUpperCase();
+  return '<article class="ownerTodayJob '+(a.status==='started'?'isWorking':a.status==='completed'?'isComplete':'isWaiting')+'">'
+    +'<div class="ownerTodayJobMain"><div class="ownerTodayTicket"><span>MHELPDESK</span><b>#'+esc(a.ticket_no||'—')+'</b></div><div class="ownerTodaySite"><b>'+esc(a.site||'Customer / site not recorded')+'</b><span>'+esc(a.job_description||'No job description recorded')+'</span></div></div>'
+    +'<div class="ownerTodayMeta"><span class="ownerTodayType">'+esc(type)+'</span><span class="ownerTodayRole '+role.toLowerCase()+'">'+role+'</span></div>'
+    +'<div class="ownerTodayOwner"><b>'+esc(who)+'</b><span>'+esc(a.status==='started'?'Working now':a.status==='completed'?'Work complete':'Waiting to start')+'</span></div>'
+    +'<div class="ownerTodayState"><span class="'+(a.status==='started'?'working':a.status==='completed'?'complete':'waiting')+'">'+status+'</span></div></article>';
 }
 function ownerAppToday(){
   const today=localDateKey(new Date());
   const rows=(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');
   const groups=[
-    ['Needs Assignment',a=>!a.assignee_user_id&&a.assignment_scope!=='department'&&a.status!=='completed'],
-    ['Waiting for IT',a=>a.assigned_role==='it'&&a.status==='assigned'],
-    ['IT Working',a=>a.assigned_role==='it'&&a.status==='started'],
-    ['Waiting for Service',a=>a.assigned_role==='service'&&a.status==='assigned'],
-    ['Service Working',a=>a.assigned_role==='service'&&a.status==='started'],
-    ['Complete',a=>a.status==='completed']
+    ['Needs Assignment','Needs an owner assignment',a=>!a.assignee_user_id&&a.assignment_scope!=='department'&&a.status!=='completed'],
+    ['Waiting for IT','Ready for IT to take the next step',a=>a.assigned_role==='it'&&a.status==='assigned'],
+    ['IT Working','IT has the job now',a=>a.assigned_role==='it'&&a.status==='started'],
+    ['Waiting for Service','Ready for Service to take the next step',a=>a.assigned_role==='service'&&a.status==='assigned'],
+    ['Service Working','Service has the job now',a=>a.assigned_role==='service'&&a.status==='started'],
+    ['Complete','Finished today',a=>a.status==='completed']
   ];
-  const body=groups.map(([label,fn])=>{const x=rows.filter(fn);return x.length?'<section class="ownerAppGroup"><h2>'+label+' <span>'+x.length+'</span></h2>'+x.map(ownerAppJobRow).join('')+'</section>':''}).join('');
-  return ownerAppHeader('TODAY','Today','Today’s Tech Check work, ownership, current step, and what is waiting.')+(body||ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'));
+  const active=rows.filter(a=>a.status!=='completed').length, working=rows.filter(a=>a.status==='started').length, waiting=rows.filter(a=>a.status==='assigned').length, complete=rows.filter(a=>a.status==='completed').length;
+  const summary='<div class="ownerTodaySummary"><div><b>'+rows.length+'</b><span>TOTAL TODAY</span></div><div><b>'+active+'</b><span>OPEN</span></div><div><b>'+working+'</b><span>WORKING</span></div><div><b>'+waiting+'</b><span>WAITING</span></div><div><b>'+complete+'</b><span>COMPLETE</span></div></div>';
+  const body=groups.map(([label,sub,fn])=>{const x=rows.filter(fn);return x.length?'<section class="ownerTodayGroup"><header><div><h2>'+label+'</h2><p>'+sub+'</p></div><strong>'+x.length+'</strong></header><div class="ownerTodayJobs">'+x.map(ownerAppJobRow).join('')+'</div></section>':''}).join('');
+  return ownerAppHeader('TODAY','Today','Live Tech Check work for today — who has it, what they are doing, and what is waiting.')+summary+(body||ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'));
 }
 function ownerAppAttention(){
   renderOwnerAttention();
