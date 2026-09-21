@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const data={
-  "version": "company-knowledge-v13",
+  "version": "company-knowledge-v14",
   "generated_from": {
     "date": "2026-09-19",
     "authority": [
@@ -627,6 +627,13 @@
       "Recon II Battery is an accepted database label, but its exact physical model/specification is still undocumented."
     ]
   },
+  "retired_equipment": {
+    "Solar Pole": {
+      "status": "retired",
+      "rule": "Solar Pole is retired from the Cameras On Site operating system and must not be offered or created as current equipment.",
+      "replacement_note": "Standalone Pole remains a valid equipment type. Do not treat Pole and Solar Pole as the same product."
+    }
+  },
   "phase_7_gap_inventory": {
     "rule": "These are missing Cameras On Site facts. Vision must return MISSING INFORMATION rather than fill them with generic internet assumptions.",
     "products": {
@@ -835,8 +842,15 @@
       "ai_limit": "Do not tell a technician to take a replacement part from inventory unless live Tech Check data confirms one exists."
     },
     "unresolved_troubleshooting": {
-      "rule": "Service troubleshoots and verifies power, then calls IT. If Service and IT still cannot find a solution, escalate to the Owner.",
-      "owner_view": "Show MHelpDesk ticket/job, unit, original problem, Service checks, IT checks/actions, and what remains unresolved."
+      "rule": "Service troubleshoots and verifies power, then calls IT. Service and IT troubleshoot together. If the unit cannot be repaired onsite, IT authorizes use of the appropriate checked-out backup unit for the swap. The failed unit returns through Service Return → IT Intake. If Service and IT still cannot determine a solution, escalate to the Owner.",
+      "sequence": [
+        "Service troubleshoots the offline unit and verifies power.",
+        "Service calls IT and Service + IT troubleshoot together.",
+        "If onsite repair is not possible, IT authorizes the appropriate backup-unit swap.",
+        "The failed unit returns through Service Return → IT Intake.",
+        "If Service + IT still cannot determine a solution, escalate to Owner with a short complete summary."
+      ],
+      "owner_view": "Show MHelpDesk ticket/job, unit, original problem, Service power/troubleshooting checks, IT checks/actions, whether a backup swap was authorized, returned-unit status, and what remains unresolved."
     },
     "proactive_alerting": {
       "rule": "OnSite Vision proactively notifies the Owner of detected issues and also keeps each issue visible on the Owner dashboard until resolved.",
@@ -856,9 +870,9 @@
       "service_owner": "Service Tech",
       "battery_baseline": [
         "4 × 12V 110Ah batteries on truck at all times",
-        "2 × LiTime batteries on truck at all times"
+        "2 × LiTime 12V 100Ah batteries on truck at all times"
       ],
-      "spare_unit_rule": "Carry 1 spare Spotter, Sniper, or Solar Spotter depending on the jobs/places scheduled for that day.",
+      "spare_unit_rule": "Carry 1 complete backup unit appropriate to that day’s work: Spotter, Sniper, or Solar Spotter. The backup must complete the proper IT checkout before departure.",
       "predeparture": "Service Tech verifies required truck batteries are charged before leaving and updates Tech Check.",
       "gate": "If required battery readiness/count is not met, replace/correct it before the Service Tech can move on.",
       "used_battery_rule": "When batteries are used/swapped, record how many in Tech Check and MHelpDesk. Returned swapped batteries go to the charging station and begin charging.",
