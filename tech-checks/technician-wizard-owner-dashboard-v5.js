@@ -2127,11 +2127,11 @@ function expectedPrepItemCount() {
   return equipmentManifestDeviceTotal(manifest) + equipmentManifestStandTotal(manifest);
 }
 const TICKET_PARTS = [
-  { key:'solar_panel_qty', id:'SolarPanels', label:'Additional Solar Panels' },
-  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Additional Batteries' },
-  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Additional Cameras' },
-  { key:'sim_replacement_qty', id:'SimReplacements', label:'Additional SIM Cards' },
-  { key:'micro_sd_qty', id:'MicroSdCards', label:'Additional SD / Micro SD Cards' },
+  { key:'solar_panel_qty', id:'SolarPanels', label:'Solar Panel Replacement', help:'Replace an existing solar panel with a new one.' },
+  { key:'battery_replacement_qty', id:'BatteryReplacements', label:'Battery Replacement', help:'Replace an existing battery with a new one.' },
+  { key:'camera_replacement_qty', id:'CameraReplacements', label:'Camera Replacement', help:'Replace an existing camera with a new one.' },
+  { key:'sim_replacement_qty', id:'SimReplacements', label:'SIM Card Swap', help:'IT supplies it: remove the old SIM → install the new SIM.' },
+  { key:'micro_sd_qty', id:'MicroSdCards', label:'SD / Micro SD Card Replacement', help:'IT supplies the replacement SD / micro SD card.' },
 ];
 function cleanPartQty(value) { return Math.max(0, Math.floor(Number(value || 0))); }
 function readTicketPartInputs(prefix='wlPart') {
@@ -2145,10 +2145,11 @@ function ticketPartsRows(data) {
 function ticketPartsTotal(data) { return ticketPartsRows(data).reduce((sum,row) => sum + row.qty, 0); }
 function ticketPartsInlineHtml(data) {
   const rows = ticketPartsRows(data).filter(row => row.qty > 0);
-  return rows.length ? `<div class='wl-parts-summary'><b>Parts Required</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div></div>` : `<div class='wl-parts-summary'><b>Parts Required</b><div class='small'>None listed.</div></div>`;
+  const itSupplied=rows.filter(row=>row.key==='sim_replacement_qty'||row.key==='micro_sd_qty');
+  return rows.length ? `<div class='wl-parts-summary'><b>Replacement / Swap Work</b><div class='wl-parts-chips'>${rows.map(row => `<span><b>${row.qty}</b> × ${esc(row.label)}</span>`).join('')}</div>${itSupplied.length?`<div class='small top8'><b>IT SUPPLIES:</b> ${esc(itSupplied.map(row=>row.qty+' × '+row.label).join(', '))}. Service verifies these in the IT → Service handoff before leaving.</div>`:''}</div>` : `<div class='wl-parts-summary'><b>Replacement / Swap Work</b><div class='small'>None listed.</div></div>`;
 }
 function ticketPartsInputsHtml(prefix='wlPart', data={}) {
-  return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span><input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
+  return `<div class='wl-parts-grid'>${TICKET_PARTS.map(part => `<label><span>${esc(part.label)}</span>${part.help?`<small>${esc(part.help)}</small>`:''}<input id='${prefix}${part.id}' type='number' inputmode='numeric' min='0' step='1' value='${cleanPartQty(data?.[part.key])}'></label>`).join('')}</div>`;
 }
 const OWNER_DEVICE_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const OWNER_STAND_TYPES = window.TechCheckRules?.standTypes || ['110V Stand','Solar Stand','Pole'];
@@ -2285,7 +2286,7 @@ function ensureITEquipmentManifestFields(ticketGrid) {
     wrap.style.gridColumn='1 / -1';
     ticketGrid.append(wrap);
   }
-  wrap.innerHTML=`<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Choose the exact units/devices, stands, and extra parts being sent for this MHelpDesk ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div><div class='wl-requirement-section partsArea'><div class='wl-requirement-heading'>PARTS / SUPPLIES</div>${ticketPartsInputsHtml('wlPart')}</div>`;
+  wrap.innerHTML=`<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Choose the exact units/devices, stands, and extra parts being sent for this MHelpDesk ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div><div class='wl-requirement-section partsArea'><div class='wl-requirement-heading'>REPLACEMENT / SWAP WORK</div><div class='small'><b>IT supplies all listed SIM and SD/micro SD cards.</b> Put the exact quantity in the Service handoff.</div>${ticketPartsInputsHtml('wlPart')}</div>`;
   wrap.querySelectorAll('[data-it-equipment-qty]').forEach(input => input.addEventListener('input', syncITEquipmentCounts));
   syncITEquipmentCounts();
   return wrap;
@@ -5386,7 +5387,7 @@ async function installOwnerAssignments(force = false) {
             </div>
           </div>
           <div id='ownerAutoServicePlan' class='hidden'></div>
-          <div class='wl-requirement-section'><div class='wl-requirement-heading'>Extra Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
+          <div class='wl-requirement-section'><div class='wl-requirement-heading'>Replacement / Swap Categories</div><div class='small'><b>SIM and SD/micro SD cards come from IT.</b> If Service is doing the field work, Tech Check uses IT → Service so Service receives and verifies the cards in the handoff.</div>${ticketPartsInputsHtml('ownerPart')}</div>
         </div>
       </section>
 
@@ -6627,6 +6628,8 @@ function ownerAIReview(){
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
   if(!a.job_description)issues.push('Add a short description of what needs to be done.');
   if(type==='pickup'&&role==='it')issues.push('Pickup must start with Service. Choose Service only or Service → IT.');
+  const itSuppliedCards=Number(parts.sim_replacement_qty||0)+Number(parts.micro_sd_qty||0);
+  if(type!=='pickup'&&itSuppliedCards>0&&(role==='service'||role==='service_it'))issues.push('SIM / SD replacements come from IT. Choose IT → Service so IT supplies the cards before Service leaves.');
   if((role==='it'||dual)&&deviceCount+standCount<1)issues.push('Choose the equipment IT will work on in Step 2.');
   const autoSolarPlan=automaticServiceSolarPlan(manifest,type);
   if(autoSolarPlan.spotters>0&&manifestQty(manifest,'Solar Stand')>0)issues.push('Remove Solar Stand from the IT list. Service gets it automatically after the IT handoff.');
@@ -6674,6 +6677,7 @@ async function ownerAssignJob() {
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
+  if (workType!=='pickup' && (Number(parts.sim_replacement_qty||0)>0 || Number(parts.micro_sd_qty||0)>0) && (role==='service' || role==='service_it')) return alert('SIM Card Swap and SD/Micro SD Card Replacement must use IT → Service. IT supplies the card(s), then Service verifies them in the handoff.');
   if (workType === 'pickup' && role === 'it') return alert('Pickup starts with Service. Choose Service Department Only, IT + Service Departments, or Service + IT Departments so Service handles the field pickup before IT Intake.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
@@ -6977,7 +6981,15 @@ document.addEventListener('change', e => {
   if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
-  if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();}
+  if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) {
+    if(e.target?.id==='ownerPartSimReplacements'||e.target?.id==='ownerPartMicroSdCards'){
+      const parts=readTicketPartInputs('ownerPart'),role=document.getElementById('ownerAssignRole'),workType=document.getElementById('ownerAssignWorkType')?.value||'service';
+      if(workType!=='pickup'&&(Number(parts.sim_replacement_qty||0)>0||Number(parts.micro_sd_qty||0)>0)&&role&&(role.value==='service'||role.value==='service_it')){
+        role.value='it_service';role.dataset.ownerConfirmed='1';refreshOwnerAssignmentTechOptions();syncOwnerSimplePills();
+      }
+    }
+    ownerSaveAssignDraftNow();ownerAIReview();
+  }
 });
 
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();} if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
