@@ -92,9 +92,10 @@
     if(!client) throw new Error('OnSite Vision live data is not configured.');
     const scope=String(filters.scope||'active').trim().toLowerCase();
     const unitReference=String(filters.unit_reference||'').trim();
+    const ticketNo=String(filters.ticket_no||'').trim();
     const limit=Math.max(1,Math.min(Number(options.limit||100),250));
     const force=Boolean(options.force);
-    const cacheKey=JSON.stringify({scope,unitReference:unitReference.toLowerCase(),limit});
+    const cacheKey=JSON.stringify({scope,unitReference:unitReference.toLowerCase(),ticketNo,limit});
     const cached=escalationCache.get(cacheKey);
     if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
 
@@ -113,10 +114,11 @@
       'owner_resolved_at','resolved_at','created_at','updated_at'
     ].join(',')).order('updated_at',{ascending:false}).limit(limit);
     if(statuses.length)query=query.in('status',statuses);
+    if(ticketNo)query=query.eq('ticket_no',ticketNo);
     const response=await query;
     if(response.error)throw response.error;
     const rows=(Array.isArray(response.data)?response.data:[]).filter(row=>matchesUnit(row,unitReference));
-    const value={scope,unit_reference:unitReference,count:rows.length,rows};
+    const value={scope,unit_reference:unitReference,ticket_no:ticketNo,count:rows.length,rows};
     escalationCache.set(cacheKey,{at:Date.now(),value});
     return value;
   }
