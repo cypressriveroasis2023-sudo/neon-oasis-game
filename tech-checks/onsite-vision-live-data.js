@@ -6,6 +6,8 @@
   'use strict';
   let client=null;
   const cache=new Map();
+  const historyCache=new Map();
+  const reviewCache={at:0,value:null};
   const TTL_MS=15000;
 
   function configure(supabaseClient){
@@ -30,6 +32,40 @@
     return value;
   }
 
+  async function getCompanyHistory(kind,value,options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const k=String(kind||'').trim().toLowerCase();
+    const v=String(value||'').trim();
+    if(!['technician','unit','site'].includes(k)) throw new Error('History kind must be technician, unit, or site.');
+    if(!v) throw new Error('History lookup value is required.');
+    const cacheKey=k+'|'+v.toLowerCase();
+    const force=Boolean(options.force);
+    const cached=historyCache.get(cacheKey);
+    if(!force && cached && (Date.now()-cached.at)<TTL_MS) return cached.value;
+    const response=await client.rpc('get_company_history_v1',{
+      p_kind:k,
+      p_value:v,
+      p_limit:Math.max(1,Math.min(Number(options.limit||100),250))
+    });
+    if(response.error) throw response.error;
+    const result=response.data||{kind:k,query:v,found:false,events:[]};
+    historyCache.set(cacheKey,{at:Date.now(),value:result});
+    return result;
+  }
+
+  async function getOwnerReviewQueue(options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const force=Boolean(options.force);
+    if(!force && reviewCache.value && (Date.now()-reviewCache.at)<TTL_MS) return reviewCache.value;
+    const response=await client.rpc('owner_review_queue_v1',{
+      p_limit:Math.max(1,Math.min(Number(options.limit||40),100))
+    });
+    if(response.error) throw response.error;
+    reviewCache.at=Date.now();
+    reviewCache.value=Array.isArray(response.data)?response.data:[];
+    return reviewCache.value;
+  }
+
   function prime(context){
     const k=key(context?.ticket_no);
     if(k) cache.set(k,{at:Date.now(),value:context});
@@ -41,7 +77,12 @@
     if(k) cache.delete(k);
   }
 
-  function invalidateAll(){ cache.clear(); }
+  function invalidateAll(){
+    cache.clear();
+    historyCache.clear();
+    reviewCache.at=0;
+    reviewCache.value=null;
+  }
 
   function forWorkflowEngine(context){
     const c=context||{};
@@ -76,9 +117,11 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v1',
+    version:'live-data-v2',
     configure,
     getJobContext,
+    getCompanyHistory,
+    getOwnerReviewQueue,
     prime,
     invalidate,
     invalidateAll,
