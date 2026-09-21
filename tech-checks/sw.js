@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v133';
+const CACHE_NAME = 'tech-check-field-shell-v134';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -21,7 +21,7 @@ self.addEventListener('install', event => {
       cache.add(new Request('./onsite-vision-actions.js?v=action-layer-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-persistence.js?v=persistence-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v39', { cache:'reload' }))
+      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v40', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
