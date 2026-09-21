@@ -415,6 +415,13 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_departure_readiness',
+    description: 'Read live Tech Check truck/day departure readiness: charged battery minimums and IT-checked-out backup units. Use before saying Service is ready to leave the shop.',
+    strict: true,
+    parameters: { type: 'object', properties: { ticket_no: { type: 'string' } }, required: ['ticket_no'], additionalProperties: false },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -509,7 +516,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v24',
+        agent_version: 'onsite-vision-agent-v25',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -671,7 +678,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v24',
+            agent_version: 'onsite-vision-agent-v25',
           }
         } as Json
       }
@@ -845,6 +852,33 @@ Deno.serve(async (req) => {
         } as Json
       }
 
+      if (name === 'get_departure_readiness') {
+        const ticketNo=clean(args.ticket_no)
+        let batteryQuery=userClient.from('truck_spare_batteries').select('ticket_no,equipment_type,battery_type,qty_prepared,ready_ok,service_tech_name,status,it_checked_out_at,it_checked_out_by_name,resolved_at').neq('status','resolved').is('resolved_at',null).limit(250)
+        if(ticketNo)batteryQuery=batteryQuery.eq('ticket_no',ticketNo)
+        const batteryResult=await batteryQuery
+        if(batteryResult.error)throw batteryResult.error
+        const batteries=Array.isArray(batteryResult.data)?batteryResult.data:[]
+
+        let spareQuery=userClient.from('prep_items').select('equipment_type,purpose,unit_tag,power_ok,functions_ok,safe_ok,verified_at,spare_outcome,spare_checked_out_at,spare_checked_out_to_name,spare_it_checked_out_at,spare_it_checked_out_by_name,prep_tickets!inner(ticket_no,work_type,status)').eq('purpose','spare').limit(250)
+        if(ticketNo)spareQuery=spareQuery.eq('prep_tickets.ticket_no',ticketNo)
+        const spareResult=await spareQuery
+        if(spareResult.error)throw spareResult.error
+        const spares=(Array.isArray(spareResult.data)?spareResult.data:[]).filter((row:any)=>!['returned','used'].includes(clean(row.spare_outcome).toLowerCase()))
+
+        const readyBatteries=batteries.filter((row:any)=>row.ready_ok===true&&Boolean(row.it_checked_out_at))
+        const standardQty=readyBatteries.filter((row:any)=>/110\s*ah/i.test(clean(row.battery_type))).reduce((sum:number,row:any)=>sum+Number(row.qty_prepared||0),0)
+        const litimeQty=readyBatteries.filter((row:any)=>/litime/i.test(clean(row.battery_type))&&/100\s*ah/i.test(clean(row.battery_type))).reduce((sum:number,row:any)=>sum+Number(row.qty_prepared||0),0)
+        const eligibleBackup=spares.filter((row:any)=>['spotter','sniper','solar spotter'].includes(clean(row.equipment_type).toLowerCase())&&row.power_ok===true&&row.functions_ok===true&&row.safe_ok===true&&Boolean(row.verified_at)&&Boolean(row.spare_it_checked_out_at)&&Boolean(row.spare_checked_out_at))
+        return {
+          ticket_no:ticketNo,batteries,spares,
+          counts:{standard_12v_110ah:standardQty,litime_12v_100ah:litimeQty,eligible_backup_units:eligibleBackup.length},
+          minimums:{standard_12v_110ah:4,litime_12v_100ah:2,eligible_backup_units:1},
+          ready:standardQty>=4&&litimeQty>=2&&eligibleBackup.length>=1,
+          rules:['Minimum 4 x charged 12V 110Ah batteries.','Minimum 2 x charged LiTime 12V 100Ah batteries.','One IT-checked-out Spotter, Sniper, or Solar Spotter backup appropriate for the day. Solar Pole is retired.','Anything not recorded is MISSING INFORMATION.']
+        } as Json
+      }
+
       if (name === 'get_company_knowledge') {
         const topic=clean(args.topic)
         const baseline=knowledgeForTopic(topic)
@@ -886,6 +920,7 @@ Deno.serve(async (req) => {
       '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
       '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
+      '- For truck readiness, departure readiness, battery minimums, or backup-unit readiness, call get_departure_readiness before answering. Never assume unrecorded equipment is on the truck.',
       '- A live needs_replacement hold means the unit is NOT available Shop Inventory. Do not say it may return to Shop Inventory through a generic path while that hold exists.',
       '- Treat Owner notification as VERIFIED DATABASE FACT only when the matching app_notifications row is present. A permanent report alone does not prove the notification row is still recorded.',
       '- The final repair/replacement disposition is MISSING INFORMATION unless a documented Cameras On Site procedure and completed outcome are present. Do not invent a repair, purchase, retirement, or return-to-shop decision.',
@@ -1013,7 +1048,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v24',
+      agent_version: 'onsite-vision-agent-v25',
       model,
       tool_trace: toolTrace,
       ...parsed,
