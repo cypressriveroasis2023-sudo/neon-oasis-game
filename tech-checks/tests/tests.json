@@ -1,8 +1,8 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v127",
-  "service_worker": "v95",
-  "generated_for": "OnSite Vision + technician shared Tech Check rule parity",
+  "runtime_version": "release-qa-v128",
+  "service_worker": "v133",
+  "generated_for": "OnSite Vision live offline escalation answers + technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
     "rule": "Do not create, claim, hand off, deploy, return, complete, cancel, or overwrite production records unless using an explicitly approved QA/test ticket and test accounts.",
@@ -2792,7 +2792,133 @@
         "No MHelpDesk record is changed"
       ],
       "manual_device": false
+    },
+    {
+      "id": "VISION-OFFLINE-LIVE-01",
+      "area": "OnSite Vision · live offline units",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision answers which units are offline now from unresolved field_escalations only",
+      "steps": [
+        "Seed rollback-only waiting_it, joint_troubleshooting, backup_swap_authorized, unresolved_owner, and resolved escalation states",
+        "Read the active escalation set as an authenticated Owner",
+        "Verify resolved_at and the active status set agree with the Owner dashboard definition",
+        "Ask Vision which units are offline now"
+      ],
+      "expected": [
+        "Only unresolved waiting_it, joint_troubleshooting, backup_swap_authorized, and unresolved_owner records are reported as currently offline",
+        "failed_unit_in_it_intake, repaired_onsite, and owner_resolved records are not reported as currently offline",
+        "Every answer is sourced from Tech Check and MHelpDesk remains separate",
+        "Rollback leaves zero QA residue"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-WAITING-IT-01",
+      "area": "OnSite Vision · waiting for IT",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision answers which offline cases are waiting for IT",
+      "steps": [
+        "Seed mixed rollback-only escalation statuses",
+        "Query the waiting_it live read path",
+        "Ask Vision which cases are waiting for IT"
+      ],
+      "expected": [
+        "Only unresolved waiting_it records are returned",
+        "Unit, ticket, site, Service technician, problem, and update context come from field_escalations when recorded",
+        "Unrecorded requested fields use MISSING INFORMATION"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-OWNER-DECISION-01",
+      "area": "OnSite Vision · Owner decision",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision answers which offline cases need an Owner decision",
+      "steps": [
+        "Seed a rollback-only unresolved_owner escalation alongside other active statuses",
+        "Query the Owner-decision live read path",
+        "Ask Vision which cases need my Owner decision"
+      ],
+      "expected": [
+        "Only unresolved_owner cases are returned",
+        "The complete recorded Service + IT context remains available",
+        "Vision does not claim any MHelpDesk change"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-TROUBLESHOOTING-01",
+      "area": "OnSite Vision · troubleshooting history",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision reports troubleshooting already attempted on a live or resolved offline-unit case",
+      "steps": [
+        "Seed rollback-only Service power verification, original problem, Service notes, and IT notes",
+        "Ask what troubleshooting has already been attempted for the unit or current ticket",
+        "Repeat with one optional field omitted"
+      ],
+      "expected": [
+        "Original problem, power verification, Service troubleshooting, and IT troubleshooting come from the escalation record",
+        "A missing recorded field is labeled MISSING INFORMATION rather than inferred",
+        "No write is performed"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-BACKUP-01",
+      "area": "OnSite Vision · backup swap",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision reports whether IT authorized a backup swap",
+      "steps": [
+        "Seed one rollback-only backup_swap_authorized record with backup unit/type/time and one case without authorization",
+        "Ask whether a backup swap was authorized for each case"
+      ],
+      "expected": [
+        "Authorized backup unit/type/time are reported only when recorded",
+        "A case without authorization is reported as having no recorded backup authorization",
+        "Vision never invents a backup unit"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-INTAKE-01",
+      "area": "OnSite Vision · failed-unit IT Intake",
+      "role": "owner",
+      "mode": "source + authenticated RLS rollback",
+      "destructive": false,
+      "scenario": "Vision reports whether the failed unit reached IT Intake after an authorized swap",
+      "steps": [
+        "Seed a rollback-only failed_unit_in_it_intake record with resolved_at set and an unresolved authorized-swap case",
+        "Ask whether the failed unit reached IT Intake for each case"
+      ],
+      "expected": [
+        "failed_unit_in_it_intake is treated as resolved and reported as having reached Service Return → IT Intake",
+        "An unresolved authorized-swap case with no linked return is reported as not yet having a linked IT Intake return",
+        "The resolved failed-unit case does not appear in the current-offline list"
+      ]
+    },
+    {
+      "id": "VISION-OFFLINE-LAST-WORKED-01",
+      "area": "OnSite Vision · Unit History",
+      "role": "owner",
+      "mode": "source + permanent history read model",
+      "destructive": false,
+      "scenario": "Vision answers who last worked on an offline-unit history using permanent Company History",
+      "steps": [
+        "Ask who last worked on a numbered unit with recorded history",
+        "Resolve the unit through get_company_history_v1",
+        "Verify the most recent attributable event is used"
+      ],
+      "expected": [
+        "The answer comes from permanent Unit History, not a guessed current assignment",
+        "Offline escalation events remain eligible history after resolution",
+        "Unknown history returns MISSING INFORMATION instead of an invented technician"
+      ]
     }
   ],
-  "last_release_qa_note": "Offline-unit escalation is now integrated into Owner Needs Attention. Active Service/IT work remains visible, unresolved cases become an Owner action, and resolution clears the active alert while preserving permanent history. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "OnSite Vision now answers live offline-unit status, waiting-for-IT, Owner-decision, troubleshooting, backup-authorization, failed-unit IT Intake, and last-worked questions from Tech Check records. Active state follows resolved_at; failed_unit_in_it_intake is resolved. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
