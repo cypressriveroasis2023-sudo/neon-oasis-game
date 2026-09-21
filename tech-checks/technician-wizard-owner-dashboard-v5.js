@@ -6668,6 +6668,8 @@ async function ownerAssignJob() {
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
   const timeInput=document.getElementById('ownerAssignTime'); if (timeInput) timeInput.value='';
   const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
+  const roleInput=document.getElementById('ownerAssignRole'); if(roleInput) roleInput.value='it';
+  const techPills=document.getElementById('ownerAssignedTechPills'); if(techPills) techPills.innerHTML='';
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
   ownerAIDispatchPrepared=false;
