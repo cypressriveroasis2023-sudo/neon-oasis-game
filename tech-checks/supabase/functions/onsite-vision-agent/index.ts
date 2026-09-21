@@ -20,6 +20,29 @@ const json = (body: unknown, status = 200) =>
 
 const clean = (value: unknown) => String(value ?? '').trim()
 const lower = (value: unknown) => clean(value).toLowerCase()
+
+const unitNumber = (value: unknown) => {
+  const digits = clean(value).match(/\d+/g)?.join('') || ''
+  return digits ? String(Number(digits)) : ''
+}
+const matchesOfflineUnit = (row: any, reference: unknown) => {
+  const ref = clean(reference)
+  if (!ref) return true
+  const refLower = lower(ref)
+  const tag = clean(row?.unit_tag)
+  const equipment = clean(row?.equipment_type)
+  const want = unitNumber(ref)
+  const got = unitNumber(tag)
+  if (want && got && want === got) {
+    const namedType = refLower
+      .replace(/[\d#._-]+/g, ' ')
+      .replace(/\b(unit|number|no)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return !namedType || lower(equipment).includes(namedType) || namedType.includes(lower(equipment))
+  }
+  return lower(equipment + ' ' + tag).includes(refLower) || lower(tag) === refLower
+}
 const todayCentral = () =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Chicago',
@@ -128,6 +151,7 @@ function knowledgeForTopic(topic: string) {
   const equipment = KNOWLEDGE?.equipment || {}
   const workflows = KNOWLEDGE?.workflows || {}
   const truckSpares = KNOWLEDGE?.truck_spares || null
+  const retiredEquipment = KNOWLEDGE?.retired_equipment || {}
   const gapInventory = KNOWLEDGE?.phase_7_gap_inventory || null
 
   // Truck-spare questions must resolve against the server-enforced spare mappings
@@ -137,6 +161,18 @@ function knowledgeForTopic(topic: string) {
       certainty: 'COMPANY RULE',
       topic: 'truck_spares',
       definition: truckSpares,
+    }
+  }
+
+  const retiredName = Object.keys(retiredEquipment).find((name) =>
+    q === lower(name) || q.includes(lower(name))
+  )
+  if (retiredName) {
+    return {
+      certainty: 'COMPANY RULE',
+      topic: 'retired_equipment',
+      retired_equipment: retiredName,
+      definition: retiredEquipment[retiredName],
     }
   }
 
@@ -319,6 +355,50 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_company_history',
+    description: 'Read the permanent Cameras On Site history for a technician, numbered unit, or customer/site. Use this for who last worked on a unit, prior problems/work at a site, or a technician work-history question.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['technician', 'unit', 'site'] },
+        value: { type: 'string', description: 'Technician name/username/user id, unit tag, or exact customer/site name.' },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      required: ['kind', 'value', 'limit'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_owner_review_queue',
+    description: 'Get the current Owner closeout queue, including jobs ready for Owner Review and jobs the Owner returned for correction. This is Tech Check only; MHelpDesk remains separate.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'get_offline_escalations',
+    description: 'Read live Tech Check offline-unit escalation records. Use for currently offline units, cases waiting for IT, cases needing an Owner decision, troubleshooting already attempted, backup-swap authorization, and whether a failed unit reached IT Intake. MHelpDesk remains separate.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['active', 'waiting_it', 'owner_decision', 'resolved', 'all'] },
+        unit_reference: { type: 'string', description: 'Optional natural unit reference such as Helios 7. Use an empty string when not filtering by unit.' },
+        ticket_no: { type: 'string', description: 'Optional MHelpDesk ticket reference. Use an empty string when not filtering by ticket.' },
+      },
+      required: ['scope', 'unit_reference', 'ticket_no'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -413,7 +493,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v20',
+        agent_version: 'onsite-vision-agent-v23',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -575,8 +655,76 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v15',
+            agent_version: 'onsite-vision-agent-v23',
           }
+        } as Json
+      }
+
+      if (name === 'get_company_history') {
+        const kind=clean(args.kind).toLowerCase()
+        const value=clean(args.value)
+        const limit=Math.max(1,Math.min(Number(args.limit||50),100))
+        const { data, error } = await userClient.rpc('get_company_history_v1', {
+          p_kind: kind,
+          p_value: value,
+          p_limit: limit,
+        })
+        if (error) throw error
+        return (data || { kind, query:value, found:false, events:[] }) as Json
+      }
+
+      if (name === 'get_owner_review_queue') {
+        const { data, error } = await userClient.rpc('owner_review_queue_v1', { p_limit: 40 })
+        if (error) throw error
+        return { reviews: Array.isArray(data) ? data : [] } as Json
+      }
+
+      if (name === 'get_offline_escalations') {
+        const scope = clean(args.scope).toLowerCase()
+        const unitReference = clean(args.unit_reference)
+        const ticketNo = clean(args.ticket_no)
+        if (!['active','waiting_it','owner_decision','resolved','all'].includes(scope)) {
+          throw new Error('Invalid offline escalation scope.')
+        }
+
+        let query = userClient
+          .from('field_escalations')
+          .select([
+            'id','ticket_no','site','unit_tag','equipment_type','service_tech_name',
+            'original_problem','service_power_verified','service_troubleshooting_notes',
+            'service_started_at','it_tech_name','it_troubleshooting_notes','status',
+            'backup_unit_tag','backup_equipment_type','backup_authorized_at',
+            'failed_return_id','owner_summary','owner_notified_at','owner_resolution',
+            'owner_resolved_by_name','owner_resolved_at','resolved_at','created_at','updated_at'
+          ].join(','))
+          .order('updated_at', { ascending: false })
+          .limit(100)
+
+        if (scope === 'active') {
+          query = query
+            .in('status', ['waiting_it','joint_troubleshooting','backup_swap_authorized','unresolved_owner'])
+            .is('resolved_at', null)
+        } else if (scope === 'waiting_it') {
+          query = query.eq('status', 'waiting_it').is('resolved_at', null)
+        } else if (scope === 'owner_decision') {
+          query = query.eq('status', 'unresolved_owner').is('resolved_at', null)
+        } else if (scope === 'resolved') {
+          query = query.not('resolved_at', 'is', null)
+        }
+        if (ticketNo) query = query.eq('ticket_no', ticketNo)
+
+        const { data, error } = await query
+        if (error) throw error
+        const escalations = (Array.isArray(data) ? data : [])
+          .filter((row: any) => matchesOfflineUnit(row, unitReference))
+
+        return {
+          scope,
+          unit_reference: unitReference,
+          ticket_no: ticketNo,
+          count: escalations.length,
+          escalations,
+          rule: 'resolved_at is authoritative for active vs resolved. failed_unit_in_it_intake is resolved because the failed-unit return has entered Service Return → IT Intake.',
         } as Json
       }
 
@@ -617,6 +765,11 @@ Deno.serve(async (req) => {
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
       '- For system health, database health, AI data integrity, security exposure, profile ambiguity, or whether Tech Check is ready for review, call get_system_health and distinguish critical integrity failures from normal workflow attention.',
       '- For questions about a named company person, employee, technician, owner, or whether someone exists in Tech Check, call find_people. This lookup includes Owner/IT/Service and active/inactive/archived profile records.',
+      '- For permanent historical questions about a technician, numbered unit, or customer/site, call get_company_history before answering. History remains available after job closeout and after equipment returns to Shop Inventory.',
+      '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
+      '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
+      '- For offline escalations, resolved_at is authoritative for active vs resolved. A failed_unit_in_it_intake record is resolved because the failed-unit return reached Service Return → IT Intake.',
+      '- If a requested offline-escalation fact was never recorded, label it MISSING INFORMATION instead of inferring it.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
       '- Product/checklist requirements returned through Company Knowledge are synchronized from the shared TechCheckRules runtime used by the technician app. Treat shared_it_checklist/shared_it_check_fields as the technician-side checklist contract.',
       '- Never substitute generic internet knowledge for undocumented Cameras On Site technical rules.',
@@ -739,7 +892,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v5',
+      agent_version: 'onsite-vision-agent-v23',
       model,
       tool_trace: toolTrace,
       ...parsed,
