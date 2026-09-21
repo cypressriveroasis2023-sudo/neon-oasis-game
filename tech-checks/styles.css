@@ -3942,6 +3942,29 @@ select {
 }
 
 
+/* Permanent company history */
+#view-owner .ownerHistorySearch{display:grid;grid-template-columns:minmax(150px,.7fr) minmax(220px,1.5fr) auto;gap:10px;align-items:end}
+#view-owner .ownerHistorySearch label{display:grid;gap:5px}
+#view-owner .ownerHistorySearch label>span{font-size:11px;font-weight:850;color:#41586b}
+#view-owner .ownerHistorySearch input,#view-owner .ownerHistorySearch select{width:100%;margin:0}
+#view-owner .ownerCompanyHistoryResults{display:grid;gap:9px;margin-top:12px}
+#view-owner .ownerCompanyHistoryHead{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border-radius:12px;background:#eef5ff;border:1px solid #bdd2ec}
+#view-owner .ownerCompanyHistoryHead span{display:block;font-size:10px;font-weight:900;letter-spacing:.08em;color:#315c86}
+#view-owner .ownerCompanyHistoryHead b{display:block;margin-top:3px;color:#172839}
+#view-owner .ownerCompanyHistoryHead strong{white-space:nowrap;color:#315c86}
+#view-owner .ownerCompanyHistoryEvent{padding:11px 12px;border:1px solid #d7e0e8;border-radius:11px;background:#fff}
+#view-owner .ownerCompanyHistoryEvent>div:first-child{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+#view-owner .ownerCompanyHistoryEvent>div:first-child b{font-size:11px;color:#193f63}
+#view-owner .ownerCompanyHistoryEvent>div:first-child span{font-size:10px;color:#647586;text-align:right}
+#view-owner .ownerCompanyHistoryEvent p{margin:6px 0 0;color:#21384b;font-size:12px;line-height:1.45}
+@media(max-width:680px){
+  #view-owner .ownerHistorySearch{grid-template-columns:1fr}
+  #view-owner .ownerHistorySearch .btn{width:100%}
+  #view-owner .ownerCompanyHistoryHead{align-items:flex-start}
+  #view-owner .ownerCompanyHistoryEvent>div:first-child{display:grid}
+  #view-owner .ownerCompanyHistoryEvent>div:first-child span{text-align:left}
+}
+
 /* Service truck load gate v122 */
 .truckLoadGate{
   margin-top:12px;
