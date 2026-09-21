@@ -1949,8 +1949,9 @@ async function transcribeVoiceBlob(blob,mimeType){
 async function voice(){
   if(voiceBusy)return;
   if(voiceRecorder?.state==='recording'){
+    voiceBusy=true;
     setVoiceStatus('Finishing…','busy');
-    try{voiceRecorder.stop();}catch{}
+    try{voiceRecorder.stop();}catch{voiceBusy=false;}
     return;
   }
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
@@ -1970,6 +1971,7 @@ async function voice(){
       stopVoiceTracks();voiceRecorder=null;voiceBusy=false;setVoiceStatus('');
     };
     voiceRecorder.onstop=async()=>{
+      voiceBusy=true;
       const blob=new Blob(voiceChunks,{type:actualType});
       voiceChunks=[];stopVoiceTracks();voiceRecorder=null;
       try{
@@ -1984,7 +1986,7 @@ async function voice(){
     voiceRecorder.start(250);
     voiceBusy=false;
     setVoiceStatus('Listening… tap the microphone again when you are done.','recording');
-    voiceStopTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording'){setVoiceStatus('Finishing…','busy');voiceRecorder.stop();}},45000);
+    voiceStopTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording'){voiceBusy=true;setVoiceStatus('Finishing…','busy');voiceRecorder.stop();}},45000);
   }catch(error){
     voiceBusy=false;stopVoiceTracks();voiceRecorder=null;setVoiceStatus('');
     if(String(error?.name||'')==='NotAllowedError'){
