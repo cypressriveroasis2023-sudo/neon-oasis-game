@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v1",
-  "description": "Owner-style language regression bank for OnSite Vision. No case may execute a write; expected action means proposed action only.",
+  "version": "onsite-vision-language-evals-v2",
+  "description": "Owner-style language regression bank for OnSite Vision, including multi-step operations orchestration. No case may execute a write; expected action means proposed action only.",
   "categories": [
     "workload",
     "workload_followup",
@@ -19,7 +19,8 @@
     "departure",
     "company_knowledge",
     "source_code",
-    "owner_correction"
+    "owner_correction",
+    "operations_snapshot"
   ],
   "cases": [
     {
@@ -499,6 +500,62 @@
       ],
       "intent": "source_code",
       "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "op01",
+      "utterance": "give me the rundown for today",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op02",
+      "utterance": "what do I need to deal with today",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op03",
+      "utterance": "what's behind right now",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op04",
+      "utterance": "how are operations looking today",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op05",
+      "utterance": "who has room to take another job today",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op06",
+      "utterance": "give me my morning ops brief",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op07",
+      "utterance": "what needs my attention and who's overloaded",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
+      "action": "none"
+    },
+    {
+      "id": "op08",
+      "utterance": "tell me everything i need to know about today",
+      "intent": "operations_snapshot",
+      "tool": "get_operations_snapshot",
       "action": "none"
     }
   ]
