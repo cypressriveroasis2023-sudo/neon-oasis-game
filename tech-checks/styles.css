@@ -4146,3 +4146,23 @@ body:has(#view-owner:not(.hidden)) .tabs{display:none!important}
 #view-owner .ownerWorkspaceRail button.ownerNavActive{background:#1c2a35!important;color:#fff!important;border-left:3px solid #e3171d!important;padding-left:9px!important}
 #view-owner .ownerWorkspaceRail button:focus-visible{outline:2px solid #4b9fca!important;outline-offset:1px!important}
 #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected{min-height:calc(100vh - 72px)!important}
+
+/* Owner module pages v165 — clean, readable application pages */
+@media(min-width:721px){
+ #view-owner .ownerWorkspaceContent{padding:0!important}
+ #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected{padding:44px 52px 64px!important}
+ #view-owner .ownerModuleHead{max-width:920px;margin:0 0 30px!important;padding:0 0 22px;border-bottom:1px solid #293844}
+ #view-owner .ownerModuleHead>span{display:block!important;margin-bottom:7px;color:#6f8799!important;font-size:11px!important;font-weight:900!important;letter-spacing:1.7px!important}
+ #view-owner .ownerModuleHead h1{margin:0!important;color:#f4f8fa!important;font-size:30px!important;line-height:1.1!important;letter-spacing:-.6px!important}
+ #view-owner .ownerModuleHead p{margin:8px 0 0!important;color:#8fa1ae!important;font-size:14px!important;line-height:1.45!important}
+ #view-owner .ownerWorkspaceContent .ownerDashBody{max-width:none!important}
+ #view-owner .ownerWorkspaceContent .ownerHistorySearch{max-width:920px!important}
+ #view-owner .ownerWorkspaceContent input,#view-owner .ownerWorkspaceContent select,#view-owner .ownerWorkspaceContent textarea{min-height:42px!important;border-radius:7px!important}
+ #view-owner .ownerWorkspaceContent .card,#view-owner .ownerWorkspaceContent .item,#view-owner .ownerWorkspaceContent .ownerFold,#view-owner .ownerWorkspaceContent details:not(.ownerDashSection){border-radius:8px!important}
+}
+@media(max-width:720px){
+ #view-owner .ownerModuleHead{margin:0 0 18px;padding:8px 0 16px;border-bottom:1px solid #293844}
+ #view-owner .ownerModuleHead>span{font-size:10px;font-weight:900;letter-spacing:1.3px;color:#6f8799}
+ #view-owner .ownerModuleHead h1{margin:5px 0 0;font-size:24px;color:#f4f8fa}
+ #view-owner .ownerModuleHead p{margin:6px 0 0;color:#8fa1ae}
+}
