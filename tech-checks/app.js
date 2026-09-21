@@ -85,7 +85,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-structural-v204')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-interactions-v206')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1855,13 +1855,11 @@ function ownerAppToday(){
 }
 function ownerAppAttention(){
   renderOwnerAttention();
-  const src=document.getElementById('ownerAttention');
-  return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+(src?.innerHTML?.trim()||ownerAppEmpty('NOTHING NEEDS YOUR ATTENTION'));
+  return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div data-owner-mount="ownerAttention"></div>';
 }
 function ownerAppReview(){
   renderOwnerReview();
-  const src=document.getElementById('ownerReviewQueue');
-  return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+(src?.innerHTML?.trim()||ownerAppEmpty('NO JOBS WAITING FOR OWNER REVIEW'));
+  return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+'<div data-owner-mount="ownerReviewQueue"></div>';
 }
 function ownerAppTeam(){
   const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
@@ -1925,8 +1923,8 @@ function ownerAppActivity(){
 }
 function ownerAppAccounts(){
   renderPasswordResetRequests();renderUsers();
-  const resets=document.getElementById('passwordResetRequests')?.innerHTML||'';
-  const users=document.getElementById('userList')?.innerHTML||'';
+  const resets='<div data-owner-mount="passwordResetRequests"></div>';
+  const users='<div data-owner-mount="userList"></div>';
   return ownerAppHeader('ACCESS','Technician Accounts','Create technician logins and manage existing access.')
     +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>'
     +'<section class="ownerAppGroup"><h2>Password Reset Requests</h2>'+resets+'</section><section class="ownerAppGroup"><h2>Current Users</h2>'+users+'</section>';
@@ -1937,20 +1935,24 @@ async function ownerAppCreateTech(){
   await createTech();ownerAppRender();
 }
 async function ownerAppAssign(){
-  if(typeof window.installOwnerAssignments==='function') await window.installOwnerAssignments(true);
-  else if(typeof installOwnerAssignments==='function') await installOwnerAssignments(true);
-  const legacy=document.getElementById('ownerJobAssignments');
-  const body=legacy?.querySelector('.ownerDashBody');
+  if(!document.getElementById('ownerAssignTicket')) {
+    if(typeof window.installOwnerAssignments==='function') await window.installOwnerAssignments(false);
+    else if(typeof installOwnerAssignments==='function') await installOwnerAssignments(false);
+  }
   return ownerAppHeader('DISPATCH','Assign Job','Create the real Tech Check assignment that matches the existing MHelpDesk ticket.')
-    +(body?.innerHTML||'<div class="ownerAppEmpty"><b>Loading the assignment form…</b></div>');
+    +'<div data-owner-mount="ownerJobAssignments"></div>';
 }
+const ownerAppMountHomes = new Map();
+let ownerAppRenderVersion = 0;
 async function ownerAppRender(){
   if(state.profile?.role!=='owner')return;
   const host=document.getElementById('ownerAppPage');if(!host)return;
-  // Keep the real assignment form alive between routes. Its production logic
-  // intentionally scopes queries to #ownerJobAssignments.
-  const mountedAssign=host.querySelector('#ownerJobAssignments');
-  if(mountedAssign) document.getElementById('ownerLegacyMounts')?.append(mountedAssign);
+  const version=++ownerAppRenderVersion;
+  const route=ownerAppRoute;
+  // Move authoritative nodes back before replacing the route, never copy IDs.
+  for(const [node,home] of ownerAppMountHomes) {
+    if(host.contains(node)) home.append(node);
+  }
   let html='';
   if(ownerAppRoute==='today')html=ownerAppToday();
   else if(ownerAppRoute==='calendar')html=ownerAppCalendar();
@@ -1963,7 +1965,14 @@ async function ownerAppRender(){
   else if(ownerAppRoute==='activity')html=ownerAppActivity();
   else if(ownerAppRoute==='accounts')html=ownerAppAccounts();
   else if(ownerAppRoute==='assign')html=await ownerAppAssign();
+  if(version!==ownerAppRenderVersion || route!==ownerAppRoute)return;
   host.innerHTML=html;
+  for(const slot of host.querySelectorAll('[data-owner-mount]')) {
+    const node=document.getElementById(slot.dataset.ownerMount);
+    if(!node)continue;
+    if(!ownerAppMountHomes.has(node))ownerAppMountHomes.set(node,node.parentElement);
+    slot.replaceWith(node);
+  }
   document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===ownerAppRoute));
   if(ownerAppRoute==='assign'){
     // Mount the COMPLETE production form, not only its inner body. Production
@@ -1972,10 +1981,6 @@ async function ownerAppRender(){
     if(legacy){
       legacy.open=true;
       legacy.classList.add('ownerAppMountedAssign');
-      const header=host.querySelector('.ownerAppPageHeader');
-      host.innerHTML='';
-      if(header)host.append(header);
-      host.append(legacy);
       legacy.removeAttribute('aria-hidden');
     }
   }
