@@ -40,7 +40,7 @@ let activeSvcPrep = null;
 let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
-let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null), load:{qty110:'',charged110:false,qtyLi:'',chargedLi:false,backup:''} };
+let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
 let serviceReturnRecovered = false;
@@ -50,7 +50,7 @@ async function deviceDraftKey(kind) { const { data:{ session } } = await liveDb.
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
 async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (!key) return null; try { const value=JSON.parse(localStorage.getItem(key)||'null'); if (!value) return null; if (Date.now()-Number(value.savedAt||0)>FIELD_DRAFT_TTL) { localStorage.removeItem(key); return null; } return value; } catch { return null; } }
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
-function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer], load:{...(inspection.load||{})} }); }
+function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer] }); }
 function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag), offlineEscalationId:serviceReturn.offlineEscalationId||null }); }
 const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
 let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
@@ -130,6 +130,10 @@ function injectStyles() {
     .wl-blue{background:linear-gradient(180deg,#e5141b,#c90910)!important;color:#fff!important;border:1px solid #b6080e!important}.wl-red{background:linear-gradient(180deg,#e5141b,#c90910)!important;color:#fff!important}.wl-gray{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important}.wl-amber{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important;border-left:4px solid #7b8b9b!important}.wl-green{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important;border-left:4px solid #2a7bc7!important}
     .wl-head{border:1px solid #d8dde2!important;background:#fff!important;border-radius:12px!important}.wl-head .kicker{color:#d20b12!important}.wl-progress span{background:#d20b12!important}
     .wl-question{border:1px solid #d8dde2!important;background:#fff!important;box-shadow:0 3px 12px rgba(0,0,0,.04)}
+    #view-it .wl-question .qtext,#view-svc .wl-question .qtext{font-size:26px!important;line-height:1.22!important;margin:12px 0 20px!important}
+    #view-it .wl-options button,#view-svc .wl-options button{min-height:70px!important;border-radius:999px!important;font-size:19px!important}
+    #view-it .wl-nav button,#view-svc .wl-nav button{min-height:62px!important;border-radius:999px!important;font-size:18px!important}
+    #view-it .wl-big,#view-svc .wl-big{border-radius:999px!important;font-size:18px!important;text-align:center!important}
     .wl-next{background:#d20b12!important}.wl-stop a,.wl-red{background:#d20b12!important}
     .wl-ticket{border:1px solid #d8dde2!important;box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .wl-issue-list{display:grid;gap:8px;margin-top:10px}.wl-issue-link{width:100%;border:1px solid #e5aaa6;border-radius:11px;background:#fff;color:#9e2119;padding:11px 12px;text-align:left;font-weight:850;cursor:pointer}.wl-issue-link:hover{background:#fff5f4}.wl-issue-link b{display:block;color:#741b15}.wl-issue-link span{display:block;font-size:12px;margin-top:2px;color:#9e2119}
@@ -672,7 +676,7 @@ function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be assigned directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
-    { kicker:'BEFORE DEPARTURE', title:'Verify the permanent truck load before leaving', body:`<p><b>Monday–Friday only:</b> complete the Truck / Trailer Inspection and physically verify the Service truck has at least <b>4 × 12V 110Ah batteries</b> and <b>2 × LiTime 12V 100Ah batteries</b>. Both battery groups must be charged. If anything is missing or not charged, replace it with a charged battery before you proceed.</p><p>Also take <b>one complete backup unit appropriate to today’s work</b>: Spotter, Sniper, or Solar Spotter. IT must properly check out that backup and you must accept it before Tech Check will let the morning check pass. If the complete backup is unused, return it through <b>IT Intake</b> at the end of the day.</p>` },
+    { kicker:'START THE DAY', title:'Truck Check → Trailer Check → Today’s Tasks', body:`<p><b>Monday–Friday only:</b> complete the Truck Check one question at a time. If you are taking a trailer, complete the Trailer Check next.</p><p>That is the complete start-day gate right now. <b>No spare unit, battery count, or spare checkout is required to pass the morning check.</b> After you submit it, go straight to <b>Today’s Tasks</b>.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
@@ -680,7 +684,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'TRUCK SPARES', title:'Resolve every truck backup after the call', body:`<p>IT may hand you a <b>BACKUP / truck spare</b> unit or extra batteries for the current MHelpDesk job. These are contingency items in case a field unit or battery is bad.</p><p>If a spare unit was <b>not used</b>, choose <b>RETURN UNUSED → IT INTAKE</b>. IT must verify it after transport before it can return to Shop Inventory. If it was used for a swap, mark it <b>USED FOR SWAP</b> and return the failed/replaced field unit through normal IT Intake. For spare batteries, enter the quantity used and Tech Check returns the remainder unused.</p>` },
     { kicker:'RETURN TO IT', title:'Return equipment to the right place', body:`<p>Most equipment coming back from the field uses <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p><b>110V Stand exception:</b> put the stand on the trailer, bring it back to the shop, and return it directly to <b>Shop Inventory</b> from Service. If the stand has no tag, choose <b>110V Stand — No Tag</b>; no tag does not block the return and IT Intake is not required.</p><p>For Helios and other solar equipment, Tech Check performs an AI-assisted OCR scan of the tag photo and compares it to the expected unit tag. A clear mismatch requires a new photo; an unreadable scan falls back to technician visual confirmation.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
-    { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY IT HANDOFF + SPARES</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RESOLVE TRUCK SPARES</b><span>→</span><b>RETURN FAILED / FIELD UNITS TO IT</b></div><p>Unused complete backup units return through IT Intake before Shop Inventory. Failed/replaced field equipment also follows Service → IT Intake.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your simple Service flow', body:`<div class='wl-help-flow'><b>TRUCK CHECK</b><span>→</span><b>TRAILER CHECK IF NEEDED</b><span>→</span><b>TODAY’S TASKS</b><span>→</span><b>VERIFY IT HANDOFF</b><span>→</span><b>SERVICE / FIELD WORK</b></div><p>Solar-panel hookup and charging verification happen on the <b>Service side after the IT → Service handoff</b>. Optional truck spares are handled only when a specific job actually has one.</p>` },
   ];
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Assign it directly to a specific IT Tech or Service Tech, or assign it to the department queue for a technician to claim.</p>` },
@@ -698,8 +702,8 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may assign a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
-    { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>From <b>Ticket Summary</b>, tap <b>Manage Truck Spares</b> to open the separate Truck Spares / Backups page when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete hardware/deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Then <b>IT must CHECK OUT the spare</b> before Service is allowed to take it. Spare batteries follow the same style: save the physically present/charged/READY quantity, then use <b>CHECK OUT SPARE BATTERIES</b>. Only after checkout does IT create the Service handoff.</p>` },
-    { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After every required check, photo, signature, and readiness item passes, create the handoff to Service.</p><p>Tech Check records the IT Tech who prepared it. The Service Tech must verify the exact units and listed parts before accepting the handoff.</p>` },
+    { kicker:'OPTIONAL SPARES', title:'Only handle a backup when the job actually needs one', body:`<p>Truck spares are <b>not part of the morning Truck / Trailer Check</b> and are not required for every Service Tech day.</p><p>If a specific job truly needs contingency equipment, use <b>Manage Truck Spares</b> for that job and follow the normal IT checkout. Otherwise, skip this completely and keep the normal IT prep → Service handoff flow simple.</p>` },
+    { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After the required <b>IT shop checks</b>, photo, signature, and readiness items pass, create the handoff to Service.</p><p><b>IT does not hook solar panels to units in the shop.</b> Service performs solar-panel / PV charging verification after receiving the IT → Service handoff. Tech Check records the IT Tech who prepared the equipment.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for tagged equipment returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help Center</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
     { kicker:'IT FLOW', title:'Your complete IT flow', body:`<div class='wl-help-flow'><b>OWNER / IT QUEUE</b><span>→</span><b>OPEN / CLAIM IT JOB</b><span>→</span><b>PULL FROM SHELF</b><span>→</span><b>TECH CHECK</b><span>→</span><b>CREATE SERVICE HANDOFF</b></div><p>Returns travel the other direction: <b>Service → IT Intake → Owner/Manager → Shelf Inventory.</b></p>` },
@@ -762,7 +766,7 @@ function helpTopicsForRole(role){
     {id:'assigned',icon:'1',title:'Start assigned IT work',desc:'Direct assignments and department-queue jobs.',body:"<p>Owner-assigned jobs appear in <b>My Work Today</b>. Direct jobs are already assigned to you. Department-queue jobs can be claimed by an IT Tech; once claimed, the Owner sees who took responsibility.</p>"},
     {id:'prep',icon:'+',title:'Start Equipment Prep',desc:'Use Owner assignment or start an on-the-fly prep when needed.',body:"<p>For an unexpected need, <b>Start New Equipment Prep</b> using the current MHelpDesk reference. This creates the Tech Check workflow only; it does not create or edit the MHelpDesk ticket.</p>"},
     {id:'deployment',icon:'✓',title:'Complete deployment checks',desc:'Pull the exact equipment and finish every required check.',body:"<p>Enter the exact unit tags and complete the required equipment-specific checks one unit at a time. Required photos, tag confirmation, signature, and readiness checks must be complete before handoff.</p>"},
-    {id:'helios',icon:'H',title:'Helios checks',desc:'Cameras, router ports, speaker, Cerbo, MPPT, SD cards, and readiness.',body:"<p>Helios requires the full equipment-specific IT checklist. Camera 1 uses ports <b>81 / 554 / 1400</b>, Camera 2 <b>81 / 554 / 1500</b>, PTZ <b>81 / 554 / 1600</b>, and IP Speaker <b>81 / 554 / 1700</b>. Verify the device and router configuration where required.</p><p>Also complete the Cerbo/VRM, MPPT, battery box, recording-before-format, three 1TB SD cards, monitoring, customer email, and final readiness checks.</p>"},
+    {id:'helios',icon:'H',title:'Helios IT checks',desc:'Cameras, router ports, speaker, Cerbo/VRM, SD cards, and shop readiness.',body:"<p>IT completes the Helios hardware, programming, ports, Cerbo/VRM, battery-box, recording, SD-card, monitoring, and customer-access checks.</p><p><b>Do not connect a solar panel or perform PV charging verification in IT.</b> Service performs the solar / yard charging check after the IT → Service handoff.</p>"},
     {id:'handoff',icon:'⇄',title:'Create the Service handoff',desc:'Finish IT and hand the verified equipment to Service.',body:"<p>After all required IT checks, photos, signatures, and readiness items pass, create the <b>Service handoff</b>. Service must open the same MHelpDesk ticket and verify the exact handed-off equipment.</p>"},
     {id:'intake',icon:'↩',title:'IT Intake & returns',desc:'Receive equipment returning from Service.',body:"<p>IT Intake shows the Service Tech, ticket, unit tag, notes, and photos. Complete every intake check, document the unit, and move it to the Owner/Manager confirmation step before shelf inventory.</p>"},
     {id:'alerts',icon:'!',title:'Phone alerts & history',desc:'Enable alerts once and review previous IT work.',body:"<p>Open <b>Menu → Phone Alerts</b> on your device to receive new-assignment alerts. Use Status & History to review prior IT work.</p>"}
@@ -1051,7 +1055,7 @@ function helpStepGuide(role, step){
         'Complete the full hardware/deploy-ready IT check, matching-tag photo, and signature for the BACKUP unit.',
         'Tap CHECK OUT SPARE after the unit is fully ready. Service cannot take it until IT checks it out.',
         'For extra Solar Spotter, Ranger, Helios, or Recon II batteries, save the READY quantity and then tap CHECK OUT SPARE BATTERIES.',
-        'Only after all spares are checked out should IT create the Service handoff.'
+        'This is optional job-specific contingency equipment. If the job has no requested backup/spare, skip this page completely.'
       ],
       selector:"[data-wl-truck-spares-it]"
     },
@@ -1060,8 +1064,8 @@ function helpStepGuide(role, step){
         'Finish every required IT equipment check.',
         'Confirm required photos, visible tag match, and IT signature are complete.',
         'Resolve every readiness issue shown by Tech Check.',
-        'If the ticket has Truck Spares, use CHECK OUT SPARE / CHECK OUT SPARE BATTERIES first.',
-        'Create the Service handoff only after all required job equipment and spares are ready and checked out.',
+        'If the specific job includes an optional Truck Spare, complete its checkout. Otherwise skip spares.',
+        'Create the Service handoff after the required IT job-equipment checks are complete.',
         'Physically hand Service the exact equipment and parts listed on the same ticket.'
       ],
       selector:'#wlItWizardOnly'
@@ -2822,7 +2826,6 @@ function itUnitStepsData(item, unitNo) {
   if (item.equipment_type === 'Ranger') {
     steps.push({ kind: 'bool', field: 'solar_mppt_updated_ok', label: `Is the MPPT firmware / configuration on ${identity} updated?` });
     steps.push({ kind: 'bool', field: 'solar_mppt_tested_ok', label: `Was the MPPT on ${identity} tested and working correctly?` });
-    steps.push({ kind: 'bool', field: 'solar_pv_charging_ok', label: `With a solar panel connected to ${identity}, did you verify the Ranger battery is charging through the MPPT?` });
   }
   if (['DELIVERY','BACKUP'].includes(item.purpose) || (['Sniper','Spotter','Recon 2','Ranger'].includes(item.equipment_type) && item.purpose === 'SWAP')) {
     steps.push({ kind: 'bool', field: 'delivery_sim_ok', label: `Is the SIM card for ${identity} active and installed in the router?` });
@@ -2866,7 +2869,7 @@ function itUnitReady(item) {
   }
   if (item.equipment_type === 'Spotter' && !(item.unit_programmed_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
   if (item.equipment_type === 'Recon 2' && !(item.unit_programmed_ok && Number(item.recon_camera_count || 0) >= 1 && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
-  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.solar_pv_charging_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
+  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
   const customerSwap = ['Sniper','Spotter','Recon 2','Ranger'].includes(item.equipment_type) && item.purpose === 'SWAP';
   if (!['DELIVERY','BACKUP'].includes(item.purpose) && !customerSwap) return true;
   const batteryReady = ['Solar Spotter','Spotter'].includes(item.equipment_type) || item.delivery_batteries_charged_ok;
@@ -3515,7 +3518,7 @@ async function showSvcHome() {
     <div class='wl-svc-command-hero'>
       <div class='wl-svc-command-kicker'>SERVICE TECH COMMAND CENTER</div>
       <h2>${esc(ownerViewingService?'Service Team':techName)} · ${esc(todayLabel)}</h2>
-      <p>Start day → verify exact MHelpDesk work → receive IT handoffs → field work → returns / troubleshooting → closeout.</p>
+      <p><b>Truck Check → Trailer Check if needed → Today’s Tasks.</b> Then open the next job and follow the simple step-by-step flow.</p>
       <div class='wl-svc-command-state ${commandTone}'><i></i><span><b>${esc(commandState)}</b><br>${esc(commandDetail)}</span></div>
     </div>
 
@@ -3541,7 +3544,7 @@ async function showSvcHome() {
     </div>
 
     <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Today / Needs Action</b><span>${commandAssignments.length} open</span></div>
+      <div class='wl-svc-command-section-head'><b>Today’s Tasks</b><span>${commandAssignments.length} open</span></div>
       ${commandAssignments.length?commandAssignments.map(assignmentCard).join(''):"<div class='ok'><b>✓ No due, overdue, or unscheduled Service jobs.</b></div>"}
     </div>
 
@@ -4114,46 +4117,38 @@ function inspectionQuestion() {
   const total = 8 + 1 + (inspection.takingTrailer === true ? 7 : 0) + 1;
   let card = document.getElementById('wlInspection'); if (!card) { card = document.createElement('div'); card.id = 'wlInspection'; card.className = 'card'; viewSvc().append(card); }
   let body = '';
-  if (inspection.step < 8) { const i = inspection.step; body = `${progress(`Truck Question ${i + 1} of 8`, truckLabels[i], i + 1, total)}<div class='wl-question'><div class='qtext'>${esc(truckLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.truck[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
-  else if (inspection.step === 8) { body = `${progress('Trailer', 'Are you taking a trailer today?', 9, total)}<div class='wl-question'><div class='qtext'>Taking a trailer today?</div><div class='wl-options'><button class='pass ${inspection.takingTrailer === false ? 'on' : ''}' data-wl-trailer='no'>NO TRAILER</button><button class='fail ${inspection.takingTrailer === true ? 'on' : ''}' data-wl-trailer='yes'>YES</button></div></div>`; }
-  else if (inspection.takingTrailer === true && inspection.step < 16) { const i = inspection.step - 9; body = `${progress(`Trailer Question ${i + 1} of 7`, trailerLabels[i], inspection.step + 1, total)}<div class='wl-question'><div class='qtext'>${esc(trailerLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.trailer[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
-  else { const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false)); const load=inspection.load||{}; const loadReady=Number(load.qty110||0)>=4&&load.charged110===true&&Number(load.qtyLi||0)>=2&&load.chargedLi===true&&['Spotter','Sniper','Solar Spotter'].includes(String(load.backup||'')); body = `${progress('Final Step', 'Verify truck load and submit to Owner', total, total)}<div class='wl-review'><b>Truck:</b> ${inspection.truck.some(v => v === false) ? 'FAILED' : 'PASS'}<br><b>Trailer:</b> ${inspection.takingTrailer === true ? (inspection.trailer.some(v => v === false) ? 'FAILED' : 'PASS') : 'Not taken'}</div>${failed ? `<div class='wl-stop'><b>FAILED ITEM — CALL OPERATIONS MANAGER</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<div class='wl-question top10'><div class='qtext'>Required batteries & backup before departure</div><div class='wl-note'>Physically verify at least 4 × 12V 110Ah batteries and 2 × LiTime 12V 100Ah batteries are on the truck and charged. Missing/not-charged batteries must be replaced first.</div><label>12V 110Ah battery count</label><input id='wlTruck110Qty' type='number' min='0' inputmode='numeric' value='${esc(load.qty110||'')}' placeholder='4 minimum'><label class='check top8'><input id='wlTruck110Charged' type='checkbox' ${load.charged110?'checked':''}><span>All required 12V 110Ah batteries physically verified charged</span></label><label>LiTime 12V 100Ah battery count</label><input id='wlTruckLiQty' type='number' min='0' inputmode='numeric' value='${esc(load.qtyLi||'')}' placeholder='2 minimum'><label class='check top8'><input id='wlTruckLiCharged' type='checkbox' ${load.chargedLi?'checked':''}><span>Both LiTime 12V 100Ah batteries physically verified charged</span></label><label>Complete backup unit appropriate to today’s work</label><select id='wlTruckBackup'><option value=''>Choose backup</option>${['Spotter','Sniper','Solar Spotter'].map(v=>`<option value='${v}' ${load.backup===v?'selected':''}>${v}</option>`).join('')}</select><div class='small top8'>Tech Check verifies the selected backup was properly checked out by IT to you.</div></div>${!loadReady?`<div class='wl-stop top10'><b>TRUCK LOAD NOT READY</b><div>Complete the battery minimum, charged verification, and backup selection before departure.</div></div>`:''}<button class='wl-big ${failed ? 'wl-red' : 'wl-green'} top10' data-wl-submit-inspection ${loadReady?'':'disabled'}>Submit Morning Inspection to Owner</button>`; }
+  if (inspection.step < 8) { const i = inspection.step; body = `${progress(`Truck Check · ${i + 1} of 8`, truckLabels[i], i + 1, total)}<div class='wl-question'><div class='qtext'>${esc(truckLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.truck[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
+  else if (inspection.step === 8) { body = `${progress('Trailer Check', 'Are you taking a trailer today?', 9, total)}<div class='wl-question'><div class='qtext'>Are you taking a trailer today?</div><div class='wl-options'><button class='pass ${inspection.takingTrailer === false ? 'on' : ''}' data-wl-trailer='no'>NO TRAILER</button><button class='pass ${inspection.takingTrailer === true ? 'on' : ''}' data-wl-trailer='yes'>YES</button></div></div>`; }
+  else if (inspection.takingTrailer === true && inspection.step < 16) { const i = inspection.step - 9; body = `${progress(`Trailer Check · ${i + 1} of 7`, trailerLabels[i], inspection.step + 1, total)}<div class='wl-question'><div class='qtext'>${esc(trailerLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.trailer[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
+  else {
+    const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false));
+    body = `${progress('Ready for Today’s Tasks', 'Review and submit', total, total)}<div class='wl-review'><b>Truck Check:</b> ${inspection.truck.some(v => v === false) ? 'FAILED' : 'PASS'}<br><b>Trailer Check:</b> ${inspection.takingTrailer === true ? (inspection.trailer.some(v => v === false) ? 'FAILED' : 'PASS') : 'Not taking a trailer'}</div>${failed ? `<div class='wl-stop'><b>FAILED ITEM — CALL OPERATIONS MANAGER</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<button class='wl-big ${failed ? 'wl-red' : 'wl-green'} top10' data-wl-submit-inspection>Submit & Show Today’s Tasks →</button>`;
+  }
   const failedNow = inspection.truck.some(v => v === false) || inspection.trailer.some(v => v === false);
   card.innerHTML = `${inspectionRecovered ? `<div class='warn wl-draft-recovered'><b>Recovered unsent inspection from this device.</b><div class='small'>Nothing was submitted while you were offline or away. Continue where you left off.</div></div>` : ''}<button class='wl-back' data-wl-home='svc'>← Service Home</button>${body}${failedNow && inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<div class='wl-stop'><b>A failed item needs immediate attention.</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<div class='wl-nav'><button class='wl-prev' data-wl-inspect-prev ${inspection.step === 0 ? 'disabled' : ''}>Back</button>${inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<button class='wl-next' data-wl-inspect-next>Next →</button>` : '<span></span>'}</div>`;
   hideChildren(viewSvc(), [card]); resetWizardPosition();
 }
-async function startInspection() { const saved=await loadDeviceDraft('inspection'); if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) { inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7), load:{qty110:saved.load?.qty110||'',charged110:saved.load?.charged110===true,qtyLi:saved.load?.qtyLi||'',chargedLi:saved.load?.chargedLi===true,backup:saved.load?.backup||''} }; while(inspection.truck.length<8) inspection.truck.push(null); while(inspection.trailer.length<7) inspection.trailer.push(null); inspectionRecovered=true; } else { inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null), load:{qty110:'',charged110:false,qtyLi:'',chargedLi:false,backup:''} }; inspectionRecovered=false; } inspectionQuestion(); }
+async function startInspection() { const saved=await loadDeviceDraft('inspection'); if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) { inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7) }; while(inspection.truck.length<8) inspection.truck.push(null); while(inspection.trailer.length<7) inspection.trailer.push(null); inspectionRecovered=true; } else { inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null) }; inspectionRecovered=false; } inspectionQuestion(); }
 async function submitInspection() {
   if (inspection.truck.some(v => v === null)) return alert('Complete every truck question.');
   if (inspection.takingTrailer === true && inspection.trailer.some(v => v === null)) return alert('Complete every trailer question.');
-  const load=inspection.load||{};
-  if (Number(load.qty110||0)<4) return alert('At least 4 × 12V 110Ah batteries are required on the Service truck.');
-  if (load.charged110!==true) return alert('Physically verify the required 12V 110Ah batteries are charged. Replace any missing/not-charged battery before proceeding.');
-  if (Number(load.qtyLi||0)<2) return alert('At least 2 × LiTime 12V 100Ah batteries are required on the Service truck.');
-  if (load.chargedLi!==true) return alert('Physically verify both LiTime 12V 100Ah batteries are charged. Replace any missing/not-charged battery before proceeding.');
-  if (!['Spotter','Sniper','Solar Spotter'].includes(String(load.backup||''))) return alert('Choose the complete backup unit appropriate to today’s work.');
-  if (!navigator.onLine) { await saveInspectionDraft(); return alert('No connection. Your inspection is saved on this device, but it has NOT been submitted to the Owner. Reconnect and tap Submit again.'); }
+  if (!navigator.onLine) { await saveInspectionDraft(); return alert('No connection. Your inspection is saved on this device, but it has NOT been submitted. Reconnect and tap Submit again.'); }
   const truck = {}; inspection.truck.forEach((v, i) => truck[`truck_${i + 1}`] = v);
   const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v);
   const text = document.getElementById('sessionClosed')?.textContent || '';
   const tickets = [...text.matchAll(/MHelpDesk Ticket\s*#([^·\s]+)/gi)].map(m => m[1]);
   document.body.classList.add('busy');
   try {
-    const { error } = await liveDb.rpc('submit_morning_check_v2', {
+    const { error } = await liveDb.rpc('submit_morning_check', {
       p_mhelp_reviewed:true,
       p_truck_checks:truck,
       p_taking_trailer:inspection.takingTrailer===true,
       p_trailer_checks:trailer,
-      p_closed_ticket_nos:tickets,
-      p_truck_12v_110ah_qty:Number(load.qty110||0),
-      p_truck_12v_110ah_charged:true,
-      p_truck_litime_12v_100ah_qty:Number(load.qtyLi||0),
-      p_truck_litime_12v_100ah_charged:true,
-      p_backup_unit_type:String(load.backup||'')
+      p_closed_ticket_nos:tickets
     });
     if (error) throw error;
     await clearDeviceDraft('inspection'); inspectionRecovered=false;
-    alert('Morning inspection and required truck load submitted to the Owner.');
+    alert('Truck / Trailer Check submitted. Next: Today’s Tasks.');
     showSvcHome();
   } catch(error) {
     await saveInspectionDraft();
@@ -4183,15 +4178,6 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     ownerAIDispatchBuild();
   }
-});
-document.addEventListener('input', e => {
-  if (e.target?.id==='wlTruck110Qty') { inspection.load.qty110=e.target.value; saveInspectionDraft(); }
-  if (e.target?.id==='wlTruckLiQty') { inspection.load.qtyLi=e.target.value; saveInspectionDraft(); }
-});
-document.addEventListener('change', e => {
-  if (e.target?.id==='wlTruck110Charged') { inspection.load.charged110=e.target.checked; saveInspectionDraft(); }
-  if (e.target?.id==='wlTruckLiCharged') { inspection.load.chargedLi=e.target.checked; saveInspectionDraft(); }
-  if (e.target?.id==='wlTruckBackup') { inspection.load.backup=e.target.value; saveInspectionDraft(); }
 });
 document.addEventListener('change', async e => {
   if (e.target.id === 'wlReturnPhoto') {
