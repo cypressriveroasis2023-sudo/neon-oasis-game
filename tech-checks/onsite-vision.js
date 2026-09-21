@@ -593,7 +593,23 @@ function renderOrder(){
   h.innerHTML='<div class="vision-context-block"><h3>'+esc(a?.site||p?.site||'No site')+'</h3><div class="vision-context-grid"><div><span>Job</span><b>'+esc(workType(rows,p).toUpperCase())+'</b></div><div><span>Schedule</span><b>'+esc(schedule(a))+'</b></div><div><span>Equipment</span><b>'+esc(units(p,a))+'</b></div><div><span>Prep</span><b>'+esc(String(p?.status||'Not linked').toUpperCase())+'</b></div></div></div><div class="vision-context-block"><h3>Assignments</h3><div class="vision-context-list">'+(list||'<div class="vision-system-note">No active assignments.</div>')+'</div></div><div class="vision-context-block"><h3>What happens next</h3><div class="vision-answer-copy">'+esc(next(ticket))+'</div><div class="vision-order-actions"><button class="primary" type="button" data-order-prompt="Who has this job?">Ask who has it</button><button type="button" data-order-prompt="Assign a Service Tech to this job">Assign Service</button><button type="button" data-order-prompt="What still needs to be done on this job?">Show remaining work</button></div></div>';
   refreshLiveOrderPanel(ticket).catch(()=>{});
 }
-function ticketFrom(text){const m=String(text||'').match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i)||String(text||'').match(/#(\d{3,})\b/);return m?.[1]||'';}
+function ticketFrom(text){
+  const raw=String(text||'');
+  const direct=raw.match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i)||raw.match(/#(\d{3,})\b/);
+  if(direct?.[1])return direct[1];
+  // Natural speech often puts the number first: "22712 job ticket".
+  const reverse=raw.match(/\b(\d{3,})\b(?=[^.\n]{0,28}\b(?:job|ticket|service\s+order|work\s+order)\b)/i);
+  if(reverse?.[1])return reverse[1];
+  // A single known Tech Check number is enough context for questions such as
+  // "What does 22712 look like?" without treating arbitrary years as tickets.
+  const numbers=[...raw.matchAll(/\b(\d{3,})\b/g)].map(m=>m[1]);
+  if(numbers.length===1){
+    const candidate=numbers[0];
+    const known=(state.jobs||[]).some(j=>String(j.ticket_no||'')===candidate)||(state.preps||[]).some(p=>String(p.ticket_no||'')===candidate);
+    if(known)return candidate;
+  }
+  return'';
+}
 function numberWords(text){const m={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};return String(text||'').replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,x=>String(m[x.toLowerCase()]||x));}
 function unitHint(text){
   const raw=numberWords(text),defs=[['Helios',/\bhelio(?:s)?\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Ranger',/\branger\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Solar Spotter',/\bsolar\s+spotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Spotter',/\bspotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Sniper',/\bsniper\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i]];
@@ -1022,7 +1038,8 @@ async function systemHealthHtml(){
 
 function personLookupName(raw){
   const text=String(raw||'').trim();
-  if(/\b(assigned|assignment|handling|has\s+it|has\s+this|service\s+order|ticket)\b/i.test(text))return'';
+  // Ticket/unit questions must never be consumed by the people-profile intent.
+  if(/\b(assigned|assignment|handling|has\s+it|has\s+this|service\s+order|ticket)\b/i.test(text)||/\b\d{3,}\b/.test(text))return'';
   const match=text.match(/^(?:who(?:'s|\s+is)|tell\s+me\s+about|what\s+does)\s+(.+?)(?:\s+do)?[?.!]*$/i);
   return match?String(match[1]||'').replace(/\b(?:at|for)\s+cameras\s+on\s+site\b.*$/i,'').trim():'';
 }
@@ -1068,13 +1085,19 @@ async function answer(text){
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
 
-  const personReply=await personLookupHtml(raw);
-  if(personReply)return personReply;
-
-  const agentReply=await serverAgentAnswer(raw);
-  if(agentReply)return agentReply;
-
+  // Resolve an explicit Tech Check ticket/unit before profile lookup or the
+  // conversational agent. This prevents a named ticket from being mistaken for
+  // a person and prevents the prior active ticket from overriding the number
+  // the Owner just typed.
   const hint=unitHint(raw);let ticket=ticketFrom(raw)||ticketByUnit(hint);
+  if(!ticket){
+    const personReply=await personLookupHtml(raw);
+    if(personReply)return personReply;
+
+    const agentReply=await serverAgentAnswer(raw);
+    if(agentReply)return agentReply;
+  }
+
   if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
   const d=dateFrom(raw);
   if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return dateJobs(d);
@@ -1103,7 +1126,7 @@ async function answer(text){
     }
     if(/\b(who\s+(?:has|is\s+assigned|is\s+handling)|who(?:'s|\s+is)\s+(?:task|assigned|handling)|assignment|assigned\s+to|who\s+has\s+it)\b/i.test(raw))return context?.found?liveWhoHtml(context):who(ticket);
     if(/\b(holding|hold(?:ing)? up|blocked|blocker|stuck|why (?:can'?t|cannot)|what.*preventing)\b/i.test(raw))return context?.found?liveBlockersHtml(context):'<div class="vision-answer-title">I could not load the full blocker context.</div>'+jobCard(ticket);
-    if(/\b(what happens next|what next|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
+    if(/\b(what happens next|what next|next steps?|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
     if(/\b(show|list|what).*(equipment|unit|units|gear)|\bwhat equipment\b/i.test(raw))return context?.found?liveEquipmentHtml(context):jobCard(ticket);
     if(/\b(show|list|see|what).*(photo|photos|picture|pictures|evidence|signature|signatures)\b/i.test(raw))return context?.found?liveEvidenceHtml(context):'<div class="vision-answer-title">No evidence context is available.</div>';
     return context?.found?'<div class="vision-answer-title">MHelpDesk #'+esc(ticket)+'</div><div class="vision-answer-copy">Here is the current Tech Check context from the live database.</div>'+liveJobCard(context):ticketAnswer(ticket,'Here is the live Tech Check side of this service order.');
