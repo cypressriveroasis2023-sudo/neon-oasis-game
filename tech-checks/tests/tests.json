@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v139",
-  "service_worker": "v151",
+  "runtime_version": "release-qa-v140",
+  "service_worker": "v154",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3567,7 +3567,108 @@
         "Department involvement can count the same shared ticket in both IT and Service",
         "IT → Service handoff remains the required transition"
       ]
+    },
+    {
+      "id": "FLOW-E2E-SWAP-01",
+      "area": "Cross-role flow · Owner → IT → Service → IT → Owner",
+      "role": "owner/it/service",
+      "mode": "authenticated rollback",
+      "destructive": false,
+      "scenario": "A standard Spotter SWAP completes the full Tech Check workflow without losing ownership between departments",
+      "steps": [
+        "Owner creates one IT and one Service assignment on the same MHelpDesk ticket",
+        "IT claims the task, creates the replacement-unit prep, completes camera programming/ports/deploy-readiness checks, photo/tag verification and signature",
+        "IT creates the Service handoff",
+        "Service claims the same ticket, verifies the handoff, records receipt evidence, records the replaced field-unit return, and completes the Service workflow",
+        "IT Intake completes the returned old unit",
+        "Owner Review becomes ready and Owner closes the Tech Check job"
+      ],
+      "expected": [
+        "IT assignment completes only after IT handoff",
+        "Service assignment becomes linked/actionable after handoff",
+        "Service completes only after SWAP return + handoff closeout",
+        "Owner Review is not ready while the old unit is still open in IT Intake",
+        "Owner closeout succeeds only after all recorded gates are complete"
+      ]
+    },
+    {
+      "id": "FLOW-SWAP-OLD-RETURN-01",
+      "area": "Cross-role flow · SWAP accountability",
+      "role": "service/it",
+      "mode": "rollback + source",
+      "destructive": false,
+      "scenario": "Replacement unit and returned old field unit remain distinct",
+      "steps": [
+        "Prepare replacement Spotter 991288",
+        "Attempt to return that same replacement unit while it is READY FOR SERVICE",
+        "Then return distinct old field unit 991287"
+      ],
+      "expected": [
+        "Tech Check blocks returning the replacement unit while its lifecycle is READY FOR SERVICE",
+        "A distinct old/failed field unit can enter Service Return → IT Intake",
+        "The SWAP closeout counts the old-unit return by required equipment type without confusing it with the replacement"
+      ]
+    },
+    {
+      "id": "FLOW-SWAP-SERVICE-STAYS-OPEN-01",
+      "area": "Service Tech · SWAP continuity",
+      "role": "service",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Recording the old SWAP unit return does not prematurely complete the Service assignment",
+      "steps": [
+        "Open an active released Spotter/Sniper/Recon II/Helios SWAP",
+        "Submit the old field-unit return",
+        "Return to the active SWAP workflow"
+      ],
+      "expected": [
+        "syncServiceAssignmentAfterReturn detects the active released SWAP prep",
+        "The return is counted but Service assignment remains open",
+        "Return confirmation says Continue active SWAP workflow",
+        "Final Service completion remains owned by close_prep_ticket or the equipment-specific field closeout"
+      ]
+    },
+    {
+      "id": "FLOW-SWAP-OWNER-REVIEW-GATE-01",
+      "area": "Owner closeout · SWAP",
+      "role": "owner",
+      "mode": "authenticated rollback",
+      "destructive": false,
+      "scenario": "Owner Review stays blocked until the replaced field unit finishes IT Intake",
+      "steps": [
+        "Complete IT → Service handoff and Service SWAP verification",
+        "Record old field unit as waiting_it",
+        "Read owner_job_closeout_summary_v1",
+        "Complete IT Intake / inventory confirmation",
+        "Read Owner Review queue and close the job"
+      ],
+      "expected": [
+        "waiting_it return keeps ready_for_owner_review=false",
+        "missing_required_swap_returns becomes zero once the old unit return is recorded",
+        "open_returns remains one until IT Intake is complete",
+        "After intake completes, Ready for Owner Review becomes true and owner_close_job_v1 succeeds"
+      ]
+    },
+    {
+      "id": "FLOW-E2E-ROLLBACK-RESIDUE-01",
+      "area": "Cross-role flow · QA safety",
+      "role": "owner",
+      "mode": "rollback",
+      "destructive": false,
+      "scenario": "End-to-end production QA leaves no test records behind",
+      "steps": [
+        "Run the full Owner → IT → Service → IT Intake → Owner closeout transaction under QA ticket 99192288",
+        "Rollback the transaction",
+        "Check assignments, preps, returns, Owner reviews, and reports"
+      ],
+      "expected": [
+        "0 assignments remain",
+        "0 prep tickets remain",
+        "0 unit returns remain",
+        "0 Owner reviews remain",
+        "0 reports remain"
+      ]
     }
   ],
-  "last_release_qa_note": "Fixed OnSite Vision workload subject stickiness shown in mobile QA. Broad questions such as How many jobs today?, How many total jobs do I have today?, and How many jobs are scheduled today? now reset prior named-technician context and return the company-wide distinct Tech Check ticket total. Questions naming both IT and Service report total tickets plus department involvement counts, while explicit referential follow-ups such as him or And tomorrow preserve the named technician. Edge agent v30 follows the same rule."
+  "last_release_qa_note": "Full rollback-safe Owner → IT → Service handoff → Service SWAP → old-unit return → IT Intake → Owner Review → Owner closeout QA passed. The test exposed and fixed a client flow bug where recording the old SWAP unit could prematurely complete the Service assignment before the active handoff/field workflow closed. Standard and Helios SWAP returns now remain fieldPending until the actual SWAP workflow completes. Replacement and returned-old-unit identity protections were verified, and rollback residue is zero."
 }
