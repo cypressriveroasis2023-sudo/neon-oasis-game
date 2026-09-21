@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-field-shell-v217-owner-contrast';
+const CACHE_NAME = 'tech-check-field-shell-v218-owner-routing';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,7 +10,7 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=owner-stability-v217', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=owner-routing-fix-v218', { cache:'reload' })),
       cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=owner-interactions-v207', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=owner-contrast-v217', { cache:'reload' })),
