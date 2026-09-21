@@ -1859,8 +1859,7 @@ function ownerAppToday(){
   return ownerAppHeader('TODAY','Today','Live Tech Check work for today — who has it, what they are doing, and what is waiting.')+summary+(body||ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'));
 }
 function ownerAppAttention(){
-  renderOwnerAttention();
-  return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div data-owner-mount="ownerAttention"></div>';
+  return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
 }
 function ownerAppReview(){
   const rows=state.ownerReviewQueue||[];
@@ -1977,7 +1976,16 @@ async function ownerAppRender(){
   // Assign Job is the one production control surface that must retain its
   // authoritative DOM node because its existing handlers are scoped to it.
   if(route==='assign' && host.querySelector('#ownerJobAssignments #ownerAssignTicket')){
-    ownerInteractionSafety();return;
+    const form=host.querySelector('#ownerJobAssignments');
+    form.open=true;
+    form.classList.add('ownerAppMountedAssign');
+    form.removeAttribute('aria-hidden');
+    form.style.display='block';
+    form.style.visibility='visible';
+    form.style.pointerEvents='auto';
+    document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute==='assign'));
+    ownerInteractionSafety();
+    return;
   }
   const mounted=host.querySelector('#ownerJobAssignments');
   // Keep the authoritative Assign Job DOM mounted when leaving the page.
@@ -2022,9 +2030,10 @@ async function ownerAppRender(){
     const form=document.getElementById('ownerJobAssignments');
     if(form){
       form.open=true;form.classList.add('ownerAppMountedAssign');
-      form.removeAttribute('aria-hidden');form.style.display='block';
+      form.removeAttribute('aria-hidden');form.style.display='block';form.style.visibility='visible';form.style.pointerEvents='auto';
     }
   }
+  if(route==='attention') renderOwnerAttention();
   ownerInteractionSafety();
 }
 async function ownerAppNavigate(route){
@@ -2044,7 +2053,18 @@ function ownerInteractionSafety(){
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');if(ws)ws.style.pointerEvents='auto';
   const form=document.getElementById('ownerJobAssignments');
   if(form&&form.closest('#ownerAppPage')){
-    form.removeAttribute('aria-hidden');form.style.pointerEvents='auto';
+    const active=ownerAppRoute==='assign';
+    if(active){
+      form.removeAttribute('aria-hidden');
+      form.style.display='block';
+      form.style.visibility='visible';
+      form.style.pointerEvents='auto';
+    }else{
+      form.setAttribute('aria-hidden','true');
+      form.style.display='none';
+      form.style.visibility='hidden';
+      form.style.pointerEvents='none';
+    }
   }
 }
 function bindOwnerAppRouter(){
