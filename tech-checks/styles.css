@@ -4617,3 +4617,104 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerJobAssignments .warn *,
 #view-owner #ownerJobAssignments .ownerReviewStep *{color:#f8fafb!important;opacity:1!important}
 
+
+
+/* Owner contrast + interaction stabilization v217
+   Keep the centered geometry. Make every Owner route readable and prevent
+   hidden preserved Assign Job DOM from ever intercepting another page. */
+#view-owner #ownerAppPage{
+  background:#081117!important;
+  color:#f7fafb!important;
+}
+#view-owner #ownerAppPage .ownerAppPageHeader h1,
+#view-owner #ownerAppPage .ownerAppGroup>h2,
+#view-owner #ownerAppPage h2,
+#view-owner #ownerAppPage h3,
+#view-owner #ownerAppPage h4,
+#view-owner #ownerAppPage label,
+#view-owner #ownerAppPage b,
+#view-owner #ownerAppPage strong{
+  color:#f7fafb!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage .ownerAppPageHeader p,
+#view-owner #ownerAppPage .small,
+#view-owner #ownerAppPage small,
+#view-owner #ownerAppPage p,
+#view-owner #ownerAppPage span{
+  color:#c2cdd3;
+}
+#view-owner #ownerAppPage .ownerAppPageHeader>span{
+  color:#ff4a50!important;
+}
+#view-owner #ownerAppPage input,
+#view-owner #ownerAppPage select,
+#view-owner #ownerAppPage textarea{
+  background:#0b171e!important;
+  color:#fff!important;
+  border:1px solid #4b6571!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage input::placeholder,
+#view-owner #ownerAppPage textarea::placeholder{
+  color:#aebcc3!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage select option{
+  background:#0b171e!important;
+  color:#fff!important;
+}
+#view-owner #ownerAppPage .ownerAppEmpty,
+#view-owner #ownerAppPage .ownerAppAccountCreate,
+#view-owner #ownerAppPage .ownerAppJobRow,
+#view-owner #ownerAppPage .ownerAppUnitRow,
+#view-owner #ownerAppPage .ownerAppHandoffRow,
+#view-owner #ownerAppPage .ownerAppTeamRow,
+#view-owner #ownerAppPage .ownerCompanyHistoryEvent,
+#view-owner #ownerAppPage .ownerCompanyHistoryHead{
+  background:#0f1b22!important;
+  border-color:#3c525d!important;
+  color:#f7fafb!important;
+}
+#view-owner #ownerAppPage .ownerCompanyHistoryEvent p,
+#view-owner #ownerAppPage .ownerCompanyHistoryEvent span,
+#view-owner #ownerAppPage .ownerCompanyHistoryHead span{
+  color:#c2cdd3!important;
+}
+#view-owner #ownerAppPage .ownerCompanyHistoryEvent b,
+#view-owner #ownerAppPage .ownerCompanyHistoryHead b,
+#view-owner #ownerAppPage .ownerCompanyHistoryHead strong{
+  color:#fff!important;
+}
+#view-owner #ownerAppPage .warn{
+  background:#251619!important;
+  border-color:#9a3b41!important;
+  color:#fff!important;
+}
+#view-owner #ownerAppPage .ok{
+  background:#111f27!important;
+  border-color:#3c525d!important;
+  color:#fff!important;
+}
+#view-owner #ownerAppPage .btn,
+#view-owner #ownerAppPage button.active,
+#view-owner #ownerAppPage button.selected,
+#view-owner #ownerAppPage button[aria-pressed="true"]{
+  background:#e31b23!important;
+  border-color:#ff4a50!important;
+  color:#fff!important;
+}
+#view-owner #ownerAppPage button:not(.btn):not(.active):not(.selected):not([aria-pressed="true"]){
+  background:#111f27;
+  border-color:#3c525d;
+  color:#f5f8f9;
+}
+#view-owner #ownerAppPage #ownerJobAssignments[aria-hidden="true"]{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+#view-owner #ownerAppPage #ownerJobAssignments.ownerAppMountedAssign{
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
