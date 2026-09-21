@@ -418,6 +418,7 @@
       <div class="ownerAppBrand"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>TECH CHECK</b><small>OWNER</small></span></div>
       <nav>
         <button type="button" data-owner-route="today">Today</button>
+        <button type="button" data-owner-route="calendar">Calendar</button>
         <button type="button" data-owner-route="attention">Needs Attention</button>
         <button type="button" data-owner-route="review">Owner Review</button>
         <button type="button" data-owner-route="assign">Assign Job</button>
@@ -456,10 +457,10 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v10"></script>
-    <script type="module" src="./app.js?v=owner-structural-v200"></script>
+    <script type="module" src="./app.js?v=owner-structural-v202"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=201', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=202', { scope: './', updateViaCache: 'none' }).catch(console.warn));
       }
     </script>
   </body>
