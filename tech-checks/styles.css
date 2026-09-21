@@ -3843,3 +3843,15 @@ select {
   #view-owner .ownerCommandQuick{grid-template-columns:repeat(2,minmax(0,1fr))}
   #view-owner .ownerCommandQuick button{min-height:46px}
 }
+
+
+/* Owner Command Center v120 — live command priorities */
+#view-owner .ownerCommandStats button.ready{border-color:#9bcfb1;background:#f3fbf6}
+#view-owner .ownerCommandStats button.ready span,#view-owner .ownerCommandStats button.ready b{color:#166b40}
+#view-owner .ownerCommandStats button{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+#view-owner .ownerCommandStats button:active,#view-owner .ownerCommandQuick button:active{transform:scale(.985)}
+#view-owner .ownerCommandQuick button{cursor:pointer}
+#view-owner .ownerCommandHero{border:1px solid rgba(255,255,255,.08)}
+@media(max-width:680px){
+  #view-owner .ownerCommandStats button small{font-size:8px;line-height:1.25}
+}
