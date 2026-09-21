@@ -613,7 +613,7 @@ function techCheckDateKey(value = new Date()) {
 function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
-    { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be sent directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
+    { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be assigned directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
@@ -624,15 +624,15 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'SERVICE FLOW', title:'Your complete Service flow', body:`<div class='wl-help-flow'><b>OWNER / SERVICE QUEUE</b><span>→</span><b>OPEN SERVICE JOB</b><span>→</span><b>VERIFY IT HANDOFF + SPARES</b><span>→</span><b>FIELD WORK</b><span>→</span><b>RESOLVE TRUCK SPARES</b><span>→</span><b>RETURN FAILED / FIELD UNITS TO IT</b></div><p>Unused truck spares return directly to Shop Inventory. Equipment that was actually in the field and comes back follows IT Intake.</p>` },
   ];
   if (role === 'owner') return [
-    { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Send it directly to a specific IT Tech or Service Tech, or send it to the department queue for a technician to claim.</p>` },
-    { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows the job's real stage, such as <b>Waiting for Tech / Sent → Claimed / In Process → Tech Check In Progress → Ready for Service → Service Verify / Solar Checkout → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
+    { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Assign it directly to a specific IT Tech or Service Tech, or assign it to the department queue for a technician to claim.</p>` },
+    { kicker:'LIVE PROGRESS', title:'See who took the task', body:`<p>The Owner dashboard shows the job's real stage, such as <b>Waiting for Tech / Assigned → Claimed / In Process → Tech Check In Progress → Ready for Service → Service Verify / Solar Checkout → Done</b>. Department jobs change from waiting to the technician’s name as soon as that person claims the task.</p>` },
     { kicker:'ROLE SEPARATION', title:'IT and Service stay separate', body:`<p><b>IT + Service</b> means IT prepares the equipment first and Service waits for the Service handoff. <b>Service + IT</b> means Service works first and IT waits for the returned equipment before Intake.</p><p><b>Pickup always starts with Service.</b> Returning equipment goes through IT Intake before shelf inventory.</p>` },
     { kicker:'TRUCK SPARES', title:'Monitor contingency equipment that is still out', body:`<p>IT can add a <b>BACKUP / Truck Spare</b> to a Service ticket without changing the customer/job equipment manifest. The Owner Equipment Handoffs area shows truck spares that Service has not resolved yet.</p><p>An <b>unused</b> spare goes directly back to Shop Inventory. A spare marked <b>USED</b> stays with the field job, while the failed/replaced field unit follows the normal Service → IT Intake → Owner/Manager inventory flow.</p>` },
     { kicker:'UNIT HISTORY', title:'Tickets close; units continue', body:`<p>Every new MHelpDesk job is a new job. Unit numbers remain universal in Tech Check so the same unit can be followed across different closed tickets.</p>` },
   ];
   return [
     { kicker:'WELCOME', title:'IT Tech · How Tech Check Works', body:`<p>Tech Check is your equipment-prep and intake workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Owner-assigned work is the normal flow, but IT can still create an <b>on-the-fly Equipment Prep</b> when the job requires it.</p>` },
-    { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may send a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
+    { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may assign a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
     { kicker:'TRUCK SPARES', title:'Add a ready-to-deploy truck backup when needed', body:`<p>From <b>Ticket Summary</b>, tap <b>Manage Truck Spares</b> to open the separate Truck Spares / Backups page when Service needs contingency equipment for the call. A BACKUP unit is separate from the customer/job equipment manifest, but stays tied to the same MHelpDesk reference.</p><p>Run the complete hardware/deploy-ready IT check on the spare unit, including the required photo/signature and equipment-specific programming. Then <b>IT must CHECK OUT the spare</b> before Service is allowed to take it. Spare batteries follow the same style: save the physically present/charged/READY quantity, then use <b>CHECK OUT SPARE BATTERIES</b>. Only after checkout does IT create the Service handoff.</p>` },
@@ -4339,8 +4339,8 @@ function assignmentNeedsServiceSolar(a, prep) {
 function ownerAssignmentProgress(a, prep, solarCheck=null) {
   const roleLabel=a.assigned_role==='it'?'IT':'SERVICE';
   if(a.status==='completed'||prep?.status==='closed')return {step:5,label:'DONE',detail:roleLabel+' task completed'};
-  if(!a.assignee_user_id&&a.assignment_scope==='department')return {step:1,label:'WAITING FOR '+roleLabel+' TECH',detail:'Sent to the '+(a.assigned_role==='it'?'IT Department':'Service Department')+' queue'};
-  if(a.status==='assigned')return {step:1,label:'SENT',detail:'Waiting for '+a.assignee_name+' to start'};
+  if(!a.assignee_user_id&&a.assignment_scope==='department')return {step:1,label:'WAITING FOR '+roleLabel+' TECH',detail:'Assigned to the '+(a.assigned_role==='it'?'IT Department':'Service Department')+' queue'};
+  if(a.status==='assigned')return {step:1,label:'ASSIGNED',detail:'Waiting for '+a.assignee_name+' to start'};
   if(a.assigned_role==='service'&&prep?.status==='released'&&prepHasHeliosField(prep)){
     if(solarCheck?.helios_field_completed_at&&!solarCheck?.helios_owner_verified_at)return {step:4,label:'WAITING OWNER FINAL VERIFY',detail:'Service submitted the Helios field installation, photos, and signature'};
     if(solarCheck?.handoff_accepted_at)return {step:4,label:'HELIOS FIELD INSTALL IN PROGRESS',detail:'Service accepted the IT handoff; field installation is still open'};
@@ -4634,10 +4634,10 @@ async function installOwnerAssignments(force = false) {
         <div class='wl-requirement-section'><div class='wl-requirement-heading'>Parts / Supplies</div>${ticketPartsInputsHtml('ownerPart')}</div>
       </div>
       <div class='grid top10'>
-        <div><label>Send Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
+        <div><label>Assign Ticket To</label><select id='ownerAssignRole'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select></div>
         <div><label>Assign Technician(s)</label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small'>Choose one tech, tap +, then add another if needed. Leave blank for the department queue.</div></div>
       </div>
-      <div id='ownerAIReviewBox' class='wl-ai-panel hidden top10'></div><div class='owner-ai-actions'><button type='button' class='btn wl-ai-review-btn' data-owner-ai-review>✨ AI Review Before Sending</button><button class='btn ownerDispatchButton' data-wl-owner-assign>Send Tech Check Job</button></div>
+      <div id='ownerAIReviewBox' class='wl-ai-panel hidden top10'></div><div class='owner-ai-actions'><button type='button' class='btn wl-ai-review-btn' data-owner-ai-review>✨ AI Review Before Assigning</button><button class='btn ownerDispatchButton' data-wl-owner-assign>Assign Tech Check Job</button></div>
     </div>`;
 
   liveHost.innerHTML = `
@@ -4768,7 +4768,7 @@ function refreshOwnerAssignmentTechOptions() {
   } else {
     select.disabled = false;
     select.innerHTML = ownerAssignmentTechOptions(role);
-    if (hint) hint.textContent = `Select one or more ${role === 'it' ? 'IT' : 'Service'} technicians. Leave all unselected to send it to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
+    if (hint) hint.textContent = `Select one or more ${role === 'it' ? 'IT' : 'Service'} technicians. Leave all unselected to assign it to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
   }
   document.getElementById('ownerAssignParts')?.classList.remove('hidden');
   refreshOwnerWorkTypeLabels();
@@ -4883,7 +4883,7 @@ function ensureOwnerCommandCenter(){
     card=document.createElement('section');
     card.id='ownerCommandCenter';
     card.className='ownerCommandCenter';
-    card.innerHTML=`<div class="ownerCommandHero"><div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div><a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a></div><div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite"><button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>open Tech Check jobs</small></button><button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions & issues</small></button><button type="button" data-owner-command="review"><span>Ready for My Review</span><b>—</b><small>completed work awaiting Owner review</small></button><button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>loading live readiness…</small></button></div><div class="ownerCommandQuick"><button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button></div>`;
+    card.innerHTML=`<div class="ownerCommandHero"><div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div><a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a></div><div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite"><button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>open Tech Check jobs</small></button><button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions & issues</small></button><button type="button" data-owner-command="review"><span>Ready for My Review</span><b>—</b><small>completed work awaiting Owner review</small></button><button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>loading live readiness…</small></button></div><div class="ownerCommandQuick"><button type="button" data-owner-command="assign">+ Assign Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button></div>`;
     view.prepend(card);
   }
   if(!card.dataset.commandBound){
@@ -5700,7 +5700,7 @@ function ownerAIReview(){
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
   if(!a.site)issues.push('Customer / Site is blank.');
   if(!a.job_description)issues.push('Job description is missing.');
-  if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Send it to Service or Service + IT.');
+  if(type==='pickup'&&role==='it')issues.push('Pickup cannot start with IT. Assign it to Service or Service + IT.');
   if(type==='pickup'&&role==='it_service')issues.push('Pickup will be forced to Service first, then IT Intake.');
   if((role==='it'||dual)&&!x.equipment.length)issues.push('IT is included but no equipment quantity is listed.');
   const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean),
@@ -5745,12 +5745,12 @@ async function ownerAssignJob() {
     const missing=ownerAIDispatchMissing(ownerAIDispatchLastParse||{});
     if (missing.length) {
       ownerAIDispatchRender(ownerAIDispatchLastParse||{warnings:[]});
-      return alert("AI Dispatch still needs: " + missing.join(", ") + ". Nothing was sent.");
+      return alert("AI Dispatch still needs: " + missing.join(", ") + ". Nothing was assigned.");
     }
     const eq=normalizedEquipmentManifest(equipmentManifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ") || "No equipment";
     const flow=role==="it_service"?"IT → Service":role==="service_it"?"Service → IT":role==="it"?"IT only":"Service only";
     const techNames=assignees.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
-    const confirmText="ONSITE VISION CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date/time: "+ownerAIScheduleText(scheduledFor,scheduledTime)+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nSend this Tech Check job?";
+    const confirmText="ONSITE VISION CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date/time: "+ownerAIScheduleText(scheduledFor,scheduledTime)+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nAssign this Tech Check job?";
     if (!confirm(confirmText)) return;
   }
 
@@ -5817,7 +5817,7 @@ async function ownerAssignJob() {
   ownerAIDispatchLastParse=null;
   await installOwnerAssignments(true);
   const target = (role === 'it_service' || role === 'service_it') ? (workType === 'pickup' || role === 'service_it' ? 'Service first, then IT Intake' : 'IT first, then Service') : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
-  alert('Sent to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
+  alert('Assigned to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
   if (!activeItPrep?.id) return;
