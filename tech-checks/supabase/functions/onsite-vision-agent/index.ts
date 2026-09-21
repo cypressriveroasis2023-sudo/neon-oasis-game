@@ -399,6 +399,22 @@ const tools = [
   },
   {
     type: 'function',
+    name: 'get_damage_holds',
+    description: 'Read live Tech Check damaged-equipment / Needs Replacement return records. Use for equipment needing replacement or repair attention, IT damage documentation, Owner damage notification evidence, Maintenance/Shop Inventory status, and whether a damaged unit can return to Shop Inventory. MHelpDesk remains separate.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['active', 'all'] },
+        unit_reference: { type: 'string', description: 'Optional natural unit reference. Use an empty string when not filtering by unit.' },
+        ticket_no: { type: 'string', description: 'Optional MHelpDesk ticket reference. Use an empty string when not filtering by ticket.' },
+      },
+      required: ['scope', 'unit_reference', 'ticket_no'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
     name: 'get_company_knowledge',
     description: 'Read verified Cameras On Site product, workflow, configuration, checklist, battery, port, handoff, or troubleshooting knowledge. Never substitute generic internet knowledge for this tool.',
     strict: true,
@@ -493,7 +509,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v23',
+        agent_version: 'onsite-vision-agent-v24',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -655,7 +671,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v23',
+            agent_version: 'onsite-vision-agent-v24',
           }
         } as Json
       }
@@ -728,6 +744,107 @@ Deno.serve(async (req) => {
         } as Json
       }
 
+      if (name === 'get_damage_holds') {
+        const scope = clean(args.scope).toLowerCase()
+        const unitReference = clean(args.unit_reference)
+        const ticketNo = clean(args.ticket_no)
+        if (!['active','all'].includes(scope)) throw new Error('Invalid damage-hold scope.')
+
+        let query = userClient
+          .from('unit_returns')
+          .select([
+            'id','ticket_no','unit_tag','equipment_type','service_tech_name','returned_at','return_notes',
+            'status','it_tech_name','it_received_at','physical_condition_ok','accessories_ok','batteries_ok',
+            'sd_cards_ok','electronics_ok','power_functions_ok','damage_notes','intake_photo_paths',
+            'mhelp_inventory_confirmed','mhelp_confirmed_at','completed_at','created_at','updated_at'
+          ].join(','))
+          .order('updated_at', { ascending: false })
+          .limit(100)
+
+        if (scope === 'active') query = query.eq('status', 'needs_replacement')
+        else query = query.not('damage_notes', 'is', null)
+        if (ticketNo) query = query.eq('ticket_no', ticketNo)
+
+        const { data, error } = await query
+        if (error) throw error
+        const returns = (Array.isArray(data) ? data : [])
+          .filter((row: any) => matchesOfflineUnit(row, unitReference))
+
+        const tickets = [...new Set(returns.map((row: any) => clean(row.ticket_no)).filter(Boolean))]
+        const tags = [...new Set(returns.map((row: any) => clean(row.unit_tag)).filter(Boolean))]
+        let assets: any[] = []
+        let notifications: any[] = []
+        let reports: any[] = []
+
+        if (tags.length) {
+          const assetResult = await userClient
+            .from('asset_inventory')
+            .select('unit_key,unit_tag,asset_type,availability_status,last_event,notes,updated_at')
+            .in('unit_tag', tags)
+            .limit(Math.max(20, tags.length * 3))
+          if (assetResult.error) throw assetResult.error
+          assets = Array.isArray(assetResult.data) ? assetResult.data : []
+        }
+
+        if (tickets.length) {
+          const notificationResult = await userClient
+            .from('app_notifications')
+            .select('id,recipient_user_id,kind,title,ticket_no,unit_tag,read_at,created_at')
+            .eq('title', 'Damaged equipment needs replacement')
+            .in('ticket_no', tickets)
+            .order('created_at', { ascending: false })
+            .limit(250)
+          if (notificationResult.error) throw notificationResult.error
+          notifications = Array.isArray(notificationResult.data) ? notificationResult.data : []
+
+          const reportResult = await userClient
+            .from('reports')
+            .select('id,kind,ticket_no,actor_name,text,created_at')
+            .eq('kind', 'DAMAGED EQUIPMENT NEEDS REPLACEMENT')
+            .in('ticket_no', tickets)
+            .order('created_at', { ascending: false })
+            .limit(250)
+          if (reportResult.error) throw reportResult.error
+          reports = Array.isArray(reportResult.data) ? reportResult.data : []
+        }
+
+        const damageHolds = returns.map((row: any) => {
+          const tag = clean(row.unit_tag)
+          const ticket = clean(row.ticket_no)
+          const asset = assets.find((a: any) => clean(a.unit_tag) === tag) || null
+          const rowNotifications = notifications.filter((n: any) =>
+            clean(n.ticket_no) === ticket &&
+            (!tag || !clean(n.unit_tag) || clean(n.unit_tag) === tag)
+          )
+          const rowReports = reports.filter((r: any) => clean(r.ticket_no) === ticket)
+          return {
+            ...row,
+            asset_inventory_status: asset?.availability_status || null,
+            asset_last_event: asset?.last_event || null,
+            owner_notified: rowNotifications.length > 0,
+            owner_notification_count: rowNotifications.length,
+            owner_notification_latest_at: rowNotifications[0]?.created_at || null,
+            permanent_damage_report_present: rowReports.length > 0,
+            permanent_damage_report_at: rowReports[0]?.created_at || null,
+            shop_inventory_blocked: row.status === 'needs_replacement',
+          }
+        })
+
+        return {
+          scope,
+          unit_reference: unitReference,
+          ticket_no: ticketNo,
+          count: damageHolds.length,
+          damage_holds: damageHolds,
+          rules: [
+            'A needs_replacement return is held out of available Shop Inventory.',
+            'Owner notification is VERIFIED DATABASE FACT only when a matching app_notifications record is present.',
+            'The permanent damage report does not substitute for missing notification evidence.',
+            'The normal final repair/replacement disposition remains MISSING INFORMATION until Cameras On Site defines and completes that procedure.'
+          ],
+        } as Json
+      }
+
       if (name === 'get_company_knowledge') {
         const topic=clean(args.topic)
         const baseline=knowledgeForTopic(topic)
@@ -768,6 +885,10 @@ Deno.serve(async (req) => {
       '- For permanent historical questions about a technician, numbered unit, or customer/site, call get_company_history before answering. History remains available after job closeout and after equipment returns to Shop Inventory.',
       '- For Ready for Owner Review, Owner closeout, or returned-for-correction questions, call get_owner_review_queue before answering. Do not claim MHelpDesk was closed or changed.',
       '- For offline-unit questions, cases waiting for IT, Owner decisions on offline cases, troubleshooting already attempted, backup swap authorization, or whether a failed unit reached IT Intake, call get_offline_escalations before answering.',
+      '- For damaged equipment, Needs Replacement holds, IT damage notes, Owner damage-notification evidence, Maintenance status, or Shop Inventory eligibility after damage, call get_damage_holds before answering.',
+      '- A live needs_replacement hold means the unit is NOT available Shop Inventory. Do not say it may return to Shop Inventory through a generic path while that hold exists.',
+      '- Treat Owner notification as VERIFIED DATABASE FACT only when the matching app_notifications row is present. A permanent report alone does not prove the notification row is still recorded.',
+      '- The final repair/replacement disposition is MISSING INFORMATION unless a documented Cameras On Site procedure and completed outcome are present. Do not invent a repair, purchase, retirement, or return-to-shop decision.',
       '- For offline escalations, resolved_at is authoritative for active vs resolved. A failed_unit_in_it_intake record is resolved because the failed-unit return reached Service Return → IT Intake.',
       '- If a requested offline-escalation fact was never recorded, label it MISSING INFORMATION instead of inferring it.',
       '- For technical product configuration, required checks, batteries, ports, workflow rules, or troubleshooting, call get_company_knowledge before answering.',
@@ -892,7 +1013,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v23',
+      agent_version: 'onsite-vision-agent-v24',
       model,
       tool_trace: toolTrace,
       ...parsed,
