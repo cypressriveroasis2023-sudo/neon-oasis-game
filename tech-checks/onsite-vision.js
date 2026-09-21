@@ -653,15 +653,30 @@ function workloadIntent(text){
   const date=dateFrom(raw)||dayKey(new Date());
   return{date,role:tech?.role||role,tech};
 }
-function workloadHtml(intent){
+async function workloadHtml(intent){
   if(!intent)return'';
+  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
+  const label=dateLabel(intent.date),today=intent.date===dayKey(new Date());
+  const layer=visionLiveData();
+  if(layer?.getWorkload){
+    const live=await layer.getWorkload({
+      date:intent.date,
+      role:intent.role||'',
+      tech_id:intent.tech?.user_id||'',
+      tech_name:intent.tech&&!intent.tech?.user_id?(intent.tech.full_name||intent.tech.username||''):''
+    },{force:true});
+    const tickets=Array.isArray(live?.tickets)?live.tickets:[];
+    if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(today?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">I checked the live Tech Check assignments. MHelpDesk remains separate.</div>';
+    if(tickets.length===1){state.currentTicket=tickets[0];const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);}
+    return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(today?'today':'on '+esc(label))+'.</div>'
+      +'<div class="vision-answer-copy">I checked the live Tech Check assignments. MHelpDesk remains separate.</div>'
+      +tickets.slice(0,12).map(ticket=>jobCard(ticket)).join('');
+  }
   const rows=state.jobs.filter(j=>{
-    if(j.status==='completed'||String(j.scheduled_for||'')!==String(intent.date))return false;
+    if(j.status==='completed'||j.status==='cancelled'||String(j.scheduled_for||'')!==String(intent.date))return false;
     if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
     if(intent.tech){
-      const uid=String(intent.tech.user_id||'');
-      const rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||'');
-      const rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
+      const uid=String(intent.tech.user_id||''),rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||''),rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
       const names=[intent.tech.full_name,intent.tech.username].filter(Boolean).map(v=>String(v).trim().toLowerCase());
       if(uid&&rowUid)return rowUid===uid;
       return names.includes(rowName);
@@ -669,18 +684,7 @@ function workloadHtml(intent){
     return true;
   });
   const tickets=[...new Set(rows.map(j=>String(j.ticket_no||'')).filter(Boolean))];
-  const subject=intent.tech
-    ?(intent.tech.full_name||intent.tech.username||'That technician')
-    :(intent.role==='it'?'IT':'Service');
-  const label=dateLabel(intent.date);
-  if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(intent.date===dayKey(new Date())?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">That answer came from the live Tech Check schedule. MHelpDesk remains separate.</div>';
-  if(tickets.length===1){
-    state.currentTicket=tickets[0];
-    const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);
-  }
-  return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(intent.date===dayKey(new Date())?'today':'on '+esc(label))+'.</div>'
-    +'<div class="vision-answer-copy">I pulled the live Tech Check assignments. MHelpDesk remains separate.</div>'
-    +tickets.slice(0,12).map(jobCard).join('');
+  return tickets.length?'<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+(today?'today':'on '+esc(label))+'.</div><div class="vision-answer-copy">Live-query support was unavailable, so I used the currently loaded Tech Check assignments. MHelpDesk remains separate.</div>'+tickets.slice(0,12).map(jobCard).join(''):'<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+(today?'today':'on '+esc(label))+'.</div>';
 }
 function findTech(text,role=''){
   const s=String(text||'').toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role),exact=pool.find(t=>[t.full_name,t.username].filter(Boolean).some(v=>s.includes(String(v).toLowerCase())));if(exact)return exact;
