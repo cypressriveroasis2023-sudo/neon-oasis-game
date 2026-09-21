@@ -4510,30 +4510,44 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerJobAssignments .wl-equipment-number-block label{color:#dce5e9!important}
 
 
-/* Owner desktop centered workspace + contrast v214 */
+/* Owner desktop workspace geometry + readability — consolidated
+   The sidebar is 224px. Center the WORKING COLUMN against the full browser
+   viewport, not against the post-sidebar remainder. This replaces the v214/v215
+   override stack so every Owner route shares one real container geometry. */
 @media (min-width:900px){
-  #view-owner #ownerApp .ownerAppWorkspace{min-width:0!important}
+  #view-owner #ownerApp .ownerAppWorkspace{
+    min-width:0!important;
+    overflow:auto!important;
+  }
   #view-owner #ownerApp #ownerAppPage{
+    --owner-column-width:min(calc(100vw - 520px),1180px);
+    width:var(--owner-column-width)!important;
+    max-width:1180px!important;
+    min-height:100%!important;
+    padding:34px 0 70px!important;
+    margin-left:max(32px,calc(50vw - 224px - (var(--owner-column-width) / 2)))!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+    position:relative!important;
+    z-index:0!important;
+  }
+  #view-owner #ownerAppPage>.ownerAppPageHeader,
+  #view-owner #ownerAppPage>.ownerAppPageHead,
+  #view-owner #ownerAppPage>.ownerAppPageBody,
+  #view-owner #ownerAppPage>.ownerAppPageContent,
+  #view-owner #ownerAppPage>.ownerAppGroup,
+  #view-owner #ownerAppPage>#ownerJobAssignments,
+  #view-owner #ownerAppPage>.ownerAppEmpty{
     width:100%!important;
     max-width:none!important;
-    padding-left:clamp(28px,4vw,76px)!important;
-    padding-right:clamp(28px,4vw,76px)!important;
-    box-sizing:border-box!important
-  }
-  #view-owner #ownerAppPage>.ownerAppPageHead,
-  #view-owner #ownerAppPage>#ownerJobAssignments,
-  #view-owner #ownerAppPage>.ownerAppPageBody,
-  #view-owner #ownerAppPage>.ownerAppPageContent{
-    width:min(100%,1280px)!important;
-    max-width:1280px!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-    box-sizing:border-box!important
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
   }
   #view-owner #ownerJobAssignments .ownerDashBody>*{
     max-width:none!important;
     width:100%!important;
-    box-sizing:border-box!important
+    box-sizing:border-box!important;
   }
 }
 #view-owner{
@@ -4543,7 +4557,8 @@ body.busy #view-owner{pointer-events:auto!important}
  --oa-line:#38505c!important;
  --oa-text:#f7fafb!important;
  --oa-muted:#b7c3c9!important;
- --oa-red:#e31b23!important
+ --oa-red:#e31b23!important;
+ --oa-blue:#e31b23!important
 }
 #view-owner #ownerAppPage,
 #view-owner #ownerJobAssignments{background:var(--oa-bg)!important;color:var(--oa-text)!important}
@@ -4602,22 +4617,3 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner #ownerJobAssignments .warn *,
 #view-owner #ownerJobAssignments .ownerReviewStep *{color:#f8fafb!important;opacity:1!important}
 
-
-/* Owner true-center desktop workspace v215
-   Center the working column in the full desktop viewport, not merely in the
-   remaining area beside the left rail. Keep the fixed navigation untouched. */
-@media (min-width:900px){
-  #view-owner #ownerApp #ownerAppPage{
-    padding-left:0!important;
-    padding-right:0!important
-  }
-  #view-owner #ownerAppPage>.ownerAppPageHead,
-  #view-owner #ownerAppPage>#ownerJobAssignments,
-  #view-owner #ownerAppPage>.ownerAppPageBody,
-  #view-owner #ownerAppPage>.ownerAppPageContent{
-    width:min(calc(100vw - 420px),1280px)!important;
-    max-width:1280px!important;
-    margin-left:auto!important;
-    margin-right:auto!important
-  }
-}
