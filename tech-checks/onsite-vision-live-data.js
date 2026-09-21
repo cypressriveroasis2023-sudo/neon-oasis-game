@@ -8,6 +8,8 @@
   const cache=new Map();
   const historyCache=new Map();
   const reviewCache={at:0,value:null};
+  const escalationCache=new Map();
+  const ACTIVE_ESCALATION_STATUSES=['waiting_it','joint_troubleshooting','backup_swap_authorized','failed_unit_in_it_intake','unresolved_owner'];
   const TTL_MS=15000;
 
   function configure(supabaseClient){
@@ -16,6 +18,25 @@
   }
 
   function key(ticket){ return String(ticket??'').trim(); }
+  function unitNumber(value){
+    const digits=String(value??'').match(/\d+/g)?.join('')||'';
+    return digits?String(Number(digits)):'';
+  }
+  function matchesUnit(row,reference){
+    const ref=String(reference||'').trim();
+    if(!ref)return true;
+    const refLower=ref.toLowerCase();
+    const tag=String(row?.unit_tag||'').trim();
+    const equipment=String(row?.equipment_type||'').trim();
+    const combined=(equipment+' '+tag).toLowerCase();
+    const want=unitNumber(ref);
+    const got=unitNumber(tag);
+    if(want&&got&&want===got){
+      const namedType=refLower.replace(/[\d#._-]+/g,' ').replace(/\b(unit|number|no)\b/g,' ').replace(/\s+/g,' ').trim();
+      return !namedType || equipment.toLowerCase().includes(namedType) || namedType.includes(equipment.toLowerCase());
+    }
+    return combined.includes(refLower)||tag.toLowerCase()===refLower;
+  }
 
   async function getJobContext(ticket,options={}){
     const k=key(ticket);
@@ -66,6 +87,40 @@
     return reviewCache.value;
   }
 
+
+  async function getOfflineEscalations(filters={},options={}){
+    if(!client) throw new Error('OnSite Vision live data is not configured.');
+    const scope=String(filters.scope||'active').trim().toLowerCase();
+    const unitReference=String(filters.unit_reference||'').trim();
+    const limit=Math.max(1,Math.min(Number(options.limit||100),250));
+    const force=Boolean(options.force);
+    const cacheKey=JSON.stringify({scope,unitReference:unitReference.toLowerCase(),limit});
+    const cached=escalationCache.get(cacheKey);
+    if(!force&&cached&&(Date.now()-cached.at)<TTL_MS)return cached.value;
+
+    let statuses=[];
+    if(scope==='active')statuses=ACTIVE_ESCALATION_STATUSES;
+    else if(scope==='waiting_it')statuses=['waiting_it'];
+    else if(scope==='owner_decision')statuses=['unresolved_owner'];
+    else if(scope==='resolved')statuses=['repaired_onsite','owner_resolved'];
+    else if(scope!=='all')throw new Error('Offline escalation scope must be active, waiting_it, owner_decision, resolved, or all.');
+
+    let query=client.from('field_escalations').select([
+      'id','ticket_no','site','unit_tag','equipment_type','service_tech_name','original_problem',
+      'service_power_verified','service_troubleshooting_notes','service_started_at','it_tech_name',
+      'it_troubleshooting_notes','status','backup_unit_tag','backup_equipment_type','backup_authorized_at',
+      'failed_return_id','owner_summary','owner_notified_at','owner_resolution','owner_resolved_by_name',
+      'owner_resolved_at','resolved_at','created_at','updated_at'
+    ].join(',')).order('updated_at',{ascending:false}).limit(limit);
+    if(statuses.length)query=query.in('status',statuses);
+    const response=await query;
+    if(response.error)throw response.error;
+    const rows=(Array.isArray(response.data)?response.data:[]).filter(row=>matchesUnit(row,unitReference));
+    const value={scope,unit_reference:unitReference,count:rows.length,rows};
+    escalationCache.set(cacheKey,{at:Date.now(),value});
+    return value;
+  }
+
   function prime(context){
     const k=key(context?.ticket_no);
     if(k) cache.set(k,{at:Date.now(),value:context});
@@ -82,6 +137,7 @@
     historyCache.clear();
     reviewCache.at=0;
     reviewCache.value=null;
+    escalationCache.clear();
   }
 
   function forWorkflowEngine(context){
@@ -117,11 +173,12 @@
   }
 
   const api=Object.freeze({
-    version:'live-data-v2',
+    version:'live-data-v3',
     configure,
     getJobContext,
     getCompanyHistory,
     getOwnerReviewQueue,
+    getOfflineEscalations,
     prime,
     invalidate,
     invalidateAll,
