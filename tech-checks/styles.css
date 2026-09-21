@@ -4331,3 +4331,11 @@ body.busy #view-owner{pointer-events:auto!important}
 #view-owner .ownerAppSidebar{z-index:70!important}
 #view-owner .ownerAppWorkspace{position:relative;z-index:1}
 #view-owner .ownerAppPage{position:relative;z-index:2}
+
+/* Owner workspace isolation v208 */
+#view-owner>#ownerLegacyMounts,
+#view-owner .ownerLegacyMounts{display:none!important;visibility:hidden!important;position:absolute!important;inset:auto!important;width:0!important;height:0!important;overflow:hidden!important;pointer-events:none!important;z-index:-1!important}
+#view-owner #ownerApp{display:grid!important;visibility:visible!important;pointer-events:auto!important}
+#view-owner #ownerApp .ownerAppWorkspace,
+#view-owner #ownerApp #ownerAppPage{visibility:visible!important;pointer-events:auto!important}
+#view-owner #ownerAppPage>#ownerJobAssignments.ownerAppMountedAssign{display:block!important;visibility:visible!important;position:static!important;width:100%!important;height:auto!important;overflow:visible!important;pointer-events:auto!important;z-index:auto!important}
