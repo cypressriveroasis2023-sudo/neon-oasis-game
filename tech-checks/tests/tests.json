@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
-  "runtime_version": "release-qa-v137",
-  "service_worker": "v147",
+  "runtime_version": "release-qa-v138",
+  "service_worker": "v148",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3391,7 +3391,95 @@
         "Service troubleshooting waiting on IT is counted",
         "Released handoffs with Service and Owner/MHelpDesk inventory confirmation do not falsely block IT closeout"
       ]
+    },
+    {
+      "id": "TECH-DASHBOARD-NOFREEZE-SERVICE-01",
+      "area": "Service Tech · command center reliability",
+      "role": "service",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Service dashboard renders immediately and cannot be held hostage by one slow data source",
+      "steps": [
+        "Open Service Tech dashboard",
+        "Observe loading shell before live queries finish",
+        "Allow one live query to fail or exceed the dashboard timeout"
+      ],
+      "expected": [
+        "Loading feedback renders immediately",
+        "Other live data still renders through Promise.allSettled",
+        "A partial-load warning appears instead of a frozen/blank dashboard",
+        "Technician can retry the dashboard"
+      ]
+    },
+    {
+      "id": "TECH-DASHBOARD-NOFREEZE-IT-01",
+      "area": "IT Technician · command center reliability",
+      "role": "it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "IT dashboard renders even when one live source or workflow gate check is slow",
+      "steps": [
+        "Open IT Technician dashboard",
+        "Allow one base live query or one assignment gate query to fail/timeout"
+      ],
+      "expected": [
+        "Loading feedback renders immediately",
+        "Base command-center data uses independent settled results",
+        "Slow assignment gate falls back to STATUS UNAVAILABLE rather than hanging the full dashboard",
+        "Technician can retry before starting that item"
+      ]
+    },
+    {
+      "id": "TECH-DASHBOARD-RACE-01",
+      "area": "Technician dashboards · navigation reliability",
+      "role": "service/it/owner",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Repeated navigation cannot let an older dashboard request overwrite a newer screen",
+      "steps": [
+        "Open Service or IT home",
+        "Trigger another dashboard refresh/navigation before the first load finishes"
+      ],
+      "expected": [
+        "Each dashboard load increments a render token",
+        "Stale async completion exits without repainting the current dashboard",
+        "Rapid taps do not produce a stuck or reverted screen"
+      ]
+    },
+    {
+      "id": "TECH-DASHBOARD-TIMEOUT-01",
+      "area": "Technician dashboards · network resilience",
+      "role": "service/it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "A network request has a bounded dashboard wait",
+      "steps": [
+        "Start a technician command-center load with an unresolved live-data promise"
+      ],
+      "expected": [
+        "Base dashboard requests time out instead of waiting forever",
+        "IT workflow-gate checks use the shorter bounded timeout",
+        "Rejected sources are converted to safe per-section fallbacks by the dashboard renderer"
+      ]
+    },
+    {
+      "id": "TECH-DASHBOARD-CACHE-01",
+      "area": "Technician dashboards · release loading",
+      "role": "service/it",
+      "mode": "source",
+      "destructive": false,
+      "scenario": "Fresh command-center code is loaded after the freeze hardening release",
+      "steps": [
+        "Open Tech Check after deployment",
+        "Inspect app and service-worker asset versions"
+      ],
+      "expected": [
+        "Index references the new app release",
+        "App imports the new technician module release",
+        "Service worker caches the same app/module versions",
+        "Older cached command-center JavaScript cannot silently remain the active shell"
+      ]
     }
   ],
-  "last_release_qa_note": "IT Technician home is now a daily command center: today/overdue/unscheduled/upcoming assignments, Service field issues needing IT, returns waiting IT Intake, draft equipment prep, queue health, Needs Replacement holds, one prioritized next action, and end-of-day IT closeout. Owner/Admin can also operate the IT department queue through the existing authorized claim contract while MHelpDesk remains separate. Concurrent Vision voice work advanced the shared cache to v147 while preserving app v64 and technician module v147; final command-center QA is aligned to that newer worker."
+  "last_release_qa_note": "Service and IT command centers are freeze-hardened. Both render an immediate loading shell, use independent settled live-data requests with bounded waits, preserve usable sections if one source fails, protect against stale async repaint races, and provide retry/STATUS UNAVAILABLE recovery instead of hanging. IT per-ticket workflow-gate checks are independently bounded. Release assets are aligned to app v65, technician module v148, shared cache v148."
 }
