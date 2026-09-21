@@ -4009,3 +4009,48 @@ select {
 @media(max-width:680px){
   .truckLoadGrid{grid-template-columns:1fr}
 }
+
+/* Owner workspace v160 — clean dark operations home */
+#view-owner>.ownerWorkspace{display:grid!important;grid-template-columns:190px minmax(0,1fr)!important;min-height:620px!important;margin:14px 0 22px!important;padding:0!important;overflow:hidden!important;border:1px solid #26313c!important;border-radius:18px!important;background:#10171f!important;box-shadow:0 18px 48px rgba(4,12,20,.24)!important;color:#edf4f8!important}
+#view-owner .ownerWorkspaceRail{display:flex;flex-direction:column;gap:5px;padding:18px 12px;background:#0b1118;border-right:1px solid #25313c}
+#view-owner .ownerWorkspaceBrand{display:flex;align-items:center;gap:9px;padding:5px 7px 20px;margin-bottom:6px;border-bottom:1px solid #25313c}
+#view-owner .ownerWorkspaceBrand img{width:31px;height:31px}
+#view-owner .ownerWorkspaceBrand span{display:flex;flex-direction:column;line-height:1.05}
+#view-owner .ownerWorkspaceBrand b{font-size:13px;letter-spacing:.7px}
+#view-owner .ownerWorkspaceBrand small{font-size:10px;color:#718292;margin-top:4px;letter-spacing:1.6px}
+#view-owner .ownerWorkspaceRail button{border:0;border-radius:9px;background:transparent;color:#9caab7;text-align:left;padding:11px 12px;font-size:13px;font-weight:800;cursor:pointer}
+#view-owner .ownerWorkspaceRail button:hover{background:#18232d;color:#fff}
+#view-owner .ownerWorkspaceMain{display:flex;flex-direction:column;justify-content:center;max-width:780px;width:100%;margin:auto;padding:42px 42px 48px}
+#view-owner .ownerWorkspaceTop{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:26px}
+#view-owner .ownerWorkspaceTop span:first-child{display:block;color:#6f8293;font-size:11px;font-weight:900;letter-spacing:1.7px}
+#view-owner .ownerWorkspaceTop h2{margin:5px 0 0;color:#f5f8fa;font-size:30px;letter-spacing:-.8px}
+#view-owner .ownerWorkspaceLive{color:#5fd6a0!important;font-size:10px!important;letter-spacing:1px!important;padding:7px 10px;border:1px solid #275944;border-radius:999px;background:#10261e}
+#view-owner .ownerVisionPrompt{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:14px;min-height:92px;padding:16px 18px;text-decoration:none;color:#eef5f8;background:#17222c;border:1px solid #30404d;border-radius:15px;box-shadow:inset 0 1px rgba(255,255,255,.025)}
+#view-owner .ownerVisionPrompt:hover{border-color:#526777;background:#1a2732}
+#view-owner .ownerVisionOrb{width:48px;height:48px;display:grid;place-items:center;border-radius:50%;background:#0c151d;border:1px solid #354857}
+#view-owner .ownerVisionOrb img{width:27px;height:27px}
+#view-owner .ownerVisionPrompt b{display:block;font-size:18px}
+#view-owner .ownerVisionPrompt span{display:block;margin-top:4px;color:#8fa0ae;font-size:13px}
+#view-owner .ownerVisionPrompt strong{color:#e8eff4;font-size:13px}
+#view-owner .ownerWorkspaceStats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:9px!important;margin:18px 0 0!important}
+#view-owner .ownerWorkspaceStats button{display:flex!important;flex-direction:column!important;align-items:flex-start!important;min-height:92px!important;padding:13px 14px!important;border:1px solid #293946!important;border-radius:12px!important;background:#121c25!important;color:#edf3f6!important;text-align:left!important;box-shadow:none!important}
+#view-owner .ownerWorkspaceStats button span{font-size:11px!important;color:#8293a1!important}
+#view-owner .ownerWorkspaceStats button b{font-size:27px!important;margin:5px 0 1px!important}
+#view-owner .ownerWorkspaceStats button small{font-size:10px!important;color:#697c8b!important}
+#view-owner .ownerWorkspaceStats button.alert{border-color:#77383b!important;background:#25191c!important}
+#view-owner .ownerWorkspaceActions{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:8px;margin-top:12px}
+#view-owner .ownerWorkspaceActions button{min-height:46px;border:1px solid #30404d;border-radius:10px;background:#18232d;color:#aebbc5;font-size:11px;font-weight:900;cursor:pointer}
+#view-owner .ownerWorkspaceActions button.primary{background:#d20b12;color:#fff;border-color:#d20b12}
+#view-owner>.ownerDashSection{margin-left:0!important;margin-right:0!important}
+@media(max-width:720px){
+ #view-owner>.ownerWorkspace{grid-template-columns:1fr!important;min-height:0!important}
+ #view-owner .ownerWorkspaceRail{display:grid;grid-template-columns:repeat(4,1fr);border-right:0;border-bottom:1px solid #25313c;padding:9px}
+ #view-owner .ownerWorkspaceBrand{grid-column:1/-1;margin:0;padding:5px 5px 10px}
+ #view-owner .ownerWorkspaceRail button{padding:9px 5px;text-align:center;font-size:10px}
+ #view-owner .ownerWorkspaceMain{padding:24px 15px 28px}
+ #view-owner .ownerWorkspaceTop h2{font-size:25px}
+ #view-owner .ownerVisionPrompt{grid-template-columns:42px minmax(0,1fr);min-height:88px}
+ #view-owner .ownerVisionPrompt strong{display:none}
+ #view-owner .ownerWorkspaceStats{grid-template-columns:repeat(2,1fr)!important}
+ #view-owner .ownerWorkspaceActions{grid-template-columns:1fr 1fr}
+}
