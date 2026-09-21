@@ -1971,11 +1971,13 @@ async function ownerAppRender(){
     ownerInteractionSafety();return;
   }
   const mounted=host.querySelector('#ownerJobAssignments');
-  if(mounted){
-    const home=document.getElementById('ownerLegacyMounts');
-    if(home)home.append(mounted);
+  // Keep the authoritative Assign Job DOM mounted when leaving the page.
+  // Moving it into the hidden legacy container caused the form to appear to
+  // disappear and risked breaking state/handlers. Hide it in place instead.
+  if(mounted && route!=='assign'){
     mounted.classList.remove('ownerAppMountedAssign');
     mounted.setAttribute('aria-hidden','true');
+    mounted.style.display='none';
   }
   let html='';
   if(route==='today')html=ownerAppToday();
@@ -1990,7 +1992,14 @@ async function ownerAppRender(){
   else if(route==='accounts')html=ownerAppAccounts();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
-  host.innerHTML=html;
+  if(mounted && route!=='assign'){
+    // Preserve the live form node and its entered values while rendering the
+    // requested Owner page beside it.
+    [...host.children].forEach(child=>{ if(child!==mounted) child.remove(); });
+    host.insertAdjacentHTML('beforeend',html);
+  }else{
+    host.innerHTML=html;
+  }
   // Never move legacy dashboard sections into the desktop workspace. Only
   // mount the single authoritative Assign Job form and the two account lists.
   for(const slot of host.querySelectorAll('[data-owner-mount]')){
@@ -2004,7 +2013,7 @@ async function ownerAppRender(){
     const form=document.getElementById('ownerJobAssignments');
     if(form){
       form.open=true;form.classList.add('ownerAppMountedAssign');
-      form.removeAttribute('aria-hidden');
+      form.removeAttribute('aria-hidden');form.style.display='block';
     }
   }
   ownerInteractionSafety();
