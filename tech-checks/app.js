@@ -1379,7 +1379,7 @@ function renderOwnerAttention() {
   if (failedInspections.length) parts.push(row('inspection',`${failedInspections.length} current failed morning inspection${failedInspections.length===1?'':'s'} today`,failedInspections.map(r => techName(r.service_tech_id)).join(' · '),'activity',true));
   if (waitingIt.length) parts.push(row('intake',`${waitingIt.length} returned unit${waitingIt.length===1?'':'s'} waiting for IT intake`,waitingIt.map(r => `Unit ${r.unit_tag}${ownerAgeHours(r.returned_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',overdueReturns.length>0));
   if (drafts.length) parts.push(row('prep',`${drafts.length} MHelpDesk ticket${drafts.length===1?'':'s'} still in IT prep`,drafts.map(p => `#${p.ticket_no}${ownerAgeHours(p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueDrafts.length>0));
-  if (released.length) parts.push(row('service',`${released.length} prepared ticket${released.length===1?'':'s'} waiting for Service checkout`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
+  if (released.length) parts.push(row('service',`${released.length} IT handoff${released.length===1?'':'s'} ready for Service`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
   host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
 }
 function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
@@ -1586,7 +1586,8 @@ function renderOwnerCommandCenter() {
   bindOwnerCommandCenter();
   const activeTechs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service')).length;
   const activeAssets=(state.assetInventory||[]).filter(a=>a.availability_status!=='retired').length;
-  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled').length;
+  const todayKey=localDateKey(new Date());
+  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled'&&String(a.scheduled_for||'')===todayKey).length;
   const returns=state.ownerReturns||[];
   const readyReview=returns.filter(r=>r.status==='pending_mhelp_inventory').length;
   const waitingIt=returns.filter(r=>r.status==='waiting_it').length;
@@ -1600,7 +1601,7 @@ function renderOwnerCommandCenter() {
   const values=[
     {n:jobs,sub:'scheduled jobs',alert:false},
     {n:attention,sub:attention===1?'owner action':'owner actions',alert:attention>0},
-    {n:readyReview+waitingIt,sub:'returns / handoffs',alert:readyReview>0},
+    {n:readyReview,sub:'ready for owner review',alert:readyReview>0},
     {n:activeTechs,sub:activeAssets+' active assets',alert:false}
   ];
   [...host.querySelectorAll('button')].forEach((button,i)=>{
