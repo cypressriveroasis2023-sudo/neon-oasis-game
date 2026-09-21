@@ -1,7 +1,7 @@
 {
   "suite": "Tech Check Release QA",
   "runtime_version": "release-qa-v137",
-  "service_worker": "v145",
+  "service_worker": "v147",
   "generated_for": "OnSite Vision live offline + damaged-equipment operations and technician shared Tech Check rule parity",
   "production_safety": {
     "default_mode": "non-destructive",
@@ -3393,5 +3393,5 @@
       ]
     }
   ],
-  "last_release_qa_note": "IT Technician home is now a daily command center: today/overdue/unscheduled/upcoming assignments, Service field issues needing IT, returns waiting IT Intake, draft equipment prep, queue health, Needs Replacement holds, one prioritized next action, and end-of-day IT closeout. Owner/Admin can also operate the IT department queue through the existing authorized claim contract while MHelpDesk remains separate."
+  "last_release_qa_note": "IT Technician home is now a daily command center: today/overdue/unscheduled/upcoming assignments, Service field issues needing IT, returns waiting IT Intake, draft equipment prep, queue health, Needs Replacement holds, one prioritized next action, and end-of-day IT closeout. Owner/Admin can also operate the IT department queue through the existing authorized claim contract while MHelpDesk remains separate. Concurrent Vision voice work advanced the shared cache to v147 while preserving app v64 and technician module v147; final command-center QA is aligned to that newer worker."
 }
