@@ -566,7 +566,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
-      db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name').in('status',['waiting_it','pending_mhelp_inventory']).order('returned_at',{ascending:true}),
+      db.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at,it_received_at,updated_at,service_tech_name,it_tech_name,return_notes,damage_notes').in('status',['waiting_it','pending_mhelp_inventory','needs_replacement']).order('returned_at',{ascending:true}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,truck_12v_110ah_qty,truck_12v_110ah_charged,truck_litime_12v_100ah_qty,truck_litime_12v_100ah_charged,backup_unit_type,backup_unit_tag,backup_it_checkout_verified,submitted_at').gte('submitted_at',dayStart.toISOString()).order('submitted_at',{ascending:false}),
       db.from('morning_checks').select('id,service_tech_id,truck_checks,taking_trailer,trailer_checks,truck_12v_110ah_qty,truck_12v_110ah_charged,truck_litime_12v_100ah_qty,truck_litime_12v_100ah_charged,backup_unit_type,backup_unit_tag,backup_it_checkout_verified,submitted_at').gte('submitted_at',selectedStart.toISOString()).lt('submitted_at',selectedEnd.toISOString()).order('submitted_at',{ascending:false}),
       db.from('job_assignments').select('*').eq('scheduled_for',ownerDailyDate).order('assigned_at',{ascending:true}),
@@ -1277,17 +1277,18 @@ function inspectionSummary(row) {
   const trailerValues=Object.values(row.trailer_checks || {}).filter(v => typeof v === 'boolean');
   const truckFail=truckValues.includes(false);
   const trailerFail=Boolean(row.taking_trailer) && trailerValues.includes(false);
-  const loadPass=Number(row.truck_12v_110ah_qty||0)>=4
+  const loadRecorded=Boolean(row.backup_unit_type)||Number(row.truck_12v_110ah_qty||0)>0||Number(row.truck_litime_12v_100ah_qty||0)>0||row.truck_12v_110ah_charged===true||row.truck_litime_12v_100ah_charged===true||row.backup_it_checkout_verified===true;
+  const loadPass=!loadRecorded || (Number(row.truck_12v_110ah_qty||0)>=4
     && row.truck_12v_110ah_charged===true
     && Number(row.truck_litime_12v_100ah_qty||0)>=2
     && row.truck_litime_12v_100ah_charged===true
     && row.backup_it_checkout_verified===true
-    && ['Spotter','Sniper','Solar Spotter'].includes(String(row.backup_unit_type||''));
+    && ['Spotter','Sniper','Solar Spotter'].includes(String(row.backup_unit_type||'')));
   return {
     failed: truckFail || trailerFail || !loadPass,
     truck: truckFail ? 'FAILED' : 'PASS',
     trailer: !row.taking_trailer ? 'Not taking trailer' : trailerFail ? 'FAILED' : 'PASS',
-    load: loadPass
+    load: !loadRecorded ? 'Legacy check — load not recorded' : loadPass
       ? Number(row.truck_12v_110ah_qty||0)+' × 12V 110Ah + '+Number(row.truck_litime_12v_100ah_qty||0)+' × LiTime 12V 100Ah · '+String(row.backup_unit_type||'Backup')+' '+String(row.backup_unit_tag||'')
       : 'NOT VERIFIED'
   };
@@ -1485,14 +1486,15 @@ function renderOwnerAttention() {
   const released = state.preps.filter(p => p.status === 'released');
   const waitingIt = returns.filter(r => r.status === 'waiting_it');
   const manager = returns.filter(r => r.status === 'pending_mhelp_inventory');
+  const replacements = returns.filter(r => r.status === 'needs_replacement');
   const resetPending = (state.resetRequests || []).filter(r => r.status === 'pending' && new Date(r.expires_at).getTime() > Date.now());
   const latestInspection = new Map(); (state.todayInspections || []).forEach(row => { if (!latestInspection.has(row.service_tech_id)) latestInspection.set(row.service_tech_id,row); });
-  const failedInspections = [...latestInspection.values()].filter(row => Object.values(row.truck_checks || {}).includes(false) || (row.taking_trailer && Object.values(row.trailer_checks || {}).includes(false)));
+  const failedInspections = [...latestInspection.values()].filter(row => inspectionSummary(row)?.failed);
   const overdueDrafts = drafts.filter(p => ownerAgeHours(p.created_at) >= 24);
   const overdueReleased = released.filter(p => ownerAgeHours(p.released_at || p.created_at) >= 24);
   const overdueReturns = waitingIt.filter(r => ownerAgeHours(r.returned_at) >= 24);
   const overdueManager = manager.filter(r => ownerAgeHours(r.it_received_at || r.updated_at) >= 24);
-  const ownerActions = manager.length + resetPending.length + failedInspections.length + corrections.length;
+  const ownerActions = manager.length + replacements.length + resetPending.length + failedInspections.length + corrections.length;
   const overdueCount = overdueDrafts.length + overdueReleased.length + overdueReturns.length + overdueManager.length;
   const attentionCount = ownerActions + overdueCount;
   const attentionBadge = $('ownerAttentionBadge');
@@ -1505,8 +1507,9 @@ function renderOwnerAttention() {
   if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
   const row = (kind,title,detail,target,urgent=false) => `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini' onclick="ownerJump('${target}')">Open →</button></div>`;
-  const nextOwner = corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Route correction for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>${esc(String(corrections[0].correction_role || 'service').toUpperCase())} correction requested · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerCommandAction('review')">Open Owner Review →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
+  const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Route correction for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>${esc(String(corrections[0].correction_role || 'service').toUpperCase())} correction requested · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerCommandAction('review')">Open Owner Review →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
   const parts = [];
+  if (replacements.length) parts.push(row('replacement',`${replacements.length} damaged equipment item${replacements.length===1?'':'s'} need replacement / repair`,replacements.map(r => `${r.equipment_type || 'Equipment'} ${r.unit_tag || ''} · #${r.ticket_no}`).join(' | '),'returns',true));
   if (corrections.length) parts.push(row('correction',`${corrections.length} job${corrections.length===1?'':'s'} returned for correction`,corrections.map(r => `#${r.ticket_no} · ${String(r.correction_role || 'service').toUpperCase()} · ${r.correction_reason || 'Owner correction requested'}`).join(' | '),'review',true));
   if (manager.length) parts.push(row('manager',`${manager.length} return${manager.length===1?'':'s'} need your MHelpDesk inventory confirmation`,manager.map(r => `Unit ${r.unit_tag} · #${r.ticket_no}${ownerAgeHours(r.it_received_at || r.updated_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',true));
   if (resetPending.length) parts.push(row('reset',`${resetPending.length} password reset request${resetPending.length===1?'':'s'} waiting for approval`,resetPending.map(r => r.username).join(' · '),'accounts',true));
@@ -1727,13 +1730,14 @@ function renderOwnerCommandCenter() {
   const readyReview=reviewRows.filter(r=>r.review_status==='ready').length;
   const correctionReview=reviewRows.filter(r=>r.review_status==='correction_requested').length;
   const waitingIt=returns.filter(r=>r.status==='waiting_it').length;
+  const replacementCount=returns.filter(r=>r.status==='needs_replacement').length;
   const resetPending=(state.resetRequests||[]).filter(r=>r.status==='pending'&&new Date(r.expires_at).getTime()>Date.now()).length;
   const latestInspection=new Map();
   (state.todayInspections||[]).forEach(row=>{if(!latestInspection.has(row.service_tech_id)) latestInspection.set(row.service_tech_id,row);});
-  const failed=[...latestInspection.values()].filter(row=>Object.values(row.truck_checks||{}).includes(false)||(row.taking_trailer&&Object.values(row.trailer_checks||{}).includes(false))).length;
+  const failed=[...latestInspection.values()].filter(row=>inspectionSummary(row)?.failed).length;
   const overdue=(state.preps||[]).filter(p=>p.status!=='closed'&&ownerAgeHours(p.released_at||p.created_at)>=24).length+
     returns.filter(r=>ownerAgeHours(r.it_received_at||r.returned_at||r.updated_at)>=24).length;
-  const attention=correctionReview+resetPending+failed+overdue;
+  const attention=correctionReview+replacementCount+resetPending+failed+overdue;
   const values=[
     {n:jobs,sub:'scheduled jobs',alert:false},
     {n:attention,sub:attention===1?'owner action':'owner actions',alert:attention>0},
