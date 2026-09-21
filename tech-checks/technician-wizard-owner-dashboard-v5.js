@@ -3369,9 +3369,10 @@ function techDashboardTimeout(promise,fallback,ms=7000){
   return Promise.race([
     Promise.resolve(promise),
     new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timed out loading live data.')),ms);})
-  ]).then(value=>{clearTimeout(timer);return value;},error=>{clearTimeout(timer);throw error;}).catch(error=>{
-    console.warn('Tech dashboard partial-load fallback',error);
-    return fallback;
+  ]).then(value=>{clearTimeout(timer);return value;},error=>{
+    clearTimeout(timer);
+    console.warn('Tech dashboard live-data request failed; using safe fallback.',error);
+    throw error;
   });
 }
 function techDashboardSettled(results){
