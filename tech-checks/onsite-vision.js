@@ -261,7 +261,7 @@ async function runLanguageEval(){
   status.classList.remove('hidden','good','warn');
   status.innerHTML='<b>Running language QA…</b><span>Checking slang, voice-like wording, follow-ups, actions, programming questions, and Owner corrections.</span>';
   try{
-    const result=await db.functions.invoke('onsite-vision-language-eval',{body:{limit:60}});
+    const result=await db.functions.invoke('onsite-vision-language-eval',{body:{limit:100}});
     if(result.error||!result.data?.ok)throw new Error(result.data?.error||result.error?.message||'Language QA failed.');
     const data=result.data,mismatches=Array.isArray(data.mismatches)?data.mismatches:[];
     status.classList.add(Number(data.failed||0)===0?'good':'warn');
@@ -518,7 +518,7 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask what IT or a technician has today, create a Delivery / Pickup / Swap / Service job, assign work, or ask how Tech Check is supposed to work. Vision keeps the service order in context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What jobs do I have Monday?">Monday\'s jobs</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask for a full operations rundown, what needs your attention, who has room, what IT or a technician has today, create work, assign it, or ask how Tech Check is programmed. Vision keeps the operating context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="Give me today's operations rundown. What is behind, what needs my attention, and who has room?">Today\'s ops brief</button><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -1657,6 +1657,9 @@ async function departureReadinessHtml(raw){
     +'<div class="vision-answer-copy">Anything not recorded in Tech Check is MISSING INFORMATION, not assumed to be on the truck.</div>';
 }
 
+function operationsOverviewIntent(raw){
+  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+deal\s+with|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief|daily\s+brief|today(?:'s)?\s+brief|run\s+the\s+company)\b/i.test(String(raw||''));
+}
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
 }
@@ -1703,6 +1706,11 @@ async function answer(text){
     return await continueDraft(raw);
   }
   if(isCreateRequest(raw))return startDraft(raw);
+
+  if(operationsOverviewIntent(raw)){
+    const operationsReply=await serverAgentAnswer(raw);
+    if(operationsReply)return operationsReply;
+  }
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
 
