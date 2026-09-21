@@ -730,51 +730,103 @@ function workloadIntent(text){
   const raw=String(text||'').trim(),s=raw.toLowerCase(),memory=cleanMemory(chat()?.memory);
   const jobCue=/\b(job|jobs|ticket|tickets|work|workload|schedule|scheduled|assignment|assignments|run|runs|route|day|calls?|stops?)\b/.test(s);
   const askCue=/\b(how many|what(?:'s| is| are)?|show|list|tell me|does|do|has|have|got|working|doing|busy|on deck|lined up|going on|anything|much|what about|how about)\b/.test(s);
-  let role=/\bservice(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'service':/\bit(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s)?'it':'';
+  const serviceMention=/\bservice(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s);
+  const itMention=/\bit(?:\s+(?:team|department|techs?|technicians?))?\b/.test(s);
+  let scope=serviceMention&&itMention?'both':serviceMention?'service':itMention?'it':'';
+  let role=scope==='service'||scope==='it'?scope:'';
   let tech=findTech(raw,role)||findTech(raw);
-  const followup=/\b(what about|how about|and|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(s)&&String(memory.current_subject||'').startsWith('workload:');
-  if(followup&&!tech&&Array.isArray(memory.technician_names)&&memory.technician_names.length){
-    tech=findTech(memory.technician_names[memory.technician_names.length-1])||null;
+
+  const rememberedSubject=String(memory.current_subject||'');
+  const workloadFollowup=rememberedSubject.startsWith('workload:');
+  const explicitPersonReference=/\b(he|him|his|she|her|hers|that\s+(?:tech|technician|person)|same\s+(?:tech|technician|person))\b/.test(s);
+  const terseDateFollowup=/^(?:(?:and|what about|how about)\s+)?(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\??$/i.test(raw.trim());
+
+  if(workloadFollowup&&!tech&&!role&&scope!=='both'&&(explicitPersonReference||terseDateFollowup)){
+    if(rememberedSubject==='workload:technician'&&Array.isArray(memory.technician_names)&&memory.technician_names.length){
+      tech=findTech(memory.technician_names[memory.technician_names.length-1])||null;
+      if(tech)role=tech.role||'';
+    }else{
+      const remembered=rememberedSubject.match(/^workload:(it|service)$/);
+      if(remembered)role=remembered[1];
+    }
   }
-  if(followup&&!role&&!tech){
-    const remembered=String(memory.current_subject||'').match(/^workload:(it|service)$/);
-    if(remembered)role=remembered[1];
-  }
+
   const dateCue=Boolean(dateFrom(raw))||/\b(today|tomorrow|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(s);
   const conversationalWorkCue=/\b(got|have|has|doing|working|busy|lined up|on deck|on today|taking|handling|what about|how about)\b/.test(s);
-  const impliedWork=Boolean((role||tech)&&(dateCue||conversationalWorkCue||followup));
-  if((!jobCue&&!impliedWork)||!askCue||(!role&&!tech))return null;
+  const impliedWork=Boolean((scope||role||tech)&&(dateCue||conversationalWorkCue||explicitPersonReference||terseDateFollowup));
+
+  if((!jobCue&&!impliedWork)||!askCue)return null;
+
   const date=dateFrom(raw)||dayKey(new Date());
-  return{date,role:tech?.role||role,tech};
+  if(tech)return{date,scope:'technician',role:tech.role||role,tech};
+  if(scope==='both')return{date,scope:'both',role:'',tech:null};
+  if(role)return{date,scope:role,role,tech:null};
+
+  // A broad workload question is company-wide. Do not inherit the prior named
+  // technician just because the Owner said "today" or "jobs" again.
+  if(jobCue&&(dateCue||/\b(total|scheduled|all|company|we|i\s+have|do\s+i\s+have)\b/.test(s)))return{date,scope:'all',role:'',tech:null};
+  return null;
 }
 async function workloadHtml(intent){
   if(!intent)return'';
-  const subject=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):(intent.role==='it'?'IT':'Service');
-  mergeWorkingMemory({
+  const scope=intent.scope||(intent.tech?'technician':intent.role||'all');
+  const techName=intent.tech?(intent.tech.full_name||intent.tech.username||'That technician'):'';
+  const conversation=ensureChat(),prior=cleanMemory(conversation.memory);
+  conversation.memory={
+    ...prior,
     date:intent.date,
-    current_subject:'workload:'+(intent.tech?'technician':intent.role||''),
-    technician_names:intent.tech?[intent.tech.full_name||intent.tech.username||'']:[]
-  });
+    current_subject:'workload:'+scope,
+    technician_names:intent.tech?[techName]:[]
+  };
+  conversation.updatedAt=now();
+  saveChats();
+
   const label=dateLabel(intent.date),when=intent.date===dayKey(new Date())?'today':'on '+label;
   const layer=visionLiveData();
+  const summarize=(live)=>{
+    const tickets=Array.isArray(live?.tickets)?live.tickets:[];
+    const assignments=Array.isArray(live?.assignments)?live.assignments:[];
+    const completed=Number(live?.completed||0),remaining=Number(live?.remaining??Math.max(0,tickets.length-completed));
+    const roleTickets=(role)=>[...new Set(assignments.filter(row=>String(row.assigned_role||'').toLowerCase()===role).map(row=>String(row.ticket_no||'').trim()).filter(Boolean))];
+    return{tickets,assignments,completed,remaining,itCount:roleTickets('it').length,serviceCount:roleTickets('service').length};
+  };
+  const maybeSelectSingle=(tickets)=>{
+    if(tickets.length!==1||scope==='all'||scope==='both')return;
+    state.currentTicket=tickets[0];
+    const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);
+  };
+  const cards=(tickets)=>tickets.slice(0,12).map(ticket=>jobCard(ticket)).join('');
+
   if(layer?.getWorkload){
     const live=await layer.getWorkload({
       date:intent.date,
-      role:intent.role||'',
+      role:(scope==='it'||scope==='service'||scope==='technician')?(intent.role||''):'',
       tech_id:intent.tech?.user_id||'',
-      tech_name:intent.tech&&!intent.tech?.user_id?(intent.tech.full_name||intent.tech.username||''):''
+      tech_name:intent.tech&&!intent.tech?.user_id?techName:''
     },{force:true});
-    const tickets=Array.isArray(live?.tickets)?live.tickets:[];
-    const completed=Number(live?.completed||0),remaining=Number(live?.remaining??Math.max(0,tickets.length-completed));
+    const result=summarize(live),tickets=result.tickets;
+    maybeSelectSingle(tickets);
+
+    if(scope==='all'||scope==='both'){
+      if(!tickets.length)return '<div class="vision-answer-title">There are 0 Tech Check jobs scheduled '+esc(when)+'.</div><div class="vision-answer-copy">I checked the live company-wide Tech Check schedule. MHelpDesk remains separate.</div>';
+      const departmentLine='IT is involved in '+result.itCount+' · Service is involved in '+result.serviceCount+'. Department counts can overlap when the same ticket flows through both.';
+      return '<div class="vision-answer-title">There are '+tickets.length+' total Tech Check job'+(tickets.length===1?'':'s')+' scheduled '+esc(when)+'.</div>'
+        +'<div class="vision-answer-copy">'+esc(String(result.remaining))+' remaining · '+esc(String(result.completed))+' completed. '+esc(departmentLine)+' MHelpDesk remains separate.</div>'
+        +cards(tickets);
+    }
+
+    const subject=scope==='technician'?techName:(scope==='it'?'IT':'Service');
     if(!tickets.length)return '<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div><div class="vision-answer-copy">I checked the live Tech Check schedule. MHelpDesk remains separate.</div>';
-    if(tickets.length===1){state.currentTicket=tickets[0];const current=ensureChat();current.ticket=tickets[0];saveChats();setTimeout(renderOrder,0);}
     return '<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div>'
-      +'<div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. I checked the live Tech Check schedule and assignments. MHelpDesk remains separate.</div>'
-      +tickets.slice(0,12).map(ticket=>jobCard(ticket)).join('');
+      +'<div class="vision-answer-copy">'+esc(String(result.remaining))+' remaining · '+esc(String(result.completed))+' completed. I checked the live Tech Check schedule and assignments. MHelpDesk remains separate.</div>'
+      +cards(tickets);
   }
+
   const rows=state.jobs.filter(j=>{
     if(j.status==='cancelled'||String(j.scheduled_for||'')!==String(intent.date))return false;
-    if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
+    if(scope==='it'||scope==='service'||scope==='technician'){
+      if(intent.role&&String(j.assigned_role||'').toLowerCase()!==intent.role)return false;
+    }
     if(intent.tech){
       const uid=String(intent.tech.user_id||''),rowUid=String(j.assignee_user_id||j.assigned_to||j.user_id||''),rowName=String(j.assignee_name||j.assigned_to_name||'').trim().toLowerCase();
       const names=[intent.tech.full_name,intent.tech.username].filter(Boolean).map(v=>String(v).trim().toLowerCase());
@@ -785,9 +837,22 @@ async function workloadHtml(intent){
   });
   const byTicket=new Map();
   rows.forEach(row=>{const ticket=String(row.ticket_no||'');if(!ticket)return;if(!byTicket.has(ticket))byTicket.set(ticket,[]);byTicket.get(ticket).push(row);});
-  const tickets=[...byTicket.keys()],completed=tickets.filter(ticket=>(byTicket.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length,remaining=Math.max(0,tickets.length-completed);
+  const tickets=[...byTicket.keys()];
+  const completed=tickets.filter(ticket=>(byTicket.get(ticket)||[]).every(row=>String(row.status||'').toLowerCase()==='completed')).length;
+  const remaining=Math.max(0,tickets.length-completed);
+  maybeSelectSingle(tickets);
+
+  if(scope==='all'||scope==='both'){
+    const itCount=[...new Set(rows.filter(r=>String(r.assigned_role||'').toLowerCase()==='it').map(r=>String(r.ticket_no||'')))].filter(Boolean).length;
+    const serviceCount=[...new Set(rows.filter(r=>String(r.assigned_role||'').toLowerCase()==='service').map(r=>String(r.ticket_no||'')))].filter(Boolean).length;
+    return tickets.length
+      ?'<div class="vision-answer-title">There are '+tickets.length+' total Tech Check job'+(tickets.length===1?'':'s')+' scheduled '+esc(when)+'.</div><div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. IT is involved in '+esc(String(itCount))+' · Service is involved in '+esc(String(serviceCount))+'. Department counts can overlap. Live-query support was unavailable, so I used the currently loaded Tech Check assignments.</div>'+cards(tickets)
+      :'<div class="vision-answer-title">There are 0 Tech Check jobs scheduled '+esc(when)+'.</div>';
+  }
+
+  const subject=scope==='technician'?techName:(scope==='it'?'IT':'Service');
   return tickets.length
-    ?'<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div><div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. Live-query support was unavailable, so I used the currently loaded Tech Check assignments. MHelpDesk remains separate.</div>'+tickets.slice(0,12).map(jobCard).join('')
+    ?'<div class="vision-answer-title">'+esc(subject)+' has '+tickets.length+' Tech Check job'+(tickets.length===1?'':'s')+' '+esc(when)+'.</div><div class="vision-answer-copy">'+esc(String(remaining))+' remaining · '+esc(String(completed))+' completed. Live-query support was unavailable, so I used the currently loaded Tech Check assignments. MHelpDesk remains separate.</div>'+cards(tickets)
     :'<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div>';
 }
 function findTech(text,role=''){
