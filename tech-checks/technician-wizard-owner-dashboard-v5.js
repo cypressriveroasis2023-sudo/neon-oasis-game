@@ -7138,9 +7138,15 @@ async function runOwnerRefresh(force=false) {
   if (ownerRefreshInFlight) { ownerRefreshQueued=true; return; }
   ownerRefreshInFlight=true;
   try {
-    await Promise.all([installOwnerAssignments(force), installOwnerIntake(force), installOwnerFieldEscalations(force)]);
+    const results=await Promise.allSettled([
+      techDashboardTimeout(installOwnerAssignments(force),null,12000),
+      techDashboardTimeout(installOwnerIntake(force),null,12000),
+      techDashboardTimeout(installOwnerFieldEscalations(force),null,12000)
+    ]);
     organizeOwnerDashboard();
     ownerLastRefreshAt=Date.now();
+    const failed=results.filter(r=>r.status==='rejected');
+    if(failed.length) console.warn('Owner support refresh completed with '+failed.length+' timed-out/failed section(s).');
   } catch (error) {
     console.error('Owner dashboard refresh failed', error);
     const message=esc(error?.message||'Could not load live Tech Check data.');
