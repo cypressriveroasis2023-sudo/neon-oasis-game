@@ -85,7 +85,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-unified-shell-v222')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=production-qa-20260921a')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1394,22 +1394,13 @@ function renderOwnerTechOverview() {
 }
 
 function ownerJump(target) {
-  const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'attention',vision:'attention',daily:'team',activity:'activity'};
+  if(target==='vision'){ window.location.href='./onsite-vision.html'; return; }
+  const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'review',daily:'team',activity:'activity'};
   const route=routeMap[target];
-  if(route && typeof ownerAppNavigate==='function'){
-    ownerAppNavigate(route);
-    return;
-  }
+  if(route && typeof ownerAppNavigate==='function') ownerAppNavigate(route);
 }
 function ownerOpenReturn(id) {
-  const section = document.getElementById('ownerIntakeTracking');
-  if (section?.tagName === 'DETAILS') section.open = true;
-  const el=[...document.querySelectorAll('details[data-owner-return]')].find(x => x.dataset.ownerReturn===String(id));
-  if (!el) return ownerJump('returns');
-  el.open=true;
-  el.scrollIntoView({behavior:'smooth',block:'center'});
-  el.classList.add('ownerAttentionFlash');
-  setTimeout(() => el.classList.remove('ownerAttentionFlash'),1200);
+  ownerAppNavigate('handoffs');
 }
 
 function ownerReviewStepClass(value) {
