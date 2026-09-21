@@ -2557,6 +2557,26 @@
         "IT and Service assignments on the same MHelpDesk ticket remain separate alerts",
         "Acknowledgement and final resolution remain attached to the same stable alert row"
       ]
+    },
+    {
+      "id": "OWNER-HISTORY-HANDOFF-WORDING-01",
+      "area": "Owner Command Center · permanent history",
+      "role": "owner",
+      "mode": "source + authenticated production UI",
+      "destructive": false,
+      "scenario": "Legacy audit records use current IT → Service handoff terminology in Owner-facing history without rewriting permanent data",
+      "steps": [
+        "Open Company History for a site with an older IT equipment transfer record",
+        "Open Recent Activity containing the same legacy report",
+        "Verify the Owner-facing event title and detail use handoff wording",
+        "Verify the stored audit record remains unchanged"
+      ],
+      "expected": [
+        "Owner-facing history never says equipment was sent or released to Service",
+        "The display says IT → Service handoff or created the Service handoff",
+        "Permanent audit rows and timestamps are preserved",
+        "MHelpDesk remains separate"
+      ]
     }
   ],
   "last_release_qa_note": "Current release QA covers OnSite Vision Q8→Q9, stable persistent Owner Vision alerts, authenticated Owner closeout/correction routing, permanent Company History, and Help alignment. Vision alert keys now fingerprint the semantic issue rather than elapsed-time display text, so one unresolved assignment issue remains one active alert while detail/last-seen updates. Legacy elapsed-key rows were retained with an explicit superseded-by-normalization note rather than falsely claiming the workflow condition cleared."
