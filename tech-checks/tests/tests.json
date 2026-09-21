@@ -2732,7 +2732,45 @@
         "Rollback leaves no QA residue"
       ],
       "manual_device": false
+    },
+    {
+      "id": "OWNER-REVIEW-AUTHORITY-01",
+      "area": "Owner Command Center / Closeout",
+      "role": "owner",
+      "mode": "source+db",
+      "destructive": false,
+      "scenario": "Ready for Owner Review count uses the database closeout gate instead of a browser-side guess",
+      "steps": [
+        "Create a rollback-only completed Service ticket with an unresolved offline-unit escalation",
+        "Confirm owner_review_queue_v1 excludes the ticket",
+        "Refresh the Owner Command Center"
+      ],
+      "expected": [
+        "The top Ready for Owner Review count matches the authoritative Owner Review badge",
+        "An unresolved offline-unit escalation cannot appear ready",
+        "Close Job remains unavailable until all closeout gates pass"
+      ],
+      "manual_device": false
+    },
+    {
+      "id": "OWNER-UNIT-LOOKUP-OFFLINE-01",
+      "area": "Owner Unit History",
+      "role": "owner",
+      "mode": "source+manual",
+      "destructive": false,
+      "scenario": "Prominent Unit Lookup includes offline Service + IT troubleshooting",
+      "steps": [
+        "Search a unit with a recorded offline escalation",
+        "Review the timeline and summary counters"
+      ],
+      "expected": [
+        "Timeline shows Service power verification and call to IT",
+        "IT notes, status, authorized backup, and Owner resolution appear when recorded",
+        "Offline escalation count is visible and unresolved entries are marked for attention",
+        "No activity is invented when no record exists"
+      ],
+      "manual_device": true
     }
   ],
-  "last_release_qa_note": "Offline escalation passed role/workflow rollback verification and permanent Technician/Unit/Site history plus Owner closeout rollback verification. Authenticated phone-sized visual pass remains in the manual-device queue."
+  "last_release_qa_note": "Owner Review now uses the authoritative database closeout gate in both the review card and Command Center count. Unit Lookup includes offline Service + IT escalation history. Authenticated phone-sized visual pass remains in the manual-device queue."
 }
