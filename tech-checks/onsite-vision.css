@@ -312,6 +312,25 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   box-shadow:inset 3px 0 0 #e2b85a;
 }
 .vision-action-card.blocked small{color:#e2b85a}
+.vision-plan-card{border-color:#46647c;background:linear-gradient(145deg,#142536,#0e1924)}
+.vision-plan-card>small{color:#ff5157}
+.vision-plan-steps{display:grid;gap:8px;margin-top:12px}
+.vision-plan-step{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:start;border:1px solid #2e4458;border-radius:11px;background:#101c27;padding:10px}
+.vision-plan-step-num{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:#1a2b3a;color:#dfe8ef;font-size:10px;font-weight:950}
+.vision-plan-step>div:last-child{min-width:0;display:grid;gap:3px}
+.vision-plan-step small{font-size:7px;font-weight:950;letter-spacing:.1em;color:#7f93a5}
+.vision-plan-step b{font-size:11px;color:#f4f7f9;line-height:1.35}
+.vision-plan-step span{font-size:9px;color:#93a5b4;line-height:1.45}
+.vision-plan-step em{font-style:normal;font-size:8px;color:#647b8e}
+.vision-plan-step.ready{border-color:rgba(85,200,135,.38);box-shadow:inset 3px 0 0 rgba(85,200,135,.85)}
+.vision-plan-step.ready small{color:#73d59a}
+.vision-plan-step.guided{border-color:rgba(226,184,90,.38);box-shadow:inset 3px 0 0 rgba(226,184,90,.8)}
+.vision-plan-step.guided small{color:#e2b85a}
+.vision-plan-step.needs-input{border-color:rgba(255,81,87,.32);box-shadow:inset 3px 0 0 rgba(255,81,87,.72)}
+.vision-plan-step.needs-input small{color:#ff7479}
+.vision-plan-notes{display:grid;gap:5px;margin-top:10px;padding:9px 10px;border-radius:9px;background:#0d1822;border:1px solid #26394a}
+.vision-plan-notes span{font-size:8px;color:#7d91a3;line-height:1.4}
+
 
 
 /* Persistent conversations + Teach Vision v14 */
