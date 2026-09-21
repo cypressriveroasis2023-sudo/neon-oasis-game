@@ -4576,6 +4576,18 @@ async function installOwnerAssignments(force = false) {
   const alertsToday=ownerAIAckRows.filter(r=>techCheckDateKey(new Date(r.acknowledged_at))===todayKey);
   const resolvedToday=ownerAIAckRows.filter(r=>r.resolved_at&&techCheckDateKey(new Date(r.resolved_at))===todayKey);
   const outstandingAlerts=aiStates.filter(x=>x.s.state==='attention');
+  const ownerReviewJobs=all.filter(a=>{
+    const prep=prepMap.get(a.prep_ticket_id), solar=solarCheckMap.get(a.prep_ticket_id);
+    if(a.status!=='completed' && prep?.status!=='closed')return false;
+    if(prepHasHeliosField(prep))return Boolean(solar?.helios_field_completed_at&&!solar?.helios_owner_verified_at);
+    return true;
+  });
+  const commandCenter=ensureOwnerCommandCenter();
+  if(commandCenter){
+    commandCenter.dataset.readyReview=String(ownerReviewJobs.length);
+    commandCenter.dataset.activeTechs=String(ownerAssignmentProfiles.length);
+    commandCenter.dataset.activeAssets=String(ownerAssignmentAssets.length);
+  }
   const unfinishedTechs=active.map(a=>({ticket:a.ticket_no||'—',role:a.assigned_role==='it'?'IT':'Service',name:a.assignee_name||a.assigned_to_name||(a.assignment_scope==='department'?'Department Queue':'Unassigned')}));
   const assignedRows = assignedWaiting.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
   const progressRows = inProgress.map(a => ownerAssignmentRowHtml(a, prepMap.get(a.prep_ticket_id), solarCheckMap.get(a.prep_ticket_id))).join('');
@@ -4688,6 +4700,7 @@ async function installOwnerAssignments(force = false) {
   refreshOwnerAutoServicePlan();
   refreshOwnerWorkTypeLabels();
   organizeOwnerDashboard();
+  syncOwnerCompactDashboard();
 }
 async function ownerLookupUnitHistory(){
   const input=document.getElementById('ownerUnitLookupInput'),out=document.getElementById('ownerUnitLookupResult');
@@ -4812,7 +4825,27 @@ function ownerCardBadgeNumber(id){
   const txt=String(document.querySelector('#'+id+' .ownerDashBadge')?.textContent||'');
   return Number((txt.match(/\d+/)||['0'])[0])||0;
 }
-function syncOwnerCompactDashboard(){ /* classic Owner home uses each card's own live badge */ }
+function syncOwnerCompactDashboard(){
+  const card=document.getElementById('ownerCommandCenter');
+  if(!card)return;
+  const stat=(action,value)=>{
+    const btn=card.querySelector('[data-owner-command="'+action+'"]');
+    const b=btn?.querySelector('b');
+    if(b)b.textContent=String(value??0);
+    return btn;
+  };
+  const attention=ownerBadgeNumber('ownerAttentionBadge');
+  const today=ownerBadgeNumber('ownerAssignmentBadge') || ownerBadgeNumber('ownerTechOverviewBadge');
+  const review=Number(card.dataset.readyReview||0);
+  const activeTechs=Number(card.dataset.activeTechs||0);
+  const activeAssets=Number(card.dataset.activeAssets||0);
+  stat('today',today);
+  stat('attention',attention)?.classList.toggle('alert',attention>0);
+  stat('review',review)?.classList.toggle('ready',review>0);
+  const team=stat('team',activeTechs);
+  const teamSmall=team?.querySelector('small');
+  if(teamSmall)teamSmall.textContent=activeTechs+' active techs · '+activeAssets+' active assets';
+}
 function ownerClassicCardFor(name){
   return ({
     Assign:'ownerJobAssignments',
@@ -4850,7 +4883,7 @@ function ensureOwnerCommandCenter(){
     card=document.createElement('section');
     card.id='ownerCommandCenter';
     card.className='ownerCommandCenter';
-    card.innerHTML=`<div class="ownerCommandHero"><div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div><a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a></div><div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite"><button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>scheduled jobs</small></button><button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions</small></button><button type="button" data-owner-command="review"><span>Ready for Review</span><b>—</b><small>returns / handoffs</small></button><button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>active techs / assets</small></button></div><div class="ownerCommandQuick"><button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button></div>`;
+    card.innerHTML=`<div class="ownerCommandHero"><div><span class="ownerCommandKicker">OWNER COMMAND CENTER</span><h2>Today at Cameras On Site</h2><p>Start with what needs you, then move into live work, people, and equipment.</p></div><a class="ownerCommandVision" href="./onsite-vision.html"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""><span><b>OnSite Vision</b><small>Ask, search, and review operations</small></span><strong>Open →</strong></a></div><div id="ownerCommandStats" class="ownerCommandStats" aria-live="polite"><button type="button" data-owner-command="today"><span>Today</span><b>—</b><small>open Tech Check jobs</small></button><button type="button" data-owner-command="attention"><span>Needs Attention</span><b>—</b><small>owner actions & issues</small></button><button type="button" data-owner-command="review"><span>Ready for My Review</span><b>—</b><small>completed work awaiting Owner review</small></button><button type="button" data-owner-command="team"><span>Team & Equipment</span><b>—</b><small>loading live readiness…</small></button></div><div class="ownerCommandQuick"><button type="button" data-owner-command="assign">+ Send Job to Tech</button><button type="button" data-owner-command="units">Search Units</button><button type="button" data-owner-command="handoffs">Equipment Handoffs</button><button type="button" data-owner-command="activity">Recent Activity</button></div>`;
     view.prepend(card);
   }
   if(!card.dataset.commandBound){
@@ -4875,14 +4908,7 @@ function ensureOwnerCommandCenter(){
     if(b)b.textContent=String(value??0);
     return btn;
   };
-  const attention=ownerBadgeNumber('ownerAttentionBadge');
-  const today=ownerBadgeNumber('ownerTechOverviewBadge') || ownerBadgeNumber('ownerAssignmentBadge');
-  const review=ownerBadgeNumber('ownerHandoffsBadge');
-  const team=ownerBadgeNumber('ownerAccountsBadge') + ownerBadgeNumber('ownerUnitStatusBadge');
-  stat('today',today);
-  stat('attention',attention)?.classList.toggle('alert',attention>0);
-  stat('review',review);
-  stat('team',team);
+  syncOwnerCompactDashboard();
   return card;
 }
 
