@@ -7488,3 +7488,15 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
   #view-it .wl-it-truck-manage-row,#view-it .wl-it-load-line{grid-template-columns:1fr!important}
   #view-it .wl-it-truck-counts{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+/* Owner inline truck inventory editor */
+.ownerCmdInventoryEditBtn{width:100%;margin-top:10px;min-height:34px;border:1px solid #e31821;border-radius:7px;background:#151d21;color:#fff;font-size:9px;font-weight:1000;letter-spacing:.06em;cursor:pointer}
+.ownerCmdInventoryEditBtn:hover{background:#e31821}
+.ownerCmdInventoryEditor{margin-top:9px;padding:10px;border:1px solid #e31821;border-radius:9px;background:#071218}
+.ownerCmdInventoryEditor[hidden]{display:none!important}
+.ownerTruckEditorHead{display:flex;justify-content:space-between;gap:10px;align-items:start;margin-bottom:10px}.ownerTruckEditorHead>div{display:grid;gap:3px}.ownerTruckEditorHead b{color:#fff;font-size:11px}.ownerTruckEditorHead span{color:#a9b7bd;font-size:9px}
+.ownerTruckEditorLabel{margin:12px 0 6px;color:#ff6b71;font-size:9px;font-weight:1000;letter-spacing:.08em}
+.ownerTruckEditRow{display:grid;grid-template-columns:minmax(100px,1fr) minmax(110px,1fr) auto;gap:6px;align-items:center;padding:7px 0;border-top:1px solid #1d3038}.ownerTruckEditRow>div{display:grid;gap:2px}.ownerTruckEditRow b{color:#fff;font-size:10px}.ownerTruckEditRow span{color:#93a5ad;font-size:8px}.ownerTruckEditRow input{min-width:0;height:32px!important;margin:0!important;padding:5px 7px!important;background:#0c1d24!important;color:#fff!important;border:1px solid #38515d!important;border-radius:6px!important;font-size:10px!important}.ownerTruckEditRow>button{height:32px;border:1px solid #e31821;border-radius:6px;background:#e31821;color:#fff;font-size:8px;font-weight:1000;padding:0 8px}
+.ownerTruckVerify{display:flex!important;align-items:center;gap:3px;color:#b9c5ca;font-size:8px}.ownerTruckVerify input{width:14px!important;height:14px!important;min-height:0!important}
+.ownerTruckUnitChecks{margin:7px 0;padding:8px;border:1px solid #2b414b;border-radius:7px;background:#0b1920;display:flex;flex-wrap:wrap;gap:6px 10px}.ownerTruckUnitChecks>b,.ownerTruckUnitChecks>span{width:100%}.ownerTruckUnitChecks>b{font-size:9px;color:#fff}.ownerTruckUnitChecks>span{font-size:8px;color:#92a5ad}.ownerTruckUnitChecks label{font-size:8px;color:#c7d1d5;display:flex;align-items:center;gap:3px}
+@media(max-width:720px){.ownerTruckEditRow{grid-template-columns:1fr}.ownerTruckEditRow>button{width:100%}}
