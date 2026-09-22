@@ -469,7 +469,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=it-inline-ticket-20260922c"></script>
+    <script type="module" src="./app.js?v=service-truck-baseline-20260922d"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -480,7 +480,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=it-inline-ticket-20260922c', { scope: './', updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('./sw.js?v=service-truck-baseline-20260922d', { scope: './', updateViaCache: 'none' });
             await registration.update();
           } catch (error) {
             console.warn(error);
