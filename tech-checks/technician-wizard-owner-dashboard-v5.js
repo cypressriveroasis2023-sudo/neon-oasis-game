@@ -665,6 +665,33 @@ function injectStyles() {
       #view-it .wl-nav{position:static!important;padding-top:8px!important}
     }
   `;
+  s.textContent += `
+    /* IT Intake dark-background contrast fix */
+    #view-it #wlItIntake .wl-title,
+    #view-it #wlItIntake .wl-sub {
+      color:#ffffff!important;
+      opacity:1!important;
+    }
+    #view-it #wlItIntake .wl-sub {
+      color:#d8e1e6!important;
+    }
+
+    /* Preserve dark text on the white cards/buttons */
+    #view-it #wlItIntake .wl-mode-card,
+    #view-it #wlItIntake .wl-mode-card .wl-mode-title,
+    #view-it #wlItIntake .wl-mode-card .wl-mode-sub,
+    #view-it #wlItIntake .wl-menu button {
+      color:#182635!important;
+    }
+    #view-it #wlItIntake .wl-mode-card .wl-mode-sub {
+      color:#71808d!important;
+    }
+
+    /* Active red action stays white */
+    #view-it #wlItIntake .wl-menu button.wl-red {
+      color:#ffffff!important;
+    }
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
