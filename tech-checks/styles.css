@@ -4832,3 +4832,50 @@ td{color:#eef5f8!important}
 #view-it button[aria-pressed="true"],#view-service button[aria-pressed="true"]{
   background:var(--tc-red)!important;border-color:#ff555b!important;color:#fff!important;
 }
+
+
+/* Tech Check visual polish v226 — approved dark/red command-center baseline */
+:root{
+  --tc-bg:#071018;--tc-panel:#0c171f;--tc-panel2:#101d25;--tc-panel3:#14232c;
+  --tc-line:#263a46;--tc-line2:#3a515e;--tc-text:#f5f8fa;--tc-muted:#9eafb9;--tc-red:#e31b23;
+}
+body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
+.card,.item,.check,.report,.ticketCard,.prepCard,.inspectionCard,.returnCard,
+.ownerFold,.unitForm,.unitConfirm,.batteryVerify,.deliveryChecks,.accountbar,
+.wl-workstrip span,.unitStatusRow,.wl-next-action,.ownerNextAction,.ownerHistoryFold{
+  background:var(--tc-panel2)!important;border-color:var(--tc-line)!important;color:var(--tc-text)!important;
+}
+.ownerFold summary,.ownerFoldBody,.ownerHistoryFold>summary,.ownerHistoryFold>div{background:transparent!important;color:var(--tc-text)!important}
+.ownerFoldHint,.ownerActiveLabel,.wl-divider{color:var(--tc-muted)!important}
+.ownerProcess .processStep{background:#17252e!important;color:#c8d3d8!important}
+.ownerProcess .processStep.done{background:#102019!important;color:#aef0c8!important}
+.ownerProcess .processStep.current{background:#2a1719!important;color:#ffb6ba!important;box-shadow:inset 0 0 0 1px #7a3036!important}
+.unitForm,.unitConfirm,.batteryVerify,.deliveryChecks{box-shadow:none!important}
+.wl-workstrip b,.unitStatusRow b,.wl-next-action b,.ownerNextAction b{color:#fff!important}
+.wl-workstrip span{color:var(--tc-muted)!important}
+.wl-mode-pills button,.wl-unit-choice{
+  background:#121f27!important;color:#dce5e9!important;border-color:#344a56!important;
+}
+.wl-mode-pills button.on,.wl-unit-choice.on{
+  background:#291719!important;color:#fff!important;border-color:var(--tc-red)!important;
+}
+.wl-unit-choice span{color:var(--tc-muted)!important}
+.wl-photo-button{background:#111d24!important;color:#ffb6ba!important;border-color:#a23b42!important}
+.wl-return-preview img,.wl-return-photo img{background:#0a141b!important;border-color:var(--tc-line)!important}
+.tabs{background:#0d1920!important;border-color:var(--tc-line)!important}
+.tabs button{color:#b9c6cc!important}
+.tabs button.on{background:#291719!important;color:#fff!important;border-color:var(--tc-red)!important;box-shadow:none!important}
+.itWelcome,.itWeather{color:#fff!important;border-color:var(--tc-line)!important}
+.itWelcome span,.itWeather span{color:var(--tc-muted)!important}
+.check{border-bottom-color:var(--tc-line)!important}
+.check input[type="checkbox"]{accent-color:var(--tc-red)}
+.mini{background:#14232c!important;color:#eef4f6!important;border:1px solid #344a56!important}
+.mini:hover{background:#192b35!important;border-color:#526873!important}
+.btn{box-shadow:none!important}
+.btn.danger,.mini.danger{background:#321719!important;color:#ffb6ba!important;border-color:#7a3036!important}
+.pill.swap{background:#241c2f!important;color:#d8c3ff!important}
+.pill.delivery{background:#291719!important;color:#ffb6ba!important}
+.pill.backup{background:#102522!important;color:#a6e5da!important}
+.bad{background:#281719!important;border-color:#713138!important;color:#ffd9dc!important}
+.auth .card{background:var(--tc-panel2)!important}
+.connectionBanner.offline{background:#251a11!important;border-color:#744b24!important;color:#ffd39b!important}
