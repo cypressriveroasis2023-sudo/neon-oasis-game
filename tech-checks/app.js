@@ -2556,11 +2556,17 @@ async function ownerAppRender(){
   else clearInterval(window.ownerTodayClockTimer);
   ownerInteractionSafety();
 }
+function ownerToggleMobileMenu(){
+  const side=document.getElementById('ownerAppSidebar'),btn=document.getElementById('ownerMobileMenuButton');if(!side)return;
+  const open=!side.classList.contains('mobileOpen');side.classList.toggle('mobileOpen',open);document.body.classList.toggle('ownerMenuOpen',open);if(btn)btn.setAttribute('aria-expanded',String(open));
+}
+function ownerCloseMobileMenu(){const side=document.getElementById('ownerAppSidebar'),btn=document.getElementById('ownerMobileMenuButton');if(side)side.classList.remove('mobileOpen');document.body.classList.remove('ownerMenuOpen');if(btn)btn.setAttribute('aria-expanded','false');}
 async function ownerAppNavigate(route){
   if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ws)ws.scrollLeft=0;
   ownerAppRoute=route;
+  ownerCloseMobileMenu();
   await ownerAppRender();
 }
 function ownerInteractionSafety(){
