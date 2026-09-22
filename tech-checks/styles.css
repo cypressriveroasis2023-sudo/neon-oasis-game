@@ -4958,3 +4958,58 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
   #view-owner .owner-simple-pills{grid-template-columns:1fr 1fr!important}
   #view-owner .owner-assign-command-grid .grid,#view-owner .owner-assign-command-grid .wl-equipment-number-grid{grid-template-columns:1fr!important}
 }
+
+
+/* Assign Job visual parity v229 — match Technician Accounts / Calendar approved density */
+#view-owner[data-owner-route="assign"] .ownerAppMain,
+#view-owner .ownerAppMain:has(#ownerJobAssignments){max-width:980px!important;width:min(980px,calc(100vw - 250px))!important;margin:0 auto!important}
+#view-owner #ownerJobAssignments{background:transparent!important;border:0!important;padding:0!important}
+#view-owner #ownerJobAssignments>summary{display:none!important}
+#view-owner #ownerJobAssignments .ownerDashBody{padding:0!important;background:transparent!important}
+#view-owner #ownerJobAssignments .owner-simple-intro,
+#view-owner #ownerJobAssignments #ownerAssignDraftStatus{
+  min-height:30px!important;display:flex!important;align-items:center!important;margin:0 0 8px!important;padding:7px 10px!important;
+  background:#0f1c23!important;border:1px solid #263a46!important;border-radius:7px!important;color:#b9c7ce!important;font-size:10px!important;
+}
+#view-owner #ownerJobAssignments .owner-simple-intro b{color:#fff!important;margin-right:4px!important}
+#view-owner .owner-assign-command-grid{gap:9px!important}
+#view-owner .owner-assign-command-grid .owner-simple-step{
+  padding:10px!important;border-radius:7px!important;background:#101d24!important;border-color:#2b3d47!important;
+}
+#view-owner .owner-simple-step-head{margin-bottom:8px!important}
+#view-owner .owner-simple-step-head b{font-size:12px!important}
+#view-owner .owner-simple-step-head span:not(.owner-simple-step-num){font-size:8px!important;line-height:1.25!important}
+#view-owner .owner-simple-step-num{
+  width:18px!important;height:18px!important;min-width:18px!important;border-radius:4px!important;font-size:8px!important;
+}
+#view-owner .owner-simple-pills{gap:6px!important;margin-bottom:8px!important}
+#view-owner .owner-simple-pills button{min-height:30px!important;border-radius:6px!important;padding:4px 7px!important;font-size:9px!important}
+#view-owner .owner-simple-pills.role-pills button{min-height:38px!important}
+#view-owner .owner-assign-command-grid input,
+#view-owner .owner-assign-command-grid select{min-height:30px!important;height:30px!important;padding:4px 7px!important;font-size:10px!important}
+#view-owner .owner-assign-command-grid label{font-size:8px!important}
+#view-owner .owner-assign-command-grid .top10{margin-top:7px!important}
+#view-owner .owner-assign-command-grid .top8{margin-top:6px!important}
+#view-owner .owner-assign-equipment-card .qtext,
+#view-owner .owner-assign-equipment-card .wl-requirement-heading{font-size:10px!important;color:#fff!important}
+#view-owner .owner-assign-equipment-card .small{font-size:8px!important;line-height:1.3!important}
+#view-owner .owner-assign-equipment-card .wl-ticket-parts-setup>div{border-color:#263a46!important}
+#view-owner .owner-assign-equipment-card input[type="number"]{min-height:28px!important;height:28px!important}
+#view-owner .owner-assign-tech-card .wl-tech-add-row button{min-height:30px!important;height:30px!important}
+#view-owner .owner-assign-review-card{padding:10px!important}
+#view-owner .owner-assign-review-card .owner-simple-review{
+  background:#0c171d!important;border:1px solid #2b3d47!important;border-radius:6px!important;padding:8px!important;color:#eaf1f4!important;
+}
+#view-owner .owner-assign-review-card .owner-simple-review>div,
+#view-owner .owner-assign-review-card .owner-simple-review li{
+  background:#111f26!important;border-color:#31434e!important;color:#dfe8ec!important;font-size:9px!important;
+}
+#view-owner .owner-assign-review-card .owner-simple-assign{min-height:36px!important;font-size:10px!important}
+@media(min-width:901px){
+  #view-owner .owner-assign-job-card{grid-column:1/-1!important}
+  #view-owner .owner-assign-schedule-card{grid-column:1/2!important}
+  #view-owner .owner-assign-location-card{grid-column:2/3!important}
+  #view-owner .owner-assign-equipment-card{grid-column:1/2!important}
+  #view-owner .owner-assign-tech-card{grid-column:2/3!important}
+  #view-owner .owner-assign-review-card{grid-column:1/-1!important}
+}
