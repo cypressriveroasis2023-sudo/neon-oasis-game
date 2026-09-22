@@ -1426,6 +1426,9 @@ function guidedTourSteps(role){
     { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck Check → required follow-up → next job → End My Day.' },
     { selector:"#wlSvcHome [data-wl-service-open-job]", open:'#wlSvcHome .wl-service-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number. Tech Check will find the correct Service job.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-return]", open:'#wlSvcHome .wl-service-more', title:'RETURN EQUIPMENT', text:'Use this when a unit comes back from the field. Tech Check will walk you through the return photo and IT Intake.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-svc='returns']", open:'#wlSvcHome .wl-service-more', title:'MY RETURNED UNITS', text:'Use this to see equipment you returned and whether IT Intake is still waiting or already complete.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-offline-start]", open:'#wlSvcHome .wl-service-more', title:'OFFLINE UNIT / CALL IT', text:'Use this when a field unit goes offline. Check power first, then call IT and record the troubleshooting here.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-svc='history']", open:'#wlSvcHome .wl-service-more', title:'STATUS & HISTORY', text:'Use this to review your Service jobs, handoffs, returns, and completed work.', fallback:'#wlSvcHome .wl-service-more > summary' },
     ...topControls
   ];
   return [
@@ -1434,6 +1437,8 @@ function guidedTourSteps(role){
     { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → End My Day.' },
     { selector:"#wlItHome [data-wl-it-open-job]", open:'#wlItHome .wl-it-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number to open or claim the correct IT job.', fallback:'#wlItHome .wl-it-more > summary' },
     { selector:"#wlItHome [data-wl-mode='intake']", open:'#wlItHome .wl-it-more', title:'IT INTAKE AND RETURNS', text:'Returned equipment waits here. Open it and Tech Check will continue one check at a time.', fallback:'#wlItHome .wl-it-more > summary' },
+    { selector:"#wlItHome [data-wl-it='pending']", open:'#wlItHome .wl-it-more', title:'RESUME EQUIPMENT PREP', text:'Use this to continue an IT prep job you already started. Saved work stays attached to the same ticket.', fallback:'#wlItHome .wl-it-more > summary' },
+    { selector:"#wlItHome [data-wl-it='history']", open:'#wlItHome .wl-it-more', title:'STATUS & HISTORY', text:'Use this to review IT prep, handoffs, Intake work, site registration, and completed jobs.', fallback:'#wlItHome .wl-it-more > summary' },
     ...topControls
   ];
 }
