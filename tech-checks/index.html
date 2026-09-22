@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-truck-editor-hostfix-20260922za" />
+    <link rel="stylesheet" href="./styles.css?v=owner-truck-saveall-20260922zb" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -479,7 +479,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=owner-truck-editor-hostfix-20260922za"></script>
+    <script type="module" src="./app.js?v=owner-truck-saveall-20260922zb"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -490,7 +490,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-truck-editor-hostfix-20260922za', { scope: './', updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-truck-saveall-20260922zb', { scope: './', updateViaCache: 'none' });
             await registration.update();
           } catch (error) {
             console.warn(error);
