@@ -4679,6 +4679,8 @@ async function showITServiceTruckManager(serviceTechId){
       ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='1' inputmode='numeric' placeholder='Qty added'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>ADD TO TRUCK</button></div>`).join('')}
     </div>`;
 }
+window.showITServiceTruckInventory=showITServiceTruckInventory;
+window.showITServiceTruckManager=showITServiceTruckManager;
 async function itLoadTruckUnit(serviceTechId,type){
   const input=document.getElementById('wlLoadUnit_'+String(type).replaceAll(' ','_')); const tag=input?.value.trim()||'';
   const checks={}; document.querySelectorAll('[data-wl-it-load-unit-check]').forEach(x=>checks[x.dataset.wlItLoadUnitCheck]=Boolean(x.checked));
