@@ -7287,3 +7287,159 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* Owner account username + disabled account management v244 */
+#view-owner #ownerPersistentAccounts{
+  display:grid;
+  gap:14px;
+  padding-bottom:80px;
+}
+#view-owner .ownerAccountsStatusGrid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+#view-owner .ownerAccountsStatusGrid>div{
+  min-height:76px;
+  padding:12px 14px;
+  border:1px solid #304651;
+  border-radius:10px;
+  background:#101d24;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+#view-owner .ownerAccountsStatusGrid b{
+  color:#fff!important;
+  font-size:26px!important;
+  line-height:1!important;
+}
+#view-owner .ownerAccountsStatusGrid span{
+  margin-top:6px;
+  color:#9badb6!important;
+  font-size:8px!important;
+  font-weight:1000!important;
+  letter-spacing:.11em!important;
+}
+#view-owner #ownerPersistentAccounts .ownerTeamStats{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:7px!important;
+  margin:0!important;
+}
+#view-owner #ownerPersistentAccounts .ownerTeamStats>span{
+  min-width:120px;
+  border:1px solid #314650!important;
+  background:#101d24!important;
+  color:#afbec6!important;
+}
+#view-owner #ownerPersistentAccounts .ownerTeamStats b{
+  color:#fff!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAppGroup{
+  margin:0!important;
+  padding:15px!important;
+  border:1px solid #2d424d!important;
+  border-radius:12px!important;
+  background:#0f1b22!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAppGroup>h2{
+  margin:0 0 4px!important;
+  color:#fff!important;
+  font-size:18px!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAppGroup>p{
+  margin:0 0 10px!important;
+  color:#a8b9c1!important;
+  font-size:10px!important;
+}
+#view-owner #ownerPersistentAccounts .ownerAccountsDisabledGroup{
+  border-color:#6c4b26!important;
+  box-shadow:inset 4px 0 0 #ff9f0a;
+}
+#view-owner #ownerPersistentAccounts .ownerAccountsFormerGroup{
+  border-color:#593138!important;
+  box-shadow:inset 4px 0 0 #ff3b30;
+}
+#view-owner #ownerPersistentAccounts .teamMemberCard,
+#view-owner #ownerPersistentAccounts #inactiveUserList .teamMemberCard{
+  background:#111d24!important;
+  border-color:#31434e!important;
+  color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts .teamMemberCard.disabledAccount{
+  border-left-color:#ff9f0a!important;
+  opacity:1!important;
+}
+#view-owner #ownerPersistentAccounts .teamMemberCard>summary{
+  background:#111f27!important;
+}
+#view-owner #ownerPersistentAccounts .teamMemberIdentity b{
+  color:#fff!important;
+}
+#view-owner #ownerPersistentAccounts .teamMemberIdentity span{
+  color:#b6c5cc!important;
+}
+#view-owner #ownerPersistentAccounts .teamMemberBody{
+  border-top-color:#2b414c!important;
+  background:#0e1a21!important;
+}
+#view-owner #ownerPersistentAccounts .accountDisabledNotice{
+  margin:0 0 10px!important;
+  background:#2a2012!important;
+  border-color:#8b611f!important;
+  color:#ffe7b4!important;
+}
+#view-owner #ownerPersistentAccounts .teamEditGrid{
+  grid-template-columns:1.15fr 1.15fr .85fr .75fr auto!important;
+}
+#view-owner #ownerPersistentAccounts .teamEditGrid label{
+  color:#dce7ec!important;
+  font-size:10px!important;
+  font-weight:850!important;
+}
+#view-owner #ownerPersistentAccounts .teamEditGrid .small{
+  margin-top:4px;
+  color:#8ea2ad!important;
+  font-size:8px!important;
+  line-height:1.25!important;
+}
+#view-owner #ownerPersistentAccounts .archivedTeamCard{
+  background:#171518!important;
+  border-color:#56343a!important;
+  color:#eef4f7!important;
+}
+#view-owner #ownerPersistentAccounts .archivedTeamCard b{
+  color:#fff!important;
+}
+#view-owner #ownerPersistentAccounts .teamHistoryRow{
+  border-bottom-color:#2b3e48!important;
+}
+@media(max-width:980px){
+  #view-owner #ownerPersistentAccounts .teamEditGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:620px){
+  #view-owner .ownerAccountsStatusGrid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+  #view-owner .ownerAccountsStatusGrid>div{
+    min-height:64px!important;
+    padding:9px!important;
+  }
+  #view-owner .ownerAccountsStatusGrid b{
+    font-size:21px!important;
+  }
+  #view-owner .ownerAccountsStatusGrid span{
+    font-size:6px!important;
+  }
+  #view-owner #ownerPersistentAccounts .teamEditGrid{
+    grid-template-columns:1fr!important;
+  }
+  #view-owner #ownerPersistentAccounts .teamSaveCell .mini{
+    width:100%!important;
+  }
+}
