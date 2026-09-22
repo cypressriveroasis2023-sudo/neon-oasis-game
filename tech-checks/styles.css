@@ -5138,3 +5138,24 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
  #view-owner .ownerCalDay{min-height:72px!important}
  #view-owner .ownerCalInspector{grid-template-columns:1fr}
 }
+
+
+/* Workflow Health contrast must override the dark Owner workspace theme. */
+#view-owner #ownerAppPage #ownerWorkflowHealthCard .owner-health-head h2{
+  color:#0b1d2d!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage #ownerWorkflowHealthCard .owner-health-head>b{
+  background:#fde2e2!important;
+  color:#a9080d!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage #ownerWorkflowHealthCard .owner-health-list article div>b{
+  color:#17283b!important;
+  opacity:1!important;
+}
+#view-owner #ownerAppPage #ownerWorkflowHealthCard .owner-health-list article small,
+#view-owner #ownerAppPage #ownerWorkflowHealthCard>p{
+  color:#667789!important;
+  opacity:1!important;
+}
