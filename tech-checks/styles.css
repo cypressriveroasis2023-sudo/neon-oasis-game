@@ -7500,3 +7500,7 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
 .ownerTruckVerify{display:flex!important;align-items:center;gap:3px;color:#b9c5ca;font-size:8px}.ownerTruckVerify input{width:14px!important;height:14px!important;min-height:0!important}
 .ownerTruckUnitChecks{margin:7px 0;padding:8px;border:1px solid #2b414b;border-radius:7px;background:#0b1920;display:flex;flex-wrap:wrap;gap:6px 10px}.ownerTruckUnitChecks>b,.ownerTruckUnitChecks>span{width:100%}.ownerTruckUnitChecks>b{font-size:9px;color:#fff}.ownerTruckUnitChecks>span{font-size:8px;color:#92a5ad}.ownerTruckUnitChecks label{font-size:8px;color:#c7d1d5;display:flex;align-items:center;gap:3px}
 @media(max-width:720px){.ownerTruckEditRow{grid-template-columns:1fr}.ownerTruckEditRow>button{width:100%}}
+
+/* v20260922t: JS controls Owner truck editor visibility; avoid stale hidden-state lock */
+.ownerCmdInventoryEditor[data-open="true"]{display:block!important}
+.ownerCmdInventoryEditor[data-open="false"]{display:none!important}
