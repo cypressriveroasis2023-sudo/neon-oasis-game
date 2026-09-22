@@ -744,11 +744,11 @@ async function myTruckSpareData() {
 function truckSpareServiceHtml(spares) {
   const units=spares?.units||[], batteries=spares?.batteries||[];
   if (!units.length && !batteries.length) return '';
-  const unitHtml=units.map(i=>`<div class='wl-ticket'><b>${esc(i.equipment_type)} ${esc(i.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(i.ticket_no)} · Truck BACKUP</div><div class='small top8'>Was this spare actually used today?</div><div class='grid2 top8'><button class='wl-big wl-gray' style='min-height:50px;font-size:15px' data-wl-spare-unit-return='${i.id}'>RETURN UNUSED → IT INTAKE</button><button class='wl-big wl-blue' style='min-height:50px;font-size:15px' data-wl-spare-unit-used='${i.id}'>USED FOR SWAP</button></div></div>`).join('');
+  const unitHtml=units.map(i=>`<div class='wl-ticket'><b>${esc(i.equipment_type)} ${esc(i.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(i.ticket_no)} · Truck BACKUP</div><div class='small top8'>Was this spare actually used today?</div><div class='grid2 top8'><button class='wl-big wl-gray' style='min-height:50px;font-size:15px' data-wl-spare-unit-return='${i.id}' data-wl-spare-unit-label='${esc((i.equipment_type||'Unit')+' '+(i.unit_tag||''))}'>RETURN UNUSED → IT INTAKE</button><button class='wl-big wl-blue' style='min-height:50px;font-size:15px' data-wl-spare-unit-used='${i.id}'>USED FOR SWAP</button></div><div class='small top8'><b>Return photo required:</b> an unused complete backup cannot enter IT Intake until Service photographs the unit being returned.</div></div>`).join('');
   const batteryHtml=batteries.map(b=>`<div class='wl-ticket'><b>${esc(b.battery_type)}</b><div class='small'>MHelpDesk #${esc(b.ticket_no)} · ${Number(b.qty_prepared||0)} spare prepared for ${esc(b.equipment_type)}</div><label class='top8'>How many were USED?<input id='wlSpareUsed_${b.id}' type='number' inputmode='numeric' min='0' max='${Number(b.qty_prepared||0)}' value='0'></label><button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-spare-battery-resolve='${b.id}' data-wl-spare-battery-max='${Number(b.qty_prepared||0)}'>CHECK IN BATTERY SPARES</button><div class='small'>Anything not used is automatically recorded as returned unused.</div></div>`).join('');
   return `<div class='wl-stop top10' data-wl-truck-spares>
     <b>TRUCK SPARES TO RESOLVE · ${units.length+batteries.length}</b>
-    <div>Before ending the day, resolve every backup that IT handed off to you. <b>Unused complete backup units return through IT Intake</b> after transport so IT can verify them before they become available Shop Inventory again. If you used a spare for a swap, mark it USED and return the failed/replaced field unit through the normal IT Intake flow.</div>
+    <div>Before ending the day, resolve every backup that IT handed off to you. <b>Unused complete backup units require a Service return photo and then return through IT Intake</b> so IT can verify them before they become available Shop Inventory again. If you used a spare for a swap, mark it USED and return the failed/replaced field unit through the normal IT Intake flow.</div>
     ${unitHtml}${batteryHtml}
   </div>`;
 }
@@ -5049,11 +5049,92 @@ document.addEventListener('click', async e => {
 
   const spareReturn=e.target.closest('[data-wl-spare-unit-return]');
   if (spareReturn) {
-    if (!confirm('Return this UNUSED complete backup through IT Intake? IT must verify it after transport before it can return to Shop Inventory.')) return;
-    const { error }=await liveDb.rpc('resolve_my_truck_spare_unit',{p_item_id:spareReturn.dataset.wlSpareUnitReturn,p_outcome:'returned_unused'});
-    if (error) return alert(error.message);
-    return showSvcHome();
+    const card=spareReturn.closest('.wl-ticket');
+    if(!card)return;
+    let proof=card.querySelector('.wl-unused-backup-proof');
+    if(!proof){
+      proof=document.createElement('div');
+      proof.className='wl-unused-backup-proof top10';
+      const itemId=spareReturn.dataset.wlSpareUnitReturn;
+      const label=spareReturn.dataset.wlSpareUnitLabel||'unused backup';
+      proof.innerHTML=`<div class='wl-question'>
+        <div class='qnum'>RETURN UNUSED BACKUP</div>
+        <div class='qtext'>TAKE A CLEAR RETURN PHOTO</div>
+        <div class='small'>Photograph ${esc(label)} before handing it back to IT. The photo will stay with this unit through IT Intake.</div>
+        <label class='wl-photo-button top10' for='wlUnusedBackupPhoto_${esc(itemId)}'>📷 TAKE RETURN PHOTO</label>
+        <input id='wlUnusedBackupPhoto_${esc(itemId)}' class='wl-photo-input' type='file' accept='image/*' capture='environment' data-wl-unused-backup-photo='${esc(itemId)}'>
+        <div class='wl-return-preview hidden' data-wl-unused-backup-preview></div>
+        <button class='wl-big wl-red top10' data-wl-spare-unit-return-confirm='${esc(itemId)}' disabled>SEND UNUSED BACKUP TO IT INTAKE →</button>
+        <button class='wl-service-backstep top10' data-wl-spare-unit-return-cancel>← CANCEL</button>
+      </div>`;
+      card.append(proof);
+      card.querySelector('.grid2')?.classList.add('hidden');
+      const input=proof.querySelector('[data-wl-unused-backup-photo]');
+      input?.addEventListener('change',()=>{
+        const file=input.files?.[0];
+        const preview=proof.querySelector('[data-wl-unused-backup-preview]');
+        const send=proof.querySelector('[data-wl-spare-unit-return-confirm]');
+        if(!file){
+          preview?.classList.add('hidden');
+          if(send)send.disabled=true;
+          return;
+        }
+        if(preview){
+          preview.classList.remove('hidden');
+          preview.innerHTML=`<img src='${URL.createObjectURL(file)}' alt='Unused backup return photo'><div class='ok top8'><b>✓ RETURN PHOTO READY</b></div>`;
+        }
+        if(send)send.disabled=false;
+      });
+      input?.click();
+    }else{
+      proof.querySelector('[data-wl-unused-backup-photo]')?.click();
+    }
+    return;
   }
+
+  const spareReturnCancel=e.target.closest('[data-wl-spare-unit-return-cancel]');
+  if(spareReturnCancel){
+    const proof=spareReturnCancel.closest('.wl-unused-backup-proof');
+    const card=proof?.closest('.wl-ticket');
+    proof?.remove();
+    card?.querySelector('.grid2')?.classList.remove('hidden');
+    return;
+  }
+
+  const spareReturnConfirm=e.target.closest('[data-wl-spare-unit-return-confirm]');
+  if(spareReturnConfirm){
+    const proof=spareReturnConfirm.closest('.wl-unused-backup-proof');
+    const file=proof?.querySelector('[data-wl-unused-backup-photo]')?.files?.[0];
+    if(!file)return alert('Take a clear return photo before sending this unused backup to IT Intake.');
+    if(!confirm('Send this UNUSED complete backup and its return photo to IT Intake?'))return;
+
+    const itemId=spareReturnConfirm.dataset.wlSpareUnitReturnConfirm;
+    const returnId=crypto.randomUUID();
+    let uploadedPaths=[];
+    spareReturnConfirm.disabled=true;
+    spareReturnConfirm.textContent='SENDING TO IT INTAKE…';
+    document.body.classList.add('busy');
+    try{
+      uploadedPaths=await uploadReturnPhotos([file],returnId,'service/unused-backup');
+      const {error}=await liveDb.rpc('resolve_my_truck_spare_unit_v2',{
+        p_item_id:itemId,
+        p_outcome:'returned_unused',
+        p_return_photo_paths:uploadedPaths,
+        p_return_id:returnId
+      });
+      if(error)throw error;
+      await window.refreshData?.();
+      return showSvcHome();
+    }catch(err){
+      if(uploadedPaths.length)await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(()=>null);
+      spareReturnConfirm.disabled=false;
+      spareReturnConfirm.textContent='SEND UNUSED BACKUP TO IT INTAKE →';
+      return alert(err?.message||'Could not send the unused backup to IT Intake.');
+    }finally{
+      document.body.classList.remove('busy');
+    }
+  }
+
   const spareUsed=e.target.closest('[data-wl-spare-unit-used]');
   if (spareUsed) {
     if (!confirm('Mark this truck spare USED for the field job? If it replaced a failed unit, return the failed unit through normal IT Intake.')) return;
