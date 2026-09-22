@@ -755,6 +755,23 @@ function injectStyles() {
     .wl-day-next-card.urgent{border-color:#e31821;box-shadow:0 0 0 1px rgba(227,24,33,.22) inset}
     .wl-day-next-card.waiting{border-color:#7b8991}
     .wl-day-next-card.done{border-color:#52656e}
+    #view-it .wl-it-ticket-prompt{margin:16px auto 12px;max-width:720px;padding:16px 18px;border:1px solid #334852;border-radius:14px;background:#0b1920;color:#fff;text-align:center;display:grid;gap:7px}
+    #view-it .wl-it-ticket-prompt>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
+    #view-it .wl-it-ticket-prompt>b{font-size:clamp(22px,4.5vw,34px);line-height:1.08;color:#fff;font-weight:1000}
+    #view-it .wl-it-ticket-prompt>small{font-size:13px;line-height:1.4;color:#b9c7ce;font-weight:750}
+    #view-it .wl-it-ticket-prompt>button{min-height:52px;border:1px solid #ff3b42;border-radius:10px;background:#e31821;color:#fff;font-size:17px;font-weight:1000}
+    #view-it .wl-it-service-queue{max-width:720px;margin:12px auto 0;padding:14px 16px;border:1px solid #2a414d;border-radius:14px;background:#071117;text-align:left}
+    #view-it .wl-it-service-queue-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #263943}
+    #view-it .wl-it-service-queue-head>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
+    #view-it .wl-it-service-queue-head>b{font-size:13px;color:#dce6ea}
+    #view-it .wl-it-service-queue-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #1d3039}
+    #view-it .wl-it-service-queue-row:last-child{border-bottom:0}
+    #view-it .wl-it-service-queue-row>div{display:grid;gap:2px}
+    #view-it .wl-it-service-queue-row b{color:#fff;font-size:14px}
+    #view-it .wl-it-service-queue-row span{color:#9fb0b8;font-size:12px}
+    #view-it .wl-it-service-queue-row em{font-style:normal;color:#c8d3d8;font-size:10px;font-weight:1000;letter-spacing:.06em;white-space:nowrap}
+    #view-it .wl-it-service-queue-empty,#view-it .wl-it-service-queue-more{padding:11px 0 2px;color:#9fb0b8;font-size:12px;font-weight:750}
+    #view-it .wl-readonly-extra .small{margin-top:8px;color:#91a4ad!important;font-size:12px!important;font-weight:800!important}
     .wl-day-complete-flash{margin:12px auto;max-width:720px;padding:12px 14px;border:1px solid #49636d;border-radius:12px;background:#102229;color:#fff;display:grid;gap:2px;text-align:center}
     .wl-day-complete-flash>b{font-size:16px;color:#fff}
     .wl-day-complete-flash>span{font-size:14px;font-weight:850;color:#d8e1e6}
@@ -2501,12 +2518,13 @@ async function myITDraftPreps(){
 }
 async function itDayState(){
   const today=techCheckDateKey();
-  const [assignmentsQ,returnsQ,siteQ,draftsQ,healthQ]=await Promise.all([
+  const [assignmentsQ,returnsQ,siteQ,draftsQ,healthQ,serviceQueueQ]=await Promise.all([
     myActiveAssignments('it'),
     liveDb.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at').eq('status','waiting_it').order('returned_at',{ascending:true}).limit(50),
     swapSiteRegistrationRows(),
     myITDraftPreps(),
-    liveDb.rpc('get_workflow_health_v1')
+    liveDb.rpc('get_workflow_health_v1'),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_at,released_by_name,work_type').eq('status','released').order('released_at',{ascending:true}).limit(12)
   ]);
   if(returnsQ.error)throw returnsQ.error;
   const assignments=assignmentsQ||[];
@@ -2521,6 +2539,7 @@ async function itDayState(){
     drafts:draftsQ||[],
     gates,
     recovery:healthQ?.data?.recovery||null,
+    serviceQueue:serviceQueueQ?.error ? [] : (serviceQueueQ?.data||[]),
     nextReady:gates.find(row=>row.gate?.ready)||null,
     nextBlocked:gates.find(row=>!row.gate?.ready)||null
   };
@@ -2571,7 +2590,16 @@ function itNextActionHtml(state){
     const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
     return `<div class='wl-day-next-card waiting'><span>IT JOB IS WAITING</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(gate.label||'WAITING')} · ${esc(gate.detail||'This IT job is not ready yet.')}</small><button class='wl-big wl-gray' data-wl-it-open-job>CHECK / ENTER A TICKET</button></div>`;
   }
-  return `<div class='wl-day-next-card done'><span>ALL REQUIRED WORK IS CLEAR</span><b>END MY DAY</b><small>No unresolved IT work for today.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled and will not block today.`:''}</small><button class='wl-it-start' data-wl-tech-end-day='it'>END MY DAY</button></div>`;
+  return `<div class='wl-it-ticket-prompt'><span>READY FOR THE NEXT TICKET</span><b>ENTER ANOTHER TICKET NUMBER</b><small>No unresolved IT work is waiting right now.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled.`:''}</small><button type='button' data-wl-it-open-job>ENTER MHELPDESK TICKET</button></div>`;
+}
+function itServiceQueueHtml(state){
+  const rows=Array.isArray(state?.serviceQueue)?state.serviceQueue:[];
+  const list=rows.slice(0,6).map(row=>`<div class='wl-it-service-queue-row'><div><b>MHelpDesk #${esc(row.ticket_no||'—')}</b><span>${esc(row.site||'Site not listed')}</span></div><em>WAITING FOR SERVICE</em></div>`).join('');
+  return `<section class='wl-it-service-queue'>
+    <div class='wl-it-service-queue-head'><span>SERVICE QUEUE</span><b>${rows.length} waiting</b></div>
+    ${list || "<div class='wl-it-service-queue-empty'>No IT handoffs are waiting for Service right now.</div>"}
+    ${rows.length>6?`<div class='wl-it-service-queue-more'>+${rows.length-6} more in Status & History</div>`:''}
+  </section>`;
 }
 
 let ownerWorkflowHealth=null;
@@ -2674,7 +2702,8 @@ async function showITHome() {
       <h1>HELLO, ${esc(ownerViewingIT?'TECHNICIAN':firstName.toUpperCase())}</h1>
       ${techCompletionBanner(flash)}
       ${itNextActionHtml(state)}
-      <div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> NEXT IT JOB <b>→</b> END MY DAY</div>
+      ${itServiceQueueHtml(state)}
+      <div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> NEXT IT JOB <b>→</b> SERVICE QUEUE</div>
 
       <details class='wl-it-more'>
         <summary>OTHER ACTIONS</summary>
@@ -4032,7 +4061,7 @@ function itTicketSummaryHtml(items, evidence) {
     return `<div class='wl-simple-unit'>
       <div><b>${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><span>Unit ${unitNo} · ${esc(item.purpose)}</span></div>
       <div class='wl-simple-unit-ok'>✓ READY</div>
-      <button class='mini' data-wl-final-unit='${index}'>Review Unit</button>
+      <button class='mini' data-wl-final-unit='${index}'>Review / Adjust Unit</button>
     </div>`;
   }).join('');
   return `<div class='wl-simple-ticket'>
@@ -4043,11 +4072,11 @@ function itTicketSummaryHtml(items, evidence) {
 }
 function itFinalPartsSummaryHtml() {
   const rows=ticketPartsRows(activeItPrep).filter(row=>row.qty>0);
-  if(!rows.length) return '';
-  return `<div class='wl-simple-extra'>
-    <div class='qnum'>EXTRA PARTS</div>
-    <div><b>${rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ')}</b></div>
-    <button class='mini top8' data-wl-final-view='parts'>Review Parts</button>
+  const value=rows.length ? rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ') : 'NONE LISTED';
+  return `<div class='wl-simple-extra wl-readonly-extra'>
+    <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
+    <div><b>${value}</b></div>
+    <div class='small'>READ ONLY AT HANDOFF — do not add or change parts from this screen.</div>
   </div>`;
 }
 function itFinalSpareSummaryHtml(items,rows) {
@@ -4056,30 +4085,11 @@ function itFinalSpareSummaryHtml(items,rows) {
   const bits=[];
   if(units.length) bits.push(units.map(item=>esc(item.equipment_type)+' '+esc(item.unit_tag||'')).join(' · '));
   if(batteries.length) bits.push(batteries.map(row=>Number(row.qty_prepared)+' × '+esc(row.battery_type)).join(' · '));
-  if(!bits.length) return '';
-  return `<div class='wl-simple-extra'>
-    <div class='qnum'>TRUCK SPARES</div>
-    <div><b>${bits.join(' · ')}</b></div>
-    <button class='mini top8' data-wl-final-view='spares'>Review Spares</button>
+  return `<div class='wl-simple-extra wl-readonly-extra'>
+    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
+    <div><b>${bits.length ? bits.join(' · ') : 'NONE ADDED'}</b></div>
+    <div class='small'>READ ONLY AT HANDOFF — no spare equipment can be added or changed here.</div>
   </div>`;
-}
-function itFinalPartsEditorHtml() {
-  return `${progress('Additional Parts','Separate from the ticket review',1,1)}
-    <div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div></div>
-    <div class='wl-question top10'>
-      <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
-      <div class='qtext'>Only add loose parts specifically needed for this ticket.</div>
-      <div class='small'>Normal components that belong to the unit are handled in that unit's IT checklist.</div>
-      ${ticketPartsInputsHtml('wlEditPart',activeItPrep)}
-      <button class='wl-big wl-blue top10' data-wl-save-prep-parts>Save & Return to Ticket Summary</button>
-    </div>
-    <div class='wl-nav'><button class='wl-prev' data-wl-final-view='summary'>← Ticket Summary</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>`;
-}
-function itFinalSparesEditorHtml(spareBatteries,items,evidence) {
-  return `${progress('Truck Spares / Backups','Separate contingency equipment',1,1)}
-    <div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div></div>
-    ${truckSpareITPanelHtml(spareBatteries,items,evidence)}
-    <div class='wl-nav'><button class='wl-prev' data-wl-final-view='summary'>← Ticket Summary</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>`;
 }
 
 async function releaseItPrepUnitByUnit() {
@@ -4202,16 +4212,8 @@ async function renderItUnitStep() {
     const partsOnlyProofReady=!partsOnly || (globalItPhotos.length>=1 && Boolean(globalItSignature));
     const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut && partsOnlyProofReady;
 
-    if (itFinalView==='parts') {
-      wizard.innerHTML=itFinalPartsEditorHtml();
-      resetWizardPosition(wizard);
-      return;
-    }
-    if (itFinalView==='spares') {
-      wizard.innerHTML=itFinalSparesEditorHtml(spareBatteries,items,ev);
-      resetWizardPosition(wizard);
-      return;
-    }
+    // Final handoff is read-only. Corrections go through Review / Adjust Unit.
+    if (itFinalView!=='summary') itFinalView='summary';
 
     if(partsOnly){
       wizard.innerHTML =
