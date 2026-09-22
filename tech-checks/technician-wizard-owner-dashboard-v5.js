@@ -292,7 +292,7 @@ function injectStyles() {
     .wl-guided-tour{position:fixed;inset:0;z-index:10040;pointer-events:none}.wl-guided-tour.hidden{display:none!important}
     .wl-tour-shade{position:fixed;background:rgba(4,12,20,.70);pointer-events:auto}
     .wl-tour-blocker{position:fixed;z-index:1;background:transparent;pointer-events:auto}
-    .wl-guided-tour-target{position:relative!important;z-index:10042!important;outline:4px solid #fff!important;outline-offset:4px!important;box-shadow:0 0 0 8px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
+    .wl-guided-tour-target{position:relative!important;z-index:10039!important;outline:4px solid #fff!important;outline-offset:4px!important;box-shadow:0 0 0 8px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
     .wl-tour-tip{--tour-arrow-x:50%;position:fixed;z-index:3;box-sizing:border-box;padding:16px;border:2px solid #d20b12;border-radius:20px;background:#fff;color:#101820;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}.wl-tour-tip:before{content:'';position:absolute;left:var(--tour-arrow-x);width:18px;height:18px;background:#fff;border-left:2px solid #d20b12;border-top:2px solid #d20b12;transform:translateX(-50%) rotate(45deg)}.wl-tour-tip.below:before{top:-11px}.wl-tour-tip.above:before{bottom:-11px;transform:translateX(-50%) rotate(225deg)}
     .wl-tour-tip-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.wl-tour-tip-head span{padding:6px 10px;border-radius:999px;background:#101820;color:#fff;font-size:11px;font-weight:950;letter-spacing:.06em}
     .wl-tour-tip-head button{width:38px;height:38px;margin:0;border:0;border-radius:999px;background:#e9eef2;color:#304455;font-size:25px;line-height:1;font-weight:800}
@@ -1421,7 +1421,6 @@ function guidedTourSteps(role){
     { selector:".accountActions button[onclick='logout()']", closeMenu:true, title:'SIGN OUT', text:'Tap Sign Out when you are finished or when another technician needs to use this device.' }
   ];
   if(role==='service') return [
-    { selector:'#wlSvcHome h1', title:'THIS IS YOUR SERVICE HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
     { selector:'#wlSvcHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'This card shows your one required action. You do not need to search through the app.' },
     { selector:'#wlSvcHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This starts the next required Service step.' },
     { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck Check → required follow-up → next job → End My Day.' },
@@ -1430,7 +1429,6 @@ function guidedTourSteps(role){
     ...topControls
   ];
   return [
-    { selector:'#wlItHome h1', title:'THIS IS YOUR IT HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
     { selector:'#wlItHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'IT Intake, site registration, active prep, and new jobs are automatically placed in the right order.' },
     { selector:'#wlItHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This opens the next required IT step. You do not need to search through the app.' },
     { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → End My Day.' },
