@@ -7263,3 +7263,27 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
     color:#fff!important;
   }
 }
+
+
+/* Permanent truck SIM inventory v244 */
+#view-owner .ownerCmdSubHead{
+  margin-top:12px!important;
+  padding-top:10px!important;
+  border-top:1px solid #263b46!important;
+}
+#view-owner .ownerCmdSimRow>b{
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.01em;
+}
+#view-service .wl-truck-unit-grid.wl-truck-sim-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+#view-service .wl-truck-sim-check small{
+  font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+@media(max-width:720px){
+  #view-service .wl-truck-unit-grid.wl-truck-sim-grid{
+    grid-template-columns:1fr!important;
+  }
+}
