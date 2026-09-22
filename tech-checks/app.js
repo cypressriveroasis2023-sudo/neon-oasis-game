@@ -1510,7 +1510,7 @@ async function ownerOpenTruckInventoryManager(){
   requestAnimationFrame(()=>{
     const card=document.querySelector('.ownerCmdTechCard');
     const editor=document.getElementById('ownerTruckEditor_'+first.service_tech_id);
-    if(editor?.hidden) ownerToggleTruckInventoryEditor(first.service_tech_id);
+    if(editor?.dataset.open!=='true') ownerToggleTruckInventoryEditor(first.service_tech_id);
     (editor||card)?.scrollIntoView({behavior:'smooth',block:'start'});
   });
 }
@@ -2235,10 +2235,17 @@ function ownerTruckEditorHtml(tech){
     +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(tech.service_tech_id)+'_'+i+'" type="number" min="0" value="'+qty+'"><button type="button" onclick="ownerSetTruckStock(\''+esc(tech.service_tech_id)+'\',\''+esc(type)+'\','+i+')">SET COUNT</button></div>').join('');
 }
 function ownerToggleTruckInventoryEditor(id){
-  const host=document.getElementById('ownerTruckEditor_'+id);if(!host)return;
-  if(!host.hidden){host.hidden=true;host.innerHTML='';return;}
+  const host=document.getElementById('ownerTruckEditor_'+id);
+  if(!host){alert('Truck inventory editor could not open. Refresh the page and try again.');return;}
+  const isOpen=host.dataset.open==='true';
+  if(isOpen){host.dataset.open='false';host.innerHTML='';host.style.display='none';return;}
   const tech=ownerTruckEditorTech(id);if(!tech)return alert('Truck inventory could not be found.');
-  host.innerHTML=ownerTruckEditorHtml(tech);host.hidden=false;
+  host.innerHTML=ownerTruckEditorHtml(tech);
+  host.dataset.open='true';
+  host.hidden=false;
+  host.removeAttribute('hidden');
+  host.style.display='block';
+  requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'nearest'}));
 }
 async function ownerTruckInventorySaved(message){
   await refreshData();
