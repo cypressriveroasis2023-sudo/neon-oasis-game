@@ -7541,3 +7541,43 @@ html,body{max-width:100%;overflow-x:hidden}
   #view-owner .ownerTodayMain{min-width:0;overflow-x:hidden}
   #view-owner .ownerTodayMain table{max-width:100%}
 }
+
+
+/* v20260922v — exact iPhone Today job-card layout */
+@media(max-width:720px){
+  #view-owner .ownerTodayJobsList{width:100%;max-width:100%;overflow:hidden;border-radius:0 0 10px 10px}
+  #view-owner .ownerTodayJob{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;
+    grid-template-areas:"main state" "meta state"!important;
+    gap:8px 10px!important;align-items:center!important;
+    padding:12px!important;overflow:hidden!important
+  }
+  #view-owner .ownerTodayJobMain{
+    grid-area:main!important;display:grid!important;
+    grid-template-columns:minmax(92px,34%) minmax(0,1fr)!important;
+    gap:10px!important;min-width:0!important;overflow:hidden!important
+  }
+  #view-owner .ownerTodayTicket,#view-owner .ownerTodaySite{min-width:0!important;overflow:hidden!important}
+  #view-owner .ownerTodayTicket b{
+    display:block!important;font-size:12px!important;line-height:1.2!important;
+    white-space:normal!important;overflow-wrap:anywhere!important
+  }
+  #view-owner .ownerTodaySite b,#view-owner .ownerTodaySite span{
+    display:block!important;max-width:100%!important;white-space:nowrap!important;
+    overflow:hidden!important;text-overflow:ellipsis!important
+  }
+  #view-owner .ownerTodaySite b{font-size:11px!important}
+  #view-owner .ownerTodaySite span{font-size:9px!important}
+  #view-owner .ownerTodayMeta{
+    grid-area:meta!important;display:flex!important;min-width:0!important;
+    padding-left:calc(34% + 10px)!important;gap:5px!important;overflow:hidden!important
+  }
+  #view-owner .ownerTodayMeta span{font-size:8px!important;padding:3px 5px!important;white-space:nowrap!important}
+  #view-owner .ownerTodayState{
+    grid-area:state!important;display:block!important;text-align:right!important;
+    min-width:0!important;max-width:72px!important
+  }
+  #view-owner .ownerTodayState span{display:inline-block!important;font-size:7px!important;padding:5px!important;white-space:nowrap!important}
+  #view-owner .ownerTodayOwner{display:none!important}
+}
