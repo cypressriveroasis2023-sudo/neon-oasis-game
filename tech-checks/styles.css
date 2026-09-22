@@ -4736,3 +4736,41 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
   border-color:#42535d!important;
   color:#eaf1f4!important;
 }
+
+
+/* Technician Accounts — target actual rendered teamMemberCard markup v224 */
+#view-owner #ownerPersistentAccounts #userList .teamMemberCard{
+  background:#111d24!important;border:1px solid #31434e!important;border-left-width:5px!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .teamMemberCard.role-owner{border-left-color:#ef4338!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberCard.role-service{border-left-color:#7f919c!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberCard.role-it{border-left-color:#aab8c0!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberCard>summary{
+  background:#111d24!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .teamMemberIdentity b{color:#fff!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberIdentity span{color:#9fb0ba!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberBody{
+  background:#0e1920!important;border-top-color:#31434e!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .teamMemberBody label,
+#view-owner #ownerPersistentAccounts #userList .teamMemberBody b{color:#f4f8fa!important}
+#view-owner #ownerPersistentAccounts #userList .teamMemberBody .small{color:#aebdc6!important}
+#view-owner #ownerPersistentAccounts #userList .accountSecurityFold,
+#view-owner #ownerPersistentAccounts #userList .teamEmailBox{
+  background:#111d24!important;border-color:#31434e!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .accountSecurityFold>summary{
+  background:#111d24!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .accountSecurityBody{
+  background:#0e1920!important;border-top-color:#31434e!important;
+}
+#view-owner #ownerPersistentAccounts #userList .pill{
+  background:#17242c!important;border:1px solid #465963!important;color:#eef5f8!important;
+}
+#view-owner #ownerPersistentAccounts #userList .pill.green{background:#102019!important;border-color:#315a49!important;color:#aef0c8!important}
+#view-owner #ownerPersistentAccounts #userList .pill.amber{background:#251a11!important;border-color:#744b24!important;color:#ffd39b!important}
+#view-owner #ownerPersistentAccounts #userList .roleBadge.owner{background:#321719!important;border-color:#7a3036!important;color:#ffb6ba!important}
+#view-owner #ownerPersistentAccounts #userList .roleBadge.it,
+#view-owner #ownerPersistentAccounts #userList .roleBadge.service{background:#18242b!important;border-color:#465963!important;color:#e8f0f4!important}
