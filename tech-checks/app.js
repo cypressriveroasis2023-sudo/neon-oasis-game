@@ -251,13 +251,26 @@ async function login() {
   if (!validUsername(username) || !password)
     return msg('loginMessage', 'Enter your username and password.', 'bad');
   setBusy(true);
-  const { data, error } = await db.auth.signInWithPassword({
-    email: authId(username),
-    password,
-  });
-  setBusy(false);
-  if (error)
-    return msg('loginMessage', 'Username or password is incorrect.', 'bad');
+  let data, error;
+  try {
+    const result = await appTimeout(
+      db.auth.signInWithPassword({ email: authId(username), password }),
+      'Sign in',
+      15000
+    );
+    data = result?.data;
+    error = result?.error;
+  } catch (loginError) {
+    error = loginError;
+  } finally {
+    setBusy(false);
+  }
+  if (error || !data?.session) {
+    console.warn('Tech Check sign in failed', error);
+    return msg('loginMessage', error?.message?.includes('timeout')
+      ? 'Sign in timed out. Check your connection and try again.'
+      : 'Username or password is incorrect.', 'bad');
+  }
   await enterApp(data.session);
 }
 async function enterApp(session) {
