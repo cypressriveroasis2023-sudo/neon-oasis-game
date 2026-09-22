@@ -2466,6 +2466,13 @@ async function ownerAppRender(){
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
   host.innerHTML=html;
   ownerSetPersistentSurface(route);
+  const ownerWs=document.querySelector('#view-owner .ownerAppWorkspace');
+  if(ownerWs){
+    ownerWs.scrollLeft=0;
+    requestAnimationFrame(()=>{ ownerWs.scrollLeft=0; });
+  }
+  document.documentElement.scrollLeft=0;
+  document.body.scrollLeft=0;
   document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===route));
   if(route==='attention')renderOwnerAttention();
   if(route==='accounts'){renderPasswordResetRequests();renderUsers();}
@@ -2475,6 +2482,8 @@ async function ownerAppRender(){
 }
 async function ownerAppNavigate(route){
   if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
+  const ws=document.querySelector('#view-owner .ownerAppWorkspace');
+  if(ws)ws.scrollLeft=0;
   ownerAppRoute=route;
   await ownerAppRender();
 }
