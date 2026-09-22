@@ -1807,19 +1807,6 @@ function ownerCalendarShift(n){const d=new Date(ownerCalendarDate);if(ownerCalen
 function ownerCalendarSetMode(m){ownerCalendarMode=m;ownerCalendarSelected=null;ownerAppRender();}
 function ownerCalendarToday(){ownerCalendarDate=new Date();ownerCalendarSelected=localDateKey(ownerCalendarDate);ownerAppRender();}
 function ownerCalendarSelect(key){ownerCalendarSelected=key;ownerAppRender();}
-function ownerCalendarOpenJob(id){
- const job=(state.ownerAssignments||[]).find(x=>String(x.id)===String(id));
- if(!job)return;
- // Calendar is an Owner workspace. Selecting a job must stay inside Tech Check,
- // not silently redirect the Owner into OnSite Vision.
- const key=String(job.scheduled_for||'').slice(0,10);
- if(key)ownerCalendarSelected=key;
- ownerAppRender();
- requestAnimationFrame(()=>{
-   const target=document.querySelector('[data-owner-calendar-job="'+CSS.escape(String(id))+'"]');
-   if(target){target.focus?.();target.scrollIntoView({behavior:'smooth',block:'nearest'});}
- });
-}
 function ownerCalendarDayCell(d,inMonth=true){
  const key=localDateKey(d),jobs=ownerCalendarJobsForDate(d),today=key===localDateKey(new Date()),sel=key===ownerCalendarSelected;
  return '<button type="button" class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+(sel?'selected ':'')+'" onclick="ownerCalendarSelect(\''+key+'\')"><div class="ownerCalDate"><b>'+d.getDate()+'</b>'+(jobs.length?'<span>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</span>':'')+'</div>'
