@@ -3725,17 +3725,24 @@ async function persistCurrentItItem() {
   return true;
 }
 function itCheckStepHtml(item, step, index, total, unitNo) {
-  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='${step.optional ? 'ENTER TAG IF PRESENT' : 'EXACT UNIT TAG'}'>${step.optional ? "<div class='wl-note top8'>No tag is valid for a 110V Stand. Leave this blank if the stand does not have one.</div>" : ''}</div>`;
+  if (step.kind === 'tag') {
+    const type=String(item?.equipment_type||'unit');
+    const example=type==='Helios'?'Example: 007.':'Enter the tag exactly as printed on the equipment.';
+    return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='${step.optional ? 'ENTER TAG IF PRESENT' : 'EXACT UNIT TAG'}'>${step.optional ? "<div class='wl-note top8'>No tag is valid for a 110V Stand. Leave this blank if the stand does not have one.</div>" : `<details class='wl-step-help top8'><summary>Need help?</summary><div class='wl-note top8'>Type the unit number exactly as it appears on the ${esc(type)}. ${esc(example)} Do not guess.</div></details>`}</div>`;
+  }
   if (step.kind === 'number') {
     const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1);
     const value=item[step.field] ?? (step.field==='battery_count' ? item.required_battery_count : min);
-    return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>Required minimum: ${min}</div></div>`;
+    const heliosBattery=step.field==='battery_count'&&item?.equipment_type==='Helios';
+    const label=heliosBattery?'Confirm 1 Helios battery box is prepared':step.label;
+    const note=heliosBattery?'Helios uses one internal battery box. Do not count Solar Stand batteries.':`Required minimum: ${min}`;
+    return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>${esc(note)}</div></div>`;
   }
   const answered = itBoolAnswered(item, step.field);
   const value = itBoolValue(item, step.field);
   const yes = answered && value === true;
   const no = answered && value !== true;
-  return `<div class='wl-question wl-it-auto-bool'><div class='qnum'>UNIT ${unitNo} · CHECK ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. This equipment cannot move forward while this answer is NO.</div></div>` : ''}</div>`;
+  return `<div class='wl-question wl-it-auto-bool'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. This equipment cannot move forward while this answer is NO.</div></div>` : ''}</div>`;
 }
 function itUnitIssues(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo);
@@ -4139,7 +4146,9 @@ async function renderItUnitStep() {
   } else if (itUnitPhase === 'checks') {
     const steps = itUnitStepsData(item, unitNo);
     const step = steps[itQuestionIndex];
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, step?.label || `Check ${identity}`, itQuestionIndex + 1, Math.max(1, steps.length)) + itEquipmentAIReview(item,[],unitNo) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + (step?.kind==='bool'?`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`:`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`);
+    const stepCount=Math.max(1,steps.length);
+    const equipmentName=item?.equipment_type||'Equipment';
+    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `${equipmentName} · Step ${itQuestionIndex + 1} of ${stepCount}`, itQuestionIndex + 1, stepCount) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + (step?.kind==='bool'?`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`:`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`);
   } else if (itUnitPhase === 'photo') {
     wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Photograph ${identity} with tag ${esc(item.unit_tag || '')} visible`, 1, 3) + await photoOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next: Signature →</button></div>`;
   } else if (itUnitPhase === 'review') {
