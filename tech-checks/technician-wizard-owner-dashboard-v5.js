@@ -514,7 +514,6 @@ function injectStyles() {
   `;
   s.textContent += `
     #view-svc{color:#fff!important}
-    #view-svc>.card:not(#wlSvcHome):not(#wlSvcLookup):not(#wlInspection):not(#wlSvcWizardOnly):not(#wlSvcFieldAssignment){display:none}
     #view-svc .wl-service-simple-home,
     #view-svc .wl-service-simple-card,
     #view-svc #wlSvcWizardOnly,
