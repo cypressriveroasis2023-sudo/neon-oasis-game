@@ -290,10 +290,10 @@ function injectStyles() {
 
     /* In-app guided tutorial v94 */
     .wl-guided-tour{position:fixed;inset:0;z-index:10040;pointer-events:none}.wl-guided-tour.hidden{display:none!important}
-    .wl-tour-shade{position:fixed;background:rgba(4,12,20,.78);pointer-events:auto}
+    .wl-tour-shade{position:fixed;background:rgba(4,12,20,.70);pointer-events:auto}
     .wl-tour-blocker{position:fixed;z-index:1;background:transparent;pointer-events:auto}
-    .wl-guided-tour-target{position:relative!important;z-index:10042!important;outline:5px solid #fff!important;outline-offset:5px!important;box-shadow:0 0 0 10px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
-    .wl-tour-tip{position:fixed;z-index:3;box-sizing:border-box;padding:16px;border:2px solid #d20b12;border-radius:20px;background:#fff;color:#101820;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}
+    .wl-guided-tour-target{position:relative!important;z-index:10042!important;outline:4px solid #fff!important;outline-offset:4px!important;box-shadow:0 0 0 8px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
+    .wl-tour-tip{--tour-arrow-x:50%;position:fixed;z-index:3;box-sizing:border-box;padding:16px;border:2px solid #d20b12;border-radius:20px;background:#fff;color:#101820;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}.wl-tour-tip:before{content:'';position:absolute;left:var(--tour-arrow-x);width:18px;height:18px;background:#fff;border-left:2px solid #d20b12;border-top:2px solid #d20b12;transform:translateX(-50%) rotate(45deg)}.wl-tour-tip.below:before{top:-11px}.wl-tour-tip.above:before{bottom:-11px;transform:translateX(-50%) rotate(225deg)}
     .wl-tour-tip-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.wl-tour-tip-head span{padding:6px 10px;border-radius:999px;background:#101820;color:#fff;font-size:11px;font-weight:950;letter-spacing:.06em}
     .wl-tour-tip-head button{width:38px;height:38px;margin:0;border:0;border-radius:999px;background:#e9eef2;color:#304455;font-size:25px;line-height:1;font-weight:800}
     .wl-tour-tip h3{margin:12px 0 7px!important;color:#d20b12!important;font-size:22px!important;line-height:1.08!important}.wl-tour-tip p{margin:0;color:#213445;font-size:17px;line-height:1.35;font-weight:750}
@@ -1453,7 +1453,17 @@ function clearGuidedTourTarget(){
 
 function positionGuidedTour(step,target){
   const layer=ensureGuidedTourLayer();
+  const tip=layer.querySelector('.wl-tour-tip');
+  document.getElementById('wlTourCount').textContent='STEP '+(guidedTourStep+1)+' OF '+guidedTourSteps(guidedTourRole).length;
+  document.getElementById('wlTourTitle').textContent=step.title;
+  document.getElementById('wlTourText').textContent=step.text;
+  const back=layer.querySelector('[data-wl-tour-back]');
+  back.disabled=guidedTourStep===0;
+  const next=layer.querySelector('[data-wl-tour-next]');
+  next.textContent=guidedTourStep===guidedTourSteps(guidedTourRole).length-1?'FINISH ✓':'NEXT →';
+
   const pad=8;
+  const gap=16;
   const rect=target.getBoundingClientRect();
   const top=Math.max(0,rect.top-pad), left=Math.max(0,rect.left-pad);
   const right=Math.min(innerWidth,rect.right+pad), bottom=Math.min(innerHeight,rect.bottom+pad);
@@ -1464,21 +1474,32 @@ function positionGuidedTour(step,target){
   setBox('right',{left:right+'px',top:top+'px',width:Math.max(0,innerWidth-right)+'px',height:Math.max(0,bottom-top)+'px'});
   const blocker=layer.querySelector('.wl-tour-blocker');
   Object.assign(blocker.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px'});
-  const tip=layer.querySelector('.wl-tour-tip');
+
   const tipWidth=Math.min(380,innerWidth-24);
   tip.style.width=tipWidth+'px';
-  tip.style.left=Math.max(12,Math.min(innerWidth-tipWidth-12,(left+right-tipWidth)/2))+'px';
-  const preferredBelow=bottom+12;
-  const roomBelow=innerHeight-preferredBelow;
-  const estimated=220;
-  tip.style.top=(roomBelow>=estimated ? preferredBelow : Math.max(12,top-estimated-12))+'px';
-  document.getElementById('wlTourCount').textContent='STEP '+(guidedTourStep+1)+' OF '+guidedTourSteps(guidedTourRole).length;
-  document.getElementById('wlTourTitle').textContent=step.title;
-  document.getElementById('wlTourText').textContent=step.text;
-  const back=layer.querySelector('[data-wl-tour-back]');
-  back.disabled=guidedTourStep===0;
-  const next=layer.querySelector('[data-wl-tour-next]');
-  next.textContent=guidedTourStep===guidedTourSteps(guidedTourRole).length-1?'FINISH ✓':'NEXT →';
+  tip.style.maxHeight='calc(100vh - 24px)';
+  tip.style.overflowY='auto';
+  tip.style.top='12px';
+  const tipLeft=Math.max(12,Math.min(innerWidth-tipWidth-12,(left+right-tipWidth)/2));
+  tip.style.left=tipLeft+'px';
+  const tipHeight=Math.ceil(tip.getBoundingClientRect().height);
+  const roomBelow=innerHeight-bottom-gap;
+  const roomAbove=top-gap;
+  let placement='below';
+  let tipTop=bottom+gap;
+  if(roomBelow<tipHeight && roomAbove>=tipHeight){
+    placement='above';
+    tipTop=top-tipHeight-gap;
+  }else if(roomBelow<tipHeight){
+    placement=roomAbove>roomBelow?'above':'below';
+    tipTop=placement==='above'?Math.max(12,top-tipHeight-gap):Math.min(innerHeight-tipHeight-12,bottom+gap);
+  }
+  tipTop=Math.max(12,Math.min(innerHeight-tipHeight-12,tipTop));
+  tip.style.top=tipTop+'px';
+  tip.classList.toggle('above',placement==='above');
+  tip.classList.toggle('below',placement==='below');
+  const arrowX=Math.max(28,Math.min(tipWidth-28,((left+right)/2)-tipLeft));
+  tip.style.setProperty('--tour-arrow-x',arrowX+'px');
 }
 
 function showGuidedTourStep(){
@@ -1510,6 +1531,7 @@ async function startGuidedTour(role,firstTime=false){
   guidedTourFirstTime=Boolean(firstTime);
   document.getElementById('wlHelpOverlay')?.classList.add('hidden');
   document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
+  document.getElementById('wlHelpCoachToast')?.classList.remove('show');
   if(currentRoleKey()==='owner'){
     document.getElementById(guidedTourRole==='service'?'tab-svc':'tab-it')?.click();
     await new Promise(resolve=>setTimeout(resolve,180));
@@ -1523,6 +1545,11 @@ async function finishGuidedTour(completed=true){
   clearGuidedTourTarget();
   const layer=document.getElementById('wlGuidedTourLayer');
   layer?.classList.add('hidden');
+  document.getElementById('wlHelpCoachToast')?.classList.remove('show');
+  const serviceMore=document.querySelector('#wlSvcHome .wl-service-more');
+  const itMore=document.querySelector('#wlItHome .wl-it-more');
+  if(serviceMore)serviceMore.open=false;
+  if(itMore)itMore.open=false;
   if(completed&&guidedTourFirstTime){
     const tech=await currentTechIdentity().catch(()=>null);
     if(tech?.id){
