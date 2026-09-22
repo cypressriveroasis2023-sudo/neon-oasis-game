@@ -621,6 +621,11 @@ function setupRealtime() {
       { event: '*', schema: 'public', table: 'service_truck_restock_requests' },
       scheduleRefreshData
     )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'service_truck_sims' },
+      scheduleRefreshData
+    )
     .subscribe(s => {
       $('syncStatus').textContent = !navigator.onLine ? 'Offline — unsent field drafts stay on this device' : s === 'SUBSCRIBED' ? 'Live shared data connected' : 'Connecting shared data…';
     });
@@ -701,7 +706,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.rpc('owner_review_queue_v1',{p_limit:40}),
       db.from('field_escalations').select('id,ticket_no,site,unit_tag,equipment_type,status,service_tech_name,it_tech_name,original_problem,service_troubleshooting_notes,it_troubleshooting_notes,owner_summary,created_at,updated_at').is('resolved_at',null).order('updated_at',{ascending:false}).limit(100),
       db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true}),
-      db.rpc('owner_tech_command_board_v1',{p_date:localDateKey(new Date())})
+      db.rpc('owner_tech_command_board_v2',{p_date:localDateKey(new Date())})
     ]),'Owner production data');
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
@@ -2146,9 +2151,23 @@ function ownerBoardStockRow(label,have,required){
   const ok=Number(have)>=Number(required);
   return '<div class="ownerCmdStockRow '+(ok?'good':'bad')+'"><span>'+esc(label)+'</span><b>'+Number(have||0)+' / '+Number(required)+'</b><i>'+(ok?'✓':'!')+'</i></div>';
 }
+function ownerBoardSimHtml(sim){
+  const status=String(sim.status||'unassigned');
+  const ok=status==='assigned'&&sim.sim_number;
+  let detail=ok?'SIM '+sim.sim_number:'MISSING';
+  let sub='';
+  if(status==='used_restock_due'){
+    detail=sim.sim_number?'SIM '+sim.sim_number+' · USED':'USED';
+    sub=(sim.last_used_ticket_no?'Used at MHelpDesk #'+sim.last_used_ticket_no+'. ':'')+'IT replacement required.';
+  }else if(!ok){
+    sub='IT must assign an exact SIM number to this truck slot.';
+  }
+  return '<div class="ownerCmdUnitRow ownerCmdSimRow '+(ok?'good':'bad')+'"><span>SIM '+Number(sim.slot_no||0)+'</span><b>'+esc(detail)+'</b><i>'+(ok?'✓':'!')+'</i>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div>';
+}
 function ownerBoardServiceTechCard(tech){
   const inspection=tech.inspection||{},inventory=tech.inventory_check||{},stock=tech.stock||{};
   const units=Array.isArray(tech.units)?tech.units:[];
+  const sims=Array.isArray(tech.sims)?tech.sims:[];
   const jobs=Array.isArray(tech.jobs)?tech.jobs:[];
   const restocks=Array.isArray(tech.restock_requests)?tech.restock_requests:[];
   const missing=Array.isArray(tech.missing)?tech.missing:[];
@@ -2158,6 +2177,7 @@ function ownerBoardServiceTechCard(tech){
   const trailerDetail=inspection.trailer_state==='not_taking'?'NOT TAKING':inspection.trailer_complete?'COMPLETE':'NOT COMPLETE';
   const inventoryState=inventory.ready?'good':'bad';
   const unitCount=units.filter(u=>u.status==='assigned'&&u.unit_tag).length;
+  const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
   const restockSummary=restocks.length
     ? '<div class="ownerCmdRestock"><b>⚠ '+restocks.length+' IT RESTOCK ITEM'+(restocks.length===1?'':'S')+'</b>'+restocks.map(r=>'<span>'+esc(r.item_type)+' · '+esc(String(r.status||'requested').replaceAll('_',' ').toUpperCase())+(r.original_ticket_no?' · #'+esc(r.original_ticket_no):'')+'</span>').join('')+'</div>'
     : '';
@@ -2168,8 +2188,10 @@ function ownerBoardServiceTechCard(tech){
       +ownerBoardCheckRow('Trailer Inspection',trailerState,trailerDetail,inspection.taking_trailer&&inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
       +ownerBoardCheckRow('Truck Inventory',inventoryState,inventory.ready?'COMPLETE':'MISSING STOCK',inventory.submitted?ownerBoardTime(inventory.submitted_at):'')
     +'</div>'
-    +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>TRUCK INVENTORY</b><span>'+unitCount+' / 4 units</span></div>'
+    +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>TRUCK INVENTORY</b><span>'+unitCount+' / 4 units · '+simCount+' / 3 SIMs</span></div>'
       +'<div class="ownerCmdUnitList">'+units.map(ownerBoardUnitHtml).join('')+'</div>'
+      +'<div class="ownerCmdSectionHead ownerCmdSubHead"><b>SIM CARDS · EXACT NUMBERS</b><span>'+simCount+' / 3</span></div>'
+      +'<div class="ownerCmdUnitList ownerCmdSimList">'+sims.map(ownerBoardSimHtml).join('')+'</div>'
       +'<div class="ownerCmdStockList">'
         +ownerBoardStockRow('Recon Batteries',stock.recon_battery_qty,25)
         +ownerBoardStockRow('AGM 12V 110Ah',stock.agm_12v_110ah_qty,4)
