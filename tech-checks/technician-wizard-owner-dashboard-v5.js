@@ -1474,8 +1474,8 @@ function guidedTourSteps(role){
     { selector:'#wlSvcHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'This card shows your one required action. You do not need to search through the app.' },
     { selector:'#wlSvcHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This starts the next required Service step.' },
     { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck / Trailer Inspection → Required Truck Inventory → next job → field work.' },
-    { selector:"#wlSvcHome [data-wl-service-truck-inventory]", open:'#wlSvcHome .wl-service-more', title:'REQUIRED TRUCK INVENTORY', text:'Every work day, verify the four assigned permanent units plus 25 Recon batteries, 4 AGM 12V 110Ah, and 2 LiTime 12V 100Ah before leaving the shop.', fallback:'#wlSvcHome .wl-service-more > summary' },
-    { selector:"#wlSvcHome [data-wl-service-truck-usage]", open:'#wlSvcHome .wl-service-more', title:'WHEN YOU USE TRUCK STOCK', text:'Record a permanent truck unit or battery stock used at the current MHelpDesk job. Tech Check automatically creates the IT restock requirement.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-service-truck-inventory]", open:'#wlSvcHome .wl-service-more', title:'REQUIRED TRUCK INVENTORY', text:'Every work day, verify the four assigned permanent units, the exact numbers of all 3 truck SIM cards, 25 Recon batteries, 4 AGM 12V 110Ah, and 2 LiTime 12V 100Ah before leaving the shop.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-service-truck-usage]", open:'#wlSvcHome .wl-service-more', title:'WHEN YOU USE TRUCK STOCK', text:'Record a permanent truck unit, exact SIM card, or battery stock used at the current MHelpDesk job. Tech Check automatically creates the IT restock requirement.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-open-job]", open:'#wlSvcHome .wl-service-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number. Tech Check will find the correct Service job.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-return]", open:'#wlSvcHome .wl-service-more', title:'RETURN EQUIPMENT', text:'Use this when a unit comes back from the field. Tech Check will walk you through the return photo and IT Intake.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-svc='returns']", open:'#wlSvcHome .wl-service-more', title:'MY RETURNED UNITS', text:'Use this to see equipment you returned and whether IT Intake is still waiting or already complete.', fallback:'#wlSvcHome .wl-service-more > summary' },
@@ -2600,7 +2600,8 @@ function serviceNextActionHtml(state){
   }
   if(state.inventoryDue){
     const readyCount=(state.truckReadiness?.units||[]).filter(u=>u.status==='assigned'&&u.unit_tag).length;
-    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>REQUIRED TRUCK INVENTORY</b><small>${readyCount}/4 permanent units assigned · Verify 25 Recon batteries · 4 AGM 12V 110Ah · 2 LiTime 12V 100Ah. Missing items must be restocked by IT.</small><button class='wl-service-start' data-wl-service-truck-inventory>CHECK / RESTOCK TRUCK</button></div>`;
+    const simCount=(state.truckReadiness?.sims||[]).filter(s=>s.status==='assigned'&&s.sim_number).length;
+    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>REQUIRED TRUCK INVENTORY</b><small>${readyCount}/4 permanent units · ${simCount}/3 exact SIM cards · Verify 25 Recon batteries · 4 AGM 12V 110Ah · 2 LiTime 12V 100Ah. Missing items must be restocked by IT.</small><button class='wl-service-start' data-wl-service-truck-inventory>CHECK / RESTOCK TRUCK</button></div>`;
   }
   if(state.spareCount>0){
     return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>RESOLVE TRUCK SPARES · ${state.spareCount}</b><small>Used / unused backup equipment must be resolved before your day can close.</small><button class='wl-service-start' data-wl-service-resolve-spares>RESOLVE SPARES</button></div>`;
@@ -4424,10 +4425,12 @@ function serviceTruckRestockRowsHtml(readiness){
   const rows=Array.isArray(readiness?.restock_requests)?readiness.restock_requests:[];
   if(!rows.length)return '';
   return `<div class='wl-truck-restock-list'><div class='wl-truck-section-title'>RESTOCK STATUS</div>${rows.map(r=>{
-    const qty=r.item_kind==='unit'?'1 unit':(String(r.qty_needed)+' needed');
+    const qty=r.item_kind==='unit'?'1 unit':r.item_kind==='sim'?'1 SIM':(String(r.qty_needed)+' needed');
     const detail=r.item_kind==='unit'
       ? `${r.used_unit_tag?'Used truck unit '+esc(r.used_unit_tag)+' · ':''}${r.old_unit_tag?'Old unit '+esc(r.old_unit_tag)+' · ':''}${r.original_ticket_no?'MHelpDesk #'+esc(r.original_ticket_no):''}`
-      : `${esc(qty)}${r.original_ticket_no?' · MHelpDesk #'+esc(r.original_ticket_no):''}`;
+      : r.item_kind==='sim'
+        ? `Slot ${Number(r.sim_slot_no||0)}${r.used_sim_number?' · Used SIM '+esc(r.used_sim_number):''}${r.replacement_sim_number?' · Replacement '+esc(r.replacement_sim_number):''}${r.original_ticket_no?' · MHelpDesk #'+esc(r.original_ticket_no):''}`
+        : `${esc(qty)}${r.original_ticket_no?' · MHelpDesk #'+esc(r.original_ticket_no):''}`;
     const action=r.status==='ready'
       ? `<button class='wl-service-start top8' data-wl-service-accept-truck-restock='${esc(r.id)}'>ACCEPT FROM IT →</button>`
       : (r.status==='awaiting_return'&&r.old_unit_tag
@@ -4449,15 +4452,27 @@ async function showServiceTruckInventoryCheck(){
     }
     const units=(r.units||[]).slice().sort((a,b)=>serviceTruckUnitOrder(a.equipment_type)-serviceTruckUnitOrder(b.equipment_type));
     const stock=r.stock||{};
+    const sims=(r.sims||[]).slice().sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0));
     const unitRows=units.map(u=>{
       const ready=u.status==='assigned'&&u.unit_tag;
       return `<label class='wl-truck-unit-check ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'':'disabled'}><span><b>${esc(u.equipment_type)}</b><small>${ready?'Unit '+esc(u.unit_tag):u.status==='used_restock_due'?'USED — IT RESTOCK REQUIRED':'NO UNIT ASSIGNED — IT REQUIRED'}</small></span></label>`;
+    }).join('');
+    const simRows=sims.map(s=>{
+      const ready=s.status==='assigned'&&s.sim_number;
+      const detail=ready
+        ? 'SIM '+esc(s.sim_number)
+        : s.status==='used_restock_due'
+          ? 'USED'+(s.sim_number?' · '+esc(s.sim_number):'')+(s.last_used_ticket_no?' · MHelpDesk #'+esc(s.last_used_ticket_no):'')
+          : 'NO SIM ASSIGNED — IT REQUIRED';
+      return `<label class='wl-truck-unit-check wl-truck-sim-check ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'':'disabled'}><span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>${detail}</small></span></label>`;
     }).join('');
     card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
       ${progress('MANDATORY TRUCK INVENTORY','Required before leaving the shop',1,1)}
       <div class='wl-truck-required-banner'><b>THIS IS SEPARATE FROM THE SAFETY INSPECTION</b><span>Physically verify these exact units and quantities every work day.</span></div>
       <div class='wl-truck-section-title'>PERMANENT UNITS · 4 REQUIRED</div>
       <div class='wl-truck-unit-grid'>${unitRows}</div>
+      <div class='wl-truck-section-title'>SIM CARDS · 3 REQUIRED · VERIFY THE EXACT SIM NUMBER</div>
+      <div class='wl-truck-unit-grid wl-truck-sim-grid'>${simRows}</div>
       <div class='wl-truck-section-title'>BATTERY STOCK · COUNT WHAT IS PHYSICALLY ON THE TRUCK</div>
       <div class='wl-truck-stock-grid'>
         <label><span>Recon batteries <b>25 required</b></span><input id='wlTruckReconQty' type='number' inputmode='numeric' min='0' value='${Number(stock.recon_battery_qty||0)}'></label>
@@ -4478,14 +4493,19 @@ async function submitServiceTruckInventoryCheck(){
   document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
     unitConfirmations[el.dataset.wlTruckUnitConfirm]={unit_tag:el.dataset.unitTag||'',confirmed:Boolean(el.checked)};
   });
+  const simConfirmations={};
+  document.querySelectorAll('[data-wl-truck-sim-confirm]').forEach(el=>{
+    simConfirmations[String(el.dataset.wlTruckSimConfirm||'')]={sim_number:el.dataset.simNumber||'',confirmed:Boolean(el.checked)};
+  });
   const recon=Number(document.getElementById('wlTruckReconQty')?.value);
   const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
   const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
   if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))return alert('Enter the actual battery quantities physically on the truck.');
   document.body.classList.add('busy');
   try{
-    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v1',{
+    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
       p_unit_confirmations:unitConfirmations,
+      p_sim_confirmations:simConfirmations,
       p_recon_battery_qty:Math.max(0,Math.floor(recon)),
       p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
       p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
@@ -4524,6 +4544,7 @@ async function showServiceTruckUsage(){
     }
     const ticketOptions=active.map(a=>`<option value='${esc(a.ticket_no)}'>#${esc(a.ticket_no)} · ${esc(a.site||'No site listed')}</option>`).join('');
     const unitOptions=(r.units||[]).filter(u=>u.status==='assigned'&&u.unit_tag).map(u=>`<option value='${esc(u.equipment_type)}'>${esc(u.equipment_type)} · Unit ${esc(u.unit_tag)}</option>`).join('');
+    const simOptions=(r.sims||[]).filter(s=>s.status==='assigned'&&s.sim_number).sort((a,b)=>Number(a.slot_no)-Number(b.slot_no)).map(s=>`<option value='${Number(s.slot_no)}'>Slot ${Number(s.slot_no)} · SIM ${esc(s.sim_number)}</option>`).join('');
     card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
       ${progress('PERMANENT TRUCK INVENTORY','Record anything used at a field job',1,1)}
       <div class='wl-stop'><b>USING A PERMANENT TRUCK ITEM MAKES THE TRUCK SHORT</b><div>You may finish the job already in progress, but another new field job is blocked until IT replenishes the truck and you recheck it.</div></div>
@@ -4533,6 +4554,13 @@ async function showServiceTruckUsage(){
         <label>Truck Unit<select id='wlTruckUseUnitType'><option value=''>Choose unit…</option>${unitOptions}</select></label>
         <label>OLD CUSTOMER / SITE UNIT COMING BACK<input id='wlTruckUseOldUnitTag' autocomplete='off' placeholder='Old unit tag'></label>
         <button class='wl-big wl-red top10' data-wl-service-record-truck-unit-used>RECORD UNIT USED + RETURN OLD UNIT →</button>
+      </div>
+      <div class='wl-question top10'>
+        <div class='qnum'>USED ONE OF MY 3 TRUCK SIM CARDS</div>
+        <label>MHelpDesk Ticket<select id='wlTruckUseSimTicket'>${ticketOptions}</select></label>
+        <label>Exact SIM Used<select id='wlTruckUseSimSlot'><option value=''>Choose SIM…</option>${simOptions}</select></label>
+        <button class='wl-big wl-red top10' data-wl-service-record-truck-sim-used>MARK SIM USED →</button>
+        <div class='small top8'>The exact SIM number stays in history as USED and IT must give you a replacement before the truck is ready again.</div>
       </div>
       <div class='wl-question top10'>
         <div class='qnum'>USED TRUCK BATTERY STOCK</div>
@@ -4556,6 +4584,20 @@ async function recordServiceTruckUnitUsed(){
     alert(`Truck ${type} ${data?.used_unit_tag||''} recorded as USED.\n\nNow return old unit ${oldTag} through the normal Service Return → IT Intake flow. IT will then prepare your replacement truck unit.`);
     return showServiceReturnPreset(ticket,oldTag,type);
   }catch(error){alert(error?.message||'Could not record the permanent truck unit as used.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function recordServiceTruckSimUsed(){
+  const ticket=document.getElementById('wlTruckUseSimTicket')?.value||'';
+  const slot=Number(document.getElementById('wlTruckUseSimSlot')?.value||0);
+  if(!ticket||![1,2,3].includes(slot))return alert('Choose the active MHelpDesk job and the exact SIM card you used.');
+  document.body.classList.add('busy');
+  try{
+    const {data,error}=await liveDb.rpc('service_use_truck_sim_v1',{p_ticket_no:ticket,p_slot_no:slot});
+    if(error)throw error;
+    const used=(data?.sims||[]).find(s=>Number(s.slot_no)===slot);
+    alert(`SIM ${used?.sim_number||''} recorded as USED. IT now has a replacement request for truck SIM slot ${slot}. Recheck the truck inventory after IT gives you the new SIM.`);
+    return showSvcHome();
+  }catch(error){alert(error?.message||'Could not record the truck SIM as used.');}
   finally{document.body.classList.remove('busy');}
 }
 async function recordServiceTruckStockUsed(){
@@ -4599,7 +4641,8 @@ async function showITTruckRestock(){
       <div class='wl-it-restock-banner'><b>SERVICE CANNOT LEAVE FOR A NEW JOB UNTIL THIS IS RESTORED</b><span>Unit replacements must be fully checked by IT before the Service Tech accepts them.</span></div>
       ${rows.length?rows.map(r=>{
         if(r.status==='awaiting_return')return `<div class='wl-it-restock-card waiting'><div class='qnum'>WAITING FOR OLD UNIT RETURN</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>Used truck unit: ${esc(r.used_unit_tag||'—')} · Old field unit: ${esc(r.old_unit_tag||'—')} · MHelpDesk #${esc(r.original_ticket_no||'—')}</div><div class='wl-stop top8'>Service must return the old unit through normal IT Intake before this replacement can be prepared.</div></div>`;
-        if(r.status==='ready')return `<div class='wl-it-restock-card ready'><div class='qnum'>READY — WAITING FOR SERVICE ACCEPTANCE</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>${r.item_kind==='unit'?'Replacement Unit '+esc(r.replacement_unit_tag||'—'):esc(r.qty_issued||r.qty_needed)+' ready'}</div></div>`;
+        if(r.status==='ready')return `<div class='wl-it-restock-card ready'><div class='qnum'>READY — WAITING FOR SERVICE ACCEPTANCE</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>${r.item_kind==='unit'?'Replacement Unit '+esc(r.replacement_unit_tag||'—'):r.item_kind==='sim'?'SIM '+esc(r.replacement_sim_number||'—')+' · Slot '+Number(r.sim_slot_no||0):esc(r.qty_issued||r.qty_needed)+' ready'}</div></div>`;
+        if(r.item_kind==='sim')return `<div class='wl-it-restock-card'><div class='qnum'>SIM CARD RESTOCK</div><h3>${esc(r.service_tech_name)} · SIM SLOT ${Number(r.sim_slot_no||0)}</h3><div class='small'>${r.used_sim_number?'Used SIM '+esc(r.used_sim_number)+' · ':''}${r.original_ticket_no?'MHelpDesk #'+esc(r.original_ticket_no):'Initial 3-SIM truck assignment'}</div><label>Exact Replacement SIM Number<input id='wlItRestockSim_${esc(r.id)}' autocomplete='off' inputmode='numeric' placeholder='SIM number'></label><label class='check top8'><input type='checkbox' id='wlItRestockSimVerified_${esc(r.id)}'><span>I physically verified this exact SIM number</span></label><button class='wl-it-start top8' data-wl-it-ready-truck-sim='${esc(r.id)}'>SIM VERIFIED — READY FOR SERVICE →</button></div>`;
         if(r.item_kind==='battery')return `<div class='wl-it-restock-card'><div class='qnum'>BATTERY RESTOCK</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>Needs ${Number(r.qty_needed||0)} before leaving the shop.</div><label>Quantity IT is issuing<input id='wlItRestockQty_${esc(r.id)}' type='number' inputmode='numeric' min='${Number(r.qty_needed||1)}' value='${Number(r.qty_needed||1)}'></label><button class='wl-it-start top8' data-wl-it-ready-truck-battery='${esc(r.id)}'>MARK READY FOR SERVICE →</button></div>`;
         return `<div class='wl-it-restock-card'><div class='qnum'>UNIT RESTOCK</div><h3>${esc(r.service_tech_name)} · 1 × ${esc(r.item_type)}</h3><div class='small'>${r.old_unit_tag?'Old Unit '+esc(r.old_unit_tag)+' was turned in · ':''}${r.original_ticket_no?'MHelpDesk #'+esc(r.original_ticket_no):'Initial permanent truck assignment'}</div><label>Replacement ${esc(r.item_type)} Unit Tag<input id='wlItRestockUnit_${esc(r.id)}' autocomplete='off' placeholder='Unit tag'></label>${itTruckUnitChecksHtml(r.id)}<button class='wl-it-start top8' data-wl-it-ready-truck-unit='${esc(r.id)}'>UNIT CHECKED — READY FOR SERVICE →</button></div>`;
       }).join(''):`<div class='ok'><b>✓ No permanent Service truck restock is waiting on IT.</b></div>`}
@@ -4620,6 +4663,24 @@ async function prepareITTruckUnitRestock(id){
     alert('Replacement unit is READY. The Service Tech must accept it, then physically recheck the truck before leaving.');
     return showITTruckRestock();
   }catch(error){alert(error?.message||'Could not prepare the replacement truck unit.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function prepareITTruckSimRestock(id){
+  const sim=document.getElementById('wlItRestockSim_'+id)?.value.trim()||'';
+  const verified=Boolean(document.getElementById('wlItRestockSimVerified_'+id)?.checked);
+  if(!sim)return alert('Enter the exact replacement SIM number.');
+  if(!verified)return alert('Physically verify the exact SIM number first.');
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('it_prepare_service_truck_sim_restock_v1',{
+      p_request_id:id,
+      p_replacement_sim_number:sim,
+      p_number_verified:verified
+    });
+    if(error)throw error;
+    alert('SIM is READY. The Service Tech must accept it and recheck the exact SIM number on the truck.');
+    return showITTruckRestock();
+  }catch(error){alert(error?.message||'Could not prepare the replacement SIM.');}
   finally{document.body.classList.remove('busy');}
 }
 async function prepareITTruckBatteryRestock(id){
@@ -4666,7 +4727,7 @@ async function showSvcHome() {
         <div class='wl-service-more-grid'>
           <button data-wl-service-open-job>ENTER MHELPDESK TICKET</button>
           <button data-wl-service-truck-inventory>MY REQUIRED TRUCK INVENTORY</button>
-          <button data-wl-service-truck-usage>USED TRUCK UNIT / STOCK</button>
+          <button data-wl-service-truck-usage>USED TRUCK UNIT / SIM / STOCK</button>
           <button data-wl-service-return>RETURN UNIT TO IT</button>
           <button data-wl-svc='returns'>MY RETURNED UNITS</button>
           <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
@@ -5858,10 +5919,12 @@ document.addEventListener('click', async e => {
   const acceptTruckRestock=e.target.closest('[data-wl-service-accept-truck-restock]'); if(acceptTruckRestock)return acceptServiceTruckRestock(acceptTruckRestock.dataset.wlServiceAcceptTruckRestock);
   if (e.target.closest('[data-wl-service-truck-usage]')) return showServiceTruckUsage();
   if (e.target.closest('[data-wl-service-record-truck-unit-used]')) return recordServiceTruckUnitUsed();
+  if (e.target.closest('[data-wl-service-record-truck-sim-used]')) return recordServiceTruckSimUsed();
   if (e.target.closest('[data-wl-service-record-truck-stock-used]')) return recordServiceTruckStockUsed();
   if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
   if (e.target.closest('[data-wl-it-truck-restock]')) return showITTruckRestock();
   const readyTruckUnit=e.target.closest('[data-wl-it-ready-truck-unit]'); if(readyTruckUnit)return prepareITTruckUnitRestock(readyTruckUnit.dataset.wlItReadyTruckUnit);
+  const readyTruckSim=e.target.closest('[data-wl-it-ready-truck-sim]'); if(readyTruckSim)return prepareITTruckSimRestock(readyTruckSim.dataset.wlItReadyTruckSim);
   const readyTruckBattery=e.target.closest('[data-wl-it-ready-truck-battery]'); if(readyTruckBattery)return prepareITTruckBatteryRestock(readyTruckBattery.dataset.wlItReadyTruckBattery);
   const techEndDay=e.target.closest('[data-wl-tech-end-day]');
   if(techEndDay)return attemptTechEndDay(techEndDay.dataset.wlTechEndDay);
