@@ -3443,7 +3443,7 @@ function wireCanvas(canvas) {
   ctx.scale(dpr, dpr);
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
-  ctx.strokeStyle = '#17212b';
+  ctx.strokeStyle = '#f4f8fa';
   let draw = false;
   const blockTouch = e => { e.preventDefault(); e.stopPropagation(); };
   canvas.addEventListener('touchstart', blockTouch, { passive: false });
@@ -3552,7 +3552,20 @@ async function signatureOnlyHtml(prepId, stage, unitNo = null) {
   const rows = await evidenceRows(prepId, stage);
   const signatureName = unitNo ? `unit-${unitNo}-signature.png` : null;
   const sig = [...rows].reverse().find(r => r.kind === 'signature' && (!unitNo || r.original_name === signatureName));
-  return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'><b>${unitNo ? `Unit ${unitNo} IT Verification Signature` : stage === 'it' ? 'IT Final Sign-Off' : 'Service Receipt Signature'}</b>${sig ? `<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${signatureStamp(sig.created_by_name || (stage === 'it' ? 'IT Technician' : 'Service Tech'),sig.created_at)}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div><button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>` : `<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>`}</div>`;
+  if (sig) {
+    return `<div class='wl-proof wl-sign-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'>
+      <div class='wl-photo-title'>Signature</div>
+      <div class='ok'><b>✓ Signature saved</b><div class='small'>${signatureStamp(sig.created_by_name || (stage === 'it' ? 'IT Technician' : 'Service Tech'),sig.created_at)}</div></div>
+      <button class='mini full top10' data-wl-replace='${stage}'>Sign Again</button>
+    </div>`;
+  }
+  return `<div class='wl-proof wl-sign-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'>
+    <div class='wl-photo-title'>Sign Here</div>
+    <div class='small'>Sign inside the box with your finger.</div>
+    <div class='wl-sign top10'><canvas></canvas>
+      <div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div>
+    </div>
+  </div>`;
 }
 function itSummaryHtml(forms, evidence) {
   const photos = evidence.filter(r => r.kind === 'photo');
@@ -4285,7 +4298,7 @@ async function renderItUnitStep() {
   } else if (itUnitPhase === 'signature') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const sig = unitSignature(ev, unitNo);
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Sign off ${identity}`, 2, 3) + itUnitReviewHtml(item, ev, unitNo) + await signatureOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${sig ? '' : 'disabled'}>Next: Review ${esc(identity)} →</button></div>`;
+    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, 'Sign Here', 2, 3) + await signatureOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${sig ? '' : 'disabled'}>Next →</button></div>`;
     wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }
   resetWizardPosition();
