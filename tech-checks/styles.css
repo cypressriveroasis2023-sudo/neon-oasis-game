@@ -4879,3 +4879,30 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
 .bad{background:#281719!important;border-color:#713138!important;color:#ffd9dc!important}
 .auth .card{background:var(--tc-panel2)!important}
 .connectionBanner.offline{background:#251a11!important;border-color:#744b24!important;color:#ffd39b!important}
+
+
+/* Persistent OnSite Vision launcher — Owner shell v227 */
+#view-owner .ownerAppSidebarUtility .ownerVisionLauncher{
+  display:grid!important;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:9px;
+  width:100%;min-height:54px;padding:8px 9px!important;margin:0 0 8px!important;
+  background:#111d24!important;border:1px solid #344a56!important;border-left:3px solid var(--tc-red)!important;
+  border-radius:8px;color:#f5f8fa!important;text-decoration:none!important;box-sizing:border-box;
+}
+#view-owner .ownerVisionLauncher:hover,#view-owner .ownerVisionLauncher:focus-visible{
+  background:#17252e!important;border-color:#5b707b!important;border-left-color:#ff4048!important;outline:none!important;
+}
+#view-owner .ownerVisionLauncherIcon{
+  display:grid;place-items:center;width:30px;height:30px;border-radius:50%;
+  background:#291719!important;border:1px solid #7a3036!important;color:#ff5a61!important;font-size:18px;line-height:1;
+}
+#view-owner .ownerVisionLauncher span:nth-child(2){display:flex;flex-direction:column;min-width:0}
+#view-owner .ownerVisionLauncher b{color:#fff!important;font-size:11px;line-height:1.2}
+#view-owner .ownerVisionLauncher small{color:#91a4ae!important;font-size:8px;line-height:1.35;margin-top:2px}
+#view-owner .ownerVisionLauncher em{
+  color:#ff8a8f!important;font-style:normal;font-weight:800;font-size:8px;letter-spacing:.08em;
+}
+@media(max-width:720px){
+  #view-owner .ownerAppSidebarUtility .ownerVisionLauncher{
+    grid-column:1/-1;min-height:50px;grid-template-columns:28px 1fr auto;
+  }
+}
