@@ -469,10 +469,23 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=rules-v10"></script>
-    <script type="module" src="./app.js?v=dark-full-tech-menu-20260922e"></script>
+    <script type="module" src="./app.js?v=tutorial-cache-reset-20260922f"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=health-contrast-20260922c', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+        let techCheckReloadedForWorker = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (techCheckReloadedForWorker) return;
+          techCheckReloadedForWorker = true;
+          location.reload();
+        });
+        window.addEventListener('load', async () => {
+          try {
+            const registration = await navigator.serviceWorker.register('./sw.js?v=tutorial-cache-reset-20260922f', { scope: './', updateViaCache: 'none' });
+            await registration.update();
+          } catch (error) {
+            console.warn(error);
+          }
+        });
       }
     </script>
   </body>
