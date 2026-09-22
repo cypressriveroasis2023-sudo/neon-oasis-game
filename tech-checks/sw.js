@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-health-contrast-20260922c';
+const CACHE_NAME = 'tech-check-tutorial-cache-reset-20260922f';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,8 +10,8 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=workflow-recovery-20260922a', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=workflow-recovery-20260922a', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=tutorial-cache-reset-20260922f', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=tutorial-cache-reset-20260922f', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=health-contrast-20260922c', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v33', { cache:'reload' })),
@@ -62,10 +62,33 @@ self.addEventListener('fetch', event => {
   if (!['script','style','image','font','manifest'].includes(request.destination)) return;
   event.respondWith((async () => {
     const cached=await caches.match(request);
-    const network=fetch(request).then(async response => { if (response.ok) { const cache=await caches.open(CACHE_NAME); cache.put(request,response.clone()).catch(() => {}); } return response; }).catch(() => null);
-    if (cached) { event.waitUntil(network); return cached; }
-    const response=await network;
-    if (response) return response;
+    const loadFresh=async()=>{
+      try{
+        const response=await fetch(new Request(request,{cache:'reload'}));
+        if(response?.ok){
+          const cache=await caches.open(CACHE_NAME);
+          cache.put(request,response.clone()).catch(()=>{});
+        }
+        return response;
+      }catch{return null;}
+    };
+
+    // JavaScript and CSS must be network-first. A technician should never keep
+    // running an obsolete workflow or tutorial simply because an iPhone
+    // resumed an older installed-app cache.
+    if(request.destination==='script'||request.destination==='style'){
+      const fresh=await loadFresh();
+      if(fresh)return fresh;
+      if(cached)return cached;
+      return new Response('',{status:503,statusText:'Offline'});
+    }
+
+    if(cached){
+      event.waitUntil(loadFresh());
+      return cached;
+    }
+    const fresh=await loadFresh();
+    if(fresh)return fresh;
     return new Response('',{status:503,statusText:'Offline'});
   })());
 });
