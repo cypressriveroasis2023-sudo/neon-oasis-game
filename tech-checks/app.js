@@ -1514,8 +1514,15 @@ async function ownerOpenTruckInventoryManager(){
     (editor||card)?.scrollIntoView({behavior:'smooth',block:'start'});
   });
 }
-function ownerJump(target) {
-  if(target==='vision'){ window.location.href='./onsite-vision.html'; return; }
+function ownerJump(target, context={}) {
+  if(target==='vision'){
+    const p=new URLSearchParams();
+    if(context.ticket)p.set('ticket',String(context.ticket));
+    if(context.alert)p.set('alert',String(context.alert));
+    if(context.detail)p.set('detail',String(context.detail));
+    window.location.href='./onsite-vision.html'+(p.toString()?'?'+p.toString():'');
+    return;
+  }
   const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'handoffs',daily:'team',activity:'activity'};
   const route=routeMap[target];
   if(route && typeof ownerAppNavigate==='function') ownerAppNavigate(route);
