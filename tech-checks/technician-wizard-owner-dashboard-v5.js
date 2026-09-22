@@ -588,6 +588,83 @@ function injectStyles() {
       #view-svc .wl-nav{position:static!important;padding-top:8px!important}
     }
   `;
+  s.textContent += `
+    #view-it{color:#fff!important}
+    #view-it .wl-it-simple-home,
+    #view-it .wl-it-simple-card,
+    #view-it #wlItWizardOnly,
+    #view-it #wlIntakeForm,
+    #view-it #wlPendingList,
+    #view-it #wlIntakeList,
+    #view-it #wlItStatus{
+      max-width:820px!important;margin:18px auto!important;padding:18px!important;
+      background:#071117!important;border:1px solid #263943!important;border-radius:16px!important;
+      color:#fff!important;box-shadow:0 18px 45px rgba(0,0,0,.28)!important
+    }
+    #view-it .wl-it-simple-shell{text-align:center;padding:28px 10px 10px}
+    #view-it .wl-it-simple-kicker,
+    #view-it .wl-it-step-label,
+    #view-it .qnum{color:#ff343b!important;font-size:13px!important;font-weight:950!important;letter-spacing:.12em!important}
+    #view-it .wl-it-simple-shell h1{margin:10px 0 8px!important;color:#fff!important;font-size:clamp(34px,7vw,64px)!important;line-height:1!important;font-weight:1000!important;letter-spacing:-.04em!important}
+    #view-it .wl-it-simple-shell p{margin:0 auto 24px!important;max-width:650px;color:#c7d1d6!important;font-size:20px!important;font-weight:800!important;line-height:1.35!important}
+    #view-it .wl-it-start{
+      width:100%!important;min-height:82px!important;border:1px solid #ff3b42!important;border-radius:12px!important;
+      background:#e31821!important;color:#fff!important;font-size:24px!important;font-weight:1000!important;letter-spacing:.02em!important;
+      box-shadow:0 10px 28px rgba(227,24,33,.22)!important
+    }
+    #view-it .wl-it-flowline{margin:20px 0;color:#82949e!important;font-size:12px!important;font-weight:900!important;letter-spacing:.05em!important}
+    #view-it .wl-it-flowline b{color:#ff343b!important;padding:0 5px}
+    #view-it .wl-it-more{margin-top:26px;border-top:1px solid #263943;padding-top:12px;text-align:left}
+    #view-it .wl-it-more summary{cursor:pointer;color:#8fa2ad;font-size:11px;font-weight:900;letter-spacing:.1em;text-align:center}
+    #view-it .wl-it-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    #view-it .wl-it-more-grid button,
+    #view-it .wl-back,
+    #view-it .wl-service-backstep{min-height:46px!important;border:1px solid #334954!important;border-radius:9px!important;background:#101e25!important;color:#dce6ea!important;font-weight:900!important}
+    #view-it .wl-back{width:auto!important;padding:0 16px!important;margin:0 0 16px!important}
+    #view-it .wl-head{background:#0b1920!important;border:1px solid #2a414d!important;color:#fff!important;border-radius:12px!important}
+    #view-it .wl-head h2{color:#fff!important;font-size:clamp(24px,5vw,38px)!important;font-weight:1000!important}
+    #view-it .wl-head .kicker{color:#ff343b!important;font-weight:950!important}
+    #view-it .wl-progress{background:#24343d!important}
+    #view-it .wl-progress span{background:#e31821!important}
+    #view-it .wl-question,
+    #view-it .wl-review,
+    #view-it .wl-ticket,
+    #view-it .wl-proof{background:#0b1920!important;border:1px solid #2a414d!important;color:#fff!important;border-radius:14px!important}
+    #view-it .wl-question .qtext{color:#fff!important;font-size:clamp(25px,5.4vw,42px)!important;line-height:1.12!important;font-weight:1000!important;text-transform:uppercase!important}
+    #view-it .wl-options{grid-template-columns:1fr 1fr!important;gap:12px!important}
+    #view-it .wl-options button{min-height:86px!important;border-radius:12px!important;font-size:24px!important;font-weight:1000!important}
+    #view-it .wl-options .pass{background:#fff!important;border:2px solid #fff!important;color:#0b1115!important}
+    #view-it .wl-options .fail{background:#e31821!important;border:2px solid #ff444b!important;color:#fff!important}
+    #view-it input,#view-it select,#view-it textarea{
+      min-height:62px!important;background:#02080c!important;border:2px solid #39515d!important;border-radius:10px!important;
+      color:#fff!important;font-size:22px!important;font-weight:900!important;padding:10px 14px!important
+    }
+    #view-it input::placeholder{color:#60737d!important}
+    #view-it .wl-stop{background:#2a0d10!important;border:2px solid #e31821!important;color:#fff!important;border-radius:12px!important;font-size:16px!important}
+    #view-it .wl-stop b{color:#ff5a60!important;font-size:20px!important}
+    #view-it .wl-it-ticket-entry{text-align:center;padding:28px!important}
+    #view-it .wl-it-ticket-entry input{width:100%!important;text-align:center!important;font-size:32px!important;letter-spacing:.06em!important}
+    #view-it .wl-it-help{margin-top:12px;color:#8497a1!important;font-size:13px!important;font-weight:700!important;text-align:center}
+    #view-it .wl-it-ticket-found{margin-top:14px;padding:24px;background:#0b1920;border:1px solid #2a414d;border-radius:14px;text-align:center}
+    #view-it .wl-it-ticket-number{font-size:clamp(38px,8vw,66px);font-weight:1000;color:#fff;line-height:1;margin:10px 0}
+    #view-it .wl-it-ticket-site{font-size:22px;font-weight:900;color:#cbd5da;margin-bottom:8px}
+    #view-it .wl-it-job-type{display:inline-block;margin-bottom:16px;padding:6px 12px;border:1px solid #425966;border-radius:999px;color:#fff;font-size:12px;font-weight:950}
+    #view-it .wl-it-good{padding:16px;border:1px solid #4d6977;border-radius:10px;background:#101e25;color:#fff;font-size:20px;font-weight:1000;text-align:center}
+    #view-it .wl-it-wait{padding:16px;border:2px solid #e31821;border-radius:10px;background:#2a0d10;color:#fff;font-size:20px;font-weight:1000;text-align:center}
+    #view-it .wl-it-escalate{width:100%;min-height:54px;border:1px solid #ff4a51;border-radius:9px;background:#e31821;color:#fff;font-weight:1000}
+    #view-it .wl-nav{background:#071117!important}
+    #view-it .wl-next{background:#e31821!important;color:#fff!important}
+    #view-it .wl-prev{background:#101e25!important;border:1px solid #334954!important;color:#dce6ea!important}
+    #view-it .small,#view-it .wl-note{color:#a8b7be!important}
+    @media(max-width:560px){
+      #view-it .wl-it-simple-home,#view-it .wl-it-simple-card,#view-it #wlItWizardOnly,#view-it #wlIntakeForm,#view-it #wlPendingList,#view-it #wlIntakeList,#view-it #wlItStatus{margin:8px 0!important;padding:12px!important;border-radius:12px!important}
+      #view-it .wl-it-simple-shell{padding:20px 4px 8px}
+      #view-it .wl-it-start{min-height:76px!important;font-size:22px!important}
+      #view-it .wl-options button{min-height:78px!important;font-size:22px!important}
+      #view-it .wl-it-more-grid{grid-template-columns:1fr}
+      #view-it .wl-nav{position:static!important;padding-top:8px!important}
+    }
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -2002,197 +2079,43 @@ async function showITHome() {
   if(!home){
     home=document.createElement('div');
     home.id='wlItHome';
-    home.className='card wl-home';
+    home.className='card wl-home wl-it-simple-home';
     viewIT().prepend(home);
   }
-  const loadToken=++itDashboardLoadToken;
-  home.innerHTML=techDashboardLoadingHtml('Loading IT Technician Command Center…');
+  home.innerHTML=techDashboardLoadingHtml('Loading your IT day…');
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
 
-  const settled=await Promise.allSettled([
-    techDashboardTimeout(prepCounts(),{draft:0,released:0,closed:0,nextDraft:null}),
-    techDashboardTimeout(returnCounts(),{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null}),
-    techDashboardTimeout(myActiveAssignments('it'),[]),
-    techDashboardTimeout(pushAlertState(),{supported:false,permission:'unknown',subscribed:false,ready:false}),
-    techDashboardTimeout(myAssignedInventoryAssets(),[]),
-    techDashboardTimeout(fieldEscalationRows(),[]),
-    techDashboardTimeout(swapSiteRegistrationRows(),[])
-  ]);
-  if(loadToken!==itDashboardLoadToken)return;
-  const values=settled.map(r=>r.status==='fulfilled'?r.value:null);
-  const prepSummary=values[0]||{draft:0,released:0,closed:0,nextDraft:null};
-  const returns=values[1]||{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null};
-  const assignments=values[2]||[];
-  const phoneAlerts=values[3]||{supported:false,permission:'unknown',subscribed:false,ready:false};
-  const assignedAssets=values[4]||[];
-  const offlineRows=values[5]||[];
-  const swapSiteRegs=values[6]||[];
-  let partialLoad=techDashboardSettled(settled);
-
   const ownerViewingIT=roleText().includes('Owner/Admin');
-  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingIT?'IT / Owner':'IT Technician');
-  const todayKey=techCheckDateKey();
-  const todayLabel=new Date().toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'});
-  const offlineIT=(offlineRows||[]).filter(row=>!row.resolved_at&&['waiting_it','joint_troubleshooting'].includes(String(row.status||'')));
+  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingIT?'IT Technician':'Technician');
+  const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
 
-  const offlineHtmlResult=await Promise.allSettled([techDashboardTimeout(fieldEscalationITHtml(offlineRows),'')]);
-  if(loadToken!==itDashboardLoadToken)return;
-  if(techDashboardSettled(offlineHtmlResult))partialLoad=true;
-  const offlineITHtml=offlineHtmlResult[0]?.status==='fulfilled'?(offlineHtmlResult[0].value||''):'';
+  const [prepResult,returnResult]=await Promise.allSettled([
+    techDashboardTimeout(prepCounts(),{draft:0,released:0,closed:0,nextDraft:null}),
+    techDashboardTimeout(returnCounts(),{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null})
+  ]);
+  const prepSummary=prepResult.status==='fulfilled'?prepResult.value:{draft:0,released:0,closed:0,nextDraft:null};
+  const returns=returnResult.status==='fulfilled'?returnResult.value:{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null};
 
-  const gateResults=await Promise.allSettled((assignments||[]).map(a=>techDashboardTimeout(
-    assignmentGateState(a),
-    {ready:false,label:'STATUS UNAVAILABLE',detail:'Live workflow status did not finish loading. Retry the dashboard before starting this task.'},
-    5000
-  )));
-  if(loadToken!==itDashboardLoadToken)return;
-  if(techDashboardSettled(gateResults))partialLoad=true;
-  const assignmentRows=(assignments||[]).map((a,index)=>({
-    a,
-    gate:gateResults[index]?.status==='fulfilled'
-      ? gateResults[index].value
-      : {ready:false,label:'STATUS UNAVAILABLE',detail:'Retry the dashboard before starting this task.'}
-  }));
-  const alertBanner=(partialLoad?"<div class='wl-tech-partial'><b>Partial live-data load.</b> The IT command center is usable, but one live check did not answer. Retry before starting any item marked STATUS UNAVAILABLE.</div>":"")+phoneAlertBanner(phoneAlerts);
-  const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
-  const overdueAll=assignmentRows.filter(({a})=>dateKey(a)&&dateKey(a)<todayKey);
-  const todayAll=assignmentRows.filter(({a})=>dateKey(a)===todayKey);
-  const unscheduledAll=assignmentRows.filter(({a})=>!dateKey(a));
-  const upcomingAll=assignmentRows.filter(({a})=>dateKey(a)>todayKey);
-  const deferred=[...overdueAll,...todayAll,...unscheduledAll].filter(({gate})=>!gate.ready);
-  const overdue=overdueAll.filter(({gate})=>gate.ready);
-  const today=todayAll.filter(({gate})=>gate.ready);
-  const unscheduled=unscheduledAll.filter(({gate})=>gate.ready);
-  const upcoming=upcomingAll.filter(({gate})=>gate.ready);
-  const needsAction=[...overdue,...today,...unscheduled];
-  const ready=needsAction;
-  const blocked=deferred;
-  const queueCount=needsAction.filter(({a})=>!a.assignee_user_id&&a.assignment_scope==='department').length;
+  home.innerHTML=`<div class='wl-it-simple-shell'>
+    <div class='wl-it-simple-kicker'>IT TECHNICIAN</div>
+    <h1>HELLO, ${esc(ownerViewingIT?'TECHNICIAN':firstName.toUpperCase())}</h1>
+    <p>Enter the MHelpDesk ticket you are working. Tech Check will take you to the correct IT process.</p>
+    <button class='wl-it-start' data-wl-it-open-job>START MY DAY</button>
+    <div class='wl-it-flowline'>MHELPDESK TICKET <b>→</b> VERIFY JOB <b>→</b> PREP OR INTAKE <b>→</b> ONE STEP AT A TIME <b>→</b> HANDOFF</div>
 
-  function itAssignmentState(row){
-    const {a,gate}=row;
-    const overdueFlag=dateKey(a)&&dateKey(a)<todayKey;
-    if(overdueFlag)return {label:'OVERDUE / OPEN',tone:'attn',detail:'This IT assignment is still open from an earlier work date.'};
-    if(!gate.ready)return {label:gate.label||'WAITING',tone:'wait',detail:gate.detail||'A required prior workflow step is not complete.'};
-    if(a.status==='started')return {label:'IN PROCESS',tone:'',detail:'Continue the IT workflow already started for this ticket.'};
-    return {label:'READY',tone:'',detail:'This IT assignment is ready to open after exact MHelpDesk verification.'};
-  }
-
-  function itAssignmentCard(row){
-    const {a}=row,state=itAssignmentState(row);
-    const queue=!a.assignee_user_id&&a.assignment_scope==='department';
-    return `<div class='wl-svc-job'>
-      <div class='wl-svc-job-top'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div></div><span class='${state.tone}'>${esc(state.label)}</span></div>
-      <div class='wl-svc-job-meta'><span>${esc(String(a.work_type||'service').toUpperCase())}</span><span>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</span>${queue?'<span>IT Department Queue</span>':''}</div>
-      <div class='wl-svc-job-desc'>${a.job_description?esc(a.job_description):esc(state.detail)}</div>
-      <button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-start-assignment='${a.id}' ${state.tone==='wait'?'disabled':''}>${a.status==='started'?'CONTINUE →':'ACCEPT JOB'}</button>
-    </div>`;
-  }
-
-  let commandState='IT WORKFLOW READY',commandTone='',commandDetail='Work the highest-priority IT task shown below.';
-  if(offlineIT.length){commandState='SERVICE NEEDS IT SUPPORT';commandTone='issue';commandDetail='A field unit is waiting for Service + IT troubleshooting.';}
-  else if(returns.waiting){commandState='IT INTAKE WAITING';commandTone='due';commandDetail='Returned equipment is waiting for IT Intake.';}
-  else if(swapSiteRegs.length){commandState='SWAP SITE REGISTRATION READY';commandTone='due';commandDetail='Service confirmed a replacement unit was installed. IT can register it to the customer/site now.';}
-  else if(overdue.length){commandState='OPEN IT WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one IT assignment is still open from an earlier work date.';}
-  else if(ready.length){commandState='IT JOB READY';commandDetail='An IT assignment is ready to work now.';}
-  else if(prepSummary.draft){commandState='UNFINISHED IT PREP';commandTone='due';commandDetail='An equipment prep draft is still incomplete.';}
-  else if(!needsAction.length){commandState='NO ACTIVE IT WORK TODAY';commandDetail='Only work that is ready for IT appears here. Future workflow steps stay hidden until they are released to IT.';}
-
-  let nextAction='';
-  if(offlineIT.length){
-    const issue=offlineIT[0];
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Help Service troubleshoot ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.site||'No site')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Review Service’s power check, troubleshoot together, and record the IT decision in the field-issue card below.</div></div>`;
-  }else if(returns.nextWaiting){
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Start IT Intake · Unit ${esc(returns.nextWaiting.unit_tag||'Unknown')}</b><div class='small'>${esc(returns.nextWaiting.equipment_type||'Returned unit')} · MHelpDesk #${esc(returns.nextWaiting.ticket_no||'—')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-next-it-intake='${returns.nextWaiting.id}'>Start / Continue IT Intake →</button></div>`;
-  }else if(swapSiteRegs.length){
-    const reg=swapSiteRegs[0];
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Register ${esc(reg.equipment_type)} ${esc(reg.unit_tag||'')} to ${esc(reg.site||'customer site')}</b><div class='small'>MHelpDesk #${esc(reg.ticket_no)} · Service confirmed the SWAP happened.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-confirm-swap-site='${esc(reg.id)}' data-wl-swap-site-label='${esc((reg.equipment_type||'Unit')+' '+(reg.unit_tag||''))}' data-wl-swap-site='${esc(reg.site||'Customer site')}'>Confirm Site Registration →</button></div>`;
-  }else if(ready.length){
-    const next=ready[0].a;
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Open MHelpDesk #${esc(next.ticket_no)}</b><div class='small'>${esc(next.site||'No customer / site')} · ${esc(String(next.work_type||'service').toUpperCase())} · ${esc(ownerAIScheduleText(next.scheduled_for,next.scheduled_time))}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-start-assignment='${next.id}'>${next.status==='started'?'Continue IT Task':'Open IT Task'} →</button></div>`;
-  }else if(prepSummary.nextDraft){
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Finish IT Prep · MHelpDesk #${esc(prepSummary.nextDraft.ticket_no)}</b><div class='small'>${esc(prepSummary.nextDraft.site||'No customer / site')}</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-open-it='${prepSummary.nextDraft.id}'>Continue Equipment Prep →</button></div>`;
-  }else{
-    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ IT command center is clear.</b><div class='small'>No IT task is currently released and ready to work.</div></div>`;
-  }
-
-  const upcomingHtml=upcoming.length?`<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>Upcoming IT Work</b><span>${upcoming.length} scheduled</span></div>${upcoming.slice(0,8).map(itAssignmentCard).join('')}</div>`:'';
-  const closeoutClear=!assignments.length&&!prepSummary.draft&&!returns.waiting&&!offlineIT.length&&!swapSiteRegs.length;
-
-  home.innerHTML=`${alertBanner}<div class='wl-svc-command wl-it-command'>
-    <div class='wl-svc-command-hero'>
-      <div class='wl-svc-command-kicker'>IT TECHNICIAN COMMAND CENTER</div>
-      <h2>${esc(ownerViewingIT?techName+' · IT':techName)} · ${esc(todayLabel)}</h2>
-      <p>Assignments → equipment prep → Service handoff → field support → IT Intake → inventory protection.</p>
-      <div class='wl-svc-command-state ${commandTone}'><i></i><span><b>${esc(commandState)}</b><br>${esc(commandDetail)}</span></div>
-    </div>
-
-    <div class='wl-svc-command-stats'>
-      <div class='wl-svc-command-stat'><b>${today.length}</b><span>Today’s IT jobs</span></div>
-      <div class='wl-svc-command-stat'><b>${ready.length}</b><span>Ready / actionable</span></div>
-      <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Released to IT Intake</span></div>
-      <div class='wl-svc-command-stat'><b>${swapSiteRegs.length}</b><span>SWAP site registrations</span></div>
-      <div class='wl-svc-command-stat'><b>${returns.waiting}</b><span>Returns waiting IT</span></div>
-      <div class='wl-svc-command-stat'><b>${offlineIT.length}</b><span>Service needs IT</span></div>
-    </div>
-
-    ${nextAction}
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>IT Queue Health</b><span>${needsAction.length} open now</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${overdue.length?'issue':''}'><b>Overdue IT assignments</b><span>${overdue.length}</span></div>
-        <div class='wl-svc-command-close-row ${queueCount?'pending':''}'><b>IT Department queue jobs</b><span>${queueCount}</span></div>
-        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Equipment prep drafts</b><span>${prepSummary.draft}</span></div>
-        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
-        <div class='wl-svc-command-close-row ${returns.replacement?'issue':''}'><b>Needs Replacement holds</b><span>${returns.replacement}</span></div>
-        <div class='wl-svc-command-close-row ${swapSiteRegs.length?'pending':''}'><b>SWAP site registration ready</b><span>${swapSiteRegs.length}</span></div>
+    <details class='wl-it-more'>
+      <summary>OTHER ACTIONS</summary>
+      <div class='wl-it-more-grid'>
+        <button data-wl-mode='intake'>IT INTAKE / RETURNS${returns.waiting?` · ${returns.waiting}`:''}</button>
+        <button data-wl-it='pending'>RESUME EQUIPMENT PREP${prepSummary.draft?` · ${prepSummary.draft}`:''}</button>
+        <button data-wl-it='history'>STATUS & HISTORY</button>
+        ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
       </div>
-    </div>
-
-    ${swapSiteRegistrationHtml(swapSiteRegs)}
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Today / Needs Action</b><span>${needsAction.length} open</span></div>
-      ${needsAction.length?needsAction.map(itAssignmentCard).join(''):"<div class='ok'><b>✓ No due, overdue, or unscheduled IT assignments.</b></div>"}
-    </div>
-
-    ${offlineITHtml}
-    ${upcomingHtml}
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Equipment Prep & Intake</b><span>Live Tech Check</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Draft IT preps</b><span>${prepSummary.draft}</span></div>
-        <div class='wl-svc-command-close-row'><b>Handoffs waiting for Service</b><span>${prepSummary.released}</span></div>
-        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returned units waiting IT</b><span>${returns.waiting}</span></div>
-        <div class='wl-svc-command-close-row'><b>Intake awaiting Owner / MHelpDesk inventory</b><span>${returns.inventory}</span></div>
-      </div>
-      ${assignedInventoryHtml(assignedAssets)}
-      <div class='wl-menu top10'>
-        ${ownerViewingIT?"<button class='wl-blue' data-wl-it='new'>＋ Owner: Start New Equipment Prep</button>":""}
-        <button class='${prepSummary.draft?"wl-red":"wl-gray"}' data-wl-it='pending' ${prepSummary.draft?'':'disabled'}>▶ Continue Pending Prep <span class='wl-count'>${prepSummary.draft}</span></button>
-        <button class='${returns.waiting?"wl-red":"wl-gray"}' data-wl-mode='intake' ${returns.waiting?'':'disabled'}>↩ Intake & Returns <span class='wl-count'>${returns.waiting+returns.inventory+returns.replacement}</span></button>
-        <button class='wl-gray' data-wl-it='history'>☰ Status & History <span class='wl-count'>${prepSummary.released+prepSummary.closed}</span></button>
-      </div>
-    </div>
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>End-of-Day IT Closeout</b><span>${closeoutClear?'CLEAR':'OPEN ITEMS'}</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${needsAction.length?'pending':''}'><b>Ready IT assignments</b><span>${needsAction.length}</span></div>
-        <div class='wl-svc-command-close-row ${prepSummary.draft?'pending':''}'><b>Unfinished equipment prep</b><span>${prepSummary.draft}</span></div>
-        <div class='wl-svc-command-close-row ${returns.waiting?'pending':''}'><b>Returns waiting IT Intake</b><span>${returns.waiting}</span></div>
-        <div class='wl-svc-command-close-row ${offlineIT.length?'issue':''}'><b>Service troubleshooting waiting on IT</b><span>${offlineIT.length}</span></div>
-        <div class='wl-svc-command-close-row ${swapSiteRegs.length?'pending':''}'><b>SWAP site registrations</b><span>${swapSiteRegs.length}</span></div>
-      </div>
-      <div class='small top8'>Released handoffs may remain with Service, and completed intake may remain in Owner / MHelpDesk inventory confirmation without falsely blocking IT closeout. MHelpDesk remains separate.</div>
-    </div>
+    </details>
   </div>`;
 
   hideChildren(viewIT(),[home]);
-  injectEquipmentMemory(wizard).catch(()=>{});
   resetWizardPosition();
 }
 function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
@@ -2410,6 +2333,74 @@ function updateUnitCountStatus() {
   status.className = remaining === 0 ? 'ok' : remaining > 0 ? 'warn' : 'bad';
   status.innerHTML = remaining === 0 ? `<b>✓ ${added} of ${expected} units added.</b> You can continue to Unit 1.` : remaining > 0 ? `<b>${added} of ${expected} units added.</b> Add ${remaining} more unit${remaining === 1 ? '' : 's'}.` : `<b>${added} units added but the ticket says ${expected}.</b> Remove ${Math.abs(remaining)} unit${Math.abs(remaining) === 1 ? '' : 's'} before continuing.`;
 }
+function showITJobLookup() {
+  let card=document.getElementById('wlItJobLookup');
+  if(!card){
+    card=document.createElement('div');
+    card.id='wlItJobLookup';
+    card.className='card wl-it-simple-card';
+    viewIT().append(card);
+  }
+  card.innerHTML=`<button class='wl-back' data-wl-home='it'>← BACK</button>
+    <div class='wl-it-step-label'>NEXT STEP</div>
+    <div class='wl-question wl-it-ticket-entry'>
+      <div class='qtext'>ENTER YOUR MHELPDESK TICKET #</div>
+      <input id='wlITJobSearch' inputmode='numeric' autocomplete='off' placeholder='TICKET #'>
+      <button class='wl-it-start top10' data-wl-it-find-job>FIND MY IT JOB</button>
+      <div id='wlITJobSearchMsg' class='wl-it-help'>The ticket must be assigned to you or available to the IT team.</div>
+    </div>`;
+  hideChildren(viewIT(),[card]);
+  resetWizardPosition();
+  requestAnimationFrame(()=>document.getElementById('wlITJobSearch')?.focus());
+}
+async function itFindJobByTicket() {
+  const input=document.getElementById('wlITJobSearch');
+  const msg=document.getElementById('wlITJobSearchMsg');
+  const ticket=String(input?.value||'').trim().replace(/^#\s*/,'');
+  if(!ticket){
+    if(msg)msg.innerHTML='<div class="wl-stop"><b>ENTER A TICKET NUMBER.</b></div>';
+    return;
+  }
+
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(!tech?.id)return alert('Active IT Technician account required.');
+
+  const {data,error}=await liveDb.from('job_assignments')
+    .select('*')
+    .eq('ticket_no',ticket)
+    .eq('assigned_role','it')
+    .in('status',['assigned','started'])
+    .order('assigned_at',{ascending:false})
+    .limit(10);
+  if(error)return alert(error.message);
+
+  let a=(data||[]).find(x=>x.assignee_user_id===tech.id)
+    ||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
+
+  if(!a){
+    const assignedOther=(data||[]).find(x=>x.assignee_user_id&&x.assignee_user_id!==tech.id);
+    if(msg)msg.innerHTML=assignedOther
+      ? `<div class='wl-stop'><b>THIS IT JOB IS ASSIGNED TO ANOTHER TECHNICIAN.</b><div>MHelpDesk #${esc(ticket)} cannot be opened under this login.</div></div>`
+      : `<div class='wl-stop'><b>NO IT JOB FOUND FOR #${esc(ticket)}</b><div>Check the ticket number or ask the Owner to assign it to IT.</div></div>`;
+    return;
+  }
+
+  const gate=await assignmentGateState(a);
+  const ready=Boolean(gate.ready);
+  const assignedToMe=a.assignee_user_id===tech.id;
+  const mode=String(a.work_type||'service').toUpperCase();
+
+  if(msg)msg.innerHTML=`<div class='wl-it-ticket-found'>
+    <div class='wl-it-step-label'>IT JOB FOUND</div>
+    <div class='wl-it-ticket-number'>#${esc(a.ticket_no)}</div>
+    <div class='wl-it-ticket-site'>${esc(a.site||'NO SITE LISTED')}</div>
+    <div class='wl-it-job-type'>${esc(mode)}</div>
+    <div class='${ready?'wl-it-good':'wl-it-wait'}'>${ready?'✓ '+esc(assignedToMe?'THIS IT JOB IS ASSIGNED TO YOU':'THIS JOB IS AVAILABLE TO THE IT TEAM'):'WAITING — '+esc(gate.label)}</div>
+    ${ready
+      ? `<button class='wl-it-start top10' data-wl-start-assignment='${a.id}'>START IT JOB</button>`
+      : `<div class='wl-stop top10'><b>YOU CANNOT START YET.</b><div>${esc(gate.detail||'A required prior workflow step is not complete.')}</div></div>`}
+  </div>`;
+}
 function showNewPrep() {
   const p = createParts();
   if (!p.card) return;
@@ -2544,19 +2535,45 @@ async function renderITIntakeWizard() {
   const row = intakeWizard.row;
   if (!row) return showITIntake();
   let card = document.getElementById('wlIntakeForm');
-  if (!card) { card = document.createElement('div'); card.id = 'wlIntakeForm'; card.className = 'card'; viewIT().append(card); }
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'wlIntakeForm';
+    card.className = 'card wl-it-simple-card';
+    viewIT().append(card);
+  }
   const photoHtml = await returnPhotoHtml(row.return_photo_paths);
+
   if (intakeWizard.step < intakeLabels.length) {
     const i = intakeWizard.step;
     const answer = intakeWizard.answers[i];
-    card.innerHTML = `${progress(`${row.unit_tag} · IT Intake`, intakeLabels[i], i + 1, intakeLabels.length + 2)}${intakeAIReview(row)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div>MHelpDesk #${esc(row.ticket_no)}</div><div>Returned by ${esc(row.service_tech_name)}</div>${row.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(row.return_notes)}</div></div>` : ''}<div class='small top8'><b>Service photos from site / return:</b></div><div class='wl-return-gallery'>${photoHtml}</div></div><div class='wl-question'><div class='qnum'>Intake Check ${i + 1} of ${intakeLabels.length}</div><div class='qtext'>${esc(intakeLabels[i])}</div><div class='wl-options'><button class='pass ${answer === true ? 'on' : ''}' data-wl-intake-answer='yes'>YES</button><button class='fail ${answer === false ? 'on' : ''}' data-wl-intake-answer='no'>NO</button></div>${answer === false ? `<div class='wl-stop'><b>NO recorded.</b><div>Document the issue before this unit goes back into inventory.</div></div>` : ''}</div><div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><button class='wl-next' data-wl-intake-next>Next →</button></div>`;
+    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, intakeLabels[i], i + 1, intakeLabels.length + 2)}
+      <div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div>MHelpDesk #${esc(row.ticket_no)}</div><div>Returned by ${esc(row.service_tech_name)}</div>${row.return_notes ? `<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>` : ''}${photoHtml?`<div class='wl-return-gallery top8'>${photoHtml}</div>`:''}</div>
+      <div class='wl-question wl-it-intake-bool'>
+        <div class='qnum'>INTAKE CHECK ${i + 1} OF ${intakeLabels.length}</div>
+        <div class='qtext'>${esc(intakeLabels[i])}</div>
+        <div class='wl-options'>
+          <button class='pass ${answer === true ? 'on' : ''}' data-wl-intake-answer='yes'>YES</button>
+          <button class='fail ${answer === false ? 'on' : ''}' data-wl-intake-answer='no'>NO</button>
+        </div>
+        ${answer === false ? `<div class='wl-stop'><b>STOP — THIS UNIT CANNOT CONTINUE TO INVENTORY.</b><div>Fix the problem and tap YES. If it cannot be corrected, document it as damaged / needs replacement.</div><button class='wl-it-escalate top10' data-wl-intake-escalate>DOCUMENT DAMAGE / REPLACEMENT →</button></div>` : ''}
+      </div>
+      <button class='wl-service-backstep' data-wl-intake-prev ${i===0?'disabled':''}>← PREVIOUS QUESTION</button>`;
   } else if (intakeWizard.step === intakeLabels.length) {
-    card.innerHTML = `${progress(`${row.unit_tag} · IT Intake`, 'Take an IT intake photo', intakeLabels.length + 1, intakeLabels.length + 2)}${intakeAIReview(row)}<div class='wl-review'><b>Service site / return photos</b>${row.return_notes ? `<div class='warn top8'><b>Service return / damage notes</b><div>${esc(row.return_notes)}</div></div>` : ''}<div class='wl-return-gallery'>${photoHtml}</div></div><div class='wl-question'><div class='qtext'>Take a current photo of ${esc(row.unit_tag)} in the shop.</div><div class='wl-note'>This gives the Owner a Service-return photo and an IT-intake photo for the same unit.</div><label class='wl-photo-button' for='wlIntakePhoto'>📷 Take / Choose Unit Photo</label><input id='wlIntakePhoto' class='wl-photo-input' type='file' accept='image/*'><div class='wl-return-preview ${intakeWizard.photo ? '' : 'hidden'}'>${intakeWizard.photo ? `<img src='${URL.createObjectURL(intakeWizard.photo)}' alt='Selected IT intake unit photo'><div id='wlIntakePhotoName' class='ok'><b>✓ Photo selected for ${esc(row.unit_tag)}</b><div>${esc(intakeWizard.photo.name || 'Unit photo')} is ready for review.</div></div>` : ''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><button class='wl-next' data-wl-intake-next>Next: Review →</button></div>`;
+    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, 'TAKE AN IT INTAKE PHOTO', intakeLabels.length + 1, intakeLabels.length + 2)}
+      <div class='wl-review'><b>Service return evidence</b>${row.return_notes ? `<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>` : ''}<div class='wl-return-gallery'>${photoHtml}</div></div>
+      <div class='wl-question'><div class='qtext'>TAKE A CURRENT PHOTO OF ${esc(row.unit_tag)} IN THE SHOP.</div><label class='wl-photo-button' for='wlIntakePhoto'>📷 TAKE / CHOOSE UNIT PHOTO</label><input id='wlIntakePhoto' class='wl-photo-input' type='file' accept='image/*'><div class='wl-return-preview ${intakeWizard.photo ? '' : 'hidden'}'>${intakeWizard.photo ? `<img src='${URL.createObjectURL(intakeWizard.photo)}' alt='Selected IT intake unit photo'>` : ''}</div></div>
+      <div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><button class='wl-next' data-wl-intake-next>REVIEW →</button></div>`;
   } else {
     const noCount = intakeWizard.answers.filter(v => v === false).length;
     const ready = noCount === 0 && intakeWizard.answers.every(v => v === true);
     const doc = intakeWizard.meta?.cancellationDoc;
-    card.innerHTML = `${progress(`${row.unit_tag} · IT Intake`, 'Review this unit before MHelpDesk inventory', intakeLabels.length + 2, intakeLabels.length + 2)}${intakeAIReview(row)}<div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready ? `✓ All ${intakeLabels.length} intake checks are YES.` : `${noCount} check${noCount === 1 ? '' : 's'} recorded NO — correct or document the issue before inventory.`}</div>${doc ? `<div class='ok top8'><b>SIM cancellation documentation</b><div>Date: ${esc(doc.simCanceledDate)} · Job: MHelpDesk #${esc(doc.ticket)} · Unit: ${esc(doc.unit)} · IT Initials: ${esc(doc.techInitials)}</div></div>` : ''}</div><label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Add damage, missing items, repairs needed, or other notes'>${esc(intakeWizard.notes)}</textarea>${ready ? `<div class='ok top10'><b>✓ IT INTAKE COMPLETE</b><div>SIM, monitoring, Alibi, customer-email app removal, SD cards, cleaning, 2026 Unit Tracker, damage verification, and shelf readiness are documented. Next: send this exact unit to Pending MHelpDesk Inventory.</div></div>` : `<div class='wl-stop'><b>This unit is not ready for inventory.</b><div>If the failed check is because equipment is damaged or cannot be made deployment-ready, document what needs replacement and use the Owner escalation button below. Do not mark it Shop Inventory.</div></div>`}<button class='wl-big wl-green top10' data-wl-intake-finish ${ready ? '' : 'disabled'}>SEND TO PENDING MHELPDESK INVENTORY →</button>${!ready && noCount>0 ? `<button class='wl-big wl-red top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button><div class='small top8'>This holds the unit in Maintenance / Needs Replacement. It will not become available Shop Inventory.</div>` : ''}<div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><span></span></div>`;
+    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, ready?'READY FOR PENDING MHELPDESK INVENTORY':'UNIT NEEDS ATTENTION', intakeLabels.length + 2, intakeLabels.length + 2)}
+      <div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready ? `✓ All ${intakeLabels.length} required intake checks are YES.` : `${noCount} failed check${noCount === 1 ? '' : 's'} — this unit cannot become Shop Inventory.`}</div>${doc ? `<div class='ok top8'>SIM cancellation documentation recorded.</div>` : ''}</div>
+      <label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Describe damage, missing items, repair needed, or other notes'>${esc(intakeWizard.notes)}</textarea>
+      ${ready
+        ? `<div class='wl-it-good top10'>✓ IT INTAKE COMPLETE</div><button class='wl-it-start top10' data-wl-intake-finish>SEND TO PENDING MHELPDESK INVENTORY →</button>`
+        : `<div class='wl-stop'><b>DO NOT RETURN THIS UNIT TO INVENTORY.</b><div>Document what is wrong and send it to the Owner as Needs Replacement.</div></div><button class='wl-it-start top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button>`}
+      <button class='wl-service-backstep top10' data-wl-intake-prev>← BACK</button>`;
   }
   hideChildren(viewIT(), [card]);
   resetWizardPosition();
@@ -3104,13 +3121,17 @@ async function persistCurrentItItem() {
   return true;
 }
 function itCheckStepHtml(item, step, index, total, unitNo) {
-  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='${step.optional ? 'Enter tag if present' : 'Exact unit tag'}'>${step.optional ? "<div class='wl-note top8'>No tag is valid for a 110V Stand. Leave this blank if the stand does not have one.</div>" : ''}</div>`;
-  if (step.kind === 'number') { const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1); const value=item[step.field] ?? (step.field==='battery_count' ? item.required_battery_count : min); return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Step ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>Required minimum: ${min}</div></div>`; }
+  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' value='${esc(item.unit_tag || '')}' placeholder='${step.optional ? 'ENTER TAG IF PRESENT' : 'EXACT UNIT TAG'}'>${step.optional ? "<div class='wl-note top8'>No tag is valid for a 110V Stand. Leave this blank if the stand does not have one.</div>" : ''}</div>`;
+  if (step.kind === 'number') {
+    const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1);
+    const value=item[step.field] ?? (step.field==='battery_count' ? item.required_battery_count : min);
+    return `<div class='wl-question'><div class='qnum'>UNIT ${unitNo} · STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><input id='wlItUnitValue' type='number' inputmode='numeric' min='${min}' value='${esc(value ?? '')}'><div class='wl-note top8'>Required minimum: ${min}</div></div>`;
+  }
   const answered = itBoolAnswered(item, step.field);
   const value = itBoolValue(item, step.field);
   const yes = answered && value === true;
   const no = answered && value !== true;
-  return `<div class='wl-question'><div class='qnum'>Unit ${unitNo} · Check ${index + 1} of ${total}</div><div class='qtext'>${esc(step.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>NO recorded.</b><div>This unit cannot be handed off to Service until this answer is corrected to YES.</div></div>` : ''}</div>`;
+  return `<div class='wl-question wl-it-auto-bool'><div class='qnum'>UNIT ${unitNo} · CHECK ${index + 1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. This equipment cannot move forward while this answer is NO.</div></div>` : ''}</div>`;
 }
 function itUnitIssues(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo);
@@ -3482,7 +3503,7 @@ async function renderItUnitStep() {
   } else if (itUnitPhase === 'checks') {
     const steps = itUnitStepsData(item, unitNo);
     const step = steps[itQuestionIndex];
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, step?.label || `Check ${identity}`, itQuestionIndex + 1, Math.max(1, steps.length)) + itEquipmentAIReview(item,[],unitNo) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`;
+    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, step?.label || `Check ${identity}`, itQuestionIndex + 1, Math.max(1, steps.length)) + itEquipmentAIReview(item,[],unitNo) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + (step?.kind==='bool'?`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`:`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`);
   } else if (itUnitPhase === 'photo') {
     wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Photograph ${identity} with tag ${esc(item.unit_tag || '')} visible`, 1, 3) + await photoOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next: Signature →</button></div>`;
   } else if (itUnitPhase === 'review') {
@@ -4490,10 +4511,15 @@ document.addEventListener('click', async e => {
       if (error) return alert(error.message);
       row.damage_notes = update.damage_notes;
     }
+    if (value) intakeWizard.step++;
+    return renderITIntakeWizard();
+  }
+  if (e.target.closest('[data-wl-intake-escalate]')) {
+    intakeWizard.step = intakeLabels.length;
     return renderITIntakeWizard();
   }
   if (e.target.closest('[data-wl-intake-next]')) {
-    if (intakeWizard.step < intakeLabels.length && intakeWizard.answers[intakeWizard.step] === null) return alert('Choose YES or NO first.');
+    if (intakeWizard.step < intakeLabels.length && intakeWizard.answers[intakeWizard.step] !== true) return alert('This step is blocked. Fix the issue and tap YES, or document it as Needs Replacement.');
     if (intakeWizard.step === intakeLabels.length) { const file = document.getElementById('wlIntakePhoto')?.files?.[0]; if (!file && !intakeWizard.photo) return alert('Take or choose the IT intake photo first.'); if (file) intakeWizard.photo = file; }
     intakeWizard.step++;
     return renderITIntakeWizard();
@@ -7084,6 +7110,8 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
+  if (e.target.closest('[data-wl-it-open-job]')) return showITJobLookup();
+  if (e.target.closest('[data-wl-it-find-job]')) return itFindJobByTicket();
   const assigned = e.target.closest('[data-wl-start-assignment]');
   if (assigned) return startAssignedJob(assigned.dataset.wlStartAssignment);
   const ownerHome=e.target.closest('[data-owner-compact-home]');
@@ -7141,7 +7169,7 @@ document.addEventListener('change', e => {
 
 document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();} if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if(e.target?.id==='wlOfflineKnownUnit'){const card=document.getElementById('wlOfflineUnitForm');let units=[];try{units=JSON.parse(card?.dataset.units||'[]');}catch{}const u=units[Number(e.target.value)]||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};set('wlOfflineTicket',u.ticket_no);set('wlOfflineSite',u.site);set('wlOfflineUnit',u.unit_tag);set('wlOfflineType',u.equipment_type);} if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
-document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
+document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='wlITJobSearch'){e.preventDefault();itFindJobByTicket();return;} if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
 document.addEventListener('toggle', e => {
   if(e.target?.id==='ownerJobAssignments'&&e.target.open){const live=document.getElementById('ownerLiveJobProgress');if(live)live.open=false;}
