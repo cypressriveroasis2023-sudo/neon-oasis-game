@@ -2359,7 +2359,7 @@ function ownerTodayClockTick(){
   const greeting=document.getElementById('ownerTodayGreeting');
   if(!clock)return;
   const now=new Date();
-  clock.textContent=now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+  clock.textContent=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true}).replace(/\s?(AM|PM)$/,' $1');
   if(date)date.textContent=now.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   if(greeting)greeting.textContent=ownerTodayGreeting()+', '+ownerTodayName();
 }
