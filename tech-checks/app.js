@@ -2220,21 +2220,13 @@ function ownerBoardServiceTechCard(tech){
 }
 
 function ownerTruckEditorTech(id){
-  const rows=state.ownerTechCommandBoard?.service_techs
-    || state.ownerTechCommandBoard?.service_technicians
-    || state.ownerTechCommandBoard?.technicians
-    || [];
-  return rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id));
+  const rows=Array.isArray(state.ownerTechCommandBoard?.service_techs)?state.ownerTechCommandBoard.service_techs:[];
+  return rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id))||null;
 }
 async function ownerTruckEditorFetch(id){
-  let tech=ownerTruckEditorTech(id);
+  const tech=ownerTruckEditorTech(id);
   if(tech)return tech;
-  const {data,error}=await db.rpc('it_service_truck_inventory_v1');
-  if(error)throw error;
-  const rows=Array.isArray(data)?data:[];
-  const row=rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id));
-  if(!row)throw new Error('Truck inventory could not be found.');
-  return row;
+  throw new Error('This technician is no longer on the live Team Board. Refresh and try again.');
 }
 function ownerTruckEditorHtml(tech){
   const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{};
