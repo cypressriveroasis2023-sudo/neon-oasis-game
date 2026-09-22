@@ -585,7 +585,7 @@ async function init(){
   await Promise.all([hydratePersistentChats(),loadData()]);
   checkAgentStatus().catch(error=>console.warn('Vision AI status check',error));
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
-  const q=new URLSearchParams(location.search).get('ticket');
+  const params=new URLSearchParams(location.search),q=params.get('ticket'),alertKind=params.get('alert'),alertDetail=params.get('detail');
   if(q){
     let c=state.chats.find(row=>String(row.ticket||'')===String(q));
     if(!c){
@@ -593,7 +593,11 @@ async function init(){
       state.chats.unshift(c);
     }
     state.chatId=c.id;state.currentTicket=String(q);c.ticket=state.currentTicket;
-    if(!c.messages.length)c.messages.push({role:'assistant',text:'',html:ticketAnswer(q,'I opened this service order for you. Ask who has it, what happens next, or tell me what you want changed.'),at:now()});
+    if(alertKind||alertDetail){
+      c.title='Alert · MHelpDesk #'+q;
+      const detail=alertDetail||'OnSite Vision detected an active workflow issue.';
+      c.messages.push({role:'assistant',text:'',html:ticketAnswer(q,'<b>Why you were sent here:</b> '+esc(detail)+'<br><br>I loaded this ticket so this alert has a purpose. You can ask me to explain the issue, show what is still incomplete, identify who owns the next step, or prepare the appropriate Tech Check correction for your confirmation.'),at:now()});
+    }else if(!c.messages.length)c.messages.push({role:'assistant',text:'',html:ticketAnswer(q,'I opened this service order for you. Ask who has it, what happens next, or tell me what you want changed.'),at:now()});
     saveChats();
   }else state.currentTicket=chat()?.ticket||'';
   renderHistory();renderThread();renderOrder();$('visionLoading').classList.add('hidden');$('visionApp').classList.remove('hidden');state.loaded=true;setTimeout(()=>bottom(false),30);
