@@ -7048,3 +7048,93 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
   }
   #view-owner .ownerCalDayJobState{grid-column:2;text-align:left!important}
 }
+
+
+/* GPS weather + technician mobile scroll fix v242 */
+#view-owner .ownerWeatherCurrent>em{
+  display:block;
+  margin-top:5px;
+  color:#8fd4ff!important;
+  font-style:normal!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  letter-spacing:.04em!important;
+}
+#view-owner .ownerWeatherError button{
+  width:max-content!important;
+  min-height:40px!important;
+  margin-top:10px!important;
+  background:#17303b!important;
+  border:1px solid #4b6672!important;
+  color:#fff!important;
+}
+
+/* iPhone/phone technician pages must scroll vertically. */
+html.tech-scroll-enabled,
+body.tech-scroll-enabled{
+  height:auto!important;
+  min-height:100%!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;
+}
+body.tech-scroll-enabled #appView.wrap{
+  position:relative!important;
+  inset:auto!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:100dvh!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding-bottom:calc(42px + env(safe-area-inset-bottom,0px))!important;
+  touch-action:pan-y!important;
+}
+body.tech-scroll-enabled #view-it:not(.hidden),
+body.tech-scroll-enabled #view-service:not(.hidden){
+  position:relative!important;
+  inset:auto!important;
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  touch-action:pan-y!important;
+  overscroll-behavior:visible!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+body.tech-scroll-enabled #view-it:not(.hidden) > *,
+body.tech-scroll-enabled #view-service:not(.hidden) > *{
+  max-height:none!important;
+}
+@media(max-width:720px){
+  html.tech-scroll-enabled,
+  body.tech-scroll-enabled{
+    position:static!important;
+    width:100%!important;
+    overflow-y:auto!important;
+  }
+  body.tech-scroll-enabled #appView.wrap{
+    padding-top:calc(env(safe-area-inset-top,0px) + 8px)!important;
+    padding-left:10px!important;
+    padding-right:10px!important;
+  }
+  body.tech-scroll-enabled #view-it:not(.hidden),
+  body.tech-scroll-enabled #view-service:not(.hidden){
+    padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))!important;
+  }
+  body.tech-scroll-enabled .mobileTop{
+    position:static!important;
+    top:auto!important;
+  }
+
+  /* Owner Team/Today workspace itself remains touch-scrollable on iOS. */
+  #view-owner .ownerAppWorkspace{
+    overflow-y:auto!important;
+    overscroll-behavior-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-y!important;
+  }
+}
