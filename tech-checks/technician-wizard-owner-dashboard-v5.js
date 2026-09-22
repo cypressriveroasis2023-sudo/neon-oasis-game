@@ -512,6 +512,83 @@ function injectStyles() {
     @media(min-width:900px){.wl-home{max-width:none!important}.wl-menu{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.wl-menu button,.wl-big{min-height:110px}.wl-title{font-size:34px}.wl-sub{max-width:760px}.wl-head{padding:18px 20px}.wl-question{padding:22px}.wl-question .qtext{font-size:24px}.wl-options{max-width:760px}.wl-options button{min-height:70px}.wl-nav{grid-template-columns:minmax(160px,.55fr) minmax(260px,1fr);max-width:760px}.wl-ticket{padding:18px}.wl-gallery{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-gallery img{height:150px}}
     @media(max-width:560px){.wl-title{font-size:25px}.wl-sub{font-size:15px;margin-bottom:14px}.wl-menu{gap:10px}.wl-menu button,.wl-big{font-size:18px;min-height:72px;padding:15px 16px}.wl-nav{grid-template-columns:1fr 1.45fr;position:sticky;bottom:0;background:#f3f6f9;padding:8px 0 4px;z-index:15}.wl-nav button{min-height:58px}.wl-question{padding:15px}.wl-question .qtext{font-size:20px}.wl-options button{min-height:64px}.wl-head{margin-bottom:10px}.wl-ticket{padding:12px}.wl-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-sign canvas{height:160px}}
   `;
+  s.textContent += `
+    #view-svc{color:#fff!important}
+    #view-svc>.card:not(#wlSvcHome):not(#wlSvcLookup):not(#wlInspection):not(#wlSvcWizardOnly):not(#wlSvcFieldAssignment){display:none}
+    #view-svc .wl-service-simple-home,
+    #view-svc .wl-service-simple-card,
+    #view-svc #wlSvcWizardOnly,
+    #view-svc #wlSvcFieldAssignment,
+    #view-svc #wlInspection{
+      max-width:820px!important;margin:18px auto!important;padding:18px!important;
+      background:#071117!important;border:1px solid #263943!important;border-radius:16px!important;
+      color:#fff!important;box-shadow:0 18px 45px rgba(0,0,0,.28)!important
+    }
+    #view-svc .wl-service-simple-shell{text-align:center;padding:28px 10px 10px}
+    #view-svc .wl-service-simple-kicker,
+    #view-svc .wl-service-step-label,
+    #view-svc .qnum{color:#ff343b!important;font-size:13px!important;font-weight:950!important;letter-spacing:.12em!important}
+    #view-svc .wl-service-simple-shell h1{margin:10px 0 8px!important;color:#fff!important;font-size:clamp(34px,7vw,64px)!important;line-height:1!important;font-weight:1000!important;letter-spacing:-.04em!important}
+    #view-svc .wl-service-simple-shell p{margin:0 auto 24px!important;max-width:620px;color:#c7d1d6!important;font-size:20px!important;font-weight:800!important;line-height:1.35!important}
+    #view-svc .wl-service-start{
+      width:100%!important;min-height:82px!important;border:1px solid #ff3b42!important;border-radius:12px!important;
+      background:#e31821!important;color:#fff!important;font-size:24px!important;font-weight:1000!important;letter-spacing:.02em!important;
+      box-shadow:0 10px 28px rgba(227,24,33,.22)!important
+    }
+    #view-svc .wl-service-flowline{margin:20px 0;color:#82949e!important;font-size:12px!important;font-weight:900!important;letter-spacing:.05em!important}
+    #view-svc .wl-service-flowline b{color:#ff343b!important;padding:0 5px}
+    #view-svc .wl-service-more{margin-top:26px;border-top:1px solid #263943;padding-top:12px;text-align:left}
+    #view-svc .wl-service-more summary{cursor:pointer;color:#8fa2ad;font-size:11px;font-weight:900;letter-spacing:.1em;text-align:center}
+    #view-svc .wl-service-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    #view-svc .wl-service-more-grid button,
+    #view-svc .wl-service-backstep,
+    #view-svc .wl-back{min-height:46px!important;border:1px solid #334954!important;border-radius:9px!important;background:#101e25!important;color:#dce6ea!important;font-weight:900!important}
+    #view-svc .wl-back{width:auto!important;padding:0 16px!important;margin:0 0 16px!important}
+    #view-svc .wl-service-backstep{width:100%!important;margin-top:14px!important}
+    #view-svc .wl-head{background:#0b1920!important;border:1px solid #2a414d!important;color:#fff!important;border-radius:12px!important}
+    #view-svc .wl-head h2{color:#fff!important;font-size:clamp(24px,5vw,38px)!important;font-weight:1000!important}
+    #view-svc .wl-head .kicker{color:#ff343b!important;font-weight:950!important}
+    #view-svc .wl-progress{background:#24343d!important}
+    #view-svc .wl-progress span{background:#e31821!important}
+    #view-svc .wl-question,
+    #view-svc .wl-review,
+    #view-svc .wl-ticket,
+    #view-svc .wl-proof{background:#0b1920!important;border:1px solid #2a414d!important;color:#fff!important;border-radius:14px!important}
+    #view-svc .wl-question .qtext{color:#fff!important;font-size:clamp(25px,5.4vw,42px)!important;line-height:1.12!important;font-weight:1000!important;text-transform:uppercase!important}
+    #view-svc .wl-options{grid-template-columns:1fr 1fr!important;gap:12px!important}
+    #view-svc .wl-options button{min-height:86px!important;border-radius:12px!important;font-size:24px!important;font-weight:1000!important}
+    #view-svc .wl-options .pass{background:#fff!important;border:2px solid #fff!important;color:#0b1115!important}
+    #view-svc .wl-options .fail{background:#e31821!important;border:2px solid #ff444b!important;color:#fff!important}
+    #view-svc input,#view-svc select,#view-svc textarea{
+      min-height:62px!important;background:#02080c!important;border:2px solid #39515d!important;border-radius:10px!important;
+      color:#fff!important;font-size:22px!important;font-weight:900!important;padding:10px 14px!important
+    }
+    #view-svc input::placeholder{color:#60737d!important}
+    #view-svc .wl-stop{background:#2a0d10!important;border:2px solid #e31821!important;color:#fff!important;border-radius:12px!important;font-size:16px!important}
+    #view-svc .wl-stop b{color:#ff5a60!important;font-size:20px!important}
+    #view-svc .wl-stop a{background:#e31821!important;color:#fff!important}
+    #view-svc .wl-service-ticket-entry{text-align:center;padding:28px!important}
+    #view-svc .wl-service-ticket-entry input{width:100%!important;text-align:center!important;font-size:32px!important;letter-spacing:.06em!important}
+    #view-svc .wl-service-help{margin-top:12px;color:#8497a1!important;font-size:13px!important;font-weight:700!important;text-align:center}
+    #view-svc .wl-service-ticket-found{margin-top:14px;padding:24px;background:#0b1920;border:1px solid #2a414d;border-radius:14px;text-align:center}
+    #view-svc .wl-service-ticket-number{font-size:clamp(38px,8vw,66px);font-weight:1000;color:#fff;line-height:1;margin:10px 0}
+    #view-svc .wl-service-ticket-site{font-size:22px;font-weight:900;color:#cbd5da;margin-bottom:18px}
+    #view-svc .wl-service-good{padding:16px;border:1px solid #4d6977;border-radius:10px;background:#101e25;color:#fff;font-size:20px;font-weight:1000;text-align:center}
+    #view-svc .wl-service-wait{padding:16px;border:2px solid #e31821;border-radius:10px;background:#2a0d10;color:#fff;font-size:20px;font-weight:1000;text-align:center}
+    #view-svc .wl-nav{background:#071117!important}
+    #view-svc .wl-next{background:#e31821!important;color:#fff!important}
+    #view-svc .wl-prev{background:#101e25!important;border:1px solid #334954!important;color:#dce6ea!important}
+    #view-svc .wl-service-auto-bool + .wl-nav .wl-next{display:none!important}
+    #view-svc .small,#view-svc .wl-note{color:#a8b7be!important}
+    @media(max-width:560px){
+      #view-svc .wl-service-simple-home,#view-svc .wl-service-simple-card,#view-svc #wlSvcWizardOnly,#view-svc #wlSvcFieldAssignment,#view-svc #wlInspection{margin:8px 0!important;padding:12px!important;border-radius:12px!important}
+      #view-svc .wl-service-simple-shell{padding:20px 4px 8px}
+      #view-svc .wl-service-start{min-height:76px!important;font-size:22px!important}
+      #view-svc .wl-options button{min-height:78px!important;font-size:22px!important}
+      #view-svc .wl-service-more-grid{grid-template-columns:1fr}
+      #view-svc .wl-nav{position:static!important;padding-top:8px!important}
+    }
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -3463,174 +3540,50 @@ async function showSvcHome() {
   if(!home){
     home=document.createElement('div');
     home.id='wlSvcHome';
-    home.className='card wl-home';
+    home.className='card wl-home wl-service-simple-home';
     viewSvc().prepend(home);
   }
-  const loadToken=++serviceDashboardLoadToken;
-  home.innerHTML=techDashboardLoadingHtml('Loading Service Tech Command Center…');
+  home.innerHTML=techDashboardLoadingHtml('Loading your day…');
   hideChildren(viewSvc(),[home]);
   resetWizardPosition();
 
-  const settled=await Promise.allSettled([
-    techDashboardTimeout(myReturnCounts(),{waiting:0,inventory:0,replacement:0,completed:0}),
-    techDashboardTimeout(serviceWorkData(),{assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]}),
-    techDashboardTimeout(pushAlertState(),{supported:false,permission:'unknown',subscribed:false,ready:false}),
-    techDashboardTimeout(myAssignedInventoryAssets(),[]),
-    techDashboardTimeout(myTruckSpareData(),{units:[],batteries:[]}),
-    techDashboardTimeout(fieldEscalationRows(),[])
-  ]);
-  if(loadToken!==serviceDashboardLoadToken)return;
-  const values=settled.map(r=>r.status==='fulfilled'?r.value:null);
-  const r=values[0]||{waiting:0,inventory:0,replacement:0,completed:0};
-  const work=values[1]||{assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]};
-  const phoneAlerts=values[2]||{supported:false,permission:'unknown',subscribed:false,ready:false};
-  const assignedAssets=values[3]||[];
-  const truckSpares=values[4]||{units:[],batteries:[]};
-  const offlineRows=values[5]||[];
-  const partialLoad=techDashboardSettled(settled);
-
-  const alertBanner=(partialLoad?"<div class='wl-tech-partial'><b>Partial live-data load.</b> The command center is usable, but one data source did not answer. Refresh or tap Retry if a count looks incomplete.</div>":"")+phoneAlertBanner(phoneAlerts);
-  const assignments=work.assignments||[];
+  const work=await techDashboardTimeout(
+    serviceWorkData(),
+    {assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]}
+  );
   const ownerViewingService=roleText().includes('Owner/Admin');
-  const todayKey=techCheckDateKey();
-  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingService?'Service Team':'Service Tech');
-  const todayLabel=new Date().toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'});
-  const releasedTickets=new Set((work.released||[]).map(p=>norm(p.ticket_no)));
-  const fieldTickets=new Set((work.deployed||[]).map(p=>norm(p.ticket_no)));
-  const handoffKnown=ticket=>releasedTickets.has(norm(ticket))||fieldTickets.has(norm(ticket));
-  const activeOffline=(offlineRows||[]).filter(row=>!row.resolved_at);
-  const actionableOffline=activeOffline.filter(row=>['waiting_it','joint_troubleshooting','backup_swap_authorized'].includes(String(row.status||'')));
-  const returnCount=r.waiting+r.inventory+r.replacement;
-  const deployedCount=(work.deployed||[]).length;
-  const truckSpareCount=(truckSpares.units||[]).length+(truckSpares.batteries||[]).length;
-
-  const dateKey=a=>String(a?.scheduled_for||'').slice(0,10);
-  const overdueAssignments=assignments.filter(a=>dateKey(a)&&dateKey(a)<todayKey);
-  const todayAssignments=assignments.filter(a=>dateKey(a)===todayKey);
-  const unscheduledAssignments=assignments.filter(a=>!dateKey(a));
-  const upcomingAssignments=assignments.filter(a=>dateKey(a)>todayKey);
-  const commandAssignments=[...overdueAssignments,...todayAssignments,...unscheduledAssignments];
-  const waitingHandoffAssignments=commandAssignments.filter(a=>a.requires_it_handoff&&!handoffKnown(a.ticket_no)&&String(a.work_type||'').toLowerCase()!=='pickup');
-  const readyAssignments=commandAssignments.filter(a=>{
-    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
-    return pickup||!a.requires_it_handoff||handoffKnown(a.ticket_no);
-  });
-  const handoffCount=commandAssignments.filter(a=>a.requires_it_handoff&&handoffKnown(a.ticket_no)).length;
+  const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingService?'Service Technician':'Technician');
+  const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
   const inspectionDue=Boolean(work.inspectionRequired&&!work.inspectionDone);
-  const readinessComplete=!work.inspectionRequired||Boolean(work.inspectionDone);
+  const inspectionDone=Boolean(work.inspectionDone);
+  const weekend=!work.inspectionRequired;
 
-  function assignmentState(a){
-    const pickup=String(a.work_type||'').toLowerCase()==='pickup';
-    const overdue=dateKey(a)&&dateKey(a)<todayKey;
-    if(overdue)return {label:'OVERDUE / OPEN',tone:'attn',detail:'This Service job is still open from an earlier work date.'};
-    if(pickup)return {label:'READY — PICKUP',tone:'',detail:'Service starts the pickup / return workflow.'};
-    if(a.requires_it_handoff&&!handoffKnown(a.ticket_no))return {label:'WAITING ON IT',tone:'wait',detail:'IT has not created the Service handoff yet.'};
-    if(a.requires_it_handoff&&handoffKnown(a.ticket_no))return {label:'HANDOFF READY',tone:'',detail:'IT handoff is ready or has already been accepted for field work.'};
-    return {label:'READY',tone:'',detail:'Service task can be opened after exact MHelpDesk verification.'};
-  }
+  const startAction=inspectionDue
+    ? `<button class='wl-service-start' data-wl-svc='inspect'>START MY DAY</button>`
+    : `<button class='wl-service-start' data-wl-service-open-job>${inspectionDone?'CONTINUE MY DAY':'START MY DAY'}</button>`;
 
-  function assignmentCard(a){
-    const state=assignmentState(a);
-    const queue=!a.assignee_user_id&&a.assignment_scope==='department';
-    return `<div class='wl-svc-job'>
-      <div class='wl-svc-job-top'><div><b>MHelpDesk #${esc(a.ticket_no)}</b><div class='small'>${esc(a.site||'No customer / site')}</div></div><span class='${state.tone}'>${esc(state.label)}</span></div>
-      <div class='wl-svc-job-meta'><span>${esc(String(a.work_type||'service').toUpperCase())}</span><span>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</span>${queue?'<span>Service Department Queue</span>':''}</div>
-      <div class='wl-svc-job-desc'>${esc(state.detail)}${a.job_description?'<br><b>Work:</b> '+esc(a.job_description):''}</div>
-      ${equipmentManifestInlineHtml(a)}${ticketPartsInlineHtml(a)}${techCheckAIHtml(a,'service')}
-      <button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-service-open-job>Verify Exact Ticket & Open →</button>
-    </div>`;
-  }
+  const statusLine=inspectionDue
+    ? 'First: complete your truck inspection.'
+    : weekend
+      ? 'No start-day vehicle inspection is required today.'
+      : 'Truck inspection complete. Enter your next MHelpDesk ticket.';
 
-  let commandState='READY FOR FIELD WORK',commandTone='',commandDetail='Morning readiness is complete. Work the next verified Service job.';
-  if(inspectionDue){commandState='START-DAY CHECK REQUIRED';commandTone='due';commandDetail='Complete the weekday Truck / Trailer Inspection before departure.';}
-  else if(actionableOffline.length){commandState='ACTIVE FIELD ISSUE';commandTone='issue';commandDetail='An offline-unit case is still open with Service + IT.';}
-  else if(overdueAssignments.length){commandState='OPEN WORK FROM EARLIER DATE';commandTone='blocked';commandDetail='At least one Service assignment is still open from an earlier work date.';}
-  else if(!readyAssignments.length&&waitingHandoffAssignments.length){commandState='WAITING ON IT HANDOFF';commandTone='due';commandDetail='Today’s available Service work is waiting for IT to create the handoff.';}
-  else if(!commandAssignments.length){commandState='NO ACTIVE SERVICE WORK TODAY';commandTone='';commandDetail='No Service assignment is due, overdue, or unscheduled right now.';}
+  home.innerHTML=`<div class='wl-service-simple-shell'>
+    <div class='wl-service-simple-kicker'>SERVICE TECH</div>
+    <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
+    <p>${esc(statusLine)}</p>
+    ${startAction}
+    <div class='wl-service-flowline'>TRUCK CHECK <b>→</b> TRAILER IF NEEDED <b>→</b> MHELPDESK TICKET <b>→</b> JOB</div>
 
-  let nextAction='';
-  if(inspectionDue){
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Complete the Truck / Trailer Inspection</b><div class='small'>Weekday departure readiness is not complete yet.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-svc='inspect'>Start Morning Inspection →</button></div>`;
-  }else if(actionableOffline.length){
-    const issue=actionableOffline[0];
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>Continue Offline Unit / IT Troubleshooting</b><div class='small'>MHelpDesk #${esc(issue.ticket_no||'—')} · ${esc(issue.equipment_type||'Unit')} ${esc(issue.unit_tag||'')} · ${esc(fieldEscalationStatusLabel(issue.status))}</div><div class='small'>Keep the issue open until IT records the decision. If IT authorized the backup, use the action in the Field Issue card below.</div></div>`;
-  }else if(readyAssignments.length){
-    nextAction=`<div class='wl-svc-command-next'><div class='wl-next-kicker'>DO THIS NEXT</div><b>ENTER MHELPDESK #</b><div class='small'>Service jobs stay hidden until you enter the exact ticket number.</div><button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>`;
-  }else if(waitingHandoffAssignments.length){
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DO THIS NEXT</div><b>ENTER MHELPDESK #</b><div class='small'>If IT has not completed the handoff yet, Tech Check will tell you after the exact ticket is entered.</div><button class='wl-big wl-blue top10' style='min-height:58px;font-size:18px' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>`;
-  }else if(truckSpareCount){
-    nextAction=`<div class='wl-svc-command-next wait'><div class='wl-next-kicker'>DAY CLOSEOUT</div><b>Resolve ${truckSpareCount} truck spare${truckSpareCount===1?'':'s'}</b><div class='small'>Mark each backup used or return it unused through IT Intake; check in spare batteries below.</div></div>`;
-  }else{
-    nextAction=`<div class='wl-svc-command-next clear'><div class='wl-next-kicker'>DAY STATUS</div><b>✓ Service command center is clear.</b><div class='small'>No immediate Service action is waiting in Tech Check.</div></div>`;
-  }
-
-  const closeoutClear=!assignments.length&&!activeOffline.length&&!truckSpareCount;
-  const upcomingHtml='';
-
-  home.innerHTML=`${alertBanner}<div class='wl-svc-command'>
-    <div class='wl-svc-command-hero'>
-      <div class='wl-svc-command-kicker'>SERVICE TECH COMMAND CENTER</div>
-      <h2>${esc(ownerViewingService?'Service Team':techName)} · ${esc(todayLabel)}</h2>
-      <p><b>Truck Check → Trailer Check if needed → Today’s Tasks.</b> Then open the next job and follow the simple step-by-step flow.</p>
-      <div class='wl-svc-command-state ${commandTone}'><i></i><span><b>${esc(commandState)}</b><br>${esc(commandDetail)}</span></div>
-    </div>
-
-    <div class='wl-svc-command-stats'>
-      <div class='wl-svc-command-stat'><b>${todayAssignments.length}</b><span>Today’s jobs</span></div>
-      <div class='wl-svc-command-stat'><b>${readyAssignments.length}</b><span>Ready / actionable</span></div>
-      <div class='wl-svc-command-stat'><b>${waitingHandoffAssignments.length}</b><span>Waiting on IT</span></div>
-      <div class='wl-svc-command-stat'><b>${deployedCount}</b><span>Units in field</span></div>
-      <div class='wl-svc-command-stat'><b>${activeOffline.length}</b><span>Field issues</span></div>
-      <div class='wl-svc-command-stat'><b>${truckSpareCount}</b><span>Truck spares out</span></div>
-    </div>
-
-    ${nextAction}
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Start-Day Readiness</b><span>${readinessComplete?'READY':'ACTION REQUIRED'}</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${inspectionDue?'pending':''}'><b>Truck / Trailer Inspection</b><span>${work.inspectionRequired?(work.inspectionDone?'SUBMITTED':'DUE'):'NOT REQUIRED — WEEKEND'}</span></div>
-        <div class='wl-svc-command-close-row ${waitingHandoffAssignments.length?'pending':''}'><b>IT → Service handoffs</b><span>${handoffCount} ready · ${waitingHandoffAssignments.length} waiting</span></div>
-        <div class='wl-svc-command-close-row ${activeOffline.length?'issue':''}'><b>Offline-unit escalations</b><span>${activeOffline.length?activeOffline.length+' ACTIVE':'CLEAR'}</span></div>
+    <details class='wl-service-more'>
+      <summary>OTHER ACTIONS</summary>
+      <div class='wl-service-more-grid'>
+        <button data-wl-service-return>RETURN UNIT TO IT</button>
+        <button data-wl-svc='returns'>MY RETURNED UNITS</button>
+        <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
+        <button data-wl-svc='history'>STATUS & HISTORY</button>
       </div>
-      ${work.inspectionRequired&&!work.inspectionDone?"<button class='wl-big wl-blue top10' style='min-height:50px;font-size:15px' data-wl-svc='inspect'>Complete Start-Day Inspection →</button>":''}
-    </div>
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Service Jobs</b><span>Ticket required</span></div>
-      <div class='wl-question'><div class='qtext'>ENTER MHELPDESK # TO OPEN A JOB</div><button class='wl-big wl-blue top10' data-wl-service-open-job>ENTER MHELPDESK # →</button></div>
-    </div>
-
-    ${activeOffline.length?fieldEscalationServiceHtml(offlineRows):''}
-    ${truckSpareCount?truckSpareServiceHtml(truckSpares):''}
-    ${upcomingHtml}
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>Returns & Equipment</b><span>Live Tech Check</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row'><b>Units currently in field</b><span>${deployedCount}</span></div>
-        <div class='wl-svc-command-close-row'><b>Returns already handed to IT / Owner flow</b><span>${returnCount}</span></div>
-        <div class='wl-svc-command-close-row ${truckSpareCount?'pending':''}'><b>Truck spares still unresolved</b><span>${truckSpareCount}</span></div>
-      </div>
-      ${assignedInventoryHtml(assignedAssets)}
-      <div class='wl-menu top10'>
-        <button class='wl-blue' data-wl-service-open-job>＋ Open Service Job</button>
-        <button class='${deployedCount?"wl-red":"wl-gray"}' data-wl-service-return>↩ Return Unit to IT Intake <span class='wl-count'>${deployedCount}</span></button>
-        <button class='wl-gray' data-wl-svc='returns'>▶ My Returned Units <span class='wl-count'>${returnCount}</span></button>
-        <button class='wl-gray' data-wl-offline-start>⚠ Offline Unit — Call IT</button>
-        <button class='wl-gray' data-wl-svc='history'>☰ Status & History <span class='wl-count'>${r.completed}</span></button>
-      </div>
-    </div>
-
-    <div class='wl-svc-command-section'>
-      <div class='wl-svc-command-section-head'><b>End-of-Day Closeout</b><span>${closeoutClear?'CLEAR':'OPEN ITEMS'}</span></div>
-      <div class='wl-svc-command-closeout'>
-        <div class='wl-svc-command-close-row ${assignments.length?'pending':''}'><b>Open Service assignments</b><span>${assignments.length}</span></div>
-        <div class='wl-svc-command-close-row ${activeOffline.length?'issue':''}'><b>Unresolved field issues</b><span>${activeOffline.length}</span></div>
-        <div class='wl-svc-command-close-row ${truckSpareCount?'pending':''}'><b>Truck spares to resolve</b><span>${truckSpareCount}</span></div>
-      </div>
-      <div class='small top8'>A return already handed to IT can stay in IT / Owner processing without blocking the Service Tech’s closeout. MHelpDesk remains separate.</div>
-    </div>
+    </details>
   </div>`;
 
   hideChildren(viewSvc(),[home]);
@@ -3641,51 +3594,60 @@ function showServiceJobLookup() {
   if(!card){
     card=document.createElement('div');
     card.id='wlSvcLookup';
-    card.className='card';
+    card.className='card wl-service-simple-card';
     viewSvc().append(card);
   }
-  card.innerHTML=`${progress('Service Job','Enter the exact MHelpDesk ticket',1,1)}
-    <button class='wl-back' data-wl-home='svc'>← Service Home</button>
-    <div class='wl-question'>
-      <div class='qnum'>Find Assigned Job</div>
-      <div class='qtext'>MHelpDesk Ticket #</div>
-      <input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='Enter ticket #'>
-      <button class='wl-big wl-blue top10' data-wl-service-find-job>Find Job →</button>
-      <div id='wlServiceJobSearchMsg' class='small top8'>Only the exact current MHelpDesk ticket will open the Service job.</div>
+  card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← BACK</button>
+    <div class='wl-service-step-label'>NEXT STEP</div>
+    <div class='wl-question wl-service-ticket-entry'>
+      <div class='qtext'>ENTER YOUR MHELPDESK TICKET #</div>
+      <input id='wlServiceJobSearch' inputmode='numeric' autocomplete='off' placeholder='TICKET #'>
+      <button class='wl-service-start top10' data-wl-service-find-job>FIND MY JOB</button>
+      <div id='wlServiceJobSearchMsg' class='wl-service-help'>The ticket must be assigned to you or available to the Service team.</div>
     </div>`;
   hideChildren(viewSvc(),[card]);
   resetWizardPosition();
+  requestAnimationFrame(()=>document.getElementById('wlServiceJobSearch')?.focus());
 }
 
 async function serviceFindJobByTicket(){
   const input=document.getElementById('wlServiceJobSearch'), msg=document.getElementById('wlServiceJobSearchMsg');
   const ticket=String(input?.value||'').trim().replace(/^#\s*/,'');
-  if(!ticket){if(msg)msg.innerHTML='<span class="bad">Enter the MHelpDesk ticket number.</span>';return;}
-  const tech=await currentTechIdentity().catch(()=>null); if(!tech?.id)return alert('Active Service Tech account required.');
-  const {data,error}=await liveDb.from('job_assignments').select('*').eq('ticket_no',ticket).eq('assigned_role','service').in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(10);
+  if(!ticket){if(msg)msg.innerHTML='<div class="wl-stop"><b>ENTER A TICKET NUMBER.</b></div>';return;}
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(!tech?.id)return alert('Active Service Tech account required.');
+
+  const {data,error}=await liveDb.from('job_assignments')
+    .select('*')
+    .eq('ticket_no',ticket)
+    .eq('assigned_role','service')
+    .in('status',['assigned','started'])
+    .order('assigned_at',{ascending:false})
+    .limit(10);
   if(error)return alert(error.message);
-  let a=(data||[]).find(x=>x.assignee_user_id===tech.id)||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
-  if(!a){if(msg)msg.innerHTML='<span class="bad">No available Service job matches MHelpDesk #'+esc(ticket)+'. Check the ticket number or ask the Owner to assign it.</span>';return;}
+
+  let a=(data||[]).find(x=>x.assignee_user_id===tech.id)
+    ||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
+
+  if(!a){
+    if(msg)msg.innerHTML=`<div class='wl-stop'><b>NO SERVICE JOB FOUND FOR #${esc(ticket)}</b><div>Check the ticket number or ask the Owner to assign it to you.</div></div>`;
+    return;
+  }
+
   const gate=await assignmentGateState(a);
-  const manifest=equipmentManifestInlineHtml(a);
-  const summary=`<div class='wl-service-ticket-preview'>${techCheckAIHtml(a,'service')}
-    <div class='wl-next-kicker'>TICKET FOUND — VERIFY BEFORE TAKING JOB</div>
-    <div class='wl-preview-title'>MHelpDesk #${esc(a.ticket_no)}</div>
-    <div class='wl-preview-grid'>
-      <div><span>Customer / Site</span><b>${esc(a.site||'Not listed')}</b></div>
-      <div><span>Job Type</span><b>${esc(String(a.work_type||'Service').toUpperCase())}</b></div>
-      <div><span>Work Date / Time</span><b>${esc(ownerAIScheduleText(a.scheduled_for,a.scheduled_time))}</b></div>
-      <div><span>Status</span><b>${gate.ready?'Ready for Service':esc(gate.label)}</b></div>
-    </div>
-    ${a.job_description?`<div class='wl-preview-section'><span>What is being done</span><b>${esc(a.job_description)}</b></div>`:''}
-    ${a.owner_notes?`<div class='wl-preview-section'><span>Owner Notes</span><div>${esc(a.owner_notes)}</div></div>`:''}
-    ${manifest||''}
-    ${!gate.ready?`<div class='warn top10'><b>${esc(gate.label)}</b><br>${esc(gate.detail)}</div>`:''}
-    <div class='wl-preview-confirm top10'><div><b>Is this the correct MHelpDesk job?</b><div class='small'>Nothing is claimed or changed until you choose Take This Job.</div></div>
-    <button class='wl-blue' data-wl-service-take-job='${a.id}' ${gate.ready?'':'disabled'}>✓ Take This Job</button></div>
+  const assignedToMe=a.assignee_user_id===tech.id;
+  const ready=Boolean(gate.ready);
+  const assignmentText=assignedToMe?'THIS JOB IS ASSIGNED TO YOU':'THIS JOB IS AVAILABLE TO THE SERVICE TEAM';
+
+  if(msg)msg.innerHTML=`<div class='wl-service-ticket-found'>
+    <div class='wl-service-step-label'>JOB FOUND</div>
+    <div class='wl-service-ticket-number'>#${esc(a.ticket_no)}</div>
+    <div class='wl-service-ticket-site'>${esc(a.site||'NO SITE LISTED')}</div>
+    <div class='${ready?'wl-service-good':'wl-service-wait'}'>${ready?'✓ '+esc(assignmentText):'WAITING — '+esc(gate.label)}</div>
+    ${ready
+      ? `<button class='wl-service-start top10' data-wl-service-take-job='${a.id}'>START JOB</button>`
+      : `<div class='wl-stop top10'><b>YOU CANNOT START YET.</b><div>${esc(gate.detail||'The required handoff is not ready.')}</div></div>`}
   </div>`;
-  if(msg)msg.innerHTML=summary;
-  return;
 }
 async function serviceTakeVerifiedJob(id){
   const {data:rows,error}=await liveDb.from('job_assignments').select('*').eq('id',id).eq('assigned_role','service').limit(1);
@@ -3970,18 +3932,37 @@ function svcQuestions(form) {
   return out;
 }
 function svcQuestionHtml(q, index, total) {
-  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>Check ${index + 1} of ${total}</div><div class='qtext'>${esc(q.label)}</div><input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='Enter count'></div>`;
+  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div><input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='ENTER COUNT'></div>`;
   const answered = q.input.dataset.wlAnswered === '1';
   const yes = answered && q.input.checked;
   const no = answered && !q.input.checked;
-  return `<div class='wl-question'><div class='qnum'>Check ${index + 1} of ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>NO recorded.</b><div>You can continue documenting, but this equipment cannot be accepted until the mismatch is corrected.</div></div>` : ''}</div>`;
+  return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
 }
 function svcWizardCard() {
   let wizard = document.getElementById('wlSvcWizardOnly');
   if (!wizard) { wizard = document.createElement('div'); wizard.id = 'wlSvcWizardOnly'; wizard.className = 'card'; viewSvc().append(wizard); }
   return wizard;
 }
-async function advanceSvcVerification() { const card = findSvcCard(activeSvcPrep?.ticket_no); if (!card) return; const forms = svcForms(card); if (svcUnitIndex >= forms.length) return; const questions = svcQuestions(forms[svcUnitIndex]); const q = questions[svcQuestionIndex]; if (q?.kind === 'bool' && q.input.dataset.wlAnswered !== '1') return alert('Choose YES or NO first.'); if (q?.kind === 'number') { const value = document.getElementById('wlSvcCount')?.value ?? ''; if (value === '') return alert('Enter the physical count first.'); q.input.value = value; } if (svcQuestionIndex < questions.length - 1) svcQuestionIndex++; else { svcUnitIndex++; svcQuestionIndex = 0; } return renderSvcPrep(); }
+function advanceSvcVerification() {
+  const card = findSvcCard(activeSvcPrep?.ticket_no);
+  if (!card) return;
+  const forms = svcForms(card);
+  if (svcUnitIndex >= forms.length) return;
+  const questions = svcQuestions(forms[svcUnitIndex]);
+  const q = questions[svcQuestionIndex];
+  if (q?.kind === 'bool') {
+    if (q.input.dataset.wlAnswered !== '1') return alert('Choose YES or NO first.');
+    if (!q.input.checked) return alert('This step is blocked. Fix the issue, then tap YES.');
+  }
+  if (q?.kind === 'number') {
+    const value = document.getElementById('wlSvcCount')?.value ?? '';
+    if (value === '') return alert('Enter the physical count first.');
+    q.input.value = value;
+  }
+  if (svcQuestionIndex < questions.length - 1) svcQuestionIndex++;
+  else { svcUnitIndex++; svcQuestionIndex = 0; }
+  return renderSvcPrep();
+}
 
 function serviceAIEquipmentReview(ctx,check,evidence){
   const flags=[], spotters=Number(ctx?.solar_spotter_count||0), rangers=Number(ctx?.ranger_count||0), panels=Number(ctx?.expected_solar_panels||0);
@@ -4283,24 +4264,89 @@ async function renderSvcPrep() {
 }
 function inspectionQuestion() {
   const total = 8 + 1 + (inspection.takingTrailer === true ? 7 : 0) + 1;
-  let card = document.getElementById('wlInspection'); if (!card) { card = document.createElement('div'); card.id = 'wlInspection'; card.className = 'card'; viewSvc().append(card); }
-  let body = '';
-  if (inspection.step < 8) { const i = inspection.step; body = `${progress(`Truck Check · ${i + 1} of 8`, truckLabels[i], i + 1, total)}<div class='wl-question'><div class='qtext'>${esc(truckLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.truck[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
-  else if (inspection.step === 8) { body = `${progress('Trailer Check', 'Are you taking a trailer today?', 9, total)}<div class='wl-question'><div class='qtext'>Are you taking a trailer today?</div><div class='wl-options'><button class='pass ${inspection.takingTrailer === false ? 'on' : ''}' data-wl-trailer='no'>NO TRAILER</button><button class='pass ${inspection.takingTrailer === true ? 'on' : ''}' data-wl-trailer='yes'>YES</button></div></div>`; }
-  else if (inspection.takingTrailer === true && inspection.step < 16) { const i = inspection.step - 9; body = `${progress(`Trailer Check · ${i + 1} of 7`, trailerLabels[i], inspection.step + 1, total)}<div class='wl-question'><div class='qtext'>${esc(trailerLabels[i])}</div><div class='wl-options'><button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>PASS</button><button class='fail ${inspection.trailer[i] === false ? 'on' : ''}' data-wl-answer='fail'>FAIL</button></div></div>`; }
-  else {
-    const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false));
-    body = `${progress('Ready for Today’s Tasks', 'Review and submit', total, total)}<div class='wl-review'><b>Truck Check:</b> ${inspection.truck.some(v => v === false) ? 'FAILED' : 'PASS'}<br><b>Trailer Check:</b> ${inspection.takingTrailer === true ? (inspection.trailer.some(v => v === false) ? 'FAILED' : 'PASS') : 'Not taking a trailer'}</div>${failed ? `<div class='wl-stop'><b>FAILED ITEM — CALL OPERATIONS MANAGER</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<button class='wl-big ${failed ? 'wl-red' : 'wl-green'} top10' data-wl-submit-inspection>Submit & Show Today’s Tasks →</button>`;
+  let card = document.getElementById('wlInspection');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'wlInspection';
+    card.className = 'card wl-service-simple-card';
+    viewSvc().append(card);
   }
-  const failedNow = inspection.truck.some(v => v === false) || inspection.trailer.some(v => v === false);
-  card.innerHTML = `${inspectionRecovered ? `<div class='warn wl-draft-recovered'><b>Recovered unsent inspection from this device.</b><div class='small'>Nothing was submitted while you were offline or away. Continue where you left off.</div></div>` : ''}<button class='wl-back' data-wl-home='svc'>← Service Home</button>${body}${failedNow && inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<div class='wl-stop'><b>A failed item needs immediate attention.</b><a href='tel:${OPS_TEL}'>Call Operations Manager — ${OPS_DISPLAY}</a></div>` : ''}<div class='wl-nav'><button class='wl-prev' data-wl-inspect-prev ${inspection.step === 0 ? 'disabled' : ''}>Back</button>${inspection.step < (inspection.takingTrailer === true ? 16 : 9) ? `<button class='wl-next' data-wl-inspect-next>Next →</button>` : '<span></span>'}</div>`;
-  hideChildren(viewSvc(), [card]); resetWizardPosition();
+
+  let body = '';
+  if (inspection.step < 8) {
+    const i = inspection.step;
+    const failed=inspection.truck[i]===false;
+    body = `${progress(`TRUCK CHECK · ${i + 1} OF 8`, truckLabels[i], i + 1, total)}
+      <div class='wl-question'>
+        <div class='qtext'>${esc(truckLabels[i])}</div>
+        <div class='wl-options'>
+          <button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
+          <button class='fail ${failed ? 'on' : ''}' data-wl-answer='fail'>NO</button>
+        </div>
+        ${failed?`<div class='wl-stop'><b>STOP — FIX THIS BEFORE CONTINUING.</b><div>Once it is corrected, tap YES.</div><a href='tel:${OPS_TEL}'>CALL OPERATIONS — ${OPS_DISPLAY}</a></div>`:''}
+      </div>`;
+  } else if (inspection.step === 8) {
+    body = `${progress('TRAILER', 'Are you taking a trailer today?', 9, total)}
+      <div class='wl-question'>
+        <div class='qtext'>ARE YOU TAKING A TRAILER TODAY?</div>
+        <div class='wl-options'>
+          <button class='pass' data-wl-trailer='no'>NO</button>
+          <button class='pass' data-wl-trailer='yes'>YES</button>
+        </div>
+      </div>`;
+  } else if (inspection.takingTrailer === true && inspection.step < 16) {
+    const i = inspection.step - 9;
+    const failed=inspection.trailer[i]===false;
+    body = `${progress(`TRAILER CHECK · ${i + 1} OF 7`, trailerLabels[i], inspection.step + 1, total)}
+      <div class='wl-question'>
+        <div class='qtext'>${esc(trailerLabels[i])}</div>
+        <div class='wl-options'>
+          <button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
+          <button class='fail ${failed ? 'on' : ''}' data-wl-answer='fail'>NO</button>
+        </div>
+        ${failed?`<div class='wl-stop'><b>STOP — FIX THIS BEFORE CONTINUING.</b><div>Once it is corrected, tap YES.</div><a href='tel:${OPS_TEL}'>CALL OPERATIONS — ${OPS_DISPLAY}</a></div>`:''}
+      </div>`;
+  } else {
+    const failed = inspection.truck.some(v => v === false) || (inspection.takingTrailer === true && inspection.trailer.some(v => v === false));
+    body = failed
+      ? `<div class='wl-stop'><b>INSPECTION BLOCKED.</b><div>There is still a NO answer. Go back and correct it before continuing.</div></div>`
+      : `${progress('START-DAY CHECK COMPLETE', 'Vehicle is ready', total, total)}
+         <div class='wl-service-good'>✓ ALL REQUIRED CHECKS PASSED</div>
+         <button class='wl-service-start top10' data-wl-submit-inspection>CONTINUE TO MHELPDESK TICKET</button>`;
+  }
+
+  card.innerHTML = `${inspectionRecovered ? `<div class='warn wl-draft-recovered'><b>Recovered your unfinished inspection.</b></div>` : ''}
+    <button class='wl-back' data-wl-home='svc'>← BACK</button>
+    ${body}
+    ${inspection.step>0?`<button class='wl-service-backstep' data-wl-inspect-prev>← PREVIOUS QUESTION</button>`:''}`;
+
+  hideChildren(viewSvc(), [card]);
+  resetWizardPosition();
 }
-async function startInspection() { const saved=await loadDeviceDraft('inspection'); if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) { inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7) }; while(inspection.truck.length<8) inspection.truck.push(null); while(inspection.trailer.length<7) inspection.trailer.push(null); inspectionRecovered=true; } else { inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null) }; inspectionRecovered=false; } inspectionQuestion(); }
+async function startInspection() {
+  const saved=await loadDeviceDraft('inspection');
+  if (saved && Array.isArray(saved.truck) && Array.isArray(saved.trailer)) {
+    inspection={ step:Number(saved.step||0), truck:saved.truck.slice(0,8), takingTrailer:saved.takingTrailer ?? null, trailer:saved.trailer.slice(0,7) };
+    while(inspection.truck.length<8) inspection.truck.push(null);
+    while(inspection.trailer.length<7) inspection.trailer.push(null);
+    const truckFail=inspection.truck.findIndex(v=>v===false);
+    const trailerFail=inspection.trailer.findIndex(v=>v===false);
+    if(truckFail>=0) inspection.step=truckFail;
+    else if(inspection.takingTrailer===true&&trailerFail>=0) inspection.step=9+trailerFail;
+    inspectionRecovered=true;
+  } else {
+    inspection={ step:0, truck:Array(8).fill(null), takingTrailer:null, trailer:Array(7).fill(null) };
+    inspectionRecovered=false;
+  }
+  inspectionQuestion();
+}
 async function submitInspection() {
-  if (inspection.truck.some(v => v === null)) return alert('Complete every truck question.');
-  if (inspection.takingTrailer === true && inspection.trailer.some(v => v === null)) return alert('Complete every trailer question.');
-  if (!navigator.onLine) { await saveInspectionDraft(); return alert('No connection. Your inspection is saved on this device, but it has NOT been submitted. Reconnect and tap Submit again.'); }
+  if (inspection.truck.some(v => v !== true)) return alert('Every truck question must be YES before continuing.');
+  if (inspection.takingTrailer === true && inspection.trailer.some(v => v !== true)) return alert('Every trailer question must be YES before continuing.');
+  if (!navigator.onLine) {
+    await saveInspectionDraft();
+    return alert('No connection. Your inspection is saved on this device, but it has NOT been submitted.');
+  }
   const truck = {}; inspection.truck.forEach((v, i) => truck[`truck_${i + 1}`] = v);
   const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v);
   const text = document.getElementById('sessionClosed')?.textContent || '';
@@ -4315,13 +4361,17 @@ async function submitInspection() {
       p_closed_ticket_nos:tickets
     });
     if (error) throw error;
-    await clearDeviceDraft('inspection'); inspectionRecovered=false;
-    alert('Truck / Trailer Check submitted. Next: Today’s Tasks.');
-    showSvcHome();
+    await clearDeviceDraft('inspection');
+    inspectionRecovered=false;
+    return showServiceJobLookup();
   } catch(error) {
     await saveInspectionDraft();
-    alert(error?.message === 'Failed to fetch' ? 'Connection lost. Your inspection is saved on this device and was not marked submitted. Reconnect and try again.' : (error?.message || 'Could not submit the inspection.'));
-  } finally { document.body.classList.remove('busy'); }
+    alert(error?.message === 'Failed to fetch'
+      ? 'Connection lost. Your inspection is saved on this device and was not submitted.'
+      : (error?.message || 'Could not submit the inspection.'));
+  } finally {
+    document.body.classList.remove('busy');
+  }
 }
 async function showInspectionHistory() {
   const { data } = await liveDb.from('morning_checks').select('*').order('submitted_at', { ascending: false }).limit(60); let card = document.getElementById('wlSvcHistory'); if (!card) { card = document.createElement('div'); card.id = 'wlSvcHistory'; card.className = 'card wl-history'; viewSvc().append(card); }
