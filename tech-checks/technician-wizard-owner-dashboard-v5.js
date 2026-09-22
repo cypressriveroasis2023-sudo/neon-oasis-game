@@ -1700,8 +1700,10 @@ async function setupNotificationRealtime(force=false) {
   if (!tech?.id) return;
   if (!force && notificationRealtimeUserId === tech.id && notificationRealtimeChannel) return;
   if (notificationRealtimeChannel) {
-    try { await liveDb.removeChannel(notificationRealtimeChannel); } catch {}
+    const oldChannel=notificationRealtimeChannel;
     notificationRealtimeChannel=null;
+    notificationRealtimeUserId=null;
+    try { await liveDb.removeChannel(oldChannel); } catch {}
   }
   notificationRealtimeUserId = tech.id;
   const channel=liveDb
