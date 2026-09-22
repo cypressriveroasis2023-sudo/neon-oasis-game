@@ -293,11 +293,11 @@ function injectStyles() {
     .wl-tour-shade{position:fixed;background:rgba(4,12,20,.70);pointer-events:auto}
     .wl-tour-blocker{position:fixed;z-index:1;background:transparent;pointer-events:auto}
     .wl-guided-tour-target{position:relative!important;z-index:10039!important;outline:4px solid #fff!important;outline-offset:4px!important;box-shadow:0 0 0 8px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
-    .wl-tour-tip{--tour-arrow-x:50%;position:fixed;z-index:4;box-sizing:border-box;padding:16px;border:2px solid #d20b12;border-radius:20px;background:#fff;color:#101820;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}.wl-tour-tip:before{display:none!important}
+    .wl-tour-tip{--tour-arrow-x:50%;position:fixed;z-index:4;box-sizing:border-box;padding:16px;border:2px solid #e31821;border-radius:20px;background:#08151d;color:#f4f8fa;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}.wl-tour-tip:before{display:none!important}
     .wl-tour-tip-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.wl-tour-tip-head span{padding:6px 10px;border-radius:999px;background:#101820;color:#fff;font-size:11px;font-weight:950;letter-spacing:.06em}
-    .wl-tour-tip-head button{width:38px;height:38px;margin:0;border:0;border-radius:999px;background:#e9eef2;color:#304455;font-size:25px;line-height:1;font-weight:800}
-    .wl-tour-tip h3{margin:12px 0 7px!important;color:#d20b12!important;font-size:22px!important;line-height:1.08!important}.wl-tour-tip p{margin:0;color:#213445;font-size:17px;line-height:1.35;font-weight:750}
-    .wl-tour-nav{display:grid;grid-template-columns:1fr 1.6fr;gap:9px;margin-top:15px}.wl-tour-nav button{min-height:56px;margin:0;border-radius:999px;font:inherit;font-size:14px;font-weight:950}.wl-tour-nav button:first-child{border:2px solid #ced8df;background:#fff;color:#3b4d5b}.wl-tour-nav button:last-child{border:2px solid #d20b12;background:#d20b12;color:#fff}.wl-tour-nav button:disabled{opacity:.35}
+    .wl-tour-tip-head button{width:38px;height:38px;margin:0;border:1px solid #39515d;border-radius:999px;background:#142630;color:#e8f1f5;font-size:25px;line-height:1;font-weight:800}
+    .wl-tour-tip h3{margin:12px 0 7px!important;color:#ff4249!important;font-size:22px!important;line-height:1.08!important}.wl-tour-tip p{margin:0;color:#d7e2e8;font-size:17px;line-height:1.35;font-weight:750}
+    .wl-tour-nav{display:grid;grid-template-columns:1fr 1.6fr;gap:9px;margin-top:15px}.wl-tour-nav button{min-height:56px;margin:0;border-radius:999px;font:inherit;font-size:14px;font-weight:950}.wl-tour-nav button:first-child{border:2px solid #4b606b;background:#101e25;color:#eef5f7}.wl-tour-nav button:last-child{border:2px solid #d20b12;background:#d20b12;color:#fff}.wl-tour-nav button:disabled{opacity:.35}
     @media(max-width:430px){.wl-tour-tip{padding:14px;border-radius:18px}.wl-tour-tip h3{font-size:19px!important}.wl-tour-tip p{font-size:15px}.wl-tour-nav button{min-height:54px;font-size:13px}}
 
 
@@ -1426,6 +1426,7 @@ function helpStepHowToHtml(role, step){
 let guidedTourRole = null;
 let guidedTourStep = 0;
 let guidedTourFirstTime = false;
+let guidedTourRenderToken = 0;
 
 function guidedTourSteps(role){
   const topControls=[
@@ -1516,30 +1517,37 @@ function positionGuidedTour(step,target){
   }
 }
 async function showGuidedTourStep(){
+  const token=++guidedTourRenderToken;
+  const layer=ensureGuidedTourLayer();
+
+  // Never expose a half-built tutorial card between steps.
+  layer.classList.add('hidden');
+  clearGuidedTourTarget();
+
   const steps=guidedTourSteps(guidedTourRole);
   guidedTourStep=Math.max(0,Math.min(guidedTourStep,steps.length-1));
   const step=steps[guidedTourStep];
   if(step.closeMenu)document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
-  if(step.openMenu){
-    await openTechMenu();
-    await new Promise(resolve=>setTimeout(resolve,80));
-  }
+  if(step.openMenu)await openTechMenu();
   if(step.open){
     const details=document.querySelector(step.open);
     if(details)details.open=true;
   }
-  clearGuidedTourTarget();
+
   let target=document.querySelector(step.selector);
   if((!target || target.offsetParent===null) && step.fallback)target=document.querySelector(step.fallback);
   if(!target)return finishGuidedTour(false);
-  target.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
-  const layer=ensureGuidedTourLayer();
+
+  // An instant scroll prevents the page and spotlight from visibly chasing
+  // each other on iPhone.
+  target.scrollIntoView({behavior:'auto',block:'center',inline:'nearest'});
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  if(token!==guidedTourRenderToken)return;
+
+  clearGuidedTourTarget();
+  target.classList.add('wl-guided-tour-target');
+  positionGuidedTour(step,target);
   layer.classList.remove('hidden');
-  setTimeout(()=>{
-    clearGuidedTourTarget();
-    target.classList.add('wl-guided-tour-target');
-    positionGuidedTour(step,target);
-  },260);
 }
 
 async function startGuidedTour(role,firstTime=false){
@@ -1547,19 +1555,31 @@ async function startGuidedTour(role,firstTime=false){
   if(!['service','it'].includes(guidedTourRole))return;
   guidedTourStep=0;
   guidedTourFirstTime=Boolean(firstTime);
+  guidedTourRenderToken++;
+  document.getElementById('wlGuidedTourLayer')?.classList.add('hidden');
   document.getElementById('wlHelpOverlay')?.classList.add('hidden');
   document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
   document.getElementById('wlHelpCoachToast')?.classList.remove('show');
   if(currentRoleKey()==='owner'){
     document.getElementById(guidedTourRole==='service'?'tab-svc':'tab-it')?.click();
-    await new Promise(resolve=>setTimeout(resolve,180));
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   }
-  if(guidedTourRole==='service')await showSvcHome();
-  else await showITHome();
-  setTimeout(showGuidedTourStep,120);
+
+  // Reuse the already-loaded technician home. Rebuilding it here caused the
+  // login screen to flash and race the first tutorial step.
+  const readySelector=guidedTourRole==='service'
+    ? '#wlSvcHome .wl-day-next-card'
+    : '#wlItHome .wl-day-next-card';
+  if(!document.querySelector(readySelector)){
+    if(guidedTourRole==='service')await showSvcHome();
+    else await showITHome();
+  }
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  return showGuidedTourStep();
 }
 
 async function finishGuidedTour(completed=true){
+  guidedTourRenderToken++;
   clearGuidedTourTarget();
   const layer=document.getElementById('wlGuidedTourLayer');
   layer?.classList.add('hidden');
@@ -1792,6 +1812,13 @@ async function maybeShowFirstTimeWalkthrough() {
   if (walkthroughDismissedSession || document.getElementById('appView')?.classList.contains('hidden')) return;
   const roleLabel = roleText();
   if (!roleLabel.includes('IT Technician') && !roleLabel.includes('Service Tech')) return;
+  const role=currentRoleKey();
+  const ready=role==='service'
+    ? document.querySelector('#wlSvcHome .wl-day-next-card')
+    : role==='it'
+      ? document.querySelector('#wlItHome .wl-day-next-card')
+      : null;
+  if(!ready){setTimeout(maybeShowFirstTimeWalkthrough,180);return;}
   const tech = await currentTechIdentity().catch(() => null);
   if (!tech?.id || walkthroughCheckedUserId === tech.id) return;
   walkthroughCheckedUserId = tech.id;
