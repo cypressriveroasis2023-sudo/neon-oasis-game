@@ -244,7 +244,7 @@ function showAuth() {
   }
   realtimeStarted = false;
 }
-async function login() {
+async async function login() {
   msg('loginMessage', '');
   const username = normalizeUsername($('loginUsername').value);
   const password = $('loginPassword').value;
