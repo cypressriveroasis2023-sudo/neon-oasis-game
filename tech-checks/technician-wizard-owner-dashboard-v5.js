@@ -755,6 +755,20 @@ function injectStyles() {
     .wl-day-next-card.urgent{border-color:#e31821;box-shadow:0 0 0 1px rgba(227,24,33,.22) inset}
     .wl-day-next-card.waiting{border-color:#7b8991}
     .wl-day-next-card.done{border-color:#52656e}
+    .wl-truck-required-banner,.wl-it-restock-banner{margin:12px 0;padding:14px;border:1px solid #405966;border-left:5px solid #e31821;border-radius:12px;background:#0a171d;color:#fff;display:grid;gap:4px}
+    .wl-truck-required-banner b,.wl-it-restock-banner b{font-size:13px;letter-spacing:.06em}
+    .wl-truck-required-banner span,.wl-it-restock-banner span{font-size:12px;color:#b8c7ce;font-weight:750}
+    .wl-truck-section-title{margin:18px 0 8px;color:#ff4b52;font-size:12px;font-weight:1000;letter-spacing:.12em}
+    .wl-truck-unit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .wl-truck-unit-check{min-height:72px;padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;display:flex;gap:10px;align-items:center;color:#fff}
+    .wl-truck-unit-check.missing{border-color:#a93238;background:#261014}
+    .wl-truck-unit-check input{width:24px!important;height:24px!important;min-height:0!important;padding:0!important}
+    .wl-truck-unit-check span{display:grid;gap:2px}.wl-truck-unit-check b{font-size:16px;color:#fff}.wl-truck-unit-check small{font-size:11px;color:#aebdc5}
+    .wl-truck-stock-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+    .wl-truck-stock-grid label{padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;color:#fff}.wl-truck-stock-grid label>span{display:block;min-height:42px;font-size:12px;font-weight:850}.wl-truck-stock-grid input{text-align:center!important}
+    .wl-truck-restock-list{margin-top:16px}.wl-truck-restock-row{margin:8px 0;padding:12px;border:1px solid #713238;border-radius:12px;background:#241014;color:#fff}.wl-truck-restock-row.ready{border-color:#3f6a55;background:#0d2117}.wl-truck-restock-row>div{display:grid;gap:3px}.wl-truck-restock-row span{font-size:12px;color:#b9c7ce}.wl-truck-restock-row em{display:block;margin-top:6px;font-style:normal;font-size:10px;font-weight:1000;letter-spacing:.08em;color:#ff6369}
+    .wl-it-restock-card{margin:10px 0;padding:15px;border:1px solid #405966;border-radius:12px;background:#0b1920;color:#fff}.wl-it-restock-card.waiting{border-color:#8b3c42}.wl-it-restock-card.ready{border-color:#3f6a55}.wl-it-restock-card h3{margin:4px 0 8px;color:#fff}.wl-it-restock-card label{display:block;margin-top:9px}.wl-it-restock-checks{display:grid;gap:6px;margin-top:10px}
+    @media(max-width:620px){.wl-truck-unit-grid,.wl-truck-stock-grid{grid-template-columns:1fr}}
     #view-it .wl-it-ticket-prompt{margin:16px auto 12px;max-width:720px;padding:16px 18px;border:1px solid #334852;border-radius:14px;background:#0b1920;color:#fff;text-align:center;display:grid;gap:7px}
     #view-it .wl-it-ticket-prompt>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
     #view-it .wl-it-ticket-prompt>b{font-size:clamp(22px,4.5vw,34px);line-height:1.08;color:#fff;font-weight:1000}
@@ -991,17 +1005,15 @@ function techCheckDateKey(value = new Date()) {
   const d=value instanceof Date ? value : new Date(value);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
-function serviceInspectionRequiredToday(value = new Date()) {
-  const d=value instanceof Date ? value : new Date(value);
-  const day=d.getDay();
-  return day>=1 && day<=5;
+function serviceInspectionRequiredToday() {
+  return true;
 }
 
 function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be assigned directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
-    { kicker:'START THE DAY', title:'Truck Check → Trailer Check → Today’s Tasks', body:`<p><b>Monday–Friday only:</b> complete the Truck Check one question at a time. If you are taking a trailer, complete the Trailer Check next.</p><p>That is the complete start-day gate right now. <b>No spare unit, battery count, or spare checkout is required to pass the morning check.</b> After you submit it, go straight to <b>Today’s Tasks</b>.</p>` },
+    { kicker:'START THE DAY', title:'Truck / Trailer Inspection → Required Truck Inventory → Field Work', body:`<p><b>Every work day:</b> the Truck Check is mandatory before leaving the shop. If you are taking a trailer, the Trailer Check is mandatory too.</p><p>After the safety inspection passes, physically verify your permanent truck inventory: <b>1 Sniper, 1 Ranger, 1 Spotter, 1 Solar Spotter, 25 Recon batteries, 4 AGM 12V 110Ah batteries, and 2 LiTime 12V 100Ah batteries.</b> If anything is missing, Tech Check blocks new field work and routes the shortage to IT for restock.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus Cerbo + MPPT verification.</p>` },
@@ -1009,7 +1021,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'TRUCK SPARES', title:'Resolve every truck backup after the call', body:`<p>IT may hand you a <b>BACKUP / truck spare</b> unit or extra batteries for the current MHelpDesk job. These are contingency items in case a field unit or battery is bad.</p><p>If a spare unit was <b>not used</b>, choose <b>RETURN UNUSED → IT INTAKE</b>. IT must verify it after transport before it can return to Shop Inventory. If it was used for a swap, mark it <b>USED FOR SWAP</b> and return the failed/replaced field unit through normal IT Intake. For spare batteries, enter the quantity used and Tech Check returns the remainder unused.</p>` },
     { kicker:'RETURN TO IT', title:'Return equipment to the right place', body:`<p>Most equipment coming back from the field uses <b>Return Unit to IT Intake</b>. Record the MHelpDesk reference, unit tag, condition, notes, and required photos.</p><p><b>110V Stand exception:</b> put the stand on the trailer, bring it back to the shop, and return it directly to <b>Shop Inventory</b> from Service. If the stand has no tag, choose <b>110V Stand — No Tag</b>; no tag does not block the return and IT Intake is not required.</p><p>For Helios and other solar equipment, Tech Check performs an AI-assisted OCR scan of the tag photo and compares it to the expected unit tag. A clear mismatch requires a new photo; an unreadable scan falls back to technician visual confirmation.</p>` },
     { kicker:'DAILY TOOLS', title:'Inspection, phone alerts, and history', body:`<p>Complete the Truck / Trailer Inspection from your own account. Assigned work appears in <b>My Work Today</b>. Use History to review work that has already been submitted.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when the Owner sends new work.</p>` },
-    { kicker:'SERVICE FLOW', title:'Your simple Service flow', body:`<div class='wl-help-flow'><b>TRUCK CHECK</b><span>→</span><b>TRAILER CHECK IF NEEDED</b><span>→</span><b>TODAY’S TASKS</b><span>→</span><b>VERIFY IT HANDOFF</b><span>→</span><b>SERVICE / FIELD WORK</b></div><p>Solar-panel hookup and charging verification happen on the <b>Service side after the IT → Service handoff</b>. Optional truck spares are handled only when a specific job actually has one.</p>` },
+    { kicker:'SERVICE FLOW', title:'Your simple Service flow', body:`<div class='wl-help-flow'><b>TRUCK CHECK</b><span>→</span><b>TRAILER CHECK IF NEEDED</b><span>→</span><b>PERMANENT TRUCK INVENTORY</b><span>→</span><b>TODAY’S TASKS</b><span>→</span><b>SERVICE / FIELD WORK</b></div><p>The safety inspection and permanent truck inventory are separate mandatory gates. If a permanent truck unit or battery stock is used, Tech Check records the shortage and IT must replenish it before the truck is ready for another new field job.</p>` },
   ];
   if (role === 'owner') return [
     { kicker:'OWNER HELP', title:'Dispatch with control', body:`<p>Create a Tech Check job using the current MHelpDesk reference. Assign it directly to a specific IT Tech or Service Tech, or assign it to the department queue for a technician to claim.</p>` },
@@ -1317,8 +1329,9 @@ function helpStepGuide(role, step){
     },
     'service:DAILY TOOLS':{
       steps:[
-        'Monday through Friday, tap Truck / Trailer Inspection from your own Service account. Weekend inspections are not required.',
-        'Complete every required inspection item and submit it under your name.',
+        'Every work day, complete the Truck / Trailer Inspection from your own Service account before leaving the shop.',
+        'After the inspection passes, physically verify all four permanent truck units and the required battery quantities.',
+        'If anything is short, go to IT, accept the prepared replacement/restock, then recheck the truck inventory before starting a new field job.',
         'Use History to review previously submitted Service work.',
         'Enable Menu → Phone Alerts once on your phone if you want assignment notifications.'
       ],
@@ -1460,7 +1473,9 @@ function guidedTourSteps(role){
   if(role==='service') return [
     { selector:'#wlSvcHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'This card shows your one required action. You do not need to search through the app.' },
     { selector:'#wlSvcHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This starts the next required Service step.' },
-    { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck Check → required follow-up → next job → End My Day.' },
+    { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck / Trailer Inspection → Required Truck Inventory → next job → field work.' },
+    { selector:"#wlSvcHome [data-wl-service-truck-inventory]", open:'#wlSvcHome .wl-service-more', title:'REQUIRED TRUCK INVENTORY', text:'Every work day, verify the four assigned permanent units plus 25 Recon batteries, 4 AGM 12V 110Ah, and 2 LiTime 12V 100Ah before leaving the shop.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-service-truck-usage]", open:'#wlSvcHome .wl-service-more', title:'WHEN YOU USE TRUCK STOCK', text:'Record a permanent truck unit or battery stock used at the current MHelpDesk job. Tech Check automatically creates the IT restock requirement.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-open-job]", open:'#wlSvcHome .wl-service-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number. Tech Check will find the correct Service job.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-return]", open:'#wlSvcHome .wl-service-more', title:'RETURN EQUIPMENT', text:'Use this when a unit comes back from the field. Tech Check will walk you through the return photo and IT Intake.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-svc='returns']", open:'#wlSvcHome .wl-service-more', title:'MY RETURNED UNITS', text:'Use this to see equipment you returned and whether IT Intake is still waiting or already complete.', fallback:'#wlSvcHome .wl-service-more > summary' },
@@ -2115,6 +2130,12 @@ function techCheckAIHtml(a,role){
     <div class='small top8'>AI Assist is advisory only. It cannot change, claim, complete, or reassign a ticket.</div></div>`;
 }
 async function assignmentGateState(assignment) {
+  if(assignment?.assigned_role==='service' && assignment?.status!=='started'){
+    const {data:departure,error:departureError}=await liveDb.rpc('service_departure_readiness_v1');
+    if(departureError)return {ready:false,label:'START-DAY CHECK REQUIRED',detail:departureError.message||'Truck readiness could not be verified.'};
+    if(!departure?.inspection_ready)return {ready:false,label:'TRUCK / TRAILER INSPECTION REQUIRED',detail:'Complete and pass today’s mandatory Truck Check and Trailer Check when a trailer is being used.'};
+    if(!departure?.inventory_ready)return {ready:false,label:'TRUCK INVENTORY / RESTOCK REQUIRED',detail:'Verify the permanent truck inventory and complete any IT restock before leaving the shop for a new Service job.'};
+  }
   const workType=String(assignment?.work_type||'').toLowerCase();
   const legacyPickup=!workType && /\bpick[ -]?up\b/i.test(String(assignment?.job_description||''));
   if(workType==='pickup' || legacyPickup){
@@ -2494,18 +2515,30 @@ async function assignmentGateRows(assignments=[]){
   }));
 }
 async function serviceDayState(){
-  const [work,spares,healthQ]=await Promise.all([serviceWorkData(),myTruckSpareData(),liveDb.rpc('get_workflow_health_v1')]);
+  const [work,spares,healthQ,truckQ]=await Promise.all([
+    serviceWorkData(),
+    myTruckSpareData(),
+    liveDb.rpc('get_workflow_health_v1'),
+    liveDb.rpc('service_departure_readiness_v1')
+  ]);
   const today=techCheckDateKey();
   const currentAssignments=(work.assignments||[]).filter(a=>techAssignmentIsCurrent(a,today));
   const futureAssignments=(work.assignments||[]).filter(a=>!techAssignmentIsCurrent(a,today));
+  const activeStarted=currentAssignments.find(a=>a.status==='started')||null;
   const gates=await assignmentGateRows(currentAssignments);
+  const truckReadiness=truckQ?.error
+    ? {inspection_ready:Boolean(work.inspectionDone),inventory_ready:false,departure_ready:false,units:[],stock:{},restock_requests:[]}
+    : (truckQ?.data||{});
   return {
     work,
     spares,
-    inspectionDue:Boolean(work.inspectionRequired&&!work.inspectionDone),
+    truckReadiness,
+    inspectionDue:!Boolean(truckReadiness.inspection_ready),
+    inventoryDue:Boolean(truckReadiness.inspection_ready&&!truckReadiness.inventory_ready),
     spareCount:(spares?.units?.length||0)+(spares?.batteries?.length||0),
     currentAssignments,
     futureAssignments,
+    activeStarted,
     gates,
     recovery:healthQ?.data?.recovery||null,
     nextReady:gates.find(row=>row.gate?.ready)||null,
@@ -2525,13 +2558,14 @@ async function myITDraftPreps(){
 }
 async function itDayState(){
   const today=techCheckDateKey();
-  const [assignmentsQ,returnsQ,siteQ,draftsQ,healthQ,serviceQueueQ]=await Promise.all([
+  const [assignmentsQ,returnsQ,siteQ,draftsQ,healthQ,serviceQueueQ,truckRestockQ]=await Promise.all([
     myActiveAssignments('it'),
     liveDb.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at').eq('status','waiting_it').order('returned_at',{ascending:true}).limit(50),
     swapSiteRegistrationRows(),
     myITDraftPreps(),
     liveDb.rpc('get_workflow_health_v1'),
-    liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_at,released_by_name,work_type').eq('status','released').order('released_at',{ascending:true}).limit(12)
+    liveDb.from('prep_tickets').select('id,ticket_no,site,status,released_at,released_by_name,work_type').eq('status','released').order('released_at',{ascending:true}).limit(12),
+    liveDb.rpc('get_it_service_truck_restock_queue_v1')
   ]);
   if(returnsQ.error)throw returnsQ.error;
   const assignments=assignmentsQ||[];
@@ -2547,6 +2581,7 @@ async function itDayState(){
     gates,
     recovery:healthQ?.data?.recovery||null,
     serviceQueue:serviceQueueQ?.error ? [] : (serviceQueueQ?.data||[]),
+    truckRestockQueue:truckRestockQ?.error ? [] : (truckRestockQ?.data||[]),
     nextReady:gates.find(row=>row.gate?.ready)||null,
     nextBlocked:gates.find(row=>!row.gate?.ready)||null
   };
@@ -2557,7 +2592,15 @@ function techCompletionBanner(flash){
 }
 function serviceNextActionHtml(state){
   if(state.inspectionDue){
-    return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>TRUCK CHECK</b><small>Complete the start-day truck check before field work.</small><button class='wl-service-start' data-wl-svc='inspect'>START TRUCK CHECK</button></div>`;
+    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>TRUCK / TRAILER INSPECTION</b><small>Complete the Truck Check every work day. If you are taking a trailer, its inspection is mandatory too.</small><button class='wl-service-start' data-wl-svc='inspect'>START INSPECTION</button></div>`;
+  }
+  if(state.activeStarted){
+    const a=state.activeStarted;
+    return `<div class='wl-day-next-card urgent'><span>ACTIVE FIELD JOB</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(a.site||'No site listed')} · Finish the job already in progress. Any truck shortage must be restocked before the next new job.</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>CONTINUE JOB</button></div>`;
+  }
+  if(state.inventoryDue){
+    const readyCount=(state.truckReadiness?.units||[]).filter(u=>u.status==='assigned'&&u.unit_tag).length;
+    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>REQUIRED TRUCK INVENTORY</b><small>${readyCount}/4 permanent units assigned · Verify 25 Recon batteries · 4 AGM 12V 110Ah · 2 LiTime 12V 100Ah. Missing items must be restocked by IT.</small><button class='wl-service-start' data-wl-service-truck-inventory>CHECK / RESTOCK TRUCK</button></div>`;
   }
   if(state.spareCount>0){
     return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>RESOLVE TRUCK SPARES · ${state.spareCount}</b><small>Used / unused backup equipment must be resolved before your day can close.</small><button class='wl-service-start' data-wl-service-resolve-spares>RESOLVE SPARES</button></div>`;
@@ -2584,6 +2627,10 @@ function itNextActionHtml(state){
   const site=state.siteTasks[0];
   if(site){
     return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>SWAP SITE REGISTRATION</b><small>MHelpDesk #${esc(site.ticket_no)} · ${esc(site.equipment_type||'Unit')} ${esc(site.unit_tag||'')} · ${esc(site.site||'Customer site')}</small><button class='wl-it-start' data-wl-confirm-swap-site='${esc(site.id)}' data-wl-swap-site-label='${esc((site.equipment_type||'Unit')+' '+(site.unit_tag||''))}' data-wl-swap-site='${esc(site.site||'Customer site')}'>CONFIRM SITE REGISTRATION</button></div>`;
+  }
+  const truckRestock=(state.truckRestockQueue||[]).find(r=>['requested','preparing'].includes(r.status));
+  if(truckRestock){
+    return `<div class='wl-day-next-card urgent'><span>SERVICE TRUCK RESTOCK</span><b>${esc(truckRestock.service_tech_name)}</b><small>${esc(truckRestock.item_kind==='unit' ? '1 × '+truckRestock.item_type : truckRestock.qty_needed+' × '+truckRestock.item_type)} · Required before this Service truck can leave for a new job.</small><button class='wl-it-start' data-wl-it-truck-restock>OPEN TRUCK RESTOCK</button></div>`;
   }
   const draft=state.drafts[0];
   if(draft){
@@ -2656,8 +2703,9 @@ async function attemptTechEndDay(role){
     if(role==='service'){
       const state=await techDashboardTimeout(serviceDayState(),null);
       const blockers=[];
-      if(state.inspectionDue)blockers.push('truck inspection');
-      if(state.spareCount)blockers.push(state.spareCount+' unresolved truck spare'+(state.spareCount===1?'':'s'));
+      if(state.inspectionDue)blockers.push('truck / trailer inspection');
+      if(!state.truckReadiness?.inventory_ready)blockers.push('permanent truck inventory / IT restock');
+      if(state.spareCount)blockers.push(state.spareCount+' unresolved job-specific truck spare'+(state.spareCount===1?'':'s'));
       if(state.currentAssignments.length)blockers.push(state.currentAssignments.length+' active job'+(state.currentAssignments.length===1?'':'s'));
       if(blockers.length){alert('END MY DAY IS BLOCKED\n\nFinish: '+blockers.join(', ')+'.');return showSvcHome();}
       return showTechDayComplete('service',state.futureAssignments.length);
@@ -2716,6 +2764,7 @@ async function showITHome() {
         <summary>OTHER ACTIONS</summary>
         <div class='wl-it-more-grid'>
           <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
+          <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${(state.truckRestockQueue||[]).length?` · ${state.truckRestockQueue.length}`:''}</button>
           <button data-wl-mode='intake'>IT INTAKE / RETURNS${state.waitingReturns.length?` · ${state.waitingReturns.length}`:''}</button>
           <button data-wl-it='pending'>RESUME EQUIPMENT PREP${state.drafts.length?` · ${state.drafts.length}`:''}</button>
           <button data-wl-it='history'>STATUS & HISTORY</button>
@@ -4364,6 +4413,227 @@ function techDashboardSettled(results){
   return results.some(r=>r.status==='rejected');
 }
 
+
+async function loadMyServiceTruckReadiness(){
+  const {data,error}=await liveDb.rpc('service_departure_readiness_v1');
+  if(error)throw error;
+  return data||{};
+}
+function serviceTruckUnitOrder(type){return ({'Sniper':1,'Ranger':2,'Spotter':3,'Solar Spotter':4})[type]||9;}
+function serviceTruckRestockRowsHtml(readiness){
+  const rows=Array.isArray(readiness?.restock_requests)?readiness.restock_requests:[];
+  if(!rows.length)return '';
+  return `<div class='wl-truck-restock-list'><div class='wl-truck-section-title'>RESTOCK STATUS</div>${rows.map(r=>{
+    const qty=r.item_kind==='unit'?'1 unit':(String(r.qty_needed)+' needed');
+    const detail=r.item_kind==='unit'
+      ? `${r.used_unit_tag?'Used truck unit '+esc(r.used_unit_tag)+' · ':''}${r.old_unit_tag?'Old unit '+esc(r.old_unit_tag)+' · ':''}${r.original_ticket_no?'MHelpDesk #'+esc(r.original_ticket_no):''}`
+      : `${esc(qty)}${r.original_ticket_no?' · MHelpDesk #'+esc(r.original_ticket_no):''}`;
+    const action=r.status==='ready'
+      ? `<button class='wl-service-start top8' data-wl-service-accept-truck-restock='${esc(r.id)}'>ACCEPT FROM IT →</button>`
+      : (r.status==='awaiting_return'&&r.old_unit_tag
+        ? `<button class='wl-big wl-red top8' data-wl-next-svc-return data-ticket='${esc(r.original_ticket_no||'')}' data-unit='${esc(r.old_unit_tag)}' data-type='${esc(r.item_type)}'>RETURN OLD UNIT TO IT →</button>`
+        : `<div class='small top8'>${r.status==='requested'?'IT RESTOCK REQUESTED':r.status==='preparing'?'IT IS PREPARING THIS':'WAITING FOR IT'}</div>`);
+    return `<div class='wl-truck-restock-row ${r.status==='ready'?'ready':''}'><div><b>${esc(r.item_type)}</b><span>${detail}</span></div><em>${esc(String(r.status||'').replaceAll('_',' ').toUpperCase())}</em>${action}</div>`;
+  }).join('')}</div>`;
+}
+async function showServiceTruckInventoryCheck(){
+  let card=document.getElementById('wlSvcTruckInventory');
+  if(!card){card=document.createElement('div');card.id='wlSvcTruckInventory';card.className='card wl-service-simple-card';viewSvc().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading required truck inventory…');
+  hideChildren(viewSvc(),[card]);resetWizardPosition();
+  try{
+    const r=await loadMyServiceTruckReadiness();
+    if(!r.inspection_ready){
+      card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← BACK</button><div class='wl-stop'><b>TRUCK / TRAILER INSPECTION REQUIRED FIRST</b><div>The permanent inventory check cannot replace the mandatory safety inspection.</div><button class='wl-service-start top10' data-wl-svc='inspect'>START INSPECTION</button></div>`;
+      return resetWizardPosition();
+    }
+    const units=(r.units||[]).slice().sort((a,b)=>serviceTruckUnitOrder(a.equipment_type)-serviceTruckUnitOrder(b.equipment_type));
+    const stock=r.stock||{};
+    const unitRows=units.map(u=>{
+      const ready=u.status==='assigned'&&u.unit_tag;
+      return `<label class='wl-truck-unit-check ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'':'disabled'}><span><b>${esc(u.equipment_type)}</b><small>${ready?'Unit '+esc(u.unit_tag):u.status==='used_restock_due'?'USED — IT RESTOCK REQUIRED':'NO UNIT ASSIGNED — IT REQUIRED'}</small></span></label>`;
+    }).join('');
+    card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
+      ${progress('MANDATORY TRUCK INVENTORY','Required before leaving the shop',1,1)}
+      <div class='wl-truck-required-banner'><b>THIS IS SEPARATE FROM THE SAFETY INSPECTION</b><span>Physically verify these exact units and quantities every work day.</span></div>
+      <div class='wl-truck-section-title'>PERMANENT UNITS · 4 REQUIRED</div>
+      <div class='wl-truck-unit-grid'>${unitRows}</div>
+      <div class='wl-truck-section-title'>BATTERY STOCK · COUNT WHAT IS PHYSICALLY ON THE TRUCK</div>
+      <div class='wl-truck-stock-grid'>
+        <label><span>Recon batteries <b>25 required</b></span><input id='wlTruckReconQty' type='number' inputmode='numeric' min='0' value='${Number(stock.recon_battery_qty||0)}'></label>
+        <label><span>AGM 12V 110Ah <b>4 required</b></span><input id='wlTruckAgmQty' type='number' inputmode='numeric' min='0' value='${Number(stock.agm_12v_110ah_qty||0)}'></label>
+        <label><span>LiTime 12V 100Ah <b>2 required</b></span><input id='wlTruckLiTimeQty' type='number' inputmode='numeric' min='0' value='${Number(stock.litime_12v_100ah_qty||0)}'></label>
+      </div>
+      ${serviceTruckRestockRowsHtml(r)}
+      <button class='wl-service-start top10' data-wl-submit-truck-inventory>I PHYSICALLY VERIFIED MY TRUCK →</button>
+      <button class='wl-big wl-gray top8' data-wl-service-truck-refresh>REFRESH FROM IT</button>
+      <div class='small top8'>New Service jobs remain blocked until the safety inspection AND this truck inventory check are both complete.</div>`;
+    resetWizardPosition();
+  }catch(error){
+    card.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not load permanent truck inventory.');
+  }
+}
+async function submitServiceTruckInventoryCheck(){
+  const unitConfirmations={};
+  document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
+    unitConfirmations[el.dataset.wlTruckUnitConfirm]={unit_tag:el.dataset.unitTag||'',confirmed:Boolean(el.checked)};
+  });
+  const recon=Number(document.getElementById('wlTruckReconQty')?.value);
+  const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
+  const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
+  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))return alert('Enter the actual battery quantities physically on the truck.');
+  document.body.classList.add('busy');
+  try{
+    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v1',{
+      p_unit_confirmations:unitConfirmations,
+      p_recon_battery_qty:Math.max(0,Math.floor(recon)),
+      p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
+      p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
+    });
+    if(error)throw error;
+    if(data?.inventory_ready){
+      rememberTechCompletion('service','', 'TRUCK INVENTORY READY');
+      return showSvcHome();
+    }
+    alert('TRUCK NOT READY TO LEAVE SHOP\n\nMissing items were sent to the IT restock queue. Accept the prepared replacements/restock, then physically recheck the truck.');
+    return showServiceTruckInventoryCheck();
+  }catch(error){alert(error?.message||'Could not save the truck inventory check.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function acceptServiceTruckRestock(id){
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('service_accept_truck_restock_v1',{p_request_id:id});
+    if(error)throw error;
+    alert('Restock received. Physically verify the truck again before leaving the shop.');
+    return showServiceTruckInventoryCheck();
+  }catch(error){alert(error?.message||'Could not accept the IT restock.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function showServiceTruckUsage(){
+  let card=document.getElementById('wlSvcTruckUsage');
+  if(!card){card=document.createElement('div');card.id='wlSvcTruckUsage';card.className='card wl-service-simple-card';viewSvc().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading permanent truck inventory…');
+  hideChildren(viewSvc(),[card]);resetWizardPosition();
+  try{
+    const [r,assignments]=await Promise.all([loadMyServiceTruckReadiness(),myActiveAssignments('service')]);
+    const active=(assignments||[]).filter(a=>a.status==='started');
+    if(!active.length){
+      card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button><div class='wl-stop'><b>NO ACTIVE SERVICE JOB</b><div>Open and start the MHelpDesk job before recording permanent truck inventory used.</div></div>`;
+      return resetWizardPosition();
+    }
+    const ticketOptions=active.map(a=>`<option value='${esc(a.ticket_no)}'>#${esc(a.ticket_no)} · ${esc(a.site||'No site listed')}</option>`).join('');
+    const unitOptions=(r.units||[]).filter(u=>u.status==='assigned'&&u.unit_tag).map(u=>`<option value='${esc(u.equipment_type)}'>${esc(u.equipment_type)} · Unit ${esc(u.unit_tag)}</option>`).join('');
+    card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
+      ${progress('PERMANENT TRUCK INVENTORY','Record anything used at a field job',1,1)}
+      <div class='wl-stop'><b>USING A PERMANENT TRUCK ITEM MAKES THE TRUCK SHORT</b><div>You may finish the job already in progress, but another new field job is blocked until IT replenishes the truck and you recheck it.</div></div>
+      <div class='wl-question top10'>
+        <div class='qnum'>USED ONE OF MY 4 TRUCK UNITS</div>
+        <label>MHelpDesk Ticket<select id='wlTruckUseUnitTicket'>${ticketOptions}</select></label>
+        <label>Truck Unit<select id='wlTruckUseUnitType'><option value=''>Choose unit…</option>${unitOptions}</select></label>
+        <label>OLD CUSTOMER / SITE UNIT COMING BACK<input id='wlTruckUseOldUnitTag' autocomplete='off' placeholder='Old unit tag'></label>
+        <button class='wl-big wl-red top10' data-wl-service-record-truck-unit-used>RECORD UNIT USED + RETURN OLD UNIT →</button>
+      </div>
+      <div class='wl-question top10'>
+        <div class='qnum'>USED TRUCK BATTERY STOCK</div>
+        <label>MHelpDesk Ticket<select id='wlTruckUseStockTicket'>${ticketOptions}</select></label>
+        <label>Stock Type<select id='wlTruckUseStockType'><option value='Recon Battery'>Recon Battery</option><option value='AGM 12V 110Ah'>AGM 12V 110Ah</option><option value='LiTime 12V 100Ah'>LiTime 12V 100Ah</option></select></label>
+        <label>Quantity Used<input id='wlTruckUseStockQty' type='number' inputmode='numeric' min='1' value='1'></label>
+        <button class='wl-big wl-red top10' data-wl-service-record-truck-stock-used>RECORD STOCK USED →</button>
+      </div>`;
+    resetWizardPosition();
+  }catch(error){card.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not load permanent truck inventory.');}
+}
+async function recordServiceTruckUnitUsed(){
+  const ticket=document.getElementById('wlTruckUseUnitTicket')?.value||'';
+  const type=document.getElementById('wlTruckUseUnitType')?.value||'';
+  const oldTag=document.getElementById('wlTruckUseOldUnitTag')?.value.trim()||'';
+  if(!ticket||!type||!oldTag)return alert('Choose the active MHelpDesk job, truck unit type, and enter the old unit coming back to IT.');
+  document.body.classList.add('busy');
+  try{
+    const {data,error}=await liveDb.rpc('service_use_permanent_truck_unit_v1',{p_ticket_no:ticket,p_equipment_type:type,p_old_unit_tag:oldTag});
+    if(error)throw error;
+    alert(`Truck ${type} ${data?.used_unit_tag||''} recorded as USED.\n\nNow return old unit ${oldTag} through the normal Service Return → IT Intake flow. IT will then prepare your replacement truck unit.`);
+    return showServiceReturnPreset(ticket,oldTag,type);
+  }catch(error){alert(error?.message||'Could not record the permanent truck unit as used.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function recordServiceTruckStockUsed(){
+  const ticket=document.getElementById('wlTruckUseStockTicket')?.value||'';
+  const type=document.getElementById('wlTruckUseStockType')?.value||'';
+  const qty=Math.max(1,Math.floor(Number(document.getElementById('wlTruckUseStockQty')?.value||0)));
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('service_use_truck_stock_v1',{p_ticket_no:ticket,p_item_type:type,p_qty:qty});
+    if(error)throw error;
+    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
+    return showSvcHome();
+  }catch(error){alert(error?.message||'Could not record truck stock used.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function loadITTruckRestockQueue(){
+  const {data,error}=await liveDb.rpc('get_it_service_truck_restock_queue_v1');
+  if(error)throw error;
+  return Array.isArray(data)?data:[];
+}
+function itTruckUnitChecksHtml(id){
+  const checks=[
+    ['identity_ok','Exact unit tag + correct unit type verified'],
+    ['power_ok','Power / battery system verified'],
+    ['functions_ok','Core functions tested'],
+    ['programmed_online_ok','Programmed and online'],
+    ['sd_storage_ok','SD / storage ready where applicable'],
+    ['sim_monitoring_ok','SIM / camera app / monitoring ready where applicable'],
+    ['clean_safe_ok','Clean, safe, and physically ready for truck']
+  ];
+  return `<div class='wl-it-restock-checks'>${checks.map(([key,label])=>`<label class='check'><input type='checkbox' data-wl-it-restock-check='${esc(id)}' data-check-key='${key}'><span>${esc(label)}</span></label>`).join('')}</div>`;
+}
+async function showITTruckRestock(){
+  let card=document.getElementById('wlItTruckRestock');
+  if(!card){card=document.createElement('div');card.id='wlItTruckRestock';card.className='card wl-it-simple-card';viewIT().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading Service truck restock queue…');
+  hideChildren(viewIT(),[card]);resetWizardPosition();
+  try{
+    const rows=await loadITTruckRestockQueue();
+    card.innerHTML=`<button class='wl-back' data-wl-home='it'>← IT HOME</button>${progress('SERVICE TRUCK RESTOCK','Permanent truck inventory',1,1)}
+      <div class='wl-it-restock-banner'><b>SERVICE CANNOT LEAVE FOR A NEW JOB UNTIL THIS IS RESTORED</b><span>Unit replacements must be fully checked by IT before the Service Tech accepts them.</span></div>
+      ${rows.length?rows.map(r=>{
+        if(r.status==='awaiting_return')return `<div class='wl-it-restock-card waiting'><div class='qnum'>WAITING FOR OLD UNIT RETURN</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>Used truck unit: ${esc(r.used_unit_tag||'—')} · Old field unit: ${esc(r.old_unit_tag||'—')} · MHelpDesk #${esc(r.original_ticket_no||'—')}</div><div class='wl-stop top8'>Service must return the old unit through normal IT Intake before this replacement can be prepared.</div></div>`;
+        if(r.status==='ready')return `<div class='wl-it-restock-card ready'><div class='qnum'>READY — WAITING FOR SERVICE ACCEPTANCE</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>${r.item_kind==='unit'?'Replacement Unit '+esc(r.replacement_unit_tag||'—'):esc(r.qty_issued||r.qty_needed)+' ready'}</div></div>`;
+        if(r.item_kind==='battery')return `<div class='wl-it-restock-card'><div class='qnum'>BATTERY RESTOCK</div><h3>${esc(r.service_tech_name)} · ${esc(r.item_type)}</h3><div class='small'>Needs ${Number(r.qty_needed||0)} before leaving the shop.</div><label>Quantity IT is issuing<input id='wlItRestockQty_${esc(r.id)}' type='number' inputmode='numeric' min='${Number(r.qty_needed||1)}' value='${Number(r.qty_needed||1)}'></label><button class='wl-it-start top8' data-wl-it-ready-truck-battery='${esc(r.id)}'>MARK READY FOR SERVICE →</button></div>`;
+        return `<div class='wl-it-restock-card'><div class='qnum'>UNIT RESTOCK</div><h3>${esc(r.service_tech_name)} · 1 × ${esc(r.item_type)}</h3><div class='small'>${r.old_unit_tag?'Old Unit '+esc(r.old_unit_tag)+' was turned in · ':''}${r.original_ticket_no?'MHelpDesk #'+esc(r.original_ticket_no):'Initial permanent truck assignment'}</div><label>Replacement ${esc(r.item_type)} Unit Tag<input id='wlItRestockUnit_${esc(r.id)}' autocomplete='off' placeholder='Unit tag'></label>${itTruckUnitChecksHtml(r.id)}<button class='wl-it-start top8' data-wl-it-ready-truck-unit='${esc(r.id)}'>UNIT CHECKED — READY FOR SERVICE →</button></div>`;
+      }).join(''):`<div class='ok'><b>✓ No permanent Service truck restock is waiting on IT.</b></div>`}
+      <button class='wl-big wl-gray top10' data-wl-it-truck-restock>REFRESH QUEUE</button>`;
+    resetWizardPosition();
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load Service truck restock queue.');}
+}
+async function prepareITTruckUnitRestock(id){
+  const tag=document.getElementById('wlItRestockUnit_'+id)?.value.trim()||'';
+  const checks={};
+  document.querySelectorAll(`[data-wl-it-restock-check="${CSS.escape(id)}"]`).forEach(el=>checks[el.dataset.checkKey]=Boolean(el.checked));
+  if(!tag)return alert('Enter the exact replacement unit tag.');
+  if(Object.values(checks).some(v=>!v))return alert('Complete every IT readiness check before giving this permanent truck unit to Service.');
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('it_prepare_service_truck_unit_restock_v1',{p_request_id:id,p_replacement_unit_tag:tag,p_checks:checks});
+    if(error)throw error;
+    alert('Replacement unit is READY. The Service Tech must accept it, then physically recheck the truck before leaving.');
+    return showITTruckRestock();
+  }catch(error){alert(error?.message||'Could not prepare the replacement truck unit.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function prepareITTruckBatteryRestock(id){
+  const qty=Math.max(0,Math.floor(Number(document.getElementById('wlItRestockQty_'+id)?.value||0)));
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('it_prepare_service_truck_battery_restock_v1',{p_request_id:id,p_qty_issued:qty});
+    if(error)throw error;
+    alert('Battery restock is READY for the Service Tech to accept.');
+    return showITTruckRestock();
+  }catch(error){alert(error?.message||'Could not prepare the truck battery restock.');}
+  finally{document.body.classList.remove('busy');}
+}
+
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
   let home=document.getElementById('wlSvcHome');
@@ -4389,12 +4659,14 @@ async function showSvcHome() {
       <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
       ${techCompletionBanner(flash)}
       ${serviceNextActionHtml(state)}
-      <div class='wl-service-flowline'>TRUCK CHECK <b>→</b> REQUIRED FOLLOW-UP <b>→</b> NEXT JOB <b>→</b> END MY DAY</div>
+      <div class='wl-service-flowline'>TRUCK / TRAILER INSPECTION <b>→</b> REQUIRED TRUCK INVENTORY <b>→</b> NEXT JOB <b>→</b> FIELD WORK</div>
 
       <details class='wl-service-more'>
         <summary>OTHER ACTIONS</summary>
         <div class='wl-service-more-grid'>
           <button data-wl-service-open-job>ENTER MHELPDESK TICKET</button>
+          <button data-wl-service-truck-inventory>MY REQUIRED TRUCK INVENTORY</button>
+          <button data-wl-service-truck-usage>USED TRUCK UNIT / STOCK</button>
           <button data-wl-service-return>RETURN UNIT TO IT</button>
           <button data-wl-svc='returns'>MY RETURNED UNITS</button>
           <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
@@ -5133,7 +5405,7 @@ function inspectionQuestion() {
       ? `<div class='wl-stop'><b>INSPECTION BLOCKED.</b><div>There is still a NO answer. Go back and correct it before continuing.</div></div>`
       : `${progress('START-DAY CHECK COMPLETE', 'Vehicle is ready', total, total)}
          <div class='wl-service-good'>✓ ALL REQUIRED CHECKS PASSED</div>
-         <button class='wl-service-start top10' data-wl-submit-inspection>CONTINUE TO MHELPDESK TICKET</button>`;
+         <button class='wl-service-start top10' data-wl-submit-inspection>CONTINUE TO REQUIRED TRUCK INVENTORY →</button>`;
   }
 
   card.innerHTML = `${inspectionRecovered ? `<div class='warn wl-draft-recovered'><b>Recovered your unfinished inspection.</b></div>` : ''}
@@ -5184,8 +5456,8 @@ async function submitInspection() {
     if (error) throw error;
     await clearDeviceDraft('inspection');
     inspectionRecovered=false;
-    rememberTechCompletion('service','', 'TRUCK CHECK COMPLETE');
-    return showSvcHome();
+    rememberTechCompletion('service','', 'TRUCK / TRAILER INSPECTION COMPLETE');
+    return showServiceTruckInventoryCheck();
   } catch(error) {
     await saveInspectionDraft();
     alert(error?.message === 'Failed to fetch'
@@ -5580,7 +5852,17 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
+  if (e.target.closest('[data-wl-service-truck-inventory]')) return showServiceTruckInventoryCheck();
+  if (e.target.closest('[data-wl-service-truck-refresh]')) return showServiceTruckInventoryCheck();
+  if (e.target.closest('[data-wl-submit-truck-inventory]')) return submitServiceTruckInventoryCheck();
+  const acceptTruckRestock=e.target.closest('[data-wl-service-accept-truck-restock]'); if(acceptTruckRestock)return acceptServiceTruckRestock(acceptTruckRestock.dataset.wlServiceAcceptTruckRestock);
+  if (e.target.closest('[data-wl-service-truck-usage]')) return showServiceTruckUsage();
+  if (e.target.closest('[data-wl-service-record-truck-unit-used]')) return recordServiceTruckUnitUsed();
+  if (e.target.closest('[data-wl-service-record-truck-stock-used]')) return recordServiceTruckStockUsed();
   if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
+  if (e.target.closest('[data-wl-it-truck-restock]')) return showITTruckRestock();
+  const readyTruckUnit=e.target.closest('[data-wl-it-ready-truck-unit]'); if(readyTruckUnit)return prepareITTruckUnitRestock(readyTruckUnit.dataset.wlItReadyTruckUnit);
+  const readyTruckBattery=e.target.closest('[data-wl-it-ready-truck-battery]'); if(readyTruckBattery)return prepareITTruckBatteryRestock(readyTruckBattery.dataset.wlItReadyTruckBattery);
   const techEndDay=e.target.closest('[data-wl-tech-end-day]');
   if(techEndDay)return attemptTechEndDay(techEndDay.dataset.wlTechEndDay);
   const techDayBack=e.target.closest('[data-wl-tech-day-back]');
