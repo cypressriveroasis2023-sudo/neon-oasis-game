@@ -2765,6 +2765,7 @@ async function showITHome() {
         <summary>OTHER ACTIONS</summary>
         <div class='wl-it-more-grid'>
           <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
+          <button data-wl-it-truck-inventory>SERVICE TRUCK INVENTORY</button>
           <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${(state.truckRestockQueue||[]).length?` · ${state.truckRestockQueue.length}`:''}</button>
           <button data-wl-mode='intake'>IT INTAKE / RETURNS${state.waitingReturns.length?` · ${state.waitingReturns.length}`:''}</button>
           <button data-wl-it='pending'>RESUME EQUIPMENT PREP${state.drafts.length?` · ${state.drafts.length}`:''}</button>
@@ -4613,6 +4614,87 @@ async function recordServiceTruckStockUsed(){
   }catch(error){alert(error?.message||'Could not record truck stock used.');}
   finally{document.body.classList.remove('busy');}
 }
+
+async function loadITServiceTruckInventory(){
+  const {data,error}=await liveDb.rpc('it_service_truck_inventory_v1');
+  if(error)throw error;
+  return Array.isArray(data)?data:[];
+}
+function itTruckInventoryCounts(row){
+  const units=Array.isArray(row?.units)?row.units:[];
+  const sims=Array.isArray(row?.sims)?row.sims:[];
+  const stock=row?.stock||{};
+  return {
+    units:units.filter(x=>x.status==='assigned'&&x.unit_tag).length,
+    sims:sims.filter(x=>x.status==='assigned'&&x.sim_number).length,
+    recon:Number(stock.recon_battery_qty||0),
+    agm:Number(stock.agm_12v_110ah_qty||0),
+    litime:Number(stock.litime_12v_100ah_qty||0)
+  };
+}
+function itTruckInventorySummaryHtml(row){
+  const n=itTruckInventoryCounts(row),ready=Boolean(row.departure_ready);
+  return `<article class='wl-it-truck-manage-row ${ready?'ready':'not-ready'}'>
+    <div><span>SERVICE TRUCK</span><h3>${esc(row.service_tech_name||'Service Tech')}</h3><b>${ready?'READY TO LEAVE SHOP':'NOT READY'}</b></div>
+    <div class='wl-it-truck-counts'><i>${n.units}/4 <small>UNITS</small></i><i>${n.sims}/3 <small>SIMs</small></i><i>${n.recon}/25 <small>RECON</small></i><i>${n.agm}/4 <small>AGM</small></i><i>${n.litime}/2 <small>LiTime</small></i></div>
+    <button class='wl-it-start' data-wl-it-manage-truck='${esc(row.service_tech_id)}'>MANAGE / LOAD TRUCK →</button>
+  </article>`;
+}
+async function showITServiceTruckInventory(){
+  let card=document.getElementById('wlItTruckInventory');
+  if(!card){card=document.createElement('div');card.id='wlItTruckInventory';card.className='card wl-it-simple-card';viewIT().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading permanent Service truck inventory…');
+  hideChildren(viewIT(),[card]); resetWizardPosition();
+  try{
+    const rows=await loadITServiceTruckInventory();
+    window.__wlItTruckInventoryRows=rows;
+    card.innerHTML=`<button class='wl-back' data-wl-home='it'>← IT HOME</button>${progress('SERVICE TRUCKS','Permanent truck inventory',1,1)}
+      <div class='wl-it-restock-banner'><b>IT LOADS / RESTOCKS · SERVICE VERIFIES / USES</b><span>IT is the only department that adds official permanent truck inventory. Any IT change forces Service to physically verify the truck again before departure.</span></div>
+      <div class='wl-it-truck-manage-list'>${rows.length?rows.map(itTruckInventorySummaryHtml).join(''):`<div class='ok'><b>No active Service technicians.</b></div>`}</div>
+      <button class='wl-big wl-gray top10' data-wl-it-truck-inventory>REFRESH TRUCKS</button>`;
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load Service truck inventory.');}
+}
+function itTruckUnitLoadChecksHtml(){
+  return `<div class='wl-it-restock-checks'>
+    ${[['identity_ok','Exact unit / model verified'],['power_ok','Power / battery verified'],['functions_ok','Camera functions verified'],['programmed_online_ok','Programmed and online'],['sd_storage_ok','SD / storage verified'],['sim_monitoring_ok','SIM / monitoring verified'],['clean_safe_ok','Clean and safe for truck']].map(([key,label])=>`<label class='check'><input type='checkbox' data-wl-it-load-unit-check='${key}'><span>${label}</span></label>`).join('')}
+  </div>`;
+}
+async function showITServiceTruckManager(serviceTechId){
+  const rows=window.__wlItTruckInventoryRows||await loadITServiceTruckInventory();
+  const row=rows.find(x=>String(x.service_tech_id)===String(serviceTechId));
+  if(!row)return alert('Service truck not found. Refresh and try again.');
+  const card=document.getElementById('wlItTruckInventory'); if(!card)return;
+  const units=Array.isArray(row.units)?row.units:[],sims=Array.isArray(row.sims)?row.sims:[],stock=row.stock||{};
+  const unitTypes=['Sniper','Ranger','Spotter','Solar Spotter'];
+  card.innerHTML=`<button class='wl-back' data-wl-it-truck-inventory>← SERVICE TRUCKS</button>${progress('MANAGE / LOAD TRUCK',row.service_tech_name||'Service Tech',1,1)}
+    <div class='wl-it-restock-banner'><b>IT SUPPLIES THIS TRUCK</b><span>Load exact unit tags, exact SIM numbers, or add battery quantities. Service cannot add inventory here and must re-verify after every IT change.</span></div>
+    <div class='wl-it-truck-editor'>
+      <div class='wl-truck-section-title'>PERMANENT UNITS · 1 EACH</div>
+      ${unitTypes.map(type=>{const u=units.find(x=>x.equipment_type===type)||{};return `<div class='wl-it-load-line'><div><b>${esc(type)}</b><span>${u.unit_tag?'CURRENT · '+esc(u.unit_tag):'MISSING · IT LOAD REQUIRED'}</span></div><input id='wlLoadUnit_${type.replaceAll(' ','_')}' placeholder='Exact unit tag' value='${esc(u.unit_tag||'')}'><button data-wl-it-load-unit='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>LOAD / VERIFY</button></div>`;}).join('')}
+      <div id='wlItUnitLoadChecks'>${itTruckUnitLoadChecksHtml()}</div>
+      <div class='wl-truck-section-title'>SIM CARDS · EXACT NUMBERS</div>
+      ${[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return `<div class='wl-it-load-line'><div><b>SIM ${slot}</b><span>${s.sim_number?'CURRENT · '+esc(s.sim_number):'MISSING · IT LOAD REQUIRED'}</span></div><input id='wlLoadSim_${slot}' inputmode='numeric' placeholder='Exact SIM number' value='${esc(s.sim_number||'')}'><label class='wl-it-inline-verify'><input id='wlLoadSimVerified_${slot}' type='checkbox'> verified</label><button data-wl-it-load-sim='${slot}' data-service-tech='${esc(serviceTechId)}'>ASSIGN SIM</button></div>`;}).join('')}
+      <div class='wl-truck-section-title'>BATTERY STOCK · ADD ONLY WHAT IT PHYSICALLY LOADS</div>
+      ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='1' inputmode='numeric' placeholder='Qty added'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>ADD TO TRUCK</button></div>`).join('')}
+    </div>`;
+}
+async function itLoadTruckUnit(serviceTechId,type){
+  const input=document.getElementById('wlLoadUnit_'+String(type).replaceAll(' ','_')); const tag=input?.value.trim()||'';
+  const checks={}; document.querySelectorAll('[data-wl-it-load-unit-check]').forEach(x=>checks[x.dataset.wlItLoadUnitCheck]=Boolean(x.checked));
+  if(!tag)return alert('Enter the exact unit tag.');
+  if(Object.values(checks).length!==7||Object.values(checks).some(v=>!v))return alert('Complete all 7 IT readiness checks before loading this unit.');
+  try{const {error}=await liveDb.rpc('it_load_service_truck_unit_v1',{p_service_tech_id:serviceTechId,p_equipment_type:type,p_unit_tag:tag,p_checks:checks});if(error)throw error;alert(type+' '+tag+' loaded. Service must verify the truck again.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not load unit.');}
+}
+async function itLoadTruckSim(serviceTechId,slot){
+  const sim=document.getElementById('wlLoadSim_'+slot)?.value.trim()||''; const verified=Boolean(document.getElementById('wlLoadSimVerified_'+slot)?.checked);
+  if(!sim)return alert('Enter the exact SIM number.'); if(!verified)return alert('Physically verify the exact SIM number first.');
+  try{const {error}=await liveDb.rpc('it_load_service_truck_sim_v1',{p_service_tech_id:serviceTechId,p_slot_no:Number(slot),p_sim_number:sim,p_number_verified:true});if(error)throw error;alert('SIM '+slot+' assigned. Service must verify the truck again.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not assign SIM.');}
+}
+async function itAddTruckStock(serviceTechId,type,index){
+  const qty=Math.max(0,Math.floor(Number(document.getElementById('wlLoadStock_'+index)?.value||0))); if(!qty)return alert('Enter the quantity IT physically added.');
+  try{const {error}=await liveDb.rpc('it_add_service_truck_stock_v1',{p_service_tech_id:serviceTechId,p_item_type:type,p_qty_added:qty});if(error)throw error;alert(qty+' × '+type+' added. Service must recount the truck.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not add truck stock.');}
+}
+
 async function loadITTruckRestockQueue(){
   const {data,error}=await liveDb.rpc('get_it_service_truck_restock_queue_v1');
   if(error)throw error;
@@ -5922,6 +6004,11 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-service-record-truck-sim-used]')) return recordServiceTruckSimUsed();
   if (e.target.closest('[data-wl-service-record-truck-stock-used]')) return recordServiceTruckStockUsed();
   if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
+  if (e.target.closest('[data-wl-it-truck-inventory]')) return showITServiceTruckInventory();
+  const manageTruck=e.target.closest('[data-wl-it-manage-truck]'); if(manageTruck)return showITServiceTruckManager(manageTruck.dataset.wlItManageTruck);
+  const loadUnit=e.target.closest('[data-wl-it-load-unit]'); if(loadUnit)return itLoadTruckUnit(loadUnit.dataset.serviceTech,loadUnit.dataset.wlItLoadUnit);
+  const loadSim=e.target.closest('[data-wl-it-load-sim]'); if(loadSim)return itLoadTruckSim(loadSim.dataset.serviceTech,loadSim.dataset.wlItLoadSim);
+  const loadStock=e.target.closest('[data-wl-it-load-stock]'); if(loadStock)return itAddTruckStock(loadStock.dataset.serviceTech,loadStock.dataset.stockType,loadStock.dataset.wlItLoadStock);
   if (e.target.closest('[data-wl-it-truck-restock]')) return showITTruckRestock();
   const readyTruckUnit=e.target.closest('[data-wl-it-ready-truck-unit]'); if(readyTruckUnit)return prepareITTruckUnitRestock(readyTruckUnit.dataset.wlItReadyTruckUnit);
   const readyTruckSim=e.target.closest('[data-wl-it-ready-truck-sim]'); if(readyTruckSim)return prepareITTruckSimRestock(readyTruckSim.dataset.wlItReadyTruckSim);
