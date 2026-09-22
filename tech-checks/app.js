@@ -2211,7 +2211,7 @@ function ownerBoardServiceTechCard(tech){
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
       +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-truck-edit="'+esc(tech.user_id||tech.service_tech_id)+'">✎ ADJUST THIS TRUCK INVENTORY</button>'
-      +'<div id="ownerTruckEditor_'+esc(tech.service_tech_id)+'" class="ownerCmdInventoryEditor" data-open="false"></div>'
+      +'<div id="ownerTruckEditor_'+esc(tech.user_id||tech.service_tech_id)+'" class="ownerCmdInventoryEditor" data-open="false"></div>'
     +'</div>'
     +'<div class="ownerCmdSection jobs"><div class="ownerCmdSectionHead"><b>TODAY’S JOBS</b><span>'+jobs.length+'</span></div>'
       +(jobs.length?'<div class="ownerCmdJobs">'+jobs.map(ownerBoardJobHtml).join('')+'</div>':'<div class="ownerCmdEmpty">No Service jobs assigned today.</div>')
