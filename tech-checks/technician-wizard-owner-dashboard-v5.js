@@ -5506,12 +5506,11 @@ async function installOwnerAssignments(force = false) {
       <span class='ownerDashBadge neutral'>＋</span>
     </summary>
     <div class='ownerDashBody'>
-      <div class='owner-simple-intro'><b>Copy the MHelpDesk job here.</b> Tech Check will save your draft automatically. MHelpDesk itself is not changed.</div>
-      <div id='ownerAssignDraftStatus' class='small'>Draft autosaves as you type. You can leave this screen and come back without losing it.</div>
+      <div id='ownerAssignDraftStatus' class='owner-assign-draft-note small'>Draft autosaves as you type. You can leave this screen and come back without losing it.</div>
 
       <div class='owner-assign-command-grid'>
         <section class='owner-simple-step owner-assign-job-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>1</span><div><b>Job Type</b><span>Choose the type of job, then add the ticket details.</span></div></div>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>⌁</span><div><b>Job Type</b><span>Choose the type of job. Tech Check will use your defaults and equipment requirements.</span></div></div>
           <div class='owner-simple-pills'><button type='button' data-owner-work-pill='delivery'>Delivery</button><button type='button' data-owner-work-pill='pickup'>Pickup</button><button type='button' data-owner-work-pill='swap'>Swap</button><button type='button' data-owner-work-pill='service'>Service</button></div>
           <select id='ownerAssignWorkType' class='owner-simple-hidden-select' aria-label='Job type'><option value='delivery'>Delivery</option><option value='pickup'>Pickup</option><option value='swap'>Swap</option><option value='service' selected>Service</option></select>
           <div class='grid'><div><label>MHelpDesk #</label><input id='ownerAssignTicket' inputmode='numeric' placeholder='MHelpDesk ticket number'></div><div><label>Customer / Site</label><input id='ownerAssignSite' placeholder='Customer or site name'></div></div>
@@ -5519,25 +5518,25 @@ async function installOwnerAssignments(force = false) {
           <div id='ownerFlowHint' class='small top8'></div>
         </section>
         <section class='owner-simple-step owner-assign-schedule-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>2</span><div><b>Schedule</b><span>When should this be done?</span></div></div>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>▣</span><div><b>Schedule</b><span>When should this be done?</span></div></div>
           <div class='grid'><div class='ownerWorkDateField'><label>Work Date</label><input id='ownerAssignDate' type='date' value='${techCheckDateKey(new Date())}'></div><div class='ownerWorkDateField'><label>Work Time <span class='small'>(optional)</span></label><input id='ownerAssignTime' type='time' step='900'></div></div>
         </section>
         <section class='owner-simple-step owner-assign-location-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>3</span><div><b>Location / Units</b><span>Record the exact unit and stand numbers involved.</span></div></div>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>●</span><div><b>Location / Units</b><span>Where is the work and what units are involved?</span></div></div>
           <div class='wl-equipment-number-grid'><div><label>Unit #s</label><input id='ownerAssignUnitNumbers' placeholder='e.g. 058, 103, 221'></div><div><label>Stand / Solar Stand / Pole #s</label><input id='ownerAssignStandNumbers' placeholder='e.g. 047, SS-12, SP-4'></div></div>
         </section>
         <section class='owner-simple-step owner-assign-equipment-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>4</span><div><b>Equipment & Parts</b><span>Only enter what this job actually needs.</span></div></div>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>◇</span><div><b>Equipment & Parts</b><span>Enter what's required for this job.</span></div></div>
           <div id='ownerAssignParts' class='wl-ticket-parts-setup'><div class='qtext' id='ownerEquipmentTotalHeading'>Equipment</div><div class='small' id='ownerEquipmentTotalHelp'>Choose the equipment type and quantity from MHelpDesk.</div>${ownerEquipmentManifestInputsHtml()}<div id='ownerAutoServicePlan' class='hidden'></div><div class='wl-requirement-section'><div class='wl-requirement-heading'>Replacement / Swap Categories</div><div class='small'><b>SIM and SD/micro SD cards come from IT.</b> If Service is doing the field work, Tech Check uses IT → Service so Service receives and verifies the cards in the handoff.</div>${ticketPartsInputsHtml('ownerPart')}</div></div>
         </section>
         <section class='owner-simple-step owner-assign-tech-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>5</span><div><b>Who gets it?</b><span>Choose the workflow and technician.</span></div></div>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>♟</span><div><b>Who gets it?</b><span>Assign a technician or department.</span></div></div>
           <div class='owner-simple-pills role-pills'><button type='button' data-owner-role-pill='it'>IT only<small>IT does the work</small></button><button type='button' data-owner-role-pill='service'>Service only<small>Service does the work</small></button><button type='button' data-owner-role-pill='it_service'>IT → Service<small>IT first, then handoff</small></button><button type='button' data-owner-role-pill='service_it'>Service → IT<small>Service first, then IT</small></button></div>
           <select id='ownerAssignRole' class='owner-simple-hidden-select' aria-label='Department flow'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select>
           <label>Technician <span class='small'>(optional — leave blank for department queue)</span></label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small top8'></div>
         </section>
         <section class='owner-simple-step owner-assign-review-card'>
-          <div class='owner-simple-step-head'><span class='owner-simple-step-num'>6</span><div><b>Review & Assign</b><span>Check the key items before creating the assignment.</span></div></div><div id='ownerAIReviewBox' class='owner-simple-review pending'></div><button class='btn ownerDispatchButton owner-simple-assign' data-wl-owner-assign>Create Assignment</button>
+          <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>✓</span><div><b>Review & Assign</b><span>Check the key items before creating the assignment.</span></div></div><div id='ownerAIReviewBox' class='owner-simple-review pending'></div><button class='btn ownerDispatchButton owner-simple-assign' data-wl-owner-assign>Create Assignment</button>
         </section>
       </div>
     </div>`;
