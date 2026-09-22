@@ -1870,7 +1870,7 @@ function ownerCalendarShift(n){
   else if(ownerCalendarMode==='week') d.setDate(d.getDate()+7*n);
   else d.setFullYear(d.getFullYear()+n);
   ownerCalendarDate=d;
-  ownerCalendarSelected=null;
+  ownerCalendarSelected=localDateKey(d);
   ownerCalendarSelectedJobId='';
   ownerAppRender();
 }
@@ -1992,7 +1992,7 @@ function ownerAppCalendar(){
   }
   const cal=ownerCalendarMode==='month'?ownerCalendarMonth():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarYear();
   return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar Command Center','A wide, live schedule built for dispatch — see the whole month, select a day, and inspect jobs without squeezing the calendar.')
-    +'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerCalendarServiceOrder()">Open Selected</button><button class="mini" type="button" onclick="ownerCalendarToday()">Today</button></div></div>'
+    +'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerAppNavigate(\'today\')">Live Work</button><button class="mini" type="button" onclick="ownerCalendarToday()">Today</button></div></div>'
     +ownerCalendarStats()
     +'<div class="ownerCalControlBar"><div class="ownerCalPeriod"><button aria-label="Previous" onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button aria-label="Next" onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div>'
       +'<div class="ownerCalRoleFilters"><span>SHOW</span><button class="'+(ownerCalendarRoleFilter==='all'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'all\')">All Jobs</button><button class="'+(ownerCalendarRoleFilter==='it'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'it\')">IT</button><button class="'+(ownerCalendarRoleFilter==='service'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'service\')">Service</button></div>'
