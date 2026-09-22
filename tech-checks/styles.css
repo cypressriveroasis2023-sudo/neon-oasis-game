@@ -4906,3 +4906,55 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
     grid-column:1/-1;min-height:50px;grid-template-columns:28px 1fr auto;
   }
 }
+
+
+/* Assign Job command-center layout v228 — compact like approved Owner screens */
+#view-owner #ownerJobAssignments .ownerDashBody{padding:12px!important}
+#view-owner .owner-assign-command-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:12px!important;align-items:start!important;
+}
+#view-owner .owner-assign-command-grid .owner-simple-step{
+  margin:0!important;padding:14px!important;background:#0d1920!important;border:1px solid #263a46!important;border-radius:10px!important;box-shadow:none!important;
+}
+#view-owner .owner-assign-job-card,
+#view-owner .owner-assign-review-card{grid-column:1/-1!important}
+#view-owner .owner-assign-equipment-card{grid-column:1/2!important}
+#view-owner .owner-assign-tech-card{grid-column:2/3!important}
+#view-owner .owner-simple-step-head{margin-bottom:10px!important;gap:9px!important}
+#view-owner .owner-simple-step-head>div{display:flex!important;flex-direction:column!important;gap:2px!important}
+#view-owner .owner-simple-step-head b{font-size:14px!important;color:#fff!important}
+#view-owner .owner-simple-step-head span:not(.owner-simple-step-num){font-size:10px!important;color:#9eafb9!important}
+#view-owner .owner-simple-step-num{
+  width:24px!important;height:24px!important;min-width:24px!important;border-radius:6px!important;
+  display:grid!important;place-items:center!important;background:#291719!important;border:1px solid #7a3036!important;color:#ff6269!important;font-weight:900!important;font-size:10px!important;
+}
+#view-owner .owner-simple-pills{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;margin-bottom:10px!important}
+#view-owner .owner-simple-pills button{
+  min-height:36px!important;background:#101d25!important;border:1px solid #344a56!important;color:#eaf1f4!important;border-radius:9px!important;
+}
+#view-owner .owner-simple-pills button.on,
+#view-owner .owner-simple-pills button.selected{background:#e31b23!important;border-color:#ff555b!important;color:#fff!important}
+#view-owner .owner-simple-pills.role-pills button small{display:block!important;color:#91a4ae!important;font-size:8px!important;margin-top:2px!important}
+#view-owner .owner-simple-pills.role-pills button.on small,
+#view-owner .owner-simple-pills.role-pills button.selected small{color:#fff!important}
+#view-owner .owner-assign-command-grid label{font-size:9px!important;color:#d8e1e5!important;margin-bottom:4px!important}
+#view-owner .owner-assign-command-grid input,
+#view-owner .owner-assign-command-grid select{min-height:34px!important;border-radius:6px!important}
+#view-owner .owner-assign-command-grid .grid{gap:10px!important}
+#view-owner .owner-assign-command-grid .wl-equipment-number-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
+#view-owner .owner-assign-equipment-card .wl-ticket-parts-setup{padding:0!important;border:0!important;background:transparent!important}
+#view-owner .owner-assign-equipment-card .wl-equipment-manifest{gap:7px!important}
+#view-owner .owner-assign-equipment-card .wl-requirement-section{margin-top:10px!important;padding-top:10px!important;border-top:1px solid #263a46!important}
+#view-owner .owner-assign-tech-card .wl-tech-add-row{display:grid!important;grid-template-columns:minmax(0,1fr) 36px!important;gap:7px!important}
+#view-owner .owner-assign-review-card .owner-simple-review{margin:0 0 10px!important}
+#view-owner .owner-assign-review-card .owner-simple-assign{
+  width:100%!important;min-height:44px!important;background:#e31b23!important;border-color:#ff555b!important;color:#fff!important;font-size:13px!important;font-weight:900!important;border-radius:8px!important;
+}
+@media(max-width:900px){
+  #view-owner .owner-assign-command-grid{grid-template-columns:1fr!important}
+  #view-owner .owner-assign-job-card,#view-owner .owner-assign-review-card,#view-owner .owner-assign-equipment-card,#view-owner .owner-assign-tech-card{grid-column:1!important}
+}
+@media(max-width:560px){
+  #view-owner .owner-simple-pills{grid-template-columns:1fr 1fr!important}
+  #view-owner .owner-assign-command-grid .grid,#view-owner .owner-assign-command-grid .wl-equipment-number-grid{grid-template-columns:1fr!important}
+}
