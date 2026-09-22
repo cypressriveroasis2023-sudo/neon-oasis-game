@@ -7515,3 +7515,29 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
   #view-owner .ownerTodayClockCard{padding:18px 20px!important;overflow:visible!important}
   #view-owner .ownerTodayClock{font-size:clamp(28px,2.65vw,46px)!important;letter-spacing:-.045em!important;white-space:nowrap!important;overflow:visible!important;text-align:center!important}
 }
+
+
+/* v20260922u — Owner workspace responsive containment (iPhone + desktop) */
+html,body{max-width:100%;overflow-x:hidden}
+#view-owner,#view-owner .ownerTodayShell,#view-owner .ownerTodayMain,#view-owner .ownerTodayMain *{box-sizing:border-box}
+#view-owner .ownerTodayMain{min-width:0;max-width:100%;overflow-x:hidden}
+#view-owner .ownerTodayMain img,#view-owner .ownerTodayMain svg{max-width:100%}
+#view-owner .ownerTodayMain button,#view-owner .ownerTodayMain a,#view-owner .ownerTodayMain input,#view-owner .ownerTodayMain select{max-width:100%}
+#view-owner .ownerTodayMain [class*="Card"],#view-owner .ownerTodayMain [class*="card"],#view-owner .ownerTodayMain [class*="Row"],#view-owner .ownerTodayMain [class*="row"]{min-width:0}
+#view-owner .ownerTodayMain [class*="job"],#view-owner .ownerTodayMain [class*="Job"]{min-width:0;overflow:hidden}
+#view-owner .ownerTodayMain [class*="job"] *,#view-owner .ownerTodayMain [class*="Job"] *{min-width:0;overflow-wrap:anywhere}
+@media(max-width:720px){
+  #view-owner .ownerTodayMain{width:100%;padding-left:12px!important;padding-right:12px!important;padding-bottom:92px!important}
+  #view-owner .ownerTodayMain>*,#view-owner .ownerTodayMain section{width:100%;max-width:100%;min-width:0}
+  #view-owner .ownerTodayMain [style*="grid-template-columns"]{min-width:0}
+  #view-owner .ownerTodayMain table{width:100%;max-width:100%;table-layout:fixed}
+  #view-owner .ownerTodayMain td,#view-owner .ownerTodayMain th{min-width:0;overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere}
+  #view-owner .ownerTodayMain [class*="job"] h1,#view-owner .ownerTodayMain [class*="job"] h2,#view-owner .ownerTodayMain [class*="job"] h3,
+  #view-owner .ownerTodayMain [class*="Job"] h1,#view-owner .ownerTodayMain [class*="Job"] h2,#view-owner .ownerTodayMain [class*="Job"] h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #view-owner .ownerTodayMain [class*="job"] button,#view-owner .ownerTodayMain [class*="Job"] button{flex:0 0 auto}
+  #view-owner .ownerTodayMain .ownerTodayHero{grid-template-columns:1fr!important}
+}
+@media(min-width:721px){
+  #view-owner .ownerTodayMain{min-width:0;overflow-x:hidden}
+  #view-owner .ownerTodayMain table{max-width:100%}
+}
