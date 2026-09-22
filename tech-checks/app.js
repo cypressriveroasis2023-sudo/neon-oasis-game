@@ -2220,7 +2220,21 @@ function ownerBoardServiceTechCard(tech){
 }
 
 function ownerTruckEditorTech(id){
-  return (state.ownerTechCommandBoard?.service_techs||[]).find(t=>String(t.service_tech_id)===String(id));
+  const rows=state.ownerTechCommandBoard?.service_techs
+    || state.ownerTechCommandBoard?.service_technicians
+    || state.ownerTechCommandBoard?.technicians
+    || [];
+  return rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id));
+}
+async function ownerTruckEditorFetch(id){
+  let tech=ownerTruckEditorTech(id);
+  if(tech)return tech;
+  const {data,error}=await db.rpc('it_service_truck_inventory_v1');
+  if(error)throw error;
+  const rows=Array.isArray(data)?data:[];
+  const row=rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id));
+  if(!row)throw new Error('Truck inventory could not be found.');
+  return row;
 }
 function ownerTruckEditorHtml(tech){
   const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{};
@@ -2240,18 +2254,23 @@ document.addEventListener('click',function(e){
   e.preventDefault();e.stopPropagation();
   ownerToggleTruckInventoryEditor(btn.getAttribute('data-owner-truck-edit'));
 },true);
-function ownerToggleTruckInventoryEditor(id){
+async function ownerToggleTruckInventoryEditor(id){
   const host=document.getElementById('ownerTruckEditor_'+id);
   if(!host){alert('Truck inventory editor could not open. Refresh the page and try again.');return;}
   const isOpen=host.dataset.open==='true';
   if(isOpen){host.dataset.open='false';host.innerHTML='';host.style.display='none';return;}
-  const tech=ownerTruckEditorTech(id);if(!tech)return alert('Truck inventory could not be found.');
-  host.innerHTML=ownerTruckEditorHtml(tech);
-  host.dataset.open='true';
-  host.hidden=false;
-  host.removeAttribute('hidden');
-  host.style.display='block';
-  requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'nearest'}));
+  host.dataset.open='loading';host.style.display='block';
+  host.innerHTML='<div class="ownerTruckEditorHead"><div><b>LOADING TRUCK INVENTORY…</b><span>Getting the current permanent truck record.</span></div></div>';
+  try{
+    const tech=await ownerTruckEditorFetch(id);
+    host.innerHTML=ownerTruckEditorHtml(tech);
+    host.dataset.open='true';
+    host.style.display='block';
+    requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'nearest'}));
+  }catch(error){
+    host.dataset.open='false';host.style.display='none';host.innerHTML='';
+    alert(error?.message||'Truck inventory could not be found.');
+  }
 }
 async function ownerTruckInventorySaved(message){
   await refreshData();
