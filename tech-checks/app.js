@@ -358,19 +358,71 @@ function updateItWelcome() {
   clearInterval(window.itWelcomeClockTimer);
   window.itWelcomeClockTimer = setInterval(renderClock, 30000);
 }
+const TECHCHECK_LAST_GPS_KEY='techcheck:last-gps-v1';
+function techCheckLastGps(){
+  try{
+    const value=JSON.parse(localStorage.getItem(TECHCHECK_LAST_GPS_KEY)||'null');
+    return value&&Number.isFinite(Number(value.latitude))&&Number.isFinite(Number(value.longitude))?value:null;
+  }catch{return null;}
+}
+function techCheckCoordsNear(a,b){
+  if(!a||!b)return false;
+  return Math.abs(Number(a.latitude)-Number(b.latitude))<0.012
+    && Math.abs(Number(a.longitude)-Number(b.longitude))<0.012;
+}
+function techCheckGpsPosition(force=false){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation)return reject(new Error('This device does not support GPS location.'));
+    navigator.geolocation.getCurrentPosition(
+      position=>{
+        const coords={
+          latitude:Number(position.coords.latitude),
+          longitude:Number(position.coords.longitude),
+          accuracy:Number(position.coords.accuracy||0),
+          captured_at:Date.now()
+        };
+        try{localStorage.setItem(TECHCHECK_LAST_GPS_KEY,JSON.stringify(coords));}catch{}
+        resolve(coords);
+      },
+      error=>{
+        const cached=techCheckLastGps();
+        if(!force&&cached&&Date.now()-Number(cached.captured_at||0)<60*60*1000*2)return resolve({...cached,cached:true});
+        const message=error?.code===1
+          ? 'Location permission is off. Allow Location Access for Tech Check to show local weather.'
+          : 'Your GPS location could not be read right now.';
+        reject(new Error(message));
+      },
+      {enableHighAccuracy:true,timeout:12000,maximumAge:force?0:120000}
+    );
+  });
+}
+async function techCheckWeatherForGps(coords,days=7){
+  const lat=encodeURIComponent(Number(coords.latitude).toFixed(5));
+  const lon=encodeURIComponent(Number(coords.longitude).toFixed(5));
+  const url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon
+    +'&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m'
+    +'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
+    +'&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days='+Math.max(1,Math.min(7,Number(days)||7));
+  const response=await fetch(url,{cache:'no-store'});
+  if(!response.ok)throw new Error('Local weather is unavailable right now.');
+  const data=await response.json();
+  data._gps={latitude:Number(coords.latitude),longitude:Number(coords.longitude),accuracy:Number(coords.accuracy||0),cached:Boolean(coords.cached)};
+  return data;
+}
+
 async function updateItWeather() {
   const weather = $('itWeatherNow');
   if (!weather) return;
+  weather.textContent='Reading GPS for local weather…';
   try {
-    const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=29.7858&longitude=-95.8244&current=temperature_2m,apparent_temperature,weather_code&temperature_unit=fahrenheit&timezone=America%2FChicago');
-    if (!response.ok) throw new Error('weather unavailable');
-    const data = await response.json();
-    const current = data.current || {};
-    const code = Number(current.weather_code);
-    const condition = code === 0 ? 'Clear' : code <= 3 ? 'Partly cloudy' : code <= 48 ? 'Cloudy' : code <= 67 ? 'Rain' : code <= 77 ? 'Wintry' : code <= 82 ? 'Showers' : 'Storms';
-    weather.textContent = `${Math.round(current.temperature_2m)}°F · ${condition} · Feels ${Math.round(current.apparent_temperature)}°`;
+    const coords=await techCheckGpsPosition();
+    const data=await techCheckWeatherForGps(coords,1);
+    const current=data.current||{};
+    const code=Number(current.weather_code);
+    const condition=code===0?'Clear':code<=3?'Partly cloudy':code<=48?'Cloudy':code<=67?'Rain':code<=77?'Wintry':code<=82?'Showers':'Storms';
+    weather.textContent=`${Math.round(Number(current.temperature_2m||0))}°F · ${condition} · Feels ${Math.round(Number(current.apparent_temperature||0))}° · GPS`;
   } catch (error) {
-    weather.textContent = 'Katy weather unavailable';
+    weather.textContent=error?.message||'Local GPS weather unavailable';
   }
 }
 function configureTabs() {
@@ -386,6 +438,18 @@ function show(which) {
     $('view-' + n).classList.toggle('hidden', n !== which);
     $('tab-' + n).classList.toggle('on', n === which);
   });
+  const techScroll=which==='it'||which==='svc';
+  document.documentElement.classList.toggle('tech-scroll-enabled',techScroll);
+  document.body.classList.toggle('tech-scroll-enabled',techScroll);
+  if(techScroll){
+    document.documentElement.style.setProperty('overflow-y','auto','important');
+    document.body.style.setProperty('overflow-y','auto','important');
+    document.body.style.setProperty('height','auto','important');
+  }else{
+    document.documentElement.style.removeProperty('overflow-y');
+    document.body.style.removeProperty('overflow-y');
+    document.body.style.removeProperty('height');
+  }
   window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
@@ -2166,18 +2230,17 @@ function ownerWeatherMeta(code,isDay=1){
   return {icon:'🌤️',label:'Weather',kind:'cloud'};
 }
 async function ownerEnsureWeather(force=false){
-  const fresh=state.ownerWeatherData&&Date.now()-Number(state.ownerWeatherLoadedAt||0)<20*60*1000;
-  if(fresh&&!force){ownerRenderWeather();return state.ownerWeatherData;}
   const host=document.getElementById('ownerTodayWeatherHost');
-  if(host&&!state.ownerWeatherData)host.innerHTML='<div class="ownerWeatherLoading">Loading Katy forecast…</div>';
+  if(host&&!state.ownerWeatherData)host.innerHTML='<div class="ownerWeatherLoading">Reading your GPS location for local weather…</div>';
   try{
-    const url='https://api.open-meteo.com/v1/forecast?latitude=29.7858&longitude=-95.8244&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago&forecast_days=7';
-    const response=await fetch(url,{cache:'no-store'});
-    if(!response.ok)throw new Error('Forecast unavailable');
-    state.ownerWeatherData=await response.json();
+    const coords=await techCheckGpsPosition(force);
+    const cachedGps=state.ownerWeatherData?._gps;
+    const fresh=state.ownerWeatherData&&Date.now()-Number(state.ownerWeatherLoadedAt||0)<20*60*1000&&techCheckCoordsNear(coords,cachedGps);
+    if(fresh&&!force){ownerRenderWeather();return state.ownerWeatherData;}
+    state.ownerWeatherData=await techCheckWeatherForGps(coords,7);
     state.ownerWeatherLoadedAt=Date.now();
   }catch(error){
-    if(host)host.innerHTML='<div class="ownerWeatherError"><b>Weather unavailable</b><span>Katy forecast could not be loaded right now.</span></div>';
+    if(host)host.innerHTML='<div class="ownerWeatherError"><b>Location needed for weather</b><span>'+esc(error?.message||'Your GPS location could not be read.')+'</span><button class="mini" type="button" onclick="ownerEnsureWeather(true)">USE MY CURRENT LOCATION</button></div>';
     return null;
   }
   ownerRenderWeather();
@@ -2203,7 +2266,10 @@ function ownerRenderWeather(){
   const high=Math.round(Number(data.daily?.temperature_2m_max?.[0]||current.temperature_2m||0));
   const low=Math.round(Number(data.daily?.temperature_2m_min?.[0]||current.temperature_2m||0));
   const rain=Math.round(Number(data.daily?.precipitation_probability_max?.[0]||0));
-  host.innerHTML='<section class="ownerWeatherNow '+meta.kind+'"><div class="ownerWeatherIcon">'+meta.icon+'</div><div class="ownerWeatherCurrent"><span>KATY WEATHER</span><div><b>'+Math.round(Number(current.temperature_2m||0))+'°</b><strong>'+esc(meta.label)+'</strong></div><small>Feels '+Math.round(Number(current.apparent_temperature||0))+'° · Wind '+Math.round(Number(current.wind_speed_10m||0))+' mph</small></div><div class="ownerWeatherToday"><span>TODAY</span><b>'+todayMeta.icon+' '+high+'° / '+low+'°</b><small>'+rain+'% chance of rain</small></div></section>'+ownerWeatherForecastHtml(data);
+  const gps=data._gps||{};
+  const accuracy=Number(gps.accuracy||0);
+  const locationLine=(gps.cached?'LAST GPS LOCATION':'CURRENT GPS LOCATION')+(accuracy?' · ±'+Math.round(accuracy)+' m':'');
+  host.innerHTML='<section class="ownerWeatherNow '+meta.kind+'"><div class="ownerWeatherIcon">'+meta.icon+'</div><div class="ownerWeatherCurrent"><span>LOCAL WEATHER · GPS</span><div><b>'+Math.round(Number(current.temperature_2m||0))+'°</b><strong>'+esc(meta.label)+'</strong></div><small>Feels '+Math.round(Number(current.apparent_temperature||0))+'° · Wind '+Math.round(Number(current.wind_speed_10m||0))+' mph</small><em>'+esc(locationLine)+'</em></div><div class="ownerWeatherToday"><span>TODAY</span><b>'+todayMeta.icon+' '+high+'° / '+low+'°</b><small>'+rain+'% chance of rain</small></div></section>'+ownerWeatherForecastHtml(data);
 }
 function ownerTodayGreeting(){
   const h=new Date().getHours();
@@ -2251,7 +2317,7 @@ function ownerTodayJobsHtml(){
 function ownerAppToday(){
   const greeting=ownerTodayGreeting()+', '+ownerTodayName();
   return '<section class="ownerTodayHero"><div class="ownerTodayWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>Here’s what is happening today.</p></div><div class="ownerTodayClockCard"><div id="ownerTodayClock" class="ownerTodayClock">--:--:--</div><span id="ownerTodayDate"></span></div></section>'
-    +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading Katy forecast…</div>')+'</div>'
+    +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Reading your GPS location for local weather…</div>')+'</div>'
     +ownerTodayReadinessHtml()
     +ownerTodayJobsHtml();
 }
@@ -2843,6 +2909,7 @@ Object.assign(window, {
   ownerCalendarSelect,
   ownerCalendarNewJob,
   ownerCalendarServiceOrder,
+  ownerEnsureWeather,
   ownerAppRunHistory,
   ownerAppFilterUnits,
   ownerAppShowTechHistory,
