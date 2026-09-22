@@ -7624,3 +7624,12 @@ html,body{max-width:100%;overflow-x:hidden}
 @media(prefers-reduced-motion:reduce){
   #view-owner .ownerAppSidebar,#view-owner .ownerMobileMenuBackdrop{transition:none!important}
 }
+
+
+/* v20260922x — Owner iPhone header cleanup after moving navigation */
+@media(max-width:720px){
+  body:has(#view-owner:not(.hidden)) #appView>.mobileTop{display:none!important}
+  body:has(#view-owner:not(.hidden)) #appView{padding-top:0!important}
+  #view-owner .ownerAppShell{padding-top:64px!important}
+  #view-owner .ownerMobileMenuButton{top:calc(10px + env(safe-area-inset-top))!important}
+}
