@@ -6571,3 +6571,480 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* Owner Today + centered Team + bright calendar v241 */
+:root{
+  --owner-bright-red:#ff3b30;
+  --owner-bright-green:#32d74b;
+  --owner-white:#ffffff;
+  --owner-soft-white:#eaf2f6;
+  --owner-muted-white:#c7d4db;
+}
+
+/* Center and auto-flow Service tech cards. */
+#view-owner .ownerCmdSummary,
+#view-owner .ownerCmdBoardMeta,
+#view-owner .ownerCmdITSection{
+  max-width:1500px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+#view-owner .ownerCmdTechGrid{
+  width:100%!important;
+  max-width:1500px!important;
+  margin:0 auto!important;
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit,minmax(330px,390px))!important;
+  justify-content:center!important;
+  align-items:start!important;
+  gap:16px!important;
+}
+#view-owner .ownerCmdTechCard{width:100%!important;max-width:390px!important}
+
+/* Bright Owner status colors. */
+#view-owner .ownerCmdTechCard.ready{
+  border-color:#278f4a!important;
+  box-shadow:inset 5px 0 0 var(--owner-bright-green),0 16px 34px rgba(0,0,0,.22)!important;
+}
+#view-owner .ownerCmdTechCard.notReady{
+  border-color:#a83530!important;
+  box-shadow:inset 5px 0 0 var(--owner-bright-red),0 16px 34px rgba(0,0,0,.22)!important;
+}
+#view-owner .ownerCmdTechHead>strong.ready{
+  background:#123e24!important;
+  border-color:var(--owner-bright-green)!important;
+  color:#baffc9!important;
+}
+#view-owner .ownerCmdTechHead>strong.danger{
+  background:#4a1412!important;
+  border-color:var(--owner-bright-red)!important;
+  color:#ffd0cc!important;
+}
+#view-owner .ownerCmdReadyRow.good>b,
+#view-owner .ownerCmdStockRow.good>b{color:#a6ffb4!important}
+#view-owner .ownerCmdReadyRow.good>b i,
+#view-owner .ownerCmdUnitRow.good>i,
+#view-owner .ownerCmdStockRow.good>i{background:var(--owner-bright-green)!important;color:#07160c!important}
+#view-owner .ownerCmdReadyRow.bad>b,
+#view-owner .ownerCmdUnitRow.bad>b,
+#view-owner .ownerCmdStockRow.bad>b{color:#ffaaa4!important}
+#view-owner .ownerCmdReadyRow.bad>b i,
+#view-owner .ownerCmdUnitRow.bad>i,
+#view-owner .ownerCmdStockRow.bad>i{background:var(--owner-bright-red)!important;color:#fff!important}
+#view-owner .ownerCmdMissingBanner,
+#view-owner .ownerCmdRestock{border-color:var(--owner-bright-red)!important}
+#view-owner .ownerCmdMissingBanner b,
+#view-owner .ownerCmdRestock b{color:#ffb0aa!important}
+
+/* White, readable type on all dark Owner surfaces. */
+#view-owner .ownerCmdTechCard,
+#view-owner .ownerCmdTechCard *,
+#view-owner .ownerCalBoard,
+#view-owner .ownerCalBoard *,
+#view-owner .ownerCalAgenda,
+#view-owner .ownerCalAgenda *,
+#view-owner .ownerCalInspector,
+#view-owner .ownerCalInspector *,
+#view-owner .ownerCalDayView,
+#view-owner .ownerCalDayView *,
+#view-owner .ownerTodayHero,
+#view-owner .ownerTodayHero *,
+#view-owner .ownerTodayPanel,
+#view-owner .ownerTodayPanel *,
+#view-owner .ownerTodayWeatherHost,
+#view-owner .ownerTodayWeatherHost *{
+  color:var(--owner-white);
+}
+#view-owner .ownerCmdTechCard small,
+#view-owner .ownerCmdTechCard span,
+#view-owner .ownerCalBoard small,
+#view-owner .ownerCalBoard span,
+#view-owner .ownerCalAgenda small,
+#view-owner .ownerCalAgenda span,
+#view-owner .ownerCalInspector small,
+#view-owner .ownerCalInspector span,
+#view-owner .ownerTodayPanel small,
+#view-owner .ownerTodayPanel span{
+  color:var(--owner-muted-white)!important;
+}
+
+/* Owner Today is a real home dashboard, not a duplicate of Team. */
+#view-owner .ownerTodayHero{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);
+  gap:14px;
+  margin:0 0 14px;
+}
+#view-owner .ownerTodayWelcome,
+#view-owner .ownerTodayClockCard{
+  min-height:176px;
+  border:1px solid #2c4450;
+  border-radius:16px;
+  background:linear-gradient(135deg,#0f2029 0%,#0a151c 100%);
+  box-shadow:0 20px 45px rgba(0,0,0,.2);
+}
+#view-owner .ownerTodayWelcome{
+  padding:24px 26px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+#view-owner .ownerTodayWelcome>span{
+  color:#ff6a62!important;
+  font-size:9px;
+  font-weight:1000;
+  letter-spacing:.16em;
+}
+#view-owner .ownerTodayWelcome h1{
+  margin:8px 0 5px!important;
+  color:#fff!important;
+  font-size:clamp(34px,3.5vw,58px)!important;
+  line-height:1!important;
+  letter-spacing:-.04em!important;
+}
+#view-owner .ownerTodayWelcome p{
+  margin:0!important;
+  color:#c8d5dc!important;
+  font-size:14px!important;
+}
+#view-owner .ownerTodayClockCard{
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  text-align:right;
+}
+#view-owner .ownerTodayClock{
+  color:#fff!important;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace!important;
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(38px,4.2vw,66px)!important;
+  line-height:.95!important;
+  font-weight:900!important;
+  letter-spacing:-.06em!important;
+  text-shadow:0 0 22px rgba(255,255,255,.06);
+  white-space:nowrap;
+}
+#view-owner .ownerTodayClockCard>span{
+  margin-top:10px;
+  color:#c1cfd6!important;
+  font-size:11px!important;
+  font-weight:850;
+}
+#view-owner .ownerTodayWeatherHost{
+  width:100%;
+  margin:0 0 14px;
+}
+#view-owner .ownerWeatherNow{
+  min-height:146px;
+  padding:18px 20px;
+  display:grid;
+  grid-template-columns:92px minmax(0,1fr) auto;
+  gap:18px;
+  align-items:center;
+  border:1px solid #2b4450;
+  border-radius:15px 15px 0 0;
+  background:linear-gradient(135deg,#102630,#0d1920);
+}
+#view-owner .ownerWeatherNow.sun{background:linear-gradient(135deg,#183243,#13232b)}
+#view-owner .ownerWeatherNow.rain,
+#view-owner .ownerWeatherNow.storm{background:linear-gradient(135deg,#172536,#0c171f)}
+#view-owner .ownerWeatherIcon{
+  width:82px;height:82px;
+  display:grid;place-items:center;
+  border-radius:22px;
+  background:rgba(255,255,255,.07);
+  font-size:54px;
+}
+#view-owner .ownerWeatherCurrent>span,
+#view-owner .ownerWeatherToday>span{
+  display:block;
+  color:#93a9b4!important;
+  font-size:8px!important;
+  font-weight:1000!important;
+  letter-spacing:.14em!important;
+}
+#view-owner .ownerWeatherCurrent>div{
+  display:flex;align-items:baseline;gap:14px;margin:4px 0 2px;
+}
+#view-owner .ownerWeatherCurrent>div>b{
+  color:#fff!important;
+  font-size:50px!important;
+  line-height:1!important;
+}
+#view-owner .ownerWeatherCurrent>div>strong{
+  color:#fff!important;
+  font-size:19px!important;
+}
+#view-owner .ownerWeatherCurrent>small,
+#view-owner .ownerWeatherToday>small{
+  color:#c9d6dc!important;
+  font-size:10px!important;
+}
+#view-owner .ownerWeatherToday{
+  min-width:170px;
+  padding:13px 16px;
+  border-left:1px solid #304954;
+}
+#view-owner .ownerWeatherToday>b{
+  display:block;
+  margin:5px 0 3px;
+  color:#fff!important;
+  font-size:18px!important;
+}
+#view-owner .ownerWeatherWeek{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  overflow:hidden;
+  border:1px solid #2b4450;
+  border-top:0;
+  border-radius:0 0 15px 15px;
+  background:#0e1a21;
+}
+#view-owner .ownerWeatherDay{
+  min-height:118px;
+  padding:11px 8px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-right:1px solid #233943;
+  text-align:center;
+}
+#view-owner .ownerWeatherDay:last-child{border-right:0}
+#view-owner .ownerWeatherDay>span{
+  color:#a7bac3!important;
+  font-size:7px!important;
+  font-weight:1000!important;
+  letter-spacing:.08em!important;
+}
+#view-owner .ownerWeatherDay>i{
+  margin:5px 0 2px;
+  font-style:normal;
+  font-size:28px;
+}
+#view-owner .ownerWeatherDay>b{color:#fff!important;font-size:17px!important}
+#view-owner .ownerWeatherDay>small{color:#c3d0d6!important;font-size:8px!important}
+#view-owner .ownerWeatherDay>em{
+  margin-top:5px;
+  color:#8ed0ff!important;
+  font-style:normal;
+  font-size:7px!important;
+  font-weight:850;
+}
+#view-owner .ownerWeatherLoading,
+#view-owner .ownerWeatherError{
+  min-height:110px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  border:1px solid #2b4450;
+  border-radius:14px;
+  background:#0e1a21;
+  color:#fff;
+}
+#view-owner .ownerTodayPanel{
+  width:100%;
+  margin:0 0 14px;
+  padding:16px;
+  border:1px solid #2a424e;
+  border-radius:14px;
+  background:#0e1a21;
+}
+#view-owner .ownerTodayPanel>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+#view-owner .ownerTodayPanel>header span{
+  display:block;
+  color:#ff6259!important;
+  font-size:8px!important;
+  font-weight:1000!important;
+  letter-spacing:.14em!important;
+}
+#view-owner .ownerTodayPanel>header h2{
+  margin:2px 0 0!important;
+  color:#fff!important;
+  font-size:22px!important;
+}
+#view-owner .ownerTodayPanel>header button{
+  width:auto!important;
+  min-height:36px!important;
+  background:#182933!important;
+  border:1px solid #3a5562!important;
+  color:#fff!important;
+}
+#view-owner .ownerTodayReadinessGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:9px;
+}
+#view-owner .ownerTodayReadyCard{
+  min-height:78px;
+  padding:11px 12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  border:1px solid #334b56;
+  border-left:4px solid var(--owner-bright-red);
+  border-radius:9px;
+  background:#101f27;
+}
+#view-owner .ownerTodayReadyCard.ready{border-left-color:var(--owner-bright-green)}
+#view-owner .ownerTodayReadyCard>div:first-child b{display:block;color:#fff!important;font-size:12px!important}
+#view-owner .ownerTodayReadyCard>div:first-child span{display:block;margin-top:3px;font-size:8px!important;font-weight:1000!important}
+#view-owner .ownerTodayReadyCard.ready>div:first-child span{color:#a8ffb9!important}
+#view-owner .ownerTodayReadyCard.notReady>div:first-child span{color:#ff9b94!important}
+#view-owner .ownerTodayReadyChecks{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+#view-owner .ownerTodayReadyChecks i{
+  padding:4px 6px;
+  border-radius:5px;
+  font-style:normal;
+  font-size:7px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+#view-owner .ownerTodayReadyChecks i.good{background:#123d22;color:#a8ffb9!important;border:1px solid var(--owner-bright-green)}
+#view-owner .ownerTodayReadyChecks i.bad{background:#441513;color:#ffb3ae!important;border:1px solid var(--owner-bright-red)}
+#view-owner .ownerTodayMiniStats{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+  margin-bottom:10px;
+}
+#view-owner .ownerTodayMiniStats>div{
+  min-height:58px;
+  padding:9px 11px;
+  border:1px solid #2b414d;
+  border-radius:8px;
+  background:#101f27;
+}
+#view-owner .ownerTodayMiniStats b{display:block;color:#fff!important;font-size:20px!important}
+#view-owner .ownerTodayMiniStats span{color:#aebdc5!important;font-size:7px!important;font-weight:950!important}
+#view-owner .ownerTodayJobsList{display:grid;gap:8px}
+
+/* Brighter Calendar: IT red, Service green, high-contrast text. */
+#view-owner .ownerCalEvent.it,
+#view-owner .ownerCalAgendaJob.it,
+#view-owner .ownerCalDayJob.it{border-left-color:var(--owner-bright-red)!important}
+#view-owner .ownerCalEvent.service,
+#view-owner .ownerCalAgendaJob.service,
+#view-owner .ownerCalDayJob.service{border-left-color:var(--owner-bright-green)!important}
+#view-owner .ownerCalEvent.complete,
+#view-owner .ownerCalDayJob.complete{box-shadow:inset 0 0 0 1px rgba(50,215,75,.35)!important}
+#view-owner .ownerCalControlBar button.active,
+#view-owner .ownerCalRoleFilters button.active,
+#view-owner .ownerCalModes button.active{
+  border-color:var(--owner-bright-red)!important;
+  background:var(--owner-bright-red)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+#view-owner .ownerCalDay.selected{box-shadow:inset 0 0 0 2px var(--owner-bright-red)!important}
+#view-owner .ownerCalDate em{background:var(--owner-bright-red)!important}
+#view-owner .ownerCalDayJob{
+  width:100%;
+  min-height:92px;
+  display:grid;
+  grid-template-columns:112px minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  padding:13px 14px;
+  border:1px solid #304a56;
+  border-left:5px solid var(--owner-bright-green);
+  border-radius:10px;
+  background:#102029;
+  text-align:left;
+  cursor:pointer;
+}
+#view-owner .ownerCalDayJob:hover{background:#142a34}
+#view-owner .ownerCalDayJob.selected{box-shadow:inset 0 0 0 1px #6a8796}
+#view-owner .ownerCalDayTime{
+  min-height:58px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  border-right:1px solid #304854;
+}
+#view-owner .ownerCalDayTime>b{color:#fff!important;font-size:16px!important}
+#view-owner .ownerCalDayTime>span{margin-top:4px;color:#b9c8cf!important;font-size:7px!important;font-weight:1000!important}
+#view-owner .ownerCalDayJobMain{min-width:0}
+#view-owner .ownerCalDayJobMain>span{color:#a8bac3!important;font-size:7px!important;font-weight:1000!important;letter-spacing:.08em!important}
+#view-owner .ownerCalDayJobMain>h3{margin:3px 0!important;color:#fff!important;font-size:15px!important}
+#view-owner .ownerCalDayJobMain>p{margin:0!important;color:#c9d6dc!important;font-size:9px!important;line-height:1.35!important}
+#view-owner .ownerCalDayJobState{text-align:right}
+#view-owner .ownerCalDayJobState>b{display:block;color:#fff!important;font-size:8px!important}
+#view-owner .ownerCalDayJobState>span{
+  display:inline-block;margin-top:5px;padding:4px 6px;border-radius:5px;background:#243945;color:#fff!important;font-size:7px!important;font-weight:1000!important
+}
+#view-owner .ownerCalDayView>header{
+  min-height:78px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom:1px solid #2a424d;
+  background:#101f27;
+}
+#view-owner .ownerCalDayView>header span{display:block;color:#ff6c64!important;font-size:8px!important;font-weight:1000!important;letter-spacing:.13em!important}
+#view-owner .ownerCalDayView>header h2{margin:3px 0 0!important;color:#fff!important;font-size:20px!important}
+#view-owner .ownerCalDayView>header strong{color:#fff!important;font-size:10px!important}
+#view-owner .ownerCalDayJobs{display:grid;gap:9px;padding:10px}
+#view-owner .ownerCalDayEmpty{padding:28px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+#view-owner .ownerCalDayEmpty b{color:#fff!important;font-size:15px!important}
+#view-owner .ownerCalDayEmpty span{color:#c6d4da!important;font-size:10px!important}
+#view-owner .ownerCalDayEmpty button{width:auto!important;min-width:150px!important}
+
+/* Do not let older large-screen rules break centered auto-fit cards. */
+@media(min-width:1500px){
+  #view-owner .ownerCmdTechGrid{
+    grid-template-columns:repeat(auto-fit,minmax(340px,390px))!important;
+    justify-content:center!important;
+  }
+}
+@media(max-width:980px){
+  #view-owner .ownerTodayHero{grid-template-columns:1fr!important}
+  #view-owner .ownerTodayClockCard{align-items:flex-start!important;text-align:left!important}
+  #view-owner .ownerWeatherNow{grid-template-columns:76px minmax(0,1fr)!important}
+  #view-owner .ownerWeatherToday{grid-column:1/-1;border-left:0!important;border-top:1px solid #304954;padding:12px 0 0!important}
+  #view-owner .ownerWeatherWeek{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  #view-owner .ownerWeatherDay:nth-child(4){border-right:0}
+}
+@media(max-width:720px){
+  #view-owner .ownerCmdTechGrid{
+    grid-template-columns:minmax(0,1fr)!important;
+    justify-content:stretch!important;
+  }
+  #view-owner .ownerCmdTechCard{max-width:none!important}
+  #view-owner .ownerTodayWelcome,
+  #view-owner .ownerTodayClockCard{min-height:145px!important;padding:18px!important}
+  #view-owner .ownerTodayWelcome h1{font-size:34px!important}
+  #view-owner .ownerTodayClock{font-size:38px!important}
+  #view-owner .ownerWeatherNow{padding:14px!important;gap:12px!important}
+  #view-owner .ownerWeatherIcon{width:64px;height:64px;font-size:42px}
+  #view-owner .ownerWeatherCurrent>div>b{font-size:40px!important}
+  #view-owner .ownerWeatherCurrent>div>strong{font-size:15px!important}
+  #view-owner .ownerWeatherWeek{
+    grid-template-columns:repeat(7,104px)!important;
+    overflow-x:auto!important;
+  }
+  #view-owner .ownerWeatherDay{min-height:106px!important}
+  #view-owner .ownerTodayPanel{padding:12px!important}
+  #view-owner .ownerTodayPanel>header{align-items:flex-start!important}
+  #view-owner .ownerTodayMiniStats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #view-owner .ownerCalDayJob{
+    grid-template-columns:78px minmax(0,1fr)!important;
+    gap:9px!important;
+    padding:11px!important;
+  }
+  #view-owner .ownerCalDayJobState{grid-column:2;text-align:left!important}
+}
