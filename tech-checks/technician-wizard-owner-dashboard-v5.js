@@ -2411,29 +2411,34 @@ async function itFindJobByTicket() {
     ||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
 
   if(!a){
-    const {data:waitingReturns,error:returnError}=await liveDb.from('unit_returns')
-      .select('id,ticket_no,unit_tag,equipment_type,status,returned_at')
-      .eq('ticket_no',ticket)
-      .eq('status','waiting_it')
-      .order('returned_at',{ascending:true})
-      .limit(10);
-    if(returnError)return alert(returnError.message);
-    if(waitingReturns?.length){
-      const first=waitingReturns[0];
+    const [returnsResult,siteResult]=await Promise.allSettled([
+      liveDb.from('unit_returns')
+        .select('id,ticket_no,unit_tag,equipment_type,status,returned_at')
+        .eq('ticket_no',ticket)
+        .eq('status','waiting_it')
+        .order('returned_at',{ascending:true})
+        .limit(10),
+      swapSiteRegistrationRows()
+    ]);
+    const waitingReturns=returnsResult.status==='fulfilled'&&!returnsResult.value.error ? (returnsResult.value.data||[]) : [];
+    const siteTasks=siteResult.status==='fulfilled' ? (siteResult.value||[]).filter(row=>norm(row.ticket_no)===norm(ticket)) : [];
+
+    if(waitingReturns.length||siteTasks.length){
+      const siteHtml=siteTasks.map(row=>`<div class='wl-it-good top10'><b>SITE REGISTRATION REQUIRED</b><div class='small'>${esc(row.equipment_type||'Unit')} ${esc(row.unit_tag||'')} · ${esc(row.site||'Customer site')}</div><button class='wl-it-start top10' data-wl-confirm-swap-site='${esc(row.id)}' data-wl-swap-site-label='${esc((row.equipment_type||'Unit')+' '+(row.unit_tag||''))}' data-wl-swap-site='${esc(row.site||'Customer site')}'>CONFIRM SITE REGISTRATION</button></div>`).join('');
+      const returnHtml=waitingReturns.length ? `<div class='wl-it-good top10'><b>IT INTAKE REQUIRED · ${waitingReturns.length} ITEM${waitingReturns.length===1?'':'S'}</b><div class='small'>Next: ${esc(waitingReturns[0].equipment_type||'Unit')} ${esc(waitingReturns[0].unit_tag||'')}</div><button class='wl-it-start top10' data-wl-intake-start='${waitingReturns[0].id}'>START IT INTAKE</button></div>` : '';
       if(msg)msg.innerHTML=`<div class='wl-it-ticket-found'>
-        <div class='wl-it-step-label'>IT INTAKE READY</div>
+        <div class='wl-it-step-label'>IT FOLLOW-UP FOUND</div>
         <div class='wl-it-ticket-number'>#${esc(ticket)}</div>
-        <div class='wl-it-ticket-site'>${waitingReturns.length} RETURNED ITEM${waitingReturns.length===1?'':'S'} WAITING</div>
-        <div class='wl-it-good'>✓ SERVICE RETURN RECEIVED</div>
-        <div class='small top10'>Next: ${esc(first.equipment_type||'Unit')} ${esc(first.unit_tag||'')}</div>
-        <button class='wl-it-start top10' data-wl-intake-start='${first.id}'>START IT INTAKE</button>
+        <div class='wl-it-ticket-site'>${siteTasks.length?'SWAP FOLLOW-UP':''}${siteTasks.length&&waitingReturns.length?' + ':''}${waitingReturns.length?'RETURN / INTAKE':''}</div>
+        ${siteHtml}${returnHtml}
       </div>`;
       return;
     }
+
     const assignedOther=(data||[]).find(x=>x.assignee_user_id&&x.assignee_user_id!==tech.id);
     if(msg)msg.innerHTML=assignedOther
       ? `<div class='wl-stop'><b>THIS IT JOB IS ASSIGNED TO ANOTHER TECHNICIAN.</b><div>MHelpDesk #${esc(ticket)} cannot be opened under this login.</div></div>`
-      : `<div class='wl-stop'><b>NO IT WORK FOUND FOR #${esc(ticket)}</b><div>No active IT assignment or returned equipment is waiting under this ticket.</div></div>`;
+      : `<div class='wl-stop'><b>NO IT WORK FOUND FOR #${esc(ticket)}</b><div>No active IT assignment, site-registration task, or returned equipment is waiting under this ticket.</div></div>`;
     return;
   }
 
@@ -2477,7 +2482,8 @@ function showNewPrep() {
   if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
   req.style.display = pendingAssignmentManifest.length ? '' : 'none';
   req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment · ${esc(String(pendingAssignmentWorkType || 'service').toUpperCase())}</b><div class='small'>The IT equipment above was prefilled from the Owner assignment. Solar Spotter Delivery support (Solar Stand + Service-selected battery setup) and Ranger solar equipment are handled automatically on the Service side.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}${automaticServiceSolarPlanHtml(pendingAssignmentManifest,pendingAssignmentWorkType)}</div>` : '';
-  nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>Start Unit 1 →</button></div>`;
+  const partsOnlyDraft=expectedPrepItemCount()===0&&ticketPartsTotal(readTicketPartInputs('wlPart'))>0;
+  nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>${partsOnlyDraft?'Review Parts Handoff →':'Start Unit 1 →'}</button></div>`;
   resetWizardPosition();
 }
 function validateCreateStep() {
@@ -2487,7 +2493,9 @@ function validateCreateStep() {
   const unitCount = equipmentManifestDeviceTotal(manifest);
   const standCount = equipmentManifestStandTotal(manifest);
   const totalItems = unitCount + standCount;
-  if (totalItems < 1) { alert('Choose at least one unit/device or stand being sent out.'); return false; }
+  const parts=readTicketPartInputs('wlPart');
+  const partTotal=ticketPartsTotal(parts);
+  if (totalItems < 1 && partTotal < 1) { alert('Choose equipment or at least one loose part for this IT → Service handoff.'); return false; }
   if (expectedUnitCount() !== unitCount) { alert('The Unit Area total does not match the Total Units / Devices field.'); return false; }
   if (pendingAssignmentManifest.length && equipmentManifestKey(manifest) !== equipmentManifestKey(pendingAssignmentManifest)) {
     alert('This assigned job must match the Owner’s Unit Area and Stand Area. If the equipment changed, have the Owner update the assignment before continuing.');
@@ -2631,10 +2639,17 @@ async function renderITIntakeWizard() {
   resetWizardPosition();
 }
 async function showPendingList() {
-  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,created_at,expected_unit_count,prep_items(id)').eq('status', 'draft').order('created_at', { ascending: true });
+  const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,created_at,expected_unit_count,solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,prep_items(id)').eq('status', 'draft').order('created_at', { ascending: true });
   let card = document.getElementById('wlPendingList'); if (!card) { card = document.createElement('div'); card.id = 'wlPendingList'; card.className = 'card'; viewIT().append(card); }
   const rows = data || [];
-  card.innerHTML = `${progress('Pending IT Work', rows.length ? 'Choose a ticket to continue' : 'Nothing is waiting in IT', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows.map(r => { const started=(r.prep_items||[]).length; const total=r.expected_unit_count||started; const next=started<total ? `Next: start equipment item ${started+1} of ${total}` : 'Next: continue the first incomplete check'; return `<div class='wl-ticket'><b>MHelpDesk #${esc(r.ticket_no)}</b><div class='small'>${esc(r.site || 'No site / description')}</div><div class='small'>Equipment items started: ${started} of ${total}</div><div class='ok top8'><b>${esc(next)}</b></div><button class='wl-big wl-blue' data-wl-open-it='${r.id}'>Resume This Prep →</button></div>`; }).join('') || `<div class='ok'><b>No pending prep.</b></div>`}`;
+  card.innerHTML = `${progress('Pending IT Work', rows.length ? 'Choose a ticket to continue' : 'Nothing is waiting in IT', 1, 1)}<button class='wl-back' data-wl-home='it'>← IT Home</button>${rows.map(r => {
+    const started=(r.prep_items||[]).length;
+    const parts=ticketPartsTotal(r);
+    const partsOnly=r.expected_unit_count==null&&started===0&&parts>0;
+    const total=r.expected_unit_count??started;
+    const next=partsOnly?'Next: verify loose parts, photo, and IT signature':started<total?`Next: start equipment item ${started+1} of ${total}`:'Next: continue the first incomplete check';
+    return `<div class='wl-ticket'><b>MHelpDesk #${esc(r.ticket_no)}</b><div class='small'>${esc(r.site || 'No site / description')}</div><div class='small'>${partsOnly?'PARTS-ONLY HANDOFF':`Equipment items started: ${started} of ${total}`}</div><div class='ok top8'><b>${esc(next)}</b></div><button class='wl-big wl-blue' data-wl-open-it='${r.id}'>Resume This ${partsOnly?'Handoff':'Prep'} →</button></div>`;
+  }).join('') || `<div class='ok'><b>No pending prep.</b></div>`}`;
   hideChildren(viewIT(), [card]); resetWizardPosition();
 }
 function findItCard(ticket) {
@@ -2941,6 +2956,27 @@ function isSupport(type) { return window.TechCheckRules?.isSupport ? window.Tech
 function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
 function currentItItem() { return itItems()[itUnitIndex] || null; }
 function itAllowedPurposes(type) { if (type === '110V Stand') return ['SWAP']; if (type === 'Solar Stand') return ['SWAP','DELIVERY']; return ['SWAP','DELIVERY']; }
+
+function itPurposeOptionsForCurrentJob(type) {
+  const workType=String(activeItPrep?.work_type||pendingAssignmentWorkType||'service').toLowerCase();
+  if(workType==='delivery') return itAllowedPurposes(type).includes('DELIVERY') ? [{value:'DELIVERY',label:'DELIVERY'}] : itAllowedPurposes(type).map(value=>({value,label:value}));
+  if(workType==='swap') return itAllowedPurposes(type).includes('SWAP') ? [{value:'SWAP',label:'SWAP'}] : itAllowedPurposes(type).map(value=>({value,label:value}));
+  if(workType==='service'){
+    if(type==='110V Stand') return [{value:'SWAP',label:'YES — REPLACING SITE STAND'}];
+    if(type==='Solar Stand') return [
+      {value:'SWAP',label:'YES — REPLACING SITE STAND'},
+      {value:'DELIVERY',label:'NO — SUPPORT STAND'}
+    ];
+    return [
+      {value:'SWAP',label:'YES — REPLACING SITE UNIT'},
+      {value:'BACKUP',label:'NO — SUPPORT / BACKUP'}
+    ];
+  }
+  return itAllowedPurposes(type).map(value=>({value,label:value}));
+}
+function itPurposeAllowedForCurrentJob(type,purpose) {
+  return itPurposeOptionsForCurrentJob(type).some(row=>row.value===purpose);
+}
 function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; return rows.filter(r => r.kind === kind && String(r.original_name || '').startsWith(prefix)); }
 function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
 function itItemIdentity(item, unitNo) {
@@ -3415,8 +3451,15 @@ async function releaseItPrepUnitByUnit() {
   const items = itItems();
   const evidence = await evidenceRows(activeItPrep.id, 'it');
   const expected = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
-  const ready = items.length === expected && items.every((item, index) => itUnitIssues(item, evidence, index + 1).length === 0);
-  if (!ready) return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
+  const partsOnly=expected===0&&items.length===0&&ticketPartsTotal(activeItPrep)>0;
+  const itemReady = items.length === expected && items.every((item, index) => itUnitIssues(item, evidence, index + 1).length === 0);
+  const partsPhotoReady=!partsOnly || evidence.some(row=>row.kind==='photo'&&!row.prep_item_id);
+  const partsSignatureReady=!partsOnly || evidence.some(row=>row.kind==='signature'&&!row.prep_item_id);
+  const ready=itemReady&&partsPhotoReady&&partsSignatureReady;
+  if (!ready) {
+    if(partsOnly)return alert('Take one clear photo of the loose parts and save the IT final signature before handing them to Service.');
+    return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
+  }
   const button = document.querySelector('[data-wl-send-it]');
   const msg = document.getElementById('wlSendItMsg');
   if (button) { button.disabled = true; button.textContent = 'Creating Service handoff…'; }
@@ -3428,7 +3471,6 @@ async function releaseItPrepUnitByUnit() {
       const { error: verifyError } = await liveDb.rpc('verify_prep_item', { p_item_id: item.id, p_unit_tag: item.unit_tag || '', p_battery_count: Number(item.battery_count || 0), p_power_ok: Boolean(item.power_ok), p_functions_ok: Boolean(item.functions_ok), p_safe_ok: Boolean(item.safe_ok) });
       if (verifyError) throw verifyError;
       if (['DELIVERY','BACKUP'].includes(item.purpose) || (item.equipment_type === 'Sniper' && item.purpose === 'SWAP')) {
-        // Solar Spotter batteries are a Service-side checkout. The legacy delivery RPC still requires this compatibility flag.
         const { error: deliveryError } = await liveDb.rpc('verify_delivery_item_checks', { p_item_id: item.id, p_sim_ok: Boolean(item.delivery_sim_ok), p_camera_app_ok: Boolean(item.delivery_camera_app_ok), p_customer_email_app_ok: Boolean(item.delivery_customer_email_app_ok), p_batteries_charged_ok: item.equipment_type === 'Solar Spotter' ? true : Boolean(item.delivery_batteries_charged_ok), p_monitoring_ok: Boolean(item.delivery_monitoring_ok), p_ticket_count_ok: item.equipment_type === 'Helios' ? true : Boolean(item.delivery_ticket_count_ok), p_sd_formatted_ok: Boolean(item.delivery_sd_formatted_ok), p_recording_ok: Boolean(item.delivery_recording_ok) });
         if (deliveryError) throw deliveryError;
       }
@@ -3441,9 +3483,9 @@ async function releaseItPrepUnitByUnit() {
     itQuestionIndex = 0;
     itUnitPhase = 'type';
     await showITHome();
-    alert(`MHelpDesk Ticket #${ticketNo}: Service handoff created.`);
+    alert(partsOnly ? `MHelpDesk Ticket #${ticketNo}: parts handoff created for Service.` : `MHelpDesk Ticket #${ticketNo}: Service handoff created.`);
   } catch (error) {
-    if (button) { button.disabled = false; button.textContent = 'Hand Off to Service Tech →'; }
+    if (button) { button.disabled = false; button.textContent = partsOnly ? 'Hand Off Parts to Service →' : 'Hand Off to Service Tech →'; }
     if (msg) msg.innerHTML = `<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message || 'Please try again.')}</div></div>`;
   } finally {
     document.body.classList.remove('busy');
@@ -3513,7 +3555,11 @@ async function renderItUnitStep() {
     const spareUnitsCheckedOut=spareUnits.every(row=>Boolean(row.spare_it_checked_out_at));
     const spareBatteriesReady = spareBatteries.every(row => Boolean(row.ready_ok));
     const spareBatteriesCheckedOut = spareBatteries.every(row => Boolean(row.it_checked_out_at));
-    const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut;
+    const partsOnly=totalUnits===0 && items.length===0 && ticketPartsTotal(activeItPrep)>0;
+    const globalItPhotos=ev.filter(row=>row.kind==='photo'&&!row.prep_item_id);
+    const globalItSignature=[...ev].reverse().find(row=>row.kind==='signature'&&!row.prep_item_id);
+    const partsOnlyProofReady=!partsOnly || (globalItPhotos.length>=1 && Boolean(globalItSignature));
+    const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut && partsOnlyProofReady;
 
     if (itFinalView==='parts') {
       wizard.innerHTML=itFinalPartsEditorHtml();
@@ -3524,6 +3570,22 @@ async function renderItUnitStep() {
       wizard.innerHTML=itFinalSparesEditorHtml(spareBatteries,items,ev);
       resetWizardPosition(wizard);
       return;
+    }
+
+    if(partsOnly){
+      wizard.innerHTML =
+        progress('PARTS-ONLY IT HANDOFF', ready ? 'READY — HAND OFF PARTS' : 'Verify the loose parts', 1, 1) +
+        `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div><div class='small'>No whole unit or stand is leaving the shop on this ticket.</div></div>` +
+        itFinalPartsSummaryHtml() +
+        `<div class='wl-question top10'><div class='qnum'>PARTS-ONLY HANDOFF</div><div class='qtext'>VERIFY THE EXACT PARTS AND QUANTITIES</div><div class='small'>Photograph the actual parts IT is giving Service, then sign the ticket-level IT handoff.</div></div>` +
+        await photoOnlyHtml(activeItPrep.id,'it',null,1) +
+        await signatureOnlyHtml(activeItPrep.id,'it',null) +
+        `<div id='wlSendItMsg'></div>` +
+        (ready ? `<div class='ok top10'><b>✓ PARTS HANDOFF READY</b><div>Service will verify these same parts, photo evidence, and quantities before accepting the handoff.</div></div>` : `<div class='wl-stop top10'><b>PHOTO + IT SIGNATURE REQUIRED</b><div>Save one clear parts photo and the IT final sign-off before handing this ticket to Service.</div></div>`) +
+        `<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready?'':'disabled'}>HAND OFF PARTS TO SERVICE →</button>
+        <div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><button class='wl-next' data-wl-it='history'>Status & History →</button></div>`;
+      wizard.querySelectorAll('canvas').forEach(wireCanvas);
+      return resetWizardPosition();
     }
 
     wizard.innerHTML =
@@ -3548,8 +3610,14 @@ async function renderItUnitStep() {
     const supportOptions = STAND_POLE_TYPES.map(type => `<option value='${esc(type)}' ${itTypeChoice === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
     wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, `What type of equipment is Item ${unitNo}?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Equipment Plan</div>${equipmentManifestInlineHtml(activeItPrep)}${unitCountEditor(totalUnits)}</div><div class='wl-question top10'><div class='qtext'>Choose the equipment type</div><select id='wlItUnitType'><option value=''>Choose type…</option><optgroup label='Camera / Unit Types'>${cameraOptions}</optgroup><optgroup label='Stand / Pole Types'>${supportOptions}</optgroup></select></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'purpose') {
-    const purposes = itAllowedPurposes(itTypeChoice);
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `What is Unit ${unitNo} for?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Choose SWAP or DELIVERY</div><div class='wl-options'>${purposes.map(p => `<button class='${itPurposeChoice === p ? 'pass on' : 'pass'}' data-wl-unit-purpose='${p}'>${p}</button>`).join('')}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    const options=itPurposeOptionsForCurrentJob(itTypeChoice);
+    const serviceJob=String(activeItPrep?.work_type||'').toLowerCase()==='service';
+    const question=serviceJob?'IS THIS UNIT REPLACING A UNIT ALREADY AT THE SITE?':'Confirm this unit purpose';
+    const note=serviceJob
+      ? (itTypeChoice==='110V Stand'?'110V Stand is swap-only. If it is not replacing a site stand, the Owner assignment needs to be corrected.':'YES uses the SWAP return path. NO treats the unit as Service support / backup equipment.')
+      : 'Tech Check selected the purpose from the Owner job type.';
+    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, serviceJob?'One simple purpose question':'Confirm unit purpose', 1, 1) +
+      `<div class='wl-question'><div class='qtext'>${esc(question)}</div><div class='wl-options'>${options.map(row => `<button class='${itPurposeChoice === row.value ? 'pass on' : 'pass'}' data-wl-unit-purpose='${row.value}'>${esc(row.label)}</button>`).join('')}</div><div class='wl-note'>${esc(note)}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'recon') {
     wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, 'Recon II camera count', 1, 1) + `<div class='wl-question'><div class='qtext'>How many cameras are going on this Recon II for this deployment?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${Math.max(1, Number(itReconRequired || 1))}'></div><div class='wl-note top8'>Battery quantity is entered separately during the unit check after the Recon II is programmed and ready.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
   } else if (itUnitPhase === 'checks') {
@@ -4676,13 +4744,22 @@ document.addEventListener('click', async e => {
       const value = document.getElementById('wlItUnitType')?.value || '';
       if (!value) return alert('Choose the unit type first.');
       itTypeChoice = value;
+      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
+      if(autoPurpose && itPurposeAllowedForCurrentJob(value,autoPurpose)){
+        itPurposeChoice=autoPurpose;
+        if(value==='Recon 2'){itUnitPhase='recon';return renderItUnitStep();}
+        if(!await configureCurrentItItem())return;
+        itQuestionIndex=0;
+        itUnitPhase='checks';
+        return renderItUnitStep();
+      }
       itPurposeChoice = '';
       itUnitPhase = 'purpose';
       return renderItUnitStep();
     }
     if (itUnitPhase === 'purpose') {
       if (!itPurposeChoice) return alert('Choose BACKUP, SWAP, or DELIVERY first.');
-      if (!itAllowedPurposes(itTypeChoice).includes(itPurposeChoice)) return alert('That purpose is not available for this equipment type.');
+      if (!itPurposeAllowedForCurrentJob(itTypeChoice,itPurposeChoice)) return alert('That purpose is not available for this equipment type and job.');
       if (itTypeChoice === 'Recon 2') { itUnitPhase = 'recon'; return renderItUnitStep(); }
       if (!await configureCurrentItItem()) return;
       itQuestionIndex = 0;
@@ -5030,6 +5107,10 @@ document.addEventListener('click', async e => {
       }));
       if (tagScan && itemId) await saveItTagScan(itemId,tagScan);
       if (panel.dataset.stage === 'it' && unitNo && activeItPrep) {
+        activeItPrep = await getPrep(activeItPrep.id);
+        return renderItUnitStep();
+      }
+      if (panel.dataset.stage === 'it' && !unitNo && activeItPrep?.id === panel.dataset.proof && activeItPrep.expected_unit_count == null && itItems().length === 0) {
         activeItPrep = await getPrep(activeItPrep.id);
         return renderItUnitStep();
       }
@@ -6594,7 +6675,8 @@ function ownerAIDispatchMissing(parsed) {
   applyOwnerAutomaticFlow();
   const manifest=readOwnerEquipmentManifest();
   const roleValue=role?.value||"";
-  if ((roleValue==="it" || roleValue==="it_service" || roleValue==="service_it") && !manifest.length) missing.push("equipment type and quantity");
+  const partsOnlyCount=ticketPartsTotal(readTicketPartInputs("ownerPart"));
+  if ((roleValue==="it" || roleValue==="it_service" || roleValue==="service_it") && !manifest.length && partsOnlyCount<1) missing.push("equipment type / quantity or loose parts");
   (parsed?.mentionedWithoutQty||[]).forEach(label=>{
     const low=String(label||"").toLowerCase();
     const hasManifest=manifest.some(r=>String(r.label||"").toLowerCase()===low && Number(r.qty||0)>0);
@@ -6935,7 +7017,6 @@ function ownerAIReview(){
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
   if(!a.job_description)issues.push('Add a short description of what needs to be done.');
   if((type==='delivery'||type==='swap'||type==='pickup')&&deviceCount+standCount<1)issues.push('Choose the equipment involved in this job.');
-  if(type==='service'&&role==='it_service'&&deviceCount+standCount<1)issues.push('Choose the equipment type IT is preparing for this Service job.');
   const autoSolarPlan=automaticServiceSolarPlan(manifest,type);
   if(autoSolarPlan.spotters>0&&manifestQty(manifest,'Solar Stand')>0)issues.push('Remove Solar Stand from the IT list. Service gets it automatically after the IT handoff.');
   if(deviceCount&&un.length&&deviceCount!==un.length)issues.push('The unit quantity and the number of Unit #s do not match.');
@@ -6983,7 +7064,7 @@ async function ownerAssignJob() {
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
-  if (['it','it_service','service_it'].includes(role) && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area because this workflow includes IT.');
+  if (['it','it_service','service_it'].includes(role) && selectedDeviceCount + selectedStandCount < 1 && ticketPartsTotal(parts) < 1) return alert('Choose equipment or at least one loose part because this workflow includes IT.');
   const autoSolarPlan=automaticServiceSolarPlan(equipmentManifest,workType);
   if (autoSolarPlan.spotters > 0 && manifestQty(equipmentManifest,'Solar Stand') > 0) return alert('Remove Solar Stand from the IT Stand Area. A Delivery with Solar Spotter automatically assigns the Solar Stand to the Service checkout after IT creates the Service handoff for the Solar Spotter.');
   if (!description) return alert('Enter a short job description so the technician knows what needs to be done.');
