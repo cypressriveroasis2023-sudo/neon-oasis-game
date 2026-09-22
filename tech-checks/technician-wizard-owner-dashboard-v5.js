@@ -302,6 +302,20 @@ function injectStyles() {
 
 
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
+    .wl-tech-menu-dark{background:rgba(0,8,14,.82)!important}
+    .wl-tech-menu-dark .wl-menu-sheet{background:#08151d!important;color:#f4f8fa!important;border:1px solid #2b414d!important;box-shadow:0 24px 70px rgba(0,0,0,.58)!important}
+    .wl-tech-menu-dark .wl-menu-head{padding-bottom:12px;border-bottom:1px solid #263b46}
+    .wl-tech-menu-dark .wl-menu-head h2{color:#fff!important}
+    .wl-tech-menu-dark .wl-next-kicker{color:#ff343b!important}
+    .wl-tech-menu-dark .wl-menu-close-btn{background:#142630!important;color:#e8f1f5!important;border:1px solid #39515d!important}
+    .wl-tech-menu-dark .wl-app-menu-list{gap:9px}
+    .wl-tech-menu-dark .wl-app-menu-item{background:#101e25!important;color:#f1f6f8!important;border:1px solid #334954!important;box-shadow:none!important}
+    .wl-tech-menu-dark .wl-app-menu-item b{color:#fff!important}
+    .wl-tech-menu-dark .wl-app-menu-item small{color:#9eb0ba!important}
+    .wl-tech-menu-dark .wl-app-menu-item>strong{color:#aebdc5!important}
+    .wl-tech-menu-dark .wl-app-menu-icon{background:#e31821!important;color:#fff!important}
+    .wl-tech-menu-dark .wl-menu-section-label{margin:14px 3px 7px;color:#ff4b52;font-size:10px;font-weight:950;letter-spacing:.14em;text-transform:uppercase}
+    .wl-tech-menu-dark .wl-menu-signout{border-color:#8d3439!important;background:#33181c!important}
 
 
     /* Compact Owner Menu v89 */
@@ -1084,7 +1098,7 @@ function renderHelpCenter(roleOverride=null){
       <button type='button' data-wl-help-role='service' class='${helpCenterRole==='service'?'selected':''}'><b>S</b><span>Service</span></button>
     </div>
     <section class='wl-help-start-card'>
-      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${['service','it'].includes(helpCenterRole)?'10-step guided tutorial':'Simple '+esc(helpRoleName(helpCenterRole))+' walkthrough'}</b><small>${['service','it'].includes(helpCenterRole)?'Follow the spotlight on the real app. Tap NEXT after each stop.':'One instruction at a time.'}</small></div></div>
+      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${['service','it'].includes(helpCenterRole)?guidedTourSteps(helpCenterRole).length+'-step guided tutorial':'Simple '+esc(helpRoleName(helpCenterRole))+' walkthrough'}</b><small>${['service','it'].includes(helpCenterRole)?'Follow the spotlight on the real app. Tap NEXT after each stop.':'One instruction at a time.'}</small></div></div>
       <button type='button' data-wl-help-walkthrough>START GUIDED TUTORIAL →</button>
     </section>
     <section class='wl-help-flow-section'>
@@ -1716,6 +1730,7 @@ async function openTechMenu() {
   const role = currentRoleKey();
 
   panel.classList.toggle('wl-owner-menu', role === 'owner');
+  panel.classList.toggle('wl-tech-menu-dark', role !== 'owner');
   if (title) title.textContent = role === 'owner' ? 'Owner Menu' : 'Menu';
 
   if (role === 'owner') {
@@ -1744,23 +1759,31 @@ async function openTechMenu() {
 
   const push = await pushAlertState();
   const pushLabel = !push ? '' : push.ready ? 'Phone alerts are enabled on this device.' : push.permission === 'denied' ? 'Phone alerts are blocked in this device settings.' : 'Enable once if you want new assignments to alert this phone.';
+  const roleActions = role === 'service' ? `
+      <div class='wl-menu-section-label'>SERVICE ACTIONS</div>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-home'><span class='wl-app-menu-icon'>⌂</span><span><b>Service Home</b><small>Return to your next required action.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-ticket'><span class='wl-app-menu-icon'>#</span><span><b>Enter MHelpDesk Ticket</b><small>Open or claim the correct Service job.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-return'><span class='wl-app-menu-icon'>↩</span><span><b>Return Unit to IT</b><small>Record the unit, photo, and return.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-returns'><span class='wl-app-menu-icon'>R</span><span><b>My Returned Units</b><small>See what is waiting for IT Intake.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-offline'><span class='wl-app-menu-icon'>!</span><span><b>Offline Unit / Call IT</b><small>Check power, call IT, and record troubleshooting.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='service-history'><span class='wl-app-menu-icon'>✓</span><span><b>Status & History</b><small>Review Service work and inspections.</small></span><strong>›</strong></button>
+    ` : `
+      <div class='wl-menu-section-label'>IT ACTIONS</div>
+      <button class='wl-app-menu-item' data-wl-menu-go='it-home'><span class='wl-app-menu-icon'>⌂</span><span><b>IT Home</b><small>Return to your next required action.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='it-ticket'><span class='wl-app-menu-icon'>#</span><span><b>Enter MHelpDesk Ticket</b><small>Open or claim the correct IT job.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='it-intake'><span class='wl-app-menu-icon'>↩</span><span><b>IT Intake / Returns</b><small>Continue returned-equipment Intake.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='it-prep'><span class='wl-app-menu-icon'>▶</span><span><b>Resume Equipment Prep</b><small>Continue saved IT preparation.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-go='it-history'><span class='wl-app-menu-icon'>✓</span><span><b>Status & History</b><small>Review prep, handoffs, Intake, and completed work.</small></span><strong>›</strong></button>
+    `;
   body.innerHTML = `
     <div class='wl-app-menu-list'>
-      <button class='wl-app-menu-item' data-wl-menu-help>
-        <span class='wl-app-menu-icon'>?</span>
-        <span><b>Help Center</b><small>Guides, walkthroughs & quick answers.</small></span>
-        <strong>›</strong>
-      </button>
-      <button class='wl-app-menu-item' data-wl-menu-phone-alerts>
-        <span class='wl-app-menu-icon'>↗</span>
-        <span><b>Phone Alerts</b><small>${esc(pushLabel)}</small></span>
-        <strong>${push?.ready ? 'ON' : '›'}</strong>
-      </button>
-      <button class='wl-app-menu-item' data-wl-menu-refresh>
-        <span class='wl-app-menu-icon'>↻</span>
-        <span><b>Refresh Tech Check</b><small>Reload the latest assignments, equipment, and workflow status.</small></span>
-        <strong>›</strong>
-      </button>
+      ${roleActions}
+      <div class='wl-menu-section-label'>HELP & PHONE</div>
+      <button class='wl-app-menu-item' data-wl-menu-help><span class='wl-app-menu-icon'>?</span><span><b>Replay Guided Tutorial</b><small>Return directly to the step-by-step walkthrough.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-notifications><span class='wl-app-menu-icon'>●</span><span><b>Notifications</b><small>Open your Tech Check alerts and settings.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-phone-alerts><span class='wl-app-menu-icon'>↗</span><span><b>Phone Alerts</b><small>${esc(pushLabel)}</small></span><strong>${push?.ready ? 'ON' : '›'}</strong></button>
+      <button class='wl-app-menu-item' data-wl-menu-refresh><span class='wl-app-menu-icon'>↻</span><span><b>Refresh Tech Check</b><small>Reload the latest assignments and workflow status.</small></span><strong>›</strong></button>
+      <button class='wl-app-menu-item wl-menu-signout' data-wl-menu-signout><span class='wl-app-menu-icon'>×</span><span><b>Sign Out</b><small>Leave Tech Check on this device.</small></span><strong>›</strong></button>
     </div>
   `;
   panel.classList.remove('hidden');
@@ -7868,11 +7891,33 @@ document.addEventListener('click', async e => {
   }
   if (e.target.closest('#techMenuButton')) return openTechMenu();
   if (e.target.closest('[data-wl-menu-close]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return; }
-  if (e.target.closest('[data-wl-menu-help]')) return openHelpCenter();
+  const menuGo=e.target.closest('[data-wl-menu-go]');
+  if(menuGo){
+    document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
+    const action=menuGo.dataset.wlMenuGo;
+    if(action==='service-home')return showSvcHome();
+    if(action==='service-ticket')return showServiceJobLookup();
+    if(action==='service-return')return showServiceReturn();
+    if(action==='service-returns')return showServiceReturnHistory();
+    if(action==='service-offline')return showOfflineUnitForm();
+    if(action==='service-history')return showInspectionHistory();
+    if(action==='it-home')return showITHome();
+    if(action==='it-ticket')return showITJobLookup();
+    if(action==='it-intake')return showITIntake();
+    if(action==='it-prep')return showPendingList();
+    if(action==='it-history')return showITStatus();
+  }
+  if (e.target.closest('[data-wl-menu-help]')) {
+    const role=currentRoleKey();
+    if(['service','it'].includes(role)){document.getElementById('wlTechMenuPanel')?.classList.add('hidden');return startGuidedTour(role,false);}
+    return openHelpCenter();
+  }
+  if (e.target.closest('[data-wl-menu-notifications]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return openNotificationPanel(); }
+  if (e.target.closest('[data-wl-menu-signout]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return window.logout?.(); }
   if (e.target.closest('[data-wl-menu-phone-alerts]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); return enableBrowserAlerts(); }
   if (e.target.closest('[data-wl-menu-refresh]')) { document.getElementById('wlTechMenuPanel')?.classList.add('hidden'); await window.refreshData?.(); return; }
   if (e.target.closest('[data-wl-menu-ai-dispatch]')) return openOwnerAIDispatch();
-  if (e.target.closest('#helpTrainingButton')) return openHelpCenter();
+  if (e.target.closest('#helpTrainingButton')) { const role=currentRoleKey(); return ['service','it'].includes(role)?startGuidedTour(role,false):openHelpCenter(); }
   const helpRole=e.target.closest('[data-wl-help-role]'); if(helpRole) return renderHelpCenter(helpRole.dataset.wlHelpRole);
   const helpTopic=e.target.closest('[data-wl-help-topic]'); if(helpTopic) return renderHelpTopic(helpTopic.dataset.wlHelpTopic);
   if(e.target.closest('[data-wl-help-center]')) return renderHelpCenter(helpCenterRole);
