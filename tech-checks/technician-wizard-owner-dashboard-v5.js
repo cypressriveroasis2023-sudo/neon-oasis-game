@@ -698,6 +698,25 @@ function injectStyles() {
     .owner-auto-flow-card>b{font-size:22px;font-weight:1000;color:#fff;line-height:1.15}
     .owner-auto-flow-card>small{font-size:13px;font-weight:750;color:#b9c7ce;line-height:1.35}
   `;
+  s.textContent += `
+    .wl-day-next-card{margin:18px auto 12px;padding:22px 18px;max-width:720px;border:1px solid #334852;border-radius:16px;background:#0b1920;color:#fff;text-align:center;display:grid;gap:8px}
+    .wl-day-next-card>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
+    .wl-day-next-card>b{font-size:clamp(26px,5vw,44px);line-height:1.05;color:#fff;font-weight:1000}
+    .wl-day-next-card>small{font-size:14px;line-height:1.45;color:#c5d0d5;font-weight:750}
+    .wl-day-next-card.urgent{border-color:#e31821;box-shadow:0 0 0 1px rgba(227,24,33,.22) inset}
+    .wl-day-next-card.waiting{border-color:#7b8991}
+    .wl-day-next-card.done{border-color:#52656e}
+    .wl-day-complete-flash{margin:12px auto;max-width:720px;padding:12px 14px;border:1px solid #49636d;border-radius:12px;background:#102229;color:#fff;display:grid;gap:2px;text-align:center}
+    .wl-day-complete-flash>b{font-size:16px;color:#fff}
+    .wl-day-complete-flash>span{font-size:14px;font-weight:850;color:#d8e1e6}
+    .wl-day-complete-flash>small{font-size:12px;color:#aebec5}
+    .wl-day-complete-card{max-width:820px!important;margin:22px auto!important;background:#071117!important;color:#fff!important;text-align:center!important;padding:34px 22px!important}
+    .wl-day-complete-card .wl-day-check{width:74px;height:74px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;background:#e31821;color:#fff;font-size:42px;font-weight:1000}
+    .wl-day-complete-card .wl-day-kicker{font-size:12px;font-weight:1000;letter-spacing:.14em;color:#ff4b52}
+    .wl-day-complete-card h1{font-size:clamp(36px,8vw,70px)!important;color:#fff!important;margin:8px 0!important}
+    .wl-day-complete-card p{font-size:18px;color:#d8e1e6!important;font-weight:750}
+    .wl-day-future{margin:16px auto;max-width:600px;padding:12px;border:1px solid #334852;border-radius:10px;color:#c5d0d5;font-weight:750}
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -1818,9 +1837,12 @@ async function beginServiceReturnForAssignment(id) {
 }
 async function completeServiceFieldAssignment(id) {
   if(!confirm('Mark this Tech Check Service task complete?\n\nThis only updates Tech Check. It does not change MHelpDesk.')) return;
+  const {data:rows}=await liveDb.from('job_assignments').select('ticket_no').eq('id',id).limit(1);
+  const ticket=rows?.[0]?.ticket_no||activeSvcAssignment?.ticket_no||'';
   const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'completed'});
   if(error)return alert(error.message);
   activeSvcAssignment=null;
+  rememberTechCompletion('service',ticket,'JOB COMPLETE');
   await showSvcHome();
 }
 async function syncServiceAssignmentAfterReturn(ticket,techId) {
@@ -2106,6 +2128,180 @@ function swapSiteRegistrationHtml(rows){
   if(!rows?.length)return'';
   return `<div class='wl-svc-command-section'><div class='wl-svc-command-section-head'><b>SWAP Site Registration</b><span>${rows.length} ready</span></div>${rows.map(row=>`<div class='wl-svc-job'><div class='wl-svc-job-top'><div><b>${esc(row.equipment_type)} ${esc(row.unit_tag||'')}</b><div class='small'>MHelpDesk #${esc(row.ticket_no)} · ${esc(row.site||'Customer site')}</div></div><span>READY</span></div><div class='wl-svc-job-desc'>Service confirmed this replacement unit was actually installed. Confirm that IT registered this exact unit to the customer/site.</div><button class='wl-big wl-blue top10' style='min-height:52px;font-size:15px' data-wl-confirm-swap-site='${esc(row.id)}' data-wl-swap-site-label='${esc((row.equipment_type||'Unit')+' '+(row.unit_tag||''))}' data-wl-swap-site='${esc(row.site||'Customer site')}'>Confirm Site Registration →</button></div>`).join('')}</div>`;
 }
+
+let techCompletionFlash={service:null,it:null};
+function rememberTechCompletion(role,ticket='',label='TASK COMPLETE'){
+  if(!['service','it'].includes(role))return;
+  techCompletionFlash[role]={ticket:String(ticket||''),label:String(label||'TASK COMPLETE')};
+}
+function takeTechCompletion(role){
+  const value=techCompletionFlash[role]||null;
+  techCompletionFlash[role]=null;
+  return value;
+}
+function techAssignmentIsCurrent(a,today=techCheckDateKey()){
+  const date=String(a?.scheduled_for||'').trim();
+  return !date || date<=today;
+}
+function techAssignmentScheduleText(a){
+  const date=String(a?.scheduled_for||'').trim();
+  const time=String(a?.scheduled_time||'').trim().slice(0,5);
+  if(!date)return time?time:'UNSCHEDULED';
+  const d=new Date(date+'T12:00:00');
+  const day=Number.isNaN(d.getTime())?date:d.toLocaleDateString([], {month:'short',day:'numeric'});
+  return time?day+' · '+time:day;
+}
+async function assignmentGateRows(assignments=[]){
+  return Promise.all((assignments||[]).map(async assignment=>{
+    try{return {assignment,gate:await assignmentGateState(assignment)};}
+    catch(error){return {assignment,gate:{ready:false,label:'CHECK REQUIRED',detail:error?.message||'Could not verify this job yet.'}};}
+  }));
+}
+async function serviceDayState(){
+  const [work,spares]=await Promise.all([serviceWorkData(),myTruckSpareData()]);
+  const today=techCheckDateKey();
+  const currentAssignments=(work.assignments||[]).filter(a=>techAssignmentIsCurrent(a,today));
+  const futureAssignments=(work.assignments||[]).filter(a=>!techAssignmentIsCurrent(a,today));
+  const gates=await assignmentGateRows(currentAssignments);
+  return {
+    work,
+    spares,
+    inspectionDue:Boolean(work.inspectionRequired&&!work.inspectionDone),
+    spareCount:(spares?.units?.length||0)+(spares?.batteries?.length||0),
+    currentAssignments,
+    futureAssignments,
+    gates,
+    nextReady:gates.find(row=>row.gate?.ready)||null,
+    nextBlocked:gates.find(row=>!row.gate?.ready)||null
+  };
+}
+async function myITDraftPreps(){
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(!tech?.id)return [];
+  const {data,error}=await liveDb.from('prep_tickets')
+    .select('id,ticket_no,site,status,created_at,work_type')
+    .eq('status','draft')
+    .eq('created_by',tech.id)
+    .order('created_at',{ascending:true});
+  if(error)throw error;
+  return data||[];
+}
+async function itDayState(){
+  const today=techCheckDateKey();
+  const [assignmentsQ,returnsQ,siteQ,draftsQ]=await Promise.all([
+    myActiveAssignments('it'),
+    liveDb.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at').eq('status','waiting_it').order('returned_at',{ascending:true}).limit(50),
+    swapSiteRegistrationRows(),
+    myITDraftPreps()
+  ]);
+  if(returnsQ.error)throw returnsQ.error;
+  const assignments=assignmentsQ||[];
+  const currentAssignments=assignments.filter(a=>techAssignmentIsCurrent(a,today));
+  const futureAssignments=assignments.filter(a=>!techAssignmentIsCurrent(a,today));
+  const gates=await assignmentGateRows(currentAssignments);
+  return {
+    currentAssignments,
+    futureAssignments,
+    waitingReturns:returnsQ.data||[],
+    siteTasks:siteQ||[],
+    drafts:draftsQ||[],
+    gates,
+    nextReady:gates.find(row=>row.gate?.ready)||null,
+    nextBlocked:gates.find(row=>!row.gate?.ready)||null
+  };
+}
+function techCompletionBanner(flash){
+  if(!flash)return '';
+  return `<div class='wl-day-complete-flash'><b>✓ ${esc(flash.label)}</b>${flash.ticket?`<span>MHelpDesk #${esc(flash.ticket)}</span>`:''}<small>Tech Check automatically checked what you need to do next.</small></div>`;
+}
+function serviceNextActionHtml(state){
+  if(state.inspectionDue){
+    return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>TRUCK CHECK</b><small>Complete the start-day truck check before field work.</small><button class='wl-service-start' data-wl-svc='inspect'>START TRUCK CHECK</button></div>`;
+  }
+  if(state.spareCount>0){
+    return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>RESOLVE TRUCK SPARES · ${state.spareCount}</b><small>Used / unused backup equipment must be resolved before your day can close.</small><button class='wl-service-start' data-wl-service-resolve-spares>RESOLVE SPARES</button></div>`;
+  }
+  if(state.nextReady){
+    const a=state.nextReady.assignment;
+    return `<div class='wl-day-next-card'><span>NEXT JOB</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(a.site||'No site listed')} · ${esc(String(a.work_type||'service').toUpperCase())} · ${esc(techAssignmentScheduleText(a))}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>OPEN NEXT JOB</button></div>`;
+  }
+  if(state.nextBlocked){
+    const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
+    return `<div class='wl-day-next-card waiting'><span>TODAY'S JOB IS WAITING</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(gate.label||'WAITING')} · ${esc(gate.detail||'This job is not ready yet.')}</small><button class='wl-big wl-gray' data-wl-service-open-job>CHECK / ENTER A TICKET</button></div>`;
+  }
+  return `<div class='wl-day-next-card done'><span>ALL REQUIRED WORK IS CLEAR</span><b>END MY DAY</b><small>No unresolved Service work for today.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled and will not block today.`:''}</small><button class='wl-service-start' data-wl-tech-end-day='service'>END MY DAY</button></div>`;
+}
+function itNextActionHtml(state){
+  const r=state.waitingReturns[0];
+  if(r){
+    return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>IT INTAKE</b><small>MHelpDesk #${esc(r.ticket_no)} · ${esc(r.equipment_type||'Unit')} ${esc(r.unit_tag||'')}</small><button class='wl-it-start' data-wl-intake-start='${esc(r.id)}'>START IT INTAKE</button></div>`;
+  }
+  const site=state.siteTasks[0];
+  if(site){
+    return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>SWAP SITE REGISTRATION</b><small>MHelpDesk #${esc(site.ticket_no)} · ${esc(site.equipment_type||'Unit')} ${esc(site.unit_tag||'')} · ${esc(site.site||'Customer site')}</small><button class='wl-it-start' data-wl-confirm-swap-site='${esc(site.id)}' data-wl-swap-site-label='${esc((site.equipment_type||'Unit')+' '+(site.unit_tag||''))}' data-wl-swap-site='${esc(site.site||'Customer site')}'>CONFIRM SITE REGISTRATION</button></div>`;
+  }
+  const draft=state.drafts[0];
+  if(draft){
+    return `<div class='wl-day-next-card'><span>RESUME IT JOB</span><b>MHELPDESK #${esc(draft.ticket_no)}</b><small>${esc(draft.site||'No site listed')} · ${esc(String(draft.work_type||'service').toUpperCase())}</small><button class='wl-it-start' data-wl-open-it='${esc(draft.id)}'>CONTINUE IT PREP</button></div>`;
+  }
+  if(state.nextReady){
+    const a=state.nextReady.assignment;
+    return `<div class='wl-day-next-card'><span>NEXT IT JOB</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(a.site||'No site listed')} · ${esc(String(a.work_type||'service').toUpperCase())} · ${esc(techAssignmentScheduleText(a))}</small><button class='wl-it-start' data-wl-start-assignment='${esc(a.id)}'>OPEN NEXT IT JOB</button></div>`;
+  }
+  if(state.nextBlocked){
+    const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
+    return `<div class='wl-day-next-card waiting'><span>IT JOB IS WAITING</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(gate.label||'WAITING')} · ${esc(gate.detail||'This IT job is not ready yet.')}</small><button class='wl-big wl-gray' data-wl-it-open-job>CHECK / ENTER A TICKET</button></div>`;
+  }
+  return `<div class='wl-day-next-card done'><span>ALL REQUIRED WORK IS CLEAR</span><b>END MY DAY</b><small>No unresolved IT work for today.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled and will not block today.`:''}</small><button class='wl-it-start' data-wl-tech-end-day='it'>END MY DAY</button></div>`;
+}
+async function showServiceSpareResolution(){
+  let card=document.getElementById('wlSvcSpareResolution');
+  if(!card){card=document.createElement('div');card.id='wlSvcSpareResolution';card.className='card wl-service-simple-card';viewSvc().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading truck spares…');
+  hideChildren(viewSvc(),[card]);
+  try{
+    const spares=await techDashboardTimeout(myTruckSpareData(),{units:[],batteries:[]});
+    const count=(spares.units?.length||0)+(spares.batteries?.length||0);
+    if(!count)return showSvcHome();
+    card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← BACK</button>${progress('REQUIRED FOLLOW-UP','Resolve truck spares',1,1)}${truckSpareServiceHtml(spares)}`;
+    hideChildren(viewSvc(),[card]);resetWizardPosition();
+  }catch(error){
+    card.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not load truck spares.');
+  }
+}
+async function attemptTechEndDay(role){
+  try{
+    if(role==='service'){
+      const state=await techDashboardTimeout(serviceDayState(),null);
+      const blockers=[];
+      if(state.inspectionDue)blockers.push('truck inspection');
+      if(state.spareCount)blockers.push(state.spareCount+' unresolved truck spare'+(state.spareCount===1?'':'s'));
+      if(state.currentAssignments.length)blockers.push(state.currentAssignments.length+' active job'+(state.currentAssignments.length===1?'':'s'));
+      if(blockers.length){alert('END MY DAY IS BLOCKED\n\nFinish: '+blockers.join(', ')+'.');return showSvcHome();}
+      return showTechDayComplete('service',state.futureAssignments.length);
+    }
+    const state=await techDashboardTimeout(itDayState(),null);
+    const blockers=[];
+    if(state.waitingReturns.length)blockers.push(state.waitingReturns.length+' IT Intake return'+(state.waitingReturns.length===1?'':'s'));
+    if(state.siteTasks.length)blockers.push(state.siteTasks.length+' site registration'+(state.siteTasks.length===1?'':'s'));
+    if(state.drafts.length)blockers.push(state.drafts.length+' open IT prep'+(state.drafts.length===1?'':'s'));
+    if(state.currentAssignments.length)blockers.push(state.currentAssignments.length+' active IT job'+(state.currentAssignments.length===1?'':'s'));
+    if(blockers.length){alert('END MY DAY IS BLOCKED\n\nFinish: '+blockers.join(', ')+'.');return showITHome();}
+    return showTechDayComplete('it',state.futureAssignments.length);
+  }catch(error){
+    alert('Tech Check could not verify that all required work is finished. End My Day stays blocked until the live work check succeeds.');
+    return role==='it'?showITHome():showSvcHome();
+  }
+}
+function showTechDayComplete(role,futureCount=0){
+  const host=role==='it'?viewIT():viewSvc();
+  if(!host)return;
+  let card=document.getElementById(role==='it'?'wlItDayComplete':'wlSvcDayComplete');
+  if(!card){card=document.createElement('div');card.id=role==='it'?'wlItDayComplete':'wlSvcDayComplete';card.className='card wl-day-complete-card';host.append(card);}
+  card.innerHTML=`<div class='wl-day-check'>✓</div><div class='wl-day-kicker'>TECH CHECK</div><h1>DAY COMPLETE</h1><p>No unresolved ${role==='it'?'IT':'Service'} work is waiting for you today.</p>${futureCount?`<div class='wl-day-future'>${futureCount} future assignment${futureCount===1?' is':'s are'} already scheduled. ${futureCount===1?'It does':'They do'} not block today.</div>`:''}<button class='${role==='it'?'wl-it-start':'wl-service-start'} top10' data-wl-tech-day-back='${role}'>BACK TO TECH CHECK</button>`;
+  hideChildren(host,[card]);resetWizardPosition();
+}
+
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
   let home=document.getElementById('wlItHome');
@@ -2115,7 +2311,7 @@ async function showITHome() {
     home.className='card wl-home wl-it-simple-home';
     viewIT().prepend(home);
   }
-  home.innerHTML=techDashboardLoadingHtml('Loading your IT day…');
+  home.innerHTML=techDashboardLoadingHtml('Checking your next IT action…');
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
 
@@ -2123,30 +2319,30 @@ async function showITHome() {
   const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingIT?'IT Technician':'Technician');
   const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
 
-  const [prepResult,returnResult]=await Promise.allSettled([
-    techDashboardTimeout(prepCounts(),{draft:0,released:0,closed:0,nextDraft:null}),
-    techDashboardTimeout(returnCounts(),{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null})
-  ]);
-  const prepSummary=prepResult.status==='fulfilled'?prepResult.value:{draft:0,released:0,closed:0,nextDraft:null};
-  const returns=returnResult.status==='fulfilled'?returnResult.value:{waiting:0,inventory:0,replacement:0,completed:0,nextWaiting:null};
+  try{
+    const state=await techDashboardTimeout(itDayState(),null);
+    const flash=takeTechCompletion('it');
+    home.innerHTML=`<div class='wl-it-simple-shell'>
+      <div class='wl-it-simple-kicker'>IT TECHNICIAN</div>
+      <h1>HELLO, ${esc(ownerViewingIT?'TECHNICIAN':firstName.toUpperCase())}</h1>
+      ${techCompletionBanner(flash)}
+      ${itNextActionHtml(state)}
+      <div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> NEXT IT JOB <b>→</b> END MY DAY</div>
 
-  home.innerHTML=`<div class='wl-it-simple-shell'>
-    <div class='wl-it-simple-kicker'>IT TECHNICIAN</div>
-    <h1>HELLO, ${esc(ownerViewingIT?'TECHNICIAN':firstName.toUpperCase())}</h1>
-    <p>Enter the MHelpDesk ticket you are working. Tech Check will take you to the correct IT process.</p>
-    <button class='wl-it-start' data-wl-it-open-job>START MY DAY</button>
-    <div class='wl-it-flowline'>MHELPDESK TICKET <b>→</b> VERIFY JOB <b>→</b> PREP OR INTAKE <b>→</b> ONE STEP AT A TIME <b>→</b> HANDOFF</div>
-
-    <details class='wl-it-more'>
-      <summary>OTHER ACTIONS</summary>
-      <div class='wl-it-more-grid'>
-        <button data-wl-mode='intake'>IT INTAKE / RETURNS${returns.waiting?` · ${returns.waiting}`:''}</button>
-        <button data-wl-it='pending'>RESUME EQUIPMENT PREP${prepSummary.draft?` · ${prepSummary.draft}`:''}</button>
-        <button data-wl-it='history'>STATUS & HISTORY</button>
-        ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
-      </div>
-    </details>
-  </div>`;
+      <details class='wl-it-more'>
+        <summary>OTHER ACTIONS</summary>
+        <div class='wl-it-more-grid'>
+          <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
+          <button data-wl-mode='intake'>IT INTAKE / RETURNS${state.waitingReturns.length?` · ${state.waitingReturns.length}`:''}</button>
+          <button data-wl-it='pending'>RESUME EQUIPMENT PREP${state.drafts.length?` · ${state.drafts.length}`:''}</button>
+          <button data-wl-it='history'>STATUS & HISTORY</button>
+          ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
+        </div>
+      </details>
+    </div>`;
+  }catch(error){
+    home.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not verify your IT work.');
+  }
 
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
@@ -3482,8 +3678,8 @@ async function releaseItPrepUnitByUnit() {
     itUnitIndex = 0;
     itQuestionIndex = 0;
     itUnitPhase = 'type';
+    rememberTechCompletion('it',ticketNo,partsOnly?'PARTS HANDOFF COMPLETE':'IT HANDOFF COMPLETE');
     await showITHome();
-    alert(partsOnly ? `MHelpDesk Ticket #${ticketNo}: parts handoff created for Service.` : `MHelpDesk Ticket #${ticketNo}: Service handoff created.`);
   } catch (error) {
     if (button) { button.disabled = false; button.textContent = partsOnly ? 'Hand Off Parts to Service →' : 'Hand Off to Service Tech →'; }
     if (msg) msg.innerHTML = `<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message || 'Please try again.')}</div></div>`;
@@ -3683,48 +3879,38 @@ async function showSvcHome() {
     home.className='card wl-home wl-service-simple-home';
     viewSvc().prepend(home);
   }
-  home.innerHTML=techDashboardLoadingHtml('Loading your day…');
+  home.innerHTML=techDashboardLoadingHtml('Checking your next Service action…');
   hideChildren(viewSvc(),[home]);
   resetWizardPosition();
 
-  const work=await techDashboardTimeout(
-    serviceWorkData(),
-    {assignments:[],released:[],inspectionDone:false,inspectionRequired:serviceInspectionRequiredToday(),deployed:[]}
-  );
   const ownerViewingService=roleText().includes('Owner/Admin');
   const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingService?'Service Technician':'Technician');
   const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
-  const inspectionDue=Boolean(work.inspectionRequired&&!work.inspectionDone);
-  const inspectionDone=Boolean(work.inspectionDone);
-  const weekend=!work.inspectionRequired;
 
-  const startAction=inspectionDue
-    ? `<button class='wl-service-start' data-wl-svc='inspect'>START MY DAY</button>`
-    : `<button class='wl-service-start' data-wl-service-open-job>${inspectionDone?'CONTINUE MY DAY':'START MY DAY'}</button>`;
+  try{
+    const state=await techDashboardTimeout(serviceDayState(),null);
+    const flash=takeTechCompletion('service');
+    home.innerHTML=`<div class='wl-service-simple-shell'>
+      <div class='wl-service-simple-kicker'>SERVICE TECH</div>
+      <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
+      ${techCompletionBanner(flash)}
+      ${serviceNextActionHtml(state)}
+      <div class='wl-service-flowline'>TRUCK CHECK <b>→</b> REQUIRED FOLLOW-UP <b>→</b> NEXT JOB <b>→</b> END MY DAY</div>
 
-  const statusLine=inspectionDue
-    ? 'First: complete your truck inspection.'
-    : weekend
-      ? 'No start-day vehicle inspection is required today.'
-      : 'Truck inspection complete. Enter your next MHelpDesk ticket.';
-
-  home.innerHTML=`<div class='wl-service-simple-shell'>
-    <div class='wl-service-simple-kicker'>SERVICE TECH</div>
-    <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
-    <p>${esc(statusLine)}</p>
-    ${startAction}
-    <div class='wl-service-flowline'>TRUCK CHECK <b>→</b> TRAILER IF NEEDED <b>→</b> MHELPDESK TICKET <b>→</b> JOB</div>
-
-    <details class='wl-service-more'>
-      <summary>OTHER ACTIONS</summary>
-      <div class='wl-service-more-grid'>
-        <button data-wl-service-return>RETURN UNIT TO IT</button>
-        <button data-wl-svc='returns'>MY RETURNED UNITS</button>
-        <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
-        <button data-wl-svc='history'>STATUS & HISTORY</button>
-      </div>
-    </details>
-  </div>`;
+      <details class='wl-service-more'>
+        <summary>OTHER ACTIONS</summary>
+        <div class='wl-service-more-grid'>
+          <button data-wl-service-open-job>ENTER MHELPDESK TICKET</button>
+          <button data-wl-service-return>RETURN UNIT TO IT</button>
+          <button data-wl-svc='returns'>MY RETURNED UNITS</button>
+          <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
+          <button data-wl-svc='history'>STATUS & HISTORY</button>
+        </div>
+      </details>
+    </div>`;
+  }catch(error){
+    home.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not verify your Service work.');
+  }
 
   hideChildren(viewSvc(),[home]);
   resetWizardPosition();
@@ -4503,7 +4689,8 @@ async function submitInspection() {
     if (error) throw error;
     await clearDeviceDraft('inspection');
     inspectionRecovered=false;
-    return showServiceJobLookup();
+    rememberTechCompletion('service','', 'TRUCK CHECK COMPLETE');
+    return showSvcHome();
   } catch(error) {
     await saveInspectionDraft();
     alert(error?.message === 'Failed to fetch'
@@ -4665,8 +4852,8 @@ document.addEventListener('click', async e => {
       const tech = await currentTechIdentity();
       await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
       intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
-      alert('Owner notified. This equipment is held in Maintenance / Needs Replacement and is NOT available Shop Inventory.');
-      return showITIntake();
+      rememberTechCompletion('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');
+      return showITHome();
     } catch (error) {
       return alert(error?.message || 'Could not mark this equipment as needing replacement.');
     }
@@ -4685,7 +4872,8 @@ document.addEventListener('click', async e => {
     if (error) return alert(error.message);
     await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
     intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
-    return showITIntake();
+    rememberTechCompletion('it',row.ticket_no,'IT INTAKE COMPLETE');
+    return showITHome();
   }
   const ownerRemoveReturn = e.target.closest('[data-wl-owner-remove-return]'); if (ownerRemoveReturn) { if (!roleText().includes('Owner/Admin')) return alert('Only the Owner/Admin can remove Return & Intake tracking records.'); const unit = ownerRemoveReturn.dataset.wlUnit || 'this unit'; const ticket = ownerRemoveReturn.dataset.wlTicket || ''; if (!confirm(`Remove Unit ${unit}${ticket ? ` from MHelpDesk #${ticket}` : ''} from Return & Intake Tracking?\n\nThis deletes this tracking record from the app and cannot be undone.`)) return; ownerRemoveReturn.disabled = true; ownerRemoveReturn.textContent = 'Removing…'; const { error } = await liveDb.rpc('owner_remove_unit_return', { p_return_id: ownerRemoveReturn.dataset.wlOwnerRemoveReturn }); if (error) { ownerRemoveReturn.disabled = false; ownerRemoveReturn.textContent = 'Remove from Tracking'; return alert(error.message); } await installOwnerIntake(true); if (typeof window.refreshData === 'function') await window.refreshData(); return; } const ownerMhelpDone = e.target.closest('[data-wl-owner-mhelp-done]');
   if (ownerMhelpDone) {
@@ -4893,6 +5081,11 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
+  if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
+  const techEndDay=e.target.closest('[data-wl-tech-end-day]');
+  if(techEndDay)return attemptTechEndDay(techEndDay.dataset.wlTechEndDay);
+  const techDayBack=e.target.closest('[data-wl-tech-day-back]');
+  if(techDayBack)return techDayBack.dataset.wlTechDayBack==='it'?showITHome():showSvcHome();
   const beginAssignedReturn=e.target.closest('[data-wl-service-begin-return]');
   if(beginAssignedReturn) return beginServiceReturnForAssignment(beginAssignedReturn.dataset.wlServiceBeginReturn);
   const completeServiceAssignment=e.target.closest('[data-wl-service-complete-assignment]');
@@ -4991,6 +5184,7 @@ document.addEventListener('click', async e => {
     if(!confirm('Confirm IT registered '+label+' to '+site+'?\n\nThis records the site-registration step in Tech Check.'))return;
     const {error}=await liveDb.rpc('it_confirm_swap_site_registration_v1',{p_item_id:confirmSwapSite.dataset.wlConfirmSwapSite});
     if(error)return alert(error.message);
+    rememberTechCompletion('it','', 'SITE REGISTRATION COMPLETE');
     return showITHome();
   }
 
@@ -5124,6 +5318,7 @@ document.addEventListener('click', async e => {
       });
       if(error)throw error;
       await window.refreshData?.();
+      rememberTechCompletion('service','', 'BACKUP RETURN SENT TO IT');
       return showSvcHome();
     }catch(err){
       if(uploadedPaths.length)await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(()=>null);
@@ -5140,6 +5335,7 @@ document.addEventListener('click', async e => {
     if (!confirm('Mark this truck spare USED for the field job? If it replaced a failed unit, return the failed unit through normal IT Intake.')) return;
     const { error }=await liveDb.rpc('resolve_my_truck_spare_unit',{p_item_id:spareUsed.dataset.wlSpareUnitUsed,p_outcome:'used'});
     if (error) return alert(error.message);
+    rememberTechCompletion('service','', 'BACKUP DISPOSITION RECORDED');
     return showSvcHome();
   }
   const spareBattery=e.target.closest('[data-wl-spare-battery-resolve]');
@@ -5153,7 +5349,13 @@ document.addEventListener('click', async e => {
     return showSvcHome();
   }
 
-  if (e.target.closest('[data-wl-close-svc]')) { await window.closePreparedTicket(activeSvcPrep.id); setTimeout(showSvcHome, 300); return; }
+  if (e.target.closest('[data-wl-close-svc]')) {
+    const ticket=activeSvcPrep?.ticket_no||'';
+    await window.closePreparedTicket(activeSvcPrep.id);
+    rememberTechCompletion('service',ticket,'JOB COMPLETE');
+    setTimeout(showSvcHome,300);
+    return;
+  }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) {
     const panel = upload.closest('.wl-proof');
     const input = panel.querySelector('.wl-file');
