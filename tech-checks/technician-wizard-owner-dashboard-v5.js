@@ -1084,7 +1084,7 @@ function renderHelpCenter(roleOverride=null){
       <button type='button' data-wl-help-role='service' class='${helpCenterRole==='service'?'selected':''}'><b>S</b><span>Service</span></button>
     </div>
     <section class='wl-help-start-card'>
-      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${['service','it'].includes(helpCenterRole)?'8-step guided tutorial':'Simple '+esc(helpRoleName(helpCenterRole))+' walkthrough'}</b><small>${['service','it'].includes(helpCenterRole)?'Follow the spotlight on the real app. Tap NEXT after each stop.':'One instruction at a time.'}</small></div></div>
+      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${['service','it'].includes(helpCenterRole)?'10-step guided tutorial':'Simple '+esc(helpRoleName(helpCenterRole))+' walkthrough'}</b><small>${['service','it'].includes(helpCenterRole)?'Follow the spotlight on the real app. Tap NEXT after each stop.':'One instruction at a time.'}</small></div></div>
       <button type='button' data-wl-help-walkthrough>START GUIDED TUTORIAL →</button>
     </section>
     <section class='wl-help-flow-section'>
@@ -1414,25 +1414,29 @@ let guidedTourStep = 0;
 let guidedTourFirstTime = false;
 
 function guidedTourSteps(role){
+  const topControls=[
+    { selector:'#techMenuButton', title:'MENU', text:'Open Menu anytime for Help, phone alerts, and other Tech Check tools.' },
+    { selector:"[data-wl-menu-phone-alerts]", openMenu:true, title:'PHONE ALERTS', text:'Enable this once on each phone so new assignments can alert you when Tech Check is closed.' },
+    { selector:".accountActions button[onclick='refreshData()']", closeMenu:true, title:'REFRESH', text:'Tap Refresh when you want Tech Check to reload the latest assignments and workflow status right now.' },
+    { selector:".accountActions button[onclick='logout()']", closeMenu:true, title:'SIGN OUT', text:'Tap Sign Out when you are finished or when another technician needs to use this device.' }
+  ];
   if(role==='service') return [
     { selector:'#wlSvcHome h1', title:'THIS IS YOUR SERVICE HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
     { selector:'#wlSvcHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'This card shows your one required action. You do not need to search through the app.' },
     { selector:'#wlSvcHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This starts the next required Service step.' },
     { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck Check → required follow-up → next job → End My Day.' },
-    { selector:'#wlSvcHome .wl-service-more > summary', title:'OTHER ACTIONS', text:'Open this only when you need to enter a ticket, return equipment, call IT, or review history.' },
     { selector:"#wlSvcHome [data-wl-service-open-job]", open:'#wlSvcHome .wl-service-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number. Tech Check will find the correct Service job.', fallback:'#wlSvcHome .wl-service-more > summary' },
     { selector:"#wlSvcHome [data-wl-service-return]", open:'#wlSvcHome .wl-service-more', title:'RETURN EQUIPMENT', text:'Use this when a unit comes back from the field. Tech Check will walk you through the return photo and IT Intake.', fallback:'#wlSvcHome .wl-service-more > summary' },
-    { selector:'#techMenuButton', title:'HELP AND PHONE ALERTS', text:'Open Menu anytime for Help, phone alerts, or a fresh data check.' }
+    ...topControls
   ];
   return [
     { selector:'#wlItHome h1', title:'THIS IS YOUR IT HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
     { selector:'#wlItHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'IT Intake, site registration, active prep, and new jobs are automatically placed in the right order.' },
     { selector:'#wlItHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This opens the next required IT step. You do not need to search through the app.' },
     { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → End My Day.' },
-    { selector:'#wlItHome .wl-it-more > summary', title:'OTHER ACTIONS', text:'Open this only when you need to enter a ticket, resume prep, review returns, or see history.' },
     { selector:"#wlItHome [data-wl-it-open-job]", open:'#wlItHome .wl-it-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number to open or claim the correct IT job.', fallback:'#wlItHome .wl-it-more > summary' },
     { selector:"#wlItHome [data-wl-mode='intake']", open:'#wlItHome .wl-it-more', title:'IT INTAKE AND RETURNS', text:'Returned equipment waits here. Open it and Tech Check will continue one check at a time.', fallback:'#wlItHome .wl-it-more > summary' },
-    { selector:'#techMenuButton', title:'HELP AND PHONE ALERTS', text:'Open Menu anytime for Help, phone alerts, or a fresh data check.' }
+    ...topControls
   ];
 }
 
@@ -1502,10 +1506,15 @@ function positionGuidedTour(step,target){
   tip.style.setProperty('--tour-arrow-x',arrowX+'px');
 }
 
-function showGuidedTourStep(){
+async function showGuidedTourStep(){
   const steps=guidedTourSteps(guidedTourRole);
   guidedTourStep=Math.max(0,Math.min(guidedTourStep,steps.length-1));
   const step=steps[guidedTourStep];
+  if(step.closeMenu)document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
+  if(step.openMenu){
+    await openTechMenu();
+    await new Promise(resolve=>setTimeout(resolve,80));
+  }
   if(step.open){
     const details=document.querySelector(step.open);
     if(details)details.open=true;
@@ -1546,6 +1555,7 @@ async function finishGuidedTour(completed=true){
   const layer=document.getElementById('wlGuidedTourLayer');
   layer?.classList.add('hidden');
   document.getElementById('wlHelpCoachToast')?.classList.remove('show');
+  document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
   const serviceMore=document.querySelector('#wlSvcHome .wl-service-more');
   const itMore=document.querySelector('#wlItHome .wl-it-more');
   if(serviceMore)serviceMore.open=false;
