@@ -7581,3 +7581,46 @@ html,body{max-width:100%;overflow-x:hidden}
   #view-owner .ownerTodayState span{display:inline-block!important;font-size:7px!important;padding:5px!important;white-space:nowrap!important}
   #view-owner .ownerTodayOwner{display:none!important}
 }
+
+
+/* v20260922w — iPhone top navigation drawer; remove bottom tab strip */
+.ownerMobileMenuButton,.ownerMobileMenuBackdrop{display:none}
+@media(max-width:720px){
+  body.ownerMenuOpen{overflow:hidden!important}
+  #view-owner .ownerAppShell{position:relative!important;padding-top:58px!important}
+  #view-owner .ownerMobileMenuButton{
+    display:flex!important;position:fixed!important;top:calc(8px + env(safe-area-inset-top))!important;right:12px!important;z-index:1002!important;
+    min-width:96px!important;height:42px!important;padding:0 14px!important;align-items:center!important;justify-content:center!important;gap:8px!important;
+    border:1px solid #3a515e!important;border-radius:10px!important;background:#101d24!important;color:#fff!important;
+    font-size:14px!important;font-weight:900!important;box-shadow:0 6px 20px rgba(0,0,0,.28)!important
+  }
+  #view-owner .ownerMobileMenuBackdrop{
+    display:block!important;position:fixed!important;inset:0!important;z-index:999!important;background:rgba(0,0,0,.56)!important;
+    opacity:0!important;pointer-events:none!important;transition:opacity .16s ease!important
+  }
+  body.ownerMenuOpen #view-owner .ownerMobileMenuBackdrop{opacity:1!important;pointer-events:auto!important}
+  #view-owner .ownerAppSidebar{
+    position:fixed!important;top:0!important;right:0!important;left:auto!important;bottom:0!important;z-index:1001!important;
+    width:min(86vw,340px)!important;height:100dvh!important;padding:calc(70px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom))!important;
+    display:block!important;border:0!important;border-left:1px solid #304651!important;background:#09151b!important;
+    overflow-y:auto!important;overflow-x:hidden!important;transform:translateX(105%)!important;transition:transform .18s ease!important;
+    box-shadow:-18px 0 45px rgba(0,0,0,.42)!important
+  }
+  #view-owner .ownerAppSidebar.mobileOpen{transform:translateX(0)!important}
+  #view-owner .ownerAppSidebar nav{display:grid!important;width:100%!important;min-width:0!important;height:auto!important;gap:7px!important}
+  #view-owner .ownerAppSidebar nav a,#view-owner .ownerAppSidebar nav button{
+    display:flex!important;width:100%!important;min-width:0!important;height:46px!important;align-items:center!important;justify-content:flex-start!important;
+    padding:0 14px!important;border:1px solid #293e49!important;border-radius:9px!important;background:#101e26!important;color:#e6eef2!important;
+    font-size:13px!important;font-weight:850!important;text-align:left!important;text-decoration:none!important;white-space:normal!important
+  }
+  #view-owner .ownerAppSidebar nav button.active{border-color:#e63d43!important;background:#2a171b!important;color:#fff!important}
+  #view-owner .ownerAppBrand{display:flex!important;margin-bottom:14px!important}
+  #view-owner .ownerAppSidebarUtility{display:grid!important;gap:7px!important;margin-top:14px!important;padding-top:14px!important;border-top:1px solid #263943!important}
+  #view-owner .ownerAppSidebarUtility .ownerVisionLauncher{display:none!important}
+  #view-owner .ownerAppSidebarUtility button{display:block!important;width:100%!important;min-height:44px!important}
+  #view-owner .ownerAppWorkspace{padding-bottom:0!important}
+  #view-owner #ownerAppPage{padding-bottom:32px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  #view-owner .ownerAppSidebar,#view-owner .ownerMobileMenuBackdrop{transition:none!important}
+}
