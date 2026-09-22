@@ -62,6 +62,8 @@ let state = {
   ownerAIAlerts: [],
   ownerFieldEscalations: [],
   ownerTechCommandBoard: null,
+  ownerWeatherData: null,
+  ownerWeatherLoadedAt: 0,
   dailyInspections: [],
   matched: [],
   sessionClosed: [],
@@ -1842,9 +1844,9 @@ function ownerCalendarJobsForDate(d){
 }
 function ownerCalendarRangeRows(){
   const rows=ownerCalendarFilteredRows();
-  if(ownerCalendarMode==='year'){
-    const y=ownerCalendarDate.getFullYear();
-    return rows.filter(a=>String(a.scheduled_for||'').startsWith(String(y)+'-'));
+  if(ownerCalendarMode==='day'){
+    const key=localDateKey(ownerCalendarDate);
+    return rows.filter(a=>String(a.scheduled_for||'')===key);
   }
   if(ownerCalendarMode==='week'){
     const start=new Date(ownerCalendarDate);start.setHours(12,0,0,0);start.setDate(start.getDate()-start.getDay());
@@ -1868,14 +1870,15 @@ function ownerCalendarShift(n){
   const d=new Date(ownerCalendarDate);
   if(ownerCalendarMode==='month') d.setMonth(d.getMonth()+n);
   else if(ownerCalendarMode==='week') d.setDate(d.getDate()+7*n);
-  else d.setFullYear(d.getFullYear()+n);
+  else d.setDate(d.getDate()+n);
   ownerCalendarDate=d;
   ownerCalendarSelected=localDateKey(d);
   ownerCalendarSelectedJobId='';
   ownerAppRender();
 }
 function ownerCalendarSetMode(m){
-  ownerCalendarMode=m;
+  ownerCalendarMode=['day','week','month'].includes(m)?m:'month';
+  ownerCalendarSelected=localDateKey(ownerCalendarDate);
   ownerCalendarSelectedJobId='';
   ownerAppRender();
 }
@@ -1923,6 +1926,26 @@ function ownerCalendarWeek(){
   for(let i=0;i<7;i++){const x=new Date(start);x.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(x,true);}
   return '<div class="ownerCalScroll"><div class="ownerCalGridFrame ownerCalWeekFrame"><div class="ownerCalWeekdays">'+Array.from({length:7},(_,i)=>{const x=new Date(start);x.setDate(start.getDate()+i);return '<b>'+x.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+'</b>';}).join('')+'</div><div class="ownerCalWeek">'+cells+'</div></div></div>';
 }
+function ownerCalendarDay(){
+  const key=localDateKey(ownerCalendarDate);
+  ownerCalendarSelected=key;
+  const jobs=ownerCalendarJobsForDate(ownerCalendarDate).slice().sort((a,b)=>String(a.scheduled_time||'99:99').localeCompare(String(b.scheduled_time||'99:99')));
+  const d=new Date(key+'T12:00:00');
+  const rows=jobs.length?jobs.map(j=>{
+    const id=esc(String(j.id||''));
+    const role=j.assigned_role==='it'?'it':'service';
+    const selected=String(j.id||'')===String(ownerCalendarSelectedJobId||'');
+    const status=j.status==='started'?'working':j.status==='completed'?'complete':'waiting';
+    const time=j.scheduled_time?new Date(key+'T'+String(j.scheduled_time).slice(0,8)).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'Time not set';
+    return '<button type="button" class="ownerCalDayJob '+role+' '+status+' '+(selected?'selected':'')+'" onclick="ownerCalendarOpenJob(\''+id+'\')">'
+      +'<div class="ownerCalDayTime"><b>'+esc(time)+'</b><span>'+esc(role.toUpperCase())+'</span></div>'
+      +'<div class="ownerCalDayJobMain"><span>MHELPDESK #'+esc(j.ticket_no||'—')+'</span><h3>'+esc(j.site||'Customer / Site')+'</h3><p>'+esc(j.job_description||'No job description recorded')+'</p></div>'
+      +'<div class="ownerCalDayJobState"><b>'+esc(String(j.work_type||'Job').toUpperCase())+'</b><span>'+esc(ownerCalendarStatusLabel(j))+'</span></div>'
+      +'</button>';
+  }).join(''):'<div class="ownerCalDayEmpty"><b>No jobs scheduled</b><span>There are no Tech Check jobs on this day.</span><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ Create Job</button></div>';
+  return '<div class="ownerCalDayView"><header><div><span>DAILY SCHEDULE</span><h2>'+d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'</h2></div><strong>'+jobs.length+' JOB'+(jobs.length===1?'':'S')+'</strong></header><div class="ownerCalDayJobs">'+rows+'</div></div>';
+}
+
 function ownerCalendarYear(){
   const y=ownerCalendarDate.getFullYear();
   return '<div class="ownerCalYear">'+Array.from({length:12},(_,m)=>{
@@ -1981,25 +2004,30 @@ function ownerCalendarInspector(){
 function ownerCalendarStats(){
   const rows=ownerCalendarRangeRows(),selected=ownerCalendarSelectedJobs();
   const it=rows.filter(j=>j.assigned_role==='it').length,service=rows.filter(j=>j.assigned_role==='service').length,working=rows.filter(j=>j.status==='started').length;
-  return '<div class="ownerCalStats"><div><b>'+rows.length+'</b><span>IN THIS '+(ownerCalendarMode==='year'?'YEAR':ownerCalendarMode==='week'?'WEEK':'MONTH')+'</span></div><div><b>'+selected.length+'</b><span>SELECTED DAY</span></div><div><b>'+it+'</b><span>IT JOBS</span></div><div><b>'+service+'</b><span>SERVICE JOBS</span></div><div><b>'+working+'</b><span>WORKING NOW</span></div></div>';
+  return '<div class="ownerCalStats"><div><b>'+rows.length+'</b><span>IN THIS '+(ownerCalendarMode==='day'?'DAY':ownerCalendarMode==='week'?'WEEK':'MONTH')+'</span></div><div><b>'+selected.length+'</b><span>SELECTED DAY</span></div><div><b>'+it+'</b><span>IT JOBS</span></div><div><b>'+service+'</b><span>SERVICE JOBS</span></div><div><b>'+working+'</b><span>WORKING NOW</span></div></div>';
 }
 function ownerAppCalendar(){
-  const label=ownerCalendarMode==='year'?String(ownerCalendarDate.getFullYear()):ownerCalendarDate.toLocaleDateString(undefined,ownerCalendarMode==='month'?{month:'long',year:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
-  if(!ownerCalendarSelected) ownerCalendarSelected=localDateKey(new Date());
+  if(!ownerCalendarSelected) ownerCalendarSelected=localDateKey(ownerCalendarDate);
   if(ownerCalendarSelected&&!ownerCalendarSelectedJobId){
     const first=ownerCalendarSelectedJobs()[0];
     if(first)ownerCalendarSelectedJobId=String(first.id||'');
   }
-  const cal=ownerCalendarMode==='month'?ownerCalendarMonth():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarYear();
-  return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar Command Center','A wide, live schedule built for dispatch — see the whole month, select a day, and inspect jobs without squeezing the calendar.')
+  let label='';
+  if(ownerCalendarMode==='month') label=ownerCalendarDate.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  else if(ownerCalendarMode==='week'){
+    const start=new Date(ownerCalendarDate);start.setDate(start.getDate()-start.getDay());
+    const end=new Date(start);end.setDate(end.getDate()+6);
+    label='Week of '+start.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' – '+end.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  }else label=ownerCalendarDate.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const cal=ownerCalendarMode==='day'?ownerCalendarDay():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarMonth();
+  const side=ownerCalendarMode==='day'?ownerCalendarInspector():ownerCalendarAgenda()+ownerCalendarInspector();
+  return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar Command Center','Switch between daily, weekly, and monthly dispatch views without squeezing the schedule.')
     +'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerAppNavigate(\'today\')">Live Work</button><button class="mini" type="button" onclick="ownerCalendarToday()">Today</button></div></div>'
     +ownerCalendarStats()
     +'<div class="ownerCalControlBar"><div class="ownerCalPeriod"><button aria-label="Previous" onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button aria-label="Next" onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div>'
       +'<div class="ownerCalRoleFilters"><span>SHOW</span><button class="'+(ownerCalendarRoleFilter==='all'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'all\')">All Jobs</button><button class="'+(ownerCalendarRoleFilter==='it'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'it\')">IT</button><button class="'+(ownerCalendarRoleFilter==='service'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'service\')">Service</button></div>'
-      +'<div class="ownerCalModes"><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='year'?'active':'')+'" onclick="ownerCalendarSetMode(\'year\')">Year</button></div></div>'
-    +'<div class="ownerCalWorkspaceV2"><main class="ownerCalMain"><div class="ownerCalBoard">'+cal+'</div></main>'
-      +(ownerCalendarMode==='year'?'':'<aside class="ownerCalSideRail">'+ownerCalendarAgenda()+ownerCalendarInspector()+'</aside>')
-    +'</div>';
+      +'<div class="ownerCalModes"><button class="'+(ownerCalendarMode==='day'?'active':'')+'" onclick="ownerCalendarSetMode(\'day\')">Day</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button></div></div>'
+    +'<div class="ownerCalWorkspaceV2"><main class="ownerCalMain"><div class="ownerCalBoard">'+cal+'</div></main><aside class="ownerCalSideRail">'+side+'</aside></div>';
 }
 
 function ownerBoardTime(value){
@@ -2122,7 +2150,111 @@ function ownerTechCommandBoardHtml(mode='today'){
     +ownerBoardITSupportHtml(board.it_techs);
 }
 
-function ownerAppToday(){ return ownerTechCommandBoardHtml('today'); }
+
+function ownerWeatherMeta(code,isDay=1){
+  const c=Number(code);
+  if(c===0)return {icon:isDay?'☀️':'🌙',label:'Clear',kind:'sun'};
+  if(c<=2)return {icon:isDay?'🌤️':'☁️',label:'Partly Cloudy',kind:'cloud'};
+  if(c===3)return {icon:'☁️',label:'Cloudy',kind:'cloud'};
+  if(c<=48)return {icon:'🌫️',label:'Fog',kind:'cloud'};
+  if(c<=57)return {icon:'🌦️',label:'Drizzle',kind:'rain'};
+  if(c<=67)return {icon:'🌧️',label:'Rain',kind:'rain'};
+  if(c<=77)return {icon:'❄️',label:'Wintry',kind:'snow'};
+  if(c<=82)return {icon:'🌦️',label:'Showers',kind:'rain'};
+  if(c<=86)return {icon:'🌨️',label:'Snow Showers',kind:'snow'};
+  if(c>=95)return {icon:'⛈️',label:'Thunderstorms',kind:'storm'};
+  return {icon:'🌤️',label:'Weather',kind:'cloud'};
+}
+async function ownerEnsureWeather(force=false){
+  const fresh=state.ownerWeatherData&&Date.now()-Number(state.ownerWeatherLoadedAt||0)<20*60*1000;
+  if(fresh&&!force){ownerRenderWeather();return state.ownerWeatherData;}
+  const host=document.getElementById('ownerTodayWeatherHost');
+  if(host&&!state.ownerWeatherData)host.innerHTML='<div class="ownerWeatherLoading">Loading Katy forecast…</div>';
+  try{
+    const url='https://api.open-meteo.com/v1/forecast?latitude=29.7858&longitude=-95.8244&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago&forecast_days=7';
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error('Forecast unavailable');
+    state.ownerWeatherData=await response.json();
+    state.ownerWeatherLoadedAt=Date.now();
+  }catch(error){
+    if(host)host.innerHTML='<div class="ownerWeatherError"><b>Weather unavailable</b><span>Katy forecast could not be loaded right now.</span></div>';
+    return null;
+  }
+  ownerRenderWeather();
+  return state.ownerWeatherData;
+}
+function ownerWeatherForecastHtml(data){
+  const daily=data?.daily||{},times=daily.time||[];
+  if(!times.length)return '';
+  return '<div class="ownerWeatherWeek">'+times.slice(0,7).map((date,index)=>{
+    const meta=ownerWeatherMeta(daily.weather_code?.[index],1);
+    const d=new Date(date+'T12:00:00');
+    const day=index===0?'TODAY':d.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase();
+    const rain=Number(daily.precipitation_probability_max?.[index]||0);
+    return '<article class="ownerWeatherDay '+meta.kind+'"><span>'+day+'</span><i>'+meta.icon+'</i><b>'+Math.round(Number(daily.temperature_2m_max?.[index]||0))+'°</b><small>'+Math.round(Number(daily.temperature_2m_min?.[index]||0))+'° low</small><em>'+rain+'% rain</em></article>';
+  }).join('')+'</div>';
+}
+function ownerRenderWeather(){
+  const host=document.getElementById('ownerTodayWeatherHost'),data=state.ownerWeatherData;
+  if(!host||!data)return;
+  const current=data.current||{},meta=ownerWeatherMeta(current.weather_code,current.is_day);
+  const todayCode=data.daily?.weather_code?.[0];
+  const todayMeta=ownerWeatherMeta(todayCode,1);
+  const high=Math.round(Number(data.daily?.temperature_2m_max?.[0]||current.temperature_2m||0));
+  const low=Math.round(Number(data.daily?.temperature_2m_min?.[0]||current.temperature_2m||0));
+  const rain=Math.round(Number(data.daily?.precipitation_probability_max?.[0]||0));
+  host.innerHTML='<section class="ownerWeatherNow '+meta.kind+'"><div class="ownerWeatherIcon">'+meta.icon+'</div><div class="ownerWeatherCurrent"><span>KATY WEATHER</span><div><b>'+Math.round(Number(current.temperature_2m||0))+'°</b><strong>'+esc(meta.label)+'</strong></div><small>Feels '+Math.round(Number(current.apparent_temperature||0))+'° · Wind '+Math.round(Number(current.wind_speed_10m||0))+' mph</small></div><div class="ownerWeatherToday"><span>TODAY</span><b>'+todayMeta.icon+' '+high+'° / '+low+'°</b><small>'+rain+'% chance of rain</small></div></section>'+ownerWeatherForecastHtml(data);
+}
+function ownerTodayGreeting(){
+  const h=new Date().getHours();
+  return h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+}
+function ownerTodayName(){
+  const raw=state.profile?.full_name||state.profile?.username||'James';
+  return String(raw).trim().split(/\s+/)[0]||'James';
+}
+function ownerTodayClockTick(){
+  const clock=document.getElementById('ownerTodayClock');
+  const date=document.getElementById('ownerTodayDate');
+  const greeting=document.getElementById('ownerTodayGreeting');
+  if(!clock)return;
+  const now=new Date();
+  clock.textContent=now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+  if(date)date.textContent=now.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  if(greeting)greeting.textContent=ownerTodayGreeting()+', '+ownerTodayName();
+}
+function ownerStartTodayLive(){
+  clearInterval(window.ownerTodayClockTimer);
+  ownerTodayClockTick();
+  window.ownerTodayClockTimer=setInterval(ownerTodayClockTick,1000);
+  ownerEnsureWeather();
+}
+function ownerTodayReadinessHtml(){
+  const techs=Array.isArray(state.ownerTechCommandBoard?.service_techs)?state.ownerTechCommandBoard.service_techs:[];
+  if(!techs.length)return '';
+  return '<section class="ownerTodayPanel"><header><div><span>TEAM READINESS</span><h2>Service Trucks</h2></div><button class="mini" type="button" onclick="ownerAppNavigate(\'team\')">Open Team Board →</button></header><div class="ownerTodayReadinessGrid">'+techs.map(t=>{
+    const inspection=t.inspection||{},inv=t.inventory_check||{};
+    const ready=Boolean(t.truck_ready);
+    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(inv.ready?'good':'bad')+'">Inventory '+(inv.ready?'✓':'✕')+'</i></div></article>';
+  }).join('')+'</div></section>';
+}
+function ownerTodayJobsHtml(){
+  const today=localDateKey(new Date());
+  const rows=(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');
+  const open=rows.filter(a=>a.status!=='completed'),working=rows.filter(a=>a.status==='started'),waiting=rows.filter(a=>a.status==='assigned'),complete=rows.filter(a=>a.status==='completed');
+  return '<section class="ownerTodayPanel"><header><div><span>TODAY’S OPERATIONS</span><h2>'+rows.length+' Scheduled Job'+(rows.length===1?'':'s')+'</h2></div><button class="mini" type="button" onclick="ownerAppNavigate(\'calendar\')">Open Calendar →</button></header>'
+    +'<div class="ownerTodayMiniStats"><div><b>'+open.length+'</b><span>OPEN</span></div><div><b>'+working.length+'</b><span>WORKING</span></div><div><b>'+waiting.length+'</b><span>WAITING</span></div><div><b>'+complete.length+'</b><span>COMPLETE</span></div></div>'
+    +(rows.length?'<div class="ownerTodayJobsList">'+rows.map(ownerAppJobRow).join('')+'</div>':ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'))
+    +'</section>';
+}
+
+function ownerAppToday(){
+  const greeting=ownerTodayGreeting()+', '+ownerTodayName();
+  return '<section class="ownerTodayHero"><div class="ownerTodayWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>Here’s what is happening today.</p></div><div class="ownerTodayClockCard"><div id="ownerTodayClock" class="ownerTodayClock">--:--:--</div><span id="ownerTodayDate"></span></div></section>'
+    +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading Katy forecast…</div>')+'</div>'
+    +ownerTodayReadinessHtml()
+    +ownerTodayJobsHtml();
+}
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
 }
@@ -2271,6 +2403,8 @@ async function ownerAppRender(){
   document.querySelectorAll('[data-owner-route]').forEach(b=>b.classList.toggle('active',b.dataset.ownerRoute===route));
   if(route==='attention')renderOwnerAttention();
   if(route==='accounts'){renderPasswordResetRequests();renderUsers();}
+  if(route==='today')ownerStartTodayLive();
+  else clearInterval(window.ownerTodayClockTimer);
   ownerInteractionSafety();
 }
 async function ownerAppNavigate(route){
