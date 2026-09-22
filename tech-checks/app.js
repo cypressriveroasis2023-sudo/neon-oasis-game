@@ -2186,7 +2186,10 @@ function ownerBoardServiceTechCard(tech){
   const truckState=inspection.truck_complete?'good':'bad';
   const trailerState=inspection.trailer_state==='not_taking'?'na':inspection.trailer_complete?'good':'bad';
   const trailerDetail=inspection.trailer_state==='not_taking'?'NOT TAKING':inspection.trailer_complete?'COMPLETE':'NOT COMPLETE';
-  const inventoryState=inventory.ready?'good':'bad';
+  const stockComplete=Boolean(inventory.stock_complete);
+  const verificationRequired=Boolean(inventory.verification_required);
+  const inventoryState=inventory.ready?'good':stockComplete&&verificationRequired?'na':'bad';
+  const inventoryDetail=inventory.ready?'COMPLETE':stockComplete&&verificationRequired?'VERIFY INVENTORY':'MISSING STOCK';
   const unitCount=units.filter(u=>u.status==='assigned'&&u.unit_tag).length;
   const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
   const restockSummary=restocks.length
@@ -2197,7 +2200,7 @@ function ownerBoardServiceTechCard(tech){
     +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>DAILY READINESS</b><span>'+esc(dateLabel((state.ownerTechCommandBoard&&state.ownerTechCommandBoard.date)||localDateKey(new Date())))+'</span></div>'
       +ownerBoardCheckRow('Truck Inspection',truckState,inspection.truck_complete?'COMPLETE':'NOT COMPLETE',inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
       +ownerBoardCheckRow('Trailer Inspection',trailerState,trailerDetail,inspection.taking_trailer&&inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
-      +ownerBoardCheckRow('Truck Inventory',inventoryState,inventory.ready?'COMPLETE':'MISSING STOCK',inventory.submitted?ownerBoardTime(inventory.submitted_at):'')
+      +ownerBoardCheckRow('Truck Inventory',inventoryState,inventoryDetail,inventory.submitted?ownerBoardTime(inventory.submitted_at):'')
     +'</div>'
     +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>TRUCK INVENTORY</b><span>'+unitCount+' / 4 units · '+simCount+' / 3 SIMs</span></div>'
       +'<div class="ownerCmdUnitList">'+units.map(ownerBoardUnitHtml).join('')+'</div>'
@@ -2374,7 +2377,7 @@ function ownerTodayReadinessHtml(){
     const sims=Array.isArray(t.sims)?t.sims:[];
     const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
     const ready=Boolean(t.truck_ready);
-    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(simCount===3?'good':'bad')+'">SIMs '+simCount+'/3</i><i class="'+(inv.ready?'good':'bad')+'">Inventory '+(inv.ready?'✓':'✕')+'</i></div></article>';
+    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(simCount===3?'good':'bad')+'">SIMs '+simCount+'/3</i><i class="'+(inv.ready?'good':inv.stock_complete?'neutral':'bad')+'">Inventory '+(inv.ready?'✓':inv.stock_complete?'VERIFY':'✕')+'</i></div></article>';
   }).join('')+'</div></section>';
 }
 function ownerTodayJobsHtml(){
