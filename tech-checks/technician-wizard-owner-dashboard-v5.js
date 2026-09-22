@@ -717,6 +717,19 @@ function injectStyles() {
     .wl-day-complete-card p{font-size:18px;color:#d8e1e6!important;font-weight:750}
     .wl-day-future{margin:16px auto;max-width:600px;padding:12px;border:1px solid #334852;border-radius:10px;color:#c5d0d5;font-weight:750}
   `;
+  s.textContent += `
+    .wl-tech-live-status{position:fixed;z-index:9997;right:12px;top:calc(env(safe-area-inset-top,0px) + 62px);display:flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#071117;border:1px solid #3a4b53;color:#fff;font-size:10px;font-weight:1000;letter-spacing:.08em;box-shadow:0 6px 18px rgba(0,0,0,.22);pointer-events:none}
+    .wl-tech-live-status.hidden{display:none!important}
+    .wl-tech-live-status i{width:7px;height:7px;border-radius:50%;background:#fff;display:block}
+    .wl-tech-live-status.live{border-color:#52656e}
+    .wl-tech-live-status.live i{background:#74d99f;box-shadow:0 0 0 3px rgba(116,217,159,.12)}
+    .wl-tech-live-status.reconnecting{border-color:#e31821}
+    .wl-tech-live-status.reconnecting i{background:#e31821;animation:wlLivePulse 1s infinite}
+    .wl-tech-live-status.offline{border-color:#7b8991;color:#d5dde1}
+    .wl-tech-live-status.offline i{background:#7b8991}
+    @keyframes wlLivePulse{0%,100%{opacity:.35}50%{opacity:1}}
+    @media(max-width:700px){.wl-tech-live-status{right:8px;top:calc(env(safe-area-inset-top,0px) + 58px);font-size:9px;padding:5px 8px}}
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -1681,27 +1694,35 @@ async function showSystemNotification(row) {
     }
   } catch {}
 }
-async function setupNotificationRealtime() {
+async function setupNotificationRealtime(force=false) {
   if (document.getElementById('appView')?.classList.contains('hidden')) return;
   const tech = await currentTechIdentity().catch(() => null);
-  if (!tech?.id || notificationRealtimeUserId === tech.id) return;
+  if (!tech?.id) return;
+  if (!force && notificationRealtimeUserId === tech.id && notificationRealtimeChannel) return;
   if (notificationRealtimeChannel) {
     try { await liveDb.removeChannel(notificationRealtimeChannel); } catch {}
+    notificationRealtimeChannel=null;
   }
   notificationRealtimeUserId = tech.id;
-  notificationRealtimeChannel = liveDb
+  const channel=liveDb
     .channel('tech-check-notifications-' + tech.id)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications', filter: 'recipient_user_id=eq.' + tech.id }, payload => {
       refreshNotificationBadge();
       showSystemNotification(payload.new);
-      if ((payload.new.kind === 'new_assignment' || payload.new.kind === 'returned_unit') && isIT() && !viewIT()?.classList.contains('hidden')) showITHome();
-      if ((payload.new.kind === 'new_assignment' || payload.new.kind === 'equipment_ready_service') && isSvc() && !viewSvc()?.classList.contains('hidden')) showSvcHome();
+      scheduleTechWorkflowRefresh('notification',payload);
       if (payload.new.kind === 'owner_action' && roleText().includes('Owner/Admin')) {
         installOwnerIntake(true);
         window.refreshData?.();
       }
-    })
-    .subscribe();
+    });
+  notificationRealtimeChannel=channel;
+  channel.subscribe(status=>{
+    if(channel!==notificationRealtimeChannel)return;
+    if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+      notificationRealtimeUserId=null;
+      if(!document.hidden&&navigator.onLine!==false)setTimeout(()=>setupNotificationRealtime(true),1800);
+    }
+  });
   refreshNotificationBadge();
 }
 let equipmentMemoryCache=new Map();
@@ -1903,6 +1924,7 @@ async function startAssignedJob(id) {
       showITHome();
       return;
     }
+    await sendTechWorkflowBroadcast('assignment_claimed',{assignment_id:id,role:'it',ticket_no:assignment.ticket_no});
     ({ data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1));
     assignment = rows?.[0];
     if (!assignment) return alert('The accepted IT assignment could not be reopened.');
@@ -3984,6 +4006,7 @@ async function serviceTakeVerifiedJob(id){
   if(!a.assignee_user_id&&a.assignment_scope==='department'){
     const {error:claimError}=await liveDb.rpc('claim_my_department_assignment',{p_assignment_id:id});
     if(claimError)return alert(claimError.message||'Another Service Tech already claimed this ticket.');
+    await sendTechWorkflowBroadcast('assignment_claimed',{assignment_id:id,role:'service',ticket_no:a.ticket_no});
   }
   return startAssignedJob(id);
 }
@@ -7719,17 +7742,172 @@ function scheduleOwnerStartupLoad() {
 }
 window.refreshOwnerIntake = () => scheduleOwnerRefresh(true, 160);
 let ownerLiveRealtimeStarted=false;
+
+let techWorkflowRealtimeChannel=null;
+let techWorkflowRealtimeUserId=null;
+let techWorkflowRealtimeGeneration=0;
+let techWorkflowRealtimeState='reconnecting';
+let techWorkflowReconnectTimer=null;
+let techWorkflowRefreshTimer=null;
+let techWorkflowHeartbeatTimer=null;
+let techWorkflowRefreshPending=false;
+let techWorkflowReconnectAttempt=0;
+const techWorkflowEventSeen=new Map();
+
+function techLiveIndicator(){
+  let el=document.getElementById('wlTechLiveStatus');
+  if(!el){
+    el=document.createElement('div');
+    el.id='wlTechLiveStatus';
+    el.className='wl-tech-live-status reconnecting';
+    el.innerHTML="<i></i><span>RECONNECTING</span>";
+    document.body.append(el);
+  }
+  return el;
+}
+function setTechLiveStatus(state='reconnecting'){
+  techWorkflowRealtimeState=state;
+  const el=techLiveIndicator();
+  const appVisible=!document.getElementById('appView')?.classList.contains('hidden');
+  el.classList.toggle('hidden',!appVisible);
+  el.classList.remove('live','reconnecting','offline');
+  const normalized=state==='live'?'live':state==='offline'?'offline':'reconnecting';
+  el.classList.add(normalized);
+  const label=normalized==='live'?'LIVE':normalized==='offline'?'OFFLINE':'RECONNECTING';
+  const span=el.querySelector('span'); if(span)span.textContent=label;
+}
+function techElementVisible(el){
+  if(!el)return false;
+  if(el.classList.contains('hidden')||el.style.display==='none')return false;
+  let parent=el.parentElement;
+  while(parent&&parent!==document.body){
+    if(parent.classList?.contains('hidden')||parent.style?.display==='none')return false;
+    parent=parent.parentElement;
+  }
+  return true;
+}
+function techWorkflowEventKey(source,payload){
+  const row=payload?.new||payload?.old||payload?.payload||{};
+  const id=row.id||row.assignment_id||row.ticket_no||'global';
+  const stamp=row.updated_at||row.released_at||row.closed_at||row.status||payload?.eventType||payload?.type||'event';
+  return source+'|'+id+'|'+stamp;
+}
+function techWorkflowDuplicate(source,payload){
+  const now=Date.now(),key=techWorkflowEventKey(source,payload);
+  for(const [k,t] of techWorkflowEventSeen){if(now-t>5000)techWorkflowEventSeen.delete(k);}
+  if(techWorkflowEventSeen.has(key))return true;
+  techWorkflowEventSeen.set(key,now);
+  return false;
+}
+async function forceTechWorkflowRefresh(reason='live'){
+  if(document.hidden||document.getElementById('appView')?.classList.contains('hidden'))return;
+  techWorkflowRefreshPending=false;
+  const role=currentRoleKey();
+  if(role==='owner'){
+    scheduleOwnerRefresh(true,reason==='resume'?80:140);
+    return;
+  }
+  if(role==='it'&&!viewIT()?.classList.contains('hidden')){
+    if(techElementVisible(document.getElementById('wlItHome'))||techElementVisible(document.getElementById('wlItDayComplete')))return showITHome();
+    if(techElementVisible(document.getElementById('wlItJobLookup'))){
+      const input=document.getElementById('wlITJobSearch');
+      if(input?.value?.trim())return itFindJobByTicket();
+    }
+    if(techElementVisible(document.getElementById('wlPendingList')))return showPendingList();
+    techWorkflowRefreshPending=true;
+    return;
+  }
+  if(role==='service'&&!viewSvc()?.classList.contains('hidden')){
+    if(techElementVisible(document.getElementById('wlSvcHome'))||techElementVisible(document.getElementById('wlSvcDayComplete')))return showSvcHome();
+    if(techElementVisible(document.getElementById('wlSvcLookup'))){
+      const input=document.getElementById('wlServiceJobSearch');
+      if(input?.value?.trim())return serviceFindJobByTicket();
+    }
+    if(techElementVisible(document.getElementById('wlSvcSpareResolution'))&&!document.querySelector('.wl-unused-backup-proof'))return showServiceSpareResolution();
+    techWorkflowRefreshPending=true;
+  }
+}
+function scheduleTechWorkflowRefresh(source='live',payload=null,delay=220){
+  if(payload&&techWorkflowDuplicate(source,payload))return;
+  clearTimeout(techWorkflowRefreshTimer);
+  techWorkflowRefreshTimer=setTimeout(()=>forceTechWorkflowRefresh(source),delay);
+}
+function scheduleTechWorkflowReconnect(){
+  clearTimeout(techWorkflowReconnectTimer);
+  if(document.hidden||navigator.onLine===false)return;
+  techWorkflowReconnectAttempt++;
+  const delay=Math.min(12000,1200*Math.pow(1.7,Math.min(techWorkflowReconnectAttempt,5)));
+  techWorkflowReconnectTimer=setTimeout(()=>setupTechWorkflowRealtime(true),delay);
+}
+async function sendTechWorkflowBroadcast(kind,payload={}){
+  const channel=techWorkflowRealtimeChannel;
+  if(!channel||techWorkflowRealtimeState!=='live')return;
+  try{
+    await channel.send({type:'broadcast',event:'workflow',payload:{kind,at:new Date().toISOString(),...payload}});
+  }catch(error){console.warn('Workflow broadcast failed',error);}
+}
+function onTechWorkflowDbEvent(table,payload){
+  scheduleTechWorkflowRefresh(table,payload);
+}
+async function setupTechWorkflowRealtime(force=false){
+  if(document.getElementById('appView')?.classList.contains('hidden'))return;
+  const tech=await currentTechIdentity().catch(()=>null);
+  if(!tech?.id)return;
+  if(!force&&techWorkflowRealtimeChannel&&techWorkflowRealtimeUserId===tech.id)return;
+
+  const generation=++techWorkflowRealtimeGeneration;
+  clearTimeout(techWorkflowReconnectTimer);
+  if(techWorkflowRealtimeChannel){
+    const old=techWorkflowRealtimeChannel;
+    techWorkflowRealtimeChannel=null;
+    try{await liveDb.removeChannel(old);}catch{}
+  }
+
+  techWorkflowRealtimeUserId=tech.id;
+  setTechLiveStatus(navigator.onLine===false?'offline':'reconnecting');
+  if(navigator.onLine===false)return;
+
+  const channel=liveDb.channel('tech-check-workflow-live-v4')
+    .on('broadcast',{event:'workflow'},message=>{
+      if(generation!==techWorkflowRealtimeGeneration)return;
+      scheduleTechWorkflowRefresh('broadcast',message);
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'job_assignments'},payload=>onTechWorkflowDbEvent('job_assignments',payload))
+    .on('postgres_changes',{event:'*',schema:'public',table:'prep_tickets'},payload=>onTechWorkflowDbEvent('prep_tickets',payload))
+    .on('postgres_changes',{event:'*',schema:'public',table:'prep_items'},payload=>onTechWorkflowDbEvent('prep_items',payload))
+    .on('postgres_changes',{event:'*',schema:'public',table:'unit_returns'},payload=>onTechWorkflowDbEvent('unit_returns',payload))
+    .on('postgres_changes',{event:'*',schema:'public',table:'truck_spare_batteries'},payload=>onTechWorkflowDbEvent('truck_spare_batteries',payload))
+    .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},payload=>{
+      if(currentRoleKey()==='owner')onTechWorkflowDbEvent('profiles',payload);
+    });
+
+  techWorkflowRealtimeChannel=channel;
+  channel.subscribe(status=>{
+    if(generation!==techWorkflowRealtimeGeneration||channel!==techWorkflowRealtimeChannel)return;
+    if(status==='SUBSCRIBED'){
+      techWorkflowReconnectAttempt=0;
+      setTechLiveStatus('live');
+      scheduleTechWorkflowRefresh('subscribed',null,80);
+      return;
+    }
+    if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+      setTechLiveStatus(navigator.onLine===false?'offline':'reconnecting');
+      scheduleTechWorkflowReconnect();
+    }
+  });
+
+  if(!techWorkflowHeartbeatTimer){
+    techWorkflowHeartbeatTimer=setInterval(()=>{
+      if(document.hidden||document.getElementById('appView')?.classList.contains('hidden'))return;
+      if(navigator.onLine===false){setTechLiveStatus('offline');return;}
+      // Safety sync covers RLS edge cases such as a department job being claimed by someone else.
+      forceTechWorkflowRefresh('safety');
+    },30000);
+  }
+}
+
 function setupOwnerLiveRealtime(){
-  if(ownerLiveRealtimeStarted)return;
-  ownerLiveRealtimeStarted=true;
-  const refresh=()=>{if(roleText().includes('Owner/Admin'))scheduleOwnerRefresh(true,140);};
-  liveDb.channel('tech-check-owner-dashboard-live-v2')
-    .on('postgres_changes',{event:'*',schema:'public',table:'job_assignments'},refresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'prep_tickets'},refresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'prep_items'},refresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'unit_returns'},refresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},refresh)
-    .subscribe();
+  return setupTechWorkflowRealtime();
 }
 let serviceSolarRealtimeStarted=false;
 function setupServiceSolarRealtime() {
@@ -7748,12 +7926,13 @@ function boot() {
   injectStyles();
   installTabs();
   setupNotificationRealtime();
-  if (roleText().includes('Owner/Admin')) { setupServiceSolarRealtime(); setupOwnerLiveRealtime(); }
+  setupTechWorkflowRealtime();
+  if (roleText().includes('Owner/Admin')) setupServiceSolarRealtime();
   refreshNotificationBadge();
   if (roleText().includes('Owner/Admin')) organizeOwnerDashboard();
 
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
-  if (!appVisible) return;
+  if (!appVisible) { setTechLiveStatus('reconnecting'); return; }
 
   if (roleText().includes('Owner/Admin')) scheduleOwnerStartupLoad();
   if (isIT() && !viewIT()?.classList.contains('hidden') && !document.getElementById('wlItHome')) showITHome();
@@ -7780,13 +7959,25 @@ let lastLifecycleRefresh=0;
 function refreshAfterResume() {
   if (document.hidden) return;
   const now=Date.now();
-  if (now-lastLifecycleRefresh < 15000) return;
+  if (now-lastLifecycleRefresh < 5000) return;
   lastLifecycleRefresh=now;
+  setTechLiveStatus(navigator.onLine===false?'offline':'reconnecting');
   scheduleBoot();
-  if (roleText().includes('Owner/Admin')) scheduleOwnerRefresh(true,220);
+  setupTechWorkflowRealtime(true);
+  setupNotificationRealtime(true);
+  forceTechWorkflowRefresh('resume');
+  if (roleText().includes('Owner/Admin')) scheduleOwnerRefresh(true,80);
 }
 document.addEventListener('visibilitychange', refreshAfterResume);
 window.addEventListener('focus', refreshAfterResume);
+window.addEventListener('pageshow',event=>{if(event.persisted)refreshAfterResume();});
+window.addEventListener('online',()=>{
+  setTechLiveStatus('reconnecting');
+  setupTechWorkflowRealtime(true);
+  setupNotificationRealtime(true);
+  forceTechWorkflowRefresh('online');
+});
+window.addEventListener('offline',()=>setTechLiveStatus('offline'));
 window.addEventListener('beforeunload', ownerSaveAssignDraftNow);
 boot();
 
