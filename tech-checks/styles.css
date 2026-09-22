@@ -4774,3 +4774,61 @@ body.busy #view-owner,#view-owner #ownerApp,#view-owner .ownerAppWorkspace,#view
 #view-owner #ownerPersistentAccounts #userList .roleBadge.owner{background:#321719!important;border-color:#7a3036!important;color:#ffb6ba!important}
 #view-owner #ownerPersistentAccounts #userList .roleBadge.it,
 #view-owner #ownerPersistentAccounts #userList .roleBadge.service{background:#18242b!important;border-color:#465963!important;color:#e8f0f4!important}
+
+
+/* Tech Check global dark/red visual system — match Owner Accounts v225 */
+:root{
+  --tc-bg:#081117;--tc-panel:#0d1920;--tc-panel2:#111f27;--tc-line:#31434e;
+  --tc-text:#f4f8fa;--tc-muted:#aebdc6;--tc-red:#e31b23;
+}
+body{background:var(--tc-bg)!important;color:var(--tc-text)!important}
+.wrap,.view{color:var(--tc-text)}
+.card,.check,.item,.report,.ticketCard,.prepCard,.inspectionCard,.returnCard,
+.ownerDashSection,.ownerDashBody,.wl-card,.wl-panel,.wl-review,.wl-note{
+  background:var(--tc-panel2)!important;border-color:var(--tc-line)!important;color:var(--tc-text)!important;box-shadow:none!important;
+}
+.card h1,.card h2,.card h3,.card h4,.card b,.card strong,
+.check b,.item b,.report b,.ticketCard b,.prepCard b,.inspectionCard b,.returnCard b,
+.view h1,.view h2,.view h3,.view h4,.view label{color:var(--tc-text)!important}
+.small,.muted,.help,.subtitle,.card p,.view small{color:var(--tc-muted)!important;opacity:1!important}
+input,select,textarea{
+  background:#0b141a!important;color:var(--tc-text)!important;border-color:#3a4d58!important;box-shadow:none!important;
+}
+input::placeholder,textarea::placeholder{color:#81939e!important;opacity:1!important}
+select option{background:#0b141a!important;color:var(--tc-text)!important}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--tc-red)!important;border-color:var(--tc-red)!important}
+button,.mini,.btn{border-color:#3a4d58}
+.btn,.btn.primary,button.primary,.mini.primary,.danger:not(.pill){
+  background:var(--tc-red)!important;border-color:#ff555b!important;color:#fff!important;
+}
+.tabs button.active,.tabs .active,.tab.active,[aria-selected="true"]{
+  background:var(--tc-red)!important;border-color:#ff555b!important;color:#fff!important;
+}
+.ok{background:#101d19!important;border-color:#315a49!important;color:#dff5e8!important}
+.warn{background:#241719!important;border-color:#713138!important;color:#ffd9dc!important}
+.pill,.badge{background:#17242c;border-color:#465963;color:#eef5f8}
+.pill.green,.badge.green{background:#102019!important;border-color:#315a49!important;color:#aef0c8!important}
+.pill.amber,.badge.amber{background:#251a11!important;border-color:#744b24!important;color:#ffd39b!important}
+.sep{background:#2a3d49!important}
+table,thead,tbody,tr,td,th{border-color:var(--tc-line)!important}
+th{color:#dce6eb!important}
+td{color:#eef5f8!important}
+.connectionBanner{background:#111f27!important;border-color:#31434e!important;color:#eef5f8!important}
+.connectionBanner.online{background:#101d19!important;border-color:#315a49!important;color:#dff5e8!important}
+#view-it,#view-service,#view-owner{background:var(--tc-bg)!important;color:var(--tc-text)!important}
+#view-it .card,#view-service .card,
+#view-it details,#view-service details,
+#view-it .item,#view-service .item{
+  background:var(--tc-panel2)!important;border-color:var(--tc-line)!important;color:var(--tc-text)!important;
+}
+#view-it summary,#view-service summary{color:var(--tc-text)!important}
+#view-it summary b,#view-service summary b{color:#fff!important}
+#view-it .small,#view-service .small,#view-it p,#view-service p{color:var(--tc-muted)!important}
+#view-it button:not(.danger),#view-service button:not(.danger){
+  background:#121d24;color:#eef5f8;border-color:#3a4d58;
+}
+#view-it button:hover,#view-service button:hover{border-color:#667985}
+#view-it button.active,#view-service button.active,
+#view-it button[aria-pressed="true"],#view-service button[aria-pressed="true"]{
+  background:var(--tc-red)!important;border-color:#ff555b!important;color:#fff!important;
+}
