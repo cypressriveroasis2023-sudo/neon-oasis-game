@@ -5849,3 +5849,725 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
   }
   #view-owner .ownerAppBrand,#view-owner .ownerAppSidebarUtility{display:none!important}
 }
+
+
+/* Owner calendar command center v240 */
+#view-owner .ownerCalTop{
+  width:100%;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:18px!important;
+  align-items:start!important;
+  margin:0 0 14px!important;
+}
+#view-owner .ownerCalTop .ownerAppPageHeader{
+  margin:0!important;
+  padding-bottom:14px!important;
+}
+#view-owner .ownerCalQuick{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  padding-top:4px!important;
+  flex-wrap:wrap!important;
+}
+#view-owner .ownerCalQuick button{
+  min-height:40px!important;
+  padding:0 15px!important;
+  border-radius:8px!important;
+  font-size:11px!important;
+  font-weight:900!important;
+}
+#view-owner .ownerCalStats{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  margin:0 0 14px;
+}
+#view-owner .ownerCalStats>div{
+  min-height:72px;
+  padding:12px 14px;
+  border:1px solid #293e49;
+  border-radius:9px;
+  background:#101c23;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+#view-owner .ownerCalStats b{
+  color:#f5fafc!important;
+  font-size:25px!important;
+  line-height:1!important;
+  font-weight:1000!important;
+}
+#view-owner .ownerCalStats span{
+  margin-top:6px;
+  color:#8095a1!important;
+  font-size:8px!important;
+  line-height:1.2!important;
+  font-weight:950!important;
+  letter-spacing:.12em!important;
+}
+#view-owner .ownerCalControlBar{
+  width:100%;
+  min-height:54px;
+  display:grid;
+  grid-template-columns:minmax(280px,1fr) auto auto;
+  gap:12px;
+  align-items:center;
+  padding:8px 10px;
+  margin:0 0 10px;
+  border:1px solid #2a3f4a;
+  border-radius:10px;
+  background:#0f1b22;
+}
+#view-owner .ownerCalPeriod,
+#view-owner .ownerCalRoleFilters,
+#view-owner .ownerCalModes{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+#view-owner .ownerCalPeriod h2{
+  min-width:0;
+  margin:0 0 0 8px!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#f2f7f9!important;
+  font-size:18px!important;
+  font-weight:950!important;
+}
+#view-owner .ownerCalControlBar button{
+  min-height:34px;
+  padding:0 10px;
+  border:1px solid #344c58;
+  border-radius:6px;
+  background:#14232b;
+  color:#c6d2d8;
+  font:inherit;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+#view-owner .ownerCalControlBar button:hover{
+  border-color:#4b6a79;
+  background:#192b35;
+  color:#fff;
+}
+#view-owner .ownerCalRoleFilters>span{
+  margin-right:2px;
+  color:#738995;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.12em;
+}
+#view-owner .ownerCalRoleFilters button.active,
+#view-owner .ownerCalModes button.active{
+  border-color:#ef4338!important;
+  background:#2a1719!important;
+  color:#fff!important;
+  box-shadow:inset 0 -2px 0 #ef4338;
+}
+#view-owner .ownerCalWorkspaceV2{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 360px;
+  gap:14px;
+  align-items:start;
+}
+#view-owner .ownerCalMain{
+  min-width:0;
+}
+#view-owner .ownerCalBoard{
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+  border:1px solid #263b46!important;
+  border-radius:11px!important;
+  background:#0b161d!important;
+}
+#view-owner .ownerCalScroll{
+  width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-color:#435b68 #0b161d;
+}
+#view-owner .ownerCalGridFrame{
+  min-width:760px;
+}
+#view-owner .ownerCalWeekFrame{
+  min-width:920px;
+}
+#view-owner .ownerCalWeekdays{
+  max-width:none!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(0,1fr))!important;
+  border:0!important;
+  border-bottom:1px solid #293e49!important;
+  background:#101d24!important;
+}
+#view-owner .ownerCalWeekdays b{
+  min-height:36px;
+  display:grid;
+  place-items:center;
+  padding:0 7px!important;
+  color:#8da0ab!important;
+  font-size:9px!important;
+  font-weight:950!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}
+#view-owner .ownerCalMonth,
+#view-owner .ownerCalWeek{
+  max-width:none!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(0,1fr))!important;
+  border:0!important;
+  background:#0b161d!important;
+}
+#view-owner .ownerCalMonth{
+  min-height:auto!important;
+}
+#view-owner .ownerCalWeek{
+  min-height:640px!important;
+}
+#view-owner .ownerCalDay{
+  appearance:none;
+  width:100%;
+  min-width:0;
+  min-height:128px!important;
+  padding:8px!important;
+  border:0!important;
+  border-right:1px solid #1e313b!important;
+  border-bottom:1px solid #1e313b!important;
+  border-radius:0!important;
+  background:#0b171e!important;
+  color:#e7eef2!important;
+  text-align:left!important;
+  overflow:hidden!important;
+  cursor:pointer!important;
+  transition:background .12s ease,box-shadow .12s ease!important;
+}
+#view-owner .ownerCalMonth .ownerCalDay:nth-child(7n),
+#view-owner .ownerCalWeek .ownerCalDay:nth-child(7n){
+  border-right:0!important;
+}
+#view-owner .ownerCalDay:hover{
+  background:#10212a!important;
+}
+#view-owner .ownerCalDay.muted{
+  background:#091219!important;
+  opacity:.47!important;
+}
+#view-owner .ownerCalDay.selected{
+  position:relative;
+  z-index:1;
+  background:#111f27!important;
+  box-shadow:inset 0 0 0 2px #ef4338!important;
+}
+#view-owner .ownerCalDay.today{
+  box-shadow:inset 0 0 0 1px #425e6b!important;
+}
+#view-owner .ownerCalDay.today.selected{
+  box-shadow:inset 0 0 0 2px #ef4338!important;
+}
+#view-owner .ownerCalDate{
+  min-height:24px;
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  margin:0 0 5px!important;
+  color:#9caeb7!important;
+}
+#view-owner .ownerCalDate b{
+  min-width:22px;
+  color:#eef4f7!important;
+  font-size:12px!important;
+  font-weight:1000!important;
+}
+#view-owner .ownerCalDate em{
+  padding:2px 5px;
+  border-radius:4px;
+  background:#ef4338;
+  color:#fff;
+  font-style:normal;
+  font-size:6px;
+  font-weight:1000;
+  letter-spacing:.08em;
+}
+#view-owner .ownerCalDate span{
+  margin-left:auto;
+  color:#6f8490!important;
+  font-size:7px!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+#view-owner .ownerCalEvent{
+  width:100%;
+  min-width:0;
+  margin:4px 0 0!important;
+  padding:6px 7px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:2px!important;
+  border:1px solid #29404b!important;
+  border-left:3px solid #3c9bd1!important;
+  border-radius:6px!important;
+  background:#111f27!important;
+  text-align:left!important;
+  overflow:hidden!important;
+}
+#view-owner .ownerCalEvent.service{
+  border-left-color:#48a66d!important;
+}
+#view-owner .ownerCalEvent.waiting{
+  background:#171d20!important;
+}
+#view-owner .ownerCalEvent.working{
+  background:#102535!important;
+}
+#view-owner .ownerCalEvent.complete{
+  opacity:.72!important;
+}
+#view-owner .ownerCalEvent div{
+  min-width:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:4px!important;
+}
+#view-owner .ownerCalEvent b{
+  color:#f2f7f9!important;
+  font-size:8px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+}
+#view-owner .ownerCalEvent span{
+  color:#79909b!important;
+  font-size:6px!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+#view-owner .ownerCalEvent strong{
+  display:block!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  color:#9fb0b9!important;
+  font-size:7px!important;
+  font-weight:750!important;
+}
+#view-owner .ownerCalMore{
+  display:block;
+  margin-top:5px;
+  color:#ef8589!important;
+  font-size:7px!important;
+  font-weight:900!important;
+}
+#view-owner .ownerCalSideRail{
+  min-width:0;
+  display:grid;
+  gap:12px;
+  position:sticky;
+  top:12px;
+}
+#view-owner .ownerCalAgenda,
+#view-owner .ownerCalInspector{
+  width:100%;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden;
+  border:1px solid #293f4b!important;
+  border-radius:11px!important;
+  background:#0e1a21!important;
+}
+#view-owner .ownerCalAgendaHead,
+#view-owner .ownerCalInspectorHead{
+  min-height:66px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px 13px!important;
+  border-bottom:1px solid #273c47!important;
+  background:#101f27!important;
+}
+#view-owner .ownerCalAgendaHead>div,
+#view-owner .ownerCalInspectorHead>div{
+  min-width:0;
+}
+#view-owner .ownerCalAgendaHead small,
+#view-owner .ownerCalInspectorHead small{
+  display:block;
+  color:#ef5a52!important;
+  font-size:7px!important;
+  font-weight:1000!important;
+  letter-spacing:.12em!important;
+}
+#view-owner .ownerCalAgendaHead h3,
+#view-owner .ownerCalInspectorHead h3{
+  margin:2px 0 1px!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#f4f8fa!important;
+  font-size:15px!important;
+  line-height:1.15!important;
+}
+#view-owner .ownerCalAgendaHead span,
+#view-owner .ownerCalInspectorHead span{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#8296a1!important;
+  font-size:9px!important;
+}
+#view-owner .ownerCalAgendaHead>strong{
+  min-width:30px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:#20333e;
+  color:#e5edf1;
+  font-size:10px;
+}
+#view-owner .ownerCalInspectorHead>strong{
+  padding:5px 7px;
+  border-radius:5px;
+  background:#20333e;
+  color:#d8e3e8;
+  font-size:7px;
+  font-weight:1000;
+  letter-spacing:.06em;
+  white-space:nowrap;
+}
+#view-owner .ownerCalAgendaList{
+  max-height:360px;
+  overflow:auto;
+  padding:8px;
+}
+#view-owner .ownerCalAgendaJob{
+  width:100%!important;
+  min-height:76px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:10px!important;
+  align-items:start!important;
+  margin:0 0 7px!important;
+  padding:10px!important;
+  border:1px solid #2b424e!important;
+  border-left:3px solid #48a66d!important;
+  border-radius:8px!important;
+  background:#101f27!important;
+  color:#edf3f6!important;
+  text-align:left!important;
+  cursor:pointer!important;
+}
+#view-owner .ownerCalAgendaJob.it{
+  border-left-color:#3c9bd1!important;
+}
+#view-owner .ownerCalAgendaJob.selected{
+  background:#142933!important;
+  box-shadow:inset 0 0 0 1px #45697b!important;
+}
+#view-owner .ownerCalAgendaJob:hover{
+  background:#142630!important;
+}
+#view-owner .ownerCalAgendaMain{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+#view-owner .ownerCalAgendaMain>span{
+  color:#78909b!important;
+  font-size:7px!important;
+  font-weight:950!important;
+  letter-spacing:.07em!important;
+}
+#view-owner .ownerCalAgendaMain>b{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#f2f7f9!important;
+  font-size:10px!important;
+}
+#view-owner .ownerCalAgendaMain>small{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  color:#91a3ac!important;
+  font-size:8px!important;
+  line-height:1.3!important;
+}
+#view-owner .ownerCalAgendaState{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+}
+#view-owner .ownerCalAgendaState strong{
+  color:#dce6ea!important;
+  font-size:7px!important;
+}
+#view-owner .ownerCalAgendaState em{
+  padding:3px 5px;
+  border-radius:4px;
+  background:#283740;
+  color:#9eb0ba!important;
+  font-style:normal!important;
+  font-size:6px!important;
+  font-weight:1000!important;
+  letter-spacing:.05em!important;
+}
+#view-owner .ownerCalFacts{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:0!important;
+  padding:4px 10px 10px!important;
+}
+#view-owner .ownerCalFacts span{
+  min-height:52px;
+  padding:9px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:3px;
+  border-right:1px solid #263a45;
+  border-bottom:1px solid #263a45;
+}
+#view-owner .ownerCalFacts span:nth-child(2n){
+  border-right:0;
+}
+#view-owner .ownerCalFacts span:nth-last-child(-n+2){
+  border-bottom:0;
+}
+#view-owner .ownerCalFacts small,
+#view-owner .ownerCalInspectorSection>small{
+  color:#708691!important;
+  font-size:6px!important;
+  font-weight:950!important;
+  letter-spacing:.11em!important;
+}
+#view-owner .ownerCalFacts b{
+  color:#edf4f7!important;
+  font-size:9px!important;
+}
+#view-owner .ownerCalInspectorSection{
+  margin:0 10px!important;
+  padding:10px 0!important;
+  border-top:1px solid #273b46!important;
+}
+#view-owner .ownerCalInspectorSection>b{
+  display:block;
+  margin-top:3px;
+  color:#eef4f7!important;
+  font-size:10px!important;
+}
+#view-owner .ownerCalInspectorSection>p{
+  margin:4px 0 0!important;
+  color:#9badb6!important;
+  font-size:9px!important;
+  line-height:1.4!important;
+}
+#view-owner .ownerCalInspectorActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  padding:10px;
+}
+#view-owner .ownerCalInspectorActions button{
+  width:100%!important;
+  min-height:38px!important;
+  margin:0!important;
+}
+#view-owner .ownerCalRailEmpty{
+  padding:18px;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+#view-owner .ownerCalRailEmpty b{
+  color:#eef4f7!important;
+  font-size:12px!important;
+}
+#view-owner .ownerCalRailEmpty span{
+  color:#8397a2!important;
+  font-size:9px!important;
+  line-height:1.4!important;
+}
+#view-owner .ownerCalYear{
+  max-width:none!important;
+  width:100%!important;
+  padding:12px!important;
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+#view-owner .ownerCalYear button{
+  min-height:128px!important;
+  padding:14px!important;
+  display:grid!important;
+  grid-template-columns:1fr auto!important;
+  grid-template-rows:auto auto 1fr!important;
+  gap:3px 8px!important;
+  border:1px solid #2a414d!important;
+  border-radius:9px!important;
+  background:#101f27!important;
+  color:#eef4f7!important;
+  text-align:left!important;
+}
+#view-owner .ownerCalYear button:hover{
+  background:#152832!important;
+  border-color:#496878!important;
+}
+#view-owner .ownerCalYear button>span{
+  grid-column:1/-1;
+  color:#ef5a52!important;
+  font-size:7px!important;
+  font-weight:1000!important;
+  letter-spacing:.12em!important;
+}
+#view-owner .ownerCalYear button>b{
+  color:#fff!important;
+  font-size:15px!important;
+}
+#view-owner .ownerCalYear button>strong{
+  color:#fff!important;
+  font-size:28px!important;
+  line-height:1!important;
+}
+#view-owner .ownerCalYear button>small{
+  grid-column:1/-1;
+  align-self:end;
+  color:#8498a3!important;
+  font-size:8px!important;
+}
+
+@media(min-width:1500px){
+  #view-owner .ownerCalWorkspaceV2{
+    grid-template-columns:minmax(0,1fr) 390px;
+    gap:16px;
+  }
+  #view-owner .ownerCalDay{
+    min-height:142px!important;
+  }
+  #view-owner .ownerCalEvent b{
+    font-size:9px!important;
+  }
+  #view-owner .ownerCalEvent strong{
+    font-size:8px!important;
+  }
+}
+@media(max-width:1320px){
+  #view-owner .ownerCalWorkspaceV2{
+    grid-template-columns:1fr!important;
+  }
+  #view-owner .ownerCalSideRail{
+    position:static!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  }
+  #view-owner .ownerCalAgenda,
+  #view-owner .ownerCalInspector{
+    min-height:100%!important;
+  }
+  #view-owner .ownerCalAgendaList{
+    max-height:390px;
+  }
+}
+@media(max-width:1000px){
+  #view-owner .ownerCalControlBar{
+    grid-template-columns:1fr auto!important;
+  }
+  #view-owner .ownerCalPeriod{
+    grid-column:1/-1;
+  }
+  #view-owner .ownerCalRoleFilters{
+    justify-self:start;
+  }
+  #view-owner .ownerCalModes{
+    justify-self:end;
+  }
+  #view-owner .ownerCalStats{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media(max-width:720px){
+  #view-owner .ownerCalTop{
+    grid-template-columns:1fr!important;
+    gap:6px!important;
+  }
+  #view-owner .ownerCalQuick{
+    justify-content:flex-start!important;
+    padding:0 0 4px!important;
+  }
+  #view-owner .ownerCalQuick button{
+    flex:1 1 auto!important;
+  }
+  #view-owner .ownerCalStats{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+  #view-owner .ownerCalStats>div{
+    min-height:62px!important;
+    padding:9px 10px!important;
+  }
+  #view-owner .ownerCalStats>div:last-child{
+    grid-column:1/-1;
+  }
+  #view-owner .ownerCalStats b{
+    font-size:21px!important;
+  }
+  #view-owner .ownerCalControlBar{
+    grid-template-columns:1fr!important;
+    padding:8px!important;
+  }
+  #view-owner .ownerCalPeriod,
+  #view-owner .ownerCalRoleFilters,
+  #view-owner .ownerCalModes{
+    width:100%;
+    justify-content:flex-start!important;
+    overflow-x:auto;
+  }
+  #view-owner .ownerCalPeriod h2{
+    margin-left:4px!important;
+    font-size:15px!important;
+  }
+  #view-owner .ownerCalRoleFilters button,
+  #view-owner .ownerCalModes button{
+    flex:0 0 auto;
+  }
+  #view-owner .ownerCalGridFrame{
+    min-width:720px!important;
+  }
+  #view-owner .ownerCalWeekFrame{
+    min-width:880px!important;
+  }
+  #view-owner .ownerCalDay{
+    min-height:112px!important;
+  }
+  #view-owner .ownerCalSideRail{
+    grid-template-columns:1fr!important;
+  }
+  #view-owner .ownerCalAgendaList{
+    max-height:none!important;
+  }
+  #view-owner .ownerCalYear{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:460px){
+  #view-owner .ownerCalYear{
+    grid-template-columns:1fr!important;
+  }
+}
