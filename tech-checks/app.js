@@ -88,7 +88,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=truck-sims-20260922l')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=truck-sims-20260922m')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -2322,8 +2322,10 @@ function ownerTodayReadinessHtml(){
   if(!techs.length)return '';
   return '<section class="ownerTodayPanel"><header><div><span>TEAM READINESS</span><h2>Service Trucks</h2></div><button class="mini" type="button" onclick="ownerAppNavigate(\'team\')">Open Team Board →</button></header><div class="ownerTodayReadinessGrid">'+techs.map(t=>{
     const inspection=t.inspection||{},inv=t.inventory_check||{};
+    const sims=Array.isArray(t.sims)?t.sims:[];
+    const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
     const ready=Boolean(t.truck_ready);
-    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(inv.ready?'good':'bad')+'">Inventory '+(inv.ready?'✓':'✕')+'</i></div></article>';
+    return '<article class="ownerTodayReadyCard '+(ready?'ready':'notReady')+'"><div><b>'+esc(t.name||'Service Tech')+'</b><span>'+(ready?'READY TO LEAVE SHOP':'NOT READY')+'</span></div><div class="ownerTodayReadyChecks"><i class="'+(inspection.truck_complete?'good':'bad')+'">Truck '+(inspection.truck_complete?'✓':'✕')+'</i><i class="'+(inspection.trailer_state==='not_taking'||inspection.trailer_complete?'good':'bad')+'">Trailer '+(inspection.trailer_state==='not_taking'?'N/A':inspection.trailer_complete?'✓':'✕')+'</i><i class="'+(simCount===3?'good':'bad')+'">SIMs '+simCount+'/3</i><i class="'+(inv.ready?'good':'bad')+'">Inventory '+(inv.ready?'✓':'✕')+'</i></div></article>';
   }).join('')+'</div></section>';
 }
 function ownerTodayJobsHtml(){
