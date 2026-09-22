@@ -61,6 +61,7 @@ let state = {
   ownerReviewQueue: [],
   ownerAIAlerts: [],
   ownerFieldEscalations: [],
+  ownerTechCommandBoard: null,
   dailyInspections: [],
   matched: [],
   sessionClosed: [],
@@ -153,9 +154,8 @@ function shiftDateKey(key,days) {
 function dateLabel(key) {
   return new Intl.DateTimeFormat(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'}).format(dateFromKey(key));
 }
-function serviceInspectionRequiredForDate(key) {
-  const day=dateFromKey(key).getDay();
-  return day>=1 && day<=5;
+function serviceInspectionRequiredForDate() {
+  return true;
 }
 
 function requiredBattery(item) {
@@ -232,6 +232,7 @@ function showAuth() {
     ownerReviewQueue: [],
     ownerAIAlerts: [],
     ownerFieldEscalations: [],
+    ownerTechCommandBoard: null,
     matched: [],
     sessionClosed: [],
   };
@@ -534,6 +535,26 @@ function setupRealtime() {
       { event: '*', schema: 'public', table: 'field_escalations' },
       scheduleRefreshData
     )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'service_truck_units' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'service_truck_stock' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'service_truck_inventory_checks' },
+      scheduleRefreshData
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'service_truck_restock_requests' },
+      scheduleRefreshData
+    )
     .subscribe(s => {
       $('syncStatus').textContent = !navigator.onLine ? 'Offline — unsent field drafts stay on this device' : s === 'SUBSCRIBED' ? 'Live shared data connected' : 'Connecting shared data…';
     });
@@ -599,7 +620,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     const reportLimit = initial ? 60 : 250;
     const historyLimit = initial ? 80 : 300;
     const registryLimit = initial ? 180 : 500;
-    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries] = await appTimeout(Promise.all([
+    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries, ownerTechBoard] = await appTimeout(Promise.all([
       db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
@@ -613,7 +634,8 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.from('team_access_history').select('*').order('created_at',{ascending:false}).limit(initial ? 40 : 100),
       db.rpc('owner_review_queue_v1',{p_limit:40}),
       db.from('field_escalations').select('id,ticket_no,site,unit_tag,equipment_type,status,service_tech_name,it_tech_name,original_problem,service_troubleshooting_notes,it_troubleshooting_notes,owner_summary,created_at,updated_at').is('resolved_at',null).order('updated_at',{ascending:false}).limit(100),
-      db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true})
+      db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true}),
+      db.rpc('owner_tech_command_board_v1',{p_date:localDateKey(new Date())})
     ]),'Owner production data');
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
@@ -629,6 +651,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     if (!ownerReviewQueue.error) state.ownerReviewQueue = Array.isArray(ownerReviewQueue.data) ? ownerReviewQueue.data : [];
     if (!fieldEscalations.error) state.ownerFieldEscalations = fieldEscalations.data || [];
     if (!truckSpareBatteries.error) state.truckSpareBatteries = truckSpareBatteries.data || [];
+    if (!ownerTechBoard.error) state.ownerTechCommandBoard = ownerTechBoard.data || null;
     renderOwner();
     renderOwnerUnitSearch();
     renderOwnerEquipment();
@@ -1852,22 +1875,128 @@ function ownerAppCalendar(){
  return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar','Interactive Tech Check schedule — select a day to inspect the work.')+'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerCalendarServiceOrder()">Service Order</button><button class="mini" type="button" onclick="ownerCalendarToday()">↻</button></div></div>'
  +'<div class="ownerCalWorkspace"><main><div class="ownerCalToolbar"><div><button aria-label="Previous" onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button aria-label="Next" onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div><div class="ownerCalModes"><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='year'?'active':'')+'" onclick="ownerCalendarSetMode(\'year\')">Year</button></div></div><div class="ownerCalLayout"><div class="ownerCalBoard">'+cal+'</div>'+(ownerCalendarMode==='year'?'':ownerCalendarAgenda())+'</div></main>'+ownerCalendarInspector()+'</div>';
 }
-function ownerAppToday(){
-  const today=localDateKey(new Date());
-  const rows=(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');
-  const groups=[
-    ['Needs Assignment','Needs an owner assignment',a=>!a.assignee_user_id&&a.assignment_scope!=='department'&&a.status!=='completed'],
-    ['Waiting for IT','Ready for IT to take the next step',a=>a.assigned_role==='it'&&a.status==='assigned'],
-    ['IT Working','IT has the job now',a=>a.assigned_role==='it'&&a.status==='started'],
-    ['Waiting for Service','Ready for Service to take the next step',a=>a.assigned_role==='service'&&a.status==='assigned'],
-    ['Service Working','Service has the job now',a=>a.assigned_role==='service'&&a.status==='started'],
-    ['Complete','Finished today',a=>a.status==='completed']
-  ];
-  const active=rows.filter(a=>a.status!=='completed').length, working=rows.filter(a=>a.status==='started').length, waiting=rows.filter(a=>a.status==='assigned').length, complete=rows.filter(a=>a.status==='completed').length;
-  const summary='<div class="ownerTodaySummary"><div><b>'+rows.length+'</b><span>TOTAL TODAY</span></div><div><b>'+active+'</b><span>OPEN</span></div><div><b>'+working+'</b><span>WORKING</span></div><div><b>'+waiting+'</b><span>WAITING</span></div><div><b>'+complete+'</b><span>COMPLETE</span></div></div>';
-  const body=groups.map(([label,sub,fn])=>{const x=rows.filter(fn);return x.length?'<section class="ownerTodayGroup"><header><div><h2>'+label+'</h2><p>'+sub+'</p></div><strong>'+x.length+'</strong></header><div class="ownerTodayJobs">'+x.map(ownerAppJobRow).join('')+'</div></section>':''}).join('');
-  return ownerAppHeader('TODAY','Today','Live Tech Check work for today — who has it, what they are doing, and what is waiting.')+summary+(body||ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY'));
+
+function ownerBoardTime(value){
+  if(!value)return '—';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'—':d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 }
+function ownerBoardInitials(name){
+  return String(name||'Tech').trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'T';
+}
+function ownerBoardCheckRow(label,stateValue,detail,time=''){
+  const cls=stateValue==='good'?'good':stateValue==='na'?'na':'bad';
+  const icon=stateValue==='good'?'✓':stateValue==='na'?'—':'✕';
+  return '<div class="ownerCmdReadyRow '+cls+'"><span>'+esc(label)+'</span><b><i>'+icon+'</i>'+esc(detail)+'</b><em>'+esc(time||'')+'</em></div>';
+}
+function ownerBoardStageHtml(stages){
+  const rows=(Array.isArray(stages)?stages:[]).filter(s=>s.status!=='not_required');
+  if(!rows.length)return '';
+  return '<div class="ownerCmdJobFlow">'+rows.map((s,index)=>{
+    const status=String(s.status||'waiting');
+    const cls=status==='complete'?'complete':status==='working'?'working':'waiting';
+    const icon=status==='complete'?'✓':status==='working'?'●':'○';
+    return '<div class="ownerCmdFlowStep '+cls+'"><i>'+icon+'</i><span><b>'+esc(s.label||s.key||'Step')+'</b>'+(s.tech?'<small>'+esc(s.tech)+'</small>':'')+'</span></div>'+(index<rows.length-1?'<div class="ownerCmdFlowLine"></div>':'');
+  }).join('')+'</div>';
+}
+function ownerBoardJobHtml(job){
+  const flow=job.flow==='IT_TO_SERVICE'?'IT → SERVICE':job.flow==='SERVICE_TO_IT'?'SERVICE → IT':'SERVICE';
+  const stage=String(job.current_stage||'WAITING').replaceAll('_',' ');
+  const stageClass=/complete/i.test(stage)?'complete':/working|progress/i.test(stage)?'working':/owner|replacement|inventory/i.test(stage)?'danger':'waiting';
+  const time=job.scheduled_time?String(job.scheduled_time).slice(0,5):'';
+  return '<article class="ownerCmdJob '+stageClass+'">'
+    +'<header><div><span>MHELPDESK</span><b>#'+esc(job.ticket_no||'—')+' · '+esc(job.site||'Site not recorded')+'</b></div><strong>'+esc(stage)+'</strong></header>'
+    +'<div class="ownerCmdJobMeta"><span>'+esc(String(job.work_type||'service').toUpperCase())+'</span><span>'+esc(flow)+'</span>'+(time?'<span>'+esc(time)+'</span>':'')+'</div>'
+    +(job.job_description?'<p>'+esc(job.job_description)+'</p>':'')
+    +ownerBoardStageHtml(job.stages)
+    +'</article>';
+}
+function ownerBoardUnitHtml(unit){
+  const status=String(unit.status||'unassigned');
+  const ok=status==='assigned'&&unit.unit_tag;
+  let detail=ok?'Unit '+unit.unit_tag:'MISSING';
+  let sub='';
+  if(status==='used_restock_due'){
+    detail=unit.unit_tag?'Unit '+unit.unit_tag+' · USED':'USED';
+    sub=(unit.last_used_ticket_no?'Used at MHelpDesk #'+unit.last_used_ticket_no+'. ':'')+'Awaiting IT replacement.';
+  }else if(!ok){
+    sub='Permanent truck unit must be assigned by IT.';
+  }
+  return '<div class="ownerCmdUnitRow '+(ok?'good':'bad')+'"><span>'+esc(unit.equipment_type||'Unit')+'</span><b>'+esc(detail)+'</b><i>'+(ok?'✓':'!')+'</i>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div>';
+}
+function ownerBoardStockRow(label,have,required){
+  const ok=Number(have)>=Number(required);
+  return '<div class="ownerCmdStockRow '+(ok?'good':'bad')+'"><span>'+esc(label)+'</span><b>'+Number(have||0)+' / '+Number(required)+'</b><i>'+(ok?'✓':'!')+'</i></div>';
+}
+function ownerBoardServiceTechCard(tech){
+  const inspection=tech.inspection||{},inventory=tech.inventory_check||{},stock=tech.stock||{};
+  const units=Array.isArray(tech.units)?tech.units:[];
+  const jobs=Array.isArray(tech.jobs)?tech.jobs:[];
+  const restocks=Array.isArray(tech.restock_requests)?tech.restock_requests:[];
+  const missing=Array.isArray(tech.missing)?tech.missing:[];
+  const ready=Boolean(tech.truck_ready);
+  const truckState=inspection.truck_complete?'good':'bad';
+  const trailerState=inspection.trailer_state==='not_taking'?'na':inspection.trailer_complete?'good':'bad';
+  const trailerDetail=inspection.trailer_state==='not_taking'?'NOT TAKING':inspection.trailer_complete?'COMPLETE':'NOT COMPLETE';
+  const inventoryState=inventory.ready?'good':'bad';
+  const unitCount=units.filter(u=>u.status==='assigned'&&u.unit_tag).length;
+  const restockSummary=restocks.length
+    ? '<div class="ownerCmdRestock"><b>⚠ '+restocks.length+' IT RESTOCK ITEM'+(restocks.length===1?'':'S')+'</b>'+restocks.map(r=>'<span>'+esc(r.item_type)+' · '+esc(String(r.status||'requested').replaceAll('_',' ').toUpperCase())+(r.original_ticket_no?' · #'+esc(r.original_ticket_no):'')+'</span>').join('')+'</div>'
+    : '';
+  return '<section class="ownerCmdTechCard '+(ready?'ready':'notReady')+'">'
+    +'<header class="ownerCmdTechHead"><div class="ownerCmdAvatar">'+esc(ownerBoardInitials(tech.name))+'</div><div><h2>'+esc(tech.name||'Service Tech')+'</h2><span>SERVICE TECHNICIAN</span></div><strong class="'+(ready?'ready':'danger')+'">'+(ready?'TRUCK READY':'NOT READY')+'</strong></header>'
+    +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>DAILY READINESS</b><span>'+esc(dateLabel((state.ownerTechCommandBoard&&state.ownerTechCommandBoard.date)||localDateKey(new Date())))+'</span></div>'
+      +ownerBoardCheckRow('Truck Inspection',truckState,inspection.truck_complete?'COMPLETE':'NOT COMPLETE',inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
+      +ownerBoardCheckRow('Trailer Inspection',trailerState,trailerDetail,inspection.taking_trailer&&inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
+      +ownerBoardCheckRow('Truck Inventory',inventoryState,inventory.ready?'COMPLETE':'MISSING STOCK',inventory.submitted?ownerBoardTime(inventory.submitted_at):'')
+    +'</div>'
+    +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>TRUCK INVENTORY</b><span>'+unitCount+' / 4 units</span></div>'
+      +'<div class="ownerCmdUnitList">'+units.map(ownerBoardUnitHtml).join('')+'</div>'
+      +'<div class="ownerCmdStockList">'
+        +ownerBoardStockRow('Recon Batteries',stock.recon_battery_qty,25)
+        +ownerBoardStockRow('AGM 12V 110Ah',stock.agm_12v_110ah_qty,4)
+        +ownerBoardStockRow('LiTime 12V 100Ah',stock.litime_12v_100ah_qty,2)
+      +'</div>'
+      +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
+      +restockSummary
+    +'</div>'
+    +'<div class="ownerCmdSection jobs"><div class="ownerCmdSectionHead"><b>TODAY’S JOBS</b><span>'+jobs.length+'</span></div>'
+      +(jobs.length?'<div class="ownerCmdJobs">'+jobs.map(ownerBoardJobHtml).join('')+'</div>':'<div class="ownerCmdEmpty">No Service jobs assigned today.</div>')
+    +'</div>'
+    +'</section>';
+}
+function ownerBoardITSupportHtml(itTechs){
+  const techs=Array.isArray(itTechs)?itTechs:[];
+  if(!techs.length)return '';
+  return '<section class="ownerCmdITSection"><header><div><span>IT SUPPORT</span><h2>IT Technicians</h2></div><strong>'+techs.length+'</strong></header><div class="ownerCmdITGrid">'
+    +techs.map(t=>{
+      const jobs=Array.isArray(t.jobs)?t.jobs:[];
+      const current=jobs.find(j=>j.status==='started')||jobs.find(j=>j.status==='assigned')||jobs[0];
+      return '<article class="ownerCmdITCard"><div class="ownerCmdAvatar small">'+esc(ownerBoardInitials(t.name))+'</div><div><b>'+esc(t.name||'IT Technician')+'</b><span>IT TECHNICIAN</span></div><div class="ownerCmdITWork"><b>'+(current?'MHelpDesk #'+esc(current.ticket_no):'No active job')+'</b><span>'+esc(current?(String(current.status||'').toUpperCase()+' · '+(current.site||'No site')):'Available / waiting')+'</span></div><strong>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</strong></article>';
+    }).join('')
+    +'</div></section>';
+}
+function ownerTechCommandBoardHtml(mode='today'){
+  const board=state.ownerTechCommandBoard;
+  if(!board)return ownerAppHeader('OWNER COMMAND CENTER',mode==='team'?'Technician Command Board':'Owner Command Center','Live technician readiness, permanent truck inventory, and IT ↔ Service job workflow.')+ownerAppEmpty('LOADING TECHNICIAN COMMAND BOARD','Refresh if this remains visible.');
+  const service=Array.isArray(board.service_techs)?board.service_techs:[];
+  const summary=board.summary||{};
+  const summaryHtml='<div class="ownerCmdSummary">'
+    +'<div><b>'+Number(summary.service_techs||service.length)+'</b><span>SERVICE TECHS</span></div>'
+    +'<div><b>'+Number(summary.active_jobs||0)+'</b><span>ACTIVE JOBS</span></div>'
+    +'<div class="'+(Number(summary.waiting_it||0)>0?'alert':'')+'"><b>'+Number(summary.waiting_it||0)+'</b><span>WAITING ON IT</span></div>'
+    +'<div class="'+(Number(summary.truck_restock_needed||0)>0?'alert':'')+'"><b>'+Number(summary.truck_restock_needed||0)+'</b><span>TRUCK RESTOCK NEEDED</span></div>'
+    +'</div>';
+  const title=mode==='team'?'Technician Command Board':'Owner Command Center';
+  const desc='Truck / trailer inspection, required truck inventory, exact unit numbers, stock shortages, and each job’s IT ↔ Service progress — one live board on desktop and mobile.';
+  return ownerAppHeader('LIVE OPERATIONS',title,desc)
+    +summaryHtml
+    +'<div class="ownerCmdBoardMeta"><span>Updated '+ownerBoardTime(board.generated_at)+'</span><button type="button" class="mini" onclick="refreshData()">↻ Refresh Live Board</button></div>'
+    +'<div class="ownerCmdTechGrid">'+(service.length?service.map(ownerBoardServiceTechCard).join(''):ownerAppEmpty('NO ACTIVE SERVICE TECHNICIANS'))+'</div>'
+    +ownerBoardITSupportHtml(board.it_techs);
+}
+
+function ownerAppToday(){ return ownerTechCommandBoardHtml('today'); }
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
 }
@@ -1887,17 +2016,7 @@ function ownerAppReview(){
   if(corrections.length)body+='<section class="ownerAppGroup"><h2>Corrections in progress <span>'+corrections.length+'</span></h2>'+corrections.map(rowHtml).join('')+'</section>';
   return ownerAppHeader('FINAL REVIEW','Owner Review','Jobs waiting for your review, correction decision, or final closeout.')+(body||ownerAppEmpty('NOTHING IS WAITING FOR OWNER REVIEW','Completed jobs appear here after the required Tech Check workflow is finished.'));
 }
-function ownerAppTeam(){
-  const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service'));
-  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled'&&a.status!=='completed');
-  const assets=state.assetInventory||[];
-  const body=techs.map(t=>{
-    const tj=jobs.filter(a=>a.assignee_user_id===t.user_id), ta=assets.filter(a=>a.assigned_to===t.user_id&&a.availability_status==='assigned');
-    const current=tj.find(a=>a.status==='started')||tj[0];
-    return '<button class="ownerAppTeamRow" type="button" onclick="ownerAppShowTechHistory(\''+t.user_id+'\')"><div><b>'+esc(t.full_name||t.username)+'</b><span>'+esc(t.role==='it'?'IT TECHNICIAN':'SERVICE TECHNICIAN')+'</span></div><div><b>'+(current?'MHelpDesk #'+esc(current.ticket_no):'No current job')+'</b><span>'+esc(current?(current.status==='started'?'Working now':'Waiting to start'):'Available')+'</span></div><div><b>'+ta.length+' assigned</b><span>'+esc(ta.map(a=>a.unit_tag).join(', ')||'No assigned equipment')+'</span></div></button>';
-  }).join('');
-  return ownerAppHeader('TEAM','Team','Active IT and Service technicians, current work, and assigned equipment.')+(body||ownerAppEmpty('NO ACTIVE TECHNICIANS'));
-}
+function ownerAppTeam(){ return ownerTechCommandBoardHtml('team'); }
 function ownerAppShowTechHistory(id){
   const t=(state.profiles||[]).find(p=>p.user_id===id);if(!t)return;
   const q=document.getElementById('ownerCompanyHistoryQuery'),k=document.getElementById('ownerCompanyHistoryKind');
