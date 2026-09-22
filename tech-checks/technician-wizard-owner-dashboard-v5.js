@@ -2182,7 +2182,7 @@ async function assignmentGateRows(assignments=[]){
   }));
 }
 async function serviceDayState(){
-  const [work,spares]=await Promise.all([serviceWorkData(),myTruckSpareData()]);
+  const [work,spares,healthQ]=await Promise.all([serviceWorkData(),myTruckSpareData(),liveDb.rpc('get_workflow_health_v1')]);
   const today=techCheckDateKey();
   const currentAssignments=(work.assignments||[]).filter(a=>techAssignmentIsCurrent(a,today));
   const futureAssignments=(work.assignments||[]).filter(a=>!techAssignmentIsCurrent(a,today));
@@ -2195,6 +2195,7 @@ async function serviceDayState(){
     currentAssignments,
     futureAssignments,
     gates,
+    recovery:healthQ?.data?.recovery||null,
     nextReady:gates.find(row=>row.gate?.ready)||null,
     nextBlocked:gates.find(row=>!row.gate?.ready)||null
   };
@@ -2212,11 +2213,12 @@ async function myITDraftPreps(){
 }
 async function itDayState(){
   const today=techCheckDateKey();
-  const [assignmentsQ,returnsQ,siteQ,draftsQ]=await Promise.all([
+  const [assignmentsQ,returnsQ,siteQ,draftsQ,healthQ]=await Promise.all([
     myActiveAssignments('it'),
     liveDb.from('unit_returns').select('id,ticket_no,unit_tag,equipment_type,status,returned_at').eq('status','waiting_it').order('returned_at',{ascending:true}).limit(50),
     swapSiteRegistrationRows(),
-    myITDraftPreps()
+    myITDraftPreps(),
+    liveDb.rpc('get_workflow_health_v1')
   ]);
   if(returnsQ.error)throw returnsQ.error;
   const assignments=assignmentsQ||[];
@@ -2230,6 +2232,7 @@ async function itDayState(){
     siteTasks:siteQ||[],
     drafts:draftsQ||[],
     gates,
+    recovery:healthQ?.data?.recovery||null,
     nextReady:gates.find(row=>row.gate?.ready)||null,
     nextBlocked:gates.find(row=>!row.gate?.ready)||null
   };
@@ -2244,6 +2247,10 @@ function serviceNextActionHtml(state){
   }
   if(state.spareCount>0){
     return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>RESOLVE TRUCK SPARES · ${state.spareCount}</b><small>Used / unused backup equipment must be resolved before your day can close.</small><button class='wl-service-start' data-wl-service-resolve-spares>RESOLVE SPARES</button></div>`;
+  }
+  if(state.recovery?.kind==='service_job'){
+    const a=state.currentAssignments.find(x=>String(x.id)===String(state.recovery.record_id));
+    if(a)return `<div class='wl-day-next-card urgent'><span>CONTINUE WHERE YOU STOPPED</span><b>${esc(state.recovery.title)}</b><small>${esc(state.recovery.step||'Continue this field job.')}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>RESUME JOB</button></div>`;
   }
   if(state.nextReady){
     const a=state.nextReady.assignment;
@@ -2277,6 +2284,34 @@ function itNextActionHtml(state){
     return `<div class='wl-day-next-card waiting'><span>IT JOB IS WAITING</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(gate.label||'WAITING')} · ${esc(gate.detail||'This IT job is not ready yet.')}</small><button class='wl-big wl-gray' data-wl-it-open-job>CHECK / ENTER A TICKET</button></div>`;
   }
   return `<div class='wl-day-next-card done'><span>ALL REQUIRED WORK IS CLEAR</span><b>END MY DAY</b><small>No unresolved IT work for today.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled and will not block today.`:''}</small><button class='wl-it-start' data-wl-tech-end-day='it'>END MY DAY</button></div>`;
+}
+
+let ownerWorkflowHealth=null;
+async function installOwnerWorkflowHealth(){
+  const {data,error}=await liveDb.rpc('get_workflow_health_v1');
+  if(error)throw error;
+  ownerWorkflowHealth=data||null;
+  renderOwnerWorkflowHealth();
+  return ownerWorkflowHealth;
+}
+function renderOwnerWorkflowHealth(){
+  const page=document.getElementById('ownerAppPage')||document.getElementById('view-owner');
+  if(!page)return;
+  let card=document.getElementById('ownerWorkflowHealthCard');
+  const issues=Array.isArray(ownerWorkflowHealth?.issues)?ownerWorkflowHealth.issues:[];
+  if(!issues.length){card?.remove();return;}
+  if(!card){card=document.createElement('section');card.id='ownerWorkflowHealthCard';card.className='owner-workflow-health';const anchor=document.getElementById('ownerRouteView');page.insertBefore(card,anchor||page.firstChild);}
+  card.innerHTML=`<div class='owner-health-head'><div><span>WORKFLOW HEALTH</span><h2>${issues.length} WORKFLOW ISSUE${issues.length===1?'':'S'} NEED ATTENTION</h2></div><b>${Number(ownerWorkflowHealth?.critical_count||0)} CRITICAL</b></div>
+    <div class='owner-health-list'>${issues.map(issue=>`<article class='${issue.severity==='critical'?'critical':'warning'}'><div><span>MHELPDESK #${esc(issue.ticket_no||'—')}</span><b>${esc(issue.title)}</b><small>${esc(issue.detail)}</small></div>${issue.repairable?`<button type='button' data-owner-repair-workflow='${esc(issue.issue_key)}'>REPAIR WORKFLOW</button>`:`<em>REVIEW REQUIRED</em>`}</article>`).join('')}</div>
+    <p>Safe Repair only relinks or recreates workflow routing already proven by saved records. It never creates photos, signatures, physical checks, swap answers, or inventory decisions.</p>`;
+}
+async function ownerRepairWorkflow(issueKey){
+  if(!issueKey)return;
+  if(!confirm('Repair this workflow using the existing saved records?\n\nTech Check will not invent evidence or technician confirmations.'))return;
+  const {data,error}=await liveDb.rpc('repair_workflow_issue_v1',{p_issue_key:issueKey});
+  if(error)return alert(error.message||'The workflow could not be repaired.');
+  alert(`Workflow repaired for MHelpDesk #${data?.ticket_no||''}. An audit entry was saved.`);
+  await runOwnerRefresh(true);
 }
 async function showServiceSpareResolution(){
   let card=document.getElementById('wlSvcSpareResolution');
@@ -7624,6 +7659,8 @@ document.addEventListener('click', async e => {
   }
   const ownerSaveEquipment=e.target.closest('[data-owner-save-equipment]');
   if(ownerSaveEquipment)return ownerSaveEquipmentQuantities(ownerSaveEquipment);
+  const workflowRepair=e.target.closest('[data-owner-repair-workflow]');
+  if(workflowRepair)return ownerRepairWorkflow(workflowRepair.dataset.ownerRepairWorkflow);
   const heliosReview=e.target.closest('[data-wl-owner-helios-review]'); if(heliosReview) return ownerOpenHeliosFinalReview(heliosReview.dataset.wlOwnerHeliosReview);
   const heliosVerify=e.target.closest('[data-wl-owner-helios-verify]'); if(heliosVerify) return ownerVerifyHeliosFinal(heliosVerify.dataset.wlOwnerHeliosVerify);
   if(e.target.closest('[data-wl-owner-helios-close]')) { document.getElementById('ownerHeliosFinalReview')?.remove(); return; }
@@ -7710,7 +7747,8 @@ async function runOwnerRefresh(force=false) {
     const results=await Promise.allSettled([
       techDashboardTimeout(installOwnerAssignments(force),null,12000),
       techDashboardTimeout(installOwnerIntake(force),null,12000),
-      techDashboardTimeout(installOwnerFieldEscalations(force),null,12000)
+      techDashboardTimeout(installOwnerFieldEscalations(force),null,12000),
+      techDashboardTimeout(installOwnerWorkflowHealth(),null,12000)
     ]);
     organizeOwnerDashboard();
     ownerLastRefreshAt=Date.now();
