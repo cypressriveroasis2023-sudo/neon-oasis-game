@@ -2255,7 +2255,7 @@ async function startAssignedJob(id) {
     const totalInput = document.getElementById('wlTotalUnits');
     if (totalInput) totalInput.value = String(requestedDevices);
     syncITEquipmentCounts();
-    totalInput?.focus();
+    refreshAssignedITSetupSummary();
     return;
   }
 
@@ -3008,6 +3008,26 @@ async function itFindJobByTicket() {
       : `<div class='wl-stop top10'><b>YOU CANNOT START YET.</b><div>${esc(gate.detail||'A required prior workflow step is not complete.')}</div></div>`}
   </div>`;
 }
+function refreshAssignedITSetupSummary() {
+  const host=document.getElementById('wlAssignedEquipmentReq');
+  if(!host || !pendingAssignmentManifest.length) return;
+  const ticket=document.getElementById('itTicket')?.value?.trim() || '';
+  const site=document.getElementById('itSite')?.value?.trim() || '';
+  const equipment=normalizedEquipmentManifest(pendingAssignmentManifest)
+    .map(row=>`${row.qty} × ${equipmentDisplayLabel(row.label)}`).join(' · ');
+  const partData={};
+  TICKET_PARTS.forEach(part=>{partData[part.key]=cleanPartQty(document.getElementById('wlPart'+part.id)?.value);});
+  const parts=ticketPartsRows(partData).filter(row=>row.qty>0);
+  host.innerHTML=`<div class='wl-simple-setup'>
+    <div class='wl-simple-setup-kicker'>YOUR IT JOB</div>
+    <div class='wl-simple-setup-ticket'>MHelpDesk #${esc(ticket)}</div>
+    <div class='wl-simple-setup-site'>${esc(site)}</div>
+    <div class='wl-simple-setup-label'>PREPARE</div>
+    <div class='wl-simple-setup-equipment'>${esc(equipment)}</div>
+    ${parts.length?`<div class='wl-simple-setup-label'>ALSO TAKE</div><div class='small'>${parts.map(row=>row.qty+' × '+esc(row.label)).join(' · ')}</div>`:''}
+    <div class='wl-simple-setup-note'>The Owner already chose the equipment. Follow the steps for each unit.</div>
+  </div>`;
+}
 function showNewPrep() {
   const p = createParts();
   if (!p.card) return;
@@ -3021,19 +3041,31 @@ function showNewPrep() {
   if (!head) { head = document.createElement('div'); head.id = 'wlCreateHead'; p.card.prepend(head); }
   let nav = document.getElementById('wlCreateNav');
   if (!nav) { nav = document.createElement('div'); nav.id = 'wlCreateNav'; p.card.append(nav); }
-  head.style.display = '';
-  nav.style.display = '';
-  if (p.ticket) p.ticket.style.display = 'grid';
-  if (totalWrap) totalWrap.style.display = '';
-  if (equipmentWrap) equipmentWrap.style.display = '';
-  if (partsWrap) partsWrap.style.display = '';
-  head.innerHTML = progress('Job Setup', 'Enter the ticket, units, and parts required', 1, 1);
   let req = document.getElementById('wlAssignedEquipmentReq');
   if (!req) { req = document.createElement('div'); req.id = 'wlAssignedEquipmentReq'; nav.before(req); }
-  req.style.display = pendingAssignmentManifest.length ? '' : 'none';
-  req.innerHTML = pendingAssignmentManifest.length ? `<div class='wl-review'><b>Owner Assignment · ${esc(String(pendingAssignmentWorkType || 'service').toUpperCase())}</b><div class='small'>The IT equipment above was prefilled from the Owner assignment. Solar Spotter Delivery support (Solar Stand + Service-selected battery setup) and Ranger solar equipment are handled automatically on the Service side.</div>${equipmentManifestInlineHtml(pendingAssignmentManifest)}${automaticServiceSolarPlanHtml(pendingAssignmentManifest,pendingAssignmentWorkType)}</div>` : '';
-  const partsOnlyDraft=expectedPrepItemCount()===0&&ticketPartsTotal(readTicketPartInputs('wlPart'))>0;
-  nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>${partsOnlyDraft?'Review Parts Handoff →':'Start Unit 1 →'}</button></div>`;
+  head.style.display = '';
+  nav.style.display = '';
+
+  if (pendingAssignmentManifest.length) {
+    if (p.ticket) p.ticket.style.display = 'none';
+    if (totalWrap) totalWrap.style.display = 'none';
+    if (equipmentWrap) equipmentWrap.style.display = 'none';
+    if (partsWrap) partsWrap.style.display = 'none';
+    req.style.display = '';
+    head.innerHTML = progress('Job Setup', 'Ready to start', 1, 1);
+    refreshAssignedITSetupSummary();
+    const partsOnlyDraft=equipmentManifestTotal(pendingAssignmentManifest)===0&&ticketPartsTotal(readTicketPartInputs('wlPart'))>0;
+    nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>${partsOnlyDraft?'Review Parts →':'Start Unit 1 →'}</button></div>`;
+  } else {
+    if (p.ticket) p.ticket.style.display = 'grid';
+    if (totalWrap) totalWrap.style.display = '';
+    if (equipmentWrap) equipmentWrap.style.display = '';
+    if (partsWrap) partsWrap.style.display = '';
+    req.style.display = 'none';
+    head.innerHTML = progress('Job Setup', 'Enter the ticket and equipment', 1, 1);
+    const partsOnlyDraft=expectedPrepItemCount()===0&&ticketPartsTotal(readTicketPartInputs('wlPart'))>0;
+    nav.innerHTML = `<div class='wl-nav'><button class='wl-prev' data-wl-create='prev'>← IT Home</button><button class='wl-next' data-wl-create='finish'>${partsOnlyDraft?'Review Parts →':'Start Unit 1 →'}</button></div>`;
+  }
   resetWizardPosition();
 }
 function validateCreateStep() {
@@ -3458,20 +3490,56 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
   const item = stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
   const identity = item ? itItemIdentity(item, unitNo) : `Unit ${unitNo}`;
   const tag = String(item?.unit_tag || '').trim();
-  const instruction = unitNo
-    ? (stage === 'it' && tag
-      ? `Take exactly 1 clear photo of ${identity}. Make sure unit tag ${tag} is clearly visible and readable in the photo.`
-      : (stage === 'it' && item?.equipment_type === '110V Stand'
-        ? 'Take exactly 1 clear photo of the 110V Stand. If it has a tag, include it in the photo. If it has no tag, the stand photo is enough.'
-        : `Take exactly 1 clear photo for Unit ${unitNo}.`))
-    : stage === 'service' ? `IT supplied ${required} photo${required === 1 ? '' : 's'}. Take exactly ${required} Service receipt photo${required === 1 ? '' : 's'} so the photo counts match.` : 'Photograph exactly what is leaving the shop.';
   const complete = photos.length === required;
-  const input = complete && !unitNo ? '' : `<input class='wl-file top8' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}><button class='mini full top8' data-wl-upload='${stage}'>${unitNo && photos.length ? 'Replace Unit Photo' : 'Save Photo(s)'}</button>`;
   const aiScan = stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? itemTagScan(item) : null;
-  const aiScanHtml = aiScan ? tagScanStatusHtml(aiScan,tag) : (stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? (item?.photo_tag_match_ok ? `<div class='wl-ai-scan-live clear top8'><span class='wl-ai-scan-check'>✓</span><div><b>Clear to continue</b><span>The technician already verified unit tag ${esc(tag)}. No separate OnSite Vision scan result was recorded for this photo.</span></div></div>` : `<div class='wl-ai-scan-live pending top8'><span class='wl-ai-scan-mark'>…</span><div><b>OnSite Vision scan not recorded</b><span>Retake/save the unit photo to run the live tag check.</span></div></div>`) : '');
   const aiMismatch = aiScan?.status === 'mismatch';
-  const tagConfirm = stage === 'it' && unitNo && photos.length && tag ? `<div class='wl-question top8'>${aiScanHtml}<div class='qtext'>Does this photo clearly show unit tag ${esc(tag)} and match ${esc(identity)}?</div><div class='wl-options'><button class='pass ${item?.photo_tag_match_ok ? 'on' : ''}' data-wl-photo-tag='yes' ${aiMismatch?'disabled':''}>YES — TAG MATCHES</button><button class='fail' data-wl-photo-tag='no'>NO — RETAKE PHOTO</button></div>${item?.photo_tag_match_ok ? `<div class='ok top8'><b>✓ Photo tag verified for ${esc(identity)}</b></div>` : `<div class='warn top8'><b>Technician tag confirmation required before continuing.</b></div>`}</div>` : '';
-  return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'><b>${stage === 'it' && unitNo ? `${esc(identity)} Photo` : unitNo ? `Unit ${unitNo} Photo` : 'Photo Proof'}</b><div class='wl-note'>${instruction}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div><div class='${complete ? 'ok' : 'warn'} top8'><b>${complete ? '✓' : ''} ${photos.length} of ${required} photo${required === 1 ? '' : 's'} saved</b></div>` : `<div class='warn top8'>0 of ${required} photos saved.</div>`}${tagConfirm}${input}</div>`;
+
+  const shortInstruction = unitNo
+    ? (stage === 'it' && tag ? `Take 1 clear photo. Make sure tag ${tag} is visible.` : `Take 1 clear photo of ${identity}.`)
+    : stage === 'service'
+      ? `Take ${required} clear receipt photo${required===1?'':'s'}.`
+      : 'Take a clear photo of what is leaving the shop.';
+
+  const picker=`<div class='wl-photo-step'>
+    <div class='wl-photo-step-num'>STEP 1</div>
+    <div class='wl-photo-step-title'>Choose Photo</div>
+    <div class='small'>${esc(shortInstruction)}</div>
+    <label class='wl-photo-picker'>
+      <input class='wl-file' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}>
+      <span>${complete ? 'Choose a New Photo' : 'Choose Photo'}</span>
+    </label>
+    <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
+  </div>
+  <div class='wl-photo-step'>
+    <div class='wl-photo-step-num'>STEP 2</div>
+    <div class='wl-photo-step-title'>Save Photo</div>
+    <div class='small'>Save the photo before moving on.</div>
+    <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
+  </div>`;
+
+  let tagConfirm='';
+  if (stage === 'it' && unitNo && photos.length && tag) {
+    if (aiMismatch) {
+      tagConfirm=`<div class='wl-stop top10'><b>WRONG TAG</b><div>This photo does not match tag ${esc(tag)}. Choose a new photo.</div></div>`;
+    } else if (!item?.photo_tag_match_ok) {
+      tagConfirm=`<div class='wl-photo-step wl-photo-confirm'>
+        <div class='wl-photo-step-num'>STEP 3</div>
+        <div class='wl-photo-step-title'>Check the Tag</div>
+        <div class='small'>Can you clearly see tag ${esc(tag)}?</div>
+        <div class='wl-options'><button class='pass' data-wl-photo-tag='yes'>YES</button><button class='fail' data-wl-photo-tag='no'>RETAKE</button></div>
+      </div>`;
+    } else {
+      tagConfirm=`<div class='ok top10'><b>✓ Tag ${esc(tag)} confirmed</b></div>`;
+    }
+  }
+
+  return `<div class='wl-proof wl-photo-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'>
+    <div class='wl-photo-title'>${stage === 'it' && unitNo ? esc(identity) : unitNo ? `Unit ${unitNo}` : 'Photo'}</div>
+    <div class='wl-photo-status ${complete?'done':''}'>${complete ? '✓ Photo saved' : 'No photo saved yet'}</div>
+    ${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Saved photo'>`).join('')}</div>` : ''}
+    ${picker}
+    ${tagConfirm}
+  </div>`;
 }
 function signatureStamp(name,at){
   if(!at) return `Signed by ${esc(name || 'Technician')}`;
@@ -3800,8 +3868,13 @@ function itUnitReviewHtml(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo).filter(s => s.kind === 'bool');
   const passed = steps.filter(s => itBoolValue(item, s.field) === true).length;
   const identity = itItemIdentity(item, unitNo);
-  const tagText = item.equipment_type === '110V Stand' && !String(item.unit_tag || '').trim() ? 'No tag on this stand' : (itPhotoTagReady(item) ? '✓ Visible and matches' : 'Not confirmed');
-  return `<div class='wl-review' data-unit-tag='${esc(item.unit_tag||'')}'><b>${esc(identity)}</b><div><b>Unit:</b> ${unitNo}</div><div><b>Purpose:</b> ${esc(item.purpose)}</div>${item.equipment_type==='Recon 2'? `<div><b>Recon II cameras:</b> ${Number(item.recon_camera_count||0)}</div>` : ''}${Number(item.required_battery_count || 0) > 0 ? `<div><b>Batteries / boxes:</b> ${Number(item.battery_count || 0)} (minimum ${Number(item.required_battery_count || 0)})</div>` : ''}<div><b>Checks:</b> ${passed} of ${steps.length} passed</div><div><b>Photos:</b> ${photos.length}</div><div><b>Photo unit tag:</b> ${tagText}</div></div>`;
+  const sig = unitSignature(evidence, unitNo);
+  return `<div class='wl-simple-complete'>
+    <div class='wl-simple-complete-title'>${esc(identity)} is ready</div>
+    <div>✓ ${passed} checks complete</div>
+    <div>✓ ${photos.length ? 'Photo saved' : 'Photo needed'}</div>
+    <div>✓ ${sig ? 'Signed by '+esc(sig.created_by_name||'IT Technician') : 'Signature needed'}</div>
+  </div>`;
 }
 const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
   { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
@@ -3943,32 +4016,25 @@ function itTicketSummaryHtml(items, evidence) {
   const jobItems=items.map((item,index)=>({item,index})).filter(row=>row.item.purpose!=='BACKUP');
   const units=jobItems.map(({item,index})=>{
     const unitNo=index+1;
-    const photos=unitEvidence(evidence,unitNo,'photo');
-    const sig=unitSignature(evidence,unitNo);
-    return `<div class='wl-ticket'>
-      <b>Unit ${unitNo} — ${esc(item.equipment_type)}</b>
-      <div>${esc(item.purpose)} · Unit ${esc(item.unit_tag||'')}</div>
-      <div class='small'>📷 ${photos.length} photo${photos.length===1?'':'s'} · ✍️ ${sig?'Signed by '+esc(sig.created_by_name||'IT Technician'):'Signature missing'}</div>
-      <button class='mini top8' data-wl-final-unit='${index}'>Review / Adjust Unit</button>
+    return `<div class='wl-simple-unit'>
+      <div><b>${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><span>Unit ${unitNo} · ${esc(item.purpose)}</span></div>
+      <div class='wl-simple-unit-ok'>✓ READY</div>
+      <button class='mini' data-wl-final-unit='${index}'>Review Unit</button>
     </div>`;
   }).join('');
-  return `<div class='wl-review'>
-    <b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b>
-    <div>${esc(activeItPrep.site||'')}</div>
-    <div><b>Units / Devices:</b> ${Number(activeItPrep.requested_unit_count ?? equipmentManifestDeviceTotal(activeItPrep.equipment_manifest))}</div>
-    <div><b>Stands / Poles:</b> ${equipmentManifestStandTotal(activeItPrep.equipment_manifest)}</div>
+  return `<div class='wl-simple-ticket'>
+    <div class='wl-simple-ticket-number'>MHelpDesk #${esc(activeItPrep.ticket_no)}</div>
+    <div class='small'>${esc(activeItPrep.site||'')}</div>
   </div>
-  ${equipmentManifestInlineHtml(activeItPrep)}
-  <div class='top10'>${units||"<div class='small'>No job equipment prepared yet.</div>"}</div>`;
+  <div class='wl-simple-units'>${units||"<div class='small'>No equipment prepared yet.</div>"}</div>`;
 }
 function itFinalPartsSummaryHtml() {
   const rows=ticketPartsRows(activeItPrep).filter(row=>row.qty>0);
-  const line=rows.length?rows.map(row=>row.qty+' × '+esc(row.label)).join(' · '):'None listed';
-  return `<div class='wl-question top10'>
-    <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
-    <div class='qtext'>${line}</div>
-    <div class='small'>Unit-specific required components belong in that unit's checklist, not here.</div>
-    <button class='mini top8' data-wl-final-view='parts'>Adjust Parts</button>
+  if(!rows.length) return '';
+  return `<div class='wl-simple-extra'>
+    <div class='qnum'>EXTRA PARTS</div>
+    <div><b>${rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ')}</b></div>
+    <button class='mini top8' data-wl-final-view='parts'>Review Parts</button>
   </div>`;
 }
 function itFinalSpareSummaryHtml(items,rows) {
@@ -3977,11 +4043,11 @@ function itFinalSpareSummaryHtml(items,rows) {
   const bits=[];
   if(units.length) bits.push(units.map(item=>esc(item.equipment_type)+' '+esc(item.unit_tag||'')).join(' · '));
   if(batteries.length) bits.push(batteries.map(row=>Number(row.qty_prepared)+' × '+esc(row.battery_type)).join(' · '));
-  return `<div class='wl-question top10'>
-    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
-    <div class='qtext'>${bits.join(' · ')||'None added'}</div>
-    <div class='small'>Contingency equipment stays separate from the main ticket equipment summary.</div>
-    <button class='mini top8' data-wl-final-view='spares'>Manage Truck Spares</button>
+  if(!bits.length) return '';
+  return `<div class='wl-simple-extra'>
+    <div class='qnum'>TRUCK SPARES</div>
+    <div><b>${bits.join(' · ')}</b></div>
+    <button class='mini top8' data-wl-final-view='spares'>Review Spares</button>
   </div>`;
 }
 function itFinalPartsEditorHtml() {
@@ -4151,17 +4217,15 @@ async function renderItUnitStep() {
     }
 
     wizard.innerHTML =
-      progress('Ticket Summary', ready ? 'READY — Review & Hand Off' : 'Review before handoff', 1, 1) +
+      progress('Ticket Summary', ready ? 'Ready to hand off' : 'Finish this ticket', 1, 1) +
       itTicketSummaryHtml(items, ev) +
       itFinalPartsSummaryHtml() +
       itFinalSpareSummaryHtml(items,spareBatteries) +
-      (!spareUnitsCheckedOut ? `<div class='wl-stop top10'><b>Truck spare checkout is not complete.</b><div>Open Manage Truck Spares and CHECK OUT every spare unit before Service can take it.</div></div>` : '') +
-      ((!spareBatteriesReady || !spareBatteriesCheckedOut) ? `<div class='wl-stop top10'><b>Spare battery checkout is not complete.</b><div>Open Manage Truck Spares and finish the spare battery checkout.</div></div>` : '') +
+      (!spareUnitsCheckedOut ? `<div class='wl-stop top10'><b>SPARE NOT CHECKED OUT</b><div>Finish the truck spare checkout.</div></div>` : '') +
+      ((!spareBatteriesReady || !spareBatteriesCheckedOut) ? `<div class='wl-stop top10'><b>SPARE BATTERY NOT READY</b><div>Finish the spare battery checkout.</div></div>` : '') +
       `<div id='wlSendItMsg'></div>` +
-      (ready ? `<div class='ok top10'><b>✓ IT PREP COMPLETE</b><div>Review the ticket above, then create the Service handoff.</div></div>` : '') +
-      `<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE TECH →</button>
-      <div class='wl-nav'><button class='wl-prev' data-wl-final-last-unit>← Back to Unit Checks</button><button class='wl-next' data-wl-home='it'>IT Home →</button></div>
-      <button class='wl-big wl-gray top10' data-wl-it='history'>Status & History →</button>`;
+      `<button class='wl-big wl-red wl-primary-handoff top10' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE →</button>
+      <div class='wl-nav wl-simple-final-nav'><button class='wl-prev' data-wl-final-last-unit>← Back</button><span></span></div>`;
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
@@ -4210,12 +4274,14 @@ async function renderItUnitStep() {
     const equipmentName=item?.equipment_type||'Equipment';
     wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `${equipmentName} · Step ${itQuestionIndex + 1} of ${stepCount}`, itQuestionIndex + 1, stepCount) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + (step?.kind==='bool'?`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`:`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`);
   } else if (itUnitPhase === 'photo') {
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Photograph ${identity} with tag ${esc(item.unit_tag || '')} visible`, 1, 3) + await photoOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next: Signature →</button></div>`;
+    const ev = await evidenceRows(activeItPrep.id, 'it');
+    const photoReady = unitEvidence(ev, unitNo, 'photo').length === 1 && itPhotoTagReady(item);
+    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Take 1 photo of ${identity}`, 1, 3) + await photoOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${photoReady?'':'disabled'}>Next: Signature →</button></div>`;
   } else if (itUnitPhase === 'review') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const issues = itUnitIssues(item, ev, unitNo);
     const ready = issues.length === 0;
-    const sig = unitSignature(ev, unitNo); wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Review ${identity}`, 3, 3) + itEquipmentAIReview(item,ev,unitNo) + itUnitReviewHtml(item, ev, unitNo) + itIssueLinksHtml(item, ev, unitNo) + `${ready ? `<div class='ok'><b>✓ Checks, photo, and signature complete for ${esc(identity)}.</b></div>` : `<div class='wl-stop'><b>${esc(identity)} is not ready.</b><div>Choose an issue above to go directly to it.</div><button class='wl-big wl-red top10' data-wl-fix-issues>← Go to First Issue</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready ? '' : 'disabled'}>${unitNo < totalUnits ? `Next: Unit ${unitNo + 1} →` : 'Next: Ticket Summary →'}</button></div>`;
+    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, ready ? `${identity} is ready` : `Finish ${identity}`, 3, 3) + itUnitReviewHtml(item, ev, unitNo) + (ready ? '' : itIssueLinksHtml(item, ev, unitNo)) + `${ready ? '' : `<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready ? '' : 'disabled'}>${unitNo < totalUnits ? `Next: Unit ${unitNo + 1} →` : 'Next: Ticket Summary →'}</button></div>`;
   } else if (itUnitPhase === 'signature') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const sig = unitSignature(ev, unitNo);
@@ -5794,7 +5860,7 @@ document.addEventListener('click', async e => {
       await refreshProofPanel(panel);
     } catch (err) {
       upload.disabled = false;
-      upload.textContent = 'Save Photo(s)';
+      upload.textContent = 'Save Photo';
       alert(err.message || 'Upload failed.');
     }
     return;
@@ -8065,6 +8131,15 @@ document.addEventListener('click', async e => {
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
 document.addEventListener('change', e => {
+  if (e.target?.matches?.('.wl-file')) {
+    const panel=e.target.closest('.wl-proof');
+    const count=e.target.files?.length||0;
+    const status=panel?.querySelector('[data-wl-photo-selected]');
+    if(status) status.textContent=count ? (count===1?'1 photo selected':count+' photos selected') : 'No photo selected yet.';
+    const save=panel?.querySelector('[data-wl-upload]');
+    if(save) save.disabled=!count;
+  }
+
   if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignWorkType') {
