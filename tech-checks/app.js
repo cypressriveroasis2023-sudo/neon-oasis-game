@@ -88,7 +88,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=truck-inventory-20260922p')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-truck-inventory-20260922q')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -1503,6 +1503,13 @@ function renderOwnerTechOverview() {
     <div class='ownerTechDayGrid'>${techCards || '<div class="warn">No active IT or Service technicians.</div>'}</div>`;
 }
 
+async function ownerOpenTruckInventoryManager(){
+  await loadDeferredModules();
+  if(typeof window.showITServiceTruckInventory==='function') return window.showITServiceTruckInventory();
+  const fn=globalThis.showITServiceTruckInventory;
+  if(typeof fn==='function') return fn();
+  alert('Truck Inventory controls are still loading. Try again in a moment.');
+}
 function ownerJump(target) {
   if(target==='vision'){ window.location.href='./onsite-vision.html'; return; }
   const routeMap={accounts:'accounts',review:'review',prep:'handoffs',returns:'handoffs',offline:'handoffs',daily:'team',activity:'activity'};
@@ -2320,7 +2327,7 @@ function ownerStartTodayLive(){
 function ownerTodayReadinessHtml(){
   const techs=Array.isArray(state.ownerTechCommandBoard?.service_techs)?state.ownerTechCommandBoard.service_techs:[];
   if(!techs.length)return '';
-  return '<section class="ownerTodayPanel"><header><div><span>TEAM READINESS</span><h2>Service Trucks</h2></div><button class="mini" type="button" onclick="ownerAppNavigate(\'team\')">Open Team Board →</button></header><div class="ownerTodayReadinessGrid">'+techs.map(t=>{
+  return '<section class="ownerTodayPanel"><header><div><span>TEAM READINESS</span><h2>Service Trucks</h2></div><div class="ownerTodayHeaderActions"><button class="mini" type="button" onclick="ownerOpenTruckInventoryManager()">Manage Truck Inventory</button><button class="mini" type="button" onclick="ownerAppNavigate(\'team\')">Open Team Board →</button></div></header><div class="ownerTodayReadinessGrid">'+techs.map(t=>{
     const inspection=t.inspection||{},inv=t.inventory_check||{};
     const sims=Array.isArray(t.sims)?t.sims:[];
     const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
