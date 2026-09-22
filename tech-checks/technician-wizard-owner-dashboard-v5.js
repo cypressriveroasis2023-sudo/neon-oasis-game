@@ -692,6 +692,12 @@ function injectStyles() {
       color:#ffffff!important;
     }
   `;
+  s.textContent += `
+    .owner-auto-flow-card{margin:4px 0 16px;padding:16px 18px;border:1px solid #394d58;border-left:5px solid #e31821;border-radius:12px;background:#0b1920;color:#fff;display:grid;gap:5px}
+    .owner-auto-flow-card>span{font-size:11px;font-weight:950;letter-spacing:.12em;color:#ff4b52}
+    .owner-auto-flow-card>b{font-size:22px;font-weight:1000;color:#fff;line-height:1.15}
+    .owner-auto-flow-card>small{font-size:13px;font-weight:750;color:#b9c7ce;line-height:1.35}
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -2405,10 +2411,29 @@ async function itFindJobByTicket() {
     ||(data||[]).find(x=>!x.assignee_user_id&&x.assignment_scope==='department');
 
   if(!a){
+    const {data:waitingReturns,error:returnError}=await liveDb.from('unit_returns')
+      .select('id,ticket_no,unit_tag,equipment_type,status,returned_at')
+      .eq('ticket_no',ticket)
+      .eq('status','waiting_it')
+      .order('returned_at',{ascending:true})
+      .limit(10);
+    if(returnError)return alert(returnError.message);
+    if(waitingReturns?.length){
+      const first=waitingReturns[0];
+      if(msg)msg.innerHTML=`<div class='wl-it-ticket-found'>
+        <div class='wl-it-step-label'>IT INTAKE READY</div>
+        <div class='wl-it-ticket-number'>#${esc(ticket)}</div>
+        <div class='wl-it-ticket-site'>${waitingReturns.length} RETURNED ITEM${waitingReturns.length===1?'':'S'} WAITING</div>
+        <div class='wl-it-good'>✓ SERVICE RETURN RECEIVED</div>
+        <div class='small top10'>Next: ${esc(first.equipment_type||'Unit')} ${esc(first.unit_tag||'')}</div>
+        <button class='wl-it-start top10' data-wl-intake-start='${first.id}'>START IT INTAKE</button>
+      </div>`;
+      return;
+    }
     const assignedOther=(data||[]).find(x=>x.assignee_user_id&&x.assignee_user_id!==tech.id);
     if(msg)msg.innerHTML=assignedOther
       ? `<div class='wl-stop'><b>THIS IT JOB IS ASSIGNED TO ANOTHER TECHNICIAN.</b><div>MHelpDesk #${esc(ticket)} cannot be opened under this login.</div></div>`
-      : `<div class='wl-stop'><b>NO IT JOB FOUND FOR #${esc(ticket)}</b><div>Check the ticket number or ask the Owner to assign it to IT.</div></div>`;
+      : `<div class='wl-stop'><b>NO IT WORK FOUND FOR #${esc(ticket)}</b><div>No active IT assignment or returned equipment is waiting under this ticket.</div></div>`;
     return;
   }
 
@@ -5629,12 +5654,12 @@ async function installOwnerAssignments(force = false) {
         </section>
         <section class='owner-simple-step owner-assign-equipment-card'>
           <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>◇</span><div><b>Equipment & Parts</b><span>Enter what's required for this job.</span></div></div>
-          <div id='ownerAssignParts' class='wl-ticket-parts-setup'><div class='qtext' id='ownerEquipmentTotalHeading'>Equipment</div><div class='small' id='ownerEquipmentTotalHelp'>Choose the equipment type and quantity from MHelpDesk.</div>${ownerEquipmentManifestInputsHtml()}<div id='ownerAutoServicePlan' class='hidden'></div><div class='wl-requirement-section'><div class='wl-requirement-heading'>Replacement / Swap Categories</div><div class='small'><b>SIM and SD/micro SD cards come from IT.</b> If Service is doing the field work, Tech Check uses IT → Service so Service receives and verifies the cards in the handoff.</div>${ticketPartsInputsHtml('ownerPart')}</div></div>
+          <div id='ownerAssignParts' class='wl-ticket-parts-setup'><div class='qtext' id='ownerEquipmentTotalHeading'>Equipment</div><div class='small' id='ownerEquipmentTotalHelp'>Choose the equipment type and quantity from MHelpDesk.</div>${ownerEquipmentManifestInputsHtml()}<div id='ownerAutoServicePlan' class='hidden'></div><div class='wl-requirement-section'><div class='wl-requirement-heading'>Replacement / Swap Categories</div><div class='small'><b>Workflow is automatic.</b> Any shop equipment or replacement parts selected for a Service job automatically place IT before Service.</div>${ticketPartsInputsHtml('ownerPart')}</div></div>
         </section>
         <section class='owner-simple-step owner-assign-tech-card'>
           <div class='owner-simple-step-head'><span class='owner-simple-step-icon'>♟</span><div><b>Who gets it?</b><span>Assign a technician or department.</span></div></div>
-          <div class='owner-simple-pills role-pills'><button type='button' data-owner-role-pill='it'>IT only<small>IT does the work</small></button><button type='button' data-owner-role-pill='service'>Service only<small>Service does the work</small></button><button type='button' data-owner-role-pill='it_service'>IT → Service<small>IT first, then handoff</small></button><button type='button' data-owner-role-pill='service_it'>Service → IT<small>Service first, then IT</small></button></div>
-          <select id='ownerAssignRole' class='owner-simple-hidden-select' aria-label='Department flow'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select>
+          <div id='ownerAutoFlowCard' class='owner-auto-flow-card'><span>AUTOMATIC WORKFLOW</span><b data-owner-auto-flow-label>SERVICE</b><small data-owner-auto-flow-reason>Tech Check chooses the department order from the job type, equipment, and parts.</small></div>
+          <select id='ownerAssignRole' class='owner-simple-hidden-select' aria-label='Automatic department flow'><option value='it'>IT Department Only</option><option value='service'>Service Department Only</option><option value='it_service'>IT + Service Departments</option><option value='service_it'>Service + IT Departments</option></select>
           <label>Technician <span class='small'>(optional — leave blank for department queue)</span></label><div id='ownerAssignedTechPills' class='wl-tech-pills'></div><div class='wl-tech-add-row'><select id='ownerAssignTech'>${ownerAssignmentTechOptions('it')}</select><button type='button' class='mini wl-add-tech-plus' data-owner-add-tech aria-label='Add technician'>＋</button></div><div id='ownerAssignTechHint' class='small top8'></div>
         </section>
         <section class='owner-simple-step owner-assign-review-card'>
@@ -5907,67 +5932,146 @@ function addOwnerTechPill() {
   pill.innerHTML=`<span>${esc(label)}</span><button type='button' data-owner-remove-tech aria-label='Remove ${esc(label)}'>×</button>`;
   pills.appendChild(pill); select.value=''; ownerSaveAssignDraftNow(); ownerAIReview();
 }
-function refreshOwnerAssignmentTechOptions() {
-  const role = document.getElementById('ownerAssignRole')?.value || 'it';
+
+function ownerAutomaticFlowRole(workType=document.getElementById('ownerAssignWorkType')?.value||'service', manifest=readOwnerEquipmentManifest(), parts=readTicketPartInputs('ownerPart')) {
+  const type=String(workType||'service').toLowerCase();
+  if(type==='pickup') return 'service_it';
+  if(type==='delivery' || type==='swap') return 'it_service';
+  const equipmentNeeded=equipmentManifestTotal(manifest)>0;
+  const preparedParts=ticketPartsTotal(parts)>0;
+  return (equipmentNeeded || preparedParts) ? 'it_service' : 'service';
+}
+function ownerAutomaticFlowLabel(workType=document.getElementById('ownerAssignWorkType')?.value||'service', role=ownerAutomaticFlowRole()) {
+  const type=String(workType||'service').toLowerCase();
+  if(type==='pickup') return 'SERVICE → IT INTAKE';
+  if(type==='swap') return 'IT → SERVICE → IT INTAKE';
+  if(type==='delivery') return 'IT → SERVICE';
+  return role==='it_service' ? 'IT → SERVICE' : 'SERVICE';
+}
+function ownerAutomaticFlowReason(workType=document.getElementById('ownerAssignWorkType')?.value||'service', role=ownerAutomaticFlowRole()) {
+  const type=String(workType||'service').toLowerCase();
+  if(type==='pickup') return 'Service performs the field pickup first. Returned equipment then becomes available to IT Intake.';
+  if(type==='swap') return 'IT prepares the replacement, Service performs the field swap, and the old or unused replacement returns through IT Intake.';
+  if(type==='delivery') return 'IT prepares and verifies the equipment first. Service cannot start until the IT → Service handoff is ready.';
+  if(role==='it_service') return 'This Service job includes shop equipment or replacement parts, so IT prepares them before Service starts.';
+  return 'No shop equipment or replacement-part prep is required, so Service goes directly to the field.';
+}
+function applyOwnerAutomaticFlow(options={}) {
+  const roleEl=document.getElementById('ownerAssignRole');
+  if(!roleEl) return 'service';
+  const desired=ownerAutomaticFlowRole();
+  const changed=roleEl.value!==desired;
+  roleEl.value=desired;
+  roleEl.dataset.ownerConfirmed='1';
+  roleEl.dataset.autoFlow='1';
+  if(changed && options.refreshTechs!==false) refreshOwnerAssignmentTechOptions({skipWorkTypeRefresh:true,preserveExisting:true});
+  const card=document.getElementById('ownerAutoFlowCard');
+  if(card){
+    const label=card.querySelector('[data-owner-auto-flow-label]');
+    const reason=card.querySelector('[data-owner-auto-flow-reason]');
+    if(label)label.textContent=ownerAutomaticFlowLabel(undefined,desired);
+    if(reason)reason.textContent=ownerAutomaticFlowReason(undefined,desired);
+  }
+  return desired;
+}
+
+function refreshOwnerAssignmentTechOptions(options={}) {
+  const role = document.getElementById('ownerAssignRole')?.value || ownerAutomaticFlowRole();
   const select = document.getElementById('ownerAssignTech');
   const hint = document.getElementById('ownerAssignTechHint');
   if (!select) return;
-  const pills=document.getElementById('ownerAssignedTechPills'); if(pills) pills.innerHTML='';
-  if (role === 'it_service' || role === 'service_it') {
-    select.innerHTML = `<option value=''>Both Department Queues — IT prepares first, Service follows</option>`;
-    select.disabled = false;
-    select.innerHTML = `<option value=''>${role === 'service_it' ? 'Service Department Queue — any Service Tech can claim' : 'IT Department Queue — any IT Tech can claim'}</option><option value='__service_queue__'>Service Department Queue — any Service Tech can claim</option>` + ownerAssignmentProfiles.map(p => `<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role === 'it' ? 'IT' : 'Service'}</option>`).join('');
-    if (hint) hint.textContent = role === 'service_it' ? 'Service first → returned units go to IT Intake.' : 'IT first → Service receives the prepared equipment.';
-  } else {
-    select.disabled = false;
-    select.innerHTML = ownerAssignmentTechOptions(role);
-    if (hint) hint.textContent = `Select one or more ${role === 'it' ? 'IT' : 'Service'} technicians. Leave all unselected to assign it to the ${role === 'it' ? 'IT' : 'Service'} Department queue.`;
+  const pills=document.getElementById('ownerAssignedTechPills');
+  const existingIds=options.preserveExisting!==false
+    ? [...(pills?.querySelectorAll('[data-tech-id]')||[])].map(el=>el.dataset.techId).filter(Boolean)
+    : [];
+  if(pills) pills.innerHTML='';
+
+  const dual=role==='it_service'||role==='service_it';
+  if(dual){
+    select.disabled=false;
+    select.innerHTML="<option value=''>Choose an IT or Service technician to add…</option>"+
+      ownerAssignmentProfiles
+        .filter(p=>p.role==='it'||p.role==='service')
+        .map(p=>`<option value='${p.user_id}'>${esc(p.full_name || p.username || 'Technician')} — ${p.role==='it'?'IT':'Service'}</option>`).join('');
+    if(hint)hint.textContent='Add specific technicians if needed. Any department without a selected technician will use that department queue automatically.';
+  }else{
+    select.disabled=false;
+    select.innerHTML=ownerAssignmentTechOptions(role);
+    if(hint)hint.textContent=`Select one or more ${role==='it'?'IT':'Service'} technicians. Leave all unselected to assign it to the ${role==='it'?'IT':'Service'} Department queue.`;
+  }
+
+  if(pills&&existingIds.length){
+    existingIds.forEach(id=>{
+      const p=ownerAssignmentProfiles.find(row=>row.user_id===id);
+      if(!p)return;
+      if(!dual&&p.role!==role)return;
+      const label=(p.full_name||p.username||'Technician')+' — '+(p.role==='it'?'IT':'Service');
+      const el=document.createElement('span');
+      el.className='wl-tech-pill';
+      el.dataset.techId=id;
+      el.innerHTML=`<span>${esc(label)}</span><button type='button' data-owner-remove-tech aria-label='Remove ${esc(label)}'>×</button>`;
+      pills.appendChild(el);
+    });
   }
   document.getElementById('ownerAssignParts')?.classList.remove('hidden');
-  refreshOwnerWorkTypeLabels();
+  if(!options.skipWorkTypeRefresh) refreshOwnerWorkTypeLabels({skipTechRefresh:true});
 }
-function refreshOwnerWorkTypeLabels() {
-  const type = document.getElementById('ownerAssignWorkType')?.value || 'service';
+function refreshOwnerWorkTypeLabels(options={}) {
+  const type=document.getElementById('ownerAssignWorkType')?.value||'service';
+  const priorRole=document.getElementById('ownerAssignRole')?.value||'';
+  const role=applyOwnerAutomaticFlow({refreshTechs:false});
+  if(priorRole!==role&&!options.skipTechRefresh) refreshOwnerAssignmentTechOptions({skipWorkTypeRefresh:true,preserveExisting:true});
   syncOwnerSimplePills();
-  const pickup = type === 'pickup';
-  const swap = type === 'swap';
-  const delivery = type === 'delivery';
-  const action = pickup ? 'Being Picked Up' : swap ? 'Being Swapped' : delivery ? 'Being Delivered' : 'Required';
+
+  const pickup=type==='pickup', swap=type==='swap', delivery=type==='delivery';
+  const action=pickup?'Being Picked Up':swap?'Being Swapped':delivery?'Being Delivered':'Required';
   const flowHint=document.getElementById('ownerFlowHint');
-  if(flowHint) flowHint.innerHTML = pickup ? '<b>Pickup:</b> Service goes to the field first → returned equipment goes to IT Intake.' : swap ? '<b>Swap:</b> choose IT + Service for outgoing replacement prep, or Service + IT when the returned unit needs Service first → IT Intake.' : delivery ? '<b>Delivery:</b> IT prepares equipment first → Service receives the handoff and delivers it.' : '<b>Service:</b> choose the department order needed for this service call.';
+  if(flowHint) flowHint.innerHTML=`<b>Automatic workflow:</b> ${esc(ownerAutomaticFlowLabel(type,role))}<br><span class='small'>${esc(ownerAutomaticFlowReason(type,role))}</span>`;
+
+  const autoCard=document.getElementById('ownerAutoFlowCard');
+  if(autoCard){
+    const label=autoCard.querySelector('[data-owner-auto-flow-label]');
+    const reason=autoCard.querySelector('[data-owner-auto-flow-reason]');
+    if(label)label.textContent=ownerAutomaticFlowLabel(type,role);
+    if(reason)reason.textContent=ownerAutomaticFlowReason(type,role);
+  }
+
   const totalHeading=document.getElementById('ownerEquipmentTotalHeading');
   const totalHelp=document.getElementById('ownerEquipmentTotalHelp');
-  if(totalHeading) totalHeading.textContent = type==='pickup' ? 'Total Equipment Being Picked Up' : type==='delivery' ? 'Total Equipment Being Delivered' : type==='swap' ? 'Total Equipment Being Swapped' : 'Total Equipment Required';
-  if(totalHelp) totalHelp.textContent='Enter each equipment type and quantity once. Enter the specific MHelpDesk equipment numbers below.';
-  const unitHeading = document.querySelector('#ownerAssignParts .unitArea .wl-requirement-heading');
-  if (unitHeading) unitHeading.textContent = `UNIT AREA — Units / Devices ${action}`;
-  const unitHelp = document.querySelector('#ownerAssignParts .unitArea .small');
-  if (unitHelp) unitHelp.textContent = pickup
+  if(totalHeading)totalHeading.textContent=pickup?'Total Equipment Being Picked Up':delivery?'Total Equipment Being Delivered':swap?'Total Equipment Being Swapped':'Equipment / Parts Required';
+  if(totalHelp)totalHelp.textContent=type==='service'
+    ? 'Only select equipment or replacement parts that must come from the shop. Selecting any automatically adds IT before Service.'
+    : 'Enter each equipment type and quantity once. Enter the specific MHelpDesk equipment numbers below.';
+
+  const unitHeading=document.querySelector('#ownerAssignParts .unitArea .wl-requirement-heading');
+  if(unitHeading)unitHeading.textContent=`UNIT AREA — Units / Devices ${action}`;
+  const unitHelp=document.querySelector('#ownerAssignParts .unitArea .small');
+  if(unitHelp)unitHelp.textContent=pickup
     ? 'Enter the unit types and quantities being PICKED UP from the customer/site. These are coming back to the shop — they are not shelf inventory.'
     : swap
-      ? 'Enter the replacement units going out for the SWAP. Use the stand area below for any solar stands, poles, or panels involved in the swap.'
+      ? 'Enter the replacement units going out for the SWAP. IT will prepare them before Service can leave.'
       : delivery
-        ? 'Enter the unit types and quantities being DELIVERED. Use the stand area below for solar stands, poles, or panels being delivered.'
-        : 'Choose the unit types and quantities that match the MHelpDesk ticket.';
-  const standHeading = document.querySelector('#ownerAssignParts .standArea .wl-requirement-heading');
-  if (standHeading) standHeading.textContent = pickup
+        ? 'Enter the unit types and quantities being DELIVERED. IT will prepare them before Service can leave.'
+        : 'For Service jobs, select equipment here only when something must be prepared at the shop before Service goes to the field.';
+
+  const standHeading=document.querySelector('#ownerAssignParts .standArea .wl-requirement-heading');
+  if(standHeading)standHeading.textContent=pickup
     ? 'STAND AREA — Solar Stands / Poles / Panels Being Picked Up'
     : swap
       ? 'STAND AREA — Solar Stands / Poles / Panels Being Swapped'
       : delivery
         ? 'STAND AREA — Solar Stands / Poles / Panels Being Delivered'
-        : 'STAND AREA — Manual Stand Requirements';
-  const standHelp = document.querySelector('#ownerAssignParts .standArea .small');
-  if (standHelp) standHelp.textContent = pickup
+        : 'STAND AREA — Shop Equipment Needed for Service';
+  const standHelp=document.querySelector('#ownerAssignParts .standArea .small');
+  if(standHelp)standHelp.textContent=pickup
     ? 'Enter the solar stands, poles, and removable solar panels being PICKED UP and returned to the shop.'
     : swap
-      ? 'Enter the solar stands, poles, and removable solar panels being SWAPPED. This is separate from the unit/device count above.'
+      ? 'Enter the solar stands, poles, and removable solar panels being SWAPPED.'
       : delivery
         ? 'Enter any solar stands, poles, and removable solar panels being DELIVERED. Automatic Solar Spotter/Ranger requirements still apply.'
-        : 'Use this only when the MHelpDesk job specifically calls for a stand as part of IT prep.';
-  document.querySelectorAll('#ownerAssignParts [data-owner-stock-count]').forEach(el => {
-    el.style.display = pickup ? 'none' : '';
-  });
+        : 'Use this only when the Service job requires this equipment to leave the shop.';
+
+  document.querySelectorAll('#ownerAssignParts [data-owner-stock-count]').forEach(el=>{el.style.display=pickup?'none':'';});
 }
 
 // Classic Owner dashboard restored: keep the original stacked Owner cards.
@@ -6459,11 +6563,8 @@ function ownerAIDispatchApply(parsed) {
     const el=document.getElementById("ownerAssignWorkType");
     if (el) { el.value=parsed.work_type; el.dataset.aiSet="1"; }
   }
-  if (parsed.role) {
-    const el=document.getElementById("ownerAssignRole");
-    if (el) { el.value=parsed.role; el.dataset.aiSet="1"; }
-    refreshOwnerAssignmentTechOptions();
-  }
+  // Department flow is automatic from job type + equipment/parts.
+
   if (parsed.assignee_ids?.length) ownerAIAddAssigneePills(parsed.assignee_ids);
 
   parsed.manifest.forEach(row=>{
@@ -6475,6 +6576,7 @@ function ownerAIDispatchApply(parsed) {
     const el=document.getElementById("ownerPart"+part.id);
     if (el) el.value=String(parsed.parts[part.key]);
   });
+  applyOwnerAutomaticFlow();
   refreshOwnerWorkTypeLabels();
   refreshOwnerAutoServicePlan();
   ownerSaveAssignDraftNow();
@@ -6489,7 +6591,7 @@ function ownerAIDispatchMissing(parsed) {
   const date=document.getElementById("ownerAssignDate");
   if (!parsed?.scheduled_for && !date?.dataset?.aiSet && !date?.dataset?.ownerConfirmed) missing.push("work date");
   const role=document.getElementById("ownerAssignRole");
-  if (!parsed?.role && !role?.dataset?.aiSet && !role?.dataset?.ownerConfirmed) missing.push("department flow (IT, Service, IT → Service, or Service → IT)");
+  applyOwnerAutomaticFlow();
   const manifest=readOwnerEquipmentManifest();
   const roleValue=role?.value||"";
   if ((roleValue==="it" || roleValue==="it_service" || roleValue==="service_it") && !manifest.length) missing.push("equipment type and quantity");
@@ -6811,12 +6913,20 @@ async function openOwnerAIDispatch() {
 function ownerAIDraft(){const m=readOwnerEquipmentManifest();return{ticket_no:document.getElementById('ownerAssignTicket')?.value.trim()||'',site:document.getElementById('ownerAssignSite')?.value.trim()||'',work_type:document.getElementById('ownerAssignWorkType')?.value||'service',scheduled_for:document.getElementById('ownerAssignDate')?.value||'',scheduled_time:document.getElementById('ownerAssignTime')?.value||'',job_description:document.getElementById('ownerAssignDescription')?.value.trim()||'',notes:document.getElementById('ownerAssignNotes')?.value.trim()||'',equipment_manifest:m,requested_unit_count:equipmentManifestDeviceTotal(m),role:document.getElementById('ownerAssignRole')?.value||'it'};}
 function syncOwnerSimplePills(){
   const work=document.getElementById('ownerAssignWorkType')?.value||'service';
-  const role=document.getElementById('ownerAssignRole')?.value||'it';
+  const role=document.getElementById('ownerAssignRole')?.value||ownerAutomaticFlowRole();
   document.querySelectorAll('[data-owner-work-pill]').forEach(b=>b.classList.toggle('selected',b.dataset.ownerWorkPill===work));
   document.querySelectorAll('[data-owner-role-pill]').forEach(b=>b.classList.toggle('selected',b.dataset.ownerRolePill===role));
+  const card=document.getElementById('ownerAutoFlowCard');
+  if(card){
+    const label=card.querySelector('[data-owner-auto-flow-label]');
+    const reason=card.querySelector('[data-owner-auto-flow-reason]');
+    if(label)label.textContent=ownerAutomaticFlowLabel(work,role);
+    if(reason)reason.textContent=ownerAutomaticFlowReason(work,role);
+  }
 }
 function ownerAIReview(){
-  const a=ownerAIDraft(),role=a.role,type=a.work_type,dual=role==='it_service'||role==='service_it',issues=[];
+  const role=applyOwnerAutomaticFlow();
+  const a=ownerAIDraft(),type=a.work_type,issues=[];
   const manifest=normalizedEquipmentManifest(a.equipment_manifest||[]);
   const deviceCount=equipmentManifestDeviceTotal(manifest),standCount=equipmentManifestStandTotal(manifest);
   const un=(document.getElementById('ownerAssignUnitNumbers')?.value||'').split(',').map(v=>v.trim()).filter(Boolean);
@@ -6824,30 +6934,24 @@ function ownerAIReview(){
   const parts=readTicketPartInputs('ownerPart');
   if(!a.ticket_no)issues.push('Enter the MHelpDesk ticket number.');
   if(!a.job_description)issues.push('Add a short description of what needs to be done.');
-  if(type==='pickup'&&role==='it')issues.push('Pickup must start with Service. Choose Service only or Service → IT.');
-  const itSuppliedCards=Number(parts.sim_replacement_qty||0)+Number(parts.micro_sd_qty||0);
-  if(type!=='pickup'&&itSuppliedCards>0&&(role==='service'||role==='service_it'))issues.push('SIM / SD replacements come from IT. Choose IT → Service so IT supplies the cards before Service leaves.');
-  if((role==='it'||dual)&&deviceCount+standCount<1)issues.push('Choose the equipment IT will work on in Step 2.');
+  if((type==='delivery'||type==='swap'||type==='pickup')&&deviceCount+standCount<1)issues.push('Choose the equipment involved in this job.');
+  if(type==='service'&&role==='it_service'&&deviceCount+standCount<1)issues.push('Choose the equipment type IT is preparing for this Service job.');
   const autoSolarPlan=automaticServiceSolarPlan(manifest,type);
   if(autoSolarPlan.spotters>0&&manifestQty(manifest,'Solar Stand')>0)issues.push('Remove Solar Stand from the IT list. Service gets it automatically after the IT handoff.');
   if(deviceCount&&un.length&&deviceCount!==un.length)issues.push('The unit quantity and the number of Unit #s do not match.');
   if(standCount&&sn.length&&standCount!==sn.length)issues.push('The stand quantity and the number of Stand #s do not match.');
+
   const box=document.getElementById('ownerAIReviewBox');if(!box)return;
   box.classList.remove('hidden','is-ready','is-pending');
   box.classList.toggle('ready',issues.length===0);
   box.classList.toggle('pending',issues.length>0);
-  const flow=type==='pickup'?'Service pickup → IT Intake':role==='it_service'?'IT → Service':role==='service_it'?'Service → IT':role==='it'?'IT only':'Service only';
-  const equipmentText=manifest.length?manifest.map(r=>r.qty+' × '+equipmentDisplayLabel(r.label)).join(', '):'No equipment selected';
+  const flow=ownerAutomaticFlowLabel(type,role);
+  const equipmentText=manifest.length?manifest.map(r=>r.qty+' × '+equipmentDisplayLabel(r.label)).join(', '):'No shop equipment selected';
   const partTotal=Object.values(parts).reduce((sum,v)=>sum+Number(v||0),0);
-  const summary=[
-    type.toUpperCase(),
-    flow,
-    equipmentText,
-    partTotal?partTotal+' extra part'+(partTotal===1?'':'s'):null
-  ].filter(Boolean);
+  const summary=[type.toUpperCase(),flow,equipmentText,partTotal?partTotal+' extra part'+(partTotal===1?'':'s'):null].filter(Boolean);
   box.innerHTML=issues.length
     ? `<h3>${issues.length===1?'Almost done — one thing left':'Almost done — '+issues.length+' things left'}</h3><p>Fix the item${issues.length===1?'':'s'} below, then assign the job.</p><div class='owner-simple-review-list'>${issues.slice(0,4).map(v=>'<div><i>→</i><span>'+esc(v)+'</span></div>').join('')}</div><div class='owner-simple-summary'>${summary.map(v=>'<span>'+esc(v)+'</span>').join('')}</div>`
-    : `<h3>✓ Ready to assign</h3><p>Everything Tech Check needs is here.</p><div class='owner-simple-summary'>${summary.map(v=>'<span>'+esc(v)+'</span>').join('')}</div>`;
+    : `<h3>✓ Ready to assign</h3><p>Tech Check chose the workflow automatically.</p><div class='owner-simple-summary'>${summary.map(v=>'<span>'+esc(v)+'</span>').join('')}</div>`;
   const assign=document.querySelector('[data-wl-owner-assign]');
   if(assign){
     assign.textContent=issues.length?'Fix the item'+(issues.length===1?'':'s')+' above':'Assign Job →';
@@ -6863,7 +6967,7 @@ async function ownerAssignJob() {
   const standNumbers = document.getElementById('ownerAssignStandNumbers')?.value.trim() || '';
   const requestedUnitCount = equipmentManifestDeviceTotal(readOwnerEquipmentManifest());
   const description = document.getElementById('ownerAssignDescription')?.value.trim() || '';
-  const role = document.getElementById('ownerAssignRole')?.value || 'it';
+  let role = document.getElementById('ownerAssignRole')?.value || 'service';
   const assignees = [...document.querySelectorAll('#ownerAssignedTechPills [data-tech-id]')].map(el => el.dataset.techId).filter(Boolean);
   const serviceQueueSelected = !!document.querySelector('#ownerAssignedTechPills [data-queue-role="service"]');
   const assignee = assignees[0] || null;
@@ -6873,9 +6977,10 @@ async function ownerAssignJob() {
   const workType = document.getElementById('ownerAssignWorkType')?.value || 'service';
   const equipmentManifest = readOwnerEquipmentManifest();
   const parts = readTicketPartInputs('ownerPart');
+  role = ownerAutomaticFlowRole(workType,equipmentManifest,parts);
+  const roleEl=document.getElementById('ownerAssignRole');
+  if(roleEl)roleEl.value=role;
   if (!ticket) return alert('Enter the MHelpDesk reference number.');
-  if (workType!=='pickup' && (Number(parts.sim_replacement_qty||0)>0 || Number(parts.micro_sd_qty||0)>0) && (role==='service' || role==='service_it')) return alert('SIM Card Swap and SD/Micro SD Card Replacement must use IT → Service. IT supplies the card(s), then Service verifies them in the handoff.');
-  if (workType === 'pickup' && role === 'it') return alert('Pickup starts with Service. Choose Service Department Only, IT + Service Departments, or Service + IT Departments so Service handles the field pickup before IT Intake.');
   const selectedDeviceCount = equipmentManifestDeviceTotal(equipmentManifest);
   const selectedStandCount = equipmentManifestStandTotal(equipmentManifest);
   if (['it','it_service','service_it'].includes(role) && selectedDeviceCount + selectedStandCount < 1) return alert('Choose at least one unit/device or stand in the Equipment & Parts area because this workflow includes IT.');
@@ -6965,7 +7070,7 @@ async function ownerAssignJob() {
   ownerAIDispatchPrepared=false;
   ownerAIDispatchLastParse=null;
   await installOwnerAssignments(true);
-  const target = (role === 'it_service' || role === 'service_it') ? (workType === 'pickup' || role === 'service_it' ? 'Service first, then IT Intake' : 'IT first, then Service') : assignees.length > 1 ? `${assignees.length} selected technicians` : assignees.length === 1 ? 'the selected technician' : (role === 'it' ? 'the IT Department queue' : 'the Service Department queue');
+  const target = ownerAutomaticFlowLabel(workType,role);
   alert('Assigned to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
 async function saveActivePrepParts() {
@@ -7158,11 +7263,8 @@ document.addEventListener('click', async e => {
       return;
     }
     const ownerRolePill=e.target.closest('[data-owner-role-pill]');
-    if(ownerRolePill){
-      const input=document.getElementById('ownerAssignRole');
-      if(input){input.value=ownerRolePill.dataset.ownerRolePill||'it';input.dataset.ownerConfirmed='1';refreshOwnerAssignmentTechOptions();syncOwnerSimplePills();ownerSaveAssignDraftNow();ownerAIReview();}
-      return;
-    }
+    if(ownerRolePill){applyOwnerAutomaticFlow();ownerAIReview();return;}
+
     if (e.target.closest('[data-owner-compact-attention]')) {
       ownerShowGroup('Jobs');
       const card=document.getElementById('ownerAttentionCard');
@@ -7178,23 +7280,26 @@ document.addEventListener('click', async e => {
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
 document.addEventListener('change', e => {
-  if (e.target?.id === 'ownerAssignRole') { e.target.dataset.ownerConfirmed='1'; refreshOwnerAssignmentTechOptions(); }
   if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
   if (e.target?.id === 'ownerAssignTime') e.target.dataset.ownerConfirmed='1';
-  if (e.target?.id === 'ownerAssignWorkType') { e.target.dataset.ownerConfirmed='1'; refreshOwnerWorkTypeLabels(); refreshOwnerAutoServicePlan(); refreshOwnerAssignmentTechOptions(); }
-  if (e.target?.id === 'ownerAssignWorkType') refreshOwnerAutoServicePlan();
+  if (e.target?.id === 'ownerAssignWorkType') {
+    e.target.dataset.ownerConfirmed='1';
+    applyOwnerAutomaticFlow();
+    refreshOwnerWorkTypeLabels();
+    refreshOwnerAutoServicePlan();
+  }
   if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,select,textarea')) {
-    if(e.target?.id==='ownerPartSimReplacements'||e.target?.id==='ownerPartMicroSdCards'){
-      const parts=readTicketPartInputs('ownerPart'),role=document.getElementById('ownerAssignRole'),workType=document.getElementById('ownerAssignWorkType')?.value||'service';
-      if(workType!=='pickup'&&(Number(parts.sim_replacement_qty||0)>0||Number(parts.micro_sd_qty||0)>0)&&role&&(role.value==='service'||role.value==='service_it')){
-        role.value='it_service';role.dataset.ownerConfirmed='1';refreshOwnerAssignmentTechOptions();syncOwnerSimplePills();
-      }
+    if(e.target?.matches?.('[data-owner-equipment-qty]')||e.target?.id?.startsWith('ownerPart')){
+      applyOwnerAutomaticFlow();
+      refreshOwnerWorkTypeLabels();
+      refreshOwnerAutoServicePlan();
     }
-    ownerSaveAssignDraftNow();ownerAIReview();
+    ownerSaveAssignDraftNow();
+    ownerAIReview();
   }
 });
 
-document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if (e.target?.matches?.('[data-owner-equipment-qty]')) refreshOwnerAutoServicePlan(); if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();} if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
+document.addEventListener('input', e => { if (e.target?.id === 'ownerReturnSearch') filterOwnerReturns(e.target.value); if(e.target?.matches?.('[data-owner-equipment-qty]')||e.target?.id?.startsWith('ownerPart')) {applyOwnerAutomaticFlow();refreshOwnerWorkTypeLabels();refreshOwnerAutoServicePlan();} if(e.target?.closest?.('#ownerJobAssignments')&&e.target?.matches?.('input,textarea')) {ownerSaveAssignDraftNow();ownerAIReview();} if (e.target?.id === 'wlReturnTicket') { serviceReturn.ticket=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnUnit') { if(norm(e.target.value)!==norm(serviceReturn.unit)){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.unit=e.target.value; saveServiceReturnDraft(); } if (e.target?.id === 'wlReturnNotes') { serviceReturn.notes=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('change', e => { if(e.target?.id==='wlOfflineKnownUnit'){const card=document.getElementById('wlOfflineUnitForm');let units=[];try{units=JSON.parse(card?.dataset.units||'[]');}catch{}const u=units[Number(e.target.value)]||{};const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};set('wlOfflineTicket',u.ticket_no);set('wlOfflineSite',u.site);set('wlOfflineUnit',u.unit_tag);set('wlOfflineType',u.equipment_type);} if (e.target?.id === 'wlReturnType') { if(serviceReturn.type!==e.target.value){serviceReturn.photo=null;serviceReturn.tagScan=null;} serviceReturn.type=e.target.value; saveServiceReturnDraft(); } });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter') return; if(e.target?.id==='wlITJobSearch'){e.preventDefault();itFindJobByTicket();return;} if(e.target?.id==='ownerUnitLookupInput'){e.preventDefault();ownerLookupUnitHistory();return;} if (e.target?.id === 'wlItUnitValue' || e.target?.id === 'wlReconRequired') { e.preventDefault(); document.querySelector('#wlItWizardOnly [data-wl-it-next]')?.click(); return; } if (e.target?.id === 'wlSvcCount') { e.preventDefault(); document.querySelector('#wlSvcWizardOnly [data-wl-svc-next]')?.click(); return; } if (e.target?.id === 'wlTicketInput') { e.preventDefault(); document.querySelector('[data-wl-match]')?.click(); return; } if (e.target?.id === 'wlReturnTicket' || e.target?.id === 'wlReturnUnit') { e.preventDefault(); document.querySelector('#wlSvcReturn [data-wl-return-next]')?.click(); } });
 document.addEventListener('click',e=>{if(e.target.closest('[data-owner-retry-live]')){e.preventDefault();scheduleOwnerRefresh(true,0);}},true);
