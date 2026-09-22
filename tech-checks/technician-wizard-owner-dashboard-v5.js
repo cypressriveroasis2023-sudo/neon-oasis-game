@@ -288,6 +288,18 @@ function injectStyles() {
       .wl-help-simple-nav button{min-height:64px!important;font-size:15px!important}
     }
 
+    /* In-app guided tutorial v94 */
+    .wl-guided-tour{position:fixed;inset:0;z-index:10040;pointer-events:none}.wl-guided-tour.hidden{display:none!important}
+    .wl-tour-shade{position:fixed;background:rgba(4,12,20,.78);pointer-events:auto}
+    .wl-tour-blocker{position:fixed;z-index:1;background:transparent;pointer-events:auto}
+    .wl-guided-tour-target{position:relative!important;z-index:10042!important;outline:5px solid #fff!important;outline-offset:5px!important;box-shadow:0 0 0 10px #d20b12,0 14px 40px rgba(0,0,0,.34)!important;border-radius:16px!important}
+    .wl-tour-tip{position:fixed;z-index:3;box-sizing:border-box;padding:16px;border:2px solid #d20b12;border-radius:20px;background:#fff;color:#101820;box-shadow:0 18px 50px rgba(0,0,0,.34);pointer-events:auto}
+    .wl-tour-tip-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.wl-tour-tip-head span{padding:6px 10px;border-radius:999px;background:#101820;color:#fff;font-size:11px;font-weight:950;letter-spacing:.06em}
+    .wl-tour-tip-head button{width:38px;height:38px;margin:0;border:0;border-radius:999px;background:#e9eef2;color:#304455;font-size:25px;line-height:1;font-weight:800}
+    .wl-tour-tip h3{margin:12px 0 7px!important;color:#d20b12!important;font-size:22px!important;line-height:1.08!important}.wl-tour-tip p{margin:0;color:#213445;font-size:17px;line-height:1.35;font-weight:750}
+    .wl-tour-nav{display:grid;grid-template-columns:1fr 1.6fr;gap:9px;margin-top:15px}.wl-tour-nav button{min-height:56px;margin:0;border-radius:999px;font:inherit;font-size:14px;font-weight:950}.wl-tour-nav button:first-child{border:2px solid #ced8df;background:#fff;color:#3b4d5b}.wl-tour-nav button:last-child{border:2px solid #d20b12;background:#d20b12;color:#fff}.wl-tour-nav button:disabled{opacity:.35}
+    @media(max-width:430px){.wl-tour-tip{padding:14px;border-radius:18px}.wl-tour-tip h3{font-size:19px!important}.wl-tour-tip p{font-size:15px}.wl-tour-nav button{min-height:54px;font-size:13px}}
+
 
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
 
@@ -1072,8 +1084,8 @@ function renderHelpCenter(roleOverride=null){
       <button type='button' data-wl-help-role='service' class='${helpCenterRole==='service'?'selected':''}'><b>S</b><span>Service</span></button>
     </div>
     <section class='wl-help-start-card'>
-      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>Simple ${esc(helpRoleName(helpCenterRole))} walkthrough</b><small>One big instruction at a time. Tap NEXT after each step.</small></div></div>
-      <button type='button' data-wl-help-walkthrough>START STEP-BY-STEP →</button>
+      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${['service','it'].includes(helpCenterRole)?'8-step guided tutorial':'Simple '+esc(helpRoleName(helpCenterRole))+' walkthrough'}</b><small>${['service','it'].includes(helpCenterRole)?'Follow the spotlight on the real app. Tap NEXT after each stop.':'One instruction at a time.'}</small></div></div>
+      <button type='button' data-wl-help-walkthrough>START GUIDED TUTORIAL →</button>
     </section>
     <section class='wl-help-flow-section'>
       <div class='wl-help-section-title'><b>Role workflow</b><span>THE BIG PICTURE</span></div>
@@ -1397,6 +1409,130 @@ function helpStepHowToHtml(role, step){
     </div>
   `;
 }
+let guidedTourRole = null;
+let guidedTourStep = 0;
+let guidedTourFirstTime = false;
+
+function guidedTourSteps(role){
+  if(role==='service') return [
+    { selector:'#wlSvcHome h1', title:'THIS IS YOUR SERVICE HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
+    { selector:'#wlSvcHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'This card shows your one required action. You do not need to search through the app.' },
+    { selector:'#wlSvcHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This starts the next required Service step.' },
+    { selector:'#wlSvcHome .wl-service-flowline', title:'FOLLOW THIS ORDER', text:'Truck Check → required follow-up → next job → End My Day.' },
+    { selector:'#wlSvcHome .wl-service-more > summary', title:'OTHER ACTIONS', text:'Open this only when you need to enter a ticket, return equipment, call IT, or review history.' },
+    { selector:"#wlSvcHome [data-wl-service-open-job]", open:'#wlSvcHome .wl-service-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number. Tech Check will find the correct Service job.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:"#wlSvcHome [data-wl-service-return]", open:'#wlSvcHome .wl-service-more', title:'RETURN EQUIPMENT', text:'Use this when a unit comes back from the field. Tech Check will walk you through the return photo and IT Intake.', fallback:'#wlSvcHome .wl-service-more > summary' },
+    { selector:'#techMenuButton', title:'HELP AND PHONE ALERTS', text:'Open Menu anytime for Help, phone alerts, or a fresh data check.' }
+  ];
+  return [
+    { selector:'#wlItHome h1', title:'THIS IS YOUR IT HOME', text:'Start here. Tech Check checks the live work and tells you what to do next.' },
+    { selector:'#wlItHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'IT Intake, site registration, active prep, and new jobs are automatically placed in the right order.' },
+    { selector:'#wlItHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This opens the next required IT step. You do not need to search through the app.' },
+    { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → End My Day.' },
+    { selector:'#wlItHome .wl-it-more > summary', title:'OTHER ACTIONS', text:'Open this only when you need to enter a ticket, resume prep, review returns, or see history.' },
+    { selector:"#wlItHome [data-wl-it-open-job]", open:'#wlItHome .wl-it-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number to open or claim the correct IT job.', fallback:'#wlItHome .wl-it-more > summary' },
+    { selector:"#wlItHome [data-wl-mode='intake']", open:'#wlItHome .wl-it-more', title:'IT INTAKE AND RETURNS', text:'Returned equipment waits here. Open it and Tech Check will continue one check at a time.', fallback:'#wlItHome .wl-it-more > summary' },
+    { selector:'#techMenuButton', title:'HELP AND PHONE ALERTS', text:'Open Menu anytime for Help, phone alerts, or a fresh data check.' }
+  ];
+}
+
+function ensureGuidedTourLayer(){
+  let layer=document.getElementById('wlGuidedTourLayer');
+  if(layer)return layer;
+  layer=document.createElement('div');
+  layer.id='wlGuidedTourLayer';
+  layer.className='wl-guided-tour hidden';
+  layer.innerHTML="<div class='wl-tour-shade top'></div><div class='wl-tour-shade left'></div><div class='wl-tour-shade right'></div><div class='wl-tour-shade bottom'></div><div class='wl-tour-blocker'></div><section class='wl-tour-tip' role='dialog' aria-modal='true'><div class='wl-tour-tip-head'><span id='wlTourCount'></span><button type='button' data-wl-tour-close aria-label='Close tutorial'>×</button></div><h3 id='wlTourTitle'></h3><p id='wlTourText'></p><div class='wl-tour-nav'><button type='button' data-wl-tour-back>BACK</button><button type='button' data-wl-tour-next>NEXT →</button></div></section>";
+  document.body.append(layer);
+  return layer;
+}
+
+function clearGuidedTourTarget(){
+  document.querySelectorAll('.wl-guided-tour-target').forEach(el=>el.classList.remove('wl-guided-tour-target'));
+}
+
+function positionGuidedTour(step,target){
+  const layer=ensureGuidedTourLayer();
+  const pad=8;
+  const rect=target.getBoundingClientRect();
+  const top=Math.max(0,rect.top-pad), left=Math.max(0,rect.left-pad);
+  const right=Math.min(innerWidth,rect.right+pad), bottom=Math.min(innerHeight,rect.bottom+pad);
+  const setBox=(name,styles)=>{const el=layer.querySelector('.wl-tour-shade.'+name);Object.assign(el.style,styles);};
+  setBox('top',{left:'0px',top:'0px',width:'100vw',height:top+'px'});
+  setBox('bottom',{left:'0px',top:bottom+'px',width:'100vw',height:Math.max(0,innerHeight-bottom)+'px'});
+  setBox('left',{left:'0px',top:top+'px',width:left+'px',height:Math.max(0,bottom-top)+'px'});
+  setBox('right',{left:right+'px',top:top+'px',width:Math.max(0,innerWidth-right)+'px',height:Math.max(0,bottom-top)+'px'});
+  const blocker=layer.querySelector('.wl-tour-blocker');
+  Object.assign(blocker.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px'});
+  const tip=layer.querySelector('.wl-tour-tip');
+  const tipWidth=Math.min(380,innerWidth-24);
+  tip.style.width=tipWidth+'px';
+  tip.style.left=Math.max(12,Math.min(innerWidth-tipWidth-12,(left+right-tipWidth)/2))+'px';
+  const preferredBelow=bottom+12;
+  const roomBelow=innerHeight-preferredBelow;
+  const estimated=220;
+  tip.style.top=(roomBelow>=estimated ? preferredBelow : Math.max(12,top-estimated-12))+'px';
+  document.getElementById('wlTourCount').textContent='STEP '+(guidedTourStep+1)+' OF '+guidedTourSteps(guidedTourRole).length;
+  document.getElementById('wlTourTitle').textContent=step.title;
+  document.getElementById('wlTourText').textContent=step.text;
+  const back=layer.querySelector('[data-wl-tour-back]');
+  back.disabled=guidedTourStep===0;
+  const next=layer.querySelector('[data-wl-tour-next]');
+  next.textContent=guidedTourStep===guidedTourSteps(guidedTourRole).length-1?'FINISH ✓':'NEXT →';
+}
+
+function showGuidedTourStep(){
+  const steps=guidedTourSteps(guidedTourRole);
+  guidedTourStep=Math.max(0,Math.min(guidedTourStep,steps.length-1));
+  const step=steps[guidedTourStep];
+  if(step.open){
+    const details=document.querySelector(step.open);
+    if(details)details.open=true;
+  }
+  clearGuidedTourTarget();
+  let target=document.querySelector(step.selector);
+  if((!target || target.offsetParent===null) && step.fallback)target=document.querySelector(step.fallback);
+  if(!target)return finishGuidedTour(false);
+  target.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+  const layer=ensureGuidedTourLayer();
+  layer.classList.remove('hidden');
+  setTimeout(()=>{
+    clearGuidedTourTarget();
+    target.classList.add('wl-guided-tour-target');
+    positionGuidedTour(step,target);
+  },260);
+}
+
+async function startGuidedTour(role,firstTime=false){
+  guidedTourRole=['service','it'].includes(role)?role:currentRoleKey();
+  if(!['service','it'].includes(guidedTourRole))return;
+  guidedTourStep=0;
+  guidedTourFirstTime=Boolean(firstTime);
+  document.getElementById('wlHelpOverlay')?.classList.add('hidden');
+  document.getElementById('wlTechMenuPanel')?.classList.add('hidden');
+  if(currentRoleKey()==='owner'){
+    document.getElementById(guidedTourRole==='service'?'tab-svc':'tab-it')?.click();
+    await new Promise(resolve=>setTimeout(resolve,180));
+  }
+  if(guidedTourRole==='service')await showSvcHome();
+  else await showITHome();
+  setTimeout(showGuidedTourStep,120);
+}
+
+async function finishGuidedTour(completed=true){
+  clearGuidedTourTarget();
+  const layer=document.getElementById('wlGuidedTourLayer');
+  layer?.classList.add('hidden');
+  if(completed&&guidedTourFirstTime){
+    const tech=await currentTechIdentity().catch(()=>null);
+    if(tech?.id){
+      const now=new Date().toISOString();
+      await liveDb.from('technician_training_state').upsert({user_id:tech.id,walkthrough_completed_at:now,last_help_opened_at:now,updated_at:now},{onConflict:'user_id'});
+    }
+  }
+  guidedTourFirstTime=false;
+}
+
 function helpWalkthroughPages(role = currentRoleKey()) {
   const sections = helpStepsForRole(role);
   if (!['service','it'].includes(role)) {
@@ -1501,8 +1637,10 @@ function renderHelpWalkthrough() {
   overlay.classList.remove('hidden');
 }
 async function openHelpWalkthrough(firstTime = false, roleOverride = null) {
+  const requestedRole = firstTime ? currentRoleKey() : (roleOverride || helpCenterRole || currentRoleKey());
+  if (['service','it'].includes(requestedRole)) return startGuidedTour(requestedRole, firstTime);
   helpWalkthroughMode = firstTime ? 'first' : 'help';
-  helpWalkthroughRole = firstTime ? null : (roleOverride || helpCenterRole || currentRoleKey());
+  helpWalkthroughRole = firstTime ? null : requestedRole;
   helpWalkthroughStep = 0;
   if (!firstTime) {
     const tech = await currentTechIdentity().catch(() => null);
@@ -7732,6 +7870,9 @@ document.addEventListener('click', async e => {
   const heliosReview=e.target.closest('[data-wl-owner-helios-review]'); if(heliosReview) return ownerOpenHeliosFinalReview(heliosReview.dataset.wlOwnerHeliosReview);
   const heliosVerify=e.target.closest('[data-wl-owner-helios-verify]'); if(heliosVerify) return ownerVerifyHeliosFinal(heliosVerify.dataset.wlOwnerHeliosVerify);
   if(e.target.closest('[data-wl-owner-helios-close]')) { document.getElementById('ownerHeliosFinalReview')?.remove(); return; }
+  if(e.target.closest('[data-wl-tour-close]')) return finishGuidedTour(false);
+  if(e.target.closest('[data-wl-tour-back]')) { guidedTourStep=Math.max(0,guidedTourStep-1); return showGuidedTourStep(); }
+  if(e.target.closest('[data-wl-tour-next]')) { const steps=guidedTourSteps(guidedTourRole); if(guidedTourStep>=steps.length-1)return finishGuidedTour(true); guidedTourStep++; return showGuidedTourStep(); }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const pages=helpWalkthroughPages(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= pages.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
