@@ -178,13 +178,18 @@ function updateConnectionStatus() {
   clearTimeout(connectionHideTimer);
   if (sync && !online) sync.textContent = 'Offline — unsent field drafts stay on this device';
   if (!banner) return;
-  banner.classList.remove('hidden','online','offline');
-  banner.classList.add(online ? 'online' : 'offline');
-  banner.innerHTML = online ? '<b>Back online.</b> Refreshing shared Tech Check data…' : '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
+  // Do not flash a reconnect banner for normal iPhone network handoffs.
+  // Only interrupt the UI when the device is actually offline.
   if (online) {
+    banner.classList.add('hidden');
+    banner.classList.remove('online','offline');
+    if (sync) sync.textContent = 'Connected to shared data';
     if (state.session) scheduleRefreshData();
-    connectionHideTimer = setTimeout(() => banner.classList.add('hidden'), 3200);
+    return;
   }
+  banner.classList.remove('hidden','online');
+  banner.classList.add('offline');
+  banner.innerHTML = '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
 }
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
