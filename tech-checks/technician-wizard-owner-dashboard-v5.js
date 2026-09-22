@@ -2777,6 +2777,9 @@ function equipmentManifestExpanded(raw) {
   });
   return out;
 }
+function requiredItEquipmentType(index=itUnitIndex) {
+  return equipmentManifestExpanded(activeItPrep?.equipment_manifest || [])[index] || '';
+}
 function manifestQty(raw,label) {
   if (window.TechCheckRules?.manifestQty) return window.TechCheckRules.manifestQty(raw,label);
   return normalizedEquipmentManifest(raw).filter(row => row.label===label).reduce((sum,row)=>sum+row.qty,0);
@@ -2852,6 +2855,7 @@ function itEquipmentManifestInputsHtml(data=[]) {
   return `<div class='wl-owner-equipment-requirements'><div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>UNIT AREA — Units / Devices Being Sent</div><div class='small'>Choose exactly what is going out for this MHelpDesk ticket.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('device',data)}</div></div><div class='wl-requirement-section standArea'><div class='wl-requirement-heading'>STAND AREA — Stands Being Sent</div><div class='small'>Stands are counted separately from the unit/device count.</div><div class='wl-owner-equipment-grid top8'>${itEquipmentQtyGrid('stand',data)}</div></div></div>`;
 }
 function readITEquipmentManifest() {
+  if (pendingAssignmentManifest.length) return normalizedEquipmentManifest(pendingAssignmentManifest);
   return [...document.querySelectorAll('#wlITEquipmentWrap [data-it-equipment-qty]')].map(input => ({
     category: input.dataset.category || 'other',
     label: input.dataset.label || '',
@@ -2880,7 +2884,10 @@ function ensureITEquipmentManifestFields(ticketGrid) {
     wrap.style.gridColumn='1 / -1';
     ticketGrid.append(wrap);
   }
-  wrap.innerHTML=`<div class='qtext'>Parts Required From This Ticket</div><div class='small'>Choose the exact units/devices, stands, and extra parts being sent for this MHelpDesk ticket.</div>${itEquipmentManifestInputsHtml(pendingAssignmentManifest)}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div><div class='wl-requirement-section partsArea'><div class='wl-requirement-heading'>REPLACEMENT / SWAP WORK</div><div class='small'><b>IT supplies all listed SIM and SD/micro SD cards.</b> Put the exact quantity in the Service handoff.</div>${ticketPartsInputsHtml('wlPart')}</div>`;
+  const assignedPlan = pendingAssignmentManifest.length
+    ? `<div class='wl-requirement-section unitArea'><div class='wl-requirement-heading'>EQUIPMENT FROM OWNER</div><div class='small'>This equipment is locked to the Owner assignment. IT prepares exactly what is listed below.</div>${equipmentManifestInlineHtml({equipment_manifest:pendingAssignmentManifest})}</div>`
+    : itEquipmentManifestInputsHtml([]);
+  wrap.innerHTML=`<div class='qtext'>Parts Required From This Ticket</div>${assignedPlan}<div id='wlITEquipmentCountSummary' class='wl-equipment-count-summary'></div><div class='wl-requirement-section partsArea'><div class='wl-requirement-heading'>REPLACEMENT / SWAP WORK</div><div class='small'><b>IT supplies all listed SIM and SD/micro SD cards.</b> Put the exact quantity in the Service handoff.</div>${ticketPartsInputsHtml('wlPart')}</div>`;
   wrap.querySelectorAll('[data-it-equipment-qty]').forEach(input => input.addEventListener('input', syncITEquipmentCounts));
   syncITEquipmentCounts();
   return wrap;
@@ -4071,7 +4078,12 @@ async function showItPrep(prepId) {
     itTypeChoice = item.equipment_type || '';
     itPurposeChoice = item.purpose || '';
     itReconRequired = Number(item.recon_camera_count || 1);
-    if (!item.equipment_type || !item.purpose) { itUnitPhase = 'type'; itTypeChoice = item.equipment_type || equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || ''; itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || ''; }
+    const requiredType=requiredItEquipmentType(itUnitIndex);
+    if ((requiredType && item.equipment_type!==requiredType) || !item.equipment_type || !item.purpose) {
+      itUnitPhase = 'type';
+      itTypeChoice = requiredType || item.equipment_type || '';
+      itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || '';
+    }
     else {
       const issues = itUnitIssues(item, evidence, unitNo);
       if (!issues.length) itUnitPhase = 'review';
@@ -4156,9 +4168,30 @@ async function renderItUnitStep() {
   const unitNo = itUnitIndex + 1;
   const identity = item ? itItemIdentity(item, unitNo) : `Unit ${unitNo}`;
   if (itUnitPhase === 'type') {
-    const cameraOptions = CAMERA_UNIT_TYPES.map(type => `<option value='${esc(type)}' ${itTypeChoice === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
-    const supportOptions = STAND_POLE_TYPES.map(type => `<option value='${esc(type)}' ${itTypeChoice === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
-    wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, `What type of equipment is Item ${unitNo}?`, 1, 1) + `<div class='wl-question'><div class='qtext'>Equipment Plan</div>${equipmentManifestInlineHtml(activeItPrep)}${unitCountEditor(totalUnits)}</div><div class='wl-question top10'><div class='qtext'>Choose the equipment type</div><select id='wlItUnitType'><option value=''>Choose type…</option><optgroup label='Camera / Unit Types'>${cameraOptions}</optgroup><optgroup label='Stand / Pole Types'>${supportOptions}</optgroup></select></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    const lockedType=requiredItEquipmentType(itUnitIndex);
+    if (lockedType) {
+      itTypeChoice=lockedType;
+      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
+      if (autoPurpose && itPurposeAllowedForCurrentJob(lockedType,autoPurpose)) {
+        itPurposeChoice=autoPurpose;
+        if (lockedType==='Recon 2') {
+          itUnitPhase='recon';
+          return renderItUnitStep();
+        }
+        const current=currentItItem();
+        if (!current || current.equipment_type!==lockedType || current.purpose!==autoPurpose) {
+          if (!await configureCurrentItItem()) return;
+        }
+        itQuestionIndex=0;
+        itUnitPhase='checks';
+        return renderItUnitStep();
+      }
+      itPurposeChoice=currentItItem()?.purpose || '';
+      itUnitPhase='purpose';
+      return renderItUnitStep();
+    }
+    wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, 'Equipment type missing', 1, 1) +
+      `<div class='wl-stop'><b>OWNER ACTION NEEDED</b><div>This ticket does not say what equipment IT should prepare. Go back and have the Owner correct the assignment.</div></div><div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><span></span></div>`;
   } else if (itUnitPhase === 'purpose') {
     const options=itPurposeOptionsForCurrentJob(itTypeChoice);
     const serviceJob=String(activeItPrep?.work_type||'').toLowerCase()==='service';
@@ -5286,20 +5319,6 @@ document.addEventListener('click', async e => {
     const items = itItems();
     const totalUnits = activeItPrep?.expected_unit_count || itExpectedUnits || items.length;
     if (itUnitPhase === 'type') {
-      const value = document.getElementById('wlItUnitType')?.value || '';
-      if (!value) return alert('Choose the unit type first.');
-      itTypeChoice = value;
-      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
-      if(autoPurpose && itPurposeAllowedForCurrentJob(value,autoPurpose)){
-        itPurposeChoice=autoPurpose;
-        if(value==='Recon 2'){itUnitPhase='recon';return renderItUnitStep();}
-        if(!await configureCurrentItItem())return;
-        itQuestionIndex=0;
-        itUnitPhase='checks';
-        return renderItUnitStep();
-      }
-      itPurposeChoice = '';
-      itUnitPhase = 'purpose';
       return renderItUnitStep();
     }
     if (itUnitPhase === 'purpose') {
@@ -5424,9 +5443,27 @@ document.addEventListener('click', async e => {
     if (itUnitPhase === 'signature') { itUnitPhase = 'photo'; return renderItUnitStep(); }
     if (itUnitPhase === 'review') { itUnitPhase = 'signature'; return renderItUnitStep(); }
     if (itUnitPhase === 'photo') { itUnitPhase = 'checks'; itQuestionIndex = Math.max(0, itUnitStepsData(currentItItem(), itUnitIndex + 1).length - 1); return renderItUnitStep(); }
-    if (itUnitPhase === 'checks') { if (itQuestionIndex > 0) { itQuestionIndex--; return renderItUnitStep(); } itUnitPhase = 'purpose'; itTypeChoice = currentItItem()?.equipment_type || ''; itPurposeChoice = currentItItem()?.purpose || ''; return renderItUnitStep(); }
+    if (itUnitPhase === 'checks') {
+      if (itQuestionIndex > 0) { itQuestionIndex--; return renderItUnitStep(); }
+      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
+      if (autoPurpose) {
+        if (itUnitIndex===0) return showPendingList();
+        itUnitIndex--;
+        itUnitPhase='review';
+        return renderItUnitStep();
+      }
+      itUnitPhase = 'purpose';
+      itTypeChoice = currentItItem()?.equipment_type || requiredItEquipmentType(itUnitIndex) || '';
+      itPurposeChoice = currentItItem()?.purpose || '';
+      return renderItUnitStep();
+    }
     if (itUnitPhase === 'recon') { itUnitPhase = 'purpose'; return renderItUnitStep(); }
-    if (itUnitPhase === 'purpose') { itUnitPhase = 'type'; return renderItUnitStep(); }
+    if (itUnitPhase === 'purpose') {
+      if (itUnitIndex===0) return showPendingList();
+      itUnitIndex--;
+      itUnitPhase='review';
+      return renderItUnitStep();
+    }
     if (itUnitPhase === 'type') { if (itUnitIndex === 0) return showPendingList(); itUnitIndex--; itUnitPhase = 'review'; return renderItUnitStep(); }
   }
   if (e.target.closest('[data-wl-add-truck-spare-unit]')) { e.preventDefault(); e.stopPropagation(); return addTruckSpareUnitFromSummary(); }
