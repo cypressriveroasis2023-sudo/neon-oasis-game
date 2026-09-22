@@ -430,7 +430,11 @@
         <button type="button" data-owner-route="accounts">Technician Accounts</button>
       </nav>
       <div class="ownerAppSidebarUtility">
-        <a href="./onsite-vision.html">OnSite Vision</a>
+        <a class="ownerVisionLauncher" href="./onsite-vision.html" aria-label="Open OnSite Vision">
+          <span class="ownerVisionLauncherIcon">◉</span>
+          <span><b>OnSite Vision</b><small>AI command center</small></span>
+          <em>OPEN</em>
+        </a>
         <button type="button" onclick="refreshData()">Refresh</button>
         <button type="button" onclick="logout()">Sign Out</button>
       </div>
