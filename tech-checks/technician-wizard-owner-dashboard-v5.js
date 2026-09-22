@@ -6608,7 +6608,7 @@ function ownerAIDispatchMissing(parsed) {
 function ownerAIDispatchSummary(parsed) {
   const a=ownerAIDraft(), techIds=[...document.querySelectorAll("#ownerAssignedTechPills [data-tech-id]")].map(el=>el.dataset.techId), techs=techIds.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
   const eq=normalizedEquipmentManifest(a.equipment_manifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ");
-  const flow=a.role==="it_service"?"IT → Service":a.role==="service_it"?"Service → IT":a.role==="it"?"IT only":"Service only";
+  const flow=ownerAutomaticFlowLabel(a.work_type,a.role);
   return {ticket:a.ticket_no||"—",site:a.site||"—",date:ownerAIScheduleText(document.getElementById("ownerAssignDate")?.value||"",document.getElementById("ownerAssignTime")?.value||""),type:String(a.work_type||"").toUpperCase(),flow,techs:techs.length?techs.join(", "):"Department queue",equipment:eq||"—"};
 }
 function ownerAIDispatchRender(parsed) {
@@ -6995,7 +6995,7 @@ async function ownerAssignJob() {
       return alert("AI Dispatch still needs: " + missing.join(", ") + ". Nothing was assigned.");
     }
     const eq=normalizedEquipmentManifest(equipmentManifest).map(r=>r.qty+" × "+equipmentDisplayLabel(r.label)).join(", ") || "No equipment";
-    const flow=role==="it_service"?"IT → Service":role==="service_it"?"Service → IT":role==="it"?"IT only":"Service only";
+    const flow=ownerAutomaticFlowLabel(workType,role);
     const techNames=assignees.map(id=>ownerAssignmentProfiles.find(p=>p.user_id===id)?.full_name||ownerAssignmentProfiles.find(p=>p.user_id===id)?.username).filter(Boolean);
     const confirmText="ONSITE VISION CONFIRMATION\n\nMHelpDesk #"+ticket+"\nSite: "+(site||"—")+"\nWork date/time: "+ownerAIScheduleText(scheduledFor,scheduledTime)+"\nJob: "+workType.toUpperCase()+"\nFlow: "+flow+"\nAssigned: "+(techNames.length?techNames.join(", "):"Department queue")+"\nEquipment: "+eq+"\n\nAssign this Tech Check job?";
     if (!confirm(confirmText)) return;
@@ -7063,7 +7063,7 @@ async function ownerAssignJob() {
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
   const timeInput=document.getElementById('ownerAssignTime'); if (timeInput) timeInput.value='';
   const workTypeInput=document.getElementById('ownerAssignWorkType'); if (workTypeInput) workTypeInput.value='service';
-  const roleInput=document.getElementById('ownerAssignRole'); if(roleInput) roleInput.value='it';
+  const roleInput=document.getElementById('ownerAssignRole'); if(roleInput) roleInput.value='service';
   const techPills=document.getElementById('ownerAssignedTechPills'); if(techPills) techPills.innerHTML='';
   fillTicketPartInputs({}, 'ownerPart');
   document.querySelectorAll('#ownerJobAssignments [data-owner-equipment-qty]').forEach(input => { input.value='0'; });
