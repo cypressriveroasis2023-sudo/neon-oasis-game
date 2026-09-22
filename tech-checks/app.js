@@ -178,18 +178,13 @@ function updateConnectionStatus() {
   clearTimeout(connectionHideTimer);
   if (sync && !online) sync.textContent = 'Offline — unsent field drafts stay on this device';
   if (!banner) return;
-  // Do not flash a reconnect banner for normal iPhone network handoffs.
-  // Only interrupt the UI when the device is actually offline.
+  banner.classList.remove('hidden','online','offline');
+  banner.classList.add(online ? 'online' : 'offline');
+  banner.innerHTML = online ? '<b>Back online.</b> Refreshing shared Tech Check data…' : '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
   if (online) {
-    banner.classList.add('hidden');
-    banner.classList.remove('online','offline');
-    if (sync) sync.textContent = 'Connected to shared data';
     if (state.session) scheduleRefreshData();
-    return;
+    connectionHideTimer = setTimeout(() => banner.classList.add('hidden'), 3200);
   }
-  banner.classList.remove('hidden','online');
-  banner.classList.add('offline');
-  banner.innerHTML = '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
 }
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
@@ -2561,17 +2556,11 @@ async function ownerAppRender(){
   else clearInterval(window.ownerTodayClockTimer);
   ownerInteractionSafety();
 }
-function ownerToggleMobileMenu(){
-  const side=document.getElementById('ownerAppSidebar'),btn=document.getElementById('ownerMobileMenuButton');if(!side)return;
-  const open=!side.classList.contains('mobileOpen');side.classList.toggle('mobileOpen',open);document.body.classList.toggle('ownerMenuOpen',open);if(btn)btn.setAttribute('aria-expanded',String(open));
-}
-function ownerCloseMobileMenu(){const side=document.getElementById('ownerAppSidebar'),btn=document.getElementById('ownerMobileMenuButton');if(side)side.classList.remove('mobileOpen');document.body.classList.remove('ownerMenuOpen');if(btn)btn.setAttribute('aria-expanded','false');}
 async function ownerAppNavigate(route){
   if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ws)ws.scrollLeft=0;
   ownerAppRoute=route;
-  ownerCloseMobileMenu();
   await ownerAppRender();
 }
 function ownerInteractionSafety(){
