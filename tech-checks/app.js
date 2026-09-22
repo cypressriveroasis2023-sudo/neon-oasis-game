@@ -2206,12 +2206,66 @@ function ownerBoardServiceTechCard(tech){
       +'</div>'
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
+      +'<button type="button" class="ownerCmdInventoryEditBtn" onclick="ownerToggleTruckInventoryEditor(\''+esc(tech.service_tech_id)+'\')">✎ ADJUST THIS TRUCK INVENTORY</button>'
+      +'<div id="ownerTruckEditor_'+esc(tech.service_tech_id)+'" class="ownerCmdInventoryEditor" hidden></div>'
     +'</div>'
     +'<div class="ownerCmdSection jobs"><div class="ownerCmdSectionHead"><b>TODAY’S JOBS</b><span>'+jobs.length+'</span></div>'
       +(jobs.length?'<div class="ownerCmdJobs">'+jobs.map(ownerBoardJobHtml).join('')+'</div>':'<div class="ownerCmdEmpty">No Service jobs assigned today.</div>')
     +'</div>'
     +'</section>';
 }
+
+function ownerTruckEditorTech(id){
+  return (state.ownerTechCommandBoard?.service_techs||[]).find(t=>String(t.service_tech_id)===String(id));
+}
+function ownerTruckEditorHtml(tech){
+  const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{};
+  const unitTypes=['Sniper','Ranger','Spotter','Solar Spotter'];
+  return '<div class="ownerTruckEditorHead"><div><b>OWNER · ADJUST TRUCK INVENTORY</b><span>Changes are permanent and logged. Service must verify again after any change.</span></div><button class="mini" type="button" onclick="ownerToggleTruckInventoryEditor(\''+esc(tech.service_tech_id)+'\')">Close</button></div>'
+    +'<div class="ownerTruckEditorLabel">PERMANENT UNITS</div>'
+    +unitTypes.map(type=>{const u=units.find(x=>x.equipment_type===type)||{};const key=type.replaceAll(' ','_');return '<div class="ownerTruckEditRow"><div><b>'+esc(type)+'</b><span>'+(u.unit_tag?'Current · '+esc(u.unit_tag):'MISSING')+'</span></div><input id="ownerTruckUnit_'+esc(tech.service_tech_id)+'_'+key+'" value="'+esc(u.unit_tag||'')+'" placeholder="Exact unit tag"><button type="button" onclick="ownerSaveTruckUnit(\''+esc(tech.service_tech_id)+'\',\''+esc(type)+'\')">'+(u.unit_tag?'VERIFY':'ASSIGN')+'</button></div>';}).join('')
+    +'<div class="ownerTruckUnitChecks"><b>UNIT READINESS CHECKS</b><span>Required when assigning a missing unit.</span>'+[['identity_ok','Identity'],['power_ok','Power'],['functions_ok','Functions'],['programmed_online_ok','Online'],['sd_storage_ok','SD / storage'],['sim_monitoring_ok','SIM / monitoring'],['clean_safe_ok','Clean / safe']].map(([k,l])=>'<label><input type="checkbox" data-owner-truck-unit-check="'+k+'"> '+l+'</label>').join('')+'</div>'
+    +'<div class="ownerTruckEditorLabel">SIM CARDS · EXACT NUMBERS</div>'
+    +[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return '<div class="ownerTruckEditRow"><div><b>SIM '+slot+'</b><span>'+(s.sim_number?'Current · '+esc(s.sim_number):'MISSING')+'</span></div><input id="ownerTruckSim_'+esc(tech.service_tech_id)+'_'+slot+'" value="'+esc(s.sim_number||'')+'" placeholder="Exact SIM number"><label class="ownerTruckVerify"><input id="ownerTruckSimVerify_'+esc(tech.service_tech_id)+'_'+slot+'" type="checkbox"> verified</label><button type="button" onclick="ownerSaveTruckSim(\''+esc(tech.service_tech_id)+'\','+slot+')">SAVE</button></div>';}).join('')
+    +'<div class="ownerTruckEditorLabel">BATTERY COUNTS · SET ACTUAL COUNT</div>'
+    +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(tech.service_tech_id)+'_'+i+'" type="number" min="0" value="'+qty+'"><button type="button" onclick="ownerSetTruckStock(\''+esc(tech.service_tech_id)+'\',\''+esc(type)+'\','+i+')">SET COUNT</button></div>').join('');
+}
+function ownerToggleTruckInventoryEditor(id){
+  const host=document.getElementById('ownerTruckEditor_'+id);if(!host)return;
+  if(!host.hidden){host.hidden=true;host.innerHTML='';return;}
+  const tech=ownerTruckEditorTech(id);if(!tech)return alert('Truck inventory could not be found.');
+  host.innerHTML=ownerTruckEditorHtml(tech);host.hidden=false;
+}
+async function ownerTruckInventorySaved(message){
+  await refreshData();
+  if(ownerAppRoute!=='team')await ownerAppNavigate('team');
+  alert(message+' Service must physically verify the truck again before leaving.');
+}
+async function ownerSaveTruckUnit(id,type){
+  const tech=ownerTruckEditorTech(id),u=(tech?.units||[]).find(x=>x.equipment_type===type);
+  const tag=document.getElementById('ownerTruckUnit_'+id+'_'+type.replaceAll(' ','_'))?.value.trim()||'';
+  if(!tag)return alert('Enter the exact unit tag.');
+  if(u?.unit_tag&&String(u.unit_tag).trim()!==tag)return alert('This slot already contains '+u.unit_tag+'. Use the normal used/return workflow before replacing an assigned permanent unit.');
+  const checks={};document.querySelectorAll('[data-owner-truck-unit-check]').forEach(x=>checks[x.dataset.ownerTruckUnitCheck]=Boolean(x.checked));
+  if(!u?.unit_tag&&Object.values(checks).some(v=>!v))return alert('Complete all 7 unit readiness checks before assigning this unit.');
+  if(u?.unit_tag)return alert(type+' '+u.unit_tag+' is already assigned. No inventory change is needed.');
+  setBusy(true);const {error}=await db.rpc('it_load_service_truck_unit_v1',{p_service_tech_id:id,p_equipment_type:type,p_unit_tag:tag,p_checks:checks});setBusy(false);
+  if(error)return alert(error.message);return ownerTruckInventorySaved(type+' '+tag+' assigned.');
+}
+async function ownerSaveTruckSim(id,slot){
+  const sim=document.getElementById('ownerTruckSim_'+id+'_'+slot)?.value.trim()||'',verified=Boolean(document.getElementById('ownerTruckSimVerify_'+id+'_'+slot)?.checked);
+  if(!sim)return alert('Enter the exact SIM number.');if(!verified)return alert('Check verified after physically confirming the exact SIM number.');
+  setBusy(true);const {error}=await db.rpc('it_load_service_truck_sim_v1',{p_service_tech_id:id,p_slot_no:Number(slot),p_sim_number:sim,p_number_verified:true});setBusy(false);
+  if(error)return alert(error.message);return ownerTruckInventorySaved('SIM '+slot+' saved.');
+}
+async function ownerSetTruckStock(id,type,index){
+  const raw=document.getElementById('ownerTruckStock_'+id+'_'+index)?.value,qty=Math.floor(Number(raw));
+  if(!Number.isFinite(qty)||qty<0)return alert('Enter the actual quantity on the truck.');
+  if(!confirm('Set '+type+' truck inventory to '+qty+'? This Owner adjustment will be logged.'))return;
+  setBusy(true);const {error}=await db.rpc('owner_set_service_truck_stock_count_v1',{p_service_tech_id:id,p_item_type:type,p_qty:qty});setBusy(false);
+  if(error)return alert(error.message);return ownerTruckInventorySaved(type+' count changed to '+qty+'.');
+}
+
 function ownerBoardITSupportHtml(itTechs){
   const techs=Array.isArray(itTechs)?itTechs:[];
   if(!techs.length)return '';
