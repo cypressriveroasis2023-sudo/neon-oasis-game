@@ -1504,11 +1504,15 @@ function renderOwnerTechOverview() {
 }
 
 async function ownerOpenTruckInventoryManager(){
-  await loadDeferredModules();
-  if(typeof window.showITServiceTruckInventory==='function') return window.showITServiceTruckInventory();
-  const fn=globalThis.showITServiceTruckInventory;
-  if(typeof fn==='function') return fn();
-  alert('Truck Inventory controls are still loading. Try again in a moment.');
+  if(ownerAppRoute!=='team') await ownerAppNavigate('team');
+  const first=(state.ownerTechCommandBoard?.service_techs||[])[0];
+  if(!first)return alert('No active Service Tech truck inventory was found.');
+  requestAnimationFrame(()=>{
+    const card=document.querySelector('.ownerCmdTechCard');
+    const editor=document.getElementById('ownerTruckEditor_'+first.service_tech_id);
+    if(editor?.hidden) ownerToggleTruckInventoryEditor(first.service_tech_id);
+    (editor||card)?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
 }
 function ownerJump(target) {
   if(target==='vision'){ window.location.href='./onsite-vision.html'; return; }
