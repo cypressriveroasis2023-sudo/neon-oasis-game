@@ -2232,55 +2232,27 @@ async function ownerTruckEditorFetch(id){
   return tech;
 }
 function ownerTruckEditorHtml(tech,id){
-  const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{};
-  const unitTypes=['Sniper','Ranger','Spotter','Solar Spotter'];
-  return '<div class="ownerTruckEditorHead"><div><b>OWNER · EDIT '+esc(tech.name||'SERVICE TECH')+' TRUCK</b><span>Enter the exact inventory physically on this truck. Every save is logged and requires Service to re-verify.</span></div><button class="mini" type="button" data-owner-truck-edit="'+esc(id)+'">Close</button></div>'
-   +'<div class="ownerTruckEditorLabel">UNITS · EXACT UNIT NUMBERS</div>'
-   +unitTypes.map(type=>{const u=units.find(x=>x.equipment_type===type)||{},key=type.replaceAll(' ','_');return '<div class="ownerTruckEditRow"><div><b>'+esc(type)+'</b><span>'+(u.unit_tag?'Current · '+esc(u.unit_tag):'MISSING')+'</span></div><input id="ownerTruckUnit_'+esc(id)+'_'+key+'" value="'+esc(u.unit_tag||'')+'" placeholder="Enter '+esc(type)+' unit #"><button type="button" data-owner-save-unit="'+esc(type)+'" data-tech-id="'+esc(id)+'">SAVE UNIT</button></div>';}).join('')
-   +'<div class="ownerTruckEditorLabel">SIM CARDS · EXACT NUMBERS</div>'
-   +[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return '<div class="ownerTruckEditRow"><div><b>SIM '+slot+'</b><span>'+(s.sim_number?'Current · '+esc(s.sim_number):'MISSING')+'</span></div><input id="ownerTruckSim_'+esc(id)+'_'+slot+'" value="'+esc(s.sim_number||'')+'" placeholder="Enter SIM '+slot+' number"><button type="button" data-owner-save-sim="'+slot+'" data-tech-id="'+esc(id)+'">SAVE SIM</button></div>';}).join('')
-   +'<div class="ownerTruckEditorLabel">BATTERY INVENTORY · ACTUAL COUNT ON TRUCK</div>'
-   +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(id)+'_'+i+'" type="number" min="0" value="'+qty+'"><button type="button" data-owner-save-stock="'+esc(type)+'" data-stock-index="'+i+'" data-tech-id="'+esc(id)+'">SET COUNT</button></div>').join('');
+ const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{},types=['Sniper','Ranger','Spotter','Solar Spotter'];
+ return '<div class="ownerTruckEditorHead"><div><b>OWNER · EDIT '+esc(tech.name||'SERVICE TECH')+' TRUCK</b><span>Enter everything first. Nothing changes until you press SAVE ALL TRUCK INVENTORY.</span></div><button class="mini" type="button" data-owner-truck-edit="'+esc(id)+'">Close</button></div>'
+ +'<div class="ownerTruckEditorLabel">UNITS · EXACT UNIT NUMBERS</div>'
+ +types.map(type=>{const u=units.find(x=>x.equipment_type===type)||{},key=type.replaceAll(' ','_');return '<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>'+esc(type)+'</b><span>'+(u.unit_tag?'Current · '+esc(u.unit_tag):'MISSING')+'</span></div><input id="ownerTruckUnit_'+esc(id)+'_'+key+'" value="'+esc(u.unit_tag||'')+'" placeholder="Enter '+esc(type)+' unit #"></div>';}).join('')
+ +'<div class="ownerTruckEditorLabel">SIM CARDS · EXACT NUMBERS</div>'
+ +[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return '<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>SIM '+slot+'</b><span>'+(s.sim_number?'Current · '+esc(s.sim_number):'MISSING')+'</span></div><input id="ownerTruckSim_'+esc(id)+'_'+slot+'" value="'+esc(s.sim_number||'')+'" placeholder="Enter SIM '+slot+' number"></div>';}).join('')
+ +'<div class="ownerTruckEditorLabel">BATTERY INVENTORY · ACTUAL COUNT ON TRUCK</div>'
+ +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(id)+'_'+i+'" type="number" min="0" value="'+qty+'"></div>').join('')
+ +'<div class="ownerTruckSaveBar"><span>Review all unit numbers, SIM numbers, and counts before saving.</span><button type="button" data-owner-save-all="'+esc(id)+'">SAVE ALL TRUCK INVENTORY</button></div>';
 }
-async function ownerFetchTruckInventory(id){
-  const {data,error}=await db.rpc('owner_service_truck_inventory_v1');
-  if(error)throw error;
-  const rows=Array.isArray(data)?data:[];
-  return rows.find(x=>String(x.service_tech_id||x.user_id)===String(id))||null;
+async function ownerFetchTruckInventory(id){const {data,error}=await db.rpc('owner_service_truck_inventory_v1');if(error)throw error;const rows=Array.isArray(data)?data:[];return rows.find(x=>String(x.service_tech_id||x.user_id)===String(id))||null;}
+async function ownerToggleTruckInventoryEditor(id){const host=document.getElementById('ownerTruckEditor_'+id);if(!host)return alert('Truck editor container was not found.');if(host.dataset.open==='true'){host.dataset.open='false';host.style.display='none';host.innerHTML='';return;}host.dataset.open='loading';host.style.display='block';host.innerHTML='<div class="ownerTruckEditorHead"><b>LOADING CURRENT TRUCK INVENTORY…</b></div>';try{const tech=await ownerFetchTruckInventory(id);if(!tech)throw new Error('No truck inventory record exists for this technician.');host.innerHTML=ownerTruckEditorHtml(tech,id);host.dataset.open='true';host.style.display='block';requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'center'}));}catch(error){host.dataset.open='false';host.style.display='none';host.innerHTML='';alert('Truck inventory editor could not open: '+(error?.message||'unknown error'));}}
+async function ownerSaveAllTruckInventory(id){
+ const types=['Sniper','Ranger','Spotter','Solar Spotter'],units={},sims={},stock={};
+ types.forEach(type=>units[type]=document.getElementById('ownerTruckUnit_'+id+'_'+type.replaceAll(' ','_'))?.value.trim()||'');
+ [1,2,3].forEach(slot=>sims[String(slot)]=document.getElementById('ownerTruckSim_'+id+'_'+slot)?.value.trim()||'');
+ [['Recon Battery',0],['AGM 12V 110Ah',1],['LiTime 12V 100Ah',2]].forEach(([type,i])=>stock[type]=Math.max(0,Math.floor(Number(document.getElementById('ownerTruckStock_'+id+'_'+i)?.value||0))));
+ if(!confirm('Save ALL truck inventory for this technician? Service will be required to verify the truck again.'))return;
+ setBusy(true);try{const {error}=await db.rpc('owner_save_service_truck_inventory_batch_v1',{p_service_tech_id:id,p_payload:{units,sims,stock}});if(error)throw error;await refreshData();alert('Truck inventory saved. Service must re-verify before leaving the shop.');}catch(error){alert('Could not save truck inventory: '+(error?.message||'unknown error'));}finally{setBusy(false);}
 }
-async function ownerToggleTruckInventoryEditor(id){
-  const host=document.getElementById('ownerTruckEditor_'+id);
-  if(!host)return alert('Truck editor container was not found.');
-  if(host.dataset.open==='true'){host.dataset.open='false';host.style.display='none';host.innerHTML='';return;}
-  host.dataset.open='loading';host.style.display='block';host.innerHTML='<div class="ownerTruckEditorHead"><b>LOADING CURRENT TRUCK INVENTORY…</b></div>';
-  try{
-    const tech=await ownerFetchTruckInventory(id);
-    if(!tech)throw new Error('No truck inventory record exists for this technician.');
-    host.innerHTML=ownerTruckEditorHtml(tech,id);host.dataset.open='true';host.style.display='block';
-    requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'center'}));
-  }catch(error){host.dataset.open='false';host.style.display='none';host.innerHTML='';alert('Truck inventory editor could not open: '+(error?.message||'unknown error'));}
-}
-async function ownerSaveTruckAdjustment(id,kind,slot,value){
-  setBusy(true);
-  try{
-    const {error}=await db.rpc('owner_adjust_service_truck_inventory_v2',{p_service_tech_id:id,p_kind:kind,p_slot:String(slot),p_value:String(value)});
-    if(error)throw error;
-    const tech=await ownerFetchTruckInventory(id),host=document.getElementById('ownerTruckEditor_'+id);
-    if(host&&tech){host.innerHTML=ownerTruckEditorHtml(tech,id);host.dataset.open='true';host.style.display='block';}
-    await refreshData();
-  }catch(error){alert('Could not save truck inventory: '+(error?.message||'unknown error'));}
-  finally{setBusy(false);}
-}
-document.addEventListener('click',function(e){
-  const edit=e.target.closest?.('[data-owner-truck-edit]');
-  if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}
-  const unit=e.target.closest?.('[data-owner-save-unit]');
-  if(unit){e.preventDefault();const id=unit.dataset.techId,type=unit.dataset.ownerSaveUnit,key=type.replaceAll(' ','_'),value=document.getElementById('ownerTruckUnit_'+id+'_'+key)?.value.trim();if(!value)return alert('Enter the exact unit number.');return ownerSaveTruckAdjustment(id,'unit',type,value);}
-  const sim=e.target.closest?.('[data-owner-save-sim]');
-  if(sim){e.preventDefault();const id=sim.dataset.techId,slot=sim.dataset.ownerSaveSim,value=document.getElementById('ownerTruckSim_'+id+'_'+slot)?.value.trim();if(!value)return alert('Enter the exact SIM number.');return ownerSaveTruckAdjustment(id,'sim',slot,value);}
-  const stockBtn=e.target.closest?.('[data-owner-save-stock]');
-  if(stockBtn){e.preventDefault();const id=stockBtn.dataset.techId,i=stockBtn.dataset.stockIndex,value=document.getElementById('ownerTruckStock_'+id+'_'+i)?.value;if(value===''||Number(value)<0)return alert('Enter the actual count on the truck.');return ownerSaveTruckAdjustment(id,'stock',stockBtn.dataset.ownerSaveStock,Math.floor(Number(value)));}
-},true);
+document.addEventListener('click',function(e){const edit=e.target.closest?.('[data-owner-truck-edit]');if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}const save=e.target.closest?.('[data-owner-save-all]');if(save){e.preventDefault();e.stopPropagation();return ownerSaveAllTruckInventory(save.dataset.ownerSaveAll);}},true);
 
 function ownerBoardITSupportHtml(itTechs){
   const techs=Array.isArray(itTechs)?itTechs:[];
