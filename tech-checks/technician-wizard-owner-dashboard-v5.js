@@ -772,6 +772,9 @@ function injectStyles() {
     #view-it .wl-it-service-queue-row em{font-style:normal;color:#c8d3d8;font-size:10px;font-weight:1000;letter-spacing:.06em;white-space:nowrap}
     #view-it .wl-it-service-queue-empty,#view-it .wl-it-service-queue-more{padding:11px 0 2px;color:#9fb0b8;font-size:12px;font-weight:750}
     #view-it .wl-readonly-extra .small{margin-top:8px;color:#91a4ad!important;font-size:12px!important;font-weight:800!important}
+    #view-it .wl-it-final-lock{margin:10px 0 14px;padding:11px 13px;border:1px solid #39515d;border-radius:11px;background:#0a171d;display:grid;gap:3px;text-align:left}
+    #view-it .wl-it-final-lock b{color:#fff;font-size:13px;font-weight:1000;letter-spacing:.04em}
+    #view-it .wl-it-final-lock span{color:#a9bac2;font-size:12px;font-weight:750;line-height:1.35}
     .wl-day-complete-flash{margin:12px auto;max-width:720px;padding:12px 14px;border:1px solid #49636d;border-radius:12px;background:#102229;color:#fff;display:grid;gap:2px;text-align:center}
     .wl-day-complete-flash>b{font-size:16px;color:#fff}
     .wl-day-complete-flash>span{font-size:14px;font-weight:850;color:#d8e1e6}
@@ -1021,7 +1024,7 @@ function helpStepsForRole(role = currentRoleKey()) {
     { kicker:'MY WORK TODAY', title:'Assigned work appears first', body:`<p>Your Owner may assign a job directly to you or to the <b>IT Department queue</b>. Direct jobs are already yours. Department jobs can be claimed by an IT Tech.</p><p>When you claim a department task, the Owner immediately has a named IT Tech responsible for that work.</p>` },
     { kicker:'ON THE FLY', title:'IT can still start its own check', body:`<p>If an unexpected need comes up, use <b>Start New Equipment Prep</b>. Enter the current MHelpDesk reference, customer/site, total units/devices, exact device and stand quantities, and any parts required.</p><p>This does not create or change anything in MHelpDesk. It only makes the Tech Check workflow correspond to the correct job.</p>` },
     { kicker:'DEPLOYMENT', title:'Pull the real equipment from shelf inventory', body:`<p>For an assigned job, read the ticket information and requested equipment/parts first. Pull the actual units from the shelf, enter the exact unit tags, and complete each required check one unit at a time.</p><p>The unit tag is permanent in Tech Check. Old MHelpDesk jobs can close while the unit history continues.</p>` },
-    { kicker:'OPTIONAL SPARES', title:'Only handle a backup when the job actually needs one', body:`<p>Truck spares are <b>not part of the morning Truck / Trailer Check</b> and are not required for every Service Tech day.</p><p>If a specific job truly needs contingency equipment, use <b>Manage Truck Spares</b> for that job and follow the normal IT checkout. Otherwise, skip this completely and keep the normal IT prep → Service handoff flow simple.</p>` },
+    { kicker:'OPTIONAL SPARES', title:'Only handle a backup already required by the job', body:`<p>Truck spares are <b>not part of the morning Truck / Trailer Check</b> and are not required for every job.</p><p>If a backup is listed for the ticket, complete its normal IT check and checkout. The final handoff screen is read-only; if another spare is needed, the Owner must correct the assignment first.</p>` },
     { kicker:'SERVICE HANDOFF', title:'Complete the named handoff', body:`<p>After the required <b>IT shop checks</b>, photo, signature, and readiness items pass, create the handoff to Service.</p><p><b>IT does not hook solar panels to units in the shop.</b> Service performs solar-panel / PV charging verification after receiving the IT → Service handoff. Tech Check records the IT Tech who prepared the equipment.</p>` },
     { kicker:'INTAKE & RETURNS', title:'IT receives equipment coming back from Service', body:`<p>IT Intake is for tagged equipment returning from Service. The return shows the <b>Service Tech name</b>, MHelpDesk reference, unit tag, notes, and photos.</p><p>Complete the intake checks, document the unit, and move it through the Owner/Manager step before it returns to shelf inventory.</p>` },
     { kicker:'MENU & HISTORY', title:'Help, phone alerts, and history', body:`<p>Use <b>Menu → Help Center</b> anytime you want to replay this walkthrough. Your assigned work stays under <b>My Work Today</b>, and Status & History shows previous IT work.</p><p>Open <b>Menu → Phone Alerts</b> once on your phone if you want Tech Check to alert you when new work is sent.</p>` },
@@ -1369,14 +1372,13 @@ function helpStepGuide(role, step){
     },
     'it:TRUCK SPARES':{
       steps:[
-        'From Ticket Summary, tap Manage Truck Spares to open the separate Truck Spares / Backups page.',
-        'Add a spare unit when Service should carry an emergency replacement for this ticket.',
-        'Complete the full hardware/deploy-ready IT check, matching-tag photo, and signature for the BACKUP unit.',
-        'Tap CHECK OUT SPARE after the unit is fully ready. Service cannot take it until IT checks it out.',
-        'For extra Solar Spotter, Ranger, Helios, or Recon II batteries, save the READY quantity and then tap CHECK OUT SPARE BATTERIES.',
-        'This is optional job-specific contingency equipment. If the job has no requested backup/spare, skip this page completely.'
+        'Truck spares only appear when they are already part of the job workflow.',
+        'Do not add a new spare from the final handoff screen.',
+        'If a listed BACKUP unit is part of the ticket, complete its full hardware/deploy-ready IT check, matching-tag photo, and signature.',
+        'Complete the required IT checkout before Service can take a listed spare.',
+        'If the ticket needs different equipment or an additional spare, stop and have the Owner correct the assignment before handoff.'
       ],
-      selector:"[data-wl-truck-spares-it]"
+      selector:'#wlItWizardOnly'
     },
     'it:SERVICE HANDOFF':{
       steps:[
@@ -1464,9 +1466,10 @@ function guidedTourSteps(role){
     ...topControls
   ];
   return [
-    { selector:'#wlItHome .wl-day-next-card', title:'READ THIS CARD FIRST', text:'IT Intake, site registration, active prep, and new jobs are automatically placed in the right order.' },
-    { selector:'#wlItHome .wl-day-next-card button', title:'TAP THIS BUTTON', text:'This opens the next required IT step. You do not need to search through the app.' },
-    { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → End My Day.' },
+    { selector:'#wlItHome .wl-day-next-card, #wlItHome .wl-it-ticket-prompt', title:'READ THIS FIRST', text:'Tech Check puts the next required IT action here. If nothing is waiting, this changes to Enter Another Ticket Number.' },
+    { selector:'#wlItHome .wl-day-next-card button, #wlItHome .wl-it-ticket-prompt button', title:'DO THE NEXT THING', text:'Use this button for the next IT action or to enter the next MHelpDesk ticket.' },
+    { selector:'#wlItHome .wl-it-service-queue', title:'SERVICE QUEUE', text:'This is read-only. It shows IT handoffs already completed and waiting for Service to accept them.' },
+    { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → Service Queue.' },
     { selector:"#wlItHome [data-wl-it-open-job]", open:'#wlItHome .wl-it-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number to open or claim the correct IT job.', fallback:'#wlItHome .wl-it-more > summary' },
     { selector:"#wlItHome [data-wl-mode='intake']", open:'#wlItHome .wl-it-more', title:'IT INTAKE AND RETURNS', text:'Returned equipment waits here. Open it and Tech Check will continue one check at a time.', fallback:'#wlItHome .wl-it-more > summary' },
     { selector:"#wlItHome [data-wl-it='pending']", open:'#wlItHome .wl-it-more', title:'RESUME EQUIPMENT PREP', text:'Use this to continue an IT prep job you already started. Saved work stays attached to the same ticket.', fallback:'#wlItHome .wl-it-more > summary' },
@@ -1586,7 +1589,7 @@ async function startGuidedTour(role,firstTime=false){
   // login screen to flash and race the first tutorial step.
   const readySelector=guidedTourRole==='service'
     ? '#wlSvcHome .wl-day-next-card'
-    : '#wlItHome .wl-day-next-card';
+    : '#wlItHome .wl-day-next-card, #wlItHome .wl-it-ticket-prompt';
   if(!document.querySelector(readySelector)){
     if(guidedTourRole==='service')await showSvcHome();
     else await showITHome();
@@ -4072,11 +4075,11 @@ function itTicketSummaryHtml(items, evidence) {
 }
 function itFinalPartsSummaryHtml() {
   const rows=ticketPartsRows(activeItPrep).filter(row=>row.qty>0);
-  const value=rows.length ? rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ') : 'NONE LISTED';
+  if(!rows.length) return '';
   return `<div class='wl-simple-extra wl-readonly-extra'>
-    <div class='qnum'>ADDITIONAL LOOSE PARTS</div>
-    <div><b>${value}</b></div>
-    <div class='small'>READ ONLY AT HANDOFF — do not add or change parts from this screen.</div>
+    <div class='qnum'>ASSIGNED LOOSE PARTS</div>
+    <div><b>${rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ')}</b></div>
+    <div class='small'>ASSIGNED — READ ONLY</div>
   </div>`;
 }
 function itFinalSpareSummaryHtml(items,rows) {
@@ -4085,11 +4088,15 @@ function itFinalSpareSummaryHtml(items,rows) {
   const bits=[];
   if(units.length) bits.push(units.map(item=>esc(item.equipment_type)+' '+esc(item.unit_tag||'')).join(' · '));
   if(batteries.length) bits.push(batteries.map(row=>Number(row.qty_prepared)+' × '+esc(row.battery_type)).join(' · '));
+  if(!bits.length) return '';
   return `<div class='wl-simple-extra wl-readonly-extra'>
-    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
-    <div><b>${bits.length ? bits.join(' · ') : 'NONE ADDED'}</b></div>
-    <div class='small'>READ ONLY AT HANDOFF — no spare equipment can be added or changed here.</div>
+    <div class='qnum'>ASSIGNED TRUCK SPARES / BACKUPS</div>
+    <div><b>${bits.join(' · ')}</b></div>
+    <div class='small'>ASSIGNED — READ ONLY</div>
   </div>`;
+}
+function itFinalLockNoticeHtml(){
+  return `<div class='wl-it-final-lock'><b>✓ TICKET CONTENTS LOCKED</b><span>At handoff, IT can only review or correct a unit check. Equipment, parts, and spares cannot be added from this screen.</span></div>`;
 }
 
 async function releaseItPrepUnitByUnit() {
@@ -4233,6 +4240,7 @@ async function renderItUnitStep() {
 
     wizard.innerHTML =
       progress('Ticket Summary', ready ? 'Ready to hand off' : 'Finish this ticket', 1, 1) +
+      itFinalLockNoticeHtml() +
       itTicketSummaryHtml(items, ev) +
       itFinalPartsSummaryHtml() +
       itFinalSpareSummaryHtml(items,spareBatteries) +
