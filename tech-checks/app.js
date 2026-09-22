@@ -2210,7 +2210,7 @@ function ownerBoardServiceTechCard(tech){
       +'</div>'
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
-      +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-truck-edit="'+esc(tech.service_tech_id)+'">✎ ADJUST THIS TRUCK INVENTORY</button>'
+      +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-truck-edit="'+esc(tech.user_id||tech.service_tech_id)+'">✎ ADJUST THIS TRUCK INVENTORY</button>'
       +'<div id="ownerTruckEditor_'+esc(tech.service_tech_id)+'" class="ownerCmdInventoryEditor" data-open="false"></div>'
     +'</div>'
     +'<div class="ownerCmdSection jobs"><div class="ownerCmdSectionHead"><b>TODAY’S JOBS</b><span>'+jobs.length+'</span></div>'
@@ -2224,9 +2224,12 @@ function ownerTruckEditorTech(id){
   return rows.find(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id))||null;
 }
 async function ownerTruckEditorFetch(id){
-  const tech=ownerTruckEditorTech(id);
-  if(tech)return tech;
-  throw new Error('This technician is no longer on the live Team Board. Refresh and try again.');
+  const {data,error}=await db.rpc('owner_service_truck_inventory_v1');
+  if(error)throw error;
+  const rows=Array.isArray(data)?data:[];
+  const tech=rows.find(t=>String(t.service_tech_id||t.user_id)===String(id));
+  if(!tech)throw new Error('Truck inventory record not found for this Service Tech.');
+  return tech;
 }
 function ownerTruckEditorHtml(tech){
   const units=Array.isArray(tech.units)?tech.units:[],sims=Array.isArray(tech.sims)?tech.sims:[],stock=tech.stock||{};
