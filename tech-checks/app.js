@@ -2210,8 +2210,8 @@ function ownerBoardServiceTechCard(tech){
       +'</div>'
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
-      +'<button type="button" class="ownerCmdInventoryEditBtn" onclick="ownerToggleTruckInventoryEditor(\''+esc(tech.service_tech_id)+'\')">✎ ADJUST THIS TRUCK INVENTORY</button>'
-      +'<div id="ownerTruckEditor_'+esc(tech.service_tech_id)+'" class="ownerCmdInventoryEditor" hidden></div>'
+      +'<button type="button" class="ownerCmdInventoryEditBtn" data-owner-truck-edit="'+esc(tech.service_tech_id)+'">✎ ADJUST THIS TRUCK INVENTORY</button>'
+      +'<div id="ownerTruckEditor_'+esc(tech.service_tech_id)+'" class="ownerCmdInventoryEditor" data-open="false"></div>'
     +'</div>'
     +'<div class="ownerCmdSection jobs"><div class="ownerCmdSectionHead"><b>TODAY’S JOBS</b><span>'+jobs.length+'</span></div>'
       +(jobs.length?'<div class="ownerCmdJobs">'+jobs.map(ownerBoardJobHtml).join('')+'</div>':'<div class="ownerCmdEmpty">No Service jobs assigned today.</div>')
@@ -2234,6 +2234,12 @@ function ownerTruckEditorHtml(tech){
     +'<div class="ownerTruckEditorLabel">BATTERY COUNTS · SET ACTUAL COUNT</div>'
     +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(tech.service_tech_id)+'_'+i+'" type="number" min="0" value="'+qty+'"><button type="button" onclick="ownerSetTruckStock(\''+esc(tech.service_tech_id)+'\',\''+esc(type)+'\','+i+')">SET COUNT</button></div>').join('');
 }
+document.addEventListener('click',function(e){
+  const btn=e.target.closest?.('[data-owner-truck-edit]');
+  if(!btn)return;
+  e.preventDefault();e.stopPropagation();
+  ownerToggleTruckInventoryEditor(btn.getAttribute('data-owner-truck-edit'));
+},true);
 function ownerToggleTruckInventoryEditor(id){
   const host=document.getElementById('ownerTruckEditor_'+id);
   if(!host){alert('Truck inventory editor could not open. Refresh the page and try again.');return;}
