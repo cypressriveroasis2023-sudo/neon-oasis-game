@@ -5013,3 +5013,70 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
   #view-owner .owner-assign-tech-card{grid-column:2/3!important}
   #view-owner .owner-assign-review-card{grid-column:1/-1!important}
 }
+
+
+/* Assign Job reference-match v230 — exact visual direction from approved screenshot */
+#view-owner .ownerAppPage:has(#ownerJobAssignments){max-width:1180px!important}
+#view-owner .ownerAppMain:has(#ownerJobAssignments){max-width:1180px!important;width:min(1180px,calc(100vw - 220px))!important}
+#view-owner #ownerJobAssignments .owner-assign-draft-note{
+  min-height:0!important;padding:0 0 8px!important;margin:0!important;background:transparent!important;border:0!important;color:#7f929d!important;font-size:9px!important
+}
+#view-owner .owner-assign-command-grid{grid-template-columns:1fr 1fr!important;gap:10px!important}
+#view-owner .owner-assign-command-grid .owner-simple-step{
+  padding:13px 14px!important;background:linear-gradient(180deg,#0b1b24 0%,#09171f 100%)!important;
+  border:1px solid #1f3947!important;border-radius:10px!important;
+}
+#view-owner .owner-assign-job-card,#view-owner .owner-assign-review-card{grid-column:1/-1!important}
+#view-owner .owner-simple-step-head{display:flex!important;align-items:flex-start!important;gap:9px!important;margin-bottom:10px!important}
+#view-owner .owner-simple-step-icon{
+  display:grid!important;place-items:center!important;width:24px!important;height:24px!important;min-width:24px!important;
+  color:#ff2630!important;font-size:19px!important;font-weight:900!important;line-height:1!important;
+}
+#view-owner .owner-simple-step-head b{font-size:14px!important;line-height:1.05!important;color:#f7fafb!important}
+#view-owner .owner-simple-step-head span:not(.owner-simple-step-icon):not(.owner-simple-step-num){font-size:9px!important;color:#9aabb4!important;margin-top:2px!important}
+#view-owner .owner-simple-step-num{display:none!important}
+#view-owner .owner-simple-pills{grid-template-columns:repeat(4,1fr)!important;gap:8px!important;margin:0 0 10px!important}
+#view-owner .owner-simple-pills button{
+  height:36px!important;min-height:36px!important;border-radius:18px!important;padding:0 12px!important;
+  background:#091820!important;border:1px solid #36515f!important;color:#f0f5f7!important;font-size:10px!important;font-weight:750!important;
+}
+#view-owner .owner-simple-pills button.on,#view-owner .owner-simple-pills button.selected{
+  background:#ef1823!important;border-color:#ff2630!important;color:#fff!important;box-shadow:0 0 18px rgba(239,24,35,.16)!important;
+}
+#view-owner .owner-simple-pills.role-pills button{height:44px!important;min-height:44px!important;border-radius:7px!important;line-height:1.05!important}
+#view-owner .owner-simple-pills.role-pills button small{font-size:7px!important}
+#view-owner .owner-assign-command-grid label{display:block!important;color:#dfe7eb!important;font-size:9px!important;font-weight:750!important;margin:0 0 4px!important}
+#view-owner .owner-assign-command-grid input,#view-owner .owner-assign-command-grid select{
+  height:34px!important;min-height:34px!important;padding:0 9px!important;background:#07141b!important;
+  border:1px solid #29424f!important;border-radius:6px!important;color:#f2f6f8!important;font-size:10px!important;
+}
+#view-owner .owner-assign-command-grid input::placeholder{color:#6f838e!important}
+#view-owner .owner-assign-command-grid .grid,#view-owner .owner-assign-command-grid .wl-equipment-number-grid{gap:12px!important}
+#view-owner .owner-assign-equipment-card .wl-ticket-parts-setup{max-height:178px!important;overflow:auto!important;padding-right:4px!important;scrollbar-width:thin}
+#view-owner .owner-assign-equipment-card .wl-equipment-manifest{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+#view-owner .owner-assign-equipment-card .wl-requirement-section{margin-top:8px!important;padding-top:8px!important}
+#view-owner .owner-assign-tech-card .role-pills{margin-bottom:9px!important}
+#view-owner .owner-assign-tech-card .wl-tech-pills{margin-bottom:6px!important}
+#view-owner .owner-assign-review-card .owner-simple-review{
+  margin:0 0 10px!important;padding:0!important;background:transparent!important;border:0!important;
+}
+#view-owner .owner-assign-review-card .owner-simple-review>div,
+#view-owner .owner-assign-review-card .owner-simple-review li{
+  min-height:28px!important;display:flex!important;align-items:center!important;margin:5px 0!important;padding:5px 9px!important;
+  background:#0b1a22!important;border:1px solid #29414d!important;border-radius:6px!important;color:#e8eef1!important;font-size:9px!important;
+}
+#view-owner .owner-assign-review-card .owner-simple-assign{
+  height:42px!important;min-height:42px!important;border-radius:7px!important;background:#ef1823!important;border:1px solid #ff2630!important;
+  font-size:13px!important;font-weight:900!important;letter-spacing:.01em!important;
+}
+@media(min-width:901px){
+ #view-owner .owner-assign-schedule-card{grid-column:1!important}
+ #view-owner .owner-assign-location-card{grid-column:2!important}
+ #view-owner .owner-assign-equipment-card{grid-column:1!important}
+ #view-owner .owner-assign-tech-card{grid-column:2!important}
+}
+@media(max-width:900px){
+ #view-owner .ownerAppMain:has(#ownerJobAssignments){width:100%!important}
+ #view-owner .owner-assign-command-grid{grid-template-columns:1fr!important}
+ #view-owner .owner-assign-command-grid>*{grid-column:1!important}
+}
