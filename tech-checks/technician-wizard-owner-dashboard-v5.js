@@ -3568,37 +3568,37 @@ function itUnitStepsData(item, unitNo) {
 
   if (isHeliosDeploy(item)) {
     steps.push(
-      { kind:'bool', field:'helios_camera1_hardware_ok', label:`Is Camera 1 (bullet camera) installed correctly on ${identity}?` },
-      { kind:'bool', field:'helios_camera2_hardware_ok', label:`Is Camera 2 (bullet camera) installed correctly on ${identity}?` },
-      { kind:'bool', field:'helios_ptz_assembly_ok', label:`Is the Cameras 3/4 PTZ assembly correct on ${identity}: 180° lens on top and PTZ on bottom?` },
-      { kind:'bool', field:'helios_cameras_12v_ok', label:`Are the Helios cameras powered from the required 12V supply?` },
-      { kind:'bool', field:'helios_ptz_plate_4bolts_ok', label:`Is the PTZ mounted to the removable front plate and secured with all 4 bolts?` },
-      { kind:'bool', field:'helios_router_sim_ok', label:`Is the router installed correctly with the SIM installed in ${identity}?` },
-      { kind:'bool', field:'helios_proxicast_4x4_ok', label:`Is the Proxicast 4x4 antenna installed, connected to the router, and secure?` },
-      { kind:'bool', field:'helios_speaker_24v_ok', label:`Is the IP Speaker installed and powered from the required 24V supply?` },
-      { kind:'bool', field:'helios_camera_router_programming_ok', label:`Are the cameras and router programmed together for this Helios before port verification?` },
-      { kind:'bool', field:'delivery_sim_ok', label:`Is the SIM active and is the Helios router online?` },
-      { kind:'bool', field:'delivery_camera_app_ok', label:`Is ${identity} visible and working in the camera app?` },
-      { kind:'bool', field:'helios_camera1_ports_ok', label:`Camera 1: are ports 81 / 554 / 1400 configured and open in both Camera 1 and the router?` },
-      { kind:'bool', field:'helios_camera2_ports_ok', label:`Camera 2: are ports 81 / 554 / 1500 configured and open in both Camera 2 and the router?` },
-      { kind:'bool', field:'helios_ptz_ports_ok', label:`PTZ: are ports 81 / 554 / 1600 configured and open in both the PTZ and the router?` },
-      { kind:'bool', field:'helios_speaker_ports_ok', label:`IP Speaker: are ports 81 / 554 / 1700 configured and open in both the speaker and the router?` },
-      { kind:'bool', field:'helios_alibi_vigilant_ok', label:`Is ${identity} correctly configured and visible in Alibi / Vigilant Control Center?` },
-      { kind:'bool', field:'helios_cerbo_network_ok', label:`Is the Victron Cerbo connected to the Helios router/network?` },
-      { kind:'bool', field:'helios_cerbo_vrm_ok', label:`Is the Cerbo added to Victron VRM and visible online?` },
-      { kind:'bool', field:'helios_rear_unit_tag_ok', label:`Is the permanent Helios unit tag installed on the rear and clearly readable?` },
-      { kind:'bool', field:'helios_battery_box_installed_ok', label:`Is the single Helios battery box installed inside ${identity}?` },
-      { kind:'bool', field:'helios_battery_120v_charged_ok', label:`Did you charge the Helios battery box while ${identity} was plugged into 120V?` },
-      { kind:'bool', field:'helios_3x1tb_sd_ok', label:`Are all 3 required 1TB SD cards installed in ${identity}?` },
-      { kind:'bool', field:'delivery_recording_ok', label:`Before formatting storage, did you verify ${identity} is recording correctly?` },
-      { kind:'bool', field:'delivery_sd_formatted_ok', label:`After recording verification, are all 3 × 1TB SD cards formatted and ready?` }
+      { kind:'bool', field:'helios_camera1_hardware_ok', label:`Is Camera 1 installed and secure on ${identity}?` },
+      { kind:'bool', field:'helios_camera2_hardware_ok', label:`Is Camera 2 installed and secure on ${identity}?` },
+      { kind:'bool', field:'helios_ptz_assembly_ok', label:`Is the PTZ/180 camera installed correctly on ${identity}?` },
+      { kind:'bool', field:'helios_cameras_12v_ok', label:`Are all Helios cameras powered by 12V?` },
+      { kind:'bool', field:'helios_ptz_plate_4bolts_ok', label:`Is the PTZ/180 camera secured with all 4 mounting bolts?` },
+      { kind:'bool', field:'helios_router_sim_ok', label:`Is the router installed with the SIM card in place?` },
+      { kind:'bool', field:'helios_proxicast_4x4_ok', label:`Is the Proxicast 4x4 antenna connected and secure?` },
+      { kind:'bool', field:'helios_speaker_24v_ok', label:`Is the IP Speaker installed and powered by 24V?` },
+      { kind:'bool', field:'helios_camera_router_programming_ok', label:`Are the cameras and router programmed for this Helios?` },
+      { kind:'bool', field:'delivery_sim_ok', label:`Is the SIM active and is the router online?` },
+      { kind:'bool', field:'delivery_camera_app_ok', label:`Can you see ${identity} in the camera app?` },
+      { kind:'bool', field:'helios_camera1_ports_ok', label:`Camera 1: are ports 81 / 554 / 1400 open on the camera and router?` },
+      { kind:'bool', field:'helios_camera2_ports_ok', label:`Camera 2: are ports 81 / 554 / 1500 open on the camera and router?` },
+      { kind:'bool', field:'helios_ptz_ports_ok', label:`PTZ/180: are ports 81 / 554 / 1600 open on the camera and router?` },
+      { kind:'bool', field:'helios_speaker_ports_ok', label:`IP Speaker: are ports 81 / 554 / 1700 open on the speaker and router?` },
+      { kind:'bool', field:'helios_alibi_vigilant_ok', label:`Can you see ${identity} in Alibi / Vigilant Control Center?` },
+      { kind:'bool', field:'helios_cerbo_network_ok', label:`Is the Cerbo connected to the Helios network?` },
+      { kind:'bool', field:'helios_cerbo_vrm_ok', label:`Can you see the Cerbo online in Victron VRM?` },
+      { kind:'bool', field:'helios_rear_unit_tag_ok', label:`Is the Helios unit tag on the back and easy to read?` },
+      { kind:'bool', field:'helios_battery_box_installed_ok', label:`Is the Helios battery box installed inside ${identity}?` },
+      { kind:'bool', field:'helios_battery_120v_charged_ok', label:`Was the Helios battery box charged while ${identity} was plugged into 120V?` },
+      { kind:'bool', field:'helios_3x1tb_sd_ok', label:`Are all 3 × 1TB SD cards installed in ${identity}?` },
+      { kind:'bool', field:'delivery_recording_ok', label:`Is ${identity} recording correctly?` },
+      { kind:'bool', field:'delivery_sd_formatted_ok', label:`Are all 3 × 1TB SD cards formatted and ready?` }
     );
     if (item.purpose!=='BACKUP') {
-      steps.push({ kind:'bool', field:'delivery_monitoring_ok', label:`Was Central Station monitoring for ${identity} created and sent in?` });
-      steps.push({ kind:'bool', field:'delivery_customer_email_app_ok', label:`Was ${identity} added under the customer email account in the camera app?` });
+      steps.push({ kind:'bool', field:'delivery_monitoring_ok', label:`Is Central Station monitoring set up for ${identity}?` });
+      steps.push({ kind:'bool', field:'delivery_customer_email_app_ok', label:`Is ${identity} added to the customer email account in the camera app?` });
     }
-    steps.push({ kind:'bool', field:'functions_ok', label:`Were all functions on ${identity} tested and working?` });
-    steps.push({ kind:'bool', field:'safe_ok', label:`Is ${identity} ready for the IT → Service handoff?` });
+    steps.push({ kind:'bool', field:'functions_ok', label:`Did you test ${identity} and confirm everything works?` });
+    steps.push({ kind:'bool', field:'safe_ok', label:`Is ${identity} ready to hand off to Service?` });
     return steps;
   }
 
