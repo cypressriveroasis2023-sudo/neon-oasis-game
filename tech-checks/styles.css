@@ -5080,3 +5080,56 @@ body{background:linear-gradient(180deg,#09131b 0,#071018 100%)!important}
  #view-owner .owner-assign-command-grid{grid-template-columns:1fr!important}
  #view-owner .owner-assign-command-grid>*{grid-column:1!important}
 }
+
+
+/* Calendar command center v231 — full feature parity with approved reference */
+#view-owner[data-owner-route="calendar"] .ownerAppMain{max-width:1420px!important;width:min(1420px,calc(100vw - 210px))!important}
+#view-owner .ownerCalTop{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+#view-owner .ownerCalQuick{display:flex;gap:8px;padding-top:8px}
+#view-owner .ownerCalQuick button{min-height:36px;padding:0 14px;border-radius:7px}
+#view-owner .ownerCalWorkspace{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px;align-items:start}
+#view-owner .ownerCalWorkspace>main{min-width:0}
+#view-owner .ownerCalLayout{grid-template-columns:minmax(0,1fr) 310px!important;gap:12px!important}
+#view-owner .ownerCalBoard,#view-owner .ownerCalAgenda,#view-owner .ownerCalInspector{
+ background:#0a161e!important;border:1px solid #203642!important;border-radius:9px!important
+}
+#view-owner .ownerCalMonth{min-height:620px}
+#view-owner .ownerCalDay{min-height:100px!important;padding:8px!important;background:#0b1820!important;border-color:#1d313c!important;color:#e9f0f3!important}
+#view-owner .ownerCalDay:hover{background:#10212a!important}
+#view-owner .ownerCalDay.selected{background:#0e1d25!important;box-shadow:inset 0 0 0 2px #e31b23!important}
+#view-owner .ownerCalDay.today .ownerCalDate b{background:#e31b23!important;color:#fff!important;border-radius:5px;padding:2px 5px}
+#view-owner .ownerCalEvent{margin-top:4px!important;padding:4px 5px!important;border-left:2px solid #e31b23!important;background:#111f27!important;border-radius:3px!important;font-size:8px!important;text-align:left}
+#view-owner .ownerCalEvent span{display:block;color:#8fa2ad!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-owner .ownerCalAgenda{padding:12px!important}
+#view-owner .ownerCalAgendaHead{padding-bottom:10px!important;border-bottom:1px solid #203642!important}
+#view-owner .ownerCalAgendaHead span{color:#8499a4!important;font-size:9px}
+#view-owner .ownerCalAgendaJob{width:100%!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:10px!important;text-align:left!important;padding:10px!important;margin:8px 0!important;background:#101f27!important;border:1px solid #29414d!important;border-left:3px solid #e31b23!important;border-radius:7px!important;color:#eef4f6!important}
+#view-owner .ownerCalAgendaJob>div{display:flex;flex-direction:column;gap:3px}
+#view-owner .ownerCalAgendaJob span{font-size:8px!important;color:#8fa2ad!important}
+#view-owner .ownerCalAgendaJob em{font-size:7px!important;color:#ff8a8f!important;font-style:normal;font-weight:900}
+#view-owner .ownerCalDayDetails{width:100%;height:38px;background:#e31b23!important;color:#fff!important;border:1px solid #ff4a51!important;border-radius:6px!important;font-weight:900}
+#view-owner .ownerCalInspector{position:sticky;top:12px;padding:12px!important}
+#view-owner .ownerCalInspector>small{color:#ff4a51!important;font-weight:900;font-size:8px;letter-spacing:.1em}
+#view-owner .ownerCalInspector>h3{margin:3px 0 12px!important;color:#fff!important;font-size:16px}
+#view-owner .ownerCalInspector section{padding:11px!important;margin:8px 0!important;background:#101f27!important;border:1px solid #29414d!important;border-radius:7px!important}
+#view-owner .ownerCalInspector h4{margin:0 0 8px!important;color:#fff!important;font-size:11px}
+#view-owner .ownerCalInspector p{color:#b8c5cb!important;font-size:9px!important;line-height:1.45!important}
+#view-owner .ownerCalFacts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#view-owner .ownerCalFacts span{display:flex;flex-direction:column;gap:2px}
+#view-owner .ownerCalFacts small{color:#748b96!important;font-size:7px}
+#view-owner .ownerCalFacts b{color:#edf3f5!important;font-size:9px}
+#view-owner .ownerCalInspector button{width:100%;margin-top:7px;min-height:34px}
+@media(max-width:1200px){
+ #view-owner .ownerCalWorkspace{grid-template-columns:1fr}
+ #view-owner .ownerCalInspector{position:static;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+ #view-owner .ownerCalInspector>small,#view-owner .ownerCalInspector>h3{grid-column:1/-1}
+}
+@media(max-width:850px){
+ #view-owner[data-owner-route="calendar"] .ownerAppMain{width:100%!important}
+ #view-owner .ownerCalTop{display:block}
+ #view-owner .ownerCalQuick{padding:0 0 10px}
+ #view-owner .ownerCalLayout{grid-template-columns:1fr!important}
+ #view-owner .ownerCalMonth{min-height:0}
+ #view-owner .ownerCalDay{min-height:72px!important}
+ #view-owner .ownerCalInspector{grid-template-columns:1fr}
+}
