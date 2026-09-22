@@ -2431,8 +2431,8 @@ function ownerAppActivity(){
 }
 function ownerAppAccounts(){
   renderPasswordResetRequests();renderUsers();
-  return ownerAppHeader('ACCESS','Technician Accounts','Create technician logins and manage existing access.')
-    +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>';
+  return ownerAppHeader('ACCESS','Technician Accounts','Create logins, change usernames, disable/reactivate access, and review disabled or former accounts.')
+    +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername" autocapitalize="none" spellcheck="false"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>';
 }
 async function ownerAppCreateTech(){
   const map=[['ownerAppNewTechName','newTechName'],['ownerAppNewTechUsername','newTechUsername'],['ownerAppNewTechRole','newTechRole'],['ownerAppNewTechPassword','newTechPassword']];
@@ -2763,7 +2763,17 @@ function teamMemberCard(p) {
   const email = p.notification_email || '';
   const emailStatus = email ? '<span class="pill green">EMAIL SET</span>' : '<span class="pill amber">NO EMAIL</span>';
   const ownerCopy = p.role === 'owner' ? '<label class="emailPref"><input id="emailOwner_' + p.user_id + '" type="checkbox" ' + (p.email_owner_copies ? 'checked' : '') + '><span>Owner copy emails</span></label>' : '';
-  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody"><div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div><div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div><div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div><div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Access</button></div></div><div class="teamEmailBox"><div><label>Notification Email</label><input id="notifyEmail_' + p.user_id + '" type="email" autocapitalize="none" spellcheck="false" placeholder="name@camerasonsite.com" value="' + esc(email) + '"></div><div class="emailPrefs"><label class="emailPref"><input id="emailJobs_' + p.user_id + '" type="checkbox" ' + (p.email_job_assignments !== false ? 'checked' : '') + '><span>New job assignment emails</span></label><label class="emailPref"><input id="emailHandoffs_' + p.user_id + '" type="checkbox" ' + (p.email_handoff_updates !== false ? 'checked' : '') + '><span>Equipment / handoff emails</span></label>' + ownerCopy + '</div><div class="small">Email delivery will start after the outgoing email service is connected.</div></div><details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>' + (self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>') + '</div></details>';
+  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + ' ' + (p.active?'':'disabledAccount') + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody">'
+    +(!p.active?'<div class="warn accountDisabledNotice"><b>DISABLED ACCOUNT</b><div class="small">This person cannot sign in until Access is changed back to Active and saved.</div></div>':'')
+    +'<div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div>'
+    +'<div><label>Username / Sign In</label><input id="username_' + p.user_id + '" autocapitalize="none" spellcheck="false" value="' + esc(p.username || '') + '"><div class="small">Changing this changes the username they use the next time they sign in.</div></div>'
+    +'<div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div>'
+    +'<div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div>'
+    +'<div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Account</button></div></div>'
+    +'<div class="teamEmailBox"><div><label>Notification Email</label><input id="notifyEmail_' + p.user_id + '" type="email" autocapitalize="none" spellcheck="false" placeholder="name@camerasonsite.com" value="' + esc(email) + '"></div><div class="emailPrefs"><label class="emailPref"><input id="emailJobs_' + p.user_id + '" type="checkbox" ' + (p.email_job_assignments !== false ? 'checked' : '') + '><span>New job assignment emails</span></label><label class="emailPref"><input id="emailHandoffs_' + p.user_id + '" type="checkbox" ' + (p.email_handoff_updates !== false ? 'checked' : '') + '><span>Equipment / handoff emails</span></label>' + ownerCopy + '</div><div class="small">Email delivery will start after the outgoing email service is connected.</div></div>'
+    +'<details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>'
+    +(self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>')
+    +'</div></details>';
 }
 function archivedTeamCard(p) {
   return '<div class="archivedTeamCard"><div><b>' + esc(p.full_name || p.username || 'Team Member') + '</b><div class="small">@' + esc(p.username || 'no-username') + ' · ' + esc(roleLabel(p.role)) + '</div><div class="small">Deleted from Techs on File ' + (p.archived_at ? new Date(p.archived_at).toLocaleString() : '') + (p.archived_reason ? ' · ' + esc(p.archived_reason) : '') + '</div></div><button class="mini" onclick="restoreUser(\'' + p.user_id + '\')">Restore</button></div>';
@@ -2825,11 +2835,16 @@ async function saveUserAccess(id) {
   const role = $('role_' + id).value,
     active = $('active_' + id).value === 'true',
     fullName = $('name_' + id)?.value.trim() || '',
+    username = normalizeUsername($('username_' + id)?.value || ''),
     notificationEmail = $('notifyEmail_' + id)?.value.trim().toLowerCase() || '',
     emailJobAssignments = Boolean($('emailJobs_' + id)?.checked),
     emailHandoffUpdates = Boolean($('emailHandoffs_' + id)?.checked),
     emailOwnerCopies = Boolean($('emailOwner_' + id)?.checked);
+  if (!validUsername(username)) return alert('Username must be 3–32 letters, numbers, dots, dashes, or underscores.');
   if (notificationEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) return alert('Enter a valid notification email address.');
+  const prior=state.profiles.find(p=>p.user_id===id);
+  const usernameChanged=Boolean(prior && normalizeUsername(prior.username)!==username);
+  if(usernameChanged && !confirm('Change ' + (prior?.full_name || prior?.username || 'this account') + ' sign-in username from @' + (prior?.username || 'none') + ' to @' + username + '?\n\nThey must use the NEW username the next time they sign in.')) return;
   const { data, error } = await db.functions.invoke('admin-user-management', {
     body: {
       action: 'set_access',
@@ -2837,6 +2852,7 @@ async function saveUserAccess(id) {
       role,
       active,
       full_name: fullName,
+      username,
       notification_email: notificationEmail || null,
       email_job_assignments: emailJobAssignments,
       email_handoff_updates: emailHandoffUpdates,
@@ -2845,7 +2861,7 @@ async function saveUserAccess(id) {
   });
   if (error || data?.error) return alert(error?.message || data.error);
   await refreshData();
-  alert('Team member and email settings updated.');
+  alert(usernameChanged ? 'Account updated. New sign-in username: @' + username : 'Team member and email settings updated.');
 }
 async function resetUserPassword(id) {
   const password = $('reset_' + id).value;
