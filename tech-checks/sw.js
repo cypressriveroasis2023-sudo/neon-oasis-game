@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-service-truck-baseline-20260922d';
+const CACHE_NAME = 'tech-check-service-truck-baseline-20260922e';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,8 +10,8 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=service-truck-baseline-20260922d', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=service-truck-baseline-20260922d', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=service-truck-baseline-20260922e', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=service-truck-baseline-20260922e', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=health-contrast-20260922c', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v33', { cache:'reload' })),
