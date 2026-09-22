@@ -7138,3 +7138,128 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
     touch-action:pan-y!important;
   }
 }
+
+
+/* Owner mobile viewport + Vision recovery v243 */
+/* Keep the Owner mobile workspace locked to the viewport. Nested calendar/weather rows handle their own horizontal scrolling. */
+@media(max-width:720px){
+  #view-owner,
+  #view-owner #ownerApp,
+  #view-owner .ownerAppShell,
+  #view-owner .ownerAppWorkspace,
+  #view-owner #ownerAppPage,
+  #view-owner #ownerRouteView{
+    width:100%!important;
+    max-width:100vw!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner .ownerAppWorkspace{
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    overscroll-behavior-x:none!important;
+    touch-action:pan-y!important;
+  }
+  #view-owner #ownerAppPage,
+  #view-owner #ownerRouteView{
+    overflow-x:hidden!important;
+  }
+  #view-owner #ownerRouteView>*,
+  #view-owner .ownerTodayHero,
+  #view-owner .ownerTodayWelcome,
+  #view-owner .ownerTodayClockCard,
+  #view-owner .ownerTodayWeatherHost,
+  #view-owner .ownerWeatherNow,
+  #view-owner .ownerTodayPanel,
+  #view-owner .ownerCmdTechGrid,
+  #view-owner .ownerCmdTechCard{
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+  #view-owner .ownerTodayWelcome h1,
+  #view-owner .ownerTodayClock{
+    max-width:100%!important;
+    overflow:hidden!important;
+    text-overflow:clip!important;
+  }
+  #view-owner .ownerTodayWelcome h1{
+    font-size:clamp(28px,8.5vw,36px)!important;
+    line-height:1.02!important;
+    overflow-wrap:anywhere!important;
+  }
+  #view-owner .ownerTodayClock{
+    font-size:clamp(34px,10vw,42px)!important;
+  }
+  #view-owner .ownerWeatherNow{
+    grid-template-columns:64px minmax(0,1fr)!important;
+  }
+  #view-owner .ownerWeatherCurrent,
+  #view-owner .ownerWeatherToday{
+    min-width:0!important;
+  }
+  #view-owner .ownerWeatherCurrent>div{
+    min-width:0!important;
+    flex-wrap:wrap!important;
+    gap:8px!important;
+  }
+  #view-owner .ownerWeatherCurrent>div>b{font-size:38px!important}
+  #view-owner .ownerWeatherCurrent>div>strong{font-size:14px!important}
+  #view-owner .ownerWeatherWeek{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:auto!important;
+    overscroll-behavior-x:contain!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+  #view-owner .ownerCalScroll{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:auto!important;
+    overscroll-behavior-x:contain!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+
+  /* OnSite Vision stays visible in the bottom navigation on iPhone. */
+  #view-owner .ownerAppSidebar nav .ownerVisionNav{
+    flex:0 0 auto!important;
+    min-width:74px!important;
+    height:48px!important;
+    padding:5px 8px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border:0!important;
+    border-top:2px solid #9b5cff!important;
+    border-radius:7px!important;
+    background:#1b1230!important;
+    color:#fff!important;
+    text-decoration:none!important;
+    text-align:center!important;
+    font-size:9px!important;
+    line-height:1.1!important;
+    font-weight:1000!important;
+    white-space:nowrap!important;
+  }
+}
+
+/* Desktop sidebar Vision nav item matches the route buttons while remaining easy to find. */
+@media(min-width:721px){
+  #view-owner .ownerAppSidebar nav .ownerVisionNav{
+    display:block!important;
+    padding:10px 12px!important;
+    border:0!important;
+    border-left:3px solid #8b5cf6!important;
+    border-radius:3px!important;
+    background:#181426!important;
+    color:#f3e8ff!important;
+    text-decoration:none!important;
+    text-align:left!important;
+    font:inherit!important;
+    font-weight:850!important;
+  }
+  #view-owner .ownerAppSidebar nav .ownerVisionNav:hover{
+    background:#211833!important;
+    color:#fff!important;
+  }
+}
