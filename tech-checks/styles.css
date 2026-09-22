@@ -7443,3 +7443,48 @@ body.tech-scroll-enabled #view-service:not(.hidden) > *{
     width:100%!important;
   }
 }
+
+
+/* Owner clock containment + IT proactive Service Truck Inventory v245 */
+@media(min-width:721px){
+  #view-owner .ownerTodayHero{
+    grid-template-columns:minmax(0,1.55fr) minmax(250px,.45fr)!important;
+  }
+  #view-owner .ownerTodayClockCard{
+    min-width:0!important;
+    overflow:hidden!important;
+    padding:18px 16px!important;
+  }
+  #view-owner .ownerTodayClock{
+    width:100%!important;
+    max-width:100%!important;
+    font-size:clamp(30px,3.15vw,52px)!important;
+    letter-spacing:-.075em!important;
+    text-align:right!important;
+    overflow:hidden!important;
+  }
+}
+#view-it .wl-it-truck-manage-list{display:grid;gap:10px;margin-top:12px}
+#view-it .wl-it-truck-manage-row{
+  padding:14px;border:1px solid #405966;border-left:5px solid #e31821;border-radius:12px;
+  background:#0b1920;color:#fff;display:grid;grid-template-columns:minmax(170px,1fr) minmax(280px,1.5fr) auto;gap:14px;align-items:center
+}
+#view-it .wl-it-truck-manage-row.ready{border-left-color:#47c979}
+#view-it .wl-it-truck-manage-row>div:first-child span{display:block;color:#ff666d;font-size:9px;font-weight:1000;letter-spacing:.12em}
+#view-it .wl-it-truck-manage-row h3{margin:3px 0;color:#fff;font-size:18px}
+#view-it .wl-it-truck-manage-row>div:first-child b{font-size:10px;color:#ff9ca0}
+#view-it .wl-it-truck-manage-row.ready>div:first-child b{color:#9ff0bc}
+#view-it .wl-it-truck-counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+#view-it .wl-it-truck-counts i{padding:8px 5px;border:1px solid #314852;border-radius:8px;background:#10242d;color:#fff;font-style:normal;font-size:15px;font-weight:1000;text-align:center}
+#view-it .wl-it-truck-counts small{display:block;margin-top:2px;color:#9fb0b8;font-size:8px}
+#view-it .wl-it-truck-editor{display:grid;gap:9px}
+#view-it .wl-it-load-line{padding:11px;border:1px solid #38505b;border-radius:11px;background:#0b1920;display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,1fr) auto;gap:8px;align-items:center}
+#view-it .wl-it-load-line>div{display:grid;gap:2px}.wl-it-load-line>div b{color:#fff}.wl-it-load-line>div span{color:#9fb0b8;font-size:11px}
+#view-it .wl-it-load-line input{margin:0!important;min-height:42px!important}
+#view-it .wl-it-load-line>button{min-height:42px;padding:0 12px;border:1px solid #e31821;border-radius:8px;background:#e31821;color:#fff;font-weight:1000}
+#view-it .wl-it-inline-verify{display:flex!important;align-items:center;gap:5px;color:#d6e0e5;font-size:11px;font-weight:850}
+#view-it .wl-it-inline-verify input{width:18px!important;height:18px!important;min-height:0!important}
+@media(max-width:760px){
+  #view-it .wl-it-truck-manage-row,#view-it .wl-it-load-line{grid-template-columns:1fr!important}
+  #view-it .wl-it-truck-counts{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
