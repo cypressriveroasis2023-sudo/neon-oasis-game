@@ -1824,56 +1824,182 @@ function ownerAppJobRow(a){
     +'<div class="ownerTodayState"><span class="'+(a.status==='started'?'working':a.status==='completed'?'complete':'waiting')+'">'+status+'</span></div></article>';
 }
 
-let ownerCalendarDate=new Date(), ownerCalendarMode='month', ownerCalendarSelected=null;
-function ownerCalendarJobsForDate(d){const key=localDateKey(d);return (state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===key&&a.status!=='cancelled');}
-function ownerCalendarShift(n){const d=new Date(ownerCalendarDate);if(ownerCalendarMode==='month')d.setMonth(d.getMonth()+n);else if(ownerCalendarMode==='week')d.setDate(d.getDate()+7*n);else d.setFullYear(d.getFullYear()+n);ownerCalendarDate=d;ownerCalendarSelected=null;ownerAppRender();}
-function ownerCalendarSetMode(m){ownerCalendarMode=m;ownerCalendarSelected=null;ownerAppRender();}
-function ownerCalendarToday(){ownerCalendarDate=new Date();ownerCalendarSelected=localDateKey(ownerCalendarDate);ownerAppRender();}
-function ownerCalendarSelect(key){ownerCalendarSelected=key;ownerAppRender();}
-function ownerCalendarDayCell(d,inMonth=true){
- const key=localDateKey(d),jobs=ownerCalendarJobsForDate(d),today=key===localDateKey(new Date()),sel=key===ownerCalendarSelected;
- return '<button type="button" class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+(sel?'selected ':'')+'" onclick="ownerCalendarSelect(\''+key+'\')"><div class="ownerCalDate"><b>'+d.getDate()+'</b>'+(jobs.length?'<span>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</span>':'')+'</div>'
- +jobs.slice(0,3).map(j=>'<div class="ownerCalEvent '+(j.assigned_role==='it'?'it':'service')+'"><b>#'+esc(j.ticket_no||'—')+'</b> '+esc(j.work_type||'Job')+'<span>'+esc(j.site||'')+'</span></div>').join('')
- +(jobs.length>3?'<small>+'+(jobs.length-3)+' more</small>':'')+'</button>';
+let ownerCalendarDate=new Date(), ownerCalendarMode='month', ownerCalendarSelected=null, ownerCalendarRoleFilter='all';
+let ownerCalendarSelectedJobId='';
+
+function ownerCalendarAllRows(){
+  return (state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
 }
-function ownerCalendarMonth(){const y=ownerCalendarDate.getFullYear(),m=ownerCalendarDate.getMonth(),first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());let cells='';for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(d,d.getMonth()===m);}return '<div class="ownerCalWeekdays">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>'<b>'+x+'</b>').join('')+'</div><div class="ownerCalMonth">'+cells+'</div>';}
-function ownerCalendarWeek(){const d=new Date(ownerCalendarDate),start=new Date(d);start.setDate(d.getDate()-d.getDay());let cells='';for(let i=0;i<7;i++){const x=new Date(start);x.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(x,true);}return '<div class="ownerCalWeekdays">'+Array.from({length:7},(_,i)=>{const x=new Date(start);x.setDate(start.getDate()+i);return '<b>'+x.toLocaleDateString(undefined,{weekday:'short',month:'numeric',day:'numeric'})+'</b>';}).join('')+'</div><div class="ownerCalWeek">'+cells+'</div>';}
-function ownerCalendarYear(){const y=ownerCalendarDate.getFullYear();return '<div class="ownerCalYear">'+Array.from({length:12},(_,m)=>{const jobs=(state.ownerAssignments||[]).filter(a=>{const x=new Date(String(a.scheduled_for||'')+'T12:00:00');return x.getFullYear()===y&&x.getMonth()===m&&a.status!=='cancelled'});return '<button type="button" onclick="ownerCalendarDate=new Date('+y+','+m+',1);ownerCalendarSetMode(\'month\')"><b>'+new Date(y,m,1).toLocaleDateString(undefined,{month:'long'})+'</b><strong>'+jobs.length+'</strong><span>Tech Check jobs</span></button>';}).join('')+'</div>';}
-function ownerCalendarSelectedJobs(){return ownerCalendarSelected?(state.ownerAssignments||[]).filter(a=>String(a.scheduled_for||'')===ownerCalendarSelected&&a.status!=='cancelled'):[];}
-function ownerCalendarStatusLabel(j){return j.status==='started'?'STARTED':j.status==='completed'?'COMPLETE':j.status==='closed'?'CLOSED':'SCHEDULED';}
+function ownerCalendarFilteredRows(){
+  const rows=ownerCalendarAllRows();
+  if(ownerCalendarRoleFilter==='it') return rows.filter(a=>a.assigned_role==='it');
+  if(ownerCalendarRoleFilter==='service') return rows.filter(a=>a.assigned_role==='service');
+  return rows;
+}
+function ownerCalendarJobsForDate(d){
+  const key=localDateKey(d);
+  return ownerCalendarFilteredRows().filter(a=>String(a.scheduled_for||'')===key);
+}
+function ownerCalendarRangeRows(){
+  const rows=ownerCalendarFilteredRows();
+  if(ownerCalendarMode==='year'){
+    const y=ownerCalendarDate.getFullYear();
+    return rows.filter(a=>String(a.scheduled_for||'').startsWith(String(y)+'-'));
+  }
+  if(ownerCalendarMode==='week'){
+    const start=new Date(ownerCalendarDate);start.setHours(12,0,0,0);start.setDate(start.getDate()-start.getDay());
+    const end=new Date(start);end.setDate(end.getDate()+7);
+    return rows.filter(a=>{
+      const raw=String(a.scheduled_for||'');
+      if(!raw)return false;
+      const d=new Date(raw+'T12:00:00');
+      return d>=start&&d<end;
+    });
+  }
+  const y=ownerCalendarDate.getFullYear(),m=ownerCalendarDate.getMonth();
+  return rows.filter(a=>{
+    const raw=String(a.scheduled_for||'');
+    if(!raw)return false;
+    const d=new Date(raw+'T12:00:00');
+    return d.getFullYear()===y&&d.getMonth()===m;
+  });
+}
+function ownerCalendarShift(n){
+  const d=new Date(ownerCalendarDate);
+  if(ownerCalendarMode==='month') d.setMonth(d.getMonth()+n);
+  else if(ownerCalendarMode==='week') d.setDate(d.getDate()+7*n);
+  else d.setFullYear(d.getFullYear()+n);
+  ownerCalendarDate=d;
+  ownerCalendarSelected=null;
+  ownerCalendarSelectedJobId='';
+  ownerAppRender();
+}
+function ownerCalendarSetMode(m){
+  ownerCalendarMode=m;
+  ownerCalendarSelectedJobId='';
+  ownerAppRender();
+}
+function ownerCalendarSetRoleFilter(role){
+  ownerCalendarRoleFilter=['all','it','service'].includes(role)?role:'all';
+  ownerCalendarSelectedJobId='';
+  ownerAppRender();
+}
+function ownerCalendarToday(){
+  ownerCalendarDate=new Date();
+  ownerCalendarSelected=localDateKey(ownerCalendarDate);
+  ownerCalendarSelectedJobId='';
+  ownerAppRender();
+}
+function ownerCalendarSelect(key){
+  ownerCalendarSelected=key;
+  const jobs=ownerCalendarSelectedJobs();
+  ownerCalendarSelectedJobId=jobs[0]?String(jobs[0].id||''):'';
+  ownerAppRender();
+}
+function ownerCalendarDayCell(d,inMonth=true){
+  const key=localDateKey(d),jobs=ownerCalendarJobsForDate(d),today=key===localDateKey(new Date()),sel=key===ownerCalendarSelected;
+  const maxEvents=ownerCalendarMode==='week'?5:2;
+  const events=jobs.slice(0,maxEvents).map(j=>{
+    const role=j.assigned_role==='it'?'it':'service';
+    const status=j.status==='started'?'working':j.status==='completed'?'complete':'waiting';
+    const time=j.scheduled_time?String(j.scheduled_time).slice(0,5):'';
+    return '<div class="ownerCalEvent '+role+' '+status+'"><div><b>#'+esc(j.ticket_no||'—')+'</b><span>'+esc(String(j.work_type||'Job').toUpperCase())+(time?' · '+esc(time):'')+'</span></div><strong>'+esc(j.site||'Site')+'</strong></div>';
+  }).join('');
+  return '<button type="button" class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+(sel?'selected ':'')+'" onclick="ownerCalendarSelect(\''+key+'\')">'
+    +'<div class="ownerCalDate"><b>'+d.getDate()+'</b>'+(today?'<em>TODAY</em>':'')+(jobs.length?'<span>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</span>':'')+'</div>'
+    +events
+    +(jobs.length>maxEvents?'<small class="ownerCalMore">+'+(jobs.length-maxEvents)+' more</small>':'')
+    +'</button>';
+}
+function ownerCalendarMonth(){
+  const y=ownerCalendarDate.getFullYear(),m=ownerCalendarDate.getMonth(),first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());
+  let cells='';
+  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(d,d.getMonth()===m);}
+  return '<div class="ownerCalScroll"><div class="ownerCalGridFrame"><div class="ownerCalWeekdays">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>'<b>'+x+'</b>').join('')+'</div><div class="ownerCalMonth">'+cells+'</div></div></div>';
+}
+function ownerCalendarWeek(){
+  const d=new Date(ownerCalendarDate),start=new Date(d);start.setDate(d.getDate()-d.getDay());
+  let cells='';
+  for(let i=0;i<7;i++){const x=new Date(start);x.setDate(start.getDate()+i);cells+=ownerCalendarDayCell(x,true);}
+  return '<div class="ownerCalScroll"><div class="ownerCalGridFrame ownerCalWeekFrame"><div class="ownerCalWeekdays">'+Array.from({length:7},(_,i)=>{const x=new Date(start);x.setDate(start.getDate()+i);return '<b>'+x.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+'</b>';}).join('')+'</div><div class="ownerCalWeek">'+cells+'</div></div></div>';
+}
+function ownerCalendarYear(){
+  const y=ownerCalendarDate.getFullYear();
+  return '<div class="ownerCalYear">'+Array.from({length:12},(_,m)=>{
+    const jobs=ownerCalendarFilteredRows().filter(a=>{const raw=String(a.scheduled_for||'');if(!raw)return false;const x=new Date(raw+'T12:00:00');return x.getFullYear()===y&&x.getMonth()===m;});
+    const it=jobs.filter(j=>j.assigned_role==='it').length,service=jobs.filter(j=>j.assigned_role==='service').length;
+    return '<button type="button" onclick="ownerCalendarDate=new Date('+y+','+m+',1);ownerCalendarSetMode(\'month\')"><span>'+new Date(y,m,1).toLocaleDateString(undefined,{month:'short'}).toUpperCase()+'</span><b>'+new Date(y,m,1).toLocaleDateString(undefined,{month:'long'})+'</b><strong>'+jobs.length+'</strong><small>'+it+' IT · '+service+' Service</small></button>';
+  }).join('')+'</div>';
+}
+function ownerCalendarSelectedJobs(){
+  if(!ownerCalendarSelected)return [];
+  return ownerCalendarFilteredRows().filter(a=>String(a.scheduled_for||'')===ownerCalendarSelected);
+}
+function ownerCalendarStatusLabel(j){
+  return j.status==='started'?'WORKING':j.status==='completed'?'COMPLETE':j.status==='closed'?'CLOSED':'WAITING';
+}
 function ownerCalendarAgenda(){
- if(!ownerCalendarSelected)return '<aside class="ownerCalAgenda"><h3>Select a day</h3><p>Click any date to see its jobs, ownership, and current status.</p></aside>';
- const jobs=ownerCalendarSelectedJobs(),d=new Date(ownerCalendarSelected+'T12:00:00');
- return '<aside class="ownerCalAgenda"><div class="ownerCalAgendaHead"><div><small>SELECTED DAY</small><h3>'+d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</h3><span>'+jobs.length+' job'+(jobs.length===1?'':'s')+' scheduled</span></div><strong>'+jobs.length+'</strong></div>'
- +(jobs.length?jobs.map(j=>'<button type="button" data-owner-calendar-job="'+esc(String(j.id||''))+'" class="ownerCalAgendaJob" onclick="ownerCalendarOpenJob(\''+esc(String(j.id||''))+'\')"><div><b>#'+esc(j.ticket_no||'—')+' · '+esc(j.site||'Customer / site')+'</b><span>'+esc(j.job_description||j.site||'No job description')+'</span><span>'+esc(j.scheduled_time||j.work_time||'Time not set')+'</span></div><div><b>'+esc(String(j.work_type||'Job').toUpperCase())+'</b><em>'+esc(ownerCalendarStatusLabel(j))+'</em></div></button>').join('')+'<button class="ownerCalDayDetails" type="button" onclick="ownerCalendarOpenDayDetails()">View Day Details</button>':ownerAppEmpty('NO TECH CHECK JOBS ON THIS DAY'))+'</aside>';
+  if(!ownerCalendarSelected)return '<section class="ownerCalAgenda"><div class="ownerCalRailEmpty"><b>Select a day</b><span>Choose a date on the calendar to see the jobs scheduled for it.</span></div></section>';
+  const jobs=ownerCalendarSelectedJobs(),d=new Date(ownerCalendarSelected+'T12:00:00');
+  return '<section class="ownerCalAgenda"><div class="ownerCalAgendaHead"><div><small>SELECTED DAY</small><h3>'+d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})+'</h3><span>'+jobs.length+' job'+(jobs.length===1?'':'s')+' scheduled</span></div><strong>'+jobs.length+'</strong></div>'
+    +(jobs.length?'<div class="ownerCalAgendaList">'+jobs.map(j=>{
+      const selected=String(j.id||'')===String(ownerCalendarSelectedJobId||'');
+      const role=j.assigned_role==='it'?'IT':'SERVICE';
+      const time=j.scheduled_time?String(j.scheduled_time).slice(0,5):'No time';
+      return '<button type="button" data-owner-calendar-job="'+esc(String(j.id||''))+'" class="ownerCalAgendaJob '+(selected?'selected ':'')+(j.assigned_role==='it'?'it':'service')+'" onclick="ownerCalendarOpenJob(\''+esc(String(j.id||''))+'\')"><div class="ownerCalAgendaMain"><span>'+esc(role)+' · '+esc(time)+'</span><b>#'+esc(j.ticket_no||'—')+' · '+esc(j.site||'Customer / site')+'</b><small>'+esc(j.job_description||'No job description recorded')+'</small></div><div class="ownerCalAgendaState"><strong>'+esc(String(j.work_type||'Job').toUpperCase())+'</strong><em>'+esc(ownerCalendarStatusLabel(j))+'</em></div></button>';
+    }).join('')+'</div>':ownerAppEmpty('NO JOBS ON THIS DAY','Pick another date or create a new Tech Check job.'))
+    +'</section>';
 }
 function ownerCalendarOpenDayDetails(){
- const jobs=ownerCalendarSelectedJobs(); if(!jobs.length)return;
- ownerCalendarOpenJob(String(jobs[0].id||''));
+  const jobs=ownerCalendarSelectedJobs(); if(!jobs.length)return;
+  ownerCalendarOpenJob(String(jobs[0].id||''));
 }
 function ownerCalendarServiceOrder(){
- const jobs=ownerCalendarSelectedJobs(),j=jobs.find(x=>String(x.work_type||'').toLowerCase()==='service')||jobs[0];
- if(j)ownerCalendarOpenJob(String(j.id||''));
+  const jobs=ownerCalendarSelectedJobs(),j=jobs.find(x=>String(x.work_type||'').toLowerCase()==='service')||jobs[0];
+  if(j)ownerCalendarOpenJob(String(j.id||''));
 }
 function ownerCalendarNewJob(){ownerAppNavigate('assign');}
 function ownerCalendarOpenJob(id){
- const job=(state.ownerAssignments||[]).find(x=>String(x.id)===String(id)); if(!job)return;
- const key=String(job.scheduled_for||'').slice(0,10);if(key)ownerCalendarSelected=key;
- ownerCalendarSelectedJobId=String(id);ownerAppRender();
+  const job=ownerCalendarAllRows().find(x=>String(x.id)===String(id)); if(!job)return;
+  const key=String(job.scheduled_for||'').slice(0,10);if(key)ownerCalendarSelected=key;
+  ownerCalendarSelectedJobId=String(id);
+  ownerAppRender();
 }
-let ownerCalendarSelectedJobId='';
 function ownerCalendarInspector(){
- const jobs=ownerCalendarSelectedJobs(),job=jobs.find(j=>String(j.id)===String(ownerCalendarSelectedJobId))||jobs[0];
- if(!job)return '<aside class="ownerCalInspector"><small>VIEWING</small><h3>No job selected</h3><p>Select a scheduled job to inspect its workflow.</p></aside>';
- const service=(state.profiles||[]).find(p=>p.user_id===job.assignee_user_id);
- return '<aside class="ownerCalInspector"><small>VIEWING JOB</small><h3>#'+esc(job.ticket_no||'—')+'</h3><section><h4>'+esc(job.site||'Customer / Site')+'</h4><div class="ownerCalFacts"><span><small>WORK TYPE</small><b>'+esc(String(job.work_type||'job').toUpperCase())+'</b></span><span><small>DATE</small><b>'+esc(job.scheduled_for||'—')+'</b></span><span><small>WINDOW</small><b>'+esc(job.scheduled_time||job.work_time||'Not set')+'</b></span><span><small>STATUS</small><b>'+esc(ownerCalendarStatusLabel(job))+'</b></span></div></section><section><h4>Assignments</h4><p><b>'+esc(job.assigned_role==='it'?'IT':'Service')+'</b> · '+esc(job.assignee_name||job.assigned_to_name||service?.full_name||(job.assignment_scope==='department'?'Department Queue':'Unassigned'))+'</p></section><section><h4>What happens next</h4><p>'+esc(job.status==='completed'?'Work is complete and ready for the next required workflow step.':job.assigned_role==='it'?'IT completes the required Tech Check work and handoff.':'Service completes the required field verification and proof.')+'</p><button class="btn" type="button" onclick="ownerCalendarOpenJob(\''+esc(String(job.id||''))+'\')">Mark / View Job</button><button class="mini" type="button" onclick="ownerAppNavigate(\'history\')">Show Job Notes</button><button class="mini" type="button" onclick="ownerAppNavigate(\'today\')">Show Remaining Work</button></section></aside>';
+  const jobs=ownerCalendarSelectedJobs(),job=jobs.find(j=>String(j.id)===String(ownerCalendarSelectedJobId))||jobs[0];
+  if(!job)return '<section class="ownerCalInspector"><div class="ownerCalRailEmpty"><b>No job selected</b><span>Select a job from the selected day to see the Tech Check details.</span></div></section>';
+  const service=(state.profiles||[]).find(p=>p.user_id===job.assignee_user_id);
+  const who=job.assignee_name||job.assigned_to_name||service?.full_name||(job.assignment_scope==='department'?'Department Queue':'Unassigned');
+  return '<section class="ownerCalInspector"><div class="ownerCalInspectorHead"><div><small>JOB DETAILS</small><h3>MHelpDesk #'+esc(job.ticket_no||'—')+'</h3><span>'+esc(job.site||'Customer / Site')+'</span></div><strong>'+esc(ownerCalendarStatusLabel(job))+'</strong></div>'
+    +'<div class="ownerCalFacts"><span><small>WORK TYPE</small><b>'+esc(String(job.work_type||'job').toUpperCase())+'</b></span><span><small>DATE</small><b>'+esc(job.scheduled_for||'—')+'</b></span><span><small>TIME</small><b>'+esc(job.scheduled_time||job.work_time||'Not set')+'</b></span><span><small>DEPARTMENT</small><b>'+esc(job.assigned_role==='it'?'IT':'SERVICE')+'</b></span></div>'
+    +'<div class="ownerCalInspectorSection"><small>ASSIGNED TO</small><b>'+esc(who)+'</b></div>'
+    +(job.job_description?'<div class="ownerCalInspectorSection"><small>JOB</small><p>'+esc(job.job_description)+'</p></div>':'')
+    +(job.notes?'<div class="ownerCalInspectorSection"><small>NOTES</small><p>'+esc(job.notes)+'</p></div>':'')
+    +'<div class="ownerCalInspectorActions"><button class="btn" type="button" onclick="ownerAppNavigate(\'today\')">Open Live Workflow</button><button class="mini" type="button" onclick="ownerAppNavigate(\'history\')">View History</button></div>'
+    +'</section>';
+}
+function ownerCalendarStats(){
+  const rows=ownerCalendarRangeRows(),selected=ownerCalendarSelectedJobs();
+  const it=rows.filter(j=>j.assigned_role==='it').length,service=rows.filter(j=>j.assigned_role==='service').length,working=rows.filter(j=>j.status==='started').length;
+  return '<div class="ownerCalStats"><div><b>'+rows.length+'</b><span>IN THIS '+(ownerCalendarMode==='year'?'YEAR':ownerCalendarMode==='week'?'WEEK':'MONTH')+'</span></div><div><b>'+selected.length+'</b><span>SELECTED DAY</span></div><div><b>'+it+'</b><span>IT JOBS</span></div><div><b>'+service+'</b><span>SERVICE JOBS</span></div><div><b>'+working+'</b><span>WORKING NOW</span></div></div>';
 }
 function ownerAppCalendar(){
- const label=ownerCalendarMode==='year'?String(ownerCalendarDate.getFullYear()):ownerCalendarDate.toLocaleDateString(undefined,ownerCalendarMode==='month'?{month:'long',year:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
- const cal=ownerCalendarMode==='month'?ownerCalendarMonth():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarYear();
- if(!ownerCalendarSelected){const today=localDateKey(new Date());const hasToday=(state.ownerAssignments||[]).some(a=>String(a.scheduled_for||'')===today&&a.status!=='cancelled');if(hasToday)ownerCalendarSelected=today;}
- return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar','Interactive Tech Check schedule — select a day to inspect the work.')+'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerCalendarServiceOrder()">Service Order</button><button class="mini" type="button" onclick="ownerCalendarToday()">↻</button></div></div>'
- +'<div class="ownerCalWorkspace"><main><div class="ownerCalToolbar"><div><button aria-label="Previous" onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button aria-label="Next" onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div><div class="ownerCalModes"><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='year'?'active':'')+'" onclick="ownerCalendarSetMode(\'year\')">Year</button></div></div><div class="ownerCalLayout"><div class="ownerCalBoard">'+cal+'</div>'+(ownerCalendarMode==='year'?'':ownerCalendarAgenda())+'</div></main>'+ownerCalendarInspector()+'</div>';
+  const label=ownerCalendarMode==='year'?String(ownerCalendarDate.getFullYear()):ownerCalendarDate.toLocaleDateString(undefined,ownerCalendarMode==='month'?{month:'long',year:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
+  if(!ownerCalendarSelected) ownerCalendarSelected=localDateKey(new Date());
+  if(ownerCalendarSelected&&!ownerCalendarSelectedJobId){
+    const first=ownerCalendarSelectedJobs()[0];
+    if(first)ownerCalendarSelectedJobId=String(first.id||'');
+  }
+  const cal=ownerCalendarMode==='month'?ownerCalendarMonth():ownerCalendarMode==='week'?ownerCalendarWeek():ownerCalendarYear();
+  return '<div class="ownerCalTop">'+ownerAppHeader('SCHEDULE','Calendar Command Center','A wide, live schedule built for dispatch — see the whole month, select a day, and inspect jobs without squeezing the calendar.')
+    +'<div class="ownerCalQuick"><button class="btn" type="button" onclick="ownerCalendarNewJob()">＋ New Job</button><button class="mini" type="button" onclick="ownerCalendarServiceOrder()">Open Selected</button><button class="mini" type="button" onclick="ownerCalendarToday()">Today</button></div></div>'
+    +ownerCalendarStats()
+    +'<div class="ownerCalControlBar"><div class="ownerCalPeriod"><button aria-label="Previous" onclick="ownerCalendarShift(-1)">‹</button><button onclick="ownerCalendarToday()">Today</button><button aria-label="Next" onclick="ownerCalendarShift(1)">›</button><h2>'+esc(label)+'</h2></div>'
+      +'<div class="ownerCalRoleFilters"><span>SHOW</span><button class="'+(ownerCalendarRoleFilter==='all'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'all\')">All Jobs</button><button class="'+(ownerCalendarRoleFilter==='it'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'it\')">IT</button><button class="'+(ownerCalendarRoleFilter==='service'?'active':'')+'" onclick="ownerCalendarSetRoleFilter(\'service\')">Service</button></div>'
+      +'<div class="ownerCalModes"><button class="'+(ownerCalendarMode==='month'?'active':'')+'" onclick="ownerCalendarSetMode(\'month\')">Month</button><button class="'+(ownerCalendarMode==='week'?'active':'')+'" onclick="ownerCalendarSetMode(\'week\')">Week</button><button class="'+(ownerCalendarMode==='year'?'active':'')+'" onclick="ownerCalendarSetMode(\'year\')">Year</button></div></div>'
+    +'<div class="ownerCalWorkspaceV2"><main class="ownerCalMain"><div class="ownerCalBoard">'+cal+'</div></main>'
+      +(ownerCalendarMode==='year'?'':'<aside class="ownerCalSideRail">'+ownerCalendarAgenda()+ownerCalendarInspector()+'</aside>')
+    +'</div>';
 }
 
 function ownerBoardTime(value){
