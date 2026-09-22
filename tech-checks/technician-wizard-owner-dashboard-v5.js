@@ -265,6 +265,29 @@ function injectStyles() {
     .wl-help-show-note{margin:0 0 8px;padding:9px;border:1px solid #e7c76a;border-radius:9px;background:#fff8df;color:#725000;font-size:9px;font-weight:750;line-height:1.35}
     @media(max-width:430px){.wl-help-howto{padding:9px}.wl-help-howto li{font-size:9px}.wl-help-coach-toast{bottom:12px}}
 
+    /* Simple technician training v93 */
+    .wl-help-simple-card{min-height:430px;margin-top:12px;padding:22px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border:2px solid #dce4ea;border-top:7px solid #d20b12;border-radius:24px;background:#fff;box-shadow:0 8px 24px rgba(16,24,32,.07)}
+    .wl-help-simple-role{margin-bottom:14px;padding:8px 16px;border-radius:999px;background:#101820;color:#fff;font-size:13px;font-weight:950;letter-spacing:.06em;text-transform:uppercase}
+    .wl-help-simple-number{width:78px;height:78px;margin-bottom:16px;display:grid;place-items:center;border-radius:999px;background:#d20b12;color:#fff;font-size:38px;font-weight:950;box-shadow:0 8px 18px rgba(210,11,18,.24)}
+    .wl-help-simple-card .wl-next-kicker{color:#d20b12!important;font-size:13px!important;letter-spacing:.13em!important;font-weight:950!important}
+    .wl-help-simple-card h2{max-width:560px;margin:7px 0 18px!important;color:#101820!important;font-size:27px!important;line-height:1.08!important}
+    .wl-help-simple-instruction{max-width:590px;color:#213445;font-size:27px;line-height:1.28;font-weight:900}
+    .wl-help-simple-show{width:100%;min-height:64px;margin:24px 0 0;padding:12px 18px;border:2px solid #101820;border-radius:999px;background:#fff;color:#101820;font:inherit;font-size:16px;font-weight:950}
+    .wl-help-simple-nav{grid-template-columns:1fr 1.65fr!important;gap:12px!important;margin-top:16px!important}
+    .wl-help-simple-nav button{min-height:68px!important;border-radius:999px!important;font-size:17px!important;font-weight:950!important}
+    .wl-help-simple-nav .wl-prev{background:#fff!important;border:2px solid #cfd9e1!important;color:#35495a!important}
+    .wl-help-simple-nav .wl-next{border:2px solid #d20b12!important;background:#d20b12!important;color:#fff!important}
+    .wl-help-simple-nav .wl-finish{border-color:#16844a!important;background:#16844a!important}
+    .wl-help-simple-skip{width:100%;min-height:46px;margin:10px 0 0;border:0;background:transparent;color:#647482;font:inherit;font-size:13px;font-weight:850;text-decoration:underline}
+    @media(max-width:430px){
+      .wl-help-simple-card{min-height:390px;padding:18px 14px;border-radius:20px}
+      .wl-help-simple-number{width:68px;height:68px;font-size:33px}
+      .wl-help-simple-card h2{font-size:23px!important}
+      .wl-help-simple-instruction{font-size:24px}
+      .wl-help-simple-show{min-height:60px;font-size:14px}
+      .wl-help-simple-nav button{min-height:64px!important;font-size:15px!important}
+    }
+
 
     .wl-menu-overlay{position:fixed;inset:0;background:rgba(4,17,29,.58);z-index:10030;display:flex;align-items:flex-end;justify-content:center;padding:14px}.wl-menu-overlay.hidden{display:none!important}.wl-menu-sheet{width:min(620px,100%);max-height:90vh;overflow:auto;background:#f7f9fb;border-radius:22px 22px 14px 14px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:18px}.wl-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.wl-menu-head h2{margin:2px 0 0;font-size:28px}.wl-app-menu-list{display:grid;gap:10px;margin-top:14px}.wl-app-menu-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid #d5dfe6;border-radius:14px;background:#fff;padding:14px;text-align:left;color:#172839}.wl-app-menu-item span:nth-child(2) b,.wl-app-menu-item span:nth-child(2) small{display:block}.wl-app-menu-item span:nth-child(2) small{margin-top:3px;color:#687887;font-weight:600}.wl-app-menu-item>strong{color:#687887}.wl-app-menu-icon{width:38px;height:38px;border-radius:11px;background:#0b2a3f;color:#fff;display:grid;place-items:center;font-size:18px;font-weight:950}.wl-menu-future{margin-top:14px;padding:13px;border:1px dashed #bfcbd4;border-radius:13px;background:#eef3f6}.techMenuMini{white-space:nowrap}
 
@@ -1049,8 +1072,8 @@ function renderHelpCenter(roleOverride=null){
       <button type='button' data-wl-help-role='service' class='${helpCenterRole==='service'?'selected':''}'><b>S</b><span>Service</span></button>
     </div>
     <section class='wl-help-start-card'>
-      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>${steps.length}-step ${esc(helpRoleName(helpCenterRole))} walkthrough</b><small>Best for new team members or a full refresher.</small></div></div>
-      <button type='button' data-wl-help-walkthrough>Start Walkthrough →</button>
+      <div><span class='wl-help-start-icon'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''></span><div><b>Simple ${esc(helpRoleName(helpCenterRole))} walkthrough</b><small>One big instruction at a time. Tap NEXT after each step.</small></div></div>
+      <button type='button' data-wl-help-walkthrough>START STEP-BY-STEP →</button>
     </section>
     <section class='wl-help-flow-section'>
       <div class='wl-help-section-title'><b>Role workflow</b><span>THE BIG PICTURE</span></div>
@@ -1374,10 +1397,31 @@ function helpStepHowToHtml(role, step){
     </div>
   `;
 }
+function helpWalkthroughPages(role = currentRoleKey()) {
+  const sections = helpStepsForRole(role);
+  if (!['service','it'].includes(role)) {
+    return sections.map(section => ({ section, instruction:null, instructionIndex:0, instructionCount:1 }));
+  }
+  return sections.flatMap(section => {
+    const guide = helpStepGuide(role, section);
+    const instructions = Array.isArray(guide.steps) && guide.steps.length
+      ? guide.steps
+      : ['Read this step and complete the matching action in Tech Check.'];
+    return instructions.map((instruction, instructionIndex) => ({
+      section,
+      instruction,
+      instructionIndex,
+      instructionCount:instructions.length,
+      selector:guide.selector || null,
+    }));
+  });
+}
+
 function showHelpStepInApp(){
   const role=helpWalkthroughRole || currentRoleKey();
-  const steps=helpStepsForRole(role);
-  const step=steps[Math.max(0,Math.min(helpWalkthroughStep,steps.length-1))];
+  const pages=helpWalkthroughPages(role);
+  const page=pages[Math.max(0,Math.min(helpWalkthroughStep,pages.length-1))];
+  const step=page?.section || helpStepsForRole(role)[0];
   const guide=helpStepGuide(role,step);
   if(!guide.selector) return;
 
@@ -1398,7 +1442,7 @@ function showHelpStepInApp(){
       if(body){
         const note=document.createElement('div');
         note.className='wl-help-show-note';
-        note.textContent='Open the matching job or workflow first, then tap “Show me in the app” again.';
+        note.textContent='Open the matching job or workflow first, then tap “SHOW ME” again.';
         body.prepend(note);
       }
       return;
@@ -1412,7 +1456,7 @@ function showHelpStepInApp(){
       toast.className='wl-help-coach-toast';
       document.body.appendChild(toast);
     }
-    toast.innerHTML="<b>Training pointer</b><span>This is the control for the step you just read.</span><button type='button' data-wl-help-coach-return>Back to Help</button>";
+    toast.innerHTML="<b>THIS IS THE BUTTON</b><span>Look for the highlighted control.</span><button type='button' data-wl-help-coach-return>BACK TO TRAINING</button>";
     toast.classList.add('show');
     setTimeout(()=>target.classList.remove('wl-help-live-highlight'),3200);
   },320);
@@ -1421,15 +1465,39 @@ function showHelpStepInApp(){
 function renderHelpWalkthrough() {
   const overlay = ensureHelpOverlay();
   const body = document.getElementById('wlHelpBody');
-  const steps = helpStepsForRole(helpWalkthroughRole || currentRoleKey());
-  helpWalkthroughStep = Math.max(0, Math.min(helpWalkthroughStep, steps.length - 1));
-  const step = steps[helpWalkthroughStep];
-  const helpTitle=document.getElementById('wlHelpTitle'); if(helpTitle) helpTitle.textContent='Step-by-Step Training';
-  const pct = Math.round((helpWalkthroughStep + 1) / steps.length * 100);
-  const firstTime = helpWalkthroughMode === 'first';
-  const last = helpWalkthroughStep === steps.length - 1;
   const walkthroughRole=helpWalkthroughRole || currentRoleKey();
-  body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${steps.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div>${helpStepHowToHtml(walkthroughRole,step)}</div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
+  const pages = helpWalkthroughPages(walkthroughRole);
+  helpWalkthroughStep = Math.max(0, Math.min(helpWalkthroughStep, pages.length - 1));
+  const page = pages[helpWalkthroughStep];
+  const step = page.section;
+  const helpTitle=document.getElementById('wlHelpTitle');
+  if(helpTitle) helpTitle.textContent='Step-by-Step Training';
+  const pct = Math.round((helpWalkthroughStep + 1) / pages.length * 100);
+  const firstTime = helpWalkthroughMode === 'first';
+  const last = helpWalkthroughStep === pages.length - 1;
+  const simpleTech = ['service','it'].includes(walkthroughRole);
+
+  if(simpleTech){
+    const guide=helpStepGuide(walkthroughRole,step);
+    const canShow=Boolean(guide.selector) && (currentRoleKey()===walkthroughRole || currentRoleKey()==='owner');
+    body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div>
+      <div class='wl-help-step-count'>STEP ${helpWalkthroughStep + 1} OF ${pages.length}</div>
+      <div class='wl-help-simple-card'>
+        <div class='wl-help-simple-role'>${esc(helpRoleName(walkthroughRole))}</div>
+        <div class='wl-help-simple-number'>${helpWalkthroughStep + 1}</div>
+        <div class='wl-next-kicker'>${esc(step.kicker)}</div>
+        <h2>${esc(step.title)}</h2>
+        <div class='wl-help-simple-instruction'>${esc(page.instruction)}</div>
+        ${canShow ? "<button type='button' class='wl-help-simple-show' data-wl-help-show-step>SHOW ME IN THE APP →</button>" : ''}
+      </div>
+      <div class='wl-help-nav wl-help-simple-nav'>
+        <button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>← BACK</button>
+        <button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'FINISH ✓' : 'CLOSE HELP') : 'NEXT →'}</button>
+      </div>
+      ${firstTime && helpWalkthroughStep === 0 ? "<button class='wl-help-simple-skip' data-wl-help-skip>Skip for now</button>" : ''}`;
+  } else {
+    body.innerHTML = `<div class='wl-help-progress'><span style='width:${pct}%'></span></div><div class='wl-help-step-count'>${helpWalkthroughStep + 1} of ${pages.length}</div><div class='wl-help-card'><div class='wl-next-kicker'>${esc(step.kicker)}</div><h2>${esc(step.title)}</h2><div class='wl-help-copy'>${step.body}</div>${helpStepHowToHtml(walkthroughRole,step)}</div><div class='wl-help-nav'><button class='wl-prev' data-wl-help-prev ${helpWalkthroughStep === 0 ? 'disabled' : ''}>Back</button>${firstTime && helpWalkthroughStep === 0 ? `<button class='wl-help-skip' data-wl-help-skip>Skip for now</button>` : '<span></span>'}<button class='wl-next ${last ? 'wl-finish' : ''}' data-wl-help-next>${last ? (firstTime ? 'Finish Setup ✓' : 'Close Help') : 'Next →'}</button></div>`;
+  }
   overlay.classList.remove('hidden');
 }
 async function openHelpWalkthrough(firstTime = false, roleOverride = null) {
@@ -7666,7 +7734,7 @@ document.addEventListener('click', async e => {
   if(e.target.closest('[data-wl-owner-helios-close]')) { document.getElementById('ownerHeliosFinalReview')?.remove(); return; }
   if (e.target.closest('[data-wl-help-skip]')) { walkthroughDismissedSession = true; document.getElementById('wlHelpOverlay')?.classList.add('hidden'); return; }
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
-  if (e.target.closest('[data-wl-help-next]')) { const steps=helpStepsForRole(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= steps.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
+  if (e.target.closest('[data-wl-help-next]')) { const pages=helpWalkthroughPages(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= pages.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
   if (e.target.closest('[data-wl-it-open-job]')) return showITJobLookup();
   if (e.target.closest('[data-wl-it-find-job]')) return itFindJobByTicket();
