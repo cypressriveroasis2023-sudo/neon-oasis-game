@@ -759,7 +759,10 @@ function injectStyles() {
     #view-it .wl-it-ticket-prompt>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
     #view-it .wl-it-ticket-prompt>b{font-size:clamp(22px,4.5vw,34px);line-height:1.08;color:#fff;font-weight:1000}
     #view-it .wl-it-ticket-prompt>small{font-size:13px;line-height:1.4;color:#b9c7ce;font-weight:750}
-    #view-it .wl-it-ticket-prompt>button{min-height:52px;border:1px solid #ff3b42;border-radius:10px;background:#e31821;color:#fff;font-size:17px;font-weight:1000}
+    #view-it .wl-it-home-ticket-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:4px}
+    #view-it .wl-it-home-ticket-entry input{min-height:52px!important;font-size:18px!important;text-align:center!important}
+    #view-it .wl-it-home-ticket-entry button{min-height:52px;border:1px solid #ff3b42;border-radius:10px;background:#e31821;color:#fff;font-size:15px;font-weight:1000;padding:0 16px}
+    @media(max-width:560px){#view-it .wl-it-home-ticket-entry{grid-template-columns:1fr}#view-it .wl-it-home-ticket-entry button{width:100%}}
     #view-it .wl-it-service-queue{max-width:720px;margin:12px auto 0;padding:14px 16px;border:1px solid #2a414d;border-radius:14px;background:#071117;text-align:left}
     #view-it .wl-it-service-queue-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #263943}
     #view-it .wl-it-service-queue-head>span{font-size:11px;font-weight:1000;letter-spacing:.12em;color:#ff4b52}
@@ -1467,7 +1470,8 @@ function guidedTourSteps(role){
   ];
   return [
     { selector:'#wlItHome .wl-day-next-card, #wlItHome .wl-it-ticket-prompt', title:'READ THIS FIRST', text:'Tech Check puts the next required IT action here. If nothing is waiting, this changes to Enter Another Ticket Number.' },
-    { selector:'#wlItHome .wl-day-next-card button, #wlItHome .wl-it-ticket-prompt button', title:'DO THE NEXT THING', text:'Use this button for the next IT action or to enter the next MHelpDesk ticket.' },
+    { selector:'#wlItHome .wl-day-next-card button, #wlItHome #wlITHomeTicketSearch', title:'NEXT JOB / TICKET', text:'If Tech Check has work waiting, use the action button. If not, type the exact MHelpDesk ticket number right here.' },
+    { selector:"#wlItHome [data-wl-it-find-home-job]", title:'OPEN THE TICKET', text:'Tech Check will find the active IT assignment, Intake return, or site-registration work tied to that ticket.' },
     { selector:'#wlItHome .wl-it-service-queue', title:'SERVICE QUEUE', text:'This is read-only. It shows IT handoffs already completed and waiting for Service to accept them.' },
     { selector:'#wlItHome .wl-it-flowline', title:'FOLLOW THIS ORDER', text:'IT Intake → site registration → active prep → next IT job → Service Queue.' },
     { selector:"#wlItHome [data-wl-it-open-job]", open:'#wlItHome .wl-it-more', title:'ENTER A TICKET', text:'Use the exact current MHelpDesk ticket number to open or claim the correct IT job.', fallback:'#wlItHome .wl-it-more > summary' },
@@ -2593,7 +2597,7 @@ function itNextActionHtml(state){
     const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
     return `<div class='wl-day-next-card waiting'><span>IT JOB IS WAITING</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(gate.label||'WAITING')} · ${esc(gate.detail||'This IT job is not ready yet.')}</small><button class='wl-big wl-gray' data-wl-it-open-job>CHECK / ENTER A TICKET</button></div>`;
   }
-  return `<div class='wl-it-ticket-prompt'><span>READY FOR THE NEXT TICKET</span><b>ENTER ANOTHER TICKET NUMBER</b><small>No unresolved IT work is waiting right now.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled.`:''}</small><button type='button' data-wl-it-open-job>ENTER MHELPDESK TICKET</button></div>`;
+  return `<div class='wl-it-ticket-prompt'><span>READY FOR THE NEXT TICKET</span><b>ENTER ANOTHER TICKET NUMBER</b><small>No unresolved IT work is waiting right now.${state.futureAssignments.length?` ${state.futureAssignments.length} future assignment${state.futureAssignments.length===1?' is':'s are'} already scheduled.`:''}</small><div class='wl-it-home-ticket-entry'><input id='wlITHomeTicketSearch' inputmode='numeric' autocomplete='off' placeholder='MHELPDESK TICKET #'><button type='button' data-wl-it-find-home-job>OPEN TICKET →</button></div></div>`;
 }
 function itServiceQueueHtml(state){
   const rows=Array.isArray(state?.serviceQueue)?state.serviceQueue:[];
@@ -2947,6 +2951,18 @@ function updateUnitCountStatus() {
   const remaining = expected - added;
   status.className = remaining === 0 ? 'ok' : remaining > 0 ? 'warn' : 'bad';
   status.innerHTML = remaining === 0 ? `<b>✓ ${added} of ${expected} units added.</b> You can continue to Unit 1.` : remaining > 0 ? `<b>${added} of ${expected} units added.</b> Add ${remaining} more unit${remaining === 1 ? '' : 's'}.` : `<b>${added} units added but the ticket says ${expected}.</b> Remove ${Math.abs(remaining)} unit${Math.abs(remaining) === 1 ? '' : 's'} before continuing.`;
+}
+async function openITHomeTicketSearch(){
+  const homeInput=document.getElementById('wlITHomeTicketSearch');
+  const ticket=String(homeInput?.value||'').trim().replace(/^#\s*/,'');
+  if(!ticket){
+    homeInput?.focus();
+    return;
+  }
+  showITJobLookup();
+  const lookup=document.getElementById('wlITJobSearch');
+  if(lookup) lookup.value=ticket;
+  await itFindJobByTicket();
 }
 function showITJobLookup() {
   let card=document.getElementById('wlItJobLookup');
@@ -8116,6 +8132,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-help-prev]')) { helpWalkthroughStep = Math.max(0, helpWalkthroughStep - 1); return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-help-next]')) { const pages=helpWalkthroughPages(helpWalkthroughRole || currentRoleKey()); if (helpWalkthroughStep >= pages.length - 1) return completeHelpWalkthrough(); helpWalkthroughStep++; return renderHelpWalkthrough(); }
   if (e.target.closest('[data-wl-enable-browser-alerts]')) return enableBrowserAlerts();
+  if (e.target.closest('[data-wl-it-find-home-job]')) return openITHomeTicketSearch();
   if (e.target.closest('[data-wl-it-open-job]')) return showITJobLookup();
   if (e.target.closest('[data-wl-it-find-job]')) return itFindJobByTicket();
   const assigned = e.target.closest('[data-wl-start-assignment]');
