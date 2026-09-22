@@ -446,8 +446,17 @@
         <div id="ownerPersistentControls" aria-live="off">
           <details id="ownerJobAssignments" aria-hidden="true"><span id="ownerAssignmentBadge"></span></details>
           <section id="ownerPersistentAccounts" aria-hidden="true">
+            <div class="ownerAccountsStatusGrid">
+              <div><b id="activeTeamCount">0</b><span>ACTIVE</span></div>
+              <div><b id="inactiveTeamCount">0</b><span>DISABLED</span></div>
+              <div><b id="archivedTeamCount">0</b><span>FORMER / DELETED</span></div>
+            </div>
+            <div id="ownerTeamStats" class="ownerTeamStats"></div>
             <div class="ownerAppGroup"><h2>Password Reset Requests</h2><div id="passwordResetRequests"></div></div>
-            <div class="ownerAppGroup"><h2>Current Users</h2><div id="userList"></div></div>
+            <div class="ownerAppGroup ownerAccountsActiveGroup"><h2>Active Accounts</h2><p>People who can currently sign in to Tech Check.</p><div id="userList"></div></div>
+            <div class="ownerAppGroup ownerAccountsDisabledGroup"><h2>Disabled Accounts</h2><p>These accounts are kept on file but cannot sign in until you reactivate them.</p><div id="inactiveUserList"></div></div>
+            <div class="ownerAppGroup ownerAccountsFormerGroup"><h2>Former / Deleted Accounts</h2><p>Historical work stays attached to these people. Restore an account if they return.</p><div id="archivedUserList"></div></div>
+            <div class="ownerAppGroup"><h2>Account Change History</h2><div id="teamAccessHistory"></div></div>
           </section>
         </div>
       </div>
