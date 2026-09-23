@@ -2845,7 +2845,7 @@ async function showITHome() {
   resetWizardPosition();
 }
 
-function itCreateCard()function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
+function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
 function createParts() {
   const card = itCreateCard();
   return { card, section: card?.querySelector('.sectiontitle'), intro: card?.querySelector('.sectiontitle')?.nextElementSibling, ticket: card?.querySelector('.grid'), title: [...(card?.querySelectorAll('h3') || [])].find(x => /Equipment Required/i.test(x.textContent)), eq: card?.querySelector('.grid3'), recon: document.getElementById('reconBatteryWrap'), add: [...(card?.querySelectorAll('button') || [])].find(b => /Add Requirement|Add Equipment/i.test(b.textContent)), draft: document.getElementById('needDraft'), create: [...(card?.querySelectorAll('button') || [])].find(b => /Create IT Equipment Prep/i.test(b.textContent)), msg: document.getElementById('itCreateMessage') };
