@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-bottom-nav-20260923an" />
+    <link rel="stylesheet" href="./styles.css?v=owner-bottom-nav-20260923ao" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -141,35 +141,48 @@
       <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
-<style id="owner-mobile-bottom-nav-fix">
-@media (max-width: 760px){
-  body:has(#view-owner:not(.hidden)) .mobileTop{display:none!important}
-  #view-owner .ownerAppSidebar{
-    position:fixed!important;left:12px!important;right:12px!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;top:auto!important;
-    width:auto!important;height:auto!important;min-height:0!important;z-index:9999!important;
-    display:block!important;padding:6px!important;border:1px solid #294552!important;border-radius:20px!important;
-    background:rgba(6,20,28,.97)!important;box-shadow:0 -8px 28px rgba(0,0,0,.38)!important
-  }
-  #view-owner .ownerAppSidebar .ownerAppBrand,#view-owner .ownerAppSidebar .ownerAppSidebarUtility{display:none!important}
-  #view-owner .ownerAppSidebar nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px!important}
-  #view-owner .ownerAppSidebar nav>*{display:none!important}
-  #view-owner .ownerAppSidebar nav [data-owner-route="today"],
-  #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
-  #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
-  #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
-  #view-owner .ownerAppSidebar nav a[href*="camera-health"],
-  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;min-width:0!important;min-height:58px!important;padding:7px 3px!important;border:0!important;border-radius:14px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.1!important;white-space:normal!important}
-  #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
-  #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
-  #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
-  #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
-  #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
-  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
-  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
-  #view-owner .ownerAppWorkspace{margin-left:0!important;width:100%!important;padding-bottom:92px!important}
-  #view-owner .ownerAppShell{display:block!important}
+
+<style id="owner-mobile-bottom-nav-fix-v2">
+@media (max-width:900px){
+  body.owner-mobile-active #appView>.mobileTop{display:none!important}
+  body.owner-mobile-active #view-owner{padding-bottom:84px!important}
+  body.owner-mobile-active #view-owner .ownerAppShell{display:block!important;width:100%!important;max-width:100%!important}
+  body.owner-mobile-active #view-owner .ownerAppWorkspace{margin:0!important;width:100%!important;max-width:100%!important;padding-bottom:90px!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar{position:fixed!important;z-index:10000!important;left:8px!important;right:8px!important;bottom:calc(6px + env(safe-area-inset-bottom))!important;top:auto!important;width:auto!important;max-width:none!important;height:66px!important;min-height:66px!important;overflow:hidden!important;padding:5px!important;margin:0!important;border:1px solid #294552!important;border-radius:18px!important;background:#07151e!important;box-shadow:0 -8px 28px rgba(0,0,0,.45)!important;transform:none!important}
+  body.owner-mobile-active #view-owner .ownerAppBrand,body.owner-mobile-active #view-owner .ownerAppSidebarUtility{display:none!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;overflow:hidden!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav>*{display:none!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="today"],
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav a[href*="camera-health"],
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;position:static!important;transform:none!important;min-width:0!important;width:auto!important;height:56px!important;min-height:56px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-radius:12px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.05!important;white-space:normal!important;overflow:hidden!important;background:transparent!important;color:#b9c9d2!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
+  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
+  body.owner-mobile-active.cc-mobile-nav-open #view-owner .ownerAppSidebar{height:66px!important;width:auto!important;inset:auto 8px calc(6px + env(safe-area-inset-bottom)) 8px!important}
 }
 </style>
+<script>
+(function(){
+ function syncOwnerMobile(){
+   var owner=document.getElementById('view-owner');
+   var on=!!owner&&!owner.classList.contains('hidden')&&window.matchMedia('(max-width:900px)').matches;
+   document.body.classList.toggle('owner-mobile-active',on);
+   if(on) document.body.classList.remove('cc-mobile-nav-open');
+ }
+ document.addEventListener('click',function(){setTimeout(syncOwnerMobile,0)},true);
+ window.addEventListener('resize',syncOwnerMobile);
+ window.addEventListener('pageshow',syncOwnerMobile);
+ new MutationObserver(syncOwnerMobile).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class']});
+ document.addEventListener('DOMContentLoaded',syncOwnerMobile);
+})();
+</script>
 </head>
   <body>
     <div id="app">
