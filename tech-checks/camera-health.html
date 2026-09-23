@@ -223,8 +223,9 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
   /* Actual DOM order includes the desktop checkbox column first:
      1 checkbox, 2 status, 3 device, 4 type, 5 ports, 6 model, 7 site, 8 last online, 9 version. */
   #deviceTable td:nth-child(1){display:none!important}
-  #deviceTable td:nth-child(2){order:1!important}
-  #deviceTable td:nth-child(3){order:2!important;border-top:1px solid #1d2b38!important;margin-top:5px!important;padding-top:10px!important}
+  /* Mobile hierarchy: camera identity first, then health/status details. */
+  #deviceTable td:nth-child(3){order:1!important}
+  #deviceTable td:nth-child(2){order:2!important;border-top:1px solid #1d2b38!important;margin-top:9px!important;padding-top:11px!important}
   #deviceTable td:nth-child(4){order:3!important}
   #deviceTable td:nth-child(5){order:4!important}
   #deviceTable td:nth-child(7){order:5!important}
