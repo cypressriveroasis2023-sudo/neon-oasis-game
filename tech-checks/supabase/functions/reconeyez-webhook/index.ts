@@ -126,6 +126,27 @@ Deno.serve(async (req: Request) => {
     camera = data || null;
   }
 
+  const { data: integrationRow } = await db
+    .from("camera_integrations")
+    .select("metadata")
+    .eq("provider", "reconeyez")
+    .maybeSingle();
+  const integrationMetadata =
+    integrationRow?.metadata && typeof integrationRow.metadata === "object"
+      ? integrationRow.metadata
+      : {};
+  await db.from("camera_integrations").update({
+    metadata: {
+      ...integrationMetadata,
+      last_webhook_received_at: new Date().toISOString(),
+      last_webhook_event_type: eventType || eventCode || "unrecognized",
+      ...(normalizeEvent(eventType || eventCode) === "integrationtest"
+        ? { receiver_tested_at: new Date().toISOString(), receiver_test_status: "ok" }
+        : {})
+    },
+    updated_at: new Date().toISOString()
+  }).eq("provider", "reconeyez");
+
   const mapping = healthFromEvent(eventType || eventCode);
   const { data: eventRow, error: eventInsertError } = await db
     .from("camera_integration_events")
