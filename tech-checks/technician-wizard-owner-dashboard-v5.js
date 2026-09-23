@@ -2754,6 +2754,7 @@ function ensureITCommandDashboardStyles(){
     @media(max-width:520px){.wl-it-command-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-command-head{display:block}.wl-it-ops-form .grid2,.wl-it-ops-form .grid3,.wl-it-ops-equipment{grid-template-columns:1fr}}
     .wl-it-cal-head{display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0}.wl-it-cal-head h2{margin:0;min-width:210px;text-align:center}.wl-it-cal-head button{background:#101b25;color:#fff;border:1px solid #314453;border-radius:9px;padding:8px 14px}.wl-it-cal-week,.wl-it-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.wl-it-cal-week b{text-align:center;color:#8fa0ae;font-size:11px;padding:5px}.wl-it-cal-day{min-height:105px;border:1px solid #263746;border-radius:10px;background:#0b151e;padding:7px;min-width:0}.wl-it-cal-day.empty{opacity:.25}.wl-it-cal-day>b{display:block;color:#fff;margin-bottom:6px}.wl-it-cal-day button{display:block;width:100%;text-align:left;background:#132330;color:#fff;border:1px solid #304657;border-radius:7px;padding:6px;margin:4px 0;overflow:hidden}.wl-it-cal-day button strong,.wl-it-cal-day button span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wl-it-cal-day button span{font-size:10px;color:#a8b6c2}.wl-it-attn{margin-top:12px;border:1px solid #263746;border-radius:13px;background:#0c1720;padding:12px}.wl-it-attn h3{margin:0 0 8px;color:#fff}.wl-it-attn h3 span{color:#ff6b70}.wl-it-attn-row{display:block;width:100%;text-align:left;background:#0a141d;color:#fff;border:1px solid #2b3d4b;border-radius:9px;padding:10px;margin:6px 0}.wl-it-attn-row b,.wl-it-attn-row span{display:block}.wl-it-attn-row span{color:#9eacb8;font-size:12px;margin-top:3px}
     @media(max-width:700px){.wl-it-cal-week{display:none}.wl-it-calendar{grid-template-columns:1fr}.wl-it-cal-day.empty{display:none}.wl-it-cal-day{min-height:0}.wl-it-cal-day:not(:has(button)){display:none}.wl-it-cal-day>b{font-size:13px}}
+    .wl-it-ticket-next{margin-top:10px;border:1px solid #31506a;border-left:4px solid #e22b2f;border-radius:10px;background:#0a1620;padding:10px}.wl-it-ticket-next b,.wl-it-ticket-next span{display:block}.wl-it-ticket-next span{color:#a9b6c1;font-size:12px;margin-top:3px}.wl-it-ticket-next.done{border-left-color:#36d57b}.wl-it-ticket-next.active{border-left-color:#f0b43c}.wl-it-ticket-command{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.wl-it-ticket-command>div{border:1px solid #2c4050;border-radius:11px;background:#0b151e;padding:11px}.wl-it-ticket-command .wide{grid-column:1/-1;border-left:4px solid #e22b2f}.wl-it-ticket-command small,.wl-it-ticket-command b,.wl-it-ticket-command span{display:block}.wl-it-ticket-command small{color:#8495a4;font-weight:900;letter-spacing:.08em}.wl-it-ticket-command b{color:#fff;margin-top:3px}.wl-it-ticket-command span{color:#a7b4bf;font-size:12px;margin-top:4px}
     .wl-it-audit{display:grid;gap:8px;margin-top:10px}.wl-it-audit-row{border:1px solid #263746;border-radius:10px;background:#0b151e;padding:10px}.wl-it-audit-row b{color:#fff}.wl-it-audit-row span{display:block;color:#a8b3bd;font-size:12px;margin-top:3px}.wl-it-audit-row em{font-style:normal;color:#6f8190;font-size:11px}
   `;
   document.head.append(s);
@@ -3060,7 +3061,7 @@ async function showITNeedsAttention(){
       "<div class='wl-it-ops-actions top10'><a class='wl-big wl-gray' href='./camera-health.html?v=it-ops-20260923a'>OPEN CAMERA HEALTH →</a></div>";
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load IT Needs Attention.');}
 }
-async async function loadITOpsProfiles(){
+async function loadITOpsProfiles(){
   const result=await liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active',true).is('archived_at',null).in('role',['it','service']).order('full_name');
   if(result.error)throw result.error;
   wlITOpsProfilesCache=result.data||[];
@@ -3221,6 +3222,15 @@ function itManagedTicketStatus(t){
   if(t.any_started)return 'IN PROGRESS';
   return 'SCHEDULED / READY';
 }
+function itManagedTicketNextAction(t){
+  if(t.all_finished)return {label:'COMPLETE',detail:'All required Tech Check stages are finished.',tone:'done'};
+  const type=String(t.work_type||'service').toLowerCase();
+  const hasPrep=itManagedFlowLabel(t)!=='SERVICE'&&type!=='pickup';
+  if(t.any_started)return {label:'FOLLOW ACTIVE WORK',detail:'Work has started. Keep ownership and follow the existing workflow; Service reassignment or workflow restructuring now requires Owner intervention.',tone:'active'};
+  if(type==='pickup')return {label:'WAIT FOR SERVICE PICKUP',detail:'Service performs the pickup first. IT Intake is required when the equipment returns.',tone:'next'};
+  if(hasPrep)return {label:'COMPLETE IT PREP / HANDOFF',detail:type==='swap'?'Prepare and verify the replacement, then hand off to Service. The removed unit returns to IT Intake.':'Complete required equipment checks, then hand off to Service.',tone:'next'};
+  return {label:'SERVICE FIELD WORK',detail:'No shop prep is required. Service can work the field call while you remain Ticket Lead.',tone:'next'};
+}
 function itManagedFlowLabel(t){
   const parts={solar_panel_qty:t.solar_panel_qty,battery_replacement_qty:t.battery_replacement_qty,camera_replacement_qty:t.camera_replacement_qty,sim_replacement_qty:t.sim_replacement_qty,micro_sd_qty:t.micro_sd_qty};
   const type=String(t.work_type||'service');
@@ -3236,7 +3246,9 @@ function itManagedTicketHtml(t){
   html+="<div class='lead'>TICKET LEAD · "+esc(t.job_lead_name||'IT')+"</div>";
   html+="<div class='meta'><span>"+esc(String(t.work_type||'service').toUpperCase())+"</span><span>"+esc(itManagedFlowLabel(t))+"</span><span>"+esc(date+(t.scheduled_time?' · '+String(t.scheduled_time).slice(0,5):''))+"</span><span>Service: "+esc(service)+"</span></div>";
   html+="<div class='small top8'>"+esc(t.job_description||'No description')+"</div>";
-  html+="<div class='wl-it-ops-actions'><button class='mini' data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'>Edit / Manage</button><button class='mini' data-wl-it-ticket-history='"+esc(t.ticket_no)+"'>History</button></div></article>";
+  const next=itManagedTicketNextAction(t);
+  html+="<div class='wl-it-ticket-next "+esc(next.tone)+"'><b>NEXT · "+esc(next.label)+"</b><span>"+esc(next.detail)+"</span></div>";
+  html+="<div class='wl-it-ops-actions'><button class='mini' data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'>Open Ticket</button><button class='mini' data-wl-it-ticket-history='"+esc(t.ticket_no)+"'>History</button></div></article>";
   return html;
 }
 async function showITManagedTickets(){
@@ -3266,7 +3278,9 @@ async function showITManagedTicketEditor(ticket){
   const itOptions=wlITOpsProfilesCache.filter(function(p){return p.role==='it'&&String(p.user_id)!==String(t.job_lead_user_id);}).map(function(p){
     return "<option value='"+esc(p.user_id)+"'>"+esc(p.full_name||p.username||'IT Technician')+"</option>";
   }).join('');
+  const next=itManagedTicketNextAction(t);
   card.innerHTML="<button class='wl-back' data-wl-it-managed-jobs>← MANAGED TICKETS</button>"+progress('MANAGE TICKET','MHelpDesk #'+esc(t.ticket_no),1,1)+
+    "<div class='wl-it-ticket-command'><div><small>CURRENT STATUS</small><b>"+esc(itManagedTicketStatus(t))+"</b></div><div><small>WORKFLOW</small><b>"+esc(itManagedFlowLabel(t))+"</b></div><div class='wide'><small>YOUR NEXT ACTION</small><b>"+esc(next.label)+"</b><span>"+esc(next.detail)+"</span></div></div>"+
     itOpsJobFormHtml(t,'edit')+
     "<details class='wl-it-more top10'><summary>TRANSFER TICKET OWNERSHIP</summary><div class='wl-it-owner-lock'><b>ACCOUNTABILITY EVENT</b> Transfer only when another IT Technician is actually taking responsibility for this ticket. The transfer is permanently logged.</div><label>New IT Ticket Lead<select id='wlITTransferLead'><option value=''>Choose IT Technician…</option>"+itOptions+"</select></label><label>Reason<textarea id='wlITTransferReason' rows='2' placeholder='Why is responsibility moving?'></textarea></label><button class='wl-big wl-gray top8' data-wl-it-transfer-ticket='"+esc(t.ticket_no)+"'>TRANSFER OWNERSHIP →</button></details>";
   bindITOpsForm();
