@@ -611,3 +611,14 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
  .vision-new-header{width:36px!important;min-width:36px!important}
  #visionOrderButton{width:38px!important;min-width:38px!important}
 }
+
+/* Clean single-row mobile Vision header v35 */
+@media(max-width:560px){
+ .vision-topbar{grid-template-columns:44px minmax(0,1fr) auto!important;gap:8px!important}
+ .vision-top-title{min-width:0!important}
+ .vision-top-title b{font-size:11px!important;max-width:none!important}
+ .vision-top-actions{gap:5px!important}
+ .vision-top-actions a[href="./camera-health.html"]{display:none!important}
+ #visionOrderButton{display:none!important}
+ .vision-new-header{width:40px!important;min-width:40px!important;height:40px!important;border-radius:11px!important}
+}
