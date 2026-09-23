@@ -2101,18 +2101,48 @@ function ownerCalendarOpenJob(id){
   ownerCalendarSelectedJobId=String(id);
   ownerAppRender();
 }
+function ownerCalendarTechOptions(job){
+  const role=String(job.assigned_role||'service');
+  const rows=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&p.role===role);
+  return "<option value=''>"+(role==='it'?'IT Department Queue':'Service Department Queue')+"</option>"+rows.map(p=>"<option value='"+esc(p.user_id)+"' "+(String(p.user_id)===String(job.assignee_user_id)?"selected":"")+">"+esc(p.full_name||p.username||'Technician')+"</option>").join('');
+}
+function ownerCalendarITLeadOptions(job){
+  const rows=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&p.role==='it');
+  return rows.map(p=>"<option value='"+esc(p.user_id)+"' "+(String(p.user_id)===String(job.job_lead_user_id)?"selected":"")+">"+esc(p.full_name||p.username||'IT Technician')+"</option>").join('');
+}
+async function ownerCalendarSaveOverride(id){
+  const job=ownerCalendarAllRows().find(x=>String(x.id)===String(id));if(!job)return;
+  const reason=String(document.getElementById('ownerCalOverrideReason')?.value||'').trim();
+  if(!reason)return alert('Enter why you are overriding this ticket.');
+  const result=await db.rpc('owner_override_job_v1',{p_assignment_id:job.id,p_site:document.getElementById('ownerCalEditSite')?.value||'',p_job_description:document.getElementById('ownerCalEditDescription')?.value||'',p_notes:document.getElementById('ownerCalEditNotes')?.value||'',p_scheduled_for:document.getElementById('ownerCalEditDate')?.value||null,p_scheduled_time:document.getElementById('ownerCalEditTime')?.value||null,p_assignee_user_id:document.getElementById('ownerCalEditAssignee')?.value||null,p_reason:reason});
+  if(result.error)return alert(result.error.message||'Could not save owner override.');
+  await refreshData();ownerCalendarSelectedJobId=String(id);ownerAppRender();
+}
+async function ownerCalendarChangeOwnership(ticket){
+  const lead=document.getElementById('ownerCalEditLead')?.value||'';
+  const reason=String(document.getElementById('ownerCalOwnershipReason')?.value||'').trim();
+  if(!lead)return alert('Choose Teddy, Victor, or another active IT technician.');
+  if(!reason)return alert('Enter why ownership is changing.');
+  const result=await db.rpc('owner_change_ticket_lead_v1',{p_ticket_no:String(ticket),p_new_it_user_id:lead,p_reason:reason});
+  if(result.error)return alert(result.error.message||'Could not change ticket ownership.');
+  await refreshData();ownerAppRender();
+}
 function ownerCalendarInspector(){
   const jobs=ownerCalendarSelectedJobs(),job=jobs.find(j=>String(j.id)===String(ownerCalendarSelectedJobId))||jobs[0];
-  if(!job)return '<section class="ownerCalInspector"><div class="ownerCalRailEmpty"><b>No job selected</b><span>Select a job from the selected day to see the Tech Check details.</span></div></section>';
-  const service=(state.profiles||[]).find(p=>p.user_id===job.assignee_user_id);
-  const who=job.assignee_name||job.assigned_to_name||service?.full_name||(job.assignment_scope==='department'?'Department Queue':'Unassigned');
-  return '<section class="ownerCalInspector"><div class="ownerCalInspectorHead"><div><small>JOB DETAILS</small><h3>MHelpDesk #'+esc(job.ticket_no||'—')+'</h3><span>'+esc(job.site||'Customer / Site')+'</span></div><strong>'+esc(ownerCalendarStatusLabel(job))+'</strong></div>'
-    +'<div class="ownerCalFacts"><span><small>WORK TYPE</small><b>'+esc(String(job.work_type||'job').toUpperCase())+'</b></span><span><small>DATE</small><b>'+esc(job.scheduled_for||'—')+'</b></span><span><small>TIME</small><b>'+esc(job.scheduled_time||job.work_time||'Not set')+'</b></span><span><small>DEPARTMENT</small><b>'+esc(job.assigned_role==='it'?'IT':'SERVICE')+'</b></span></div>'
-    +'<div class="ownerCalInspectorSection"><small>ASSIGNED TO</small><b>'+esc(who)+'</b></div>'
-    +(job.job_description?'<div class="ownerCalInspectorSection"><small>JOB</small><p>'+esc(job.job_description)+'</p></div>':'')
-    +(job.notes?'<div class="ownerCalInspectorSection"><small>NOTES</small><p>'+esc(job.notes)+'</p></div>':'')
-    +'<div class="ownerCalInspectorActions"><button class="btn" type="button" onclick="ownerAppNavigate(\'today\')">Open Live Workflow</button><button class="mini" type="button" onclick="ownerAppNavigate(\'history\')">View History</button></div>'
-    +'</section>';
+  if(!job)return '<section class="ownerCalInspector"><div class="ownerCalRailEmpty"><b>No job selected</b><span>Select a job from the selected day to see and edit the full Tech Check ticket.</span></div></section>';
+  const who=job.assignee_name||job.assigned_to_name||(job.assignment_scope==='department'?'Department Queue':'Unassigned');
+  return '<section class="ownerCalInspector"><div class="ownerCalInspectorHead"><div><small>OWNER TICKET CONTROL</small><h3>MHelpDesk #'+esc(job.ticket_no||'—')+'</h3><span>'+esc(job.site||'Customer / Site')+'</span></div><strong>'+esc(ownerCalendarStatusLabel(job))+'</strong></div>'
+    +'<div class="ownerCalInspectorSection"><small>FULL OWNER OVERRIDE</small><p>You can change this assignment directly. Every override is recorded in History.</p></div>'
+    +'<label>Customer / Site<input id="ownerCalEditSite" value="'+esc(job.site||'')+'"></label>'
+    +'<label>Job Description<textarea id="ownerCalEditDescription" rows="5">'+esc(job.job_description||'')+'</textarea></label>'
+    +'<label>Owner / Technician Notes<textarea id="ownerCalEditNotes" rows="3">'+esc(job.notes||'')+'</textarea></label>'
+    +'<div class="grid"><label>Work Date<input id="ownerCalEditDate" type="date" value="'+esc(job.scheduled_for||'')+'"></label><label>Work Time<input id="ownerCalEditTime" type="time" value="'+esc(String(job.scheduled_time||'').slice(0,5))+'"></label></div>'
+    +'<label>'+esc(job.assigned_role==='it'?'IT Assignment':'Service Assignment')+'<select id="ownerCalEditAssignee">'+ownerCalendarTechOptions(job)+'</select></label>'
+    +'<label>Override Reason<input id="ownerCalOverrideReason" placeholder="Why are you changing this assignment?"></label>'
+    +'<button class="btn" type="button" onclick="ownerCalendarSaveOverride(\''+esc(String(job.id))+'\')">SAVE OWNER OVERRIDE</button>'
+    +(job.assigned_role==='it'?'<div class="ownerCalInspectorSection"><small>TICKET OWNERSHIP</small><b>Current lead: '+esc(job.job_lead_name||who)+'</b><p>Change who owns the entire ticket. This updates the IT lead across the ticket, not just this assignment.</p></div><label>Ticket Owner / IT Lead<select id="ownerCalEditLead">'+ownerCalendarITLeadOptions(job)+'</select></label><label>Ownership Change Reason<input id="ownerCalOwnershipReason" placeholder="Why is ownership changing?"></label><button class="mini" type="button" onclick="ownerCalendarChangeOwnership(\''+esc(String(job.ticket_no||''))+'\')">CHANGE TICKET OWNERSHIP</button>':'')
+    +'<div class="ownerCalInspectorSection"><small>CURRENT ASSIGNMENT</small><b>'+esc(who)+'</b><p>'+esc(String(job.work_type||'job').toUpperCase())+' · '+esc(job.assigned_role==='it'?'IT':'SERVICE')+'</p></div>'
+    +'<div class="ownerCalInspectorActions"><button class="mini" type="button" onclick="ownerAppNavigate(\'history\')">View History</button></div></section>';
 }
 function ownerCalendarStats(){
   const rows=ownerCalendarRangeRows(),selected=ownerCalendarSelectedJobs();
