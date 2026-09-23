@@ -2775,18 +2775,21 @@ async function showITHome() {
   const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
 
   try{
-    const state=await techDashboardTimeout(itDayState(),null);
+    const [state,managedTickets]=await Promise.all([techDashboardTimeout(itDayState(),null),techDashboardTimeout(loadITManagedTickets(),[])]);
     const flash=takeTechCompletion('it');
     const assigned=(state.currentAssignments||[]).length;
     const returns=(state.waitingReturns||[]).length;
     const restock=(state.truckRestockQueue||[]).length;
+    const managedActive=(managedTickets||[]).filter(t=>!t.all_finished).length;
     const serviceQueue=(state.serviceQueue||[]).length;
     home.innerHTML=`<div class='wl-it-command-shell'>
       <aside class='wl-it-command-sidebar'>
         <div class='wl-it-command-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span><b>CAMERAS ONSITE</b><small>IT Technician</small></span></div>
         <nav class='wl-it-command-nav'>
           <button class='active' data-wl-home='it'>Dashboard</button>
-          <a href='./camera-health.html?v=it-dashboard-20260923a'>Camera Health</a>
+          <button data-wl-it-create-job>＋ Create Job</button>
+          <button data-wl-it-managed-jobs>Managed Tickets</button>
+          <a href='./camera-health.html?v=it-ops-20260923a'>Camera Health</a>
           <button data-wl-it-truck-inventory>Truck Inventory</button>
           <button data-wl-it-truck-restock>Truck Restock</button>
           <button data-wl-mode='intake'>IT Intake</button>
@@ -2794,16 +2797,16 @@ async function showITHome() {
           <button data-wl-it='history'>History</button>
           <button data-wl-it-open-job>Open MHelpDesk Job</button>
         </nav>
-        <div class='wl-it-command-limit'><b>IT ACCESS</b>Camera health, equipment prep, truck inventory, intake, handoffs, and IT history. Owner assignment, Owner Review, accounts, and administrative controls stay Owner-only.</div>
+        <div class='wl-it-command-limit'><b>IT OPERATIONS ACCESS</b>Create and lead Service Calls, Deliveries, Swaps, and Pickups from existing MHelpDesk tickets; run equipment prep, Camera Health, truck inventory, intake, handoffs, and operational history. Owner Review, employee accounts, permissions, system configuration, and administrative overrides stay Owner-only.</div>
       </aside>
       <main class='wl-it-command-workspace'>
-        <header class='wl-it-command-head'><div><small>CAMERAS ONSITE · IT</small><h1>Good morning, ${esc(ownerViewingIT?'IT':firstName)}</h1><p>Work the queue, maintain official equipment records, and complete required checks.</p></div><button class='mini' data-wl-home='it'>Refresh</button></header>
+        <header class='wl-it-command-head'><div><small>CAMERAS ONSITE · IT OPERATIONS</small><h1>Good morning, ${esc(ownerViewingIT?'IT':firstName)}</h1><p>Create and lead operational tickets, work the queue, maintain equipment records, and complete every required Tech Check.</p></div><div style='display:flex;gap:8px;flex-wrap:wrap'><button class='mini wl-red' data-wl-it-create-job>＋ Create Job</button><button class='mini' data-wl-home='it'>Refresh</button></div></header>
         ${techCompletionBanner(flash)}
         <div class='wl-it-command-stats'>
-          <div class='wl-it-command-stat'><b>${assigned}</b><span>ACTIVE IT JOBS</span></div>
+          <div class='wl-it-command-stat'><b>${assigned}</b><span>ACTIVE IT WORK</span></div>
+          <div class='wl-it-command-stat' role='button' tabindex='0' data-wl-it-managed-jobs style='cursor:pointer'><b>${managedActive}</b><span>MY MANAGED TICKETS</span></div>
           <div class='wl-it-command-stat'><b>${returns}</b><span>RETURNS WAITING</span></div>
           <div class='wl-it-command-stat'><b>${restock}</b><span>TRUCK RESTOCK</span></div>
-          <div class='wl-it-command-stat'><b>${serviceQueue}</b><span>SERVICE QUEUE</span></div>
         </div>
         <div class='wl-it-command-grid'>
           <section class='wl-it-command-panel'>
@@ -2815,16 +2818,19 @@ async function showITHome() {
           <section class='wl-it-command-panel'>
             <h2>IT Controls</h2>
             <div class='wl-it-permissions'>
+              <div class='wl-it-permission'><i>✓</i><div><b>Create + Lead Jobs</b><span>Create Service Calls, Deliveries, Swaps, and Pickups from existing MHelpDesk tickets. The IT tech who creates it automatically becomes Ticket Lead.</span></div></div>
               <div class='wl-it-permission'><i>✓</i><div><b>Camera Health</b><span>Open the same Camera Health workspace as Owner.</span></div></div>
               <div class='wl-it-permission'><i>✓</i><div><b>Service Truck Inventory</b><span>IT controls official unit tags, SIM numbers, and battery counts. Every change is logged.</span></div></div>
               <div class='wl-it-permission'><i>✓</i><div><b>Equipment Checks</b><span>Required readiness checks still apply before equipment is released.</span></div></div>
               <div class='wl-it-permission'><i>✓</i><div><b>Intake + Handoffs</b><span>Receive returned equipment and hand verified equipment to Service.</span></div></div>
             </div>
-            <div class='wl-it-owner-lock'><b>OWNER-ONLY:</b> job assignment, Owner Review/closeout, team accounts, access controls, and administrative overrides.</div>
+            <div class='wl-it-owner-lock'><b>OWNER-ONLY:</b> Owner Review/administrative closeout, employee accounts, role/access changes, system settings, credential/integration settings, history deletion, and Owner overrides. IT controls normal technical operations without an Owner approval gate.</div>
             <details class='wl-it-more'>
               <summary>MORE IT ACTIONS</summary>
               <div class='wl-it-more-grid'>
-                <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
+                <button data-wl-it-create-job>＋ CREATE SERVICE / DELIVERY / SWAP / PICKUP</button>
+                <button data-wl-it-managed-jobs>MY MANAGED TICKETS${managedActive?` · ${managedActive}`:''}</button>
+                <button data-wl-it-open-job>OPEN EXISTING MHELPDESK JOB</button>
                 <button data-wl-it-truck-inventory>SERVICE TRUCK INVENTORY</button>
                 <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${restock?` · ${restock}`:''}</button>
                 <button data-wl-mode='intake'>IT INTAKE / RETURNS${returns?` · ${returns}`:''}</button>
