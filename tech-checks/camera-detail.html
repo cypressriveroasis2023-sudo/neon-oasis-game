@@ -126,6 +126,8 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
           <div>Serial</div><div id="serial">—</div>
           <div id="sourceProviderLabel">Vigilant status</div><div id="vigilantStatus">—</div>
           <div id="sourceLastOnlineLabel">Vigilant last online</div><div id="vigilantLastOnline">—</div>
+          <div id="batteryLabel" class="hidden">Battery health</div><div id="batteryHealth" class="hidden">—</div>
+          <div id="reconIdLabel" class="hidden">Recon device ID</div><div id="reconDeviceId" class="hidden">—</div>
           <div>First failed</div><div id="firstFailed">—</div>
           <div>Last recovered</div><div id="lastRecovered">—</div>
         </div>
@@ -173,6 +175,10 @@ const validIP=s=>{const a=String(s||'').trim().split('.');return a.length===4&&a
 function effectivePublicIP(){const direct=cleanIP(device?.public_ip);if(direct)return direct;const r=unitRouters.find(x=>x.router_public_ip||x.unit_ip);return cleanIP(r?.router_public_ip||r?.unit_ip)}
 function routerSummaryHTML(){if(!unitRouters.length)return '<div class="small">No router is linked to this unit yet. Camera Health can show InHand, MOFI, or any other router once it is mapped to '+esc(device?.unit_key||'this unit')+'.</div>';return unitRouters.map(r=>{const st=String(r.current_status||r.reported_status||'unknown').toLowerCase(),ip=cleanIP(r.router_public_ip||r.unit_ip),name=r.router_name||'Router',model=r.router_model||name,when=r.last_checked_at||r.status_observed_at;return '<div class="routeritem"><div class="routertop"><b>'+esc(model)+'</b><span class="routerstatus '+(st==='online'?'green':st==='offline'?'red':'yellow')+'">'+esc(st.toUpperCase())+'</span></div><div class="small">'+esc(name)+(ip?' · '+esc(ip):'')+(r.reported_status?' · Reported '+esc(String(r.reported_status).toUpperCase()):'')+(when?' · Checked '+esc(fmt(when)):'')+'</div></div>'}).join('')}
 async function edgeErrorMessage(error){try{const ctx=error?.context;if(ctx&&typeof ctx.clone==='function'){const body=await ctx.clone().json().catch(()=>null);if(body?.error)return String(body.error);if(body?.message)return String(body.message)}}catch{}return String(error?.message||error||'Verification failed')}
+function reconMetadata(d=device){return d?.source_metadata&&typeof d.source_metadata==='object'?d.source_metadata:{}}
+function reconCloudUrl(d=device){const m=reconMetadata(d),u=String(m.cloud_url||m.event_url||'').trim();return /^https:\/\//i.test(u)?u:'https://na.reconeyez.com'}
+function reconBatteryText(d=device){const m=reconMetadata(d),pct=Number(m.battery_percent),status=String(m.battery_status||'').toLowerCase();if(Number.isFinite(pct)&&pct>=0&&pct<=100)return Math.round(pct)+'%'+(status?' · '+status.toUpperCase():'');if(status)return status.toUpperCase();return 'Waiting for Reconeyez status'}
+
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase(),model=String(d?.device_model||'').toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),source=String(d?.source||'').toLowerCase();if(source==='reconeyez'||prof==='reconeyez'||s.includes('reconeyez'))return'Reconeyez';if(model.startsWith('ALI-')||['helios','nvr','ranger','solar_spotter','spotter'].includes(prof)||s.includes('alibi'))return'Vigilant';if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
 function isShopDevice(d){const org=String(d?.organization||'').trim().toLowerCase();return org==='root'||String(d?.activation_state||'').toLowerCase()==='deactivated'||(cameraGroup(d)==='Reconeyez'&&org.includes('shop'))}
@@ -218,7 +224,14 @@ function render(){
   }
   $('cameraGroup').textContent=cameraGroup(device);$('unitKey').textContent=device.unit_key||'—';$('organization').textContent=device.organization||'—';
   const effectiveIp=effectivePublicIP(),directIp=cleanIP(device.public_ip),isRecon=cameraGroup(device)==='Reconeyez';$('publicIp').textContent=isRecon?'Cloud-managed':(directIp||(effectiveIp?effectiveIp+' (router)':'—'));$('model').textContent=device.device_model||'—';$('serial').textContent=device.device_serial||'—';
-  if(isRecon){$('sourceProviderLabel').textContent='Reconeyez status';$('sourceLastOnlineLabel').textContent='Reconeyez last seen';$('vigilantStatus').textContent=String(device.source_status||'Unknown').toUpperCase();$('vigilantLastOnline').textContent=device.source_last_seen_at?fmt(device.source_last_seen_at):(device.last_online_at?fmt(device.last_online_at):'—');}else{$('sourceProviderLabel').textContent='Vigilant status';$('sourceLastOnlineLabel').textContent='Vigilant last online';$('vigilantStatus').textContent=String(device.vigilant_status||'Unknown').toUpperCase();$('vigilantLastOnline').textContent=device.last_online_at?fmt(device.last_online_at):(device.last_online_source_text||'—');}
+  if(isRecon){
+    $('sourceProviderLabel').textContent='Reconeyez status';$('sourceLastOnlineLabel').textContent='Reconeyez last seen';$('vigilantStatus').textContent=String(device.source_status||'Unknown').toUpperCase();$('vigilantLastOnline').textContent=device.source_last_seen_at?fmt(device.source_last_seen_at):(device.last_online_at?fmt(device.last_online_at):'—');
+    $('batteryLabel').classList.remove('hidden');$('batteryHealth').classList.remove('hidden');$('batteryHealth').textContent=reconBatteryText(device);
+    $('reconIdLabel').classList.remove('hidden');$('reconDeviceId').classList.remove('hidden');$('reconDeviceId').textContent=device.external_device_id||reconMetadata(device).guid||'—';
+  }else{
+    $('sourceProviderLabel').textContent='Vigilant status';$('sourceLastOnlineLabel').textContent='Vigilant last online';$('vigilantStatus').textContent=String(device.vigilant_status||'Unknown').toUpperCase();$('vigilantLastOnline').textContent=device.last_online_at?fmt(device.last_online_at):(device.last_online_source_text||'—');
+    $('batteryLabel').classList.add('hidden');$('batteryHealth').classList.add('hidden');$('reconIdLabel').classList.add('hidden');$('reconDeviceId').classList.add('hidden');
+  }
   $('firstFailed').textContent=current?.first_failed_at?fmt(current.first_failed_at):'—';$('lastRecovered').textContent=current?.last_recovered_at?fmt(current.last_recovered_at):'—';
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
   const shopWrap=$('shopActionWrap'),shopBtn=$('moveShopBtn'),shopTitle=$('shopActionTitle'),shopText=$('shopActionText');
@@ -258,7 +271,8 @@ function render(){
     $('routerIpInput').value=cleanIP(r.router_public_ip||r.unit_ip)||'';
     $('routerPortInput').value=r.web_port||'';
   }else routerSetup.classList.add('hidden');
-  $('interfaceActions').innerHTML=interfaceLinks().map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
+  const actionLinks=isRecon?[[reconCloudUrl(device),reconMetadata(device).cloud_url?'Open Reconeyez event':'Open Reconeyez Cloud']]:interfaceLinks();
+  $('interfaceActions').innerHTML=actionLinks.map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){
