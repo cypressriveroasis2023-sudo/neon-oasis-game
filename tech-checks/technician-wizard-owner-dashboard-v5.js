@@ -2983,6 +2983,280 @@ function equipmentManifestInlineHtml(data) {
   const pickup = String(data?.work_type || '').toLowerCase() === 'pickup';
   return `<div class='wl-equipment-manifest'><div class='wl-manifest-title'>${pickup ? 'Equipment Being Picked Up / Returned to Shop' : 'Equipment Required From Shelf'}</div>${group(pickup ? 'Units / Devices Being Picked Up' : 'Units / Devices',devices)}${group(pickup ? 'Stands / Poles Being Picked Up' : 'Stands',stands)}${group('Other Equipment',other)}</div>`;
 }
+
+let wlITManagedTicketsCache=[];
+let wlITOpsProfilesCache=[];
+
+async function loadITManagedTickets(){
+  const result=await liveDb.rpc('my_managed_tickets_v1');
+  if(result.error)throw result.error;
+  wlITManagedTicketsCache=Array.isArray(result.data)?result.data:[];
+  return wlITManagedTicketsCache;
+}
+async function loadITOpsProfiles(){
+  const result=await liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active',true).is('archived_at',null).in('role',['it','service']).order('full_name');
+  if(result.error)throw result.error;
+  wlITOpsProfilesCache=result.data||[];
+  return wlITOpsProfilesCache;
+}
+function itOpsServiceOptions(selected){
+  selected=selected||'';
+  const service=wlITOpsProfilesCache.filter(function(p){return p.role==='service';});
+  return "<option value=''>Service Department Queue — any Service Tech can claim</option>"+
+    service.map(function(p){
+      const sel=String(selected)===String(p.user_id)?" selected":"";
+      return "<option value='"+esc(p.user_id)+"'"+sel+">"+esc(p.full_name||p.username||'Service Technician')+"</option>";
+    }).join('');
+}
+function itOpsEquipmentGrid(data){
+  const rows=normalizedEquipmentManifest(data||[]);
+  function render(category,types){
+    return types.map(function(label){
+      const found=rows.find(function(r){return r.category===category&&r.label===label;});
+      const qty=found?found.qty:0;
+      return "<label><span>"+esc(equipmentDisplayLabel(label))+"</span><input type='number' inputmode='numeric' min='0' step='1' value='"+qty+"' data-it-ops-equipment data-category='"+category+"' data-label='"+esc(label)+"'></label>";
+    }).join('');
+  }
+  return "<div class='wl-it-ops-section'><h3>Units / Devices</h3><div class='small'>Enter the quantity involved in the MHelpDesk ticket. For a Service Call, leave these at 0 when no shop prep is needed.</div><div class='wl-it-ops-equipment top8'>"+render('device',OWNER_DEVICE_TYPES)+"</div></div>"+
+    "<div class='wl-it-ops-section'><h3>Stands / Poles</h3><div class='wl-it-ops-equipment'>"+render('stand',OWNER_STAND_TYPES)+"</div></div>";
+}
+function readITOpsEquipmentManifest(){
+  return Array.from(document.querySelectorAll('#wlITOpsJobForm [data-it-ops-equipment]')).map(function(input){
+    return {category:input.dataset.category||'other',label:input.dataset.label||'',qty:cleanPartQty(input.value)};
+  }).filter(function(r){return r.label&&r.qty>0;});
+}
+function itOpsParts(){return readTicketPartInputs('itOpsPart');}
+function itOpsFlowState(){
+  const type=(document.getElementById('wlITOpsWorkType')||{}).value||'service';
+  const manifest=readITOpsEquipmentManifest();
+  const parts=itOpsParts();
+  const hasPrep=manifest.length>0||ticketPartsTotal(parts)>0;
+  if(type==='pickup')return {code:'service_it',label:'SERVICE → IT INTAKE',reason:'Service performs the pickup first. You remain Ticket Lead and IT Intake unlocks after the equipment returns.'};
+  if(type==='swap')return {code:'it_service_it',label:'IT → SERVICE → IT INTAKE',reason:'You prepare the replacement, Service performs the swap, and the old unit returns through IT Intake.'};
+  if(type==='delivery')return {code:'it_service',label:'IT → SERVICE',reason:'You prepare and verify the equipment before Service can accept the handoff and deliver/install it.'};
+  if(hasPrep)return {code:'it_service',label:'IT → SERVICE',reason:'This Service Call needs shop equipment or replacement parts, so you prepare them before Service begins.'};
+  return {code:'service',label:'SERVICE',reason:'No shop prep is required. Service can start the field call directly while you remain responsible for the ticket.'};
+}
+function itOpsRefreshFlow(){
+  const box=document.getElementById('wlITOpsFlow');
+  if(!box)return;
+  const f=itOpsFlowState();
+  box.innerHTML="<b>"+esc(f.label)+"</b><span>"+esc(f.reason)+"</span>";
+}
+function itOpsUnitSummaryParts(summary){
+  const s=String(summary||'');
+  const unit=(s.match(/Unit #s:\s*([^|]+)/i)||[])[1]||'';
+  const stand=(s.match(/Stand \/ Solar Stand #s:\s*([^|]+)/i)||[])[1]||'';
+  return {unit:unit.trim(),stand:stand.trim()};
+}
+function itOpsJobFormHtml(data,mode){
+  const d=data||{};
+  mode=mode||'create';
+  const edit=mode==='edit';
+  const parts={solar_panel_qty:d.solar_panel_qty||0,battery_replacement_qty:d.battery_replacement_qty||0,camera_replacement_qty:d.camera_replacement_qty||0,sim_replacement_qty:d.sim_replacement_qty||0,micro_sd_qty:d.micro_sd_qty||0};
+  const date=d.scheduled_for||techCheckDateKey(new Date());
+  const time=d.scheduled_time?String(d.scheduled_time).slice(0,5):'';
+  const nums=itOpsUnitSummaryParts(d.unit_summary||'');
+  const itName=(document.getElementById('whoName')||{}).textContent||'IT Technician';
+  let html="<div id='wlITOpsJobForm' class='wl-it-ops-form' data-mode='"+mode+"'>";
+  html+="<div class='wl-it-ops-banner'><b>"+(edit?'YOU ARE THE TICKET LEAD':'YOU WILL OWN THIS TICKET')+"</b><span>"+esc(edit?(d.job_lead_name||itName)+" remains responsible unless ownership is explicitly transferred.":itName+" automatically becomes Ticket Lead. Another IT Tech is not selected during creation.")+"</span></div>";
+  html+="<div class='grid3'><label>MHelpDesk Ticket #<input id='wlITOpsTicket' value='"+esc(d.ticket_no||'')+"' "+(edit?'readonly':'')+" placeholder='Existing MHelpDesk number'></label>";
+  html+="<label>Job Type<select id='wlITOpsWorkType'><option value='service' "+((d.work_type==='service'||!d.work_type)?'selected':'')+">Service Call</option><option value='delivery' "+(d.work_type==='delivery'?'selected':'')+">Delivery</option><option value='swap' "+(d.work_type==='swap'?'selected':'')+">Swap</option><option value='pickup' "+(d.work_type==='pickup'?'selected':'')+">Pickup</option></select></label>";
+  html+="<label>Service Technician<select id='wlITOpsServiceTech'>"+itOpsServiceOptions(d.service_assignee_user_id||'')+"</select></label></div>";
+  html+="<div class='grid3'><label>Customer / Site<input id='wlITOpsSite' value='"+esc(d.site||'')+"' placeholder='Customer / site'></label><label>Work Date<input id='wlITOpsDate' type='date' value='"+esc(date)+"'></label><label>Time<input id='wlITOpsTime' type='time' value='"+esc(time)+"'></label></div>";
+  html+="<div id='wlITOpsFlow' class='wl-it-ops-flow'><b>Calculating workflow…</b></div>";
+  html+="<label>Job Description<textarea id='wlITOpsDescription' rows='3' placeholder='What needs to be done?'>"+esc(d.job_description||'')+"</textarea></label>";
+  html+=itOpsEquipmentGrid(d.equipment_manifest||[]);
+  html+="<div class='wl-it-ops-section'><h3>Replacement Parts / Shop Prep</h3>"+ticketPartsInputsHtml('itOpsPart',parts)+"</div>";
+  html+="<div class='grid2'><label>Unit #s / Tags from MHelpDesk<input id='wlITOpsUnitNumbers' value='"+esc(nums.unit)+"' placeholder='Example: 198, 205'></label><label>Stand / Pole #s<input id='wlITOpsStandNumbers' value='"+esc(nums.stand)+"' placeholder='If applicable'></label></div>";
+  html+="<label>Operational Notes<textarea id='wlITOpsNotes' rows='3' placeholder='Anything the technicians need to know'>"+esc(d.notes||'')+"</textarea></label>";
+  if(edit)html+="<label>Change Note<input id='wlITOpsChangeNote' placeholder='Why are you changing this ticket?'></label>";
+  html+="<div class='wl-it-ops-actions'><button class='wl-big wl-red' "+(edit?'data-wl-it-save-managed-job':'data-wl-it-submit-create-job')+">"+(edit?'SAVE TICKET CHANGES →':'CREATE TECH CHECK JOB →')+"</button><button class='wl-big wl-gray' data-wl-it-managed-jobs>CANCEL / VIEW TICKETS</button></div></div>";
+  return html;
+}
+function bindITOpsForm(){
+  const form=document.getElementById('wlITOpsJobForm');
+  if(!form||form.dataset.bound==='1')return;
+  form.dataset.bound='1';
+  form.addEventListener('input',itOpsRefreshFlow);
+  form.addEventListener('change',itOpsRefreshFlow);
+  itOpsRefreshFlow();
+}
+async function showITCreateJob(){
+  if(currentRoleKey()!=='it')return;
+  ensureITCommandDashboardStyles();
+  let card=document.getElementById('wlITOpsCreate');
+  if(!card){card=document.createElement('div');card.id='wlITOpsCreate';card.className='card wl-it-simple-card';viewIT().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Opening IT Create Job…');
+  hideChildren(viewIT(),[card]);resetWizardPosition();
+  try{
+    await loadITOpsProfiles();
+    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('CREATE JOB','MHelpDesk remains separate · you become Ticket Lead',1,1)+
+      "<div class='wl-it-restock-banner'><b>NORMAL IT OPERATIONS — NO OWNER APPROVAL REQUIRED</b><span>Create the Tech Check workflow after the MHelpDesk ticket exists. Required equipment checks, handoffs, Service verification, and Intake gates still apply.</span></div>"+
+      itOpsJobFormHtml(null,'create');
+    bindITOpsForm();
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error&&error.message?error.message:'Could not open Create Job.');}
+}
+function itOpsPayload(){
+  const manifest=readITOpsEquipmentManifest();
+  const parts=itOpsParts();
+  const unitNumbers=((document.getElementById('wlITOpsUnitNumbers')||{}).value||'').trim();
+  const standNumbers=((document.getElementById('wlITOpsStandNumbers')||{}).value||'').trim();
+  return {
+    ticket:(((document.getElementById('wlITOpsTicket')||{}).value)||'').trim(),
+    site:(((document.getElementById('wlITOpsSite')||{}).value)||'').trim(),
+    workType:(document.getElementById('wlITOpsWorkType')||{}).value||'service',
+    date:(document.getElementById('wlITOpsDate')||{}).value||techCheckDateKey(new Date()),
+    time:(document.getElementById('wlITOpsTime')||{}).value||null,
+    serviceTech:(document.getElementById('wlITOpsServiceTech')||{}).value||null,
+    description:(((document.getElementById('wlITOpsDescription')||{}).value)||'').trim(),
+    notes:(((document.getElementById('wlITOpsNotes')||{}).value)||'').trim(),
+    manifest:manifest,parts:parts,requestedUnitCount:equipmentManifestDeviceTotal(manifest),
+    unitSummary:[unitNumbers?'Unit #s: '+unitNumbers:'',standNumbers?'Stand / Solar Stand #s: '+standNumbers:''].filter(Boolean).join(' | '),
+    changeNote:(((document.getElementById('wlITOpsChangeNote')||{}).value)||'').trim()
+  };
+}
+function validateITOpsPayload(p){
+  if(!p.ticket)return 'MHelpDesk ticket number is required.';
+  if(!p.description)return 'Enter a short job description.';
+  if(['delivery','swap','pickup'].includes(p.workType)&&equipmentManifestTotal(p.manifest)<1)return 'Choose the equipment involved in this '+p.workType+'.';
+  const plan=automaticServiceSolarPlan(p.manifest,p.workType);
+  if(plan.spotters>0&&manifestQty(p.manifest,'Solar Stand')>0)return 'Remove Solar Stand from the IT list. Delivery with Solar Spotter automatically creates the Service-side Solar Stand checkout.';
+  return '';
+}
+async function itSubmitCreateJob(){
+  const p=itOpsPayload();
+  const problem=validateITOpsPayload(p);
+  if(problem)return alert(problem);
+  const flow=itOpsFlowState();
+  if(!confirm('CREATE TECH CHECK JOB\n\nMHelpDesk #'+p.ticket+'\n'+(p.site||'No site entered')+'\n'+p.workType.toUpperCase()+' · '+flow.label+'\n\nYou will be the Ticket Lead. Continue?'))return;
+  document.body.classList.add('busy');
+  try{
+    const result=await liveDb.rpc('it_create_job_v1',{
+      p_ticket_no:p.ticket,p_site:p.site,p_work_type:p.workType,p_scheduled_for:p.date,p_scheduled_time:p.time,
+      p_service_assignee_user_id:p.serviceTech,p_requested_unit_count:p.requestedUnitCount,p_unit_summary:p.unitSummary,
+      p_job_description:p.description,p_notes:p.notes,p_solar_panel_qty:p.parts.solar_panel_qty,p_battery_replacement_qty:p.parts.battery_replacement_qty,
+      p_camera_replacement_qty:p.parts.camera_replacement_qty,p_sim_replacement_qty:p.parts.sim_replacement_qty,p_micro_sd_qty:p.parts.micro_sd_qty,p_equipment_manifest:p.manifest
+    });
+    if(result.error)throw result.error;
+    if(result.data&&result.data.service_assignment_id){
+      try{await liveDb.functions.invoke('send-techcheck-push',{body:{assignment_id:result.data.service_assignment_id}});}catch(pushError){console.warn('Service push failed',pushError);}
+    }
+    rememberTechCompletion('it',p.ticket,'TICKET CREATED · YOU ARE LEAD');
+    alert('MHelpDesk #'+p.ticket+' is now in Tech Check.\n\nTicket Lead: '+((result.data&&result.data.job_lead_name)||((document.getElementById('whoName')||{}).textContent)||'IT')+'\nFlow: '+flow.label);
+    await loadITManagedTickets();
+    return showITManagedTickets();
+  }catch(error){alert(error&&error.message?error.message:'Could not create this Tech Check job.');}
+  finally{document.body.classList.remove('busy');}
+}
+function itManagedTicketStatus(t){
+  if(t.all_finished)return 'COMPLETE';
+  if(t.any_started)return 'IN PROGRESS';
+  return 'SCHEDULED / READY';
+}
+function itManagedFlowLabel(t){
+  const parts={solar_panel_qty:t.solar_panel_qty,battery_replacement_qty:t.battery_replacement_qty,camera_replacement_qty:t.camera_replacement_qty,sim_replacement_qty:t.sim_replacement_qty,micro_sd_qty:t.micro_sd_qty};
+  const type=String(t.work_type||'service');
+  if(type==='pickup')return 'SERVICE → IT INTAKE';
+  if(type==='swap')return 'IT → SERVICE → IT INTAKE';
+  if(type==='delivery')return 'IT → SERVICE';
+  return (normalizedEquipmentManifest(t.equipment_manifest).length||ticketPartsTotal(parts))?'IT → SERVICE':'SERVICE';
+}
+function itManagedTicketHtml(t){
+  const service=t.service_assignee_name||'Service Department';
+  const date=t.scheduled_for?new Date(String(t.scheduled_for)+'T12:00:00').toLocaleDateString():'No date';
+  let html="<article class='wl-it-ops-ticket'><header><div><h3>MHelpDesk #"+esc(t.ticket_no)+"</h3><div class='small'>"+esc(t.site||'Customer / site not recorded')+"</div></div><span class='pill'>"+esc(itManagedTicketStatus(t))+"</span></header>";
+  html+="<div class='lead'>TICKET LEAD · "+esc(t.job_lead_name||'IT')+"</div>";
+  html+="<div class='meta'><span>"+esc(String(t.work_type||'service').toUpperCase())+"</span><span>"+esc(itManagedFlowLabel(t))+"</span><span>"+esc(date+(t.scheduled_time?' · '+String(t.scheduled_time).slice(0,5):''))+"</span><span>Service: "+esc(service)+"</span></div>";
+  html+="<div class='small top8'>"+esc(t.job_description||'No description')+"</div>";
+  html+="<div class='wl-it-ops-actions'><button class='mini' data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'>Edit / Manage</button><button class='mini' data-wl-it-ticket-history='"+esc(t.ticket_no)+"'>History</button></div></article>";
+  return html;
+}
+async function showITManagedTickets(){
+  if(currentRoleKey()!=='it')return;
+  ensureITCommandDashboardStyles();
+  let card=document.getElementById('wlITManagedTickets');
+  if(!card){card=document.createElement('div');card.id='wlITManagedTickets';card.className='card wl-it-simple-card';viewIT().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading tickets you lead…');
+  hideChildren(viewIT(),[card]);resetWizardPosition();
+  try{
+    const rows=await loadITManagedTickets();
+    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('MY MANAGED TICKETS','You remain responsible from creation through completion',1,1)+
+      "<div class='wl-it-ops-banner'><b>TICKET LEAD ACCOUNTABILITY</b><span>Creating a ticket makes you its IT lead. Service can perform field steps without taking ownership of the overall ticket.</span></div>"+
+      "<div class='wl-it-ops-actions top10'><button class='wl-big wl-red' data-wl-it-create-job>＋ CREATE JOB</button></div>"+
+      "<div class='wl-it-ops-ticket-list top10'>"+(rows.length?rows.map(itManagedTicketHtml).join(''):"<div class='ok'><b>No tickets assigned to you as Ticket Lead yet.</b></div>")+"</div>";
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error&&error.message?error.message:'Could not load managed tickets.');}
+}
+async function showITManagedTicketEditor(ticket){
+  if(currentRoleKey()!=='it')return;
+  if(!wlITManagedTicketsCache.length)await loadITManagedTickets();
+  const t=wlITManagedTicketsCache.find(function(row){return String(row.ticket_no)===String(ticket);});
+  if(!t)return alert('Ticket not found in your managed work.');
+  await loadITOpsProfiles();
+  let card=document.getElementById('wlITManagedTicketEditor');
+  if(!card){card=document.createElement('div');card.id='wlITManagedTicketEditor';card.className='card wl-it-simple-card';viewIT().append(card);}
+  hideChildren(viewIT(),[card]);resetWizardPosition();
+  const itOptions=wlITOpsProfilesCache.filter(function(p){return p.role==='it'&&String(p.user_id)!==String(t.job_lead_user_id);}).map(function(p){
+    return "<option value='"+esc(p.user_id)+"'>"+esc(p.full_name||p.username||'IT Technician')+"</option>";
+  }).join('');
+  card.innerHTML="<button class='wl-back' data-wl-it-managed-jobs>← MANAGED TICKETS</button>"+progress('MANAGE TICKET','MHelpDesk #'+esc(t.ticket_no),1,1)+
+    itOpsJobFormHtml(t,'edit')+
+    "<details class='wl-it-more top10'><summary>TRANSFER TICKET OWNERSHIP</summary><div class='wl-it-owner-lock'><b>ACCOUNTABILITY EVENT</b> Transfer only when another IT Technician is actually taking responsibility for this ticket. The transfer is permanently logged.</div><label>New IT Ticket Lead<select id='wlITTransferLead'><option value=''>Choose IT Technician…</option>"+itOptions+"</select></label><label>Reason<textarea id='wlITTransferReason' rows='2' placeholder='Why is responsibility moving?'></textarea></label><button class='wl-big wl-gray top8' data-wl-it-transfer-ticket='"+esc(t.ticket_no)+"'>TRANSFER OWNERSHIP →</button></details>";
+  bindITOpsForm();
+}
+async function itSaveManagedJob(){
+  const p=itOpsPayload();
+  const problem=validateITOpsPayload(p);
+  if(problem)return alert(problem);
+  document.body.classList.add('busy');
+  try{
+    const result=await liveDb.rpc('it_update_managed_job_v1',{
+      p_ticket_no:p.ticket,p_site:p.site,p_work_type:p.workType,p_scheduled_for:p.date,p_scheduled_time:p.time,
+      p_service_assignee_user_id:p.serviceTech,p_requested_unit_count:p.requestedUnitCount,p_unit_summary:p.unitSummary,
+      p_job_description:p.description,p_notes:p.notes,p_solar_panel_qty:p.parts.solar_panel_qty,p_battery_replacement_qty:p.parts.battery_replacement_qty,
+      p_camera_replacement_qty:p.parts.camera_replacement_qty,p_sim_replacement_qty:p.parts.sim_replacement_qty,p_micro_sd_qty:p.parts.micro_sd_qty,
+      p_equipment_manifest:p.manifest,p_change_note:p.changeNote
+    });
+    if(result.error)throw result.error;
+    alert('MHelpDesk #'+p.ticket+' updated. The change is in the permanent ticket history.');
+    await loadITManagedTickets();
+    return showITManagedTicketEditor(p.ticket);
+  }catch(error){alert(error&&error.message?error.message:'Could not update this ticket.');}
+  finally{document.body.classList.remove('busy');}
+}
+async function showITTicketHistory(ticket){
+  let card=document.getElementById('wlITTicketHistory');
+  if(!card){card=document.createElement('div');card.id='wlITTicketHistory';card.className='card wl-it-simple-card';viewIT().append(card);}
+  card.innerHTML=techDashboardLoadingHtml('Loading ticket history…');
+  hideChildren(viewIT(),[card]);resetWizardPosition();
+  try{
+    const result=await liveDb.rpc('ticket_activity_v1',{p_ticket_no:ticket});
+    if(result.error)throw result.error;
+    const rows=Array.isArray(result.data)?result.data:[];
+    const body=rows.length?rows.map(function(r){
+      return "<div class='wl-it-ops-history-row'><b>"+esc(String(r.action||'updated').replaceAll('_',' ').toUpperCase())+"</b><span>"+esc(r.actor_name||'System')+" · "+esc(r.actor_role==='it'?'IT Technician':r.actor_role==='owner'?'Owner/Admin':r.actor_role||'System')+"</span><small>"+new Date(r.created_at).toLocaleString()+(r.note?' · '+esc(r.note):'')+"</small></div>";
+    }).join(''):"<div class='small'>No ticket-history events yet.</div>";
+    card.innerHTML="<button class='wl-back' data-wl-it-managed-jobs>← MANAGED TICKETS</button>"+progress('TICKET HISTORY','MHelpDesk #'+esc(ticket),1,1)+"<div class='wl-it-ops-history'>"+body+"</div>";
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error&&error.message?error.message:'Could not load ticket history.');}
+}
+async function itTransferManagedTicket(ticket){
+  const id=(document.getElementById('wlITTransferLead')||{}).value||'';
+  const reason=(((document.getElementById('wlITTransferReason')||{}).value)||'').trim();
+  if(!id)return alert('Choose the IT Technician who is taking responsibility.');
+  if(!reason)return alert('Enter the reason for transferring this ticket.');
+  const p=wlITOpsProfilesCache.find(function(x){return String(x.user_id)===String(id);});
+  if(!confirm('Transfer MHelpDesk #'+ticket+' to '+((p&&(p.full_name||p.username))||'this IT Technician')+'?\n\nYou will no longer be the Ticket Lead.'))return;
+  document.body.classList.add('busy');
+  try{
+    const result=await liveDb.rpc('transfer_ticket_lead_v1',{p_ticket_no:ticket,p_new_it_user_id:id,p_reason:reason});
+    if(result.error)throw result.error;
+    alert('Ticket ownership transferred to '+((result.data&&result.data.new_lead_name)||(p&&(p.full_name||p.username))||'the new IT lead')+'. The transfer is permanently logged.');
+    await loadITManagedTickets();
+    return showITManagedTickets();
+  }catch(error){alert(error&&error.message?error.message:'Could not transfer ticket ownership.');}
+  finally{document.body.classList.remove('busy');}
+}
+
 function ownerEquipmentTypeList(category) {
   const defaults = category === 'stand' ? OWNER_STAND_TYPES : OWNER_DEVICE_TYPES;
   const fromInventory = ownerAssignmentAssets.filter(a => a.asset_category === category && a.availability_status !== 'retired').map(a => a.asset_type);
