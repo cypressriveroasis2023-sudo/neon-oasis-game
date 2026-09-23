@@ -3370,10 +3370,13 @@ async function showITNeedsAttention(){
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load IT Needs Attention.');}
 }
 async function loadITOpsProfiles(){
-  const result=await liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active',true).is('archived_at',null).in('role',['it','service']).order('full_name');
+  const result=await liveDb.rpc('it_ops_assignment_profiles_v1');
   if(result.error)throw result.error;
-  wlITOpsProfilesCache=result.data||[];
+  wlITOpsProfilesCache=Array.isArray(result.data)?result.data:[];
   return wlITOpsProfilesCache;
+}
+function canITAccountManageOwnership(){
+  return currentRoleKey()==='it' && String((document.getElementById('whoName')||{}).textContent||'').trim().toLowerCase()==='james martin';
 }
 function itOpsServiceOptions(selected){
   selected=selected||'';
@@ -3465,7 +3468,7 @@ function itOpsJobFormHtml(data,mode){
   const itName=(document.getElementById('whoName')||{}).textContent||'IT Technician';
   let html="<div id='wlITOpsJobForm' class='wl-it-ops-form' data-mode='"+mode+"'>";
   html+="<div class='wl-it-ops-banner'><b>"+(edit?'CURRENT TICKET LEAD':'ASSIGN TICKET LEAD')+"</b><span>"+esc(edit?(d.job_lead_name||itName)+" is currently responsible. You can transfer the ticket to another IT Technician below.":"Creating the ticket does not lock responsibility to you. Choose who should take over, or leave Me selected.")+"</span></div>";
-  if(!edit)html+="<label>Assigned To / Ticket Lead<select id='wlITOpsLead'>"+itOpsLeadOptions('')+"</select></label>";
+  if(!edit&&canITAccountManageOwnership())html+="<label>Assigned To / Ticket Lead<select id='wlITOpsLead'>"+itOpsLeadOptions('')+"</select><small>Owner control · choose Teddy Hopper or Victor Garcia to take over this ticket, or leave Me selected.</small></label>";
   html+="<div class='grid3'><label>MHelpDesk Ticket #<input id='wlITOpsTicket' value='"+esc(d.ticket_no||'')+"' "+(edit?'readonly':'')+" placeholder='Existing MHelpDesk number'></label>";
   html+="<label>Job Type<select id='wlITOpsWorkType'><option value='service' "+((d.work_type==='service'||!d.work_type)?'selected':'')+">Service Call</option><option value='delivery' "+(d.work_type==='delivery'?'selected':'')+">Delivery</option><option value='swap' "+(d.work_type==='swap'?'selected':'')+">Swap</option><option value='pickup' "+(d.work_type==='pickup'?'selected':'')+">Pickup</option></select></label>";
   html+="<label>Service Technician<select id='wlITOpsServiceTech'>"+itOpsServiceOptions(d.service_assignee_user_id||'')+"</select></label></div>";
@@ -3629,7 +3632,7 @@ async function showITManagedTicketEditor(ticket){
   card.innerHTML="<button class='wl-back' data-wl-it-managed-jobs>← MANAGED TICKETS</button>"+progress('MANAGE TICKET','MHelpDesk #'+esc(t.ticket_no),1,1)+
     "<div class='wl-it-ticket-command'><div><small>CURRENT STATUS</small><b>"+esc(itManagedTicketStatus(t))+"</b></div><div><small>WORKFLOW</small><b>"+esc(itManagedFlowLabel(t))+"</b></div><div class='wide'><small>YOUR NEXT ACTION</small><b>"+esc(next.label)+"</b><span>"+esc(next.detail)+"</span></div></div>"+
     itOpsJobFormHtml(t,'edit')+
-    "<details class='wl-it-more top10'><summary>TRANSFER TICKET OWNERSHIP</summary><div class='wl-it-owner-lock'><b>ACCOUNTABILITY EVENT</b> Transfer only when another IT Technician is actually taking responsibility for this ticket. The transfer is permanently logged.</div><label>New IT Ticket Lead<select id='wlITTransferLead'><option value=''>Choose IT Technician…</option>"+itOptions+"</select></label><label>Reason<textarea id='wlITTransferReason' rows='2' placeholder='Why is responsibility moving?'></textarea></label><button class='wl-big wl-gray top8' data-wl-it-transfer-ticket='"+esc(t.ticket_no)+"'>TRANSFER OWNERSHIP →</button></details>";
+    (canITAccountManageOwnership()?"<details class='wl-it-more top10'><summary>CHANGE TICKET OWNERSHIP</summary><div class='wl-it-owner-lock'><b>OWNER CONTROL</b> Only your IT account can change ticket ownership. Teddy and Victor can receive and work tickets but cannot transfer ownership.</div><label>Assign Ticket Lead To<select id='wlITTransferLead'><option value=''>Choose IT Technician…</option>"+itOptions+"</select></label><label>Reason<textarea id='wlITTransferReason' rows='2' placeholder='Why is responsibility moving?'></textarea></label><button class='wl-big wl-gray top8' data-wl-it-transfer-ticket='"+esc(t.ticket_no)+"'>CHANGE OWNERSHIP →</button></details>":"");
   bindITOpsForm();
 }
 async function itSaveManagedJob(){
@@ -3668,6 +3671,7 @@ async function showITTicketHistory(ticket){
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error&&error.message?error.message:'Could not load ticket history.');}
 }
 async function itTransferManagedTicket(ticket){
+  if(!canITAccountManageOwnership())return alert('Only James Martin can change ticket ownership.');
   const id=(document.getElementById('wlITTransferLead')||{}).value||'';
   const reason=(((document.getElementById('wlITTransferReason')||{}).value)||'').trim();
   if(!id)return alert('Choose the IT Technician who is taking responsibility.');
