@@ -88,7 +88,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=it-owner-transfer-james-20260923ah')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=it-owner-transfer-list-20260923ai')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
