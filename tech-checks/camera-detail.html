@@ -141,6 +141,15 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
       <div class="card full">
         <div class="label">Unit network / router</div>
         <div id="routerInfo"></div>
+        <div id="routerSetupWrap" class="setupbox hidden">
+          <strong>Link / update router</strong>
+          <div class="small">Use this for InHand, MOFI, or any other router assigned to this unit.</div>
+          <input id="routerNameInput" autocomplete="off" placeholder="Router name (example: MOFI Router)">
+          <input id="routerModelInput" autocomplete="off" placeholder="Router model (optional)">
+          <input id="routerIpInput" inputmode="decimal" autocomplete="off" placeholder="Router public IP">
+          <input id="routerPortInput" inputmode="numeric" autocomplete="off" placeholder="Web port (optional)">
+          <button class="action" id="saveRouterBtn">Save router to this unit</button>
+        </div>
       </div>
 
       <div class="card full">
@@ -240,6 +249,15 @@ function render(){
   $('portEmpty').textContent=portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
   $('portEmpty').classList.toggle('hidden',portKeys.length>0);
   $('routerInfo').innerHTML=routerSummaryHTML();
+  const routerSetup=$('routerSetupWrap');
+  if(ownerCanEdit){
+    routerSetup.classList.remove('hidden');
+    const r=unitRouters[0]||{};
+    $('routerNameInput').value=r.router_name||'';
+    $('routerModelInput').value=r.router_model||'';
+    $('routerIpInput').value=cleanIP(r.router_public_ip||r.unit_ip)||'';
+    $('routerPortInput').value=r.web_port||'';
+  }else routerSetup.classList.add('hidden');
   $('interfaceActions').innerHTML=interfaceLinks().map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
@@ -273,6 +291,24 @@ async function verifyNow(){
     b.textContent='Refreshing…';await load();b.textContent=effectiveHealth(device,current)==='online'?'✓ Online':'Checked';
   }catch(e){console.error(e);b.textContent='Verification failed';$('issueNotice').textContent='Verification failed: '+String(e?.message||e);$('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden')}
   finally{setTimeout(()=>{b.disabled=false;b.textContent='Verify now'},2200)}
+}
+async function saveUnitRouter(){
+  if(!device||String(profile?.role||'')!=='owner'||!device.unit_key)return;
+  const name=String($('routerNameInput').value||'').trim()||'Router';
+  const model=String($('routerModelInput').value||'').trim()||null;
+  const ip=String($('routerIpInput').value||'').trim();
+  const webPortText=String($('routerPortInput').value||'').trim();
+  if(!validIP(ip)){alert('Enter a valid router public IPv4 address.');return}
+  const webPort=webPortText?Number(webPortText):null;
+  if(webPortText&&(!Number.isInteger(webPort)||webPort<1||webPort>65535)){alert('Enter a valid web port from 1 to 65535, or leave it blank.');return}
+  const b=$('saveRouterBtn');b.disabled=true;b.textContent='Saving router…';
+  try{
+    const payload={unit_key:device.unit_key,router_name:name,router_model:model,router_public_ip:ip,web_port:webPort,web_protocol:webPort===443?'https':'http',updated_at:new Date().toISOString()};
+    const {error}=await db.from('camera_unit_routers').upsert(payload,{onConflict:'unit_key'});
+    if(error)throw error;
+    await load();
+    b.textContent='Router saved ✓';
+  }catch(e){console.error(e);alert('Could not save router: '+(e?.message||e));b.disabled=false;b.textContent='Save router to this unit'}
 }
 async function saveUnitPublicIP(){
   if(!device||String(profile?.role||'')!=='owner')return;
@@ -324,6 +360,7 @@ async function boot(){
 $('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
 $('verifyBtn').onclick=verifyNow;
 $('saveIpBtn').onclick=saveUnitPublicIP;
+$('saveRouterBtn').onclick=saveUnitRouter;
 $('moveShopBtn').onclick=moveUnitToShop;
 boot();
 </script>
