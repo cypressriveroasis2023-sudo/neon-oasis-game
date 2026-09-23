@@ -14,8 +14,8 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 .statusline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;font-weight:900;letter-spacing:.04em}.pill.online{background:#123b2a;color:var(--green)}.pill.offline{background:#3b171c;color:var(--red)}.pill.verifying{background:#3c3214;color:var(--yellow)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;width:100%;min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;max-width:100%;overflow:hidden}.card.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.value{font-size:22px;font-weight:900;margin-top:7px;word-break:break-word;overflow-wrap:anywhere;max-width:100%}.small{font-size:14px;color:var(--muted);line-height:1.45;overflow-wrap:anywhere;word-break:break-word;max-width:100%}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
 .kv{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 16px;margin-top:10px;min-width:0}.kv>div{min-width:0;overflow-wrap:anywhere}.kv>div:nth-child(odd){color:var(--muted);font-weight:700}.kv>div:nth-child(even){font-weight:800;word-break:break-word}
-.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{border:1px solid #6a5420;background:#17140a;border-radius:14px;padding:13px 14px;color:#e5cf83}.notice.red{border-color:#71313a;background:#1d1014;color:#ff9da5}.shop-action{margin-top:12px;border:1px solid #2b5065;background:#091923;border-radius:14px;padding:13px 14px}.shop-action.at-shop{border-color:#2d6848;background:#0b1d15}.shop-action .action{width:100%;margin-top:9px}.shop-action strong{display:block;font-size:15px}.shop-action .small{margin-top:4px}
-.ports{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;min-width:0}.port{border:1px solid #2b5065;background:#0a1a25;border-radius:999px;padding:7px 10px;font-size:13px;max-width:100%;overflow-wrap:anywhere}.history{margin-top:8px;min-width:0;overflow:hidden}.event{display:grid;grid-template-columns:165px 100px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid #1d2c38;align-items:start;min-width:0}.event>*{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}.event:last-child{border-bottom:0}.eventstatus{font-weight:900}.eventstatus.online{color:var(--green)}.eventstatus.offline{color:var(--red)}.eventstatus.degraded,.eventstatus.verifying{color:var(--yellow)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{border:1px solid #6a5420;background:#17140a;border-radius:14px;padding:13px 14px;color:#e5cf83}.notice.red{border-color:#71313a;background:#1d1014;color:#ff9da5}.shop-action{margin-top:12px;border:1px solid #2b5065;background:#091923;border-radius:14px;padding:13px 14px}.shop-action.at-shop{border-color:#2d6848;background:#0b1d15}.shop-action .action{width:100%;margin-top:9px}.shop-action strong{display:block;font-size:15px}.shop-action .small{margin-top:4px}.setupbox{margin-top:12px;border:1px solid #6e5420;background:#181408;border-radius:14px;padding:13px 14px}.setupbox input{width:100%;margin-top:9px;padding:12px;border:1px solid #34495b;border-radius:10px;background:#09121a;color:#eef4fb;font:inherit}.setupbox .action{width:100%;margin-top:8px}.routeritem{border:1px solid #294154;border-radius:12px;padding:12px;margin-top:9px;background:#0a141d}.routertop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.routertop b{font-size:16px}.routerstatus{font-size:12px;font-weight:950;white-space:nowrap}
+.ports{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;min-width:0}.port{border:1px solid #2b5065;background:#0a1a25;border-radius:999px;padding:7px 10px;font-size:13px;max-width:100%;overflow-wrap:anywhere}.port.off{border-color:#4b3b3b;color:#a8b4bf;background:#111820}.port.pending{border-color:#384b5c;color:#bdc8d2;background:#0e1821}.history{margin-top:8px;min-width:0;overflow:hidden}.event{display:grid;grid-template-columns:165px 100px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid #1d2c38;align-items:start;min-width:0}.event>*{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}.event:last-child{border-bottom:0}.eventstatus{font-weight:900}.eventstatus.online{color:var(--green)}.eventstatus.offline{color:var(--red)}.eventstatus.degraded,.eventstatus.verifying{color:var(--yellow)}
 .loading{padding:50px 0;text-align:center;color:var(--muted)}.error{padding:18px;border:1px solid #73323a;background:#211117;border-radius:14px;color:#ffb1b8}.hidden{display:none!important}
 @media(max-width:680px){
   .shell{width:100%;max-width:100vw;padding:12px 12px calc(64px + env(safe-area-inset-bottom));overflow-x:hidden}
@@ -86,6 +86,13 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
       <button class="action" id="moveShopBtn">Move unit to Shop / ROOT</button>
     </div>
 
+    <div id="ipSetupWrap" class="setupbox hidden">
+      <strong>Public IP required for live verification</strong>
+      <div class="small" id="ipSetupText"></div>
+      <input id="ipSetupInput" inputmode="decimal" autocomplete="off" placeholder="Example: 166.193.43.178">
+      <button class="action" id="saveIpBtn">Save public IP to this unit</button>
+    </div>
+
     <section class="grid">
       <div class="card">
         <div class="label">Last successful ping</div>
@@ -126,9 +133,14 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
       </div>
 
       <div class="card full">
-        <div class="label">Responding interfaces</div>
+        <div class="label">Configured interfaces / ports</div>
         <div id="ports" class="ports"></div>
-        <div class="small" id="portEmpty" style="margin-top:10px">No responding ports recorded.</div>
+        <div class="small" id="portEmpty" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card full">
+        <div class="label">Unit network / router</div>
+        <div id="routerInfo"></div>
       </div>
 
       <div class="card full">
@@ -142,12 +154,16 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
-let db=null,device=null,current=null,events=[],profile=null;
+let db=null,device=null,current=null,events=[],profile=null,unitRouters=[];
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'—';
 const ago=v=>{if(!v)return'';const ms=Date.now()-new Date(v).getTime();if(!Number.isFinite(ms)||ms<0)return'';const m=Math.floor(ms/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.floor(m/60);if(h<24)return h+'h '+(m%60)+'m ago';const d=Math.floor(h/24);return d+'d '+(h%24)+'h ago'};
 const cleanIP=v=>String(v||'').replace('/32','');
+const validIP=s=>{const a=String(s||'').trim().split('.');return a.length===4&&a.every(x=>/^\d{1,3}$/.test(x)&&Number(x)>=0&&Number(x)<=255)};
+function effectivePublicIP(){const direct=cleanIP(device?.public_ip);if(direct)return direct;const r=unitRouters.find(x=>x.router_public_ip||x.unit_ip);return cleanIP(r?.router_public_ip||r?.unit_ip)}
+function routerSummaryHTML(){if(!unitRouters.length)return '<div class="small">No router is linked to this unit yet. Camera Health can show InHand, MOFI, or any other router once it is mapped to '+esc(device?.unit_key||'this unit')+'.</div>';return unitRouters.map(r=>{const st=String(r.current_status||r.reported_status||'unknown').toLowerCase(),ip=cleanIP(r.router_public_ip||r.unit_ip),name=r.router_name||'Router',model=r.router_model||name,when=r.last_checked_at||r.status_observed_at;return '<div class="routeritem"><div class="routertop"><b>'+esc(model)+'</b><span class="routerstatus '+(st==='online'?'green':st==='offline'?'red':'yellow')+'">'+esc(st.toUpperCase())+'</span></div><div class="small">'+esc(name)+(ip?' · '+esc(ip):'')+(r.reported_status?' · Reported '+esc(String(r.reported_status).toUpperCase()):'')+(when?' · Checked '+esc(fmt(when)):'')+'</div></div>'}).join('')}
+async function edgeErrorMessage(error){try{const ctx=error?.context;if(ctx&&typeof ctx.clone==='function'){const body=await ctx.clone().json().catch(()=>null);if(body?.error)return String(body.error);if(body?.message)return String(body.message)}}catch{}return String(error?.message||error||'Verification failed')}
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
 function isShopDevice(d){return String(d?.organization||'').trim().toLowerCase()==='root'}
@@ -191,7 +207,7 @@ function render(){
     $('failureDetail').textContent=(current?.confirmed_outage?'Confirmed outage. ':'')+(current?.first_failed_at?'First failed '+fmt(current.first_failed_at)+'. ':'')+(current?.confirmation_reason||'');
   }
   $('cameraGroup').textContent=cameraGroup(device);$('unitKey').textContent=device.unit_key||'—';$('organization').textContent=device.organization||'—';
-  $('publicIp').textContent=cleanIP(device.public_ip)||'—';$('model').textContent=device.device_model||'—';$('serial').textContent=device.device_serial||'—';
+  const effectiveIp=effectivePublicIP(),directIp=cleanIP(device.public_ip);$('publicIp').textContent=directIp||(effectiveIp?effectiveIp+' (router)':'—');$('model').textContent=device.device_model||'—';$('serial').textContent=device.device_serial||'—';
   $('vigilantStatus').textContent=String(device.vigilant_status||'Unknown').toUpperCase();
   $('vigilantLastOnline').textContent=device.last_online_at?fmt(device.last_online_at):(device.last_online_source_text||'—');
   $('firstFailed').textContent=current?.first_failed_at?fmt(current.first_failed_at):'—';$('lastRecovered').textContent=current?.last_recovered_at?fmt(current.last_recovered_at):'—';
@@ -213,29 +229,63 @@ function render(){
   }else{
     shopBtn.classList.add('hidden');
   }
-  const ports=Object.entries(current?.port_status||{}).filter(([,v])=>v?.online);$('ports').innerHTML=ports.map(([p,v])=>'<span class="port">'+esc((device.port_labels||{})[p]||('Port '+p))+' ✓'+(v?.latency_ms?' · '+esc(v.latency_ms)+'ms':'')+'</span>').join('');$('portEmpty').classList.toggle('hidden',ports.length>0);
+  const ipSetup=$('ipSetupWrap'),ownerCanEdit=String(profile?.role||'')==='owner';
+  if(!effectiveIp&&ownerCanEdit){
+    ipSetup.classList.remove('hidden');
+    $('ipSetupText').textContent=(String(device.monitoring_profile||'').toLowerCase()==='nvr'?'This NVR can be checked directly from its public IP. ':'')+'No public IP or linked router public IP is available for '+(device.unit_key||device.device_name)+'. Add the public IP and Camera Health can run the configured checks.';
+  }else ipSetup.classList.add('hidden');
+
+  const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},portKeys=[...new Set([...expected,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
+  $('ports').innerHTML=portKeys.map(p=>{const v=ps[String(p)]||ps[p],checked=Boolean(current?.checked_at),online=Boolean(v?.online),cls=online?'':(checked?' off':' pending'),suffix=online?' ✓'+(v?.latency_ms?' · '+v.latency_ms+'ms':''):(checked?' · no response':' · not checked');return '<span class="port'+cls+'">'+esc(labels[String(p)]||('Port '+p))+esc(suffix)+'</span>'}).join('');
+  $('portEmpty').textContent=portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
+  $('portEmpty').classList.toggle('hidden',portKeys.length>0);
+  $('routerInfo').innerHTML=routerSummaryHTML();
   $('interfaceActions').innerHTML=interfaceLinks().map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){
   const id=Number(new URLSearchParams(location.search).get('id'));
   if(!Number.isFinite(id)||id<=0)throw new Error('No camera was selected.');
-  const [{data:d,error:de},{data:h,error:he},{data:hist,error:hi}]=await Promise.all([
-    db.from('camera_devices').select('*').eq('id',id).single(),
+  const {data:d,error:de}=await db.from('camera_devices').select('*').eq('id',id).single();
+  if(de)throw de;
+  const [{data:h,error:he},{data:hist,error:hi},{data:rs,error:re}]=await Promise.all([
     db.from('camera_health_current').select('*').eq('camera_device_id',id).maybeSingle(),
-    db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80)
+    db.from('camera_health_history').select('id,camera_device_id,observed_at,status,check_source,latency_ms,detail').eq('camera_device_id',id).order('observed_at',{ascending:false}).limit(80),
+    d.unit_key?db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key):Promise.resolve({data:[],error:null})
   ]);
-  if(de)throw de;if(he)console.warn(he);if(hi)console.warn(hi);
-  device=d;current=h||{};events=hist||[];
+  if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
+  device=d;current=h||{};events=hist||[];unitRouters=rs||[];
   $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();
 }
 async function verifyNow(){
   if(!device)return;const b=$('verifyBtn');b.disabled=true;
   try{
-    for(let pass=1;pass<=3;pass++){b.textContent='Verify '+pass+' / 3…';const {error}=await db.functions.invoke('camera-health-check',{body:{device_id:device.id}});if(error)throw error;if(pass<3)await new Promise(r=>setTimeout(r,900))}
+    if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
+    if(!effectivePublicIP())throw new Error('No public IP is configured for '+(device.device_name||device.unit_key)+' and no linked router public IP is available. Add a public IP before verifying.');
+    const hasProfile=String(device.monitoring_profile||'').trim()||((device.expected_ports||[]).length>0);
+    if(!hasProfile)throw new Error('No monitoring profile or port profile is configured for this device.');
+    for(let pass=1;pass<=3;pass++){
+      b.textContent='Verify '+pass+' / 3…';
+      const {error}=await db.functions.invoke('camera-health-check',{body:{device_id:device.id}});
+      if(error)throw new Error(await edgeErrorMessage(error));
+      if(pass<3)await new Promise(r=>setTimeout(r,900))
+    }
     b.textContent='Refreshing…';await load();b.textContent=effectiveHealth(device,current)==='online'?'✓ Online':'Checked';
-  }catch(e){console.error(e);b.textContent='Verification failed';$('issueNotice').textContent='Verification failed: '+(e?.message||e);$('issueNotice').className='notice red'}
+  }catch(e){console.error(e);b.textContent='Verification failed';$('issueNotice').textContent='Verification failed: '+String(e?.message||e);$('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden')}
   finally{setTimeout(()=>{b.disabled=false;b.textContent='Verify now'},2200)}
+}
+async function saveUnitPublicIP(){
+  if(!device||String(profile?.role||'')!=='owner')return;
+  const ip=String($('ipSetupInput').value||'').trim();
+  if(!validIP(ip)){alert('Enter a valid IPv4 address, for example 166.193.43.178.');return}
+  const b=$('saveIpBtn');b.disabled=true;b.textContent='Saving…';
+  try{
+    let q=db.from('camera_devices').update({public_ip:ip,public_ip_source:'owner_manual',public_ip_mapped_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+    if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);
+    const {error}=await q;if(error)throw error;
+    await load();
+    b.textContent='Saved ✓';
+  }catch(e){console.error(e);alert('Could not save public IP: '+(e?.message||e));b.disabled=false;b.textContent='Save public IP to this unit'}
 }
 async function moveUnitToShop(){
   if(!device||String(profile?.role||'')!=='owner')return;
@@ -271,8 +321,9 @@ async function boot(){
     await load();
   }catch(e){$('loading').classList.add('hidden');$('error').textContent=e?.message||String(e);$('error').classList.remove('hidden')}
 }
-$('backBtn').onclick=()=>{if(history.length>1)history.back();else location.href='./camera-health.html'};
+$('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
 $('verifyBtn').onclick=verifyNow;
+$('saveIpBtn').onclick=saveUnitPublicIP;
 $('moveShopBtn').onclick=moveUnitToShop;
 boot();
 </script>
