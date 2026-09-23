@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=command-center-standard-20260923y" />
+    <link rel="stylesheet" href="./styles.css?v=owner-bottom-nav-20260923an" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -141,6 +141,35 @@
       <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+<style id="owner-mobile-bottom-nav-fix">
+@media (max-width: 760px){
+  body:has(#view-owner:not(.hidden)) .mobileTop{display:none!important}
+  #view-owner .ownerAppSidebar{
+    position:fixed!important;left:12px!important;right:12px!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;top:auto!important;
+    width:auto!important;height:auto!important;min-height:0!important;z-index:9999!important;
+    display:block!important;padding:6px!important;border:1px solid #294552!important;border-radius:20px!important;
+    background:rgba(6,20,28,.97)!important;box-shadow:0 -8px 28px rgba(0,0,0,.38)!important
+  }
+  #view-owner .ownerAppSidebar .ownerAppBrand,#view-owner .ownerAppSidebar .ownerAppSidebarUtility{display:none!important}
+  #view-owner .ownerAppSidebar nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px!important}
+  #view-owner .ownerAppSidebar nav>*{display:none!important}
+  #view-owner .ownerAppSidebar nav [data-owner-route="today"],
+  #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
+  #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
+  #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
+  #view-owner .ownerAppSidebar nav a[href*="camera-health"],
+  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;min-width:0!important;min-height:58px!important;padding:7px 3px!important;border:0!important;border-radius:14px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.1!important;white-space:normal!important}
+  #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
+  #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
+  #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
+  #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
+  #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
+  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
+  #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
+  #view-owner .ownerAppWorkspace{margin-left:0!important;width:100%!important;padding-bottom:92px!important}
+  #view-owner .ownerAppShell{display:block!important}
+}
+</style>
 </head>
   <body>
     <div id="app">
