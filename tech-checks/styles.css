@@ -7646,3 +7646,24 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerCalWorkspaceV2{grid-template-columns:1fr!important;gap:10px!important}
  #view-owner .ownerCalSideRail{display:grid!important;grid-template-columns:1fr!important}
 }
+
+/* Calendar mobile readability + compact week v243 */
+@media(max-width:720px){
+ #view-owner .ownerCalMonth{grid-auto-rows:76px!important}
+ #view-owner .ownerCalDay{min-height:76px!important;height:76px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;padding:8px 2px!important;overflow:hidden!important}
+ #view-owner .ownerCalDate{width:100%!important;text-align:center!important}
+ #view-owner .ownerCalDate b{font-size:17px!important;line-height:1.15!important}
+ #view-owner .ownerCalDate span{font-size:8px!important;line-height:1.2!important;white-space:nowrap!important}
+ #view-owner .ownerCalEvent{display:block!important;width:7px!important;height:7px!important;min-height:7px!important;margin:4px auto 0!important;border-radius:50%!important;font-size:0!important;overflow:hidden!important}
+ #view-owner .ownerCalEvent.it{background:#5aa6cf!important}.ownerCalEvent.service{background:#54a875!important}
+ #view-owner .ownerCalWeekFrame{min-height:0!important;height:auto!important}
+ #view-owner .ownerCalWeekFrame .ownerCalWeekdays b{font-size:7px!important;line-height:1.15!important;padding:5px 1px!important;white-space:normal!important}
+ #view-owner .ownerCalWeekFrame .ownerCalMonth{grid-auto-rows:104px!important}
+ #view-owner .ownerCalWeekFrame .ownerCalDay{height:104px!important;min-height:104px!important;justify-content:center!important}
+ #view-owner .ownerCalWeekFrame .ownerCalDate b{font-size:18px!important}
+ #view-owner .ownerCalWeekFrame .ownerCalEvent{width:9px!important;height:9px!important;min-height:9px!important}
+ #view-owner .ownerCalDay.selected{background:rgba(239,67,56,.13)!important}
+ #view-owner .ownerCalDay.selected .ownerCalDate b{background:#ef4338!important;color:#fff!important;border-radius:8px!important;padding:5px 8px!important}
+ #view-owner .ownerCalDay.muted .ownerCalDate b{opacity:.45!important}
+ #view-owner .ownerCalSideRail{margin-top:8px!important}
+}
