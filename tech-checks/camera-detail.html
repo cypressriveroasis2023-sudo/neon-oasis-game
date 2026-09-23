@@ -14,7 +14,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 .statusline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;font-weight:900;letter-spacing:.04em}.pill.online{background:#123b2a;color:var(--green)}.pill.offline{background:#3b171c;color:var(--red)}.pill.verifying{background:#3c3214;color:var(--yellow)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;width:100%;min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;max-width:100%;overflow:hidden}.card.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.value{font-size:22px;font-weight:900;margin-top:7px;word-break:break-word;overflow-wrap:anywhere;max-width:100%}.small{font-size:14px;color:var(--muted);line-height:1.45;overflow-wrap:anywhere;word-break:break-word;max-width:100%}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
 .kv{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 16px;margin-top:10px;min-width:0}.kv>div{min-width:0;overflow-wrap:anywhere}.kv>div:nth-child(odd){color:var(--muted);font-weight:700}.kv>div:nth-child(even){font-weight:800;word-break:break-word}
-.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{border:1px solid #6a5420;background:#17140a;border-radius:14px;padding:13px 14px;color:#e5cf83}.notice.red{border-color:#71313a;background:#1d1014;color:#ff9da5}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{border:1px solid #6a5420;background:#17140a;border-radius:14px;padding:13px 14px;color:#e5cf83}.notice.red{border-color:#71313a;background:#1d1014;color:#ff9da5}.shop-action{margin-top:12px;border:1px solid #2b5065;background:#091923;border-radius:14px;padding:13px 14px}.shop-action.at-shop{border-color:#2d6848;background:#0b1d15}.shop-action .action{width:100%;margin-top:9px}.shop-action strong{display:block;font-size:15px}.shop-action .small{margin-top:4px}
 .ports{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;min-width:0}.port{border:1px solid #2b5065;background:#0a1a25;border-radius:999px;padding:7px 10px;font-size:13px;max-width:100%;overflow-wrap:anywhere}.history{margin-top:8px;min-width:0;overflow:hidden}.event{display:grid;grid-template-columns:165px 100px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid #1d2c38;align-items:start;min-width:0}.event>*{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}.event:last-child{border-bottom:0}.eventstatus{font-weight:900}.eventstatus.online{color:var(--green)}.eventstatus.offline{color:var(--red)}.eventstatus.degraded,.eventstatus.verifying{color:var(--yellow)}
 .loading{padding:50px 0;text-align:center;color:var(--muted)}.error{padding:18px;border:1px solid #73323a;background:#211117;border-radius:14px;color:#ffb1b8}.hidden{display:none!important}
 @media(max-width:680px){
@@ -60,6 +60,12 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
     </div>
 
     <div id="issueNotice" class="notice hidden" style="margin-top:16px"></div>
+
+    <div id="shopActionWrap" class="shop-action hidden">
+      <strong id="shopActionTitle">Move unit to Shop / ROOT</strong>
+      <div class="small" id="shopActionText"></div>
+      <button class="action" id="moveShopBtn">Move unit to Shop / ROOT</button>
+    </div>
 
     <section class="grid">
       <div class="card">
@@ -117,7 +123,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
-let db=null,device=null,current=null,events=[];
+let db=null,device=null,current=null,events=[],profile=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'—';
@@ -125,6 +131,12 @@ const ago=v=>{if(!v)return'';const ms=Date.now()-new Date(v).getTime();if(!Numbe
 const cleanIP=v=>String(v||'').replace('/32','');
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
+function isShopDevice(d){return String(d?.organization||'').trim().toLowerCase()==='root'}
+function hasDirectLiveProof(){
+  const probe=String(current?.overall_status||'').toLowerCase();
+  const portOnline=Object.values(current?.port_status||{}).some(v=>v?.online);
+  return probe==='online'||probe==='degraded'||current?.ip_reachable===true||portOnline;
+}
 function effectiveHealth(d,h){h=h||{};const vig=String(d?.vigilant_status||'').trim().toLowerCase(),probe=String(h.overall_status||'').toLowerCase(),group=cameraGroup(d),livePositive=probe==='online'||probe==='degraded'||h.ip_reachable;if(group==='Sniper'||group==='CAM V'){if(livePositive)return'online';if(probe==='offline')return'offline';return'verifying'}if(livePositive)return'online';if(vig==='online')return'online';if(vig==='offline')return'offline';return'verifying'}
 function sourceStatusText(){const group=cameraGroup(device),st=effectiveHealth(device,current),vig=String(device.vigilant_status||'Unknown').toUpperCase();if(group==='Vigilant')return st==='online'&&vig==='OFFLINE'?'LIVE CHECK: ONLINE · VIGILANT: OFFLINE':'Vigilant: '+vig;return 'Direct health check: '+st.toUpperCase()}
 function sourceDetailText(){const group=cameraGroup(device),probe=String(current?.overall_status||'unknown').toUpperCase(),vig=String(device.vigilant_status||'Unknown').toUpperCase(),livePositive=probe==='ONLINE'||probe==='DEGRADED'||current?.ip_reachable===true;if(group==='Vigilant'){if(livePositive&&vig==='OFFLINE')return 'Camera is responding live, so it is ONLINE. Vigilant currently says OFFLINE and is being treated as a source mismatch, not a camera outage.';return 'Status uses the freshest positive proof available. Live check: '+probe+' · Vigilant: '+vig;}return group+' uses the direct Avigilon health check. Backend result: '+probe}
@@ -149,6 +161,23 @@ function render(){
   $('vigilantLastOnline').textContent=device.last_online_at?fmt(device.last_online_at):(device.last_online_source_text||'—');
   $('firstFailed').textContent=current?.first_failed_at?fmt(current.first_failed_at):'—';$('lastRecovered').textContent=current?.last_recovered_at?fmt(current.last_recovered_at):'—';
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
+  const shopWrap=$('shopActionWrap'),shopBtn=$('moveShopBtn'),shopTitle=$('shopActionTitle'),shopText=$('shopActionText');
+  const owner=String(profile?.role||'')==='owner',atShop=isShopDevice(device),liveProof=hasDirectLiveProof();
+  shopWrap.classList.add('hidden');shopWrap.classList.remove('at-shop');
+  if(owner&&atShop){
+    shopWrap.classList.remove('hidden');shopWrap.classList.add('at-shop');
+    shopTitle.textContent='✓ Unit is at Shop / ROOT';
+    shopText.textContent='Shop / ROOT cameras stay out of field-offline and issue counts. If this camera is responding, it can still count as online inventory.';
+    shopBtn.classList.add('hidden');
+  }else if(owner&&liveProof){
+    shopWrap.classList.remove('hidden');
+    shopTitle.textContent='Camera is responding live';
+    shopText.textContent='Move the entire '+(device.unit_key||'camera unit')+' to Shop / ROOT. This removes it from field-offline and field-issue lists without deleting its health history.';
+    shopBtn.textContent='Move unit to Shop / ROOT';
+    shopBtn.disabled=false;shopBtn.classList.remove('hidden');
+  }else{
+    shopBtn.classList.add('hidden');
+  }
   const ports=Object.entries(current?.port_status||{}).filter(([,v])=>v?.online);$('ports').innerHTML=ports.map(([p,v])=>'<span class="port">'+esc((device.port_labels||{})[p]||('Port '+p))+' ✓'+(v?.latency_ms?' · '+esc(v.latency_ms)+'ms':'')+'</span>').join('');$('portEmpty').classList.toggle('hidden',ports.length>0);
   $('interfaceActions').innerHTML=interfaceLinks().map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
@@ -173,16 +202,43 @@ async function verifyNow(){
   }catch(e){console.error(e);b.textContent='Verification failed';$('issueNotice').textContent='Verification failed: '+(e?.message||e);$('issueNotice').className='notice red'}
   finally{setTimeout(()=>{b.disabled=false;b.textContent='Verify now'},2200)}
 }
+async function moveUnitToShop(){
+  if(!device||String(profile?.role||'')!=='owner')return;
+  if(!hasDirectLiveProof()){
+    alert('Verify this camera first. Move to Shop / ROOT is available only after the live check proves the camera is responding.');
+    return;
+  }
+  const unit=device.unit_key||device.device_name||'this camera';
+  if(!confirm('Move '+unit+' to Shop / ROOT?\n\nEvery Camera Health component assigned to this unit will be moved to ROOT and removed from field-offline / field-issue lists.'))return;
+  const b=$('moveShopBtn');b.disabled=true;b.textContent='Moving to Shop / ROOT…';
+  const patch={organization:'root',activation_source:'owner_manual_shop',updated_at:new Date().toISOString()};
+  let q=db.from('camera_devices').update(patch);
+  if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);
+  const {data,error}=await q.select('id,unit_key,device_name,organization');
+  if(error){
+    console.error(error);
+    b.disabled=false;b.textContent='Move unit to Shop / ROOT';
+    alert('Could not move this unit to Shop / ROOT: '+error.message);
+    return;
+  }
+  await load();
+  const moved=Array.isArray(data)?data.length:1;
+  $('shopActionText').textContent=(moved||1)+' camera component'+((moved||1)===1?'':'s')+' moved to ROOT. A later Vigilant organization sync can replace ROOT with the real job/site name when the unit is deployed again.';
+}
 async function boot(){
   try{
     if(!window.supabase?.createClient){await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://unpkg.com/@supabase/supabase-js@2';s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
     db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
     const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Please sign in to Tech Check first.');
+    const {data:pr,error:pe}=await db.from('profiles').select('user_id,role,active').eq('user_id',session.user.id).maybeSingle();
+    if(pe)console.warn('Camera detail profile lookup:',pe);
+    profile=pr||null;
     await load();
   }catch(e){$('loading').classList.add('hidden');$('error').textContent=e?.message||String(e);$('error').classList.remove('hidden')}
 }
 $('backBtn').onclick=()=>{if(history.length>1)history.back();else location.href='./camera-health.html'};
 $('verifyBtn').onclick=verifyNow;
+$('moveShopBtn').onclick=moveUnitToShop;
 boot();
 </script>
 </body>
