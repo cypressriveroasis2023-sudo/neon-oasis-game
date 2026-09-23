@@ -7597,3 +7597,14 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerAppSidebar nav>button.active{background:#1b2a34!important;color:#fff!important;box-shadow:inset 0 0 0 1px #385262!important}
  #view-owner .ownerAppPage{padding-bottom:96px!important}
 }
+
+/* Owner mobile dock: edge-to-edge bottom bar v221 */
+@media(max-width:720px){
+ #view-owner .ownerAppSidebar{left:0!important;right:0!important;bottom:0!important;width:100%!important;height:calc(72px + env(safe-area-inset-bottom))!important;padding:6px 8px calc(6px + env(safe-area-inset-bottom))!important;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:16px 16px 0 0!important;background:rgba(8,17,23,.985)!important;box-shadow:0 -8px 24px rgba(0,0,0,.34)!important}
+ #view-owner .ownerAppSidebar nav{height:60px!important}
+ #view-owner .ownerAppSidebar nav>a:nth-child(1),#view-owner .ownerAppSidebar nav>a:nth-child(2),#view-owner .ownerAppSidebar nav>button[data-owner-route="calendar"],#view-owner .ownerAppSidebar nav>button[data-owner-route="attention"],#view-owner .ownerAppSidebar nav>button[data-owner-route="today"]{flex-direction:column!important;gap:3px!important;font-size:10px!important;line-height:1.05!important;padding:5px 2px!important}
+ #view-owner .ownerAppSidebar nav>a:nth-child(1)::before,#view-owner .ownerAppSidebar nav>a:nth-child(2)::before,#view-owner .ownerAppSidebar nav>button[data-owner-route="calendar"]::before,#view-owner .ownerAppSidebar nav>button[data-owner-route="attention"]::before,#view-owner .ownerAppSidebar nav>button[data-owner-route="today"]::before{margin-right:0!important;font-size:16px!important}
+ #view-owner .ownerAppSidebar nav>button[data-owner-route="attention"]::before{width:18px!important;height:18px!important;font-size:11px!important}
+ #view-owner .ownerAppSidebar nav>button.active{border-radius:12px!important}
+ #view-owner .ownerAppPage{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+}
