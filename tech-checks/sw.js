@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-fatal-syntax-fix-20260923m';
+const CACHE_NAME = 'tech-check-it-calendar-attention-20260923n';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,7 +10,7 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=fatal-syntax-fix-20260923m', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=it-calendar-attention-20260923n', { cache:'reload' })),
       cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=it-ops-lead-20260923a', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=account-management-20260922n', { cache:'reload' })),
