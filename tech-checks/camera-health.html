@@ -632,7 +632,10 @@ if($('issuesSummary')){
       btn.textContent='Checking '+Math.min(i+batchSize,field.length)+' / '+field.length+'…';
       await Promise.allSettled(field.slice(i,i+batchSize).map(d=>db.functions.invoke('camera-health-check',{body:{device_id:d.id}})));
     }
+    btn.textContent='Syncing Reconeyez…';
+    try{await invokeRecon({action:'sync'})}catch(e){console.warn('Reconeyez refresh skipped:',e?.message||e)}
     await load();
+    await loadReconStatus();
     const suspects=field.filter(d=>before.get(d.id)==='online'&&['offline','verifying','degraded'].includes(String(effectiveHealth(devices.find(x=>x.id===d.id)||d)).toLowerCase()));
     const massThreshold=Math.max(5,Math.ceil(field.length*.03));
     if(suspects.length>=massThreshold){
