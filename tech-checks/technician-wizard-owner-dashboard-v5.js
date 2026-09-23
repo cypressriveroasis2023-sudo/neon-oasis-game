@@ -740,7 +740,9 @@ function injectStyles() {
       #view-it #wlITOpsCreate,
       #view-it #wlITTicketHistory{
         width:min(1400px,calc(100% - 24px))!important;
-        max-width:1400px!important
+        max-width:1400px!important;
+        margin-left:auto!important;
+        margin-right:auto!important
       }
       #view-it #wlItJobLookup{width:min(860px,calc(100% - 24px))!important;max-width:860px!important}
       #view-it #wlPendingList,#view-it #wlItStatus{width:min(1100px,calc(100% - 24px))!important;max-width:1100px!important}
