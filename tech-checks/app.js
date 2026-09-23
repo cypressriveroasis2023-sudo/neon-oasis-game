@@ -2127,6 +2127,8 @@ async function ownerCalendarChangeOwnership(ticket){
   if(result.error)return alert(result.error.message||'Could not change ticket ownership.');
   await refreshData();ownerAppRender();
 }
+window.ownerCalendarSaveOverride=ownerCalendarSaveOverride;
+window.ownerCalendarChangeOwnership=ownerCalendarChangeOwnership;
 function ownerCalendarInspector(){
   const jobs=ownerCalendarSelectedJobs(),job=jobs.find(j=>String(j.id)===String(ownerCalendarSelectedJobId))||jobs[0];
   if(!job)return '<section class="ownerCalInspector"><div class="ownerCalRailEmpty"><b>No job selected</b><span>Select a job from the selected day to see and edit the full Tech Check ticket.</span></div></section>';
