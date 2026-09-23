@@ -187,7 +187,98 @@ Deno.serve(async (req: Request) => {
       webhook_ready: Boolean(integration?.webhook_secret_id),
       last_sync_at: integration?.last_sync_at || null,
       last_sync_status: integration?.last_sync_status || null,
-      last_error: integration?.last_error || null
+      last_error: integration?.last_error || null,
+      receiver_tested_at: integration?.metadata?.receiver_tested_at || null,
+      last_webhook_received_at: integration?.metadata?.last_webhook_received_at || null,
+      live_event_type: integration?.metadata?.last_webhook_event_type || null
+    });
+  }
+
+  if (action === "webhook_setup" || action === "test_webhook") {
+    if (String(profile.role) !== "owner") return json({ error: "Owner access is required for Reconeyez live-feed setup." }, 403);
+
+    const { data: secretRows, error: secretError } = await db.rpc("get_reconeyez_integration_secrets");
+    if (secretError) return json({ error: `Could not read Reconeyez integration security configuration: ${secretError.message}` }, 500);
+    const secret = Array.isArray(secretRows) ? secretRows[0] : secretRows;
+    const webhookSecret = String(secret?.webhook_secret || "");
+    if (!webhookSecret) return json({ error: "Reconeyez webhook receiver is not configured." }, 409);
+
+    const base = String(Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
+    const endpoint = `${base}/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
+    const endpointPath = `/functions/v1/reconeyez-webhook?token=${encodeURIComponent(webhookSecret)}`;
+
+    if (action === "test_webhook") {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventType: "IntegrationTest",
+            deviceGuid: "__camera_health_receiver_test__",
+            timestamp: new Date().toISOString(),
+            source: "Camera Health self-test"
+          })
+        });
+        const resultText = await response.text();
+        if (!response.ok && response.status !== 202) {
+          throw new Error(`Receiver returned ${response.status}: ${resultText || response.statusText}`);
+        }
+        const existing = integration?.metadata && typeof integration.metadata === "object" ? integration.metadata : {};
+        await db.from("camera_integrations").update({
+          metadata: {
+            ...existing,
+            receiver_tested_at: new Date().toISOString(),
+            receiver_test_status: "ok"
+          },
+          updated_at: new Date().toISOString()
+        }).eq("provider", "reconeyez");
+        return json({ ok: true, receiver_ready: true });
+      } catch (e) {
+        const message = String((e as Error)?.message || e);
+        const existing = integration?.metadata && typeof integration.metadata === "object" ? integration.metadata : {};
+        await db.from("camera_integrations").update({
+          metadata: {
+            ...existing,
+            receiver_test_status: "error",
+            receiver_test_error: message
+          },
+          updated_at: new Date().toISOString()
+        }).eq("provider", "reconeyez");
+        return json({ error: message }, 502);
+      }
+    }
+
+    const supportRequest = [
+      "To: support@reconeyez.com",
+      "Subject: JSON Webhook integration setup — Cameras Onsite, LLC (North America)",
+      "",
+      "Hello Reconeyez Support,",
+      "",
+      "Please configure a JSON Webhook integration for our Cameras Onsite, LLC workspace on na.reconeyez.com.",
+      "",
+      `Receiving server: ${new URL(base).host}`,
+      "Port: 443",
+      "Protocol: JSON Webhook over HTTPS POST",
+      `HTTP endpoint path: ${endpointPath}`,
+      "Default site identification: 1027",
+      "Reconeyez device area: Cameras Onsite Deployed (including its Houston and San Antonio child areas)",
+      "Please exclude Shop Equipment / Shop areas from forwarded live alarms and health events.",
+      "",
+      "We need the supported health/status events forwarded, including ConnectionLost, DeviceConnected, BatteryLow, BatteryRestored, CriticalBatteryShutdown, RoutineCheck, Tamper, Armed and Disarmed.",
+      "",
+      "Our receiving endpoint is already live and tested. Please let us know when the backend integration has been enabled.",
+      "",
+      "Thank you,",
+      "Cameras Onsite, LLC"
+    ].join("\n");
+
+    return json({
+      ok: true,
+      server: new URL(base).host,
+      port: 443,
+      endpoint_path: endpointPath,
+      support_email: "support@reconeyez.com",
+      support_request: supportRequest
     });
   }
 
