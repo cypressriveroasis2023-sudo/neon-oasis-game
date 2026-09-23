@@ -7827,3 +7827,39 @@ html,body{max-width:100%;overflow-x:hidden}
   #view-it .wl-it-command-stat:last-child{grid-column:auto}
   #view-it .wl-it-big-clock{font-size:34px!important}
 }
+
+/* OWNER COMMAND CONTENT v20260923w */
+#view-owner .ownerCommandKpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:10px 0}
+#view-owner .ownerCommandKpis button{min-width:0;min-height:92px;padding:14px 16px;border:1px solid #0d6288;border-radius:8px;background:linear-gradient(135deg,#08283a,#071a25);color:#fff;text-align:left;cursor:pointer}
+#view-owner .ownerCommandKpis button.alert{background:linear-gradient(135deg,#381015,#160d12);border-color:#7d242b}
+#view-owner .ownerCommandKpis button.field{background:linear-gradient(135deg,#063523,#071b16);border-color:#08794c}
+#view-owner .ownerCommandKpis button.intake{background:linear-gradient(135deg,#26113b,#130d1e);border-color:#623092}
+#view-owner .ownerCommandKpis button.review{background:linear-gradient(135deg,#39260a,#1a1308);border-color:#805713}
+#view-owner .ownerCommandKpis b,#view-owner .ownerCommandKpis span,#view-owner .ownerCommandKpis small{display:block}
+#view-owner .ownerCommandKpis b{font-size:32px;line-height:1}
+#view-owner .ownerCommandKpis span{margin-top:7px;font-size:11px;font-weight:900;letter-spacing:.05em}
+#view-owner .ownerCommandKpis small{margin-top:5px;color:#8fa7b6;font-size:10px}
+#view-owner .ownerCommandGrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(420px,.85fr);gap:10px}
+#view-owner .ownerCommandGrid .ownerTodayPanel{margin:0!important}
+#view-owner .ownerCommandActivity{display:grid}
+#view-owner .ownerCommandActivityRow{display:grid;grid-template-columns:72px 160px minmax(0,1fr);gap:10px;align-items:center;padding:10px 4px;border-top:1px solid #1d3645}
+#view-owner .ownerCommandActivityRow:first-child{border-top:0}
+#view-owner .ownerCommandActivityRow span{color:#8fa7b6;font-size:11px}
+#view-owner .ownerCommandActivityRow b{color:#fff;font-size:12px}
+#view-owner .ownerCommandActivityRow p{margin:0;color:#b5c4cd;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#view-owner .ownerCommandQuickGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#view-owner .ownerCommandQuickGrid button,#view-owner .ownerCommandQuickGrid a{min-height:60px;padding:11px 12px;border:1px solid #294758;border-radius:7px;background:#0a1822;color:#fff;text-align:left;text-decoration:none;font:inherit;font-weight:850;cursor:pointer;box-sizing:border-box}
+#view-owner .ownerCommandQuickGrid .primary{background:#b61922;border-color:#ef3037}
+#view-owner .ownerCommandQuickGrid span{display:block;margin-top:4px;color:#91a6b3;font-size:10px;font-weight:650}
+@media(max-width:900px){
+ #view-owner .ownerCommandKpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #view-owner .ownerCommandKpis button:last-child{grid-column:1/-1}
+ #view-owner .ownerCommandGrid{grid-template-columns:1fr}
+ #view-owner .ownerCommandActivityRow{grid-template-columns:62px 120px minmax(0,1fr)}
+}
+@media(max-width:520px){
+ #view-owner .ownerCommandKpis,#view-owner .ownerCommandQuickGrid{grid-template-columns:1fr}
+ #view-owner .ownerCommandKpis button:last-child{grid-column:auto}
+ #view-owner .ownerCommandActivityRow{grid-template-columns:60px minmax(0,1fr)}
+ #view-owner .ownerCommandActivityRow p{grid-column:1/-1;white-space:normal}
+}
