@@ -831,7 +831,14 @@ function injectStyles() {
       @media(max-width:900px){#view-it .wl-it-cal-page{width:100%;padding:8px 10px 24px}#view-it .wl-it-cal-title{align-items:start;padding:14px;flex-direction:column}#view-it .wl-it-cal-title h1{font-size:23px}#view-it .wl-it-cal-layout{grid-template-columns:1fr}#view-it .wl-it-calendar-toolbar{align-items:flex-start!important}#view-it .wl-it-cal-nav strong{order:-1;width:100%}#view-it .wl-it-cal-week{display:none!important}#view-it .wl-it-calendar{display:block!important}#view-it .wl-it-cal-day{min-height:0!important;margin:7px 0!important}#view-it .wl-it-cal-day.outside,#view-it .wl-it-cal-day:not(.is-today):not(:has(.wl-it-cal-event)){display:none!important}#view-it .wl-it-cal-event strong{font-size:13px}#view-it .wl-it-cal-side{grid-template-columns:1fr}#view-it .wl-it-cal-create{width:100%!important}}
       /* Full-screen IT calendar desktop workspace; mobile remains stacked and touch friendly */
       @media(min-width:901px){
-        #view-it:has(.wl-it-cal-page){padding-left:20px!important;padding-right:20px!important}
+        #view-it:has(.wl-it-cal-page){padding-left:10px!important;padding-right:10px!important}
+        #view-it #wlITCalendar{width:100%!important;max-width:none!important;margin:0!important}
+        #view-it .wl-it-cal-page .wl-it-cal-title{margin-top:6px!important;margin-bottom:10px!important}
+        #view-it .wl-it-calendar-toolbar{margin:8px 0 6px!important}
+        #view-it .wl-it-cal-layout{grid-template-columns:minmax(0,1fr) 250px!important;gap:10px!important}
+        #view-it .wl-it-cal-day{min-height:clamp(145px,18vh,230px)!important}
+        #view-it .wl-it-cal-side{gap:10px!important}
+        #view-it .wl-it-cal-side section{padding:12px!important}
         #view-it .wl-it-cal-page{width:100%!important;max-width:none!important;margin:0!important;padding:8px 0 32px!important}
         #view-it .wl-it-cal-title{width:100%!important;margin:12px 0 16px!important;padding:18px 22px!important}
         #view-it .wl-it-cal-layout{grid-template-columns:minmax(0,1fr) clamp(280px,18vw,360px)!important;gap:16px!important;width:100%!important}
