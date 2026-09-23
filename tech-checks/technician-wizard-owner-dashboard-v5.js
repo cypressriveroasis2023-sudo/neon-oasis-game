@@ -715,6 +715,112 @@ function injectStyles() {
     }
   `;
   s.textContent += `
+    /* IT DESKTOP WORKSPACE NORMALIZATION v20260923z
+       Work pages are desktop application screens, not oversized mobile cards. */
+    @media(min-width:901px){
+      #view-it{padding:0 24px 32px!important;box-sizing:border-box!important}
+      #view-it .wl-it-simple-card,
+      #view-it #wlItWizardOnly,
+      #view-it #wlIntakeForm,
+      #view-it #wlPendingList,
+      #view-it #wlIntakeList,
+      #view-it #wlItStatus{
+        width:min(1240px,calc(100% - 24px))!important;
+        max-width:1240px!important;
+        margin:18px 0 18px 0!important;
+        padding:24px!important;
+        border-radius:12px!important;
+        box-sizing:border-box!important;
+        box-shadow:0 10px 28px rgba(0,0,0,.18)!important
+      }
+      #view-it #wlItTruckInventory,
+      #view-it #wlItTruckRestock,
+      #view-it #wlITManagedTickets,
+      #view-it #wlITManagedTicketEditor,
+      #view-it #wlITOpsCreate,
+      #view-it #wlITTicketHistory{
+        width:min(1400px,calc(100% - 24px))!important;
+        max-width:1400px!important
+      }
+      #view-it #wlItJobLookup{width:min(860px,calc(100% - 24px))!important;max-width:860px!important}
+      #view-it #wlPendingList,#view-it #wlItStatus{width:min(1100px,calc(100% - 24px))!important;max-width:1100px!important}
+      #view-it #wlItIntake{
+        width:min(1240px,calc(100% - 24px))!important;
+        max-width:1240px!important;
+        margin:18px 0!important;
+        padding:24px!important;
+        box-sizing:border-box!important
+      }
+      #view-it .wl-head{padding:15px 18px!important;margin-bottom:14px!important}
+      #view-it .wl-head h2{font-size:28px!important;line-height:1.12!important}
+      #view-it .wl-head .kicker,#view-it .wl-it-step-label{font-size:11px!important}
+      #view-it .wl-title{font-size:28px!important;line-height:1.15!important}
+      #view-it .wl-sub{font-size:14px!important;line-height:1.45!important;max-width:760px!important}
+      #view-it input,#view-it select,#view-it textarea{
+        min-height:46px!important;
+        font-size:15px!important;
+        font-weight:750!important;
+        padding:9px 12px!important;
+        border-width:1px!important
+      }
+      #view-it textarea{min-height:88px!important}
+      #view-it .wl-big,
+      #view-it .wl-it-start,
+      #view-it .wl-it-escalate{
+        width:auto!important;
+        min-height:44px!important;
+        border-radius:8px!important;
+        padding:10px 16px!important;
+        font-size:14px!important;
+        line-height:1.15!important;
+        box-shadow:none!important;
+        display:inline-flex!important;
+        align-items:center!important;
+        justify-content:center!important
+      }
+      #view-it .wl-it-ops-actions{align-items:center!important}
+      #view-it .wl-it-ops-actions .wl-big{flex:0 0 auto!important}
+      #view-it .wl-it-ticket-entry{
+        max-width:760px!important;
+        padding:22px!important;
+        text-align:left!important
+      }
+      #view-it .wl-it-ticket-entry .qtext{font-size:24px!important;margin:4px 0 14px!important;text-align:left!important}
+      #view-it .wl-it-ticket-entry input{width:min(520px,100%)!important;font-size:18px!important;text-align:left!important;letter-spacing:0!important}
+      #view-it .wl-it-ticket-entry .wl-it-help{text-align:left!important}
+      #view-it .wl-menu{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;max-width:1100px!important}
+      #view-it .wl-menu button{
+        width:100%!important;
+        min-height:72px!important;
+        padding:14px 16px!important;
+        border-radius:10px!important;
+        font-size:15px!important;
+        box-shadow:none!important
+      }
+      #view-it #wlItIntake .wl-mode-pills{max-width:760px!important}
+      #view-it #wlItIntake .wl-mode-card{min-height:68px!important}
+      #view-it .wl-it-ops-form{max-width:1180px!important}
+      #view-it .wl-it-ops-form .grid2{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      #view-it .wl-it-ops-form .grid3{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+      #view-it .wl-it-ops-ticket-list{max-width:1180px!important}
+      #view-it .wl-it-ops-ticket{padding:16px!important}
+      #view-it .wl-it-attn{max-width:980px!important;padding:14px!important}
+      #view-it .wl-it-attn-row{padding:11px 12px!important}
+      #view-it .wl-it-cal-head{justify-content:flex-start!important}
+      #view-it .wl-it-cal-head h2{text-align:left!important;min-width:180px!important}
+      #view-it .wl-it-calendar,#view-it .wl-it-cal-week{max-width:1400px!important}
+      #view-it .wl-it-cal-day{min-height:112px!important}
+      #view-it .wl-ticket{max-width:1050px!important;padding:16px!important}
+      #view-it .wl-question{max-width:980px!important;padding:20px!important}
+      #view-it .wl-question .qtext{font-size:26px!important}
+      #view-it .wl-options{max-width:720px!important}
+      #view-it .wl-options button{min-height:62px!important;font-size:18px!important}
+      #view-it .wl-review,#view-it .wl-proof{max-width:980px!important}
+      #view-it .wl-nav{max-width:760px!important}
+      #view-it .wl-it-more{max-width:900px!important}
+      #view-it .wl-it-more summary{text-align:left!important}
+      #view-it .wl-it-service-queue,#view-it .wl-it-ticket-prompt{margin-left:0!important;margin-right:0!important}
+    }
     /* IT Intake dark-background contrast fix */
     #view-it #wlItIntake .wl-title,
     #view-it #wlItIntake .wl-sub {
