@@ -829,6 +829,28 @@ function injectStyles() {
       #view-it .wl-it-cal-view-all{width:100%!important;margin-top:10px!important;padding:9px!important;border:1px solid #456174!important;border-radius:7px!important;background:#132431!important;color:#fff!important;font-weight:850!important} #view-it .wl-it-cal-none{padding:12px;color:#91a3ae;border:1px dashed #2b414f;border-radius:6px}
       #view-it .wl-it-cal-legend{display:flex;gap:22px;flex-wrap:wrap;padding:14px 2px;color:#c8d3da;font-size:12px} #view-it .wl-it-cal-legend .service{color:#56a9ff} #view-it .wl-it-cal-legend .delivery{color:#49d9b6} #view-it .wl-it-cal-legend .swap{color:#ffd04b} #view-it .wl-it-cal-legend .pickup{color:#b65cff}
       @media(max-width:900px){#view-it .wl-it-cal-page{width:100%;padding:8px 10px 24px}#view-it .wl-it-cal-title{align-items:start;padding:14px;flex-direction:column}#view-it .wl-it-cal-title h1{font-size:23px}#view-it .wl-it-cal-layout{grid-template-columns:1fr}#view-it .wl-it-calendar-toolbar{align-items:flex-start!important}#view-it .wl-it-cal-nav strong{order:-1;width:100%}#view-it .wl-it-cal-week{display:none!important}#view-it .wl-it-calendar{display:block!important}#view-it .wl-it-cal-day{min-height:0!important;margin:7px 0!important}#view-it .wl-it-cal-day.outside,#view-it .wl-it-cal-day:not(.is-today):not(:has(.wl-it-cal-event)){display:none!important}#view-it .wl-it-cal-event strong{font-size:13px}#view-it .wl-it-cal-side{grid-template-columns:1fr}#view-it .wl-it-cal-create{width:100%!important}}
+      /* Full-screen IT calendar desktop workspace; mobile remains stacked and touch friendly */
+      @media(min-width:901px){
+        #view-it:has(.wl-it-cal-page){padding-left:20px!important;padding-right:20px!important}
+        #view-it .wl-it-cal-page{width:100%!important;max-width:none!important;margin:0!important;padding:8px 0 32px!important}
+        #view-it .wl-it-cal-title{width:100%!important;margin:12px 0 16px!important;padding:18px 22px!important}
+        #view-it .wl-it-cal-layout{grid-template-columns:minmax(0,1fr) clamp(280px,18vw,360px)!important;gap:16px!important;width:100%!important}
+        #view-it .wl-it-cal-main{width:100%!important}
+        #view-it .wl-it-calendar,#view-it .wl-it-cal-week{width:100%!important;max-width:none!important}
+        #view-it .wl-it-cal-day{min-height:clamp(118px,14vh,190px)!important}
+        #view-it .wl-it-cal-side{width:100%!important}
+      }
+      @media(max-width:900px){
+        #view-it .wl-it-cal-page{width:100%!important;max-width:none!important;margin:0!important;padding:8px 10px 24px!important}
+        #view-it .wl-it-cal-title{width:100%!important}
+        #view-it .wl-it-cal-layout{width:100%!important;grid-template-columns:1fr!important}
+        #view-it .wl-it-cal-main,#view-it .wl-it-cal-side{width:100%!important;min-width:0!important}
+        #view-it .wl-it-calendar-toolbar{width:100%!important}
+        #view-it .wl-it-cal-nav,#view-it .wl-it-cal-filters{width:100%!important}
+        #view-it .wl-it-cal-nav button,#view-it .wl-it-cal-filters button{flex:1 1 auto!important}
+        #view-it .wl-it-cal-event{min-height:52px!important;padding:10px!important}
+        #view-it .wl-it-cal-side section{width:100%!important}
+      }
       #view-it #wlITCalendar{width:min(1400px,calc(100% - 24px))!important;max-width:1400px!important;margin-left:auto!important;margin-right:auto!important}
       #view-it .wl-it-calendar-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;flex-wrap:wrap!important;margin:14px 0 8px!important}
       #view-it .wl-it-cal-nav,#view-it .wl-it-cal-filters{display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important}
