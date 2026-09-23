@@ -598,3 +598,16 @@ button,textarea,input{font:inherit}button{cursor:pointer}a{color:inherit}.hidden
   .vision-composer textarea{font-size:16px!important;transform:none!important}
   input,select,textarea{font-size:16px}
 }
+
+/* Mobile topbar collision fix v34 */
+@media(max-width:560px){
+ .vision-topbar{display:grid!important;grid-template-columns:42px minmax(0,1fr) auto!important;gap:8px!important;align-items:center!important;padding-left:10px!important;padding-right:10px!important}
+ .vision-top-title{position:static!important;left:auto!important;transform:none!important;min-width:0!important;justify-self:start!important;overflow:hidden!important}
+ .vision-top-title b{max-width:100%!important;font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+ .vision-top-actions{margin-left:0!important;justify-self:end!important;gap:6px!important;min-width:0!important}
+ .vision-live-status{display:none!important}
+ .vision-top-actions a[href="./camera-health.html"]{font-size:0!important;width:38px!important;min-width:38px!important;padding:0!important;justify-content:center!important}
+ .vision-top-actions a[href="./camera-health.html"]::after{content:"Health";font-size:9px;font-weight:900}
+ .vision-new-header{width:36px!important;min-width:36px!important}
+ #visionOrderButton{width:38px!important;min-width:38px!important}
+}
