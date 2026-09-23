@@ -7695,3 +7695,38 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerCalAgendaHead{padding:11px 12px!important}.ownerCalAgendaHead h3{font-size:17px!important}.ownerCalAgendaHead>strong{display:none!important}
  #view-owner .ownerCalAgendaJob{grid-template-columns:minmax(0,1fr) auto!important;padding:9px 10px!important}.ownerCalAgendaMain small{display:none!important}
 }
+
+
+/* IT Operations full-width command center v20260923t */
+@media(min-width:901px){
+  body:has(#view-it:not(.hidden)) #appView.wrap{
+    width:100vw!important;max-width:none!important;margin:0!important;padding:0 24px 48px!important;box-sizing:border-box!important;
+  }
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop{
+    width:min(1880px,calc(100vw - 48px))!important;max-width:none!important;margin:0 auto!important;
+  }
+  #view-it:not(.hidden){
+    width:min(1880px,calc(100vw - 48px))!important;max-width:none!important;margin:0 auto!important;padding:0!important;
+  }
+  #view-it:not(.hidden)>.card{
+    width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;
+  }
+  #view-it .wl-it-command-shell{
+    width:100%!important;max-width:none!important;grid-template-columns:270px minmax(0,1fr)!important;min-height:calc(100vh - 230px)!important;
+  }
+  #view-it .wl-it-command-workspace{width:100%!important;max-width:none!important;padding:30px 34px!important}
+  #view-it .wl-it-owner-hero{grid-template-columns:minmax(520px,1.15fr) minmax(430px,.85fr)!important}
+  #view-it .wl-it-command-stats{grid-template-columns:repeat(5,minmax(150px,1fr))!important}
+  #view-it .wl-it-dashboard-row{grid-template-columns:minmax(620px,1.3fr) minmax(420px,.7fr)!important}
+  #view-it .wl-it-command-grid{grid-template-columns:minmax(620px,1.3fr) minmax(420px,.7fr)!important}
+}
+@media(min-width:1500px){
+  body:has(#view-it:not(.hidden)) #appView.wrap{padding-left:32px!important;padding-right:32px!important}
+  #view-it:not(.hidden){width:min(1920px,calc(100vw - 64px))!important}
+  #view-it .wl-it-command-shell{grid-template-columns:285px minmax(0,1fr)!important}
+  #view-it .wl-it-command-workspace{padding:34px 42px!important}
+}
+@media(max-width:900px){
+  body:has(#view-it:not(.hidden)) #appView.wrap{width:100%!important;max-width:none!important}
+  #view-it:not(.hidden),#view-it:not(.hidden)>.card{width:100%!important;max-width:none!important}
+}
