@@ -2203,7 +2203,7 @@ function ownerBoardServiceTechCard(tech){
   const stockComplete=Boolean(inventory.stock_complete);
   const verificationRequired=Boolean(inventory.verification_required);
   const inventoryState=inventory.ready?'good':stockComplete&&verificationRequired?'na':'bad';
-  const inventoryDetail=inventory.ready?'COMPLETE':stockComplete&&verificationRequired?'VERIFY INVENTORY':'MISSING STOCK';
+  const inventoryDetail=inventory.ready?'COMPLETE':stockComplete&&verificationRequired?'AWAITING SERVICE VERIFY':'MISSING STOCK';
   const unitCount=units.filter(u=>u.status==='assigned'&&u.unit_tag).length;
   const simCount=sims.filter(s=>s.status==='assigned'&&s.sim_number).length;
   const restockSummary=restocks.length
