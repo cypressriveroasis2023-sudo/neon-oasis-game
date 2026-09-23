@@ -6409,6 +6409,13 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-service-record-truck-sim-used]')) return recordServiceTruckSimUsed();
   if (e.target.closest('[data-wl-service-record-truck-stock-used]')) return recordServiceTruckStockUsed();
   if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
+  if (e.target.closest('[data-wl-it-create-job]')) return showITCreateJob();
+  if (e.target.closest('[data-wl-it-managed-jobs]')) return showITManagedTickets();
+  if (e.target.closest('[data-wl-it-submit-create-job]')) return itSubmitCreateJob();
+  if (e.target.closest('[data-wl-it-save-managed-job]')) return itSaveManagedJob();
+  const editManaged=e.target.closest('[data-wl-it-edit-managed-ticket]'); if(editManaged)return showITManagedTicketEditor(editManaged.dataset.wlItEditManagedTicket);
+  const ticketHistory=e.target.closest('[data-wl-it-ticket-history]'); if(ticketHistory)return showITTicketHistory(ticketHistory.dataset.wlItTicketHistory);
+  const transferTicket=e.target.closest('[data-wl-it-transfer-ticket]'); if(transferTicket)return itTransferManagedTicket(transferTicket.dataset.wlItTransferTicket);
   if (e.target.closest('[data-wl-it-truck-inventory]')) return showITServiceTruckInventory();
   const manageTruck=e.target.closest('[data-wl-it-manage-truck]'); if(manageTruck)return showITServiceTruckManager(manageTruck.dataset.wlItManageTruck);
   const loadUnit=e.target.closest('[data-wl-it-load-unit]'); if(loadUnit)return itLoadTruckUnit(loadUnit.dataset.serviceTech,loadUnit.dataset.wlItLoadUnit);
