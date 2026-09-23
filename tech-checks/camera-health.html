@@ -577,159 +577,135 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
 #mobileActivityToggle{display:none}
 </style>
 <style id="camera-health-bright-status">
-/* Camera Health status hierarchy: bright red = offline, bright green = online,
-   yellow = issue/verifying. Keep the dark UI and avoid excessive glow. */
+/* Strong status cues without turning the whole board neon.
+   Unit outline + status text carry the primary state.
+   Camera rows use a slim colored edge and a lighter border. */
 .unitcard.offline{
-  border:3px solid #ff2638!important;
-  background:linear-gradient(180deg,#1b0c11 0%,#10090c 100%)!important;
-  box-shadow:0 0 0 1px rgba(255,38,56,.22),0 8px 22px rgba(0,0,0,.28)!important;
+  border:2px solid #ff3b4d!important;
+  background:linear-gradient(180deg,#0f151c 0%,#0b1218 100%)!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.24)!important;
 }
 .unitcard.online{
-  border:3px solid #00e676!important;
-  background:linear-gradient(180deg,#071a10 0%,#07110b 100%)!important;
-  box-shadow:0 0 0 1px rgba(0,230,118,.18),0 8px 22px rgba(0,0,0,.28)!important;
+  border:2px solid #20d979!important;
+  background:linear-gradient(180deg,#0f151c 0%,#0b1218 100%)!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.24)!important;
 }
-.unitcard.offline:hover{border-color:#ff2638!important}
-.unitcard.online:hover{border-color:#00e676!important}
-.unitcard.offline:focus{outline:2px solid #ff2638!important}
-.unitcard.online:focus{outline:2px solid #00e676!important}
+.unitcard.offline:hover{border-color:#ff5967!important}
+.unitcard.online:hover{border-color:#3ee893!important}
+.unitcard.offline:focus{outline:2px solid #ff5967!important}
+.unitcard.online:focus{outline:2px solid #3ee893!important}
 
-.unitcard.offline .cardtitle{color:#ff5967!important}
-.unitcard.online .cardtitle{color:#39f58f!important}
+.unitcard.offline .cardtitle{color:#ff6572!important}
+.unitcard.online .cardtitle{color:#54e99c!important}
 
 .statuspill.offline{
   color:#fff!important;
-  background:#d70f21!important;
+  background:#b71d2c!important;
   border:1px solid #ff5967!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;
 }
 .statuspill.online{
-  color:#04120a!important;
-  background:#00e676!important;
-  border:1px solid #5bffa9!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)!important;
+  color:#dfffee!important;
+  background:#0f6f43!important;
+  border:1px solid #35df88!important;
 }
 .statuspill.degraded,
 .statuspill.waiting,
 .statuspill.verifying{
-  color:#171000!important;
-  background:#f5c84c!important;
-  border:1px solid #ffe18a!important;
+  color:#ffe991!important;
+  background:#463b10!important;
+  border:1px solid #c9a82b!important;
 }
 
-.unitcard.offline .unit-open-hint{
-  border-color:#ff2638!important;
-  color:#ffb1b8!important;
-  background:#210b10!important;
-}
+/* Keep action guidance neutral so status colors do not cover every surface. */
+.unit-open-hint,
+.unitcard.offline .unit-open-hint,
 .unitcard.online .unit-open-hint{
-  border-color:#00e676!important;
-  color:#8bffc1!important;
-  background:#071c10!important;
+  border-color:#36516a!important;
+  color:#d9edff!important;
+  background:#0a1620!important;
+}
+.camera-open-cta,
+.component.camera-good .camera-open-cta,
+.component.camera-offline .camera-open-cta,
+.component.camera-issue .camera-open-cta{
+  border-color:#2c6287!important;
+  background:#122638!important;
+  color:#dff2ff!important;
+}
+.camera-detail-link:hover .camera-open-cta{
+  background:#18364f!important;
+  border-color:#4b8fbd!important;
+  color:#fff!important;
 }
 
-/* A unit can be ONLINE while one camera has a warning. Keep the unit green,
-   and reserve yellow for the warning strip / issue pill. */
+/* ONLINE unit remains green even when an individual camera is warning/offline. */
 .unitcard.online .unitissuepill,
 .component.camera-issue .camera-state-label{
-  color:#ffe16a!important;
+  color:#f5c84c!important;
 }
 .unitcard.online .downline{
-  background:#211b08!important;
-  border-color:#f5c84c!important;
-  color:#ffe16a!important;
+  background:#17150b!important;
+  border-color:#8d7423!important;
+  color:#f2d673!important;
 }
 
+/* Camera rows: dark background, modest border, strong colored left edge. */
 .component.camera-good{
-  background:#061d10!important;
-  border:2px solid #00e676!important;
-  box-shadow:inset 3px 0 0 #00e676!important;
+  background:#0a1318!important;
+  border:1px solid #2d6046!important;
+  box-shadow:inset 4px 0 0 #20d979!important;
 }
 .component.camera-offline{
-  background:#210a10!important;
-  border:2px solid #ff2638!important;
-  box-shadow:inset 3px 0 0 #ff2638!important;
+  background:#130d11!important;
+  border:1px solid #74323a!important;
+  box-shadow:inset 4px 0 0 #ff3b4d!important;
 }
 .component.camera-issue{
-  background:#211b08!important;
-  border:2px solid #f5c84c!important;
-  box-shadow:inset 3px 0 0 #f5c84c!important;
+  background:#15130b!important;
+  border:1px solid #725f22!important;
+  box-shadow:inset 4px 0 0 #d7b12e!important;
 }
 .component.camera-waiting{
-  background:#111820!important;
-  border:2px solid #596b7b!important;
-  box-shadow:none!important;
+  background:#10161d!important;
+  border:1px solid #3d4c59!important;
+  box-shadow:inset 4px 0 0 #66798a!important;
 }
+.component.camera-good .camera-state-label{color:#54e99c!important}
+.component.camera-offline .camera-state-label{color:#ff6572!important}
+.component.camera-issue .camera-state-label{color:#f5c84c!important}
 
-.component.camera-good .camera-state-label,
-.component.camera-good>b{
-  color:#39f58f!important;
-}
-.component.camera-offline .camera-state-label,
-.component.camera-offline>b{
-  color:#ff5967!important;
-}
-.component.camera-issue .camera-state-label{
-  color:#ffe16a!important;
-}
+/* Keep camera names mostly white; status color does the signaling. */
+.component.camera-good>b,
+.component.camera-offline>b,
+.component.camera-issue>b{color:#f3f7fb!important}
 
-.component.camera-good .camera-open-cta{
-  border-color:#00e676!important;
-  background:#082516!important;
-  color:#8bffc1!important;
-}
-.component.camera-offline .camera-open-cta{
-  border-color:#ff2638!important;
-  background:#2a0b12!important;
-  color:#ffadb5!important;
-}
-.component.camera-issue .camera-open-cta{
-  border-color:#f5c84c!important;
-  background:#251e08!important;
-  color:#ffe16a!important;
-}
-
-/* Device view gets the same unmistakable status treatment. */
+/* Device view: slim left status marker with almost no full-row tint. */
 #deviceTable tbody tr.device-status-online{
-  box-shadow:inset 5px 0 0 #00e676!important;
-  background:rgba(0,230,118,.055)!important;
+  box-shadow:inset 4px 0 0 #20d979!important;
+  background:rgba(32,217,121,.018)!important;
 }
 #deviceTable tbody tr.device-status-offline{
-  box-shadow:inset 5px 0 0 #ff2638!important;
-  background:rgba(255,38,56,.065)!important;
+  box-shadow:inset 4px 0 0 #ff3b4d!important;
+  background:rgba(255,59,77,.022)!important;
 }
 #deviceTable tbody tr.device-status-verifying,
 #deviceTable tbody tr.device-status-degraded{
-  box-shadow:inset 5px 0 0 #f5c84c!important;
-  background:rgba(245,200,76,.05)!important;
+  box-shadow:inset 4px 0 0 #d7b12e!important;
+  background:rgba(215,177,46,.018)!important;
 }
-#deviceTable tbody tr.device-status-online td:nth-child(2)>b,
-#deviceTable tbody tr.device-status-online td:nth-child(2) .dot{
-  color:#39f58f!important;
-}
-#deviceTable tbody tr.device-status-offline td:nth-child(2)>b,
-#deviceTable tbody tr.device-status-offline td:nth-child(2) .dot{
-  color:#ff5967!important;
-}
-#deviceTable tbody tr.device-status-online td{
-  border-top-color:rgba(0,230,118,.28)!important;
-  border-bottom-color:rgba(0,230,118,.18)!important;
-}
+#deviceTable tbody tr.device-status-online td:nth-child(2)>b{color:#54e99c!important}
+#deviceTable tbody tr.device-status-offline td:nth-child(2)>b{color:#ff6572!important}
+#deviceTable tbody tr.device-status-online td,
 #deviceTable tbody tr.device-status-offline td{
-  border-top-color:rgba(255,38,56,.32)!important;
-  border-bottom-color:rgba(255,38,56,.2)!important;
+  border-top-color:#1d2b38!important;
+  border-bottom-color:#1d2b38!important;
 }
 
-/* Confirmed/current issue text stays vivid without overriding the primary status. */
-.unitcard.offline .downline,
+/* Current status copy remains readable and distinct. */
 .unitcard.offline .red,
-.component.camera-offline .red{
-  color:#ff5967!important;
-}
+.component.camera-offline .red{color:#ff6572!important}
 .unitcard.online .green,
-.component.camera-good .green{
-  color:#39f58f!important;
-}
+.component.camera-good .green{color:#54e99c!important}
 </style>
 </head><body><div id="authGate" class="authgate"><div class="authcard"><div class="brand" style="margin-bottom:16px"><img src="./techcheck-eye-192.png?v=1" alt=""><div><small>CAMERAS ONSITE</small><b>OnSite Vision · Camera Health</b></div></div><h2>Authorized Access</h2><p>Sign in with your Tech Check Owner or IT account.</p><label>Username</label><input id="cameraLoginUsername" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username"><label>Password</label><input id="cameraLoginPassword" type="password" autocomplete="current-password" placeholder="Password"><button id="cameraLogin" class="primary">Sign In</button><div id="cameraLoginMsg" class="autherr"></div><a class="btn" style="display:block;text-align:center;margin-top:10px" href="./">Sign in through Tech Check</a><div class="small" style="margin-top:10px;text-align:center">If Tech Check is already signed in, Camera Health will open automatically.</div></div></div><div class="shell">
 <aside class="cos-sidebar"><div class="cos-wordmark">CAMERAS ONSITE <span>OnSite Vision</span></div><div class="cos-submark">SECURITY · MONITOR · MAINTAIN</div><nav class="cos-nav"><button class="active">▣ &nbsp;Camera Health</button><button class="jump-events">◉ &nbsp;Alerts</button><button class="jump-trouble">⚒ &nbsp;Troubleshooting</button><button class="jump-history">▤ &nbsp;History</button><a href="./onsite-vision.html">◉ &nbsp;OnSite Vision</a><a href="./">← &nbsp;Tech Check Dashboard</a></nav></aside><div class="cos-topline"><div class="cos-title"><h1>Camera Health</h1><div>LIVE STATUS · ALERTS · TROUBLESHOOT · HISTORY</div></div><div class="cos-search"><input id="globalSearch" placeholder="Search units, sites, IPs, or device names…"><div id="cameraSearchResults"></div></div><div class="actions"><button id="importToggle" class="primary" style="display:none">Import / Map</button><button id="refresh">↻ Refresh</button><a class="btn" href="./onsite-vision.html">+ Vision</a></div></div>
