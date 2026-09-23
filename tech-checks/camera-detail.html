@@ -10,7 +10,7 @@
 *{box-sizing:border-box}html{background:var(--bg);max-width:100%;overflow-x:hidden}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;width:100%;max-width:100%;overflow-x:hidden}
 button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;margin:0 auto;padding:20px 18px 80px;overflow-x:hidden}.topbar{position:sticky;top:0;z-index:20;width:100%;max-width:100%;background:rgba(5,11,17,.96);backdrop-filter:blur(12px);padding:10px 0 14px;border-bottom:1px solid #142331}
 .toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0}.back,.action,.linkbtn{border:1px solid var(--line);background:#0d1924;color:var(--text);border-radius:12px;padding:11px 14px;text-decoration:none;font-weight:800;min-width:0;max-width:100%}
-.action.primary{background:#b91421;border-color:#e52937}.action:disabled{opacity:.55;cursor:default}.title{margin:18px 0 4px;font-size:34px;line-height:1.05}.subtitle{color:var(--muted);font-weight:700;letter-spacing:.03em}
+.action.primary{background:#b91421;border-color:#e52937}.action:disabled{opacity:.55;cursor:default}.title{margin:18px 0 4px;color:#fff;font-size:38px;font-weight:950;line-height:1.02;letter-spacing:.005em;overflow-wrap:anywhere;word-break:break-word}.subtitle{color:#8fa1b3;font-weight:750;letter-spacing:.025em}
 .statusline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;font-weight:900;letter-spacing:.04em}.pill.online{background:#123b2a;color:var(--green)}.pill.offline{background:#3b171c;color:var(--red)}.pill.verifying{background:#3c3214;color:var(--yellow)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;width:100%;min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;max-width:100%;overflow:hidden}.card.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.value{font-size:22px;font-weight:900;margin-top:7px;word-break:break-word;overflow-wrap:anywhere;max-width:100%}.small{font-size:14px;color:var(--muted);line-height:1.45;overflow-wrap:anywhere;word-break:break-word;max-width:100%}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
 .kv{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 16px;margin-top:10px;min-width:0}.kv>div{min-width:0;overflow-wrap:anywhere}.kv>div:nth-child(odd){color:var(--muted);font-weight:700}.kv>div:nth-child(even){font-weight:800;word-break:break-word}
@@ -22,8 +22,27 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   .topbar{padding:8px 0 12px}
   .toprow{align-items:stretch;gap:8px}
   .back,.action{flex:1 1 0;width:0;min-width:0;text-align:center;padding:11px 8px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .title{font-size:30px;line-height:1.08;margin-top:16px;overflow-wrap:anywhere}
-  .subtitle{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+  .title{
+    margin-top:16px;
+    margin-bottom:6px;
+    color:#ffffff;
+    font-size:clamp(38px,11vw,48px);
+    font-weight:950;
+    line-height:.98;
+    letter-spacing:.005em;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    text-shadow:0 1px 0 rgba(255,255,255,.06)
+  }
+  .subtitle{
+    color:#8fa1b3;
+    font-size:15px;
+    font-weight:750;
+    line-height:1.3;
+    letter-spacing:.02em;
+    overflow-wrap:anywhere;
+    word-break:break-word
+  }
   .statusline{gap:8px}.pill{padding:7px 10px;font-size:14px}.statusline .small{flex:1 1 180px;min-width:0}
   .notice{font-size:15px;line-height:1.4;padding:12px}
   .grid{grid-template-columns:minmax(0,1fr);gap:10px;margin-top:14px}
@@ -36,7 +55,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   .ports{gap:6px}.port{font-size:12px}
   .event{grid-template-columns:minmax(0,1fr);gap:3px;padding:10px 0}.eventstatus{font-size:13px}
 }
-@media(max-width:380px){.back,.action{font-size:14px}.title{font-size:27px}.value{font-size:22px}}
+@media(max-width:380px){.back,.action{font-size:14px}.title{font-size:36px}.value{font-size:22px}}
 </style>
 </head>
 <body>
