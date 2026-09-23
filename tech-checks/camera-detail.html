@@ -252,9 +252,13 @@ function render(){
     shopBtn.classList.add('hidden');
   }
   const ipSetup=$('ipSetupWrap'),ownerCanEdit=String(profile?.role||'')==='owner';
-  if(!effectiveIp&&ownerCanEdit&&!isRecon){
+  if(ownerCanEdit&&!isRecon){
     ipSetup.classList.remove('hidden');
-    $('ipSetupText').textContent=(String(device.monitoring_profile||'').toLowerCase()==='nvr'?'This NVR can be checked directly from its public IP. ':'')+'No public IP or linked router public IP is available for '+(device.unit_key||device.device_name)+'. Add the public IP and Camera Health can run the configured checks.';
+    $('ipSetupInput').value=cleanIP(device.public_ip)||effectiveIp||'';
+    $('ipSetupText').textContent=effectiveIp
+      ?'Owner override: update the public IP for '+(device.unit_key||device.device_name)+'. Saving changes the IP used by Camera Health for this unit.'
+      :(String(device.monitoring_profile||'').toLowerCase()==='nvr'?'This NVR can be checked directly from its public IP. ':'')+'No public IP or linked router public IP is available. Add one for live Camera Health checks.';
+    $('saveIpBtn').textContent=effectiveIp?'Update public IP':'Save public IP to this unit';
   }else ipSetup.classList.add('hidden');
 
   const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},portKeys=[...new Set([...expected,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
@@ -338,13 +342,14 @@ async function saveUnitPublicIP(){
   if(!device||String(profile?.role||'')!=='owner')return;
   const ip=String($('ipSetupInput').value||'').trim();
   if(!validIP(ip)){alert('Enter a valid IPv4 address, for example 166.193.43.178.');return}
-  const b=$('saveIpBtn');b.disabled=true;b.textContent='Saving…';
+  const oldIp=cleanIP(device.public_ip)||effectivePublicIP()||'';const b=$('saveIpBtn');b.disabled=true;b.textContent='Saving…';
   try{
     let q=db.from('camera_devices').update({public_ip:ip,public_ip_source:'owner_manual',public_ip_mapped_at:new Date().toISOString(),updated_at:new Date().toISOString()});
     if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);
     const {error}=await q;if(error)throw error;
     await load();
     b.textContent='Saved ✓';
+    if(oldIp!==ip)alert('Public IP updated'+(oldIp?' from '+oldIp:'')+' to '+ip+'. Camera Health will use the new address.');
   }catch(e){console.error(e);alert('Could not save public IP: '+(e?.message||e));b.disabled=false;b.textContent='Save public IP to this unit'}
 }
 async function moveUnitToShop(){
