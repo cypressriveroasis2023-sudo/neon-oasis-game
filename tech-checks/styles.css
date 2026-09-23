@@ -7667,3 +7667,31 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerCalDay.muted .ownerCalDate b{opacity:.45!important}
  #view-owner .ownerCalSideRail{margin-top:8px!important}
 }
+
+/* Match approved mobile calendar layout v244 */
+@media(max-width:720px){
+ #view-owner .ownerCalStats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;overflow:visible!important;gap:6px!important}
+ #view-owner .ownerCalStats>div,#view-owner .ownerCalStats>div:last-child{flex:none!important;min-width:0!important;min-height:68px!important;padding:10px!important}
+ #view-owner .ownerCalStats b{font-size:25px!important}.ownerCalStats span{font-size:8px!important}
+ #view-owner .ownerCalPeriod{grid-template-columns:42px 74px 42px minmax(0,1fr)!important;align-items:center!important}
+ #view-owner .ownerCalPeriod h2{grid-column:4!important;grid-row:1!important;margin:0!important;text-align:right!important;font-size:20px!important;white-space:nowrap!important}
+ #view-owner .ownerCalControlBar{display:grid!important;grid-template-columns:1.2fr 1fr!important;column-gap:10px!important}
+ #view-owner .ownerCalPeriod{grid-column:1/-1!important}
+ #view-owner .ownerCalRoleFilters{grid-column:1!important;grid-template-columns:repeat(3,1fr)!important}
+ #view-owner .ownerCalModes{grid-column:2!important;grid-template-columns:repeat(3,1fr)!important}
+ #view-owner .ownerCalRoleFilters>span{grid-column:1/-1!important}.ownerCalModes::before{content:'VIEW';grid-column:1/-1;color:#8395a3;font-size:9px;font-weight:900;letter-spacing:.14em}
+ #view-owner .ownerCalRoleFilters button,#view-owner .ownerCalModes button{font-size:10px!important;min-height:38px!important}
+ #view-owner .ownerCalMonth{grid-auto-rows:64px!important}
+ #view-owner .ownerCalDay{height:64px!important;min-height:64px!important;padding:7px 2px!important}
+ #view-owner .ownerCalDate b{font-size:15px!important}.ownerCalDate span{display:none!important}
+ #view-owner .ownerCalDots{display:flex!important;align-items:center!important;justify-content:center!important;gap:3px!important;margin-top:6px!important;height:9px!important}
+ #view-owner .ownerCalDots i{display:block!important;width:7px!important;height:7px!important;border-radius:50%!important;background:#55a7d4!important}
+ #view-owner .ownerCalDots i.service{background:#54c77a!important}.ownerCalDots small{font-size:8px!important;color:#b7c4ce!important;font-weight:900!important}
+ #view-owner .ownerCalEvent,#view-owner .ownerCalMore{display:none!important}
+ #view-owner .ownerCalDay.selected{background:#ef252b!important;box-shadow:none!important}
+ #view-owner .ownerCalDay.selected .ownerCalDate b{background:transparent!important;padding:0!important;font-size:17px!important}
+ #view-owner .ownerCalDay.selected .ownerCalDots i{box-shadow:0 0 0 1px rgba(255,255,255,.35)!important}
+ #view-owner .ownerCalAgenda{margin-top:8px!important}
+ #view-owner .ownerCalAgendaHead{padding:11px 12px!important}.ownerCalAgendaHead h3{font-size:17px!important}.ownerCalAgendaHead>strong{display:none!important}
+ #view-owner .ownerCalAgendaJob{grid-template-columns:minmax(0,1fr) auto!important;padding:9px 10px!important}.ownerCalAgendaMain small{display:none!important}
+}
