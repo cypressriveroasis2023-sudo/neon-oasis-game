@@ -220,21 +220,23 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
     word-break:break-word!important;
   }
 
-  /* Actual DOM order is Status, Device, Type, Ports, Model, Site, Last Online, Version. */
-  #deviceTable td:nth-child(1){order:1!important}
-  #deviceTable td:nth-child(2){order:2!important;border-top:1px solid #1d2b38!important;margin-top:5px!important;padding-top:10px!important}
-  #deviceTable td:nth-child(3){order:3!important}
-  #deviceTable td:nth-child(4){order:4!important}
-  #deviceTable td:nth-child(6){order:5!important}
-  #deviceTable td:nth-child(7){order:6!important}
-  #deviceTable td:nth-child(5),#deviceTable td:nth-child(8){display:none!important}
+  /* Actual DOM order includes the desktop checkbox column first:
+     1 checkbox, 2 status, 3 device, 4 type, 5 ports, 6 model, 7 site, 8 last online, 9 version. */
+  #deviceTable td:nth-child(1){display:none!important}
+  #deviceTable td:nth-child(2){order:1!important}
+  #deviceTable td:nth-child(3){order:2!important;border-top:1px solid #1d2b38!important;margin-top:5px!important;padding-top:10px!important}
+  #deviceTable td:nth-child(4){order:3!important}
+  #deviceTable td:nth-child(5){order:4!important}
+  #deviceTable td:nth-child(7){order:5!important}
+  #deviceTable td:nth-child(8){order:6!important}
+  #deviceTable td:nth-child(6),#deviceTable td:nth-child(9){display:none!important}
 
-  #deviceTable td:nth-child(1)::before,
   #deviceTable td:nth-child(2)::before,
   #deviceTable td:nth-child(3)::before,
   #deviceTable td:nth-child(4)::before,
-  #deviceTable td:nth-child(6)::before,
-  #deviceTable td:nth-child(7)::before{
+  #deviceTable td:nth-child(5)::before,
+  #deviceTable td:nth-child(7)::before,
+  #deviceTable td:nth-child(8)::before{
     display:block!important;
     margin:0 0 3px!important;
     color:#7f93a6!important;
@@ -242,14 +244,14 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
     font-weight:900!important;
     letter-spacing:.10em!important;
   }
-  #deviceTable td:nth-child(1)::before{content:"STATUS / ISSUE"}
-  #deviceTable td:nth-child(2)::before{content:"CAMERA / UNIT"}
-  #deviceTable td:nth-child(3)::before{content:"TYPE"}
-  #deviceTable td:nth-child(4)::before{content:"PORTS"}
-  #deviceTable td:nth-child(6)::before{content:"SITE / ORGANIZATION"}
-  #deviceTable td:nth-child(7)::before{content:"LAST ONLINE"}
+  #deviceTable td:nth-child(2)::before{content:"STATUS / ISSUE"}
+  #deviceTable td:nth-child(3)::before{content:"CAMERA / UNIT"}
+  #deviceTable td:nth-child(4)::before{content:"TYPE"}
+  #deviceTable td:nth-child(5)::before{content:"PORTS"}
+  #deviceTable td:nth-child(7)::before{content:"SITE / ORGANIZATION"}
+  #deviceTable td:nth-child(8)::before{content:"LAST ONLINE"}
 
-  #deviceTable td:nth-child(2)>a{
+  #deviceTable td:nth-child(3)>a{
     display:block!important;
     width:100%!important;
     max-width:100%!important;
