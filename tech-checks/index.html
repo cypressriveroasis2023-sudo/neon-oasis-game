@@ -481,7 +481,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=owner-all-jobs-20260923ak"></script>
+    <script type="module" src="./app.js?v=owner-full-override-20260923al"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -492,13 +492,4 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-all-jobs-20260923ak', { scope: './', updateViaCache: 'none' });
-            await registration.update();
-          } catch (error) {
-            console.warn(error);
-          }
-        });
-      }
-    </script>
-  </body>
-</html>
+            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-full-override-20260923al
