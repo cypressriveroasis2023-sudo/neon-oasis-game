@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-account-management-20260922n';
+const CACHE_NAME = 'tech-check-reconeyez-20260923a';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -43,19 +43,29 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       const isVision = url.pathname.endsWith('/onsite-vision.html');
-      const shellKey = isVision ? VISION_SHELL : APP_SHELL;
-      const cachedShell = await caches.match(shellKey, { ignoreSearch: true });
+      const isRoot = /\/tech-checks\/?$/.test(url.pathname);
+      const cachedPage = await caches.match(request, { ignoreSearch: true });
       try {
         const freshRequest = new Request(request, { cache:'reload' });
         const response = await fetch(freshRequest);
         if (response?.ok) {
           const cache=await caches.open(CACHE_NAME);
-          cache.put(shellKey,response.clone()).catch(() => {});
+          cache.put(request,response.clone()).catch(() => {});
           return response;
         }
       } catch {}
-      if (cachedShell) return cachedShell;
-      return fetch(shellKey, { cache:'reload' });
+      if (cachedPage) return cachedPage;
+      if (isVision) {
+        const cachedVision = await caches.match(VISION_SHELL, { ignoreSearch:true });
+        if (cachedVision) return cachedVision;
+        return fetch(VISION_SHELL, { cache:'reload' });
+      }
+      if (isRoot) {
+        const cachedRoot = await caches.match(APP_SHELL, { ignoreSearch:true });
+        if (cachedRoot) return cachedRoot;
+        return fetch(APP_SHELL, { cache:'reload' });
+      }
+      return new Response('Offline', { status:503, statusText:'Offline' });
     })());
     return;
   }
