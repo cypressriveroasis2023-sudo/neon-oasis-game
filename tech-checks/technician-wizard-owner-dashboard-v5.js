@@ -2745,6 +2745,8 @@ function ensureITCommandDashboardStyles(){
     .wl-it-command-nav{display:grid;gap:7px}.wl-it-command-nav button,.wl-it-command-nav a{display:block;width:100%;box-sizing:border-box;text-align:left;text-decoration:none;background:transparent!important;color:#e8eef3!important;border:1px solid transparent!important;border-radius:10px;padding:11px 12px;font-weight:850;min-height:44px}.wl-it-command-nav button:hover,.wl-it-command-nav a:hover{background:#121f2a!important;border-color:#304657!important}.wl-it-command-nav .active{background:#172633!important;border-left:3px solid #e22b2f!important}
     .wl-it-command-limit{margin-top:auto;border-top:1px solid #263746;padding:13px 8px 0;color:#91a0ad;font-size:11px;line-height:1.45}.wl-it-command-limit b{color:#eef4f8;display:block;margin-bottom:4px}
     .wl-it-command-workspace{padding:24px;min-width:0}.wl-it-command-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}.wl-it-command-head small{display:block;color:#ef4a4e;font-weight:900;letter-spacing:.12em}.wl-it-command-head h1{font-size:38px;line-height:1.05;margin:7px 0 5px;color:#fff}.wl-it-command-head p{margin:0;color:#9ba9b6}
+    .wl-it-owner-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:14px;margin-bottom:14px}.wl-it-clock-card,.wl-it-weather-card{border:1px solid #2b4050;border-radius:16px;background:#0d1923;padding:16px}.wl-it-clock-card small,.wl-it-weather-card small{display:block;color:#8ea0ae;font-weight:900;letter-spacing:.1em}.wl-it-big-clock{font-size:46px;line-height:1;font-weight:950;color:#fff;margin:8px 0 5px;font-variant-numeric:tabular-nums}.wl-it-clock-date{color:#aab7c2}.wl-it-weather-main{display:flex;align-items:center;gap:12px;margin-top:8px}.wl-it-weather-main i{font-style:normal;font-size:34px}.wl-it-weather-main b{display:block;color:#fff;font-size:27px}.wl-it-weather-main span{display:block;color:#aab7c2;font-size:12px;margin-top:2px}.wl-it-weather-error{color:#ff9296;font-size:12px;margin-top:8px}
+    @media(max-width:700px){.wl-it-owner-hero{grid-template-columns:1fr}.wl-it-big-clock{font-size:40px}}
     .wl-it-command-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}.wl-it-command-stat{background:#101b25;border:1px solid #263746;border-radius:14px;padding:14px}.wl-it-command-stat b{display:block;font-size:25px;color:#fff}.wl-it-command-stat span{font-size:11px;color:#97a5b2;font-weight:850;letter-spacing:.08em}
     .wl-it-command-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:14px}.wl-it-command-panel{background:#0f1a24;border:1px solid #263746;border-radius:16px;padding:16px}.wl-it-command-panel h2{margin:0 0 10px;color:#fff}.wl-it-command-panel .wl-it-more{margin-top:12px}
     .wl-it-permissions{display:grid;gap:8px}.wl-it-permission{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid #253745;border-radius:11px;background:#0b151e}.wl-it-permission i{font-style:normal;color:#51dd7c;font-weight:950}.wl-it-permission b{display:block;color:#edf4f8}.wl-it-permission span{display:block;color:#92a1af;font-size:12px;margin-top:2px}
@@ -2807,7 +2809,11 @@ async function showITHome() {
         <div class='wl-it-command-limit'><b>IT OPERATIONS ACCESS</b>Create and lead Service Calls, Deliveries, Swaps, and Pickups from existing MHelpDesk tickets; run equipment prep, Camera Health, truck inventory, intake, handoffs, and operational history. Owner Review, employee accounts, permissions, system configuration, and administrative overrides stay Owner-only.</div>
       </aside>
       <main class='wl-it-command-workspace'>
-        <header class='wl-it-command-head'><div><small>CAMERAS ONSITE · IT OPERATIONS</small><h1>Good morning, ${esc(ownerViewingIT?'IT':firstName)}</h1><p>Create and lead operational tickets, work the queue, maintain equipment records, and complete every required Tech Check.</p></div><div style='display:flex;gap:8px;flex-wrap:wrap'><button class='mini wl-red' data-wl-it-create-job>＋ Create Job</button><button class='mini' data-wl-home='it'>Refresh</button></div></header>
+        <header class='wl-it-command-head'><div><small>CAMERAS ONSITE · IT OPERATIONS</small><h1>Good morning, ${esc(ownerViewingIT?'IT':firstName)}</h1><p>Here’s what is happening today.</p></div><div style='display:flex;gap:8px;flex-wrap:wrap'><button class='mini wl-red' data-wl-it-create-job>＋ Create Job</button><button class='mini' data-wl-home='it'>Refresh</button></div></header>
+        <div class='wl-it-owner-hero'>
+          <section class='wl-it-clock-card'><small>LOCAL TIME</small><div id='wlITBigClock' class='wl-it-big-clock'>--:--:--</div><div id='wlITClockDate' class='wl-it-clock-date'></div></section>
+          <section class='wl-it-weather-card'><small>LOCAL WEATHER · GPS</small><div id='wlITWeatherNow'><span>Reading current weather…</span></div></section>
+        </div>
         ${techCompletionBanner(flash)}
         <div class='wl-it-command-stats'>
           <div class='wl-it-command-stat'><b>${assigned}</b><span>ACTIVE IT WORK</span></div>
@@ -2857,6 +2863,25 @@ async function showITHome() {
 
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
+  startITCommandClockWeather();
+}
+function startITCommandClockWeather(){
+  const clock=document.getElementById('wlITBigClock'),date=document.getElementById('wlITClockDate');
+  if(clock&&date){
+    const tick=()=>{const now=new Date();clock.textContent=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true});date.textContent=now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});};
+    tick(); clearInterval(window.wlITCommandClockTimer); window.wlITCommandClockTimer=setInterval(tick,1000);
+  }
+  updateITCommandWeather();
+}
+async function updateITCommandWeather(){
+  const host=document.getElementById('wlITWeatherNow'); if(!host)return;
+  try{
+    const coords=await techCheckGetCoords(false);
+    const data=await techCheckWeatherForGps(coords,1),cur=data?.current||{};
+    const code=Number(cur.weather_code),day=Number(cur.is_day)!==0;
+    const map=code===0?[day?'☀️':'🌙','Clear']:code<=3?['🌤️','Partly cloudy']:code<=48?['🌫️','Fog']:code<=67?['🌧️','Rain']:code<=77?['❄️','Snow']:code<=82?['🌦️','Showers']:code<=99?['⛈️','Storms']:['🌤️','Weather'];
+    host.innerHTML="<div class='wl-it-weather-main'><i>"+map[0]+"</i><div><b>"+Math.round(Number(cur.temperature_2m||0))+"°F · "+esc(map[1])+"</b><span>Feels "+Math.round(Number(cur.apparent_temperature||0))+"° · Wind "+Math.round(Number(cur.wind_speed_10m||0))+" mph</span></div></div>";
+  }catch(error){host.innerHTML="<div class='wl-it-weather-error'>"+esc(error?.message||'Local weather unavailable')+"</div>";}
 }
 
 function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
