@@ -808,6 +808,18 @@ function injectStyles() {
       #view-it .wl-it-ops-ticket{padding:16px!important}
       #view-it .wl-it-attn{max-width:980px!important;padding:14px!important}
       #view-it .wl-it-attn-row{padding:11px 12px!important}
+      #view-it #wlITCalendar{width:min(1400px,calc(100% - 24px))!important;max-width:1400px!important;margin-left:auto!important;margin-right:auto!important}
+      #view-it .wl-it-calendar-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;flex-wrap:wrap!important;margin:14px 0 8px!important}
+      #view-it .wl-it-cal-nav,#view-it .wl-it-cal-filters{display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important}
+      #view-it .wl-it-cal-nav button,#view-it .wl-it-cal-filters button{width:auto!important;min-height:38px!important;padding:8px 13px!important;border:1px solid #314453!important;border-radius:8px!important;background:#101b25!important;color:#fff!important;font-weight:800!important}
+      #view-it .wl-it-cal-filters button.active{background:#ed1c24!important;border-color:#ff4b50!important}
+      #view-it .wl-it-cal-head{justify-content:space-between!important;align-items:end!important}
+      #view-it .wl-it-cal-summary{color:#9eacb8!important;font-size:13px!important}
+      #view-it .wl-it-cal-day.is-today{border-color:#ed1c24!important;box-shadow:inset 0 0 0 1px #ed1c24!important}
+      #view-it .wl-it-cal-day>b span{font-size:9px!important;color:#ff5b60!important;margin-left:5px!important}
+      #view-it .wl-it-cal-unscheduled{margin-top:18px!important;padding:16px!important;border:1px solid #263746!important;border-radius:10px!important;background:#0c1720!important;max-width:900px!important}
+      #view-it .wl-it-cal-unscheduled h3{margin:0 0 10px!important}
+      #view-it .wl-it-cal-unscheduled button{display:flex!important;justify-content:space-between!important;gap:16px!important;width:100%!important;padding:10px 12px!important;margin:6px 0!important;background:#101b25!important;color:#fff!important;border:1px solid #304657!important;border-radius:8px!important;text-align:left!important}
       #view-it .wl-it-cal-head{justify-content:flex-start!important}
       #view-it .wl-it-cal-head h2{text-align:left!important;min-width:180px!important}
       #view-it .wl-it-calendar,#view-it .wl-it-cal-week{max-width:1400px!important}
@@ -3188,28 +3200,37 @@ function itOpsMonthLabel(date){
   return date.toLocaleDateString(undefined,{month:'long',year:'numeric'});
 }
 let wlITCalendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let wlITCalendarFilter='ALL';
 async function showITCalendar(shift){
   if(!isIT()||!viewIT())return;
   ensureITCommandDashboardStyles();
-  if(Number.isFinite(Number(shift))&&Number(shift)!==0)wlITCalendarMonth=new Date(wlITCalendarMonth.getFullYear(),wlITCalendarMonth.getMonth()+Number(shift),1);
+  if(shift==='today')wlITCalendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  else if(Number.isFinite(Number(shift))&&Number(shift)!==0)wlITCalendarMonth=new Date(wlITCalendarMonth.getFullYear(),wlITCalendarMonth.getMonth()+Number(shift),1);
   const card=itOpsCard(); if(!card)return;
   card.innerHTML=techDashboardLoadingHtml('Loading your Ticket Lead calendar…');
   hideChildren(viewIT(),[card]); resetWizardPosition();
   try{
     const rows=await loadITManagedTickets();
     const y=wlITCalendarMonth.getFullYear(),m=wlITCalendarMonth.getMonth();
-    const monthRows=rows.filter(t=>{const d=String(t.scheduled_for||'').split('-').map(Number);return d.length===3&&d[0]===y&&d[1]===m+1;});
+    const typeOf=t=>String(t.work_type||t.job_type||'').trim().toUpperCase();
+    const filteredRows=wlITCalendarFilter==='ALL'?rows:rows.filter(t=>typeOf(t).includes(wlITCalendarFilter));
+    const monthRows=filteredRows.filter(t=>{const d=String(t.scheduled_for||'').split('-').map(Number);return d.length===3&&d[0]===y&&d[1]===m+1;});
+    const unscheduled=filteredRows.filter(t=>!t.scheduled_for&&!t.all_finished);
     const first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),lead=first.getDay();
+    const today=techCheckDateKey(new Date());
     let cells='';
     for(let i=0;i<lead;i++)cells+="<div class='wl-it-cal-day empty'></div>";
     for(let day=1;day<=days;day++){
       const key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
       const jobs=monthRows.filter(t=>String(t.scheduled_for||'')===key);
-      cells+="<div class='wl-it-cal-day'><b>"+day+"</b>"+jobs.map(t=>"<button data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><strong>#"+esc(t.ticket_no)+"</strong><span>"+esc(t.site||t.work_type||'Job')+"</span></button>").join('')+"</div>";
+      cells+="<div class='wl-it-cal-day"+(key===today?" is-today":"")+"'><b>"+day+(key===today?" <span>TODAY</span>":"")+"</b>"+jobs.map(t=>"<button data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><strong>#"+esc(t.ticket_no)+" · "+esc(t.work_type||'Job')+"</strong><span>"+esc(t.site||'No site listed')+"</span></button>").join('')+"</div>";
     }
+    const filterButton=(value,label)=>"<button class='"+(wlITCalendarFilter===value?"active":"")+"' data-wl-it-calendar-filter='"+esc(value)+"'>"+esc(label)+"</button>";
     card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('CALENDAR','Only tickets where you are Ticket Lead',1,1)+
-      "<div class='wl-it-cal-head'><button data-wl-it-calendar-shift='-1'>←</button><h2>"+esc(itOpsMonthLabel(wlITCalendarMonth))+"</h2><button data-wl-it-calendar-shift='1'>→</button></div>"+
-      "<div class='wl-it-cal-week'><b>Sun</b><b>Mon</b><b>Tue</b><b>Wed</b><b>Thu</b><b>Fri</b><b>Sat</b></div><div class='wl-it-calendar'>"+cells+"</div>";
+      "<div class='wl-it-calendar-toolbar'><div class='wl-it-cal-nav'><button data-wl-it-calendar-shift='-1'>← Previous</button><button data-wl-it-calendar-today='1'>Today</button><button data-wl-it-calendar-shift='1'>Next →</button></div><div class='wl-it-cal-filters'>"+filterButton('ALL','All')+filterButton('SERVICE','Service')+filterButton('DELIVERY','Delivery')+filterButton('SWAP','Swap')+filterButton('PICKUP','Pickup')+"</div></div>"+
+      "<div class='wl-it-cal-head'><h2>"+esc(itOpsMonthLabel(wlITCalendarMonth))+"</h2><div class='wl-it-cal-summary'><b>"+monthRows.length+"</b> scheduled this month"+(unscheduled.length?" · <b>"+unscheduled.length+"</b> unscheduled":"")+"</div></div>"+
+      "<div class='wl-it-cal-week'><b>Sun</b><b>Mon</b><b>Tue</b><b>Wed</b><b>Thu</b><b>Fri</b><b>Sat</b></div><div class='wl-it-calendar'>"+cells+"</div>"+
+      (unscheduled.length?"<section class='wl-it-cal-unscheduled'><h3>Unscheduled Managed Tickets</h3>"+unscheduled.map(t=>"<button data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><b>#"+esc(t.ticket_no)+" · "+esc(t.work_type||'Job')+"</b><span>"+esc(t.site||'No site listed')+"</span></button>").join('')+"</section>":"");
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load your IT calendar.');}
 }
 async function showITNeedsAttention(){
@@ -6669,6 +6690,8 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-it-managed-jobs]')) return showITManagedTickets();
   if (e.target.closest('[data-wl-it-calendar]')) return showITCalendar(0);
   const itCalShift=e.target.closest('[data-wl-it-calendar-shift]'); if(itCalShift)return showITCalendar(Number(itCalShift.dataset.wlItCalendarShift||0));
+  if(e.target.closest('[data-wl-it-calendar-today]'))return showITCalendar('today');
+  const itCalFilter=e.target.closest('[data-wl-it-calendar-filter]'); if(itCalFilter){wlITCalendarFilter=String(itCalFilter.dataset.wlItCalendarFilter||'ALL').toUpperCase();return showITCalendar(0);}
   if (e.target.closest('[data-wl-it-attention]')) return showITNeedsAttention();
   if (e.target.closest('[data-wl-it-submit-create-job]')) return itSubmitCreateJob();
   if (e.target.closest('[data-wl-it-save-managed-job]')) return itSaveManagedJob();
