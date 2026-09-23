@@ -314,6 +314,7 @@ async function enterApp(session) {
   updateItWelcome();
   updateItWeather();
   configureTabs();
+  setupCommandCenterMobileMenu();
 
   // Paint the signed-in shell first. Heavy workflow code and shared-data hydration
   // are deliberately moved off the critical startup path.
@@ -325,6 +326,20 @@ async function enterApp(session) {
     scheduleIdle(() => loadDeferredModules(), 700);
     scheduleIdle(() => setupRealtime(), 1200);
   }));
+}
+function setupCommandCenterMobileMenu(){
+  const btn=document.getElementById('techMenuButton');
+  if(btn&&!btn.dataset.commandCenterBound){
+    btn.dataset.commandCenterBound='1';
+    btn.addEventListener('click',()=>document.body.classList.toggle('cc-mobile-nav-open'));
+  }
+  if(!document.body.dataset.commandCenterNavBound){
+    document.body.dataset.commandCenterNavBound='1';
+    document.addEventListener('click',event=>{
+      if(event.target.closest('#techMenuButton'))return;
+      if(event.target.closest('#view-it .wl-it-command-nav button,#view-it .wl-it-command-nav a,#view-owner .ownerAppSidebar nav button,#view-owner .ownerAppSidebar nav a')) document.body.classList.remove('cc-mobile-nav-open');
+    });
+  }
 }
 function showForcedPasswordChange(profile) {
   $('authView').classList.add('hidden');
