@@ -2794,7 +2794,10 @@ async function showITHome() {
     const todaysManaged=(managedTickets||[]).filter(t=>String(t.scheduled_for||'')===todayKey&&!t.all_finished);
     const overdueManaged=(managedTickets||[]).filter(t=>t.scheduled_for&&String(t.scheduled_for)<todayKey&&!t.all_finished);
     const prepCount=(state.drafts||[]).length;
-    const attentionCount=overdueManaged.length+returns+restock+prepCount;
+    const siteRegistration=(state.currentAssignments||[]).filter(a=>/swap/i.test(String(a.work_type||''))&&/register|site/i.test(String(a.status||'')+' '+String(a.next_step||'')));
+    const inService=(managedTickets||[]).filter(t=>t.any_started&&!t.all_finished).length;
+    const attentionCount=overdueManaged.length+returns+restock+prepCount+siteRegistration.length;
+    const recentManaged=(managedTickets||[]).slice().sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0)).slice(0,5);
     home.innerHTML=`<div class='wl-it-command-shell'>
       <aside class='wl-it-command-sidebar'>
         <div class='wl-it-command-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span><b>CAMERAS ONSITE</b><small>IT Technician</small></span></div>
@@ -2824,11 +2827,11 @@ async function showITHome() {
         </div>
         ${techCompletionBanner(flash)}
         <div class='wl-it-command-stats'>
-          <div class='wl-it-command-stat action' data-wl-it-managed-jobs><b>${managedActive}</b><span>MY ACTIVE TICKETS</span><small>Managed Tickets →</small></div>
-          <div class='wl-it-command-stat action' data-wl-it-attention><b>${attentionCount}</b><span>NEEDS ATTENTION</span><small>View details →</small></div>
-          <div class='wl-it-command-stat action' data-wl-it-calendar><b>${todaysManaged.length}</b><span>TODAY'S SCHEDULE</span><small>My calendar →</small></div>
-          <div class='wl-it-command-stat action' data-wl-mode='intake'><b>${returns}</b><span>AWAITING IT INTAKE</span><small>Process returns →</small></div>
-          <div class='wl-it-command-stat action' data-wl-it='pending'><b>${prepCount}</b><span>IN EQUIPMENT PREP</span><small>Open prep →</small></div>
+          <div class='wl-it-command-stat action' data-wl-it-managed-jobs><b>${managedActive}</b><span>MY ACTIVE TICKETS</span><small>View Tickets →</small></div>
+          <div class='wl-it-command-stat action' data-wl-it-attention><b>${attentionCount}</b><span>NEEDS ATTENTION</span><small>View Details →</small></div>
+          <div class='wl-it-command-stat action' data-wl-it-managed-jobs><b>${inService}</b><span>IN SERVICE · FIELD</span><small>View Field Jobs →</small></div>
+          <div class='wl-it-command-stat action' data-wl-mode='intake'><b>${returns}</b><span>AWAITING IT INTAKE</span><small>View Intake →</small></div>
+          <div class='wl-it-command-stat action' data-wl-it='pending'><b>${prepCount}</b><span>IN EQUIPMENT PREP</span><small>View Prep →</small></div>
         </div>
         <div class='wl-it-dashboard-row'>
           <section class='wl-it-command-panel'><h2>Today's Schedule · My Tickets</h2>
@@ -2838,13 +2841,16 @@ async function showITHome() {
             <div class='wl-it-dashboard-list'>
               <button class='wl-it-dashboard-item' data-wl-it-attention><b>Overdue Managed Tickets</b><span>${overdueManaged.length} →</span></button>
               <button class='wl-it-dashboard-item' data-wl-mode='intake'><b>Returned Units · IT Intake</b><span>${returns} →</span></button>
+              <button class='wl-it-dashboard-item' data-wl-it='pending'><b>Pending Swap Registration</b><span>${siteRegistration.length} →</span></button>
               <button class='wl-it-dashboard-item' data-wl-it='pending'><b>Unfinished Equipment Prep</b><span>${prepCount} →</span></button>
-              <button class='wl-it-dashboard-item' data-wl-it-truck-restock><b>Service Truck Restock</b><span>${restock} →</span></button>
+              <button class='wl-it-dashboard-item' data-wl-it-truck-restock><b>Service Truck Restock Requests</b><span>${restock} →</span></button>
             </div>
           </section>
         </div>
         <div class='wl-it-dashboard-row'>
-          <section class='wl-it-command-panel'><h2>Next IT Action</h2>${itNextActionHtml(state)}${itServiceQueueHtml(state)}<div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> SERVICE HANDOFF</div></section>
+          <section class='wl-it-command-panel'><h2>Recent Activity · My Tickets</h2>
+            ${recentManaged.length?"<div class='wl-it-dashboard-list'>"+recentManaged.map(t=>"<button class='wl-it-dashboard-item' data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><b>#"+esc(t.ticket_no)+" · "+esc(t.site||t.work_type||'Job')+"</b><span>"+esc(itManagedTicketStatus(t))+" · "+esc(t.updated_at?new Date(t.updated_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')+" →</span></button>").join('')+"</div>":"<div class='wl-it-empty'><div><b>No managed-ticket activity yet.</b><span>New ticket activity will appear here.</span></div></div>"}
+          </section>
           <section class='wl-it-command-panel'><h2>Quick Actions</h2><div class='wl-it-quick-grid'>
             <button class='primary' data-wl-it-create-job><b>＋ Create Job</b><span>From MHelpDesk ticket</span></button>
             <button data-wl-it-managed-jobs><b>Managed Tickets</b><span>View & update</span></button>
