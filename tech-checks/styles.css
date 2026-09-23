@@ -7730,3 +7730,100 @@ html,body{max-width:100%;overflow-x:hidden}
   body:has(#view-it:not(.hidden)) #appView.wrap{width:100%!important;max-width:none!important}
   #view-it:not(.hidden),#view-it:not(.hidden)>.card{width:100%!important;max-width:none!important}
 }
+
+/* COMMAND CENTER STANDARD v20260923v */
+:root{--cc-bg:#061018;--cc-panel:#0a1822;--cc-panel2:#0d202c;--cc-line:#214052;--cc-red:#ed1c24;--cc-text:#f5f8fa;--cc-muted:#8fa7b6}
+@media(min-width:901px){
+  body:has(#view-it:not(.hidden)),body:has(#view-owner:not(.hidden)){background:var(--cc-bg)!important}
+  body:has(#view-it:not(.hidden)) #appView.wrap,body:has(#view-owner:not(.hidden)) #appView.wrap{width:100vw!important;max-width:none!important;margin:0!important;padding:0!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop,body:has(#view-owner:not(.hidden)) #appView>.mobileTop{display:grid!important;grid-template-columns:minmax(420px,1fr) auto!important;align-items:center!important;width:100%!important;max-width:none!important;margin:0!important;padding:10px 20px!important;box-sizing:border-box!important;background:linear-gradient(90deg,#08141d,#0c2535 55%,#07131b)!important;border-bottom:2px solid var(--cc-red)!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.hero,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.hero{margin:0!important;padding:0!important;min-height:62px!important;border:0!important;background:transparent!important;box-shadow:none!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.accountbar,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.accountbar{margin:0!important;padding:0!important;border:0!important;background:transparent!important;display:flex!important;align-items:center!important;gap:18px!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.accountbar>div:first-child,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.accountbar>div:first-child{padding:9px 16px!important;border-left:1px solid #274252!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.accountbar #whoName,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.accountbar #whoName{color:#fff!important;font-size:14px!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.accountbar #syncStatus,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.accountbar #syncStatus{display:none!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.techStatusRow,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.techStatusRow,
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.mainRoleTabs,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.mainRoleTabs{display:none!important}
+  body:has(#view-it:not(.hidden)) #techMenuButton,body:has(#view-owner:not(.hidden)) #techMenuButton{display:none!important}
+  #view-it:not(.hidden),#view-owner:not(.hidden){width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+  #view-it:not(.hidden)>a,#view-it:not(.hidden)>div[style*="justify-content:flex-end"]{display:none!important}
+  #view-it:not(.hidden)>.card{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  #view-it .wl-it-command-shell{border:0!important;border-radius:0!important;min-height:calc(100vh - 84px)!important;grid-template-columns:220px minmax(0,1fr)!important}
+  #view-it .wl-it-command-sidebar{padding:14px 10px 18px!important;border-radius:0!important;background:#07151e!important}
+  #view-it .wl-it-command-brand{display:none!important}
+  #view-it .wl-it-command-nav{gap:4px!important}
+  #view-it .wl-it-command-nav button,#view-it .wl-it-command-nav a{min-height:42px!important;padding:10px 12px!important;border-radius:7px!important;font-size:13px!important}
+  #view-it .wl-it-command-nav .active{background:var(--cc-red)!important;border-color:#ff4b51!important;color:#fff!important}
+  #view-it .wl-it-command-limit{padding:18px 10px 4px!important}
+  #view-it .wl-it-command-workspace{padding:16px 18px 28px!important;background:var(--cc-bg)!important}
+  #view-it .wl-it-command-head{display:none!important}
+  #view-it .wl-it-owner-hero{grid-template-columns:minmax(420px,1.2fr) minmax(300px,.72fr) minmax(360px,.9fr)!important;gap:10px!important;margin:0 0 12px!important}
+  #view-it .wl-it-hero-greeting,#view-it .wl-it-clock-card,#view-it .wl-it-weather-card{min-height:132px!important;border-radius:8px!important;padding:18px 20px!important;box-sizing:border-box!important}
+  #view-it .wl-it-hero-greeting{background:radial-gradient(circle at 76% 50%,rgba(225,24,33,.38),transparent 34%),linear-gradient(110deg,#260b11,#7e0e18 52%,#101922)!important}
+  #view-it .wl-it-hero-greeting h2{font-size:36px!important}
+  #view-it .wl-it-big-clock{font-size:44px!important}
+  #view-it .wl-it-weather-main b{font-size:30px!important}
+  #view-it .wl-it-command-stats{gap:10px!important;margin-bottom:12px!important}
+  #view-it .wl-it-command-stat{min-height:92px!important;padding:14px 16px!important;border-radius:8px!important;box-sizing:border-box!important}
+  #view-it .wl-it-command-stat:nth-child(1){background:linear-gradient(135deg,#08283a,#071a25)!important;border-color:#0d6288!important}
+  #view-it .wl-it-command-stat:nth-child(2){background:linear-gradient(135deg,#381015,#160d12)!important;border-color:#7d242b!important}
+  #view-it .wl-it-command-stat:nth-child(3){background:linear-gradient(135deg,#063523,#071b16)!important;border-color:#08794c!important}
+  #view-it .wl-it-command-stat:nth-child(4){background:linear-gradient(135deg,#26113b,#130d1e)!important;border-color:#623092!important}
+  #view-it .wl-it-command-stat:nth-child(5){background:linear-gradient(135deg,#39260a,#1a1308)!important;border-color:#805713!important}
+  #view-it .wl-it-command-stat b{font-size:32px!important}
+  #view-it .wl-it-dashboard-row,#view-it .wl-it-command-grid{grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr)!important;gap:10px!important;margin-bottom:10px!important}
+  #view-it .wl-it-command-panel{border-radius:8px!important;padding:14px!important}
+  #view-it .wl-it-quick-grid{gap:7px!important}
+  #view-it .wl-it-quick-grid button,#view-it .wl-it-quick-grid a{min-height:58px!important;border-radius:7px!important}
+  #view-owner .ownerAppShell{width:100%!important;height:calc(100vh - 84px)!important;min-height:calc(100vh - 84px)!important;grid-template-columns:220px minmax(0,1fr)!important;background:var(--cc-bg)!important}
+  #view-owner .ownerAppSidebar{position:relative!important;inset:auto!important;width:auto!important;height:100%!important;padding:14px 10px!important;border-radius:0!important;background:#07151e!important}
+  #view-owner .ownerAppBrand{display:none!important}
+  #view-owner .ownerAppSidebar nav{gap:4px!important}
+  #view-owner .ownerAppSidebar nav button,#view-owner .ownerAppSidebar nav .ownerVisionNav{min-height:42px!important;padding:10px 12px!important;border-radius:7px!important;font-size:13px!important;box-sizing:border-box!important}
+  #view-owner .ownerAppSidebar nav button[data-owner-route="today"]{order:-20}
+  #view-owner .ownerAppSidebar nav button[data-owner-route="assign"]{order:-19}
+  #view-owner .ownerAppSidebar nav button[data-owner-route="calendar"]{order:-18}
+  #view-owner .ownerAppSidebar nav button[data-owner-route="attention"]{order:-17}
+  #view-owner .ownerAppSidebar nav button.active{background:var(--cc-red)!important;border-color:#ff4b51!important;color:#fff!important}
+  #view-owner .ownerAppSidebarUtility{margin-top:auto!important}
+  #view-owner .ownerAppWorkspace{height:100%!important;min-height:0!important;overflow:auto!important;background:var(--cc-bg)!important}
+  #view-owner .ownerAppPage{padding:16px 18px 28px!important;max-width:none!important}
+  #view-owner .ownerTodayHero{grid-template-columns:minmax(420px,1.2fr) minmax(300px,.72fr)!important;gap:10px!important;margin:0!important}
+  #view-owner .ownerTodayWelcome,#view-owner .ownerTodayClockCard{min-height:132px!important;border-radius:8px!important}
+  #view-owner .ownerTodayWelcome{background:radial-gradient(circle at 76% 50%,rgba(225,24,33,.38),transparent 34%),linear-gradient(110deg,#260b11,#7e0e18 52%,#101922)!important}
+  #view-owner .ownerTodayWeatherHost{margin:10px 0!important;border-radius:8px!important}
+  #view-owner .ownerTodayPanel{border-radius:8px!important;margin:10px 0!important}
+}
+@media(max-width:900px){
+  body:has(#view-it:not(.hidden)) #appView.wrap,body:has(#view-owner:not(.hidden)) #appView.wrap{width:100%!important;max-width:none!important;padding:0!important;overflow-x:hidden!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop,body:has(#view-owner:not(.hidden)) #appView>.mobileTop{position:sticky!important;top:0!important;z-index:95!important;padding:8px 10px!important;background:#07151e!important;border-bottom:1px solid #29414f!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.hero,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.hero{min-height:50px!important;margin:0!important;padding:0!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.accountbar,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.accountbar{margin:4px 0 0!important;padding:5px 0!important}
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.techStatusRow,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.techStatusRow,
+  body:has(#view-it:not(.hidden)) #appView>.mobileTop>.mainRoleTabs,body:has(#view-owner:not(.hidden)) #appView>.mobileTop>.mainRoleTabs{display:none!important}
+  #view-it .wl-it-command-shell{display:block!important;border:0!important;border-radius:0!important}
+  #view-it .wl-it-command-sidebar{position:sticky!important;top:104px!important;z-index:80!important;padding:6px!important;border:0!important;border-bottom:1px solid #29414f!important;overflow-x:auto!important}
+  #view-it .wl-it-command-nav{display:flex!important;width:max-content!important;gap:4px!important}
+  #view-it .wl-it-command-nav button,#view-it .wl-it-command-nav a{width:auto!important;min-width:max-content!important;min-height:42px!important;padding:9px 11px!important}
+  #view-it .wl-it-command-brand,#view-it .wl-it-command-limit,#view-it .wl-it-command-head{display:none!important}
+  #view-it .wl-it-command-workspace{padding:10px!important}
+  #view-it .wl-it-owner-hero{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  #view-it .wl-it-hero-greeting,#view-it .wl-it-clock-card,#view-it .wl-it-weather-card{min-height:0!important;padding:14px!important}
+  #view-it .wl-it-hero-greeting h2{font-size:28px!important}
+  #view-it .wl-it-big-clock{font-size:38px!important}
+  #view-it .wl-it-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+  #view-it .wl-it-command-stat{min-height:86px!important;padding:12px!important}
+  #view-it .wl-it-command-stat:last-child{grid-column:1/-1}
+  #view-it .wl-it-dashboard-row,#view-it .wl-it-command-grid{grid-template-columns:1fr!important}
+  #view-it .wl-it-dashboard-item{align-items:flex-start!important}
+  #view-it .wl-it-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #view-owner .ownerAppShell{display:block!important;width:100%!important;height:auto!important;min-height:100vh!important}
+  #view-owner .ownerAppWorkspace{height:auto!important;min-height:100vh!important;overflow:visible!important;padding-bottom:82px!important}
+  #view-owner .ownerAppPage{padding:10px!important}
+  #view-owner .ownerTodayHero{grid-template-columns:1fr!important}
+}
+@media(max-width:520px){
+  #view-it .wl-it-command-stats,#view-it .wl-it-quick-grid{grid-template-columns:1fr!important}
+  #view-it .wl-it-command-stat:last-child{grid-column:auto}
+  #view-it .wl-it-big-clock{font-size:34px!important}
+}
