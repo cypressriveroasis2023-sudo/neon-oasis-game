@@ -2734,8 +2734,31 @@ function showTechDayComplete(role,futureCount=0){
   hideChildren(host,[card]);resetWizardPosition();
 }
 
+function ensureITCommandDashboardStyles(){
+  if(document.getElementById('wlItCommandDashboardStyles'))return;
+  const s=document.createElement('style');
+  s.id='wlItCommandDashboardStyles';
+  s.textContent=`
+    .wl-it-command-shell{display:grid;grid-template-columns:245px minmax(0,1fr);min-height:calc(100vh - 180px);background:#071018;border:1px solid #263746;border-radius:22px;overflow:hidden;color:#eef4f8}
+    .wl-it-command-sidebar{background:#0b141d;border-right:1px solid #253541;padding:20px 16px;display:flex;flex-direction:column;gap:18px}
+    .wl-it-command-brand{display:flex;gap:10px;align-items:center;padding:4px 6px 14px;border-bottom:1px solid #263746}.wl-it-command-brand img{width:34px;height:34px}.wl-it-command-brand b{display:block;font-size:15px;letter-spacing:.08em}.wl-it-command-brand small{color:#9caaba}
+    .wl-it-command-nav{display:grid;gap:7px}.wl-it-command-nav button,.wl-it-command-nav a{display:block;width:100%;box-sizing:border-box;text-align:left;text-decoration:none;background:transparent!important;color:#e8eef3!important;border:1px solid transparent!important;border-radius:10px;padding:11px 12px;font-weight:850;min-height:44px}.wl-it-command-nav button:hover,.wl-it-command-nav a:hover{background:#121f2a!important;border-color:#304657!important}.wl-it-command-nav .active{background:#172633!important;border-left:3px solid #e22b2f!important}
+    .wl-it-command-limit{margin-top:auto;border-top:1px solid #263746;padding:13px 8px 0;color:#91a0ad;font-size:11px;line-height:1.45}.wl-it-command-limit b{color:#eef4f8;display:block;margin-bottom:4px}
+    .wl-it-command-workspace{padding:24px;min-width:0}.wl-it-command-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}.wl-it-command-head small{display:block;color:#ef4a4e;font-weight:900;letter-spacing:.12em}.wl-it-command-head h1{font-size:38px;line-height:1.05;margin:7px 0 5px;color:#fff}.wl-it-command-head p{margin:0;color:#9ba9b6}
+    .wl-it-command-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}.wl-it-command-stat{background:#101b25;border:1px solid #263746;border-radius:14px;padding:14px}.wl-it-command-stat b{display:block;font-size:25px;color:#fff}.wl-it-command-stat span{font-size:11px;color:#97a5b2;font-weight:850;letter-spacing:.08em}
+    .wl-it-command-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:14px}.wl-it-command-panel{background:#0f1a24;border:1px solid #263746;border-radius:16px;padding:16px}.wl-it-command-panel h2{margin:0 0 10px;color:#fff}.wl-it-command-panel .wl-it-more{margin-top:12px}
+    .wl-it-permissions{display:grid;gap:8px}.wl-it-permission{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid #253745;border-radius:11px;background:#0b151e}.wl-it-permission i{font-style:normal;color:#51dd7c;font-weight:950}.wl-it-permission b{display:block;color:#edf4f8}.wl-it-permission span{display:block;color:#92a1af;font-size:12px;margin-top:2px}
+    .wl-it-owner-lock{margin-top:12px;padding:11px;border:1px solid #5a3436;border-radius:11px;color:#d7a0a3;background:#190e11;font-size:12px}.wl-it-owner-lock b{color:#ff7478}
+    @media(max-width:900px){.wl-it-command-shell{grid-template-columns:1fr}.wl-it-command-sidebar{border-right:0;border-bottom:1px solid #253541;padding:12px}.wl-it-command-brand{display:none}.wl-it-command-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.wl-it-command-nav button,.wl-it-command-nav a{text-align:center;padding:9px 7px;font-size:12px}.wl-it-command-limit{display:none}.wl-it-command-workspace{padding:16px}.wl-it-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-command-grid{grid-template-columns:1fr}.wl-it-command-head h1{font-size:30px}}
+    @media(max-width:520px){.wl-it-command-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-command-head{display:block}}
+    .wl-it-audit{display:grid;gap:8px;margin-top:10px}.wl-it-audit-row{border:1px solid #263746;border-radius:10px;background:#0b151e;padding:10px}.wl-it-audit-row b{color:#fff}.wl-it-audit-row span{display:block;color:#a8b3bd;font-size:12px;margin-top:3px}.wl-it-audit-row em{font-style:normal;color:#6f8190;font-size:11px}
+  `;
+  document.head.append(s);
+}
+
 async function showITHome() {
   if (!isIT() || !viewIT()) return;
+  ensureITCommandDashboardStyles();
   let home=document.getElementById('wlItHome');
   if(!home){
     home=document.createElement('div');
@@ -2743,7 +2766,7 @@ async function showITHome() {
     home.className='card wl-home wl-it-simple-home';
     viewIT().prepend(home);
   }
-  home.innerHTML=techDashboardLoadingHtml('Checking your next IT action…');
+  home.innerHTML=techDashboardLoadingHtml('Checking your IT command dashboard…');
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
 
@@ -2754,26 +2777,65 @@ async function showITHome() {
   try{
     const state=await techDashboardTimeout(itDayState(),null);
     const flash=takeTechCompletion('it');
-    home.innerHTML=`<div class='wl-it-simple-shell'>
-      <div class='wl-it-simple-kicker'>IT TECHNICIAN</div>
-      <h1>HELLO, ${esc(ownerViewingIT?'TECHNICIAN':firstName.toUpperCase())}</h1>
-      ${techCompletionBanner(flash)}
-      ${itNextActionHtml(state)}
-      ${itServiceQueueHtml(state)}
-      <div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> NEXT IT JOB <b>→</b> SERVICE QUEUE</div>
-
-      <details class='wl-it-more'>
-        <summary>OTHER ACTIONS</summary>
-        <div class='wl-it-more-grid'>
-          <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
-          <button data-wl-it-truck-inventory>SERVICE TRUCK INVENTORY</button>
-          <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${(state.truckRestockQueue||[]).length?` · ${state.truckRestockQueue.length}`:''}</button>
-          <button data-wl-mode='intake'>IT INTAKE / RETURNS${state.waitingReturns.length?` · ${state.waitingReturns.length}`:''}</button>
-          <button data-wl-it='pending'>RESUME EQUIPMENT PREP${state.drafts.length?` · ${state.drafts.length}`:''}</button>
-          <button data-wl-it='history'>STATUS & HISTORY</button>
-          ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
+    const assigned=(state.currentAssignments||[]).length;
+    const returns=(state.waitingReturns||[]).length;
+    const restock=(state.truckRestockQueue||[]).length;
+    const serviceQueue=(state.serviceQueue||[]).length;
+    home.innerHTML=`<div class='wl-it-command-shell'>
+      <aside class='wl-it-command-sidebar'>
+        <div class='wl-it-command-brand'><img src='./techcheck-eye-favicon-32.png?v=1' alt=''><span><b>CAMERAS ONSITE</b><small>IT Technician</small></span></div>
+        <nav class='wl-it-command-nav'>
+          <button class='active' data-wl-home='it'>Dashboard</button>
+          <a href='./camera-health.html?v=it-dashboard-20260923a'>Camera Health</a>
+          <button data-wl-it-truck-inventory>Truck Inventory</button>
+          <button data-wl-it-truck-restock>Truck Restock</button>
+          <button data-wl-mode='intake'>IT Intake</button>
+          <button data-wl-it='pending'>Equipment Prep</button>
+          <button data-wl-it='history'>History</button>
+          <button data-wl-it-open-job>Open MHelpDesk Job</button>
+        </nav>
+        <div class='wl-it-command-limit'><b>IT ACCESS</b>Camera health, equipment prep, truck inventory, intake, handoffs, and IT history. Owner assignment, Owner Review, accounts, and administrative controls stay Owner-only.</div>
+      </aside>
+      <main class='wl-it-command-workspace'>
+        <header class='wl-it-command-head'><div><small>CAMERAS ONSITE · IT</small><h1>Good morning, ${esc(ownerViewingIT?'IT':firstName)}</h1><p>Work the queue, maintain official equipment records, and complete required checks.</p></div><button class='mini' data-wl-home='it'>Refresh</button></header>
+        ${techCompletionBanner(flash)}
+        <div class='wl-it-command-stats'>
+          <div class='wl-it-command-stat'><b>${assigned}</b><span>ACTIVE IT JOBS</span></div>
+          <div class='wl-it-command-stat'><b>${returns}</b><span>RETURNS WAITING</span></div>
+          <div class='wl-it-command-stat'><b>${restock}</b><span>TRUCK RESTOCK</span></div>
+          <div class='wl-it-command-stat'><b>${serviceQueue}</b><span>SERVICE QUEUE</span></div>
         </div>
-      </details>
+        <div class='wl-it-command-grid'>
+          <section class='wl-it-command-panel'>
+            <h2>Next IT Action</h2>
+            ${itNextActionHtml(state)}
+            ${itServiceQueueHtml(state)}
+            <div class='wl-it-flowline'>IT INTAKE <b>→</b> SITE REGISTRATION <b>→</b> ACTIVE PREP <b>→</b> SERVICE HANDOFF</div>
+          </section>
+          <section class='wl-it-command-panel'>
+            <h2>IT Controls</h2>
+            <div class='wl-it-permissions'>
+              <div class='wl-it-permission'><i>✓</i><div><b>Camera Health</b><span>Open the same Camera Health workspace as Owner.</span></div></div>
+              <div class='wl-it-permission'><i>✓</i><div><b>Service Truck Inventory</b><span>IT controls official unit tags, SIM numbers, and battery counts. Every change is logged.</span></div></div>
+              <div class='wl-it-permission'><i>✓</i><div><b>Equipment Checks</b><span>Required readiness checks still apply before equipment is released.</span></div></div>
+              <div class='wl-it-permission'><i>✓</i><div><b>Intake + Handoffs</b><span>Receive returned equipment and hand verified equipment to Service.</span></div></div>
+            </div>
+            <div class='wl-it-owner-lock'><b>OWNER-ONLY:</b> job assignment, Owner Review/closeout, team accounts, access controls, and administrative overrides.</div>
+            <details class='wl-it-more'>
+              <summary>MORE IT ACTIONS</summary>
+              <div class='wl-it-more-grid'>
+                <button data-wl-it-open-job>ENTER MHELPDESK TICKET</button>
+                <button data-wl-it-truck-inventory>SERVICE TRUCK INVENTORY</button>
+                <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${restock?` · ${restock}`:''}</button>
+                <button data-wl-mode='intake'>IT INTAKE / RETURNS${returns?` · ${returns}`:''}</button>
+                <button data-wl-it='pending'>RESUME EQUIPMENT PREP${(state.drafts||[]).length?` · ${state.drafts.length}`:''}</button>
+                <button data-wl-it='history'>STATUS & HISTORY</button>
+                ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
+              </div>
+            </details>
+          </section>
+        </div>
+      </main>
     </div>`;
   }catch(error){
     home.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not verify your IT work.');
@@ -2782,7 +2844,8 @@ async function showITHome() {
   hideChildren(viewIT(),[home]);
   resetWizardPosition();
 }
-function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
+
+function itCreateCard()function itCreateCard() { return document.getElementById('itTicket')?.closest('.card'); }
 function createParts() {
   const card = itCreateCard();
   return { card, section: card?.querySelector('.sectiontitle'), intro: card?.querySelector('.sectiontitle')?.nextElementSibling, ticket: card?.querySelector('.grid'), title: [...(card?.querySelectorAll('h3') || [])].find(x => /Equipment Required/i.test(x.textContent)), eq: card?.querySelector('.grid3'), recon: document.getElementById('reconBatteryWrap'), add: [...(card?.querySelectorAll('button') || [])].find(b => /Add Requirement|Add Equipment/i.test(b.textContent)), draft: document.getElementById('needDraft'), create: [...(card?.querySelectorAll('button') || [])].find(b => /Create IT Equipment Prep/i.test(b.textContent)), msg: document.getElementById('itCreateMessage') };
@@ -4621,6 +4684,22 @@ async function loadITServiceTruckInventory(){
   if(error)throw error;
   return Array.isArray(data)?data:[];
 }
+
+async function loadServiceTruckInventoryAudit(serviceTechId){
+  const {data,error}=await liveDb.rpc('service_truck_inventory_audit_v1',{p_service_tech_id:serviceTechId||null});
+  if(error)throw error;
+  return Array.isArray(data)?data:[];
+}
+function itTruckAuditHtml(rows){
+  if(!rows?.length)return "<div class='small'>No inventory changes have been logged yet.</div>";
+  return "<div class='wl-it-audit'>"+rows.slice(0,30).map(r=>{
+    const before=r.before_value==null||r.before_value===''?'—':r.before_value;
+    const after=r.after_value==null||r.after_value===''?'—':r.after_value;
+    const who=r.actor_name||'System';
+    const role=r.actor_role==='owner'?'Owner/Admin':r.actor_role==='it'?'IT Technician':r.actor_role||'System';
+    return "<div class='wl-it-audit-row'><b>"+esc(String(r.action||'updated').toUpperCase())+" · "+esc(r.item_slot||r.item_kind)+"</b><span>"+esc(before)+" → "+esc(after)+"</span><em>"+esc(who)+" · "+esc(role)+" · "+new Date(r.created_at).toLocaleString()+"</em></div>";
+  }).join('')+"</div>";
+}
 function itTruckInventoryCounts(row){
   const units=Array.isArray(row?.units)?row.units:[];
   const sims=Array.isArray(row?.sims)?row.sims:[];
@@ -4667,35 +4746,78 @@ async function showITServiceTruckManager(serviceTechId){
   const card=document.getElementById('wlItTruckInventory'); if(!card)return;
   const units=Array.isArray(row.units)?row.units:[],sims=Array.isArray(row.sims)?row.sims:[],stock=row.stock||{};
   const unitTypes=['Sniper','Ranger','Spotter','Solar Spotter'];
-  card.innerHTML=`<button class='wl-back' data-wl-it-truck-inventory>← SERVICE TRUCKS</button>${progress('MANAGE / LOAD TRUCK',row.service_tech_name||'Service Tech',1,1)}
-    <div class='wl-it-restock-banner'><b>IT SUPPLIES THIS TRUCK</b><span>Load exact unit tags, exact SIM numbers, or add battery quantities. Service cannot add inventory here and must re-verify after every IT change.</span></div>
+  let audit=[];
+  try{audit=await loadServiceTruckInventoryAudit(serviceTechId)}catch(error){console.warn('Could not load truck inventory audit',error)}
+  card.innerHTML=`<button class='wl-back' data-wl-it-truck-inventory>← SERVICE TRUCKS</button>${progress('MANAGE SERVICE TRUCK',row.service_tech_name||'Service Tech',1,1)}
+    <div class='wl-it-restock-banner'><b>IT MAINTAINS THE OFFICIAL INVENTORY · SERVICE PHYSICALLY VERIFIES IT</b><span>IT can add, remove, or correct unit tags, exact SIM numbers, and battery counts. Every saved change records who changed it, what changed, and when. Any change forces Service to verify the truck again before departure.</span></div>
+    <label class='top10'>Change note (optional)<input id='wlInventoryChangeNote' placeholder='Why are you changing this inventory?'></label>
     <div class='wl-it-truck-editor'>
-      <div class='wl-truck-section-title'>PERMANENT UNITS · 1 EACH</div>
-      ${unitTypes.map(type=>{const u=units.find(x=>x.equipment_type===type)||{};return `<div class='wl-it-load-line'><div><b>${esc(type)}</b><span>${u.unit_tag?'CURRENT · '+esc(u.unit_tag):'MISSING · IT LOAD REQUIRED'}</span></div><input id='wlLoadUnit_${type.replaceAll(' ','_')}' placeholder='Exact unit tag' value='${esc(u.unit_tag||'')}'><button data-wl-it-load-unit='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>LOAD / VERIFY</button></div>`;}).join('')}
+      <div class='wl-truck-section-title'>PERMANENT UNITS · EXACT UNIT TAGS</div>
+      <div class='small'>To assign or correct a unit, enter the exact tag and complete all 7 IT readiness checks below. To remove a unit from the truck, clear the tag and save.</div>
+      ${unitTypes.map(type=>{const u=units.find(x=>x.equipment_type===type)||{};return `<div class='wl-it-load-line'><div><b>${esc(type)}</b><span>${u.unit_tag?'CURRENT · '+esc(u.unit_tag):'NOT ASSIGNED'}</span></div><input id='wlLoadUnit_${type.replaceAll(' ','_')}' placeholder='Exact unit tag — blank removes' value='${esc(u.unit_tag||'')}'><button data-wl-it-load-unit='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>SAVE / CORRECT</button></div>`;}).join('')}
       <div id='wlItUnitLoadChecks'>${itTruckUnitLoadChecksHtml()}</div>
       <div class='wl-truck-section-title'>SIM CARDS · EXACT NUMBERS</div>
-      ${[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return `<div class='wl-it-load-line'><div><b>SIM ${slot}</b><span>${s.sim_number?'CURRENT · '+esc(s.sim_number):'MISSING · IT LOAD REQUIRED'}</span></div><input id='wlLoadSim_${slot}' inputmode='numeric' placeholder='Exact SIM number' value='${esc(s.sim_number||'')}'><label class='wl-it-inline-verify'><input id='wlLoadSimVerified_${slot}' type='checkbox'> verified</label><button data-wl-it-load-sim='${slot}' data-service-tech='${esc(serviceTechId)}'>ASSIGN SIM</button></div>`;}).join('')}
-      <div class='wl-truck-section-title'>BATTERY STOCK · ADD ONLY WHAT IT PHYSICALLY LOADS</div>
-      ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='1' inputmode='numeric' placeholder='Qty added'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>ADD TO TRUCK</button></div>`).join('')}
-    </div>`;
+      ${[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return `<div class='wl-it-load-line'><div><b>SIM ${slot}</b><span>${s.sim_number?'CURRENT · '+esc(s.sim_number):'NOT ASSIGNED'}</span></div><input id='wlLoadSim_${slot}' inputmode='numeric' placeholder='Exact SIM number — blank removes' value='${esc(s.sim_number||'')}'><label class='wl-it-inline-verify'><input id='wlLoadSimVerified_${slot}' type='checkbox'> exact number verified</label><button data-wl-it-load-sim='${slot}' data-service-tech='${esc(serviceTechId)}'>SAVE / CORRECT</button></div>`;}).join('')}
+      <div class='wl-truck-section-title'>BATTERY STOCK · SET THE EXACT PHYSICAL COUNT</div>
+      ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='0' inputmode='numeric' value='${qty}'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>SET EXACT COUNT</button></div>`).join('')}
+    </div>
+    <details class='wl-it-more top10' open><summary>INVENTORY CHANGE HISTORY · ${audit.length}</summary>${itTruckAuditHtml(audit)}</details>`;
 }
 window.showITServiceTruckInventory=showITServiceTruckInventory;
 window.showITServiceTruckManager=showITServiceTruckManager;
+async function refreshITTruckManager(serviceTechId){
+  window.__wlItTruckInventoryRows=await loadITServiceTruckInventory();
+  return showITServiceTruckManager(serviceTechId);
+}
+function itTruckAdjustmentChecks(){
+  const checks={};
+  document.querySelectorAll('[data-wl-it-load-unit-check]').forEach(x=>checks[x.dataset.wlItLoadUnitCheck]=Boolean(x.checked));
+  return checks;
+}
 async function itLoadTruckUnit(serviceTechId,type){
-  const input=document.getElementById('wlLoadUnit_'+String(type).replaceAll(' ','_')); const tag=input?.value.trim()||'';
-  const checks={}; document.querySelectorAll('[data-wl-it-load-unit-check]').forEach(x=>checks[x.dataset.wlItLoadUnitCheck]=Boolean(x.checked));
-  if(!tag)return alert('Enter the exact unit tag.');
-  if(Object.values(checks).length!==7||Object.values(checks).some(v=>!v))return alert('Complete all 7 IT readiness checks before loading this unit.');
-  try{const {error}=await liveDb.rpc('it_load_service_truck_unit_v1',{p_service_tech_id:serviceTechId,p_equipment_type:type,p_unit_tag:tag,p_checks:checks});if(error)throw error;alert(type+' '+tag+' loaded. Service must verify the truck again.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not load unit.');}
+  const input=document.getElementById('wlLoadUnit_'+String(type).replaceAll(' ','_'));
+  const tag=input?.value.trim()||'';
+  const checks=itTruckAdjustmentChecks();
+  if(tag && (Object.values(checks).length!==7||Object.values(checks).some(v=>!v)))return alert('Complete all 7 IT readiness checks before assigning or correcting this unit.');
+  if(!tag && !confirm('Remove the '+type+' from this Service truck inventory? Service will have to verify the truck again.'))return;
+  const note=document.getElementById('wlInventoryChangeNote')?.value.trim()||'';
+  try{
+    const {error}=await liveDb.rpc('it_adjust_service_truck_inventory_v3',{
+      p_service_tech_id:serviceTechId,p_kind:'unit',p_slot:type,p_value:tag,p_checks:checks,p_verified:false,p_note:note
+    });
+    if(error)throw error;
+    alert(type+' inventory saved. Service must physically verify the truck again.');
+    return refreshITTruckManager(serviceTechId);
+  }catch(error){alert(error?.message||'Could not change truck unit.');}
 }
 async function itLoadTruckSim(serviceTechId,slot){
-  const sim=document.getElementById('wlLoadSim_'+slot)?.value.trim()||''; const verified=Boolean(document.getElementById('wlLoadSimVerified_'+slot)?.checked);
-  if(!sim)return alert('Enter the exact SIM number.'); if(!verified)return alert('Physically verify the exact SIM number first.');
-  try{const {error}=await liveDb.rpc('it_load_service_truck_sim_v1',{p_service_tech_id:serviceTechId,p_slot_no:Number(slot),p_sim_number:sim,p_number_verified:true});if(error)throw error;alert('SIM '+slot+' assigned. Service must verify the truck again.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not assign SIM.');}
+  const sim=document.getElementById('wlLoadSim_'+slot)?.value.trim()||'';
+  const verified=Boolean(document.getElementById('wlLoadSimVerified_'+slot)?.checked);
+  if(sim&&!verified)return alert('Physically verify the exact SIM number first.');
+  if(!sim&&!confirm('Remove SIM '+slot+' from this Service truck inventory? Service will have to verify the truck again.'))return;
+  const note=document.getElementById('wlInventoryChangeNote')?.value.trim()||'';
+  try{
+    const {error}=await liveDb.rpc('it_adjust_service_truck_inventory_v3',{
+      p_service_tech_id:serviceTechId,p_kind:'sim',p_slot:String(slot),p_value:sim,p_checks:{},p_verified:verified,p_note:note
+    });
+    if(error)throw error;
+    alert('SIM '+slot+' inventory saved. Service must verify the exact SIM again.');
+    return refreshITTruckManager(serviceTechId);
+  }catch(error){alert(error?.message||'Could not change truck SIM.');}
 }
 async function itAddTruckStock(serviceTechId,type,index){
-  const qty=Math.max(0,Math.floor(Number(document.getElementById('wlLoadStock_'+index)?.value||0))); if(!qty)return alert('Enter the quantity IT physically added.');
-  try{const {error}=await liveDb.rpc('it_add_service_truck_stock_v1',{p_service_tech_id:serviceTechId,p_item_type:type,p_qty_added:qty});if(error)throw error;alert(qty+' × '+type+' added. Service must recount the truck.');return showITServiceTruckInventory();}catch(error){alert(error?.message||'Could not add truck stock.');}
+  const raw=document.getElementById('wlLoadStock_'+index)?.value;
+  const qty=Math.floor(Number(raw));
+  if(!Number.isFinite(qty)||qty<0)return alert('Enter the exact physical quantity on the truck.');
+  const note=document.getElementById('wlInventoryChangeNote')?.value.trim()||'';
+  try{
+    const {error}=await liveDb.rpc('it_adjust_service_truck_inventory_v3',{
+      p_service_tech_id:serviceTechId,p_kind:'stock',p_slot:type,p_value:String(qty),p_checks:{},p_verified:true,p_note:note
+    });
+    if(error)throw error;
+    alert(type+' count saved as '+qty+'. Service must recount the truck.');
+    return refreshITTruckManager(serviceTechId);
+  }catch(error){alert(error?.message||'Could not set truck stock count.');}
 }
 
 async function loadITTruckRestockQueue(){
