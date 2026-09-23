@@ -1994,16 +1994,17 @@ function ownerCalendarSelect(key){
 }
 function ownerCalendarDayCell(d,inMonth=true){
   const key=localDateKey(d),jobs=ownerCalendarJobsForDate(d),today=key===localDateKey(new Date()),sel=key===ownerCalendarSelected;
-  const maxEvents=ownerCalendarMode==='week'?5:2;
+  const maxEvents=ownerCalendarMode==='week'?5:3;
   const events=jobs.slice(0,maxEvents).map(j=>{
     const role=j.assigned_role==='it'?'it':'service';
     const status=j.status==='started'?'working':j.status==='completed'?'complete':'waiting';
     const time=j.scheduled_time?String(j.scheduled_time).slice(0,5):'';
     return '<div class="ownerCalEvent '+role+' '+status+'"><div><b>#'+esc(j.ticket_no||'—')+'</b><span>'+esc(String(j.work_type||'Job').toUpperCase())+(time?' · '+esc(time):'')+'</span></div><strong>'+esc(j.site||'Site')+'</strong></div>';
   }).join('');
+  const dots=jobs.length?'<div class="ownerCalDots">'+jobs.slice(0,3).map(j=>'<i class="'+(j.assigned_role==='it'?'it':'service')+'"></i>').join('')+(jobs.length>3?'<small>+'+(jobs.length-3)+'</small>':'')+'</div>':'';
   return '<button type="button" class="ownerCalDay '+(!inMonth?'muted ':'')+(today?'today ':'')+(sel?'selected ':'')+'" onclick="ownerCalendarSelect(\''+key+'\')">'
     +'<div class="ownerCalDate"><b>'+d.getDate()+'</b>'+(today?'<em>TODAY</em>':'')+(jobs.length?'<span>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</span>':'')+'</div>'
-    +events
+    +dots+events
     +(jobs.length>maxEvents?'<small class="ownerCalMore">+'+(jobs.length-maxEvents)+' more</small>':'')
     +'</button>';
 }
