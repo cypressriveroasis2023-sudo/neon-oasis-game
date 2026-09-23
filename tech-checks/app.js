@@ -410,17 +410,20 @@ async function techCheckWeatherForGps(coords,days=7){
   return data;
 }
 
-async function updateItWeather() {
+let techWeatherRefreshTimer=null;
+async function updateItWeather(force=false) {
   const weather = $('itWeatherNow');
-  if (!weather) return;
-  weather.textContent='Reading GPS for local weather…';
+  if (!weather || document.hidden) return;
+  weather.textContent='Updating local weather…';
   try {
-    const coords=await techCheckGpsPosition();
+    const coords=await techCheckGpsPosition(force);
     const data=await techCheckWeatherForGps(coords,1);
     const current=data.current||{};
     const code=Number(current.weather_code);
     const condition=code===0?'Clear':code<=3?'Partly cloudy':code<=48?'Cloudy':code<=67?'Rain':code<=77?'Wintry':code<=82?'Showers':'Storms';
-    weather.textContent=`${Math.round(Number(current.temperature_2m||0))}°F · ${condition} · Feels ${Math.round(Number(current.apparent_temperature||0))}° · GPS`;
+    weather.textContent=`${Math.round(Number(current.temperature_2m||0))}°F · ${condition} · Feels ${Math.round(Number(current.apparent_temperature||0))}° · updated ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`;
+    clearInterval(techWeatherRefreshTimer);
+    techWeatherRefreshTimer=setInterval(()=>updateItWeather(false),10*60*1000);
   } catch (error) {
     weather.textContent=error?.message||'Local GPS weather unavailable';
   }
@@ -2372,9 +2375,11 @@ function ownerTodayClockTick(){
 }
 function ownerStartTodayLive(){
   clearInterval(window.ownerTodayClockTimer);
+  clearInterval(window.ownerTodayWeatherTimer);
   ownerTodayClockTick();
   window.ownerTodayClockTimer=setInterval(ownerTodayClockTick,1000);
-  ownerEnsureWeather();
+  ownerEnsureWeather(true);
+  window.ownerTodayWeatherTimer=setInterval(()=>ownerEnsureWeather(true),10*60*1000);
 }
 function ownerTodayReadinessHtml(){
   const techs=Array.isArray(state.ownerTechCommandBoard?.service_techs)?state.ownerTechCommandBoard.service_techs:[];
