@@ -17,123 +17,401 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
 .camera-search-result{display:flex;width:100%;text-align:left;justify-content:space-between;gap:10px;padding:12px 14px;margin:6px 0;border:1px solid #304457;border-radius:12px;background:#0e1721;color:#eef4fb}
 .camera-search-result small{opacity:.7}
 </style><style id="mobile-no-horizontal-scroll">
-/* Mobile Camera Health: vertical scrolling only. Desktop layout is unchanged. */
-@media(max-width:700px){
-  html,body{width:100%!important;max-width:100%!important;overflow-x:hidden!important}
-  body,.shell,.opspanel,.panel,.tablewrap,.eventrows,.historyrows,.troublebox,#deviceTable,#unitCards{min-width:0!important;max-width:100%!important}
-  .shell{width:100%!important;overflow-x:hidden!important;padding-left:10px!important;padding-right:10px!important}
-  .cos-topline,.cos-search,.cos-search input,.toolbar,.toolbar input,.toolbar select{min-width:0!important;max-width:100%!important}
-  .toolbar{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;width:100%!important}
-  .toolbar input,.toolbar select{width:100%!important}
-  .quickfilters{width:100%!important;max-width:100%!important;overflow:hidden!important}
-  .quickfilter{min-width:0!important;max-width:100%!important;flex:1 1 145px!important;white-space:normal!important}
+/* Camera Health mobile contract: vertical-only layout. Desktop remains unchanged. */
+@media(max-width:768px){
+  html,body{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:hidden!important;
+  }
 
-  /* Alerts / issues become wrapping cards instead of desktop rows. */
-  .eventrows{overflow-y:auto!important;overflow-x:hidden!important}
-  .eventrow{
-    display:flex!important;
-    flex-wrap:wrap!important;
+  .shell{
     width:100%!important;
     max-width:100%!important;
     min-width:0!important;
-    grid-template-columns:none!important;
-    gap:5px 9px!important;
+    margin-left:0!important;
+    padding:10px!important;
+    overflow-x:hidden!important;
+  }
+  .shell *{min-width:0}
+  .shell img,.shell svg,.shell canvas{max-width:100%;height:auto}
+
+  .cos-sidebar{display:none!important}
+  .cos-topline{
+    width:100%!important;
+    max-width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:10px!important;
+    position:relative!important;
+    top:auto!important;
+  }
+  .cos-title,.cos-search,.cos-search input{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+  .cos-title h1,.cos-title div{overflow-wrap:anywhere!important;word-break:break-word!important}
+
+  .stats{
+    width:100%!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .stat{min-width:0!important;padding:12px!important}
+
+  .toolbar{
+    width:100%!important;
+    max-width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:8px!important;
+  }
+  .toolbar input,.toolbar select,.toolbar button{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+
+  .quickfilters{
+    width:100%!important;
+    max-width:100%!important;
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    overflow:hidden!important;
+  }
+  .quickfilter{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .opsgrid,.ops-bottom{
+    width:100%!important;
+    max-width:100%!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:10px!important;
+  }
+  .opspanel,.panel,.tablewrap,.eventrows,.historyrows,.troublebox,
+  #deviceTable,#unitCards,#cameraIssues,#recentChanges,#liveFeed,#outageHistory{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:hidden!important;
+  }
+  .opstitle{
+    max-width:100%!important;
+    flex-wrap:wrap!important;
+    gap:6px!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  /* Issues / live events: one vertical card per camera. */
+  .eventrows{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:8px!important;
+    padding:8px!important;
+  }
+  .issue-row{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    border:1px solid #263747!important;
+    border-radius:12px!important;
+    background:#0a141d!important;
+    overflow:hidden!important;
+  }
+  .eventrow{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    gap:5px!important;
     padding:11px 12px!important;
     white-space:normal!important;
-    text-align:left!important
+    text-align:left!important;
+    overflow:hidden!important;
   }
-  .eventrow>*{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-  .eventrow>span:first-child{flex:0 0 auto!important}
-  .eventrow>b{flex:1 1 140px!important}
-  .eventrow>.eventstatus{flex:0 0 auto!important;margin-left:auto!important}
-  .eventrow>.eventdetail{display:block!important;flex:1 0 100%!important;width:100%!important;white-space:normal!important;text-align:left!important}
-  .issue-row,.issue-actions{width:100%!important;max-width:100%!important;min-width:0!important}
-  .issue-actions{padding:0 12px 11px!important}
-  .issue-actions button{max-width:100%!important;white-space:normal!important}
-  .issue-subhead{overflow-wrap:anywhere!important}
+  .eventrow>*{
+    width:auto!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin:0!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+    text-align:left!important;
+  }
+  .eventrow>b{font-size:15px!important;line-height:1.25!important}
+  .eventrow>.eventstatus{justify-self:start!important}
+  .eventrow>.eventdetail{
+    display:block!important;
+    width:100%!important;
+    color:#9fb0bf!important;
+  }
+  .issue-actions{
+    width:100%!important;
+    max-width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:7px!important;
+    padding:0 12px 12px!important;
+  }
+  .issue-actions button{
+    width:100%!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  .issue-subhead{
+    max-width:100%!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
 
-  /* Device table becomes stacked camera cards. */
-  #deviceTable.tablewrap{overflow:visible!important;border:0!important;background:transparent!important}
-  #deviceTable table,#deviceTable tbody,#deviceTable tr,#deviceTable td{display:block!important;width:100%!important;max-width:100%!important;min-width:0!important}
-  #deviceTable table{border-collapse:separate!important}
+  /* Camera inventory table becomes true stacked cards. */
+  #deviceTable.tablewrap{
+    overflow:visible!important;
+    border:0!important;
+    background:transparent!important;
+  }
+  #deviceTable table,#deviceTable tbody{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
   #deviceTable thead{display:none!important}
-  #deviceTable tbody{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:10px!important;padding:0!important}
+  #deviceTable tbody{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:10px!important;
+  }
   #deviceTable tr{
-    position:relative!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    gap:0!important;
+    padding:12px!important;
     background:#0a141d!important;
     border:1px solid #263747!important;
     border-radius:13px!important;
-    padding:12px!important;
-    overflow:hidden!important
+    overflow:hidden!important;
   }
   #deviceTable td{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
     border:0!important;
-    padding:4px 0!important;
+    padding:5px 0!important;
     white-space:normal!important;
     overflow:visible!important;
     overflow-wrap:anywhere!important;
-    word-break:break-word!important
+    word-break:break-word!important;
   }
-  #deviceTable td:first-child{display:none!important}
-  #deviceTable td:nth-child(3){order:1!important;padding-bottom:8px!important}
-  #deviceTable td:nth-child(2){order:2!important;border-top:1px solid #1d2b38!important;padding-top:9px!important}
-  #deviceTable td:nth-child(4){order:3!important}
-  #deviceTable td:nth-child(5){order:4!important}
-  #deviceTable td:nth-child(8){order:5!important}
-  #deviceTable td:nth-child(6),#deviceTable td:nth-child(7),#deviceTable td:nth-child(9){display:none!important}
+
+  /* Actual DOM order is Status, Device, Type, Ports, Model, Site, Last Online, Version. */
+  #deviceTable td:nth-child(1){order:1!important}
+  #deviceTable td:nth-child(2){order:2!important;border-top:1px solid #1d2b38!important;margin-top:5px!important;padding-top:10px!important}
+  #deviceTable td:nth-child(3){order:3!important}
+  #deviceTable td:nth-child(4){order:4!important}
+  #deviceTable td:nth-child(6){order:5!important}
+  #deviceTable td:nth-child(7){order:6!important}
+  #deviceTable td:nth-child(5),#deviceTable td:nth-child(8){display:none!important}
+
+  #deviceTable td:nth-child(1)::before,
   #deviceTable td:nth-child(2)::before,
+  #deviceTable td:nth-child(3)::before,
   #deviceTable td:nth-child(4)::before,
-  #deviceTable td:nth-child(5)::before,
-  #deviceTable td:nth-child(8)::before{
+  #deviceTable td:nth-child(6)::before,
+  #deviceTable td:nth-child(7)::before{
     display:block!important;
-    margin:4px 0 3px!important;
+    margin:0 0 3px!important;
     color:#7f93a6!important;
     font-size:10px!important;
     font-weight:900!important;
-    letter-spacing:.10em!important
+    letter-spacing:.10em!important;
   }
-  #deviceTable td:nth-child(2)::before{content:"STATUS"}
-  #deviceTable td:nth-child(4)::before{content:"TYPE"}
-  #deviceTable td:nth-child(5)::before{content:"PORTS / PROFILE"}
-  #deviceTable td:nth-child(8)::before{content:"LAST ONLINE"}
-  #deviceTable td:nth-child(3)>a{display:block!important;font-size:17px!important;line-height:1.25!important;overflow-wrap:anywhere!important}
-  #deviceTable .issue-open-unit{width:100%!important;max-width:100%!important;margin-top:9px!important}
-  #deviceTable .small{white-space:normal!important;overflow-wrap:anywhere!important}
+  #deviceTable td:nth-child(1)::before{content:"STATUS / ISSUE"}
+  #deviceTable td:nth-child(2)::before{content:"CAMERA / UNIT"}
+  #deviceTable td:nth-child(3)::before{content:"TYPE"}
+  #deviceTable td:nth-child(4)::before{content:"PORTS"}
+  #deviceTable td:nth-child(6)::before{content:"SITE / ORGANIZATION"}
+  #deviceTable td:nth-child(7)::before{content:"LAST ONLINE"}
 
-  /* Unit cards also stay inside the phone. */
-  .unitcards{grid-template-columns:minmax(0,1fr)!important;width:100%!important;max-width:100%!important;padding:0!important}
-  .unitcard,.component-list,.component{width:100%!important;max-width:100%!important;min-width:0!important}
-  .component{grid-template-columns:minmax(0,1fr)!important;gap:4px!important}
-  .component>*{min-width:0!important;max-width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-  .cardtop{min-width:0!important;flex-wrap:wrap!important}
-  .cardtitle,.cardmeta,.meta{max-width:100%!important;overflow-wrap:anywhere!important}
+  #deviceTable td:nth-child(2)>a{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    font-size:17px!important;
+    line-height:1.25!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  #deviceTable .small,
+  #deviceTable .yellow,
+  #deviceTable .green{
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  #deviceTable .issue-open-unit{
+    width:100%!important;
+    max-width:100%!important;
+    min-height:44px!important;
+    margin-top:9px!important;
+  }
 
-  /* Troubleshooting controls stack and wrap. */
-  .opsgrid,.ops-bottom{grid-template-columns:minmax(0,1fr)!important;width:100%!important}
-  .troublebox,.trouble{width:100%!important;max-width:100%!important;min-width:0!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-  .trouble-search{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%!important;gap:8px!important}
-  .trouble-search input,.trouble-search button{width:100%!important;max-width:100%!important;min-width:0!important}
-  .diagnostic-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important;gap:7px!important}
-  .diagnostic-tabs button{width:100%!important;min-width:0!important;white-space:normal!important}
-  .quick-actions{grid-template-columns:minmax(0,1fr)!important;width:100%!important}
-  .quick-actions button{width:100%!important;max-width:100%!important;min-width:0!important;white-space:normal!important}
-  .historyrows{overflow-x:hidden!important}
+  /* Unit cards: no desktop-style columns on phones. */
+  .unitcards{
+    width:100%!important;
+    max-width:100%!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    padding:0!important;
+    gap:10px!important;
+  }
+  .unitcard,.component-list,.component,.cardtop,.cardmeta,.ports,.web-links,.card-actions{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+  .unitcard{padding:12px!important;overflow:hidden!important}
+  .cardtop{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:7px!important}
+  .statuspill{justify-self:start!important}
+  .component{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:4px!important;
+  }
+  .component>*,.cardtitle,.meta,.port,.ipline,.trouble,.downline{
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  .card-actions,.web-links{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:7px!important;
+  }
+  .card-actions button,.web-links a{
+    width:100%!important;
+    max-width:100%!important;
+    white-space:normal!important;
+  }
+
+  /* Troubleshooter: every control and result remains inside the viewport. */
+  .troublebox,.trouble{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow:hidden!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  .trouble-search{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    gap:8px!important;
+  }
+  .trouble-search input,.trouble-search button{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+  .diagnostic-tabs{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    width:100%!important;
+    gap:7px!important;
+  }
+  .diagnostic-tabs button{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  .quick-actions{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    gap:8px!important;
+  }
+  .quick-actions button{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  #troubleResult,#troubleResult *{
+    max-width:100%!important;
+    min-width:0!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+  #troubleResult pre,#troubleResult code{
+    white-space:pre-wrap!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+
+  .historyrows{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:7px!important;
+  }
   .historyrow{
     display:grid!important;
     grid-template-columns:minmax(0,1fr)!important;
     width:100%!important;
     max-width:100%!important;
+    min-width:0!important;
     gap:3px!important;
-    white-space:normal!important
+    padding:10px 12px!important;
+    white-space:normal!important;
   }
-  .historyrow>*{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
+  .historyrow>*{
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
 
-  .camera-search-result{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%!important;min-width:0!important}
-  .camera-search-result>*{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
+  .camera-search-result{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+  .camera-search-result>*{
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
 }
+
 @media(max-width:390px){
-  .diagnostic-tabs{grid-template-columns:minmax(0,1fr)!important}
-  .quickfilter{flex-basis:100%!important}
+  .stats,.quickfilters,.diagnostic-tabs{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
 }
 </style></head><body><div id="authGate" class="authgate"><div class="authcard"><div class="brand" style="margin-bottom:16px"><img src="./techcheck-eye-192.png?v=1" alt=""><div><small>CAMERAS ONSITE</small><b>OnSite Vision · Camera Health</b></div></div><h2>Authorized Access</h2><p>Sign in with your Tech Check Owner or IT account.</p><label>Username</label><input id="cameraLoginUsername" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username"><label>Password</label><input id="cameraLoginPassword" type="password" autocomplete="current-password" placeholder="Password"><button id="cameraLogin" class="primary">Sign In</button><div id="cameraLoginMsg" class="autherr"></div><a class="btn" style="display:block;text-align:center;margin-top:10px" href="./">Sign in through Tech Check</a><div class="small" style="margin-top:10px;text-align:center">If Tech Check is already signed in, Camera Health will open automatically.</div></div></div><div class="shell">
 <aside class="cos-sidebar"><div class="cos-wordmark">CAMERAS ONSITE <span>OnSite Vision</span></div><div class="cos-submark">SECURITY · MONITOR · MAINTAIN</div><nav class="cos-nav"><button class="active">▣ &nbsp;Camera Health</button><button class="jump-events">◉ &nbsp;Alerts</button><button class="jump-trouble">⚒ &nbsp;Troubleshooting</button><button class="jump-history">▤ &nbsp;History</button><a href="./onsite-vision.html">◉ &nbsp;OnSite Vision</a><a href="./">← &nbsp;Tech Check Dashboard</a></nav></aside><div class="cos-topline"><div class="cos-title"><h1>Camera Health</h1><div>LIVE STATUS · ALERTS · TROUBLESHOOT · HISTORY</div></div><div class="cos-search"><input id="globalSearch" placeholder="Search units, sites, IPs, or device names…"><div id="cameraSearchResults"></div></div><div class="actions"><button id="importToggle" class="primary" style="display:none">Import / Map</button><button id="refresh">↻ Refresh</button><a class="btn" href="./onsite-vision.html">+ Vision</a></div></div>
