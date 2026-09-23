@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-it-full-command-20260923s';
+const CACHE_NAME = 'tech-check-it-full-width-20260923t';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
