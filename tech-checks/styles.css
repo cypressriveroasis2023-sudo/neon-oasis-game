@@ -7608,3 +7608,41 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerAppSidebar nav>button.active{border-radius:12px!important}
  #view-owner .ownerAppPage{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
 }
+
+/* Owner Calendar mobile-first layout v242 */
+@media(max-width:720px){
+ #view-owner[data-owner-route="calendar"] .ownerAppPageHeader p{display:none!important}
+ #view-owner[data-owner-route="calendar"] .ownerAppPageHeader h1{font-size:29px!important;line-height:1.02!important}
+ #view-owner .ownerCalQuick{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+ #view-owner .ownerCalQuick .btn{grid-column:1/-1!important;min-height:46px!important}
+ #view-owner .ownerCalQuick button{min-height:42px!important}
+ #view-owner .ownerCalStats{display:flex!important;gap:7px!important;overflow-x:auto!important;scroll-snap-type:x proximity;padding-bottom:3px!important}
+ #view-owner .ownerCalStats>div,#view-owner .ownerCalStats>div:last-child{grid-column:auto!important;flex:0 0 116px!important;min-height:62px!important;scroll-snap-align:start!important}
+ #view-owner .ownerCalStats b{font-size:24px!important}
+ #view-owner .ownerCalControlBar{gap:8px!important;padding:9px!important}
+ #view-owner .ownerCalPeriod{display:grid!important;grid-template-columns:38px 64px 38px minmax(0,1fr)!important;gap:5px!important;overflow:visible!important}
+ #view-owner .ownerCalPeriod button{padding:0!important;min-width:0!important}
+ #view-owner .ownerCalPeriod h2{grid-column:1/-1!important;margin:4px 0 0!important;font-size:20px!important;white-space:normal!important;text-align:left!important}
+ #view-owner .ownerCalRoleFilters,#view-owner .ownerCalModes{display:grid!important;grid-template-columns:repeat(3,1fr)!important;overflow:visible!important;gap:5px!important}
+ #view-owner .ownerCalRoleFilters>span{grid-column:1/-1!important;margin:0!important}
+ #view-owner .ownerCalRoleFilters button,#view-owner .ownerCalModes button{width:100%!important;min-height:38px!important;padding:0 6px!important}
+ #view-owner .ownerCalScroll{overflow:visible!important}
+ #view-owner .ownerCalGridFrame,#view-owner .ownerCalWeekFrame{min-width:0!important;width:100%!important}
+ #view-owner .ownerCalWeekdays{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+ #view-owner .ownerCalWeekdays b{min-height:30px!important;padding:0!important;font-size:8px!important}
+ #view-owner .ownerCalMonth{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+ #view-owner .ownerCalDay{min-height:68px!important;padding:5px 3px!important}
+ #view-owner .ownerCalDate{display:block!important;margin:0!important;text-align:center!important}
+ #view-owner .ownerCalDate b{font-size:13px!important}
+ #view-owner .ownerCalDate em{display:none!important}
+ #view-owner .ownerCalDate span{display:block!important;margin:3px auto 0!important;padding:1px 3px!important;width:max-content!important;max-width:100%!important;font-size:7px!important}
+ #view-owner .ownerCalEvent{height:5px!important;margin:3px 2px 0!important;padding:0!important;border:0!important;border-radius:4px!important;background:#ef4338!important;font-size:0!important}
+ #view-owner .ownerCalEvent.it{background:#5aa6cf!important}
+ #view-owner .ownerCalEvent.service{background:#54a875!important}
+ #view-owner .ownerCalEvent>*{display:none!important}
+ #view-owner .ownerCalMore{display:none!important}
+ #view-owner .ownerCalDay.selected{box-shadow:inset 0 0 0 2px #ef4338!important}
+ #view-owner .ownerCalDay.today .ownerCalDate b{display:inline-block!important}
+ #view-owner .ownerCalWorkspaceV2{grid-template-columns:1fr!important;gap:10px!important}
+ #view-owner .ownerCalSideRail{display:grid!important;grid-template-columns:1fr!important}
+}
