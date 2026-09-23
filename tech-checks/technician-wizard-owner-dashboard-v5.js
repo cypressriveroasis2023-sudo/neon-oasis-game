@@ -3384,6 +3384,35 @@ function itOpsServiceOptions(selected){
       return "<option value='"+esc(p.user_id)+"'"+sel+">"+esc(p.full_name||p.username||'Service Technician')+"</option>";
     }).join('');
 }
+function itOpsLeadOptions(selected){
+  selected=selected||'';
+  const current=(document.getElementById('whoName')||{}).textContent||'Me';
+  const it=wlITOpsProfilesCache.filter(function(p){return p.role==='it';});
+  return "<option value=''>Me — "+esc(current)+"</option>"+
+    it.map(function(p){
+      const sel=String(selected)===String(p.user_id)?" selected":"";
+      return "<option value='"+esc(p.user_id)+"'"+sel+">"+esc(p.full_name||p.username||'IT Technician')+"</option>";
+    }).join('');
+}
+function monitoredCameraSummary(raw){
+  const rows=normalizedEquipmentManifest(raw||[]);
+  let systems=0,cameras=0,known=false,detail=[];
+  rows.filter(function(r){return r.category==='device';}).forEach(function(r){
+    const label=String(r.label||'');
+    let per=null;
+    const m=label.match(/(?:^|\D)([24])\s*[- ]?camera/i);
+    if(m)per=Number(m[1]);
+    else if(/sniper\s*4/i.test(label))per=4;
+    else if(/sniper\s*2/i.test(label))per=2;
+    if(per){known=true;systems+=Number(r.qty||0);cameras+=Number(r.qty||0)*per;detail.push(r.qty+" × "+per+"-Camera Monitored "+equipmentDisplayLabel(label).replace(/\s*[24]\s*[- ]?camera.*$/i,''));}
+  });
+  return known?{systems:systems,cameras:cameras,text:detail.join(' · ')}:null;
+}
+function itOpsMonitoredCameraHtml(raw){
+  const s=monitoredCameraSummary(raw);
+  if(!s)return "<div id='wlITOpsCameraSummary' class='small top8'><b>Monitored camera configuration:</b> Select/enter a 2-camera or 4-camera monitored system when the MHelpDesk item specifies it.</div>";
+  return "<div id='wlITOpsCameraSummary' class='wl-it-ops-flow top8'><b>MONITORED CAMERA CONFIGURATION</b><span>"+esc(s.text)+" · Total monitored cameras: "+s.cameras+"</span></div>";
+}
 function itOpsEquipmentGrid(data){
   const rows=normalizedEquipmentManifest(data||[]);
   function render(category,types){
@@ -3393,7 +3422,7 @@ function itOpsEquipmentGrid(data){
       return "<label><span>"+esc(equipmentDisplayLabel(label))+"</span><input type='number' inputmode='numeric' min='0' step='1' value='"+qty+"' data-it-ops-equipment data-category='"+category+"' data-label='"+esc(label)+"'></label>";
     }).join('');
   }
-  return "<div class='wl-it-ops-section'><h3>Units / Devices</h3><div class='small'>Enter the quantity involved in the MHelpDesk ticket. For a Service Call, leave these at 0 when no shop prep is needed.</div><div class='wl-it-ops-equipment top8'>"+render('device',OWNER_DEVICE_TYPES)+"</div></div>"+
+  return "<div class='wl-it-ops-section'><h3>Units / Devices</h3><div class='small'>Enter the quantity involved in the MHelpDesk ticket. Keep unit quantity separate from monitored camera count.</div><div class='wl-it-ops-equipment top8'>"+render('device',OWNER_DEVICE_TYPES)+"</div>"+itOpsMonitoredCameraHtml(rows)+"</div>"+
     "<div class='wl-it-ops-section'><h3>Stands / Poles</h3><div class='wl-it-ops-equipment'>"+render('stand',OWNER_STAND_TYPES)+"</div></div>";
 }
 function readITOpsEquipmentManifest(){
@@ -3435,7 +3464,8 @@ function itOpsJobFormHtml(data,mode){
   const nums=itOpsUnitSummaryParts(d.unit_summary||'');
   const itName=(document.getElementById('whoName')||{}).textContent||'IT Technician';
   let html="<div id='wlITOpsJobForm' class='wl-it-ops-form' data-mode='"+mode+"'>";
-  html+="<div class='wl-it-ops-banner'><b>"+(edit?'YOU ARE THE TICKET LEAD':'YOU WILL OWN THIS TICKET')+"</b><span>"+esc(edit?(d.job_lead_name||itName)+" remains responsible unless ownership is explicitly transferred.":itName+" automatically becomes Ticket Lead. Another IT Tech is not selected during creation.")+"</span></div>";
+  html+="<div class='wl-it-ops-banner'><b>"+(edit?'CURRENT TICKET LEAD':'ASSIGN TICKET LEAD')+"</b><span>"+esc(edit?(d.job_lead_name||itName)+" is currently responsible. You can transfer the ticket to another IT Technician below.":"Creating the ticket does not lock responsibility to you. Choose who should take over, or leave Me selected.")+"</span></div>";
+  if(!edit)html+="<label>Assigned To / Ticket Lead<select id='wlITOpsLead'>"+itOpsLeadOptions('')+"</select></label>";
   html+="<div class='grid3'><label>MHelpDesk Ticket #<input id='wlITOpsTicket' value='"+esc(d.ticket_no||'')+"' "+(edit?'readonly':'')+" placeholder='Existing MHelpDesk number'></label>";
   html+="<label>Job Type<select id='wlITOpsWorkType'><option value='service' "+((d.work_type==='service'||!d.work_type)?'selected':'')+">Service Call</option><option value='delivery' "+(d.work_type==='delivery'?'selected':'')+">Delivery</option><option value='swap' "+(d.work_type==='swap'?'selected':'')+">Swap</option><option value='pickup' "+(d.work_type==='pickup'?'selected':'')+">Pickup</option></select></label>";
   html+="<label>Service Technician<select id='wlITOpsServiceTech'>"+itOpsServiceOptions(d.service_assignee_user_id||'')+"</select></label></div>";
@@ -3454,8 +3484,8 @@ function bindITOpsForm(){
   const form=document.getElementById('wlITOpsJobForm');
   if(!form||form.dataset.bound==='1')return;
   form.dataset.bound='1';
-  form.addEventListener('input',itOpsRefreshFlow);
-  form.addEventListener('change',itOpsRefreshFlow);
+  form.addEventListener('input',function(){itOpsRefreshFlow();const s=document.getElementById('wlITOpsCameraSummary');if(s){const n=document.createElement('div');n.innerHTML=itOpsMonitoredCameraHtml(readITOpsEquipmentManifest());s.replaceWith(n.firstElementChild);}});
+  form.addEventListener('change',function(){itOpsRefreshFlow();const s=document.getElementById('wlITOpsCameraSummary');if(s){const n=document.createElement('div');n.innerHTML=itOpsMonitoredCameraHtml(readITOpsEquipmentManifest());s.replaceWith(n.firstElementChild);}});
   itOpsRefreshFlow();
 }
 async function showITCreateJob(){
@@ -3485,6 +3515,7 @@ function itOpsPayload(){
     date:(document.getElementById('wlITOpsDate')||{}).value||techCheckDateKey(new Date()),
     time:(document.getElementById('wlITOpsTime')||{}).value||null,
     serviceTech:(document.getElementById('wlITOpsServiceTech')||{}).value||null,
+    leadTech:(document.getElementById('wlITOpsLead')||{}).value||null,
     description:(((document.getElementById('wlITOpsDescription')||{}).value)||'').trim(),
     notes:(((document.getElementById('wlITOpsNotes')||{}).value)||'').trim(),
     manifest:manifest,parts:parts,requestedUnitCount:equipmentManifestDeviceTotal(manifest),
@@ -3505,7 +3536,9 @@ async function itSubmitCreateJob(){
   const problem=validateITOpsPayload(p);
   if(problem)return alert(problem);
   const flow=itOpsFlowState();
-  if(!confirm('CREATE TECH CHECK JOB\n\nMHelpDesk #'+p.ticket+'\n'+(p.site||'No site entered')+'\n'+p.workType.toUpperCase()+' · '+flow.label+'\n\nYou will be the Ticket Lead. Continue?'))return;
+  const leadProfile=wlITOpsProfilesCache.find(function(x){return String(x.user_id)===String(p.leadTech);});
+  const leadName=p.leadTech?((leadProfile&&(leadProfile.full_name||leadProfile.username))||'selected IT Technician'):((document.getElementById('whoName')||{}).textContent||'Me');
+  if(!confirm('CREATE TECH CHECK JOB\n\nMHelpDesk #'+p.ticket+'\n'+(p.site||'No site entered')+'\n'+p.workType.toUpperCase()+' · '+flow.label+'\n\nTicket Lead: '+leadName+'\nContinue?'))return;
   document.body.classList.add('busy');
   try{
     const result=await liveDb.rpc('it_create_job_v1',{
@@ -3515,10 +3548,16 @@ async function itSubmitCreateJob(){
       p_camera_replacement_qty:p.parts.camera_replacement_qty,p_sim_replacement_qty:p.parts.sim_replacement_qty,p_micro_sd_qty:p.parts.micro_sd_qty,p_equipment_manifest:p.manifest
     });
     if(result.error)throw result.error;
+    if(p.leadTech && result.data && String(result.data.job_lead_user_id)!==String(p.leadTech)){
+      const transfer=await liveDb.rpc('transfer_ticket_lead_v1',{p_ticket_no:p.ticket,p_new_it_user_id:p.leadTech,p_reason:'Assigned to IT Technician during ticket creation'});
+      if(transfer.error)throw transfer.error;
+      result.data.job_lead_user_id=p.leadTech;
+      result.data.job_lead_name=(transfer.data&&transfer.data.new_lead_name)||leadName;
+    }
     if(result.data&&result.data.service_assignment_id){
       try{await liveDb.functions.invoke('send-techcheck-push',{body:{assignment_id:result.data.service_assignment_id}});}catch(pushError){console.warn('Service push failed',pushError);}
     }
-    rememberTechCompletion('it',p.ticket,'TICKET CREATED · YOU ARE LEAD');
+    rememberTechCompletion('it',p.ticket,'TICKET CREATED · LEAD: '+leadName);
     alert('MHelpDesk #'+p.ticket+' is now in Tech Check.\n\nTicket Lead: '+((result.data&&result.data.job_lead_name)||((document.getElementById('whoName')||{}).textContent)||'IT')+'\nFlow: '+flow.label);
     await loadITManagedTickets();
     return showITManagedTickets();
@@ -3568,8 +3607,8 @@ async function showITManagedTickets(){
   hideChildren(viewIT(),[card]);resetWizardPosition();
   try{
     const rows=await loadITManagedTickets();
-    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('MY MANAGED TICKETS','You remain responsible from creation through completion',1,1)+
-      "<div class='wl-it-ops-banner'><b>TICKET LEAD ACCOUNTABILITY</b><span>Creating a ticket makes you its IT lead. Service can perform field steps without taking ownership of the overall ticket.</span></div>"+
+    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('MY MANAGED TICKETS','Create, assign, and transfer IT ticket responsibility',1,1)+
+      "<div class='wl-it-ops-banner'><b>TICKET LEAD CONTROL</b><span>The creator does not have to remain responsible. Assign the ticket to the IT Technician who should own it, and transfer it later when needed. Every transfer stays in History.</span></div>"+
       "<div class='wl-it-ops-actions top10'><button class='wl-big wl-red' data-wl-it-create-job>＋ CREATE JOB</button></div>"+
       "<div class='wl-it-ops-ticket-list top10'>"+(rows.length?rows.map(itManagedTicketHtml).join(''):"<div class='ok'><b>No tickets assigned to you as Ticket Lead yet.</b></div>")+"</div>";
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error&&error.message?error.message:'Could not load managed tickets.');}
