@@ -2412,10 +2412,24 @@ function ownerTodayJobsHtml(){
 
 function ownerAppToday(){
   const greeting=ownerTodayGreeting()+', '+ownerTodayName();
+  const today=localDateKey(new Date());
+  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
+  const active=jobs.filter(a=>a.status!=='completed').length;
+  const todayJobs=jobs.filter(a=>String(a.scheduled_for||'')===today);
+  const field=jobs.filter(a=>a.status==='started').length;
+  const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
+  const awaitingIntake=returns.filter(r=>r.status==='waiting_it').length;
+  const review=(state.ownerReviewQueue||[]).filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed').length;
+  const overdue=jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today).length;
+  const attention=overdue+returns.filter(r=>r.status==='needs_replacement'||r.status==='pending_mhelp_inventory').length+review;
+  const recent=(state.reports||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+  const recentHtml=recent.length?recent.map(r=>'<div class="ownerCommandActivityRow"><span>'+new Date(r.created_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'</span><b>'+esc(ownerWorkflowDisplayText(r.kind))+'</b><p>'+esc(ownerWorkflowDisplayText(r.text))+'</p></div>').join(''):ownerAppEmpty('NO RECENT ACTIVITY');
   return '<section class="ownerTodayHero"><div class="ownerTodayWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>Here’s what is happening today.</p></div><div class="ownerTodayClockCard"><div id="ownerTodayClock" class="ownerTodayClock">--:--:--</div><span id="ownerTodayDate"></span></div></section>'
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Reading your GPS location for local weather…</div>')+'</div>'
-    +ownerTodayReadinessHtml()
-    +ownerTodayJobsHtml();
+    +'<section class="ownerCommandKpis"><button onclick="ownerAppNavigate(\'today\')"><b>'+active+'</b><span>ACTIVE JOBS</span><small>'+todayJobs.length+' scheduled today</small></button><button class="alert" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span><small>Owner actions & issues</small></button><button class="field" onclick="ownerAppNavigate(\'calendar\')"><b>'+field+'</b><span>IN SERVICE · FIELD</span><small>View field work</small></button><button class="intake" onclick="ownerAppNavigate(\'handoffs\')"><b>'+awaitingIntake+'</b><span>AWAITING IT INTAKE</span><small>Returns workflow</small></button><button class="review" onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span><small>Ready for closeout</small></button></section>'
+    +ownerTodayJobsHtml()
+    +'<section class="ownerCommandGrid"><div class="ownerTodayPanel"><header><div><span>COMPANY LOG</span><h2>Recent Activity</h2></div><button class="mini" onclick="ownerAppNavigate(\'activity\')">View History →</button></header><div class="ownerCommandActivity">'+recentHtml+'</div></div><div class="ownerTodayPanel"><header><div><span>COMMANDS</span><h2>Quick Actions</h2></div></header><div class="ownerCommandQuickGrid"><button class="primary" onclick="ownerAppNavigate(\'assign\')">＋ Assign Job<span>Create Tech Check job</span></button><button onclick="ownerAppNavigate(\'calendar\')">Calendar<span>View schedule</span></button><button onclick="ownerAppNavigate(\'attention\')">Needs Attention<span>Owner actions</span></button><a href="./camera-health.html?v=recon-20260923-0900">Camera Health<span>Monitor cameras</span></a><button onclick="ownerAppNavigate(\'team\')">Team<span>Technician board</span></button><button onclick="ownerAppNavigate(\'units\')">Units<span>Equipment registry</span></button><button onclick="ownerAppNavigate(\'review\')">Owner Review<span>Closeout queue</span></button><a href="./onsite-vision.html">OnSite Vision<span>AI command center</span></a></div></div></section>'
+    +ownerTodayReadinessHtml();
 }
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
