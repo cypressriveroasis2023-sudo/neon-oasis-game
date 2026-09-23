@@ -88,7 +88,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=it-dashboard-audit-20260923a')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=it-ops-lead-20260923a')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -2686,7 +2686,7 @@ function renderOwnerAssignmentWorkspace(){
   body.innerHTML='<div class="ownerModuleHead"><span>DISPATCH</span><h1>Create / Assign Job</h1><p>Create the Tech Check job that matches the MHelpDesk ticket, then choose the first department.</p></div>'
     +'<div class="ownerAssignLaunch"><b>NEW TECH CHECK JOB</b><p>MHelpDesk stays separate. Tech Check uses the same ticket number to control the technician workflow.</p><button class="btn" type="button" onclick="ownerOpenExistingAssignmentCreator()">CREATE / ASSIGN JOB →</button></div>'
     +'<div class="ownerPageStats"><span><b>'+rows.length+'</b> active jobs</span><span><b>'+techs.filter(t=>t.role==='it').length+'</b> IT techs</span><span><b>'+techs.filter(t=>t.role==='service').length+'</b> Service techs</span></div>'
-    +(rows.length?'<div class="ownerPageList">'+rows.slice(0,20).map(a=>'<div class="ownerPageRow"><div><b>MHelpDesk #'+esc(a.ticket_no)+'</b><span>'+esc(a.site||'Customer / site not recorded')+'</span></div><div><b>'+esc(a.assignee_name||a.assignee_username||(!a.assignee_user_id?'Department queue':'Assigned'))+'</b><span>'+esc(a.assignee_role==='it'?'IT':a.assignee_role==='service'?'SERVICE':String(a.status||'').toUpperCase())+'</span></div></div>').join('')+'</div>':'<div class="ok"><b>No active Tech Check assignments.</b><div class="small">Use CREATE / ASSIGN JOB to start one.</div></div>');
+    +(rows.length?'<div class="ownerPageList">'+rows.slice(0,20).map(a=>'<div class="ownerPageRow"><div><b>MHelpDesk #'+esc(a.ticket_no)+'</b><span>'+esc(a.site||'Customer / site not recorded')+(a.job_lead_name?' · Lead: '+esc(a.job_lead_name):'')+'</span></div><div><b>'+esc(a.assignee_name||a.assignee_username||(!a.assignee_user_id?'Department queue':'Assigned'))+'</b><span>'+esc(a.assignee_role==='it'?'IT':a.assignee_role==='service'?'SERVICE':String(a.status||'').toUpperCase())+'</span></div></div>').join(')+'</div>':'<div class="ok"><b>No active Tech Check assignments.</b><div class="small">Use CREATE / ASSIGN JOB to start one.</div></div>');
 }
 function ownerOpenExistingAssignmentCreator(){
   const candidates=[...document.querySelectorAll('button,a')].filter(el=>/create\s*\/\s*assign job|assign job/i.test(el.textContent||'')&&!el.closest('#ownerJobAssignments'));
