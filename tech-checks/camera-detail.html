@@ -7,17 +7,36 @@
 <title>Camera Detail · Tech Check</title>
 <style>
 :root{color-scheme:dark;--bg:#050b11;--panel:#0d1721;--panel2:#101d29;--line:#263a4c;--text:#eef4fa;--muted:#96a7b8;--green:#42d887;--red:#ff646f;--yellow:#f2c451;--blue:#49a7ee}
-*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh}
-button,a{font:inherit}button{cursor:pointer}.shell{max-width:980px;margin:0 auto;padding:20px 18px 80px}.topbar{position:sticky;top:0;z-index:20;background:rgba(5,11,17,.96);backdrop-filter:blur(12px);padding:10px 0 14px;border-bottom:1px solid #142331}
-.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px}.back,.action,.linkbtn{border:1px solid var(--line);background:#0d1924;color:var(--text);border-radius:12px;padding:11px 14px;text-decoration:none;font-weight:800}
+*{box-sizing:border-box}html{background:var(--bg);max-width:100%;overflow-x:hidden}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;width:100%;max-width:100%;overflow-x:hidden}
+button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;margin:0 auto;padding:20px 18px 80px;overflow-x:hidden}.topbar{position:sticky;top:0;z-index:20;width:100%;max-width:100%;background:rgba(5,11,17,.96);backdrop-filter:blur(12px);padding:10px 0 14px;border-bottom:1px solid #142331}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0}.back,.action,.linkbtn{border:1px solid var(--line);background:#0d1924;color:var(--text);border-radius:12px;padding:11px 14px;text-decoration:none;font-weight:800;min-width:0;max-width:100%}
 .action.primary{background:#b91421;border-color:#e52937}.action:disabled{opacity:.55;cursor:default}.title{margin:18px 0 4px;font-size:34px;line-height:1.05}.subtitle{color:var(--muted);font-weight:700;letter-spacing:.03em}
 .statusline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;font-weight:900;letter-spacing:.04em}.pill.online{background:#123b2a;color:var(--green)}.pill.offline{background:#3b171c;color:var(--red)}.pill.verifying{background:#3c3214;color:var(--yellow)}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}.card.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:900;text-transform:uppercase}.value{font-size:22px;font-weight:900;margin-top:7px;word-break:break-word}.small{font-size:14px;color:var(--muted);line-height:1.45}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
-.kv{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 16px;margin-top:10px}.kv>div:nth-child(odd){color:var(--muted);font-weight:700}.kv>div:nth-child(even){font-weight:800;word-break:break-word}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;width:100%;min-width:0}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;max-width:100%;overflow:hidden}.card.full{grid-column:1/-1}.label{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.value{font-size:22px;font-weight:900;margin-top:7px;word-break:break-word;overflow-wrap:anywhere;max-width:100%}.small{font-size:14px;color:var(--muted);line-height:1.45;overflow-wrap:anywhere;word-break:break-word;max-width:100%}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
+.kv{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 16px;margin-top:10px;min-width:0}.kv>div{min-width:0;overflow-wrap:anywhere}.kv>div:nth-child(odd){color:var(--muted);font-weight:700}.kv>div:nth-child(even){font-weight:800;word-break:break-word}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{border:1px solid #6a5420;background:#17140a;border-radius:14px;padding:13px 14px;color:#e5cf83}.notice.red{border-color:#71313a;background:#1d1014;color:#ff9da5}
-.ports{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.port{border:1px solid #2b5065;background:#0a1a25;border-radius:999px;padding:7px 10px;font-size:13px}.history{margin-top:8px}.event{display:grid;grid-template-columns:165px 100px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid #1d2c38;align-items:start}.event:last-child{border-bottom:0}.eventstatus{font-weight:900}.eventstatus.online{color:var(--green)}.eventstatus.offline{color:var(--red)}.eventstatus.degraded,.eventstatus.verifying{color:var(--yellow)}
+.ports{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;min-width:0}.port{border:1px solid #2b5065;background:#0a1a25;border-radius:999px;padding:7px 10px;font-size:13px;max-width:100%;overflow-wrap:anywhere}.history{margin-top:8px;min-width:0;overflow:hidden}.event{display:grid;grid-template-columns:165px 100px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid #1d2c38;align-items:start;min-width:0}.event>*{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}.event:last-child{border-bottom:0}.eventstatus{font-weight:900}.eventstatus.online{color:var(--green)}.eventstatus.offline{color:var(--red)}.eventstatus.degraded,.eventstatus.verifying{color:var(--yellow)}
 .loading{padding:50px 0;text-align:center;color:var(--muted)}.error{padding:18px;border:1px solid #73323a;background:#211117;border-radius:14px;color:#ffb1b8}.hidden{display:none!important}
-@media(max-width:680px){.shell{padding:14px 14px 64px}.title{font-size:30px}.grid{grid-template-columns:1fr}.card.full{grid-column:auto}.kv{grid-template-columns:1fr;gap:4px}.kv>div:nth-child(even){margin-bottom:8px}.event{grid-template-columns:1fr;gap:3px}.toprow{align-items:stretch}.back,.action{flex:1;text-align:center;padding:10px}}
+@media(max-width:680px){
+  .shell{width:100%;max-width:100vw;padding:12px 12px calc(64px + env(safe-area-inset-bottom));overflow-x:hidden}
+  .topbar{padding:8px 0 12px}
+  .toprow{align-items:stretch;gap:8px}
+  .back,.action{flex:1 1 0;width:0;min-width:0;text-align:center;padding:11px 8px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .title{font-size:30px;line-height:1.08;margin-top:16px;overflow-wrap:anywhere}
+  .subtitle{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+  .statusline{gap:8px}.pill{padding:7px 10px;font-size:14px}.statusline .small{flex:1 1 180px;min-width:0}
+  .notice{font-size:15px;line-height:1.4;padding:12px}
+  .grid{grid-template-columns:minmax(0,1fr);gap:10px;margin-top:14px}
+  .card,.card.full{grid-column:auto;width:100%;max-width:100%;padding:14px;border-radius:14px}
+  .label{font-size:11px;letter-spacing:.11em}
+  .value{font-size:clamp(22px,7vw,30px);line-height:1.14;margin-top:6px}
+  .small{font-size:13px;line-height:1.42}
+  .kv{grid-template-columns:minmax(0,1fr);gap:3px}.kv>div:nth-child(odd){margin-top:7px;font-size:12px}.kv>div:nth-child(even){margin-bottom:5px}
+  .actions{display:grid;grid-template-columns:1fr;gap:8px}.linkbtn{display:block;width:100%;text-align:center;overflow-wrap:anywhere;white-space:normal}
+  .ports{gap:6px}.port{font-size:12px}
+  .event{grid-template-columns:minmax(0,1fr);gap:3px;padding:10px 0}.eventstatus{font-size:13px}
+}
+@media(max-width:380px){.back,.action{font-size:14px}.title{font-size:27px}.value{font-size:22px}}
 </style>
 </head>
 <body>
@@ -111,6 +130,7 @@ function sourceStatusText(){const group=cameraGroup(device),st=effectiveHealth(d
 function sourceDetailText(){const group=cameraGroup(device),probe=String(current?.overall_status||'unknown').toUpperCase();if(group==='Vigilant')return 'Vigilant controls ONLINE/OFFLINE for this camera. Live check: '+probe;return group+' uses the direct Avigilon health check. Backend result: '+probe}
 function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),probe=String(current?.overall_status||'unknown').toLowerCase();if(st==='offline')return group==='Vigilant'?'Vigilant currently reports this camera OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return 'No definitive ONLINE/OFFLINE result is available yet.';if(group==='Vigilant'&&probe==='offline')return 'Vigilant says ONLINE, but the direct health check is not responding. Verify the camera before dispatching.';return''}
 function latestSuccessfulPing(){if(device?.last_probe_online_at)return device.last_probe_online_at;const ev=events.find(e=>String(e.status||'').toLowerCase()==='online');return ev?.observed_at||null}
+function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
 function interfaceLinks(){const out=[];const ip=cleanIP(device?.public_ip);if(!ip)return out;const ps=current?.port_status||{},labels=device?.port_labels||{};for(const [p0,v] of Object.entries(ps)){if(!v?.online)continue;const p=Number(p0),proto=(p===443||p===8443)?'https':'http';const url=proto+'://'+ip+(p===80||p===443?'':':'+p);out.push([url,labels[p0]||('Port '+p)])}if(!out.length)out.push(['http://'+ip,'Open public IP']);return [...new Map(out.map(x=>[x[0],x])).values()]}
 function render(){
   const st=effectiveHealth(device,current),ping=latestSuccessfulPing(),checked=current?.checked_at||device?.last_health_checked_at||null,reason=issueReason();
@@ -131,7 +151,7 @@ function render(){
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
   const ports=Object.entries(current?.port_status||{}).filter(([,v])=>v?.online);$('ports').innerHTML=ports.map(([p,v])=>'<span class="port">'+esc((device.port_labels||{})[p]||('Port '+p))+' ✓'+(v?.latency_ms?' · '+esc(v.latency_ms)+'ms':'')+'</span>').join('');$('portEmpty').classList.toggle('hidden',ports.length>0);
   $('interfaceActions').innerHTML=interfaceLinks().map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
-  $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase();return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b><div class="small">'+esc(typeof ev.detail==='string'?ev.detail:JSON.stringify(ev.detail||{}))+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div></div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
+  $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){
   const id=Number(new URLSearchParams(location.search).get('id'));
