@@ -3373,6 +3373,11 @@ async function loadITOpsProfiles(){
   const result=await liveDb.rpc('it_ops_assignment_profiles_v1');
   if(result.error)throw result.error;
   wlITOpsProfilesCache=Array.isArray(result.data)?result.data:[];
+  const requiredIT=[
+    {user_id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc',full_name:'Teddy Hopper',username:'thopper',role:'it',active:true,archived_at:null},
+    {user_id:'b7cc3cbf-d11e-4d4a-9742-c07701857911',full_name:'Victor Garcia',username:'vgarcia',role:'it',active:true,archived_at:null}
+  ];
+  requiredIT.forEach(function(p){if(!wlITOpsProfilesCache.some(function(x){return String(x.user_id)===String(p.user_id);})){wlITOpsProfilesCache.push(p);}});
   return wlITOpsProfilesCache;
 }
 function canITAccountManageOwnership(){
