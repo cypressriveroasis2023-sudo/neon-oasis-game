@@ -2752,6 +2752,8 @@ function ensureITCommandDashboardStyles(){
     .wl-it-ops-form{display:grid;gap:14px}.wl-it-ops-form .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.wl-it-ops-form .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.wl-it-ops-form label{display:grid;gap:6px;color:#aab6c2;font-size:12px;font-weight:800}.wl-it-ops-form input,.wl-it-ops-form select,.wl-it-ops-form textarea{width:100%;box-sizing:border-box;background:#07111a;color:#f2f6f9;border:1px solid #314453;border-radius:10px;padding:11px;font:inherit}.wl-it-ops-form textarea{resize:vertical}.wl-it-ops-banner{border:1px solid #315f45;background:#0b2117;border-radius:13px;padding:12px}.wl-it-ops-banner b{display:block;color:#67e68f}.wl-it-ops-banner span{display:block;color:#a7b6c1;margin-top:4px}.wl-it-ops-flow{border:1px solid #394b5a;background:#0b151e;border-radius:12px;padding:12px}.wl-it-ops-flow b{color:#fff}.wl-it-ops-flow span{display:block;color:#9eacb8;margin-top:4px;font-size:12px}.wl-it-ops-section{border:1px solid #263746;border-radius:14px;padding:13px;background:#0c1720}.wl-it-ops-section>h3{margin:0 0 10px;color:#fff}.wl-it-ops-equipment{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.wl-it-ops-equipment label{border:1px solid #243746;border-radius:10px;padding:9px;background:#09131c}.wl-it-ops-ticket-list{display:grid;gap:10px}.wl-it-ops-ticket{border:1px solid #263746;border-radius:13px;padding:13px;background:#0b151e}.wl-it-ops-ticket header{display:flex;justify-content:space-between;gap:10px}.wl-it-ops-ticket h3{margin:0;color:#fff}.wl-it-ops-ticket .meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}.wl-it-ops-ticket .meta span{border:1px solid #304353;border-radius:999px;padding:5px 8px;color:#aab7c3;font-size:11px}.wl-it-ops-ticket .lead{margin-top:9px;color:#68e28c;font-weight:850}.wl-it-ops-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.wl-it-ops-history{display:grid;gap:8px}.wl-it-ops-history-row{border-left:3px solid #344c5d;background:#0a141d;padding:9px 11px;border-radius:7px}.wl-it-ops-history-row b{color:#fff}.wl-it-ops-history-row span,.wl-it-ops-history-row small{display:block;color:#9ba8b4;margin-top:3px}.wl-it-ops-history-row small{font-size:11px}
     @media(max-width:900px){.wl-it-command-shell{grid-template-columns:1fr}.wl-it-command-sidebar{border-right:0;border-bottom:1px solid #253541;padding:12px}.wl-it-command-brand{display:none}.wl-it-command-nav{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.wl-it-command-nav button,.wl-it-command-nav a{text-align:center;padding:9px 7px;font-size:12px}.wl-it-command-limit{display:none}.wl-it-command-workspace{padding:16px}.wl-it-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-command-grid{grid-template-columns:1fr}.wl-it-command-head h1{font-size:30px}}
     @media(max-width:520px){.wl-it-command-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-command-head{display:block}.wl-it-ops-form .grid2,.wl-it-ops-form .grid3,.wl-it-ops-equipment{grid-template-columns:1fr}}
+    .wl-it-cal-head{display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0}.wl-it-cal-head h2{margin:0;min-width:210px;text-align:center}.wl-it-cal-head button{background:#101b25;color:#fff;border:1px solid #314453;border-radius:9px;padding:8px 14px}.wl-it-cal-week,.wl-it-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.wl-it-cal-week b{text-align:center;color:#8fa0ae;font-size:11px;padding:5px}.wl-it-cal-day{min-height:105px;border:1px solid #263746;border-radius:10px;background:#0b151e;padding:7px;min-width:0}.wl-it-cal-day.empty{opacity:.25}.wl-it-cal-day>b{display:block;color:#fff;margin-bottom:6px}.wl-it-cal-day button{display:block;width:100%;text-align:left;background:#132330;color:#fff;border:1px solid #304657;border-radius:7px;padding:6px;margin:4px 0;overflow:hidden}.wl-it-cal-day button strong,.wl-it-cal-day button span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wl-it-cal-day button span{font-size:10px;color:#a8b6c2}.wl-it-attn{margin-top:12px;border:1px solid #263746;border-radius:13px;background:#0c1720;padding:12px}.wl-it-attn h3{margin:0 0 8px;color:#fff}.wl-it-attn h3 span{color:#ff6b70}.wl-it-attn-row{display:block;width:100%;text-align:left;background:#0a141d;color:#fff;border:1px solid #2b3d4b;border-radius:9px;padding:10px;margin:6px 0}.wl-it-attn-row b,.wl-it-attn-row span{display:block}.wl-it-attn-row span{color:#9eacb8;font-size:12px;margin-top:3px}
+    @media(max-width:700px){.wl-it-cal-week{display:none}.wl-it-calendar{grid-template-columns:1fr}.wl-it-cal-day.empty{display:none}.wl-it-cal-day{min-height:0}.wl-it-cal-day:not(:has(button)){display:none}.wl-it-cal-day>b{font-size:13px}}
     .wl-it-audit{display:grid;gap:8px;margin-top:10px}.wl-it-audit-row{border:1px solid #263746;border-radius:10px;background:#0b151e;padding:10px}.wl-it-audit-row b{color:#fff}.wl-it-audit-row span{display:block;color:#a8b3bd;font-size:12px;margin-top:3px}.wl-it-audit-row em{font-style:normal;color:#6f8190;font-size:11px}
   `;
   document.head.append(s);
@@ -2790,6 +2792,8 @@ async function showITHome() {
           <button class='active' data-wl-home='it'>Dashboard</button>
           <button data-wl-it-create-job>＋ Create Job</button>
           <button data-wl-it-managed-jobs>Managed Tickets</button>
+          <button data-wl-it-calendar>Calendar</button>
+          <button data-wl-it-attention>Needs Attention</button>
           <a href='./camera-health.html?v=it-ops-20260923a'>Camera Health</a>
           <button data-wl-it-truck-inventory>Truck Inventory</button>
           <button data-wl-it-truck-restock>Truck Restock</button>
@@ -2996,7 +3000,67 @@ async function loadITManagedTickets(){
   wlITManagedTicketsCache=Array.isArray(result.data)?result.data:[];
   return wlITManagedTicketsCache;
 }
-async function loadITOpsProfiles(){
+function itOpsCard(){
+  return document.getElementById('wlItHome');
+}
+function itOpsDateLabel(key){
+  if(!key)return 'No date';
+  const d=new Date(String(key)+'T12:00:00');
+  return Number.isNaN(d.getTime())?String(key):d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+}
+function itOpsMonthLabel(date){
+  return date.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+}
+let wlITCalendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+async function showITCalendar(shift){
+  if(!isIT()||!viewIT())return;
+  ensureITCommandDashboardStyles();
+  if(Number.isFinite(Number(shift))&&Number(shift)!==0)wlITCalendarMonth=new Date(wlITCalendarMonth.getFullYear(),wlITCalendarMonth.getMonth()+Number(shift),1);
+  const card=itOpsCard(); if(!card)return;
+  card.innerHTML=techDashboardLoadingHtml('Loading your Ticket Lead calendar…');
+  hideChildren(viewIT(),[card]); resetWizardPosition();
+  try{
+    const rows=await loadITManagedTickets();
+    const y=wlITCalendarMonth.getFullYear(),m=wlITCalendarMonth.getMonth();
+    const monthRows=rows.filter(t=>{const d=String(t.scheduled_for||'').split('-').map(Number);return d.length===3&&d[0]===y&&d[1]===m+1;});
+    const first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),lead=first.getDay();
+    let cells='';
+    for(let i=0;i<lead;i++)cells+="<div class='wl-it-cal-day empty'></div>";
+    for(let day=1;day<=days;day++){
+      const key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+      const jobs=monthRows.filter(t=>String(t.scheduled_for||'')===key);
+      cells+="<div class='wl-it-cal-day'><b>"+day+"</b>"+jobs.map(t=>"<button data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><strong>#"+esc(t.ticket_no)+"</strong><span>"+esc(t.site||t.work_type||'Job')+"</span></button>").join('')+"</div>";
+    }
+    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('CALENDAR','Only tickets where you are Ticket Lead',1,1)+
+      "<div class='wl-it-cal-head'><button data-wl-it-calendar-shift='-1'>←</button><h2>"+esc(itOpsMonthLabel(wlITCalendarMonth))+"</h2><button data-wl-it-calendar-shift='1'>→</button></div>"+
+      "<div class='wl-it-cal-week'><b>Sun</b><b>Mon</b><b>Tue</b><b>Wed</b><b>Thu</b><b>Fri</b><b>Sat</b></div><div class='wl-it-calendar'>"+cells+"</div>";
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load your IT calendar.');}
+}
+async function showITNeedsAttention(){
+  if(!isIT()||!viewIT())return;
+  ensureITCommandDashboardStyles();
+  const card=itOpsCard(); if(!card)return;
+  card.innerHTML=techDashboardLoadingHtml('Checking IT Needs Attention…');
+  hideChildren(viewIT(),[card]); resetWizardPosition();
+  try{
+    const [state,rows]=await Promise.all([techDashboardTimeout(itDayState(),null),loadITManagedTickets()]);
+    const today=techCheckDateKey(new Date());
+    const overdue=rows.filter(t=>!t.all_finished&&t.scheduled_for&&String(t.scheduled_for)<today);
+    const returns=state?.waitingReturns||[], restock=state?.truckRestockQueue||[], drafts=state?.drafts||[];
+    const site=(state?.currentAssignments||[]).filter(a=>/swap/i.test(String(a.work_type||''))&&/register|site/i.test(String(a.status||'')+' '+String(a.next_step||'')));
+    const count=overdue.length+returns.length+restock.length+drafts.length+site.length;
+    const section=(title,items,body)=>items.length?"<section class='wl-it-attn'><h3>"+esc(title)+" <span>"+items.length+"</span></h3>"+items.map(body).join('')+"</section>":'';
+    card.innerHTML="<button class='wl-back' data-wl-home='it'>← IT DASHBOARD</button>"+progress('NEEDS ATTENTION',count?count+' operational item'+(count===1?'':'s')+' need action':'Nothing urgent is waiting',1,1)+
+      (count?'':"<div class='ok'><b>✓ No IT operational exceptions right now.</b></div>")+
+      section('Overdue Managed Tickets',overdue,t=>"<button class='wl-it-attn-row' data-wl-it-edit-managed-ticket='"+esc(t.ticket_no)+"'><b>MHelpDesk #"+esc(t.ticket_no)+"</b><span>"+esc(t.site||'No site')+" · "+esc(itOpsDateLabel(t.scheduled_for))+"</span></button>")+
+      section('Returned Units Waiting for IT Intake',returns,r=>"<button class='wl-it-attn-row' data-wl-mode='intake'><b>"+esc(r.unit_tag||r.equipment_type||'Returned unit')+"</b><span>IT Intake required</span></button>")+
+      section('Swap / Site Registration',site,a=>"<button class='wl-it-attn-row' data-wl-it='pending'><b>MHelpDesk #"+esc(a.ticket_no||'—')+"</b><span>"+esc(a.site||'Site registration work pending')+"</span></button>")+
+      section('Unfinished IT Prep',drafts,d=>"<button class='wl-it-attn-row' data-wl-it='pending'><b>MHelpDesk #"+esc(d.ticket_no||'—')+"</b><span>"+esc(d.site||'Equipment prep unfinished')+"</span></button>")+
+      section('Service Truck Restock Requests',restock,r=>"<button class='wl-it-attn-row' data-wl-it-truck-restock><b>"+esc(r.tech_name||r.service_tech_name||'Service truck')+"</b><span>"+esc(r.status||'Restock requested')+"</span></button>")+
+      "<div class='wl-it-ops-actions top10'><a class='wl-big wl-gray' href='./camera-health.html?v=it-ops-20260923a'>OPEN CAMERA HEALTH →</a></div>";
+  }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load IT Needs Attention.');}
+}
+async async function loadITOpsProfiles(){
   const result=await liveDb.from('profiles').select('user_id,full_name,username,role,active,archived_at').eq('active',true).is('archived_at',null).in('role',['it','service']).order('full_name');
   if(result.error)throw result.error;
   wlITOpsProfilesCache=result.data||[];
@@ -6414,6 +6478,9 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-service-resolve-spares]')) return showServiceSpareResolution();
   if (e.target.closest('[data-wl-it-create-job]')) return showITCreateJob();
   if (e.target.closest('[data-wl-it-managed-jobs]')) return showITManagedTickets();
+  if (e.target.closest('[data-wl-it-calendar]')) return showITCalendar(0);
+  const itCalShift=e.target.closest('[data-wl-it-calendar-shift]'); if(itCalShift)return showITCalendar(Number(itCalShift.dataset.wlItCalendarShift||0));
+  if (e.target.closest('[data-wl-it-attention]')) return showITNeedsAttention();
   if (e.target.closest('[data-wl-it-submit-create-job]')) return itSubmitCreateJob();
   if (e.target.closest('[data-wl-it-save-managed-job]')) return itSaveManagedJob();
   const editManaged=e.target.closest('[data-wl-it-edit-managed-ticket]'); if(editManaged)return showITManagedTicketEditor(editManaged.dataset.wlItEditManagedTicket);
