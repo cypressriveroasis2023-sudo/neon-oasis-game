@@ -2795,7 +2795,8 @@ async function showITHome() {
           <button data-wl-it-truck-restock>Truck Restock</button>
           <button data-wl-mode='intake'>IT Intake</button>
           <button data-wl-it='pending'>Equipment Prep</button>
-          <button data-wl-it='history'>History</button>
+          <button data-wl-it-units>Units</button>
+          <button data-wl-it='history'>Handoffs / History</button>
           <button data-wl-it-open-job>Open MHelpDesk Job</button>
         </nav>
         <div class='wl-it-command-limit'><b>IT OPERATIONS ACCESS</b>Create and lead Service Calls, Deliveries, Swaps, and Pickups from existing MHelpDesk tickets; run equipment prep, Camera Health, truck inventory, intake, handoffs, and operational history. Owner Review, employee accounts, permissions, system configuration, and administrative overrides stay Owner-only.</div>
@@ -2836,7 +2837,8 @@ async function showITHome() {
                 <button data-wl-it-truck-restock>SERVICE TRUCK RESTOCK${restock?` · ${restock}`:''}</button>
                 <button data-wl-mode='intake'>IT INTAKE / RETURNS${returns?` · ${returns}`:''}</button>
                 <button data-wl-it='pending'>RESUME EQUIPMENT PREP${(state.drafts||[]).length?` · ${state.drafts.length}`:''}</button>
-                <button data-wl-it='history'>STATUS & HISTORY</button>
+                <button data-wl-it-units>UNITS / CURRENT HOLDER</button>
+                <button data-wl-it='history'>HANDOFFS & HISTORY</button>
                 ${ownerViewingIT?"<button data-wl-it='new'>OWNER: START NEW PREP</button>":""}
               </div>
             </details>
