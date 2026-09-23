@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-owner-full-override-20260923al';
+const CACHE_NAME = 'tech-check-owner-save-handler-20260923am';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,7 +10,7 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=owner-full-override-20260923al', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=owner-save-handler-20260923am', { cache:'reload' })),
       cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=owner-all-jobs-20260923ak', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=account-management-20260922n', { cache:'reload' })),
