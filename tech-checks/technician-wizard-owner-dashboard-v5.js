@@ -829,6 +829,53 @@ function injectStyles() {
       #view-it .wl-it-cal-view-all{width:100%!important;margin-top:10px!important;padding:9px!important;border:1px solid #456174!important;border-radius:7px!important;background:#132431!important;color:#fff!important;font-weight:850!important} #view-it .wl-it-cal-none{padding:12px;color:#91a3ae;border:1px dashed #2b414f;border-radius:6px}
       #view-it .wl-it-cal-legend{display:flex;gap:22px;flex-wrap:wrap;padding:14px 2px;color:#c8d3da;font-size:12px} #view-it .wl-it-cal-legend .service{color:#56a9ff} #view-it .wl-it-cal-legend .delivery{color:#49d9b6} #view-it .wl-it-cal-legend .swap{color:#ffd04b} #view-it .wl-it-cal-legend .pickup{color:#b65cff}
       @media(max-width:900px){#view-it .wl-it-cal-page{width:100%;padding:8px 10px 24px}#view-it .wl-it-cal-title{align-items:start;padding:14px;flex-direction:column}#view-it .wl-it-cal-title h1{font-size:23px}#view-it .wl-it-cal-layout{grid-template-columns:1fr}#view-it .wl-it-calendar-toolbar{align-items:flex-start!important}#view-it .wl-it-cal-nav strong{order:-1;width:100%}#view-it .wl-it-cal-week{display:none!important}#view-it .wl-it-calendar{display:block!important}#view-it .wl-it-cal-day{min-height:0!important;margin:7px 0!important}#view-it .wl-it-cal-day.outside,#view-it .wl-it-cal-day:not(.is-today):not(:has(.wl-it-cal-event)){display:none!important}#view-it .wl-it-cal-event strong{font-size:13px}#view-it .wl-it-cal-side{grid-template-columns:1fr}#view-it .wl-it-cal-create{width:100%!important}}
+      /* IT Service Truck pages use the same spacious desktop command-center proportions as Owner. */
+      @media(min-width:901px){
+        #view-it:has(#wlItTruckInventory){padding:0 18px 30px!important}
+        #view-it #wlItTruckInventory.wl-it-simple-card{
+          width:100%!important;max-width:none!important;margin:0!important;padding:18px 22px 30px!important;
+          background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important
+        }
+        #wlItTruckInventory>.wl-back{margin:0 0 12px!important}
+        #wlItTruckInventory .wl-progress{width:100%!important;max-width:none!important;margin:0 0 12px!important}
+        #wlItTruckInventory .wl-it-restock-banner{width:100%!important;max-width:none!important;margin:0 0 14px!important;padding:14px 16px!important}
+        #wlItTruckInventory .wl-it-truck-manage-list{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;width:100%!important}
+        #wlItTruckInventory .wl-it-truck-manage-row{
+          display:grid!important;grid-template-columns:1fr!important;gap:14px!important;align-content:start!important;
+          min-width:0!important;padding:18px!important;border:1px solid #263943!important;border-radius:14px!important;background:#0b1821!important
+        }
+        #wlItTruckInventory .wl-it-truck-counts{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:7px!important}
+        #wlItTruckInventory .wl-it-truck-counts i{padding:12px 6px!important;text-align:center!important;border-radius:9px!important}
+        #wlItTruckInventory .wl-it-start{width:auto!important;min-height:42px!important;justify-self:start!important;padding:0 18px!important}
+        #wlItTruckInventory>[data-wl-it-truck-inventory]{width:auto!important;min-width:150px!important;margin-top:14px!important}
+        #wlItTruckInventory>label.top10{display:block!important;width:min(720px,100%)!important;margin:12px 0 16px!important}
+        #wlItTruckInventory>label.top10 input{width:100%!important;margin-top:6px!important}
+        #wlItTruckInventory .wl-it-truck-editor{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:12px 18px!important;width:100%!important}
+        #wlItTruckInventory .wl-truck-section-title,#wlItTruckInventory .wl-it-truck-editor>.small,#wlItTruckInventory #wlItUnitLoadChecks{grid-column:1/-1!important}
+        #wlItTruckInventory .wl-it-load-line{
+          display:grid!important;grid-template-columns:minmax(150px,.55fr) minmax(180px,1fr) auto!important;
+          align-items:center!important;gap:10px!important;padding:12px!important;border:1px solid #263943!important;border-radius:11px!important;background:#0b1821!important
+        }
+        #wlItTruckInventory .wl-it-load-line input{width:100%!important;min-width:0!important}
+        #wlItTruckInventory .wl-it-load-line button{width:auto!important;white-space:nowrap!important;padding:0 14px!important;min-height:40px!important}
+        #wlItTruckInventory .wl-it-restock-checks{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important}
+        #wlItTruckInventory .wl-it-restock-checks .check{min-height:52px!important;padding:10px 12px!important;border:1px solid #263943!important;border-radius:9px!important;background:#0b1821!important}
+        #wlItTruckInventory details.wl-it-more{width:100%!important;margin-top:16px!important}
+      }
+      @media(max-width:1200px) and (min-width:901px){
+        #wlItTruckInventory .wl-it-truck-manage-list{grid-template-columns:1fr 1fr!important}
+        #wlItTruckInventory .wl-it-truck-editor{grid-template-columns:1fr!important}
+        #wlItTruckInventory .wl-it-load-line{grid-column:1!important}
+        #wlItTruckInventory .wl-it-restock-checks{grid-template-columns:1fr 1fr!important}
+      }
+      @media(max-width:900px){
+        #view-it #wlItTruckInventory.wl-it-simple-card{width:100%!important;max-width:none!important;margin:0!important;padding:12px!important}
+        #wlItTruckInventory .wl-it-truck-manage-list,#wlItTruckInventory .wl-it-truck-editor{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+        #wlItTruckInventory .wl-it-load-line{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+        #wlItTruckInventory .wl-it-load-line button,#wlItTruckInventory .wl-it-start,#wlItTruckInventory>[data-wl-it-truck-inventory]{width:100%!important}
+        #wlItTruckInventory .wl-it-restock-checks{grid-template-columns:1fr!important}
+        #wlItTruckInventory .wl-it-truck-counts{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      }
       /* Final desktop calendar sizing: later legacy rules in this file were winning the cascade. */
       @media(min-width:901px){
         #view-it:has(.wl-it-cal-page){padding:0 8px 24px!important}
