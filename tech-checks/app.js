@@ -209,15 +209,19 @@ function validUsername(v) {
 }
 
 async function init() {
-  const {
-    data: { session },
-  } = await db.auth.getSession();
-  if (session) await enterApp(session);
-  else showAuth();
-  db.auth.onAuthStateChange(async (_event, nextSession) => {
-    if (nextSession && !state.session) await enterApp(nextSession);
-    if (!nextSession && state.session) showAuth();
-  });
+  // Keep startup auth single-path. Supabase auth-state callbacks can deadlock
+  // the client when follow-up Supabase work starts before the auth lock releases.
+  // Login/logout already handle their own state; startup only restores a session.
+  try {
+    const {
+      data: { session },
+    } = await appTimeout(db.auth.getSession(), 'Restore session', 10000);
+    if (session) await enterApp(session);
+    else showAuth();
+  } catch (error) {
+    console.warn('Tech Check session restore failed', error);
+    showAuth();
+  }
 }
 function showAuth() {
   state = {
