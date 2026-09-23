@@ -223,10 +223,11 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
   /* Actual DOM order includes the desktop checkbox column first:
      1 checkbox, 2 status, 3 device, 4 type, 5 ports, 6 model, 7 site, 8 last online, 9 version. */
   #deviceTable td:nth-child(1){display:none!important}
-  /* Mobile Camera Health is a compact camera picker.
-     Full diagnostics/details belong on camera-detail.html after Open camera. */
-  #deviceTable td:nth-child(3){order:1!important}
-  #deviceTable td:nth-child(2){order:2!important;border-top:1px solid #1d2b38!important;margin-top:9px!important;padding-top:10px!important}
+  /* Mobile Camera Health is only:
+     ONLINE/OFFLINE -> camera name/number -> Open camera.
+     All diagnostics live on camera-detail.html. */
+  #deviceTable td:nth-child(2){order:1!important;padding:2px 0 5px!important}
+  #deviceTable td:nth-child(3){order:2!important;padding:2px 0 0!important}
   #deviceTable td:nth-child(4),
   #deviceTable td:nth-child(5),
   #deviceTable td:nth-child(6),
@@ -234,32 +235,28 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
   #deviceTable td:nth-child(8),
   #deviceTable td:nth-child(9){display:none!important}
 
-  #deviceTable td:nth-child(3)::before{
-    content:"CAMERA";
-    display:block!important;
-    margin:0 0 5px!important;
-    color:#7f93a6!important;
-    font-size:10px!important;
-    font-weight:900!important;
-    letter-spacing:.12em!important;
+  #deviceTable td:nth-child(2)::before,
+  #deviceTable td:nth-child(3)::before{display:none!important;content:none!important}
+
+  #deviceTable td:nth-child(2)>b{
+    font-size:20px!important;
+    font-weight:950!important;
+    line-height:1.05!important;
+    letter-spacing:.025em!important;
   }
-  #deviceTable td:nth-child(2)::before{
-    content:"STATUS";
-    display:block!important;
-    margin:0 0 4px!important;
-    color:#7f93a6!important;
-    font-size:10px!important;
-    font-weight:900!important;
-    letter-spacing:.12em!important;
+  #deviceTable td:nth-child(2) .dot{
+    width:11px!important;
+    height:11px!important;
+    margin-right:8px!important;
   }
 
   #deviceTable td:nth-child(3)>a{
     display:block!important;
     width:100%!important;
     max-width:100%!important;
-    margin:1px 0 8px!important;
+    margin:6px 0 10px!important;
     color:#ffffff!important;
-    font-size:clamp(28px,7.8vw,32px)!important;
+    font-size:clamp(30px,8.2vw,34px)!important;
     font-weight:950!important;
     line-height:1.02!important;
     letter-spacing:.01em!important;
@@ -269,16 +266,11 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
     word-break:break-word!important;
   }
 
-  /* Hide supporting metadata from the mobile list. It remains on Camera Detail. */
+  /* Supporting metadata stays off the mobile list and is shown after Open camera. */
   #deviceTable .camera-unit-name,
   #deviceTable .camera-site-name,
   #deviceTable td:nth-child(2) .small{
     display:none!important;
-  }
-  #deviceTable td:nth-child(2)>b{
-    font-size:18px!important;
-    font-weight:950!important;
-    letter-spacing:.02em!important;
   }
   #deviceTable .small,
   #deviceTable .yellow,
