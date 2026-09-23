@@ -3031,6 +3031,8 @@ Object.assign(window, {
   ownerCalendarNewJob,
   ownerCalendarServiceOrder,
   ownerEnsureWeather,
+  techCheckGpsPosition,
+  techCheckWeatherForGps,
   ownerAppRunHistory,
   ownerAppFilterUnits,
   ownerAppShowTechHistory,
