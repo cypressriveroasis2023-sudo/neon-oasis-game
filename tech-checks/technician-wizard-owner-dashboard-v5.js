@@ -6028,18 +6028,23 @@ function serviceSolarAnswerTasks(ctx,check) {
   function addBool(field,title,question,done,extra){
     tasks.push({key:field,field:field,kind:'bool',title:title,question:question,done:done===undefined?Boolean(check?.[field]):Boolean(done),extra:extra||null});
   }
-  addBool('mppt_updated_ok','MPPT CHECK','Is the MPPT firmware / configuration updated and current?');
-  addBool('mppt_tested_ok','MPPT CHECK','Is the MPPT powered, tested, and working?');
   if(ctx?.has_helios){
-    addBool('cerbo_updated_ok','HELIOS YARD TEST','Is the Helios Cerbo / Victron configuration updated and current?');
-    addBool('cerbo_online_ok','HELIOS YARD TEST','Is the Helios Cerbo online and communicating?');
-    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Did you connect the Helios PV cable to the yard tower?');
+    // Helios MPPT status cannot be verified until Service is physically outside
+    // with the unit connected to the yard tower solar panel.
+    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Is the Helios outside and connected to the yard tower solar panel?');
     addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal Helios switch to PV?');
     addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to this Helios in the Victron Bluetooth app?');
+    addBool('mppt_updated_ok','HELIOS YARD TEST','With the Helios connected to yard solar, does Victron show the MPPT firmware / configuration is current?');
+    addBool('mppt_tested_ok','HELIOS YARD TEST','With yard solar connected, is the MPPT powered and working correctly?');
+    addBool('cerbo_updated_ok','HELIOS YARD TEST','Does Victron show the Helios Cerbo / configuration is current?');
+    addBool('cerbo_online_ok','HELIOS YARD TEST','Is the Helios Cerbo online and communicating?');
     addBool('helios_yard_updates_status_ok','HELIOS YARD TEST','Does Victron show the unit healthy and current?');
     addBool('helios_battery_box_charging_ok','HELIOS YARD TEST','Is the internal Helios battery box present and charged?');
     addBool('helios_yard_solar_charging_ok','HELIOS YARD TEST','Did you verify solar charging from the yard tower panel?');
     addBool('helios_yard_ptz_wrapped_ok','HELIOS YARD TEST','Did you remove the PTZ from the door/front plate and bubble wrap it for transport?');
+  }else{
+    addBool('mppt_updated_ok','MPPT CHECK','Is the MPPT firmware / configuration updated and current?');
+    addBool('mppt_tested_ok','MPPT CHECK','Is the MPPT powered, tested, and working?');
   }
   if(expectedPanels>0){
     addBool(
@@ -6114,8 +6119,8 @@ function serviceSolarOneStepHtml(ctx,check,evidence) {
   const index=tasks.findIndex(function(task){return !task.done;});
   if(index<0){
     return "<div class='wl-question wl-solar-one-step'>"+
-      "<div class='qnum'>PRE-TRIP COMPLETE</div>"+
-      "<div class='qtext'>All required Service pre-trip checks and proof are complete.</div>"+
+      "<div class='qnum'>"+(ctx?.has_helios?'YARD TEST COMPLETE':'PRE-TRIP COMPLETE')+"</div>"+
+      "<div class='qtext'>"+(ctx?.has_helios?'Helios yard solar testing and proof are complete.':'All required Service pre-trip checks and proof are complete.')+"</div>"+
       "<div class='ok top10'><b>✓ READY FOR THE NEXT STEP</b></div>"+
       "<button class='wl-big wl-green top10' data-wl-svc-next>CONTINUE →</button>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
@@ -6538,7 +6543,7 @@ async function renderSvcPrep() {
     const confirmed=Boolean(activeSvcPrep.service_parts_confirmed);
     wizard.innerHTML=progress('Parts Handoff',`Verify parts from IT Tech ${preparedBy}`,1,1)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Solar / Helios Check →':'Compare IT Photos →'}</button></div>`;
   }else if(solarRequired&&svcUnitIndex===solarStep){
-    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress('Solar / Helios Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence);wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress(solarCtx?.has_helios?'Helios Yard Solar Test':'Solar Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence);wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
     wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   }else if(svcUnitIndex===photoStep){
