@@ -1069,6 +1069,11 @@ function injectStyles() {
       min-height:44px;display:flex;align-items:center;padding:10px 12px;border:1px solid #2d4652;border-radius:11px;
       background:#071117;color:#b8c7ce;font-size:13px;font-weight:800;overflow-wrap:anywhere
     }
+    #view-svc .wl-solar-multi-note{margin:-2px 0 10px;color:#9db0ba;font-size:11px;font-weight:800;text-align:center}
+    #view-svc .wl-solar-preview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+    #view-svc .wl-solar-preview-grid img{width:100%;height:64px;object-fit:cover;border-radius:8px;border:1px solid #3c5662}
+    #view-svc .wl-solar-clear-photos{width:100%;margin-top:10px;min-height:42px;border:1px solid #425a66;border-radius:999px;background:#0d1c24;color:#cdd8dd;font-size:11px;font-weight:1000;letter-spacing:.04em}
+    #view-svc .wl-solar-clear-photos.hidden{display:none!important}
     #view-svc .wl-solar-preview{
       margin-top:10px;padding:10px;border:1px solid #35515f;border-radius:12px;background:#071117;
       display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center
@@ -6226,8 +6231,8 @@ function serviceSolarProofTasks(ctx,evidence) {
     'mppt',
     'MPPT / CHARGING',
     ctx?.has_helios
-      ? 'Upload one MPPT screenshot or photo showing the charging readings.'
-      : 'Upload one photo showing the MPPT / charging readings while the system is actively charging.',
+      ? 'Upload one or more MPPT screenshots or photos showing the charging readings.'
+      : 'Upload one or more photos showing the MPPT / charging readings while the system is actively charging.',
     1
   );
   if(ctx?.has_helios){
@@ -6242,19 +6247,22 @@ function serviceSolarAnswersComplete(ctx,check){
 function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
   const count=serviceSolarEvidenceCount(evidence,task.category,task.kind);
   if(task.kind==='photo'){
-    const multiple=task.required>1?' multiple':'';
+    const allowsMultiple=task.category==='mppt'||task.required>1;
+    const multiple=allowsMultiple?' multiple':'';
     return "<div class='wl-question wl-solar-one-step'>"+
       "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
       "<div class='qtext'>"+esc(task.question)+"</div>"+
-      "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='"+esc(task.category)+"'>"+
-        "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" of "+task.required+" saved":"PHOTO REQUIRED")+"</div>"+
+      "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='"+esc(task.category)+"' data-wl-solar-multi='"+(allowsMultiple?"1":"0")+"'>"+
+        "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" saved":"PHOTO REQUIRED")+"</div>"+
         "<div class='wl-solar-photo-actions'>"+
           "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'"+multiple+"></label>"+
           "<label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*'"+multiple+"></label>"+
         "</div>"+
+        (allowsMultiple?"<div class='wl-solar-multi-note'>You can add multiple photos before saving.</div>":"")+
         "<div class='wl-solar-selected' data-wl-solar-selected>No photo selected yet.</div>"+
         "<div class='wl-solar-preview hidden' data-wl-solar-preview></div>"+
-        "<button class='wl-big wl-blue wl-solar-save-photo' data-wl-solar-upload disabled>SAVE PHOTO"+(task.required>1?"S":"")+" →</button>"+
+        (allowsMultiple?"<button class='wl-solar-clear-photos hidden' type='button' data-wl-solar-clear-photos>CLEAR SELECTED PHOTOS</button>":"")+
+        "<button class='wl-big wl-blue wl-solar-save-photo' data-wl-solar-upload disabled>SAVE PHOTO"+(allowsMultiple?"S":"")+" →</button>"+
       "</div>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
     "</div>";
@@ -6941,27 +6949,46 @@ document.addEventListener('change', async e => {
   if (e.target.matches?.('.wl-solar-file')) {
     const panel=e.target.closest('.wl-solar-proof');
     if(!panel)return;
-    panel.querySelectorAll('.wl-solar-file').forEach(input=>{if(input!==e.target)input.value='';});
-    const files=[...(e.target.files||[])];
+    const multi=panel.dataset.wlSolarMulti==='1';
+    const incoming=[...(e.target.files||[])];
+    if(!multi){
+      panel.querySelectorAll('.wl-solar-file').forEach(input=>{if(input!==e.target)input.value='';});
+      panel._wlSolarPendingFiles=incoming;
+    }else{
+      const existing=Array.isArray(panel._wlSolarPendingFiles)?panel._wlSolarPendingFiles:[];
+      const merged=[...existing];
+      for(const file of incoming){
+        const key=[file.name,file.size,file.lastModified].join('|');
+        if(!merged.some(x=>[x.name,x.size,x.lastModified].join('|')===key))merged.push(file);
+      }
+      panel._wlSolarPendingFiles=merged;
+      e.target.value='';
+    }
+    const files=panel._wlSolarPendingFiles||[];
     const selected=panel.querySelector('[data-wl-solar-selected]');
     const preview=panel.querySelector('[data-wl-solar-preview]');
     const save=panel.querySelector('[data-wl-solar-upload]');
-    if(preview?.dataset.objectUrl){try{URL.revokeObjectURL(preview.dataset.objectUrl);}catch{} delete preview.dataset.objectUrl;}
+    const clear=panel.querySelector('[data-wl-solar-clear-photos]');
+    for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
+    panel._wlSolarObjectUrls=[];
     if(!files.length){
       if(selected)selected.textContent='No photo selected yet.';
       preview?.classList.add('hidden');
       if(preview)preview.innerHTML='';
-      if(save)save.disabled=true;
+      if(save){save.disabled=true;save.textContent=multi?'SAVE PHOTOS →':'SAVE PHOTO →';}
+      clear?.classList.add('hidden');
       return;
     }
-    if(selected)selected.textContent=files.length===1?'✓ '+files[0].name:'✓ '+files.length+' photos selected';
+    if(selected)selected.textContent=files.length===1?'✓ 1 photo selected':'✓ '+files.length+' photos selected';
     if(preview){
-      const url=URL.createObjectURL(files[0]);
-      preview.dataset.objectUrl=url;
+      const shown=files.slice(0,4);
+      const urls=shown.map(file=>URL.createObjectURL(file));
+      panel._wlSolarObjectUrls=urls;
       preview.classList.remove('hidden');
-      preview.innerHTML="<img src='"+url+"' alt='Selected photo preview'><div><b>READY TO SAVE</b><span>"+esc(files.length===1?files[0].name:(files.length+' photos selected'))+"</span></div>";
+      preview.innerHTML="<div class='wl-solar-preview-grid'>"+urls.map((url,i)=>"<img src='"+url+"' alt='Selected photo "+(i+1)+"'>").join('')+"</div><div><b>READY TO SAVE</b><span>"+esc(files.length===1?files[0].name:(files.length+' photos selected'))+"</span></div>";
     }
-    if(save)save.disabled=false;
+    if(save){save.disabled=false;save.textContent=files.length>1?'SAVE '+files.length+' PHOTOS →':'SAVE PHOTO →';}
+    clear?.classList.remove('hidden');
     return;
   }
   if (e.target.id === 'wlReturnPhoto') {
@@ -7512,11 +7539,31 @@ document.addEventListener('click', async e => {
     return showITHome();
   }
 
+  const solarClearPhotos=e.target.closest('[data-wl-solar-clear-photos]');
+  if(solarClearPhotos){
+    const panel=solarClearPhotos.closest('.wl-solar-proof');
+    if(!panel)return;
+    panel._wlSolarPendingFiles=[];
+    for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
+    panel._wlSolarObjectUrls=[];
+    panel.querySelectorAll('.wl-solar-file').forEach(input=>{input.value='';});
+    const selected=panel.querySelector('[data-wl-solar-selected]');
+    const preview=panel.querySelector('[data-wl-solar-preview]');
+    const save=panel.querySelector('[data-wl-solar-upload]');
+    if(selected)selected.textContent='No photo selected yet.';
+    if(preview){preview.innerHTML='';preview.classList.add('hidden');}
+    if(save){save.disabled=true;save.textContent=panel.dataset.wlSolarMulti==='1'?'SAVE PHOTOS →':'SAVE PHOTO →';}
+    solarClearPhotos.classList.add('hidden');
+    return;
+  }
+
   const solarUpload=e.target.closest('[data-wl-solar-upload]');
   if (solarUpload) {
     const panel=solarUpload.closest('.wl-solar-proof');
     const category=panel?.dataset.solarCategory;
-    const files=[...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
+    const files=(Array.isArray(panel?._wlSolarPendingFiles)&&panel._wlSolarPendingFiles.length)
+      ? [...panel._wlSolarPendingFiles]
+      : [...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
     if (!category || !files.length) return alert('Take or select at least one photo first.');
     solarUpload.disabled=true;
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
