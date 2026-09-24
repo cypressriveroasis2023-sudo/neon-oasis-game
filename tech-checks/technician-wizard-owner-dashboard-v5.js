@@ -6752,7 +6752,10 @@ async function saveHeliosFieldCheckAnswer(field,value){
     document.body.classList.remove('busy');
   }
 }
-function heliosFieldProgress(kicker,title,step,total){\n  return progress(kicker,title,step,total).replace("class='wl-head'","class='wl-head wl-helios-field-head'");\n}\nfunction serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
+function heliosFieldProgress(kicker,title,step,total){
+  return progress(kicker,title,step,total).replace("class='wl-head'","class='wl-head wl-helios-field-head'");
+}
+function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const units=heliosFieldItems(prep),swaps=units.filter(x=>x.purpose==='SWAP');
   const unitLabel=heliosFieldUnitLabel(units);
   const rules=heliosFieldRuleList();
