@@ -321,14 +321,60 @@ function ownerTestApplyPresentation(){
   show(ctx.preview_role==='it'?'it':'svc');
   ownerTestRenderSessionUi();
 }
+async function ownerTestResolvePersona(role,existing={}){
+  const preferredUsername=role==='service'?'service':'ittech';
+  const usable=p=>p&&p.user_id&&p.active!==false&&!p.archived_at&&p.role===role;
+  let rows=Array.isArray(state.profiles)?state.profiles:[];
+  let persona=rows.find(p=>usable(p)&&p.username===preferredUsername)
+    ||rows.find(usable);
+  if(persona)return persona;
+
+  // On a cold app reopen, Owner Test can resume before the full Owner roster
+  // finishes hydrating. Resolve the technician directly instead of failing the test.
+  try{
+    const {data,error}=await db.from('profiles')
+      .select('user_id,username,full_name,role,active,archived_at,created_at')
+      .eq('role',role)
+      .eq('active',true)
+      .is('archived_at',null)
+      .order('created_at',{ascending:true});
+    if(!error&&Array.isArray(data)&&data.length){
+      const byId=new Map(rows.map(p=>[p.user_id,p]));
+      data.forEach(p=>byId.set(p.user_id,{...(byId.get(p.user_id)||{}),...p}));
+      state.profiles=[...byId.values()];
+      ownerTestCacheRoster();
+      rows=data;
+      persona=rows.find(p=>usable(p)&&p.username===preferredUsername)
+        ||rows.find(usable);
+      if(persona)return persona;
+    }
+  }catch(error){
+    console.warn('Owner Test persona lookup failed during app resume',error);
+  }
+
+  // If this exact role was already open in the saved Owner Test session,
+  // keep using that known persona during a temporary refresh/connection delay.
+  if(existing?.persona_id&&(existing.preview_role===role||existing.target_role===role)){
+    return {
+      user_id:existing.persona_id,
+      username:existing.persona_username||preferredUsername,
+      full_name:existing.persona_name||(role==='service'?'Test Service':'Test IT'),
+      role,
+      active:true,
+      archived_at:null
+    };
+  }
+  return null;
+}
 async function ownerTestEnterRole(ticket,targetRole){
   if(state.profile?.role!=='owner')return alert('Owner Test Mode requires the Owner account to stay signed in.');
   const role=targetRole==='service'?'service':'it';
   const existing=ownerTestSessionRead()||{};
-  const preferredUsername=role==='service'?'service':'ittech';
-  const persona=(state.profiles||[]).find(p=>p.active&&!p.archived_at&&p.role===role&&p.username===preferredUsername)
-    ||(state.profiles||[]).find(p=>p.active&&!p.archived_at&&p.role===role);
-  if(!persona?.user_id)return alert('No active '+(role==='service'?'Service':'IT')+' test technician is available.');
+  const persona=await ownerTestResolvePersona(role,existing);
+  if(!persona?.user_id){
+    console.warn('Owner Test could not resolve a '+role+' persona after live lookup.');
+    return alert('Owner Test could not load the '+(role==='service'?'Service':'IT')+' test view yet. Check the connection and try again.');
+  }
   const ctx={
     ...existing,
     ticket:String(ticket||existing.ticket||'').trim(),
