@@ -7945,3 +7945,14 @@ html,body{max-width:100%;overflow-x:hidden}
 .ownerSimpleControlGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px 24px 24px}.ownerSimpleControlGrid button{min-height:92px;text-align:left;border:1px solid #314b59;border-radius:14px;background:#10212b;color:#fff;padding:17px;cursor:pointer}.ownerSimpleControlGrid button.primary{background:#c9141d;border-color:#ff3d44}.ownerSimpleControlGrid b,.ownerSimpleControlGrid span{display:block}.ownerSimpleControlGrid b{font-size:17px}.ownerSimpleControlGrid span{margin-top:6px;color:#a7b7c1;font-size:12px}.ownerSimpleControlGrid .primary span{color:#ffe1e2}
 .ownerSimpleControlFooter{padding:0 24px 24px}.ownerSimpleControlFooter button{width:100%;min-height:54px;border:1px solid #3a515e;border-radius:12px;background:#14252f;color:#fff;font-weight:900}
 @media(max-width:900px){#view-owner .ownerControlRow{grid-template-columns:1fr!important}.ownerSimpleControlOverlay{padding:0;place-items:end center}.ownerSimpleControlPanel{width:100%;max-height:88vh;border-radius:22px 22px 0 0;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}.ownerSimpleControlPanel>header{padding:18px}.ownerSimpleControlPanel>header h2{font-size:25px}.ownerSimpleControlStatus{grid-template-columns:1fr;padding:14px 16px 0}.ownerSimpleControlGrid{grid-template-columns:1fr;padding:14px 16px 18px}.ownerSimpleControlGrid button{min-height:76px}.ownerSimpleControlFooter{padding:0 16px 16px}}
+
+/* Owner Control action polish v2 */
+#view-owner .ownerInlineControl{display:block;margin-top:8px;width:100%;min-height:38px;border:1px solid #e52c33;border-radius:9px;background:#b9151d;color:#fff;font-weight:900;font-size:11px;letter-spacing:.04em}
+#view-owner .ownerCalendarBigControl{width:100%;min-height:58px;margin:12px 0 4px;border:1px solid #ff3c43;border-radius:12px;background:#c9141d;color:#fff;font-weight:950;font-size:14px}
+.ownerSimpleControlGrid .warnAction{border-color:#765b21!important;background:#281f0d!important}
+.ownerSimpleControlGrid .closeAction{border-color:#34845c!important;background:#0e2b1d!important}
+.ownerSimpleControlGrid .reopenAction{border-color:#556777!important;background:#14222d!important}
+@media(max-width:900px){
+  #view-owner .ownerInlineControl{min-height:44px;font-size:12px}
+  #view-owner .ownerCalendarBigControl{min-height:62px;font-size:15px}
+}
