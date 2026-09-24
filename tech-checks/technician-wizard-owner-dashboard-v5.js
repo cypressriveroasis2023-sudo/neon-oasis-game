@@ -5994,6 +5994,193 @@ function serviceSolarChecklistHtml(ctx, check, evidence) {
     ${ctx.has_helios?serviceSolarProofPanelHtml(evidence,'helios_yard','Helios Yard Solar Test','Photograph the Helios connected to the yard tower for PV/Victron charging verification. Sign after the yard test and PTZ transport prep are complete.',true):''}
     <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Pre-trip complete — equipment may leave the shop after handoff acceptance':'Pre-trip still needs verification'}</b></div></div>`;
 }
+
+function serviceSolarAnswerTasks(ctx,check) {
+  const tasks=[];
+  const spotters=Number(ctx?.solar_spotter_count||0);
+  const expectedPanels=Number(ctx?.expected_solar_panels||0);
+  const requiredStands=serviceSolarRequiredStandCount(ctx);
+  const standTags=serviceSolarStandTagsValue(check).split(/\n+/).map(function(v){return v.trim();}).filter(Boolean);
+  if(ctx?.need_stand){
+    tasks.push({
+      key:'stand_tag',
+      kind:'stand',
+      title:'VERIFY SOLAR STAND',
+      question:requiredStands===1?'Enter the exact Solar Stand tag.':'Enter the '+requiredStands+' exact Solar Stand tags — one per line.',
+      value:serviceSolarStandTagsValue(check),
+      requiredStands:requiredStands,
+      done:Boolean(check?.stand_verified)&&standTags.length===requiredStands
+    });
+  }
+  if(spotters>0){
+    tasks.push({
+      key:'battery_configuration',
+      kind:'battery_config',
+      title:'VERIFY BATTERY SETUP',
+      question:'Which battery setup is physically installed on the Solar Stand?',
+      done:['agm_4x_12v_110ah','single_12v_350ah'].includes(String(check?.battery_configuration||''))
+    });
+  }
+  function addBool(field,title,question,done,extra){
+    tasks.push({key:field,field:field,kind:'bool',title:title,question:question,done:done===undefined?Boolean(check?.[field]):Boolean(done),extra:extra||null});
+  }
+  addBool('mppt_updated_ok','MPPT CHECK','Is the MPPT firmware / configuration updated and current?');
+  addBool('mppt_tested_ok','MPPT CHECK','Is the MPPT powered, tested, and working?');
+  if(ctx?.has_helios){
+    addBool('cerbo_updated_ok','HELIOS YARD TEST','Is the Helios Cerbo / Victron configuration updated and current?');
+    addBool('cerbo_online_ok','HELIOS YARD TEST','Is the Helios Cerbo online and communicating?');
+    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Did you connect the Helios PV cable to the yard tower?');
+    addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal Helios switch to PV?');
+    addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to this Helios in the Victron Bluetooth app?');
+    addBool('helios_yard_updates_status_ok','HELIOS YARD TEST','Does Victron show the unit healthy and current?');
+    addBool('helios_battery_box_charging_ok','HELIOS YARD TEST','Is the internal Helios battery box present and charged?');
+    addBool('helios_yard_solar_charging_ok','HELIOS YARD TEST','Did you verify solar charging from the yard tower panel?');
+    addBool('helios_yard_ptz_wrapped_ok','HELIOS YARD TEST','Did you remove the PTZ from the door/front plate and bubble wrap it for transport?');
+  }
+  if(expectedPanels>0){
+    addBool(
+      'solar_panels_verified',
+      'SOLAR PANEL CHECK',
+      'Do you physically have exactly '+expectedPanels+' loose solar panel'+(expectedPanels===1?'':'s')+' for this job?',
+      Boolean(check?.solar_panels_verified)&&Number(check?.solar_panel_count||0)===expectedPanels,
+      {field:'solar_panel_count',value:String(expectedPanels)}
+    );
+  }
+  addBool('batteries_charged_ok','BATTERY CHECK','Is the required battery / battery-box setup physically present and charged?');
+  addBool('solar_charging_ok','CHARGING CHECK','Is the battery system actively charging through MPPT / PV?');
+  return tasks;
+}
+function serviceSolarProofTasks(ctx,evidence) {
+  const tasks=[];
+  const spotters=Math.max(1,Number(ctx?.solar_spotter_count||0));
+  function addPhoto(category,title,question,required){
+    required=required||1;
+    tasks.push({key:category+':photo',kind:'photo',category:category,title:title,question:question,required:required,done:serviceSolarEvidenceCount(evidence,category,'photo')>=required});
+  }
+  function addSign(category,title,question){
+    tasks.push({key:category+':signature',kind:'signature',category:category,title:title,question:question,required:1,done:serviceSolarEvidenceCount(evidence,category,'signature')>=1});
+  }
+  if(ctx?.need_stand){
+    addPhoto('solar_stand','SOLAR STAND PHOTO',spotters===1?'Take one clear photo of the exact Solar Stand tag.':'Take '+spotters+' clear Solar Stand tag photos — one per stand.',spotters);
+    addSign('solar_stand','SOLAR STAND SIGN-OFF','Sign to confirm the exact Solar Stand tag(s) were physically verified.');
+  }
+  addPhoto('batteries','BATTERY PHOTO','Take one clear photo of the verified battery / battery-box setup.',1);
+  addSign('batteries','BATTERY SIGN-OFF','Sign to confirm the battery / battery-box setup was physically verified.');
+  addPhoto('mppt','MPPT / CHARGING PHOTO','Take one photo showing the MPPT / charging readings while the system is actively charging.',1);
+  if(ctx?.has_helios){
+    addPhoto('helios_cerbo_mppt','HELIOS CERBO + MPPT PHOTO','Take one photo showing the Helios Cerbo and MPPT current, online, and tested.',1);
+    addPhoto('helios_yard','HELIOS YARD TEST PHOTO','Take one photo of the Helios connected to the yard tower during the PV / Victron charging test.',1);
+    addSign('helios_yard','HELIOS YARD TEST SIGN-OFF','Sign after the Helios yard test and PTZ transport prep are complete.');
+  }
+  return tasks;
+}
+function serviceSolarAnswersComplete(ctx,check){
+  return serviceSolarAnswerTasks(ctx,check).every(function(task){return task.done;});
+}
+function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
+  const count=serviceSolarEvidenceCount(evidence,task.category,task.kind);
+  if(task.kind==='photo'){
+    return "<div class='wl-question wl-solar-one-step'>"+
+      "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+      "<div class='qtext'>"+esc(task.question)+"</div>"+
+      "<div class='wl-solar-proof top10' data-solar-category='"+esc(task.category)+"'>"+
+        "<div class='small'>Saved: "+count+" of "+task.required+"</div>"+
+        "<input class='wl-solar-file top10' type='file' accept='image/*' capture='environment' "+(task.required>1?"multiple":"")+">"+
+        "<button class='wl-big wl-blue top10' data-wl-solar-upload>SAVE PHOTO"+(task.required>1?"S":"")+" →</button>"+
+      "</div>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "</div>";
+  }
+  return "<div class='wl-question wl-solar-one-step'>"+
+    "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+    "<div class='qtext'>"+esc(task.question)+"</div>"+
+    "<div class='wl-solar-proof top10' data-solar-category='"+esc(task.category)+"'>"+
+      "<div class='wl-sign'><canvas></canvas><div class='wl-nav'>"+
+        "<button class='wl-prev' data-wl-solar-clear>Clear</button>"+
+        "<button class='wl-next' data-wl-solar-save-sign>SAVE SIGNATURE →</button>"+
+      "</div></div>"+
+    "</div>"+
+    "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+  "</div>";
+}
+function serviceSolarOneStepHtml(ctx,check,evidence) {
+  const answerTasks=serviceSolarAnswerTasks(ctx,check);
+  const proofTasks=serviceSolarProofTasks(ctx,evidence);
+  const tasks=answerTasks.concat(proofTasks);
+  const index=tasks.findIndex(function(task){return !task.done;});
+  if(index<0){
+    return "<div class='wl-question wl-solar-one-step'>"+
+      "<div class='qnum'>PRE-TRIP COMPLETE</div>"+
+      "<div class='qtext'>All required Service pre-trip checks and proof are complete.</div>"+
+      "<div class='ok top10'><b>✓ READY FOR THE NEXT STEP</b></div>"+
+      "<button class='wl-big wl-green top10' data-wl-svc-next>CONTINUE →</button>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "</div>";
+  }
+  const task=tasks[index],stepNo=index+1,total=tasks.length;
+  if(task.kind==='stand'){
+    const tagControl=task.requiredStands>1
+      ? "<textarea id='wlSolarSingleStandTag' rows='4' placeholder='ONE TAG PER LINE'>"+esc(task.value||'')+"</textarea>"
+      : "<input id='wlSolarSingleStandTag' value='"+esc(task.value||'')+"' placeholder='ENTER STAND TAG'>";
+    return "<div class='wl-question wl-solar-one-step'>"+
+      "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+      "<div class='qtext'>"+esc(task.question)+"</div>"+
+      tagControl+
+      "<button class='wl-big wl-blue top10' data-wl-solar-save-stand data-required='"+task.requiredStands+"'>SAVE & CONTINUE →</button>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "</div>";
+  }
+  if(task.kind==='battery_config'){
+    return "<div class='wl-question wl-solar-one-step'>"+
+      "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+      "<div class='qtext'>"+esc(task.question)+"</div>"+
+      "<div class='wl-options'>"+
+        "<button class='pass' data-wl-solar-battery-config='agm_4x_12v_110ah'>4 × AGM 12V 110Ah</button>"+
+        "<button class='pass' data-wl-solar-battery-config='single_12v_350ah'>1 × 12V 350Ah</button>"+
+      "</div>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "</div>";
+  }
+  if(task.kind==='bool'){
+    const extra=task.extra
+      ? " data-extra-field='"+esc(task.extra.field)+"' data-extra-value='"+esc(task.extra.value)+"'"
+      : "";
+    return "<div class='wl-question wl-solar-one-step'>"+
+      "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+      "<div class='qtext'>"+esc(task.question)+"</div>"+
+      "<div class='wl-options'>"+
+        "<button class='pass' data-wl-solar-step-answer='yes' data-field='"+esc(task.field)+"'"+extra+">YES</button>"+
+        "<button class='fail' data-wl-solar-step-answer='no'>NO</button>"+
+      "</div>"+
+      "<div class='wl-solar-step-message'></div>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "</div>";
+  }
+  return serviceSolarSingleProofHtml(task,evidence,stepNo,total);
+}
+async function saveServiceSolarProgressField(field,value){
+  if(!activeSvcPrep?.id)return false;
+  document.body.classList.add('busy');
+  const result=await liveDb.rpc('save_service_solar_progress_v1',{
+    p_prep_id:activeSvcPrep.id,p_field:String(field),p_value:String(value)
+  });
+  document.body.classList.remove('busy');
+  if(result.error){alert(result.error.message);return false;}
+  return true;
+}
+async function maybeFinalizeServiceSolarProgress(){
+  if(!activeSvcPrep?.id)return false;
+  const ctx=await serviceSolarContextData(activeSvcPrep.id);
+  const check=await loadServiceSolarCheck(activeSvcPrep.id);
+  if(!serviceSolarAnswersComplete(ctx,check))return true;
+  if(check?.completed_at)return true;
+  document.body.classList.add('busy');
+  const result=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});
+  document.body.classList.remove('busy');
+  if(result.error){alert(result.error.message);return false;}
+  return true;
+}
+
 async function saveServiceSolarChecklist() {
   if (!activeSvcPrep?.id) return;
   const ctx=await serviceSolarContextData(activeSvcPrep.id); if (!ctx.need_solar) return;
@@ -6347,7 +6534,7 @@ async function renderSvcPrep() {
     const confirmed=Boolean(activeSvcPrep.service_parts_confirmed);
     wizard.innerHTML=progress('Parts Handoff',`Verify parts from IT Tech ${preparedBy}`,1,1)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Solar / Helios Check →':'Compare IT Photos →'}</button></div>`;
   }else if(solarRequired&&svcUnitIndex===solarStep){
-    wizard.innerHTML=progress('Solar / Helios Pre-Trip','Verify charging, equipment, and Helios yard test before leaving',1,1)+serviceAIEquipmentReview(solarCtx,solarCheck,solarEvidence)+serviceSolarChecklistHtml(solarCtx,solarCheck,solarEvidence)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${solarReady?'':'disabled'}>Compare IT Photos →</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress('Solar / Helios Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence);wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
     wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   }else if(svcUnitIndex===photoStep){
@@ -6997,6 +7184,39 @@ document.addEventListener('click', async e => {
     return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-service-parts-mismatch]')) return alert('Do not accept the handoff. Compare the parts with IT and the MHelpDesk ticket, then correct the mismatch before continuing.');
+  
+  const solarStandSave=e.target.closest('[data-wl-solar-save-stand]');
+  if(solarStandSave){
+    const required=Math.max(1,Number(solarStandSave.dataset.required||1));
+    const value=String(document.getElementById('wlSolarSingleStandTag')?.value||'').trim();
+    const tags=value.split(/[,\n]+/).map(function(v){return v.trim();}).filter(Boolean);
+    if(tags.length!==required)return alert('Enter exactly '+required+' Solar Stand tag'+(required===1?'':'s')+'.');
+    if(!await saveServiceSolarProgressField('stand_tag',tags.join('\n')))return;
+    if(!await saveServiceSolarProgressField('stand_verified','true'))return;
+    await maybeFinalizeServiceSolarProgress();
+    return renderSvcPrep();
+  }
+  const solarBatteryConfig=e.target.closest('[data-wl-solar-battery-config]');
+  if(solarBatteryConfig){
+    if(!await saveServiceSolarProgressField('battery_configuration',solarBatteryConfig.dataset.wlSolarBatteryConfig))return;
+    await maybeFinalizeServiceSolarProgress();
+    return renderSvcPrep();
+  }
+  const solarStepAnswer=e.target.closest('[data-wl-solar-step-answer]');
+  if(solarStepAnswer){
+    if(solarStepAnswer.dataset.wlSolarStepAnswer==='no'){
+      const stepMessage=solarStepAnswer.closest('.wl-question')?.querySelector('.wl-solar-step-message');
+      if(stepMessage)stepMessage.innerHTML="<div class='wl-stop top10'><b>STOP — FIX THIS FIRST.</b><div>When it is corrected, tap YES. You cannot continue while this answer is NO.</div></div>";
+      return;
+    }
+    const extraField=solarStepAnswer.dataset.extraField;
+    const extraValue=solarStepAnswer.dataset.extraValue;
+    if(extraField && !await saveServiceSolarProgressField(extraField,extraValue))return;
+    if(!await saveServiceSolarProgressField(solarStepAnswer.dataset.field,'true'))return;
+    await maybeFinalizeServiceSolarProgress();
+    return renderSvcPrep();
+  }
+
   if (e.target.closest('[data-wl-save-service-solar]')) return saveServiceSolarChecklist();
   if (e.target.closest('[data-wl-accept-helios]')) return acceptHeliosHandoff();
   if (e.target.closest('[data-wl-helios-old-return]')) return startHeliosOldUnitReturn();
