@@ -312,7 +312,7 @@ function ownerTestApplyPresentation(){
   document.body.classList.add('owner-test-role-preview');
   document.body.classList.toggle('owner-test-role-it',ctx.preview_role==='it');
   document.body.classList.toggle('owner-test-role-service',ctx.preview_role==='service');
-  if(whoName)whoName.textContent='Owner Test';
+  if(whoName)whoName.textContent=ctx.persona_name||'Owner Test';
   if(whoRole)whoRole.textContent=ctx.preview_role==='it'?'IT Technician':'Service Tech';
   document.getElementById('appView')?.classList.add('singleRoleView');
   document.getElementById('tab-owner')?.classList.add('hidden');
@@ -325,22 +325,34 @@ async function ownerTestEnterRole(ticket,targetRole){
   if(state.profile?.role!=='owner')return alert('Owner Test Mode requires the Owner account to stay signed in.');
   const role=targetRole==='service'?'service':'it';
   const existing=ownerTestSessionRead()||{};
+  const preferredUsername=role==='service'?'service':'ittech';
+  const persona=(state.profiles||[]).find(p=>p.active&&!p.archived_at&&p.role===role&&p.username===preferredUsername)
+    ||(state.profiles||[]).find(p=>p.active&&!p.archived_at&&p.role===role);
+  if(!persona?.user_id)return alert('No active '+(role==='service'?'Service':'IT')+' test technician is available.');
   const ctx={
     ...existing,
     ticket:String(ticket||existing.ticket||'').trim(),
     target_role:role,
     preview_role:role,
+    persona_id:persona.user_id,
+    persona_name:persona.full_name||persona.username||(role==='service'?'Test Service':'Test IT'),
+    persona_username:persona.username||'',
     owner_username:state.profile.username||existing.owner_username||'',
     started_at:existing.started_at||new Date().toISOString(),
     updated_at:new Date().toISOString()
   };
   if(!ctx.ticket)return alert('A TEST ticket number is required.');
+  const ensure=await db.rpc('owner_test_ensure_assignment_v1',{
+    p_ticket_no:ctx.ticket,
+    p_role:role,
+    p_test_tech_id:ctx.persona_id
+  });
+  if(ensure.error)return alert(ensure.error.message||'Could not open the test technician workflow.');
   ownerTestSessionWrite(ctx);
   await loadDeferredModules();
   ownerTestApplyPresentation();
-  if(role==='service'&&typeof window.showSvcHome==='function')await window.showSvcHome();
-  if(role==='it'&&typeof window.showITHome==='function')await window.showITHome();
-  setTimeout(()=>ownerTestFocusTicket(ctx.ticket,role),250);
+  window.dispatchEvent(new CustomEvent('techcheck:owner-test-role',{detail:{...ctx}}));
+  setTimeout(()=>ownerTestFocusTicket(ctx.ticket,role),500);
 }
 async function ownerTestSwitchAccount(ticket,targetRole){
   return ownerTestEnterRole(ticket,targetRole);
