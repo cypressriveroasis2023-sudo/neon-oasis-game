@@ -5973,18 +5973,20 @@ function serviceSolarChecklistHtml(ctx, check, evidence) {
     <div class='wl-question top10'>
       ${ctx.need_stand?`<div class='wl-auto-required'><b>${spotters>1?`${spotters} Solar Stands automatically assigned for checkout`:'Solar Stand automatically assigned for checkout'}</b></div><label>Exact Solar Stand Tag${spotters>1?'s':''}</label>${spotters>1?`<textarea id='wlSvcSolarStandTag' rows='3'>${esc(standTag)}</textarea>`:`<input id='wlSvcSolarStandTag' value='${esc(standTag)}'>`}<label class='check top8'><input id='wlSvcSolarStandVerified' type='checkbox' ${check?.stand_verified?'checked':''}><span>I physically verified the exact stand(s).</span></label>`:''}
       ${batteryChoice}
-      <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
-      <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>
-      ${ctx.has_helios?`<div class='wl-stop top10'><b>HELIOS YARD SOLAR TEST — BEFORE LEAVING</b><div>Take the IT-checked-out Helios to a Helios tower in the yard. The tower already has its solar panel.</div></div>
-        <label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Helios Cerbo / Victron configuration and updates are current.</span></label>
-        <label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online and communicating.</span></label>
-        <label class='check top8'><input id='wlSvcHeliosYardPvConnected' type='checkbox' ${check?.helios_yard_pv_connected_ok?'checked':''}><span>I connected the Helios PV cable to the yard tower.</span></label>
+      ${ctx.has_helios?`<div class='wl-stop top10'><b>HELIOS YARD SOLAR TEST — BEFORE LEAVING</b><div>Take the IT-checked-out Helios outside to the Helios yard tower. Connect it to the tower solar panel before checking MPPT or Victron status.</div></div>
+        <label class='check top8'><input id='wlSvcHeliosYardPvConnected' type='checkbox' ${check?.helios_yard_pv_connected_ok?'checked':''}><span>The Helios is outside and connected to the yard tower solar panel.</span></label>
         <label class='check top8'><input id='wlSvcHeliosYardSwitchPv' type='checkbox' ${check?.helios_yard_switch_pv_ok?'checked':''}><span>I flipped the internal Helios switch to PV.</span></label>
         <label class='check top8'><input id='wlSvcHeliosYardVictron' type='checkbox' ${check?.helios_yard_victron_bluetooth_ok?'checked':''}><span>I connected to the unit in the Victron Bluetooth app.</span></label>
+        <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>With yard solar connected, Victron shows the MPPT firmware / configuration is current.</span></label>
+        <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>With yard solar connected, the MPPT is powered and working correctly.</span></label>
+        <label class='check top8'><input id='wlSvcCerboUpdated' type='checkbox' ${check?.cerbo_updated_ok?'checked':''}><span>Victron shows the Helios Cerbo / configuration is current.</span></label>
+        <label class='check top8'><input id='wlSvcCerboOnline' type='checkbox' ${check?.cerbo_online_ok?'checked':''}><span>Helios Cerbo is online and communicating.</span></label>
         <label class='check top8'><input id='wlSvcHeliosYardStatus' type='checkbox' ${check?.helios_yard_updates_status_ok?'checked':''}><span>I verified Victron status / updates and the system is healthy.</span></label>
         <label class='check top8'><input id='wlSvcHeliosBatteryCharging' type='checkbox' ${check?.helios_battery_box_charging_ok?'checked':''}><span>The internal Helios battery box is present and charged.</span></label>
         <label class='check top8'><input id='wlSvcHeliosYardCharging' type='checkbox' ${check?.helios_yard_solar_charging_ok?'checked':''}><span>I verified solar charging from the tower panel.</span></label>
-        <label class='check top8'><input id='wlSvcHeliosYardPtzWrapped' type='checkbox' ${check?.helios_yard_ptz_wrapped_ok?'checked':''}><span>I removed the PTZ from the door/front plate and bubble wrapped it for transport.</span></label>`:''}
+        <label class='check top8'><input id='wlSvcHeliosYardPtzWrapped' type='checkbox' ${check?.helios_yard_ptz_wrapped_ok?'checked':''}><span>I removed the PTZ from the door/front plate and bubble wrapped it for transport.</span></label>`:`
+        <label class='check top8'><input id='wlSvcMpptUpdated' type='checkbox' ${check?.mppt_updated_ok?'checked':''}><span>MPPT firmware / configuration is updated and current.</span></label>
+        <label class='check top8'><input id='wlSvcMpptTested' type='checkbox' ${check?.mppt_tested_ok?'checked':''}><span>MPPT was powered, tested, and is working.</span></label>`}
       ${panelBlock}
       <label class='check top8'><input id='wlSvcBatteriesCharged' type='checkbox' ${check?.batteries_charged_ok?'checked':''}><span>I verified the required battery / battery-box setup is present and charged.</span></label>
       <label class='check top8'><input id='wlSvcSolarCharging' type='checkbox' ${check?.solar_charging_ok?'checked':''}><span>I verified the battery system is actively charging through MPPT / PV.</span></label>
@@ -6202,16 +6204,26 @@ async function saveServiceSolarChecklist() {
   const selectedBatteryConfig=document.querySelector("input[name='wlSvcBatteryConfig']:checked")?.value||'';
   const batteryPlan=serviceSolarBatteryPlan(ctx,{battery_configuration:selectedBatteryConfig||undefined});
   if(Number(ctx.solar_spotter_count||0)>0&&!['agm_4x_12v_110ah','single_12v_350ah'].includes(selectedBatteryConfig))return alert('Choose the Solar Stand battery setup.');
-  if(!document.getElementById('wlSvcMpptUpdated')?.checked)return alert('Verify the MPPT update / configuration.');
-  if(!document.getElementById('wlSvcMpptTested')?.checked)return alert('Verify the MPPT test.');
-  const requiredHelios=[
-    ['wlSvcCerboUpdated','Verify the Helios Cerbo update / configuration.'],['wlSvcCerboOnline','Verify the Helios Cerbo is online.'],
-    ['wlSvcHeliosYardPvConnected','Connect the Helios PV cable to the yard tower.'],['wlSvcHeliosYardSwitchPv','Flip the internal switch to PV.'],
-    ['wlSvcHeliosYardVictron','Verify the Helios in the Victron Bluetooth app.'],['wlSvcHeliosYardStatus','Verify Victron status / updates.'],
-    ['wlSvcHeliosBatteryCharging','Verify the internal Helios battery box is present and charged.'],['wlSvcHeliosYardCharging','Verify solar charging from the yard tower.'],
-    ['wlSvcHeliosYardPtzWrapped','Remove the PTZ and bubble wrap it for transport.']
-  ];
-  if(ctx.has_helios)for(const [id,msg] of requiredHelios)if(!document.getElementById(id)?.checked)return alert(msg);
+  if(ctx.has_helios){
+    const requiredHeliosBeforeMppt=[
+      ['wlSvcHeliosYardPvConnected','Take the Helios outside and connect it to the yard tower solar panel.'],
+      ['wlSvcHeliosYardSwitchPv','Flip the internal switch to PV.'],
+      ['wlSvcHeliosYardVictron','Connect to the Helios in the Victron Bluetooth app.']
+    ];
+    for(const [id,msg] of requiredHeliosBeforeMppt)if(!document.getElementById(id)?.checked)return alert(msg);
+    if(!document.getElementById('wlSvcMpptUpdated')?.checked)return alert('Verify the MPPT firmware / configuration while the Helios is connected to yard solar.');
+    if(!document.getElementById('wlSvcMpptTested')?.checked)return alert('Verify the MPPT is powered and working while the Helios is connected to yard solar.');
+    const requiredHeliosAfterMppt=[
+      ['wlSvcCerboUpdated','Verify the Helios Cerbo update / configuration.'],['wlSvcCerboOnline','Verify the Helios Cerbo is online.'],
+      ['wlSvcHeliosYardStatus','Verify Victron status / updates.'],
+      ['wlSvcHeliosBatteryCharging','Verify the internal Helios battery box is present and charged.'],['wlSvcHeliosYardCharging','Verify solar charging from the yard tower.'],
+      ['wlSvcHeliosYardPtzWrapped','Remove the PTZ and bubble wrap it for transport.']
+    ];
+    for(const [id,msg] of requiredHeliosAfterMppt)if(!document.getElementById(id)?.checked)return alert(msg);
+  }else{
+    if(!document.getElementById('wlSvcMpptUpdated')?.checked)return alert('Verify the MPPT update / configuration.');
+    if(!document.getElementById('wlSvcMpptTested')?.checked)return alert('Verify the MPPT test.');
+  }
   if(expectedPanels>0&&panelCount!==expectedPanels)return alert('This job requires '+expectedPanels+' loose solar panel'+(expectedPanels===1?'':'s')+'.');
   if(expectedPanels>0&&!document.getElementById('wlSvcSolarPanelsVerified')?.checked)return alert('Verify the loose solar panel count.');
   if(!document.getElementById('wlSvcBatteriesCharged')?.checked)return alert('Verify the battery / battery-box setup.');
