@@ -8026,3 +8026,33 @@ html,body{max-width:100%;overflow-x:hidden}
  .ownerMoreGrid b{font-size:16px}
  .ownerMoreDanger{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
 }
+
+/* Owner Test Center v6 */
+.ownerTestCreate{border:1px solid #56363a;border-radius:16px;background:#151116;padding:16px;margin-bottom:16px}
+.ownerTestWarning{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #8d2b31;border-radius:12px;background:#2b1115;padding:12px 14px;margin-bottom:14px}
+.ownerTestWarning b{color:#ff6268;font-size:15px;letter-spacing:.08em}.ownerTestWarning span{color:#e4bdc0;font-size:12px;text-align:right}
+.ownerTestForm{display:grid;grid-template-columns:1.2fr 1.6fr 1fr 1fr .55fr auto;gap:10px;align-items:end}
+.ownerTestForm label{display:grid;gap:5px;font-size:11px;font-weight:900;color:#a8bac4}
+.ownerTestForm input,.ownerTestForm select{min-width:0;min-height:48px;border:1px solid #3a5360;border-radius:10px;background:#09161e;color:#fff;padding:0 11px;font-size:14px}
+.ownerTestCreateButton{min-height:48px;border:1px solid #ff363d;border-radius:10px;background:#c9141d;color:#fff;font-weight:950;padding:0 16px}
+.ownerTestWorkflowRow{border:1px solid #304a57;border-radius:14px;background:#0b1a22;padding:16px;margin-top:10px}
+.ownerTestWorkflowRow>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ownerTestWorkflowRow>header>div{display:grid;gap:3px}.ownerTestWorkflowRow small{font-size:10px;font-weight:950;letter-spacing:.14em;color:#ff5158}
+.ownerTestWorkflowRow>header b{font-size:18px;color:#fff}.ownerTestWorkflowRow>header span,.ownerTestWorkflowRow p{color:#9fb0ba;font-size:12px}
+.ownerTestWorkflowRow>header strong{border:1px solid #6b4d23;border-radius:999px;background:#261c0d;color:#ffc65c;padding:7px 10px;font-size:10px;letter-spacing:.08em}
+.ownerTestWorkflowActions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:13px}
+.ownerTestWorkflowActions button{min-height:44px;border:1px solid #344f5d;border-radius:10px;background:#12232d;color:#fff;font-weight:900;font-size:11px;padding:0 10px}
+.ownerTestWorkflowActions button.primary{border-color:#f03940;background:#c9141d}.ownerTestWorkflowActions button.danger{border-color:#91333a;background:#2c1116;color:#ff9da1}
+.ownerTestCleanup{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding:14px;border:1px dashed #73343a;border-radius:14px}
+.ownerTestCleanup button{min-height:46px;border:1px solid #a52e35;border-radius:10px;background:#2c1116;color:#ffb4b7;font-weight:950;padding:0 15px}.ownerTestCleanup span{font-size:12px;color:#9fb0ba}
+.ownerMoreGrid .ownerMoreTestButton{border-color:#ff353c!important;background:#321116!important}
+@media(max-width:900px){
+ .ownerTestCreate{padding:12px}
+ .ownerTestWarning{display:grid;gap:5px}.ownerTestWarning span{text-align:left}
+ .ownerTestForm{grid-template-columns:1fr}
+ .ownerTestForm input,.ownerTestForm select,.ownerTestCreateButton{width:100%;min-height:50px}
+ .ownerTestWorkflowActions{grid-template-columns:1fr 1fr}
+ .ownerTestWorkflowActions button{min-height:48px}
+ .ownerTestWorkflowActions .primary,.ownerTestWorkflowActions .danger{grid-column:1/-1}
+ .ownerTestCleanup{display:grid}.ownerTestCleanup button{width:100%;min-height:50px}
+}
