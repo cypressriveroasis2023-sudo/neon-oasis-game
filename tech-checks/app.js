@@ -2746,6 +2746,78 @@ function ownerAppActivity(){
   return ownerAppHeader('COMPANY LOG','Activity','Chronological Tech Check activity from recorded production events.')
     +(rows.length?rows.slice(0,100).map(r=>'<div class="ownerAppActivityRow"><div><b>'+esc(ownerWorkflowDisplayText(r.kind))+'</b><span>'+new Date(r.created_at).toLocaleString()+'</span></div><p>'+esc(ownerWorkflowDisplayText(r.text))+'</p></div>').join(''):ownerAppEmpty('NO ACTIVITY RECORDED'));
 }
+function ownerDefaultTestTicket(){
+  const d=new Date(),pad=n=>String(n).padStart(2,'0');
+  return 'TEST-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes());
+}
+function ownerAppTestCenter(){
+  const tests=(state.preps||[]).filter(p=>p.is_test).slice().sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+  const equipment=['Helios','Sniper','Ranger','Solar Spotter','Spotter','Recon 2','110V Stand','Solar Stand','Pole'];
+  return ownerAppHeader('OWNER TEST MODE','Test Center','Create disposable Tech Check workflows so you can test IT, handoff, Service, closeout and corrections without pretending a customer job is real.')
+    +'<section class="ownerTestCreate"><div class="ownerTestWarning"><b>TEST DATA ONLY</b><span>These workflows are marked TEST. MHelpDesk is not changed.</span></div>'
+    +'<div class="ownerTestForm"><label>Test Ticket<input id="ownerTestTicket" value="'+esc(ownerDefaultTestTicket())+'"></label><label>Test Site<input id="ownerTestSite" value="Shop - Owner Workflow Test"></label><label>Equipment<select id="ownerTestEquipment">'+equipment.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></label><label>Purpose<select id="ownerTestPurpose"><option value="DELIVERY">DELIVERY</option><option value="SWAP">SWAP</option><option value="BACKUP">BACKUP</option></select></label><label>Quantity<input id="ownerTestQty" type="number" min="1" max="10" value="1" inputmode="numeric"></label><button class="ownerTestCreateButton" type="button" onclick="ownerCreateTestWorkflow()">CREATE TEST WORKFLOW</button></div></section>'
+    +'<section class="ownerAppGroup"><h2>Current Test Workflows <span>'+tests.length+'</span></h2>'
+    +(tests.length?tests.map(ownerTestWorkflowRow).join(''):ownerAppEmpty('NO TEST WORKFLOWS','Create one above when you want to test the technician process.'))
+    +'</section><section class="ownerTestCleanup"><button type="button" onclick="ownerClearAllTestWorkflows()">CLEAR ALL TEST DATA</button><span>Removes only records explicitly marked TEST.</span></section>';
+}
+function ownerTestWorkflowRow(p){
+  const status=String(p.status||'draft').toUpperCase();
+  const items=(p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+String(i.equipment_type||'Equipment')).join(' | ')||'Equipment not completed yet';
+  return '<article class="ownerTestWorkflowRow"><header><div><small>TEST</small><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Test site')+'</span></div><strong>'+esc(status)+'</strong></header><p>'+esc(items)+'</p><div class="ownerTestWorkflowActions">'
+    +'<button class="primary" type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(p.ticket_no||'')+'\')">OWNER CONTROL</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'it\')">TEST AS IT</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'service\')">TEST AS SERVICE</button>'
+    +(p.status==='released'?'<button type="button" onclick="ownerReopenTestPrep(\''+esc(p.id)+'\')">RETURN TO IT</button>':'')
+    +(p.status!=='closed'?'<button class="danger" type="button" onclick="ownerDeleteTestPrep(\''+esc(p.id)+'\')">DELETE TEST</button>':'')
+    +'</div></article>';
+}
+async function ownerCreateTestWorkflow(){
+  const ticket=String(document.getElementById('ownerTestTicket')?.value||'').trim();
+  const site=String(document.getElementById('ownerTestSite')?.value||'').trim();
+  const equipment=String(document.getElementById('ownerTestEquipment')?.value||'Helios');
+  const purpose=String(document.getElementById('ownerTestPurpose')?.value||'DELIVERY');
+  const qty=Math.max(1,Math.min(10,Number(document.getElementById('ownerTestQty')?.value||1)));
+  if(!ticket)return alert('Enter a test ticket number.');
+  if(equipment==='110V Stand'&&purpose!=='SWAP')return alert('110V Stand test items are SWAP only.');
+  if(equipment==='Solar Stand'&&!['SWAP','DELIVERY'].includes(purpose))return alert('Solar Stand test items are DELIVERY or SWAP only.');
+  setBusy(true);
+  const {data,error}=await db.rpc('owner_create_test_prep',{p_ticket_no:ticket,p_site:site,p_requirements:[{equipment_type:equipment,purpose,qty}]});
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData();
+  alert('Test workflow created. It is marked TEST and does not change MHelpDesk.');
+  await ownerAppNavigate('testcenter');
+}
+function ownerTestOpenRole(ticket,role){
+  ownerControlTest(String(ticket),role==='service'?'service':'it');
+}
+async function ownerReopenTestPrep(prepId){
+  const reason=prompt('Why are you returning this TEST handoff to IT?','Owner workflow retest');
+  if(reason===null)return;
+  if(!String(reason).trim())return alert('Enter a reason.');
+  setBusy(true);
+  const {error}=await db.rpc('reopen_it_prep_with_reason',{p_prep_id:String(prepId),p_reason:String(reason).trim()});
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData(); await ownerAppNavigate('testcenter');
+}
+async function ownerDeleteTestPrep(prepId){
+  if(!confirm('Delete this TEST workflow? Production jobs are not affected.'))return;
+  setBusy(true);
+  const {error}=await db.rpc('delete_it_prep_with_reason',{p_prep_id:String(prepId),p_reason:'Owner deleted TEST workflow from Test Center'});
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData(); await ownerAppNavigate('testcenter');
+}
+async function ownerClearAllTestWorkflows(){
+  if(!confirm('Clear ALL records marked TEST? Production Tech Check data is not removed.'))return;
+  setBusy(true);
+  const {error}=await db.rpc('owner_clear_test_data');
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData(); await ownerAppNavigate('testcenter');
+  alert('All TEST workflow data was cleared.');
+}
 function ownerAppMore(){
   const activeTechs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service')).length;
   const activeUnits=(state.unitRegistry||[]).length;
@@ -2760,6 +2832,7 @@ function ownerAppMore(){
     +'<button type="button" data-owner-route="review"><b>OWNER REVIEW</b><span>Close, reopen or return completed Tech Check work.</span></button>'
     +'<button type="button" data-owner-route="history"><b>HISTORY</b><span>Search permanent technician, unit and site history.</span></button>'
     +'<button type="button" data-owner-route="activity"><b>ACTIVITY</b><span>See the chronological Tech Check company log.</span></button>'
+    +'<button class="ownerMoreTestButton" type="button" data-owner-route="testcenter"><b>OWNER TEST CENTER</b><span>Create disposable TEST tickets and run the IT → Service workflow yourself.</span></button>'
     +'<button type="button" data-owner-route="accounts"><b>TECHNICIAN ACCOUNTS</b><span>Create, disable, restore and manage logins.</span></button>'
     +'<a href="./onsite-vision.html"><b>ONSITE VISION</b><span>Open the AI command center.</span></a>'
     +'<a href="./camera-health.html"><b>CAMERA HEALTH</b><span>Open live camera monitoring and troubleshooting.</span></a>'
@@ -2825,6 +2898,7 @@ async function ownerAppRender(){
   else if(route==='activity')html=ownerAppActivity();
   else if(route==='accounts')html=ownerAppAccounts();
   else if(route==='more')html=ownerAppMore();
+  else if(route==='testcenter')html=ownerAppTestCenter();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
   host.innerHTML=ownerGlobalSearchBarHtml()+html;
@@ -2844,7 +2918,7 @@ async function ownerAppRender(){
   ownerInteractionSafety();
 }
 async function ownerAppNavigate(route){
-  if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts','more'].includes(route))return;
+  if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts','more','testcenter'].includes(route))return;
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ws)ws.scrollLeft=0;
   ownerAppRoute=route;
@@ -3316,6 +3390,11 @@ Object.assign(window, {
   ownerControlReturn,
   ownerGlobalSearch,
   ownerGlobalCameraSearch,
+  ownerCreateTestWorkflow,
+  ownerTestOpenRole,
+  ownerReopenTestPrep,
+  ownerDeleteTestPrep,
+  ownerClearAllTestWorkflows,
   ownerOpenUnitControl,
   ownerUnitHistory,
   ownerUnitCameraHealth,
