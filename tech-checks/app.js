@@ -208,6 +208,144 @@ function validUsername(v) {
   return USERNAME_RE.test(normalizeUsername(v));
 }
 
+const OWNER_TEST_SESSION_KEY='techcheck:owner-test-session-v2';
+const OWNER_TEST_LAST_USERS_KEY='techcheck:owner-test-last-users-v1';
+function ownerTestSessionRead(){
+  try{
+    const v=JSON.parse(localStorage.getItem(OWNER_TEST_SESSION_KEY)||'null');
+    return v&&v.ticket? v : null;
+  }catch{return null;}
+}
+function ownerTestSessionWrite(value){
+  try{localStorage.setItem(OWNER_TEST_SESSION_KEY,JSON.stringify(value));}catch{}
+  ownerTestRenderSessionUi();
+}
+function ownerTestRememberUser(profile){
+  if(!profile?.role||!profile?.username)return;
+  try{
+    const map=JSON.parse(localStorage.getItem(OWNER_TEST_LAST_USERS_KEY)||'{}')||{};
+    map[profile.role]=profile.username;
+    localStorage.setItem(OWNER_TEST_LAST_USERS_KEY,JSON.stringify(map));
+  }catch{}
+}
+function ownerTestLastUser(role){
+  try{return (JSON.parse(localStorage.getItem(OWNER_TEST_LAST_USERS_KEY)||'{}')||{})[role]||'';}catch{return '';}
+}
+function ownerTestRoleText(role){
+  return role==='owner'?'Owner/Admin':role==='it'?'IT Technician':role==='service'?'Service Technician':'Technician';
+}
+function ownerTestRenderSessionUi(){
+  const ctx=ownerTestSessionRead();
+  let auth=document.getElementById('ownerTestAuthBanner');
+  if(!auth&&document.getElementById('authView')){
+    auth=document.createElement('section');
+    auth.id='ownerTestAuthBanner';
+    auth.className='ownerTestAuthBanner hidden';
+    const card=document.querySelector('#authView .card');
+    card?.parentNode?.insertBefore(auth,card);
+  }
+  if(auth){
+    if(!ctx)auth.classList.add('hidden');
+    else{
+      auth.classList.remove('hidden');
+      auth.innerHTML='<div><small>OWNER TEST SESSION</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>Sign in with a real '+esc(ownerTestRoleText(ctx.target_role))+' account. The TEST ticket stays active while you switch accounts.</span></div><button type="button" onclick="ownerTestEndSession()">END TEST SESSION</button>';
+    }
+  }
+  let app=document.getElementById('ownerTestAppBanner');
+  if(!app&&document.getElementById('appView')){
+    app=document.createElement('section');
+    app.id='ownerTestAppBanner';
+    app.className='ownerTestAppBanner hidden';
+    const top=document.querySelector('#appView .mobileTop');
+    top?.insertAdjacentElement('afterend',app);
+  }
+  if(app){
+    if(!ctx||!state.profile)app.classList.add('hidden');
+    else{
+      app.classList.remove('hidden');
+      const actual=state.profile.role;
+      const expected=ctx.target_role;
+      const mismatch=expected&&actual!==expected;
+      const primary=actual==='owner'
+        ? '<button class="primary" type="button" onclick="ownerTestOpenCenter()">OWNER TEST CENTER</button>'
+        : '<button class="primary" type="button" onclick="ownerTestSwitchAccount(\''+esc(ctx.ticket)+'\',\''+(actual==='it'?'service':'it')+'\')">SWITCH TO '+(actual==='it'?'SERVICE':'IT')+'</button>';
+      app.innerHTML='<div><small>TEST SESSION · '+esc(actual==='owner'?'OWNER':actual.toUpperCase())+'</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>'+(mismatch?'This TEST session expects '+esc(ownerTestRoleText(expected))+'. You are signed in as '+esc(ownerTestRoleText(actual))+'.':'Real account testing is active. Changes are being made by this signed-in account.')+'</span></div><div class="ownerTestBannerActions">'+primary+(actual!=='owner'?'<button type="button" onclick="ownerTestReturnToOwner()">RETURN TO OWNER</button>':'')+'<button type="button" onclick="ownerTestSwitchLogin()">SWITCH ACCOUNT</button><button class="danger" type="button" onclick="ownerTestEndSession()">END</button></div>';
+    }
+  }
+}
+async function ownerTestSwitchAccount(ticket,targetRole){
+  const existing=ownerTestSessionRead()||{};
+  const ownerUsername=existing.owner_username||(state.profile?.role==='owner'?state.profile.username:ownerTestLastUser('owner'));
+  const ctx={
+    ...existing,
+    ticket:String(ticket||existing.ticket||'').trim(),
+    target_role:targetRole,
+    owner_username:ownerUsername||'',
+    started_at:existing.started_at||new Date().toISOString(),
+    updated_at:new Date().toISOString()
+  };
+  if(!ctx.ticket)return alert('A TEST ticket number is required.');
+  ownerTestSessionWrite(ctx);
+  const nextUser=targetRole==='owner'?(ctx.owner_username||ownerTestLastUser('owner')):ownerTestLastUser(targetRole);
+  await db.auth.signOut();
+  showAuth();
+  const u=document.getElementById('loginUsername'),p=document.getElementById('loginPassword');
+  if(u){u.value=nextUser||'';u.focus();}
+  if(p)p.value='';
+  msg('loginMessage','TEST SESSION: sign in as '+ownerTestRoleText(targetRole)+' for MHelpDesk #'+ctx.ticket+'.','warn');
+  ownerTestRenderSessionUi();
+}
+async function ownerTestSwitchLogin(){
+  const ctx=ownerTestSessionRead();if(!ctx)return;
+  await db.auth.signOut();
+  showAuth();
+  const u=document.getElementById('loginUsername'),p=document.getElementById('loginPassword');
+  if(u)u.value='';if(p)p.value='';if(u)u.focus();
+  msg('loginMessage','TEST SESSION #'+ctx.ticket+': sign in with the account you want to test.','warn');
+  ownerTestRenderSessionUi();
+}
+async function ownerTestReturnToOwner(){
+  const ctx=ownerTestSessionRead();if(!ctx)return;
+  await ownerTestSwitchAccount(ctx.ticket,'owner');
+}
+function ownerTestOpenCenter(){
+  if(state.profile?.role!=='owner')return ownerTestReturnToOwner();
+  ownerAppNavigate('testcenter');
+}
+function ownerTestEndSession(){
+  try{localStorage.removeItem(OWNER_TEST_SESSION_KEY);}catch{}
+  document.getElementById('ownerTestAuthBanner')?.classList.add('hidden');
+  document.getElementById('ownerTestAppBanner')?.classList.add('hidden');
+  msg('loginMessage','');
+}
+function ownerTestFocusTicket(ticket,role,attempt=0){
+  const value=String(ticket||''); if(!value||attempt>12)return;
+  const ids=role==='it'
+    ? ['wlITJobSearch','itTicket','ownerAssignTicket']
+    : ['wlServiceJobSearch','serviceTicket','svcTicket','serviceMhelpTicket'];
+  let found=false;
+  ids.forEach(id=>{
+    const input=document.getElementById(id);
+    if(input){input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));found=true;}
+  });
+  const selector=role==='it'?'#view-it [data-wl-it-open-job]':'#view-svc [data-wl-service-open-job]';
+  const open=document.querySelector(selector);
+  if(open){open.click();found=true;}
+  if(!found)setTimeout(()=>ownerTestFocusTicket(value,role,attempt+1),450);
+}
+function ownerTestApplyAfterLogin(profile){
+  ownerTestRememberUser(profile);
+  const ctx=ownerTestSessionRead();
+  if(!ctx){ownerTestRenderSessionUi();return;}
+  ownerTestRenderSessionUi();
+  if(profile.role==='owner'){
+    ownerAppRoute='testcenter';
+    setTimeout(()=>ownerAppNavigate('testcenter'),700);
+  }else if(profile.role==='it'||profile.role==='service'){
+    setTimeout(()=>ownerTestFocusTicket(ctx.ticket,profile.role),900);
+  }
+}
+
 async function init() {
   // Keep startup auth single-path. Supabase auth-state callbacks can deadlock
   // the client when follow-up Supabase work starts before the auth lock releases.
@@ -250,6 +388,7 @@ function showAuth() {
     liveChannel = null;
   }
   realtimeStarted = false;
+  ownerTestRenderSessionUi();
 }
 async function login() {
   msg('loginMessage', '');
@@ -320,6 +459,7 @@ async function enterApp(session) {
   updateItWeather();
   configureTabs();
   setupCommandCenterMobileMenu();
+  ownerTestApplyAfterLogin(profile);
 
   // Paint the signed-in shell first. Heavy workflow code and shared-data hydration
   // are deliberately moved off the critical startup path.
@@ -2639,16 +2779,7 @@ async function ownerControlReturn(ticket,role){
 }
 function ownerControlTest(ticket,role){
   ownerCloseSimpleControl();
-  const target=role==='it'?'it':'svc';
-  show(target);
-  setTimeout(()=>{
-    const selector=role==='it'?'#view-it [data-wl-it-open-job]':'#view-svc [data-wl-service-open-job]';
-    document.querySelector(selector)?.click();
-    setTimeout(()=>{
-      const input=document.getElementById(role==='it'?'wlITJobSearch':'wlServiceJobSearch');
-      if(input){input.value=String(ticket);input.focus();}
-    },180);
-  },180);
+  ownerTestSwitchAccount(String(ticket),role==='service'?'service':'it');
 }
 
 
@@ -2765,8 +2896,8 @@ function ownerTestWorkflowRow(p){
   const items=(p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+String(i.equipment_type||'Equipment')).join(' | ')||'Equipment not completed yet';
   return '<article class="ownerTestWorkflowRow"><header><div><small>TEST</small><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Test site')+'</span></div><strong>'+esc(status)+'</strong></header><p>'+esc(items)+'</p><div class="ownerTestWorkflowActions">'
     +'<button class="primary" type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(p.ticket_no||'')+'\')">OWNER CONTROL</button>'
-    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'it\')">TEST AS IT</button>'
-    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'service\')">TEST AS SERVICE</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'it\')">SIGN IN AS IT TECH</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'service\')">SIGN IN AS SERVICE TECH</button>'
     +(p.status==='released'?'<button type="button" onclick="ownerReopenTestPrep(\''+esc(p.id)+'\')">RETURN TO IT</button>':'')
     +(p.status!=='closed'?'<button class="danger" type="button" onclick="ownerDeleteTestPrep(\''+esc(p.id)+'\')">DELETE TEST</button>':'')
     +'</div></article>';
@@ -3392,6 +3523,11 @@ Object.assign(window, {
   ownerGlobalCameraSearch,
   ownerCreateTestWorkflow,
   ownerTestOpenRole,
+  ownerTestSwitchAccount,
+  ownerTestSwitchLogin,
+  ownerTestReturnToOwner,
+  ownerTestOpenCenter,
+  ownerTestEndSession,
   ownerReopenTestPrep,
   ownerDeleteTestPrep,
   ownerClearAllTestWorkflows,
