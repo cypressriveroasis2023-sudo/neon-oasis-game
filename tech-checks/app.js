@@ -278,15 +278,20 @@ async function login() {
       ? 'Sign in timed out. Check your connection and try again.'
       : 'Username or password is incorrect.', 'bad');
   }
-  await enterApp(data.session);
+  try {
+    await appTimeout(enterApp(data.session), 'Open Tech Check', 12000);
+  } catch (openError) {
+    console.error('Tech Check post-login open failed', openError);
+    msg('loginMessage', 'Signed in, but Tech Check could not finish opening. Tap Sign In again.', 'bad');
+  }
 }
 async function enterApp(session) {
   state.session = session;
-  const { data: profile, error } = await db
-    .from('profiles')
-    .select('*')
-    .eq('user_id', session.user.id)
-    .single();
+  const { data: profile, error } = await appTimeout(
+    db.from('profiles').select('*').eq('user_id', session.user.id).single(),
+    'Load Tech Check profile',
+    10000
+  );
   if (error || !profile) {
     await db.auth.signOut();
     return msg(
