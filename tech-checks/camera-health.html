@@ -707,6 +707,105 @@ body{background:#050b10}.shell{max-width:none;margin:0 0 0 205px;padding:0 18px 
 .unitcard.online .green,
 .component.camera-good .green{color:#54e99c!important}
 </style>
+
+<style id="owner-unit-inventory-mobile-v1">
+/* Phone-only Owner Unit Inventory repair. Desktop/tablet layout intentionally unchanged. */
+@media (max-width:768px){
+  body{padding-top:env(safe-area-inset-top)!important}
+  .shell{padding-top:calc(10px + env(safe-area-inset-top))!important}
+  .cos-topline{padding-top:10px!important}
+  .cos-title h1{font-size:30px!important;line-height:1.05!important;margin:0!important}
+  .cos-title>div{font-size:10px!important;line-height:1.4!important;letter-spacing:.12em!important}
+
+  .cos-topline .actions{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    width:100%!important;
+    gap:8px!important;
+  }
+  .cos-topline .actions>*{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    min-height:48px!important;
+    margin:0!important;
+    padding:10px 8px!important;
+    white-space:normal!important;
+    text-align:center!important;
+  }
+
+  #manageUnitsPanel{
+    width:100%!important;
+    max-width:100%!important;
+    padding:14px!important;
+    overflow:hidden!important;
+  }
+  #manageUnitsPanel>div:first-child{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto!important;
+    align-items:start!important;
+    gap:10px!important;
+  }
+  #manageUnitsPanel>div:first-child b{
+    font-size:18px!important;
+    line-height:1.12!important;
+  }
+  #manageUnitsPanel>div:first-child .small{
+    margin-top:4px!important;
+    font-size:12px!important;
+    line-height:1.35!important;
+  }
+
+  /* Override desktop inline grids inside Owner inventory. */
+  #manageUnitsPanel>div[style*="grid-template-columns"]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    gap:10px!important;
+    align-items:stretch!important;
+  }
+  #manageUnitsPanel label{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    max-width:100%!important;
+    gap:5px!important;
+    font-size:14px!important;
+    line-height:1.25!important;
+  }
+  #manageUnitsPanel input,
+  #manageUnitsPanel select,
+  #manageUnitsPanel button{
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    min-height:48px!important;
+    margin:0!important;
+    font-size:16px!important;
+  }
+  #manageUnitsPanel #closeManageUnits{
+    width:auto!important;
+    min-width:72px!important;
+    min-height:44px!important;
+    padding:8px 12px!important;
+    font-size:13px!important;
+  }
+  #manageUnitsPanel #addUnitBtn,
+  #manageUnitsPanel #removeUnitBtn,
+  #manageUnitsPanel #moveUnitBtn{
+    width:100%!important;
+    margin-top:2px!important;
+  }
+  #manageUnitsPanel>div[style*="display:flex"][style*="margin-top:8px"]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    width:100%!important;
+    gap:8px!important;
+  }
+  #manageUnitsPanel hr{width:100%!important}
+}
+</style>
 </head><body><div id="authGate" class="authgate"><div class="authcard"><div class="brand" style="margin-bottom:16px"><img src="./techcheck-eye-192.png?v=1" alt=""><div><small>CAMERAS ONSITE</small><b>OnSite Vision · Camera Health</b></div></div><h2>Authorized Access</h2><p>Sign in with your Tech Check Owner or IT account.</p><label>Username</label><input id="cameraLoginUsername" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username"><label>Password</label><input id="cameraLoginPassword" type="password" autocomplete="current-password" placeholder="Password"><button id="cameraLogin" class="primary">Sign In</button><div id="cameraLoginMsg" class="autherr"></div><a class="btn" style="display:block;text-align:center;margin-top:10px" href="./">Sign in through Tech Check</a><div class="small" style="margin-top:10px;text-align:center">If Tech Check is already signed in, Camera Health will open automatically.</div></div></div><div class="shell">
 <aside class="cos-sidebar"><div class="cos-wordmark">CAMERAS ONSITE <span>OnSite Vision</span></div><div class="cos-submark">SECURITY · MONITOR · MAINTAIN</div><nav class="cos-nav"><button class="active">▣ &nbsp;Camera Health</button><button class="jump-events">◉ &nbsp;Alerts</button><button class="jump-trouble">⚒ &nbsp;Troubleshooting</button><button class="jump-history">▤ &nbsp;History</button><a href="./onsite-vision.html">◉ &nbsp;OnSite Vision</a><a href="./">← &nbsp;Tech Check Dashboard</a></nav></aside><div class="cos-topline"><div class="cos-title"><h1>Camera Health</h1><div>LIVE STATUS · ALERTS · TROUBLESHOOT · HISTORY</div></div><div class="cos-search"><input id="globalSearch" placeholder="Search units, sites, IPs, or device names…"><div id="cameraSearchResults"></div></div><div class="actions"><button id="manageUnitsBtn" class="primary" style="display:none">+ Add / Remove Unit</button><button id="importToggle" class="primary" style="display:none">Import / Map</button><button id="refresh">↻ Refresh</button><a class="btn" href="./onsite-vision.html">+ Vision</a></div></div>
 <div id="manageUnitsPanel" class="panel import" style="display:none;padding:16px;margin-bottom:14px">
