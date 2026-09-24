@@ -6284,7 +6284,7 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
     "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
   "</div>";
 }
-function serviceSolarOneStepHtml(ctx,check,evidence) {
+function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null) {
   const answerTasks=serviceSolarAnswerTasks(ctx,check);
   const proofTasks=serviceSolarProofTasks(ctx,evidence);
   const tasks=answerTasks.concat(proofTasks);
@@ -6298,7 +6298,7 @@ function serviceSolarOneStepHtml(ctx,check,evidence) {
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
     "</div>";
   }
-  const task=tasks[index],stepNo=index+1,total=tasks.length;
+  const task=tasks[index],stepNo=offset+index+1,total=totalOverride||offset+tasks.length;
   if(task.kind==='stand'){
     const tagControl=task.requiredStands>1
       ? "<textarea id='wlSolarSingleStandTag' rows='4' placeholder='ONE TAG PER LINE'>"+esc(task.value||'')+"</textarea>"
@@ -6333,8 +6333,8 @@ function serviceSolarOneStepHtml(ctx,check,evidence) {
       "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
       "<div class='qtext'>"+esc(task.question)+"</div>"+
       "<div class='wl-options'>"+
-        "<button class='pass' data-wl-solar-step-answer='yes' data-field='"+esc(task.field)+"'"+extra+">"+yesLabel+"</button>"+
         "<button class='fail' data-wl-solar-step-answer='no' data-field='"+esc(task.field)+"'>"+noLabel+"</button>"+
+        "<button class='pass' data-wl-solar-step-answer='yes' data-field='"+esc(task.field)+"'"+extra+">"+yesLabel+"</button>"+
       "</div>"+
       "<div class='wl-solar-step-message'></div>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
@@ -6472,12 +6472,12 @@ function svcQuestions(form) {
   }
   return out;
 }
-function svcQuestionHtml(q, index, total) {
-  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div>${q.note?`<div class='wl-svc-question-note'>${esc(q.note)}</div>`:''}<input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='ENTER COUNT'></div>`;
+function svcQuestionHtml(q, index, total, displayStep=index+1, displayTotal=total) {
+  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>STEP ${displayStep} OF ${displayTotal}</div><div class='qtext'>${esc(q.label)}</div>${q.note?`<div class='wl-svc-question-note'>${esc(q.note)}</div>`:''}<input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='ENTER COUNT'></div>`;
   const answered = q.input.dataset.wlAnswered === '1';
   const yes = answered && q.input.checked;
   const no = answered && !q.input.checked;
-  return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
+  return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${displayStep} OF ${displayTotal}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
 }
 function svcWizardCard() {
   let wizard = document.getElementById('wlSvcWizardOnly');
@@ -6666,7 +6666,7 @@ function swapResultHtml(prep,state,{heliosOnly=false}={}){
     return `<div class='ok top8'><b>✓ SWAP HAPPENED · ${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><div class='small'>Replacement stays at ${esc(item.swap_installed_site||site)} · ${esc(registration)}</div></div>`;
   }).join('');
   if(undecided){
-    return `${progress('Swap Result','One simple field decision',1,1)}<div class='wl-review'><b>MHelpDesk #${esc(prep.ticket_no)}</b><div class='small'>Replacement unit: ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'Tag missing')} · Site: ${esc(site)}</div></div>${resolved}<div class='wl-question top10'><div class='qtext'>Did you actually install/use replacement ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'')} at ${esc(site)}?</div><div class='wl-options'><button class='pass' data-wl-swap-used='${esc(undecided.id)}'>YES — SWAP HAPPENED</button><button class='fail' data-wl-swap-unused='${esc(undecided.id)}'>NO — DID NOT USE IT</button></div><div class='wl-note'>YES: replacement stays at the site, IT gets a site-registration task, and the OLD unit must return through IT Intake.<br>NO: this unused replacement automatically goes back through IT Intake.</div></div>`;
+    return `${progress('Swap Result','One simple field decision',1,1)}<div class='wl-review'><b>MHelpDesk #${esc(prep.ticket_no)}</b><div class='small'>Replacement unit: ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'Tag missing')} · Site: ${esc(site)}</div></div>${resolved}<div class='wl-question top10'><div class='qtext'>Did you actually install/use replacement ${esc(undecided.equipment_type)} ${esc(undecided.unit_tag||'')} at ${esc(site)}?</div><div class='wl-options'><button class='fail' data-wl-swap-unused='${esc(undecided.id)}'>NO — DID NOT USE IT</button><button class='pass' data-wl-swap-used='${esc(undecided.id)}'>YES — SWAP HAPPENED</button></div><div class='wl-note'>YES: replacement stays at the site, IT gets a site-registration task, and the OLD unit must return through IT Intake.<br>NO: this unused replacement automatically goes back through IT Intake.</div></div>`;
   }
   const scopeInstalled=scope.filter(i=>i.swap_outcome==='installed');
   const neededByType={};
@@ -6748,6 +6748,13 @@ async function renderSvcPrep() {
   const swapState=await swapWorkflowState(activeSvcPrep);
   const allSwaps=swapState.swaps,nonHeliosSwaps=allSwaps.filter(i=>i.equipment_type!=='Helios'),heliosHandoff=heliosHandoffItems(activeSvcPrep),heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep);
   const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  const unitQuestionCounts=forms.map(form=>svcQuestions(form).length);
+  const unitQuestionTotal=unitQuestionCounts.reduce((sum,n)=>sum+n,0);
+  const solarTaskTotal=solarRequired
+    ? serviceSolarAnswerTasks(solarCtx,solarCheck).length+serviceSolarProofTasks(solarCtx,solarEvidence).length
+    : 0;
+  const combinedCheckTotal=Math.max(1,unitQuestionTotal+(hasParts?1:0)+solarTaskTotal);
+  const combinedCheckTitle=solarCtx?.has_helios?'HELIOS SERVICE CHECK':'SERVICE CHECK';
   hideChildren(viewSvc(),[wizard]);base.style.display='none';
   if(heliosHandoff.length&&solarCheck?.handoff_accepted_at){
     const heliosScope=swapState.swaps.filter(i=>i.equipment_type==='Helios');
@@ -6761,13 +6768,20 @@ async function renderSvcPrep() {
     if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
   }
   if(svcUnitIndex<forms.length){
-    const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Verify Parts →':solarRequired?'Solar / Helios Check →':'Compare IT Photos →';
-    wizard.innerHTML=progress(`Unit ${svcUnitIndex+1} of ${forms.length}`,q?.label||'Verify this unit',svcQuestionIndex+1,Math.max(1,questions.length))+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`+serviceRestartButtonHtml();
+    const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Next Check →':solarRequired?'Next Check →':'Compare IT Photos →';
+    const completedBefore=unitQuestionCounts.slice(0,svcUnitIndex).reduce((sum,n)=>sum+n,0);
+    const overallStep=completedBefore+svcQuestionIndex+1;
+    wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',overallStep,combinedCheckTotal)+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length,overallStep,combinedCheckTotal):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`+serviceRestartButtonHtml();
   }else if(hasParts&&svcUnitIndex===partStep){
-    const confirmed=Boolean(activeSvcPrep.service_parts_confirmed);
-    wizard.innerHTML=progress('Parts Handoff',`Verify parts from IT Tech ${preparedBy}`,1,1)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Solar / Helios Check →':'Compare IT Photos →'}</button></div>`;
+    const confirmed=Boolean(activeSvcPrep.service_parts_confirmed),overallStep=unitQuestionTotal+1;
+    wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',overallStep,combinedCheckTotal)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qnum'>STEP ${overallStep} OF ${combinedCheckTotal}</div><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Next Check →':'Compare IT Photos →'}</button></div>`+serviceRestartButtonHtml();
   }else if(solarRequired&&svcUnitIndex===solarStep){
-    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress(solarCtx?.has_helios?'Helios Yard Solar Test':'Solar Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}
+    const solarTasks=serviceSolarAnswerTasks(solarCtx,solarCheck).concat(serviceSolarProofTasks(solarCtx,solarEvidence));
+    const solarIndex=solarTasks.findIndex(task=>!task.done);
+    const solarOffset=unitQuestionTotal+(hasParts?1:0);
+    const overallStep=solarOffset+(solarIndex<0?solarTasks.length:solarIndex+1);
+    wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',Math.max(1,overallStep),combinedCheckTotal)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence,solarOffset,combinedCheckTotal)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
     wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   }else if(svcUnitIndex===photoStep){
@@ -6827,8 +6841,8 @@ function inspectionQuestion() {
       <div class='wl-question'>
         <div class='qtext'>${esc(truckLabels[i])}</div>
         <div class='wl-options'>
-          <button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
           <button class='fail ${failed ? 'on' : ''}' data-wl-answer='fail'>NO</button>
+          <button class='pass ${inspection.truck[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
         </div>
         ${failed?`<div class='wl-stop'><b>STOP — FIX THIS BEFORE CONTINUING.</b><div>Once it is corrected, tap YES.</div><a href='tel:${OPS_TEL}'>CALL OPERATIONS — ${OPS_DISPLAY}</a></div>`:''}
       </div>`;
@@ -6848,8 +6862,8 @@ function inspectionQuestion() {
       <div class='wl-question'>
         <div class='qtext'>${esc(trailerLabels[i])}</div>
         <div class='wl-options'>
-          <button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
           <button class='fail ${failed ? 'on' : ''}' data-wl-answer='fail'>NO</button>
+          <button class='pass ${inspection.trailer[i] === true ? 'on' : ''}' data-wl-answer='pass'>YES</button>
         </div>
         ${failed?`<div class='wl-stop'><b>STOP — FIX THIS BEFORE CONTINUING.</b><div>Once it is corrected, tap YES.</div><a href='tel:${OPS_TEL}'>CALL OPERATIONS — ${OPS_DISPLAY}</a></div>`:''}
       </div>`;
