@@ -1118,6 +1118,23 @@ function injectStyles() {
     #view-svc .wl-svc-restart-questions{width:100%;min-height:48px;margin-top:12px;border:1px solid #425a66;border-radius:999px;background:#0d1c24;color:#cdd8dd;font-size:12px;font-weight:1000;letter-spacing:.05em}
     @media(max-width:520px){#view-svc .wl-svc-summary-grid{grid-template-columns:1fr}}
   `;
+    s.textContent += `
+    #view-svc .wl-complete-continue{
+      background:#ed1c24!important;
+      color:#fff!important;
+      border:1px solid #ed1c24!important;
+      border-left:1px solid #ed1c24!important;
+      box-shadow:none!important;
+      outline:none!important;
+      -webkit-tap-highlight-color:transparent!important
+    }
+    #view-svc .wl-complete-continue:focus,
+    #view-svc .wl-complete-continue:focus-visible{
+      outline:none!important;
+      box-shadow:none!important;
+      border-color:#ed1c24!important
+    }
+  `;
     document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -4496,13 +4513,17 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
       ? `Take ${required} clear receipt photo${required===1?'':'s'}.`
       : 'Take a clear photo of what is leaving the shop.';
 
+  const captureAttr=stage==='service' ? '' : " capture='environment'";
+  const pickerLabel=stage==='service'
+    ? (complete?'Choose a New Photo From Phone':'Choose From Phone')
+    : (complete?'Choose a New Photo':'Choose Photo');
   const picker=`<div class='wl-photo-step'>
     <div class='wl-photo-step-num'>STEP 1</div>
     <div class='wl-photo-step-title'>Choose Photo</div>
     <div class='small'>${esc(shortInstruction)}</div>
     <label class='wl-photo-picker'>
-      <input class='wl-file' type='file' accept='image/*' capture='environment' ${unitNo ? '' : 'multiple'}>
-      <span>${complete ? 'Choose a New Photo' : 'Choose Photo'}</span>
+      <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
+      <span>${pickerLabel}</span>
     </label>
     <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
   </div>
@@ -6316,7 +6337,7 @@ function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null,
       "<div class='qnum'>"+(ctx?.has_helios?'YARD TEST COMPLETE':'PRE-TRIP COMPLETE')+"</div>"+
       "<div class='qtext'>"+(ctx?.has_helios?'Helios yard solar testing and proof are complete.':'All required Service pre-trip checks and proof are complete.')+"</div>"+
       "<div class='ok top10'><b>✓ READY FOR THE NEXT STEP</b></div>"+
-      "<button class='wl-big wl-green top10' data-wl-svc-next>CONTINUE →</button>"+
+      "<button class='wl-big wl-complete-continue top10' data-wl-svc-next>CONTINUE →</button>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
     "</div>";
   }
