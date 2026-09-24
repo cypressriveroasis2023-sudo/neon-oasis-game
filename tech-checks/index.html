@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-quick-find-20260923au" />
+    <link rel="stylesheet" href="./styles.css?v=owner-more-20260923av" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -157,14 +157,14 @@
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav a[href*="camera-health"],
-  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;position:static!important;transform:none!important;min-width:0!important;width:auto!important;height:56px!important;min-height:56px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-radius:12px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.05!important;white-space:normal!important;overflow:hidden!important;background:transparent!important;color:#b9c9d2!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="more"]{display:flex!important;position:static!important;transform:none!important;min-width:0!important;width:auto!important;height:56px!important;min-height:56px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-radius:12px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.05!important;white-space:normal!important;overflow:hidden!important;background:transparent!important;color:#b9c9d2!important}
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
   body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
-  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
-  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="more"]{order:6!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav 
   body:has(#view-owner:not(.hidden)).cc-mobile-nav-open #view-owner .ownerAppSidebar{height:calc(72px + env(safe-area-inset-bottom))!important;width:100%!important;inset:auto 0 0 0!important}
 }
 </style>
@@ -458,6 +458,7 @@
         <button type="button" data-owner-route="history">History</button>
         <button type="button" data-owner-route="activity">Activity</button>
         <button type="button" data-owner-route="accounts">Technician Accounts</button>
+        <button type="button" data-owner-route="more">More</button>
         <button type="button" data-owner-route="today">Dashboard</button>
       </nav>
       <div class="ownerAppSidebarUtility">
@@ -509,7 +510,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=owner-quick-find-20260923au"></script>
+    <script type="module" src="./app.js?v=owner-more-20260923av"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -520,7 +521,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-quick-find-20260923au');
+            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-more-20260923av');
             registration.update().catch(() => {});
           } catch (error) {
             console.warn('Tech Check service worker unavailable', error);
