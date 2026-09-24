@@ -4530,34 +4530,43 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
       ? `Take ${required} clear receipt photo${required===1?'':'s'}.`
       : 'Take a clear photo of what is leaving the shop.';
 
-  const captureAttr=stage==='service' ? '' : " capture='environment'";
-  const picker=stage==='service'
-    ? `<div class='wl-photo-step'>
-        <div class='wl-photo-step-num'>STEP 1</div>
-        <div class='wl-photo-step-title'>Choose Photo</div>
-        <div class='small'>${esc(shortInstruction)}</div>
-        <div class='wl-solar-photo-actions'>
-          <label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>
-          <label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>
-        </div>
-        <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
-      </div>`
-    : `<div class='wl-photo-step'>
-        <div class='wl-photo-step-num'>STEP 1</div>
-        <div class='wl-photo-step-title'>Choose Photo</div>
-        <div class='small'>${esc(shortInstruction)}</div>
-        <label class='wl-photo-picker'>
-          <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
-          <span>${complete?'Choose a New Photo':'Choose Photo'}</span>
-        </label>
-        <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
-      </div>`;
-  <div class='wl-photo-step'>
-    <div class='wl-photo-step-num'>STEP 2</div>
-    <div class='wl-photo-step-title'>Save Photo</div>
-    <div class='small'>Save the photo before moving on.</div>
-    <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
-  </div>`;
+  let picker='';
+  if(stage==='service'){
+    picker=`<div class='wl-photo-step'>
+      <div class='wl-photo-step-num'>STEP 1</div>
+      <div class='wl-photo-step-title'>Choose Photo</div>
+      <div class='small'>${esc(shortInstruction)}</div>
+      <div class='wl-solar-photo-actions'>
+        <label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>
+        <label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>
+      </div>
+      <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
+    </div>
+    <div class='wl-photo-step'>
+      <div class='wl-photo-step-num'>STEP 2</div>
+      <div class='wl-photo-step-title'>Save Photo</div>
+      <div class='small'>Save the photo before moving on.</div>
+      <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
+    </div>`;
+  }else{
+    const captureAttr=" capture='environment'";
+    picker=`<div class='wl-photo-step'>
+      <div class='wl-photo-step-num'>STEP 1</div>
+      <div class='wl-photo-step-title'>Choose Photo</div>
+      <div class='small'>${esc(shortInstruction)}</div>
+      <label class='wl-photo-picker'>
+        <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
+        <span>${complete?'Choose a New Photo':'Choose Photo'}</span>
+      </label>
+      <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
+    </div>
+    <div class='wl-photo-step'>
+      <div class='wl-photo-step-num'>STEP 2</div>
+      <div class='wl-photo-step-title'>Save Photo</div>
+      <div class='small'>Save the photo before moving on.</div>
+      <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
+    </div>`;
+  }
 
   let tagConfirm='';
   if (stage === 'it' && unitNo && photos.length && tag) {
@@ -4568,7 +4577,7 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
         <div class='wl-photo-step-num'>STEP 3</div>
         <div class='wl-photo-step-title'>Check the Tag</div>
         <div class='small'>Can you clearly see tag ${esc(tag)}?</div>
-        <div class='wl-options'><button class='pass' data-wl-photo-tag='yes'>YES</button><button class='fail' data-wl-photo-tag='no'>RETAKE</button></div>
+        <div class='wl-options'><button class='fail' data-wl-photo-tag='no'>RETAKE</button><button class='pass' data-wl-photo-tag='yes'>YES</button></div>
       </div>`;
     } else {
       tagConfirm=`<div class='ok top10'><b>✓ Tag ${esc(tag)} confirmed</b></div>`;
@@ -8004,8 +8013,8 @@ document.addEventListener('click', async e => {
   }
   const upload = e.target.closest('[data-wl-upload]'); if (upload) {
     const panel = upload.closest('.wl-proof');
-    const input = panel.querySelector('.wl-file');
-    const files = [...(input.files || [])];
+    const inputs=[...(panel.querySelectorAll('.wl-file')||[])];
+    const files=inputs.flatMap(input=>[...(input.files||[])]);
     if (!files.length) return alert('Take or select at least one photo.');
     const unitNo = Number(panel.dataset.unit || 0) || null;
     const item = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
@@ -10320,6 +10329,9 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   if (e.target?.matches?.('.wl-file')) {
     const panel=e.target.closest('.wl-proof');
+    if(panel?.dataset.stage==='service' && (e.target.files?.length||0)){
+      panel.querySelectorAll('.wl-file').forEach(input=>{if(input!==e.target)input.value='';});
+    }
     const count=e.target.files?.length||0;
     const status=panel?.querySelector('[data-wl-photo-selected]');
     if(status) status.textContent=count ? (count===1?'1 photo selected':count+' photos selected') : 'No photo selected yet.';
