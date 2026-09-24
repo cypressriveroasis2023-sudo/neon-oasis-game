@@ -7883,3 +7883,51 @@ html,body{max-width:100%;overflow-x:hidden}
  #view-owner .ownerAppBrand{display:flex!important}
  #view-owner .ownerAppSidebarUtility{display:grid!important;margin-top:16px!important;padding-top:10px!important}
 }
+
+
+/* Owner iPhone scroll repair 20260923aq — desktop rules remain unchanged */
+@media (max-width:900px){
+  #view-owner{
+    position:fixed!important;
+    inset:0!important;
+    width:100%!important;
+    height:100dvh!important;
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+  #view-owner .ownerAppShell,
+  #view-owner #ownerApp{
+    width:100%!important;
+    height:100dvh!important;
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+  #view-owner .ownerAppWorkspace{
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100dvh!important;
+    min-height:0!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior-y:auto!important;
+    touch-action:pan-y!important;
+    padding-bottom:calc(100px + env(safe-area-inset-bottom))!important;
+  }
+  #view-owner .ownerAppPage{
+    min-height:max-content!important;
+    height:auto!important;
+    overflow:visible!important;
+    padding-bottom:calc(110px + env(safe-area-inset-bottom))!important;
+  }
+  #view-owner .ownerTodayMain{
+    height:auto!important;
+    min-height:max-content!important;
+    overflow:visible!important;
+    touch-action:pan-y!important;
+  }
+  #view-owner .ownerAppSidebar{
+    touch-action:manipulation!important;
+  }
+}
