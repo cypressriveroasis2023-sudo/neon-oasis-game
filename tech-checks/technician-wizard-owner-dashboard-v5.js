@@ -41,6 +41,7 @@ let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
 let svcSolarCursor = null;
+let svcHeliosFieldCursor = null;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
@@ -1134,6 +1135,22 @@ function injectStyles() {
       box-shadow:none!important;
       border-color:#ed1c24!important
     }
+  `;
+    s.textContent += `
+    #view-svc .wl-field-context{border:1px solid #2d4652;border-radius:14px;background:#0a171e;padding:13px;margin:10px 0;color:#fff}
+    #view-svc .wl-field-context>b{display:block;font-size:17px}
+    #view-svc .wl-field-context>span{display:block;margin-top:5px;color:#aebdc5;font-size:12px;font-weight:750}
+    #view-svc .wl-field-unit{border:1px solid #315244;border-radius:13px;background:#0d2119;padding:12px;margin:9px 0;color:#fff}
+    #view-svc .wl-field-unit b{display:block;font-size:15px}.wl-field-unit span{display:block;margin-top:4px;color:#a8bbb1;font-size:11px}
+    #view-svc .wl-field-status{border-radius:14px!important;padding:14px!important;margin:12px 0!important}
+    #view-svc .wl-helios-field-step{background:#0a171e!important;border:1px solid #2d4652!important;color:#fff!important;box-shadow:none!important}
+    #view-svc .wl-helios-field-step .qtext{color:#fff!important}
+    #view-svc .wl-helios-field-step .wl-options .fail{background:#ed1c24!important;border-color:#ff4b52!important;color:#fff!important}
+    #view-svc .wl-helios-field-step .wl-options .pass{background:#f7f7f7!important;border-color:#f7f7f7!important;color:#111820!important}
+    #view-svc .wl-ai-final{background:#0a171e!important;border:1px solid #2d4652!important;color:#fff!important}
+    #view-svc .wl-ai-final .wl-ai-head,#view-svc .wl-ai-final .small{color:#aebdc5!important}
+    #view-svc .wl-ai-final .wl-ai-good{background:#0d2119!important;border:1px solid #315244!important;color:#dff7e8!important}
+    #view-svc [data-wl-accept-helios],#view-svc [data-wl-submit-helios-field]{background:#ed1c24!important;color:#fff!important;border:1px solid #ed1c24!important;border-left:1px solid #ed1c24!important;box-shadow:none!important}
   `;
     document.head.appendChild(s);
 }
@@ -4514,19 +4531,27 @@ async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null)
       : 'Take a clear photo of what is leaving the shop.';
 
   const captureAttr=stage==='service' ? '' : " capture='environment'";
-  const pickerLabel=stage==='service'
-    ? (complete?'Choose a New Photo From Phone':'Choose From Phone')
-    : (complete?'Choose a New Photo':'Choose Photo');
-  const picker=`<div class='wl-photo-step'>
-    <div class='wl-photo-step-num'>STEP 1</div>
-    <div class='wl-photo-step-title'>Choose Photo</div>
-    <div class='small'>${esc(shortInstruction)}</div>
-    <label class='wl-photo-picker'>
-      <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
-      <span>${pickerLabel}</span>
-    </label>
-    <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
-  </div>
+  const picker=stage==='service'
+    ? `<div class='wl-photo-step'>
+        <div class='wl-photo-step-num'>STEP 1</div>
+        <div class='wl-photo-step-title'>Choose Photo</div>
+        <div class='small'>${esc(shortInstruction)}</div>
+        <div class='wl-solar-photo-actions'>
+          <label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>
+          <label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>
+        </div>
+        <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
+      </div>`
+    : `<div class='wl-photo-step'>
+        <div class='wl-photo-step-num'>STEP 1</div>
+        <div class='wl-photo-step-title'>Choose Photo</div>
+        <div class='small'>${esc(shortInstruction)}</div>
+        <label class='wl-photo-picker'>
+          <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
+          <span>${complete?'Choose a New Photo':'Choose Photo'}</span>
+        </label>
+        <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
+      </div>`;
   <div class='wl-photo-step'>
     <div class='wl-photo-step-num'>STEP 2</div>
     <div class='wl-photo-step-title'>Save Photo</div>
@@ -6288,7 +6313,7 @@ function serviceSolarAnswersComplete(ctx,check){
 function serviceSolarSingleProofHtml(task,evidence,stepNo,total,reviewMode=false) {
   const count=serviceSolarEvidenceCount(evidence,task.category,task.kind);
   if(task.kind==='photo'){
-    const allowsMultiple=task.category==='mppt'||task.required>1;
+    const allowsMultiple=task.category==='mppt'||task.category==='helios_install'||task.required>1;
     const multiple=allowsMultiple?' multiple':'';
     return "<div class='wl-question wl-solar-one-step'>"+
       "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
@@ -6608,6 +6633,7 @@ async function acceptHeliosHandoff(){
   const {error}=await liveDb.rpc('accept_helios_handoff_v1',{p_prep_id:activeSvcPrep.id,p_verifications:serviceHandoffVerifications()});
   if(error)return alert(error.message);
   activeSvcPrep=await getPrep(activeSvcPrep.id);
+  svcHeliosFieldCursor=null;
   alert('Helios handoff accepted. The unit is checked out to Service, but it is NOT deployed yet. Complete the field installation next.');
   return renderSvcPrep();
 }
@@ -6618,48 +6644,163 @@ async function startHeliosOldUnitReturn(){
 }
 function heliosFieldRuleList(){
   return window.TechCheckRules?.heliosFieldChecklist || [
-    {key:'helios_field_box_mounted_ok',rpc_param:'p_box_mounted_ok',label:'Helios box installed and secured on the tower.'},
-    {key:'helios_field_pv_connected_ok',rpc_param:'p_pv_connected_ok',label:'PV cables connected.'},
-    {key:'helios_field_ptz_secured_ok',rpc_param:'p_ptz_secured_ok',label:'PTZ reinstalled and secured on the removable front plate.'},
-    {key:'helios_field_switch_pv_ok',rpc_param:'p_switch_pv_ok',label:'Internal switch flipped to PV.'},
-    {key:'helios_field_unit_battery_on_ok',rpc_param:'p_unit_battery_on_ok',label:'Helios unit and battery turned on.'},
-    {key:'helios_field_it_online_verified_ok',rpc_param:'p_it_online_verified_ok',label:'Called IT and IT verified the Helios is online.'},
-    {key:'helios_field_cameras_aimed_ok',rpc_param:'p_cameras_aimed_ok',label:'Camera aim / focus completed with IT.'},
-    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Recording verified after final aim.'},
-    {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Tower cranked to approximately 20 feet.'},
-    {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Separate tower mast locking bolt inserted and secured.'},
-    {key:'helios_field_panel_45deg_ok',rpc_param:'p_panel_45deg_ok',label:'Solar panel set to approximately 45°.'},
-    {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Separate panel angle/locking bolt installed and secured.'},
-    {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'4 bags of sand placed on the tower base.'}
+    {key:'helios_field_box_mounted_ok',rpc_param:'p_box_mounted_ok',label:'Is the Helios box installed and secured on the tower?'},
+    {key:'helios_field_pv_connected_ok',rpc_param:'p_pv_connected_ok',label:'Are the PV cables connected?'},
+    {key:'helios_field_ptz_secured_ok',rpc_param:'p_ptz_secured_ok',label:'Is the PTZ reinstalled and secured on the removable front plate?'},
+    {key:'helios_field_switch_pv_ok',rpc_param:'p_switch_pv_ok',label:'Is the internal switch flipped to PV?'},
+    {key:'helios_field_unit_battery_on_ok',rpc_param:'p_unit_battery_on_ok',label:'Are the Helios unit and battery turned on?'},
+    {key:'helios_field_it_online_verified_ok',rpc_param:'p_it_online_verified_ok',label:'Did you call IT and have IT verify the Helios is online?'},
+    {key:'helios_field_cameras_aimed_ok',rpc_param:'p_cameras_aimed_ok',label:'Did you complete camera aim / focus with IT?'},
+    {key:'helios_field_panel_45deg_ok',rpc_param:'p_panel_45deg_ok',label:'Is the solar panel set to approximately 45°?'},
+    {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Is the separate panel angle / locking bolt installed and secured?'},
+    {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Is the tower cranked to approximately 20 feet?'},
+    {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Is the separate tower mast locking bolt inserted and secured?'},
+    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Did IT verify recording after the final camera aim?'},
+    {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'Are 4 bags of sand placed on the tower base?'}
   ];
 }
+function heliosFieldUnitLabel(units){
+  const unit=units?.[0];
+  const tag=String(unit?.unit_tag||'').trim();
+  return tag ? 'Helios '+tag : 'Helios';
+}
+function heliosFieldTaskIndex(check,evidence,units){
+  const rules=heliosFieldRuleList();
+  const firstRule=rules.findIndex(rule=>check?.[rule.key]!==true);
+  if(firstRule>=0)return firstRule;
+  const photoCount=serviceSolarEvidenceCount(evidence,'helios_install','photo');
+  if(photoCount<Math.max(1,units.length))return rules.length;
+  if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return rules.length+1;
+  return rules.length+2;
+}
+function heliosFieldPhotoStepHtml(evidence,units,stepNo,total){
+  const count=serviceSolarEvidenceCount(evidence,'helios_install','photo');
+  const required=Math.max(1,units.length);
+  const saved=(evidence||[]).filter(row=>row.category==='helios_install'&&row.kind==='photo');
+  return "<div class='wl-question wl-helios-field-step'>"+
+    "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+    "<div class='qtext'>Take final installation photos showing the Helios, raised tower, mast lock bolt, solar-panel position / locking bolt, and sandbags.</div>"+
+    "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='helios_install' data-wl-solar-multi='1'>"+
+      "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" saved":"PHOTO REQUIRED")+"</div>"+
+      (saved.length?"<div class='wl-gallery'>"+saved.map(p=>"<img src='"+esc(p.url)+"' alt='Saved Helios installation photo'>").join('')+"</div>":"")+
+      "<div class='wl-solar-photo-actions'>"+
+        "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>"+
+        "<label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>"+
+      "</div>"+
+      "<div class='wl-solar-multi-note'>Add as many site photos as you need. At least "+required+" photo"+(required===1?" is":"s are")+" required.</div>"+
+      "<div class='wl-solar-selected' data-wl-solar-selected>No new photo selected yet.</div>"+
+      "<div class='wl-solar-preview hidden' data-wl-solar-preview></div>"+
+      "<button class='wl-solar-clear-photos hidden' type='button' data-wl-solar-clear-photos>CLEAR SELECTED PHOTOS</button>"+
+      "<button class='wl-big wl-red wl-solar-save-photo' data-wl-solar-upload disabled>SAVE PHOTOS →</button>"+
+    "</div>"+
+    "<div class='wl-nav'><button class='wl-prev' data-wl-helios-field-prev>Back</button>"+(count>=required?"<button class='wl-next' data-wl-helios-field-next>NEXT →</button>":"<span></span>")+"</div>"+
+  "</div>";
+}
+function heliosFieldSignatureStepHtml(evidence,stepNo,total){
+  const sig=[...(evidence||[])].reverse().find(row=>row.category==='helios_install'&&row.kind==='signature');
+  if(sig){
+    return "<div class='wl-question wl-helios-field-step'>"+
+      "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+      "<div class='qtext'>Sign to confirm you completed the Helios field installation checks in order.</div>"+
+      "<div class='ok top10'><b>✓ SIGNATURE SAVED</b><div class='small'>"+signatureStamp(sig.created_by_name||'Service Tech',sig.created_at)+"</div></div>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-helios-field-prev>Back</button><button class='wl-next' data-wl-helios-field-next>NEXT →</button></div>"+
+    "</div>";
+  }
+  return "<div class='wl-question wl-helios-field-step'>"+
+    "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
+    "<div class='qtext'>Sign to confirm you completed the Helios field installation checks in order.</div>"+
+    "<div class='wl-solar-proof wl-solar-sign-card top10' data-solar-category='helios_install'>"+
+      "<div class='wl-solar-sign-label'>SIGN BELOW</div>"+
+      "<div class='small'>Use your finger to sign inside the box.</div>"+
+      "<div class='wl-sign'><canvas></canvas><div class='wl-solar-sign-actions'><button class='wl-prev' data-wl-solar-clear>CLEAR</button><button class='wl-next' data-wl-solar-save-sign>SAVE SIGNATURE →</button></div></div>"+
+    "</div>"+
+    "<div class='wl-nav'><button class='wl-prev' data-wl-helios-field-prev>Back</button><span></span></div>"+
+  "</div>";
+}
+async function saveHeliosFieldCheckAnswer(field,value){
+  if(!activeSvcPrep?.id)return false;
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('save_service_helios_field_check_v1',{p_prep_id:activeSvcPrep.id,p_field:String(field),p_value:Boolean(value)});
+    if(error)throw error;
+    return true;
+  }catch(error){
+    alert(error?.message||'Could not save the Helios field-install check.');
+    return false;
+  }finally{
+    document.body.classList.remove('busy');
+  }
+}
 function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
-  const units=heliosFieldItems(prep), swaps=units.filter(x=>x.purpose==='SWAP'), installPhotos=serviceSolarEvidenceCount(evidence,'helios_install','photo');
-  const installSig=[...(evidence||[])].reverse().find(row=>row.category==='helios_install'&&row.kind==='signature'), submitted=Boolean(check?.helios_field_completed_at), ownerDone=Boolean(check?.helios_owner_verified_at);
+  const units=heliosFieldItems(prep),swaps=units.filter(x=>x.purpose==='SWAP');
+  const unitLabel=heliosFieldUnitLabel(units);
+  const rules=heliosFieldRuleList();
+  const total=rules.length+2;
+  const submitted=Boolean(check?.helios_field_completed_at);
+  const operationsDone=Boolean(check?.helios_owner_verified_at);
   const replacementKeys=new Set(allSwapItems(prep).map(i=>norm(i.unit_tag)).filter(Boolean));
   const returnRows=(returns||[]).filter(r=>r.equipment_type==='Helios'&&!replacementKeys.has(norm(r.unit_tag)));
-  const allChecks=heliosFieldRuleList();
-  const checklist=allChecks.map((rule,index)=>`<label class='check top8'><input id='wlHeliosFieldRule${index}' data-wl-helios-field-key='${esc(rule.key)}' type='checkbox' ${check?.[rule.key]?'checked':''} ${submitted?'disabled':''}><span>${esc(rule.label)}</span></label>`).join('');
-  const newUnits=units.map(x=>`<div class='ok top8'><b>NEW UNIT OUT · ${esc(x.unit_tag||'Tag missing')}</b><div class='small'>${esc(x.purpose)} Helios${check?.handoff_accepted_at?` · ${signatureStamp(check.handoff_accepted_by_name||'Service Tech',check.handoff_accepted_at)}`:''}</div></div>`).join('');
-  const oldBlock=swaps.length?`<div class='wl-stop top10'><b>OLD UNIT RETURNING · ${returnRows.length} of ${swaps.length} recorded</b><div>The old Helios is NOT an unused spare. Photograph the old unit and tag, document why it is being swapped, damage/issues/symptoms/repair needed, then Service Return → IT Intake.</div>${returnRows.map(r=>`<div class='wl-review top8'><b>OLD UNIT ${esc(r.unit_tag)}</b><div class='small'>${esc(r.status||'waiting_it')} · ${r.returned_at?esc(new Date(r.returned_at).toLocaleString()):''}</div><div class='small'>${esc(r.return_notes||'No return notes')}</div>${r.tag_scan_status?`<div class='small'>Tag scan: <b>${esc(String(r.tag_scan_status).toUpperCase())}</b></div>`:''}</div>`).join('')}<button class='wl-big wl-red top10' data-wl-helios-old-return>Document OLD UNIT RETURNING →</button></div>`:'';
-  const state=ownerDone?`<div class='ok top10'><b>✓ OWNER FINAL VERIFIED</b><div class='small'>${signatureStamp(check.helios_owner_verified_by_name||'Owner',check.helios_owner_verified_at)}</div></div>`:submitted?`<div class='warn top10'><b>FIELD INSTALL SUBMITTED — WAITING FOR OWNER FINAL VERIFICATION</b><div class='small'>${signatureStamp(check.helios_field_completed_by_name||'Service Tech',check.helios_field_completed_at)}</div></div>`:`<button class='wl-big wl-green top10' data-wl-submit-helios-field>Submit Helios Field Install to Owner →</button>`;
-  return `${progress('Helios Field Install','Install, verify, photograph, sign, then submit to Owner',1,1)}<div class='wl-review'><b>MHelpDesk #${esc(prep.ticket_no)}</b><div class='small'>The handoff is accepted. This job remains open until field installation and Owner final verification are complete.</div></div>${newUnits}${oldBlock}<div class='wl-question top10'><div class='qtext'>FIELD INSTALL CHECKLIST</div>${checklist}</div>${serviceSolarProofPanelHtml(evidence,'helios_install','Final Helios Installation','Take final-product photos showing the Helios, raised tower, mast lock bolt, solar-panel position/bolt, and sandbags. Upload at least one final photo per Helios.',true)}<div class='${installPhotos>=units.length&&installSig?'ok':'warn'} top10'><b>${installPhotos} of ${units.length} minimum final photos saved${installSig?' · signature saved':' · signature still required'}</b></div>${state}<div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>← Service Home</button><span></span></div>`;
+  const newUnits=units.map(x=>"<div class='wl-field-unit'><b>"+esc(x.purpose)+" · "+esc(x.equipment_type)+" "+esc(x.unit_tag||'Tag missing')+"</b><span>"+(check?.handoff_accepted_at?signatureStamp(check.handoff_accepted_by_name||'Service Tech',check.handoff_accepted_at):'Handoff accepted')+"</span></div>").join('');
+  const oldBlock=swaps.length&&returnRows.length<swaps.length
+    ? "<div class='wl-stop top10'><b>OLD UNIT RETURN STILL REQUIRED</b><div>For an installed Helios swap, document the old Helios through Service Return → IT Intake before final submission.</div><button class='wl-big wl-red top10' data-wl-helios-old-return>DOCUMENT OLD UNIT RETURN →</button></div>"
+    : "";
+
+  if(operationsDone){
+    return progress(unitLabel+' Field Install','Operations Manager verification complete',total,total)+
+      "<div class='ok wl-field-status'><b>✓ OPERATIONS MANAGER VERIFIED</b><div class='small'>"+signatureStamp(check.helios_owner_verified_by_name||'Operations Manager',check.helios_owner_verified_at)+"</div></div>"+
+      newUnits+"<div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>← SERVICE HOME</button><span></span></div>";
+  }
+  if(submitted){
+    return progress(unitLabel+' Field Install','Submitted for Operations Manager verification',total,total)+
+      "<div class='warn wl-field-status'><b>FIELD INSTALL SUBMITTED</b><div>Waiting for Operations Manager final verification.</div><div class='small top8'>"+signatureStamp(check.helios_field_completed_by_name||'Service Tech',check.helios_field_completed_at)+"</div></div>"+
+      newUnits+"<div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>← SERVICE HOME</button><span></span></div>";
+  }
+
+  const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
+  let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
+  index=Math.max(0,Math.min(total,index));
+  const header=progress(unitLabel+' Field Install','One step at a time',Math.min(total,index+1),total);
+  const context="<div class='wl-field-context'><b>MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Complete each site step in order. NO stops the install until it is corrected.</span></div>"+newUnits+oldBlock;
+
+  if(index<rules.length){
+    const rule=rules[index];
+    const yes=check?.[rule.key]===true;
+    return header+context+
+      "<div class='wl-question wl-helios-field-step'>"+
+        "<div class='qnum'>STEP "+(index+1)+" OF "+total+"</div>"+
+        "<div class='qtext'>"+esc(rule.label)+"</div>"+
+        "<div class='wl-options'><button class='fail' data-wl-helios-field-answer='no' data-field='"+esc(rule.key)+"'>NO</button><button class='pass "+(yes?"on":"")+"' data-wl-helios-field-answer='yes' data-field='"+esc(rule.key)+"'>YES</button></div>"+
+        "<div class='wl-helios-field-message'></div>"+
+        "<div class='wl-nav'>"+(index>0?"<button class='wl-prev' data-wl-helios-field-prev>Back</button>":"<button class='wl-prev' data-wl-home='svc'>Service Home</button>")+"<span></span></div>"+
+      "</div>";
+  }
+  if(index===rules.length)return header+context+heliosFieldPhotoStepHtml(evidence,units,index+1,total);
+  if(index===rules.length+1)return header+context+heliosFieldSignatureStepHtml(evidence,index+1,total);
+
+  return progress(unitLabel+' Field Install','Ready to submit',total,total)+context+
+    "<div class='ok wl-field-status'><b>✓ FIELD INSTALLATION COMPLETE</b><div>All ordered site checks, installation photos, and the Service signature are saved.</div></div>"+
+    "<button class='wl-big wl-red top10' data-wl-submit-helios-field>SUBMIT TO OPERATIONS MANAGER →</button>"+
+    "<div class='wl-nav'><button class='wl-prev' data-wl-helios-field-prev>Back</button><span></span></div>";
 }
 async function submitHeliosFieldInstall(){
   if(!activeSvcPrep?.id)return;
-  const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id), units=heliosFieldItems(activeSvcPrep), swaps=units.filter(x=>x.purpose==='SWAP');
+  const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id),units=heliosFieldItems(activeSvcPrep);
   const swapState=await swapWorkflowState(activeSvcPrep);
   if(swapState.undecided.length)return alert('Answer YES or NO for every Helios SWAP replacement first.');
   if(swapState.missingOld.some(x=>x.type==='Helios'))return alert('Document every OLD Helios unit returning through Service Return → IT Intake first.');
   if(serviceSolarEvidenceCount(evidence,'helios_install','photo')<units.length)return alert('Upload at least one final installation photo for each Helios.');
-  if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return alert('Save the timestamped Service installation signature.');
+  if(serviceSolarEvidenceCount(evidence,'helios_install','signature')<1)return alert('Save the Service installation signature.');
+  const check=await loadServiceSolarCheck(activeSvcPrep.id);
   const fieldRules=heliosFieldRuleList();
-  if(fieldRules.some(rule=>!document.querySelector(`[data-wl-helios-field-key="${rule.key}"]`)?.checked))return alert('Complete every Helios field installation check.');
+  if(fieldRules.some(rule=>check?.[rule.key]!==true))return alert('Complete every Helios field installation question in order before submitting.');
   const fieldPayload={p_prep_id:activeSvcPrep.id};
   fieldRules.forEach(rule=>{fieldPayload[rule.rpc_param]=true;});
   const {error}=await liveDb.rpc('save_my_helios_field_install_v1',fieldPayload);
-  if(error)return alert(error.message);
-  activeSvcPrep=await getPrep(activeSvcPrep.id); alert('Helios field installation submitted to the Owner for final verification.'); return renderSvcPrep();
+  if(error)return alert(String(error.message||'Could not submit the field install.').replace(/Owner/g,'Operations Manager'));
+  activeSvcPrep=await getPrep(activeSvcPrep.id);
+  svcHeliosFieldCursor=null;
+  alert('Helios field installation submitted to the Operations Manager for final verification.');
+  return renderSvcPrep();
 }
 function rangerFieldItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(i=>i.equipment_type==='Ranger'&&(i.purpose==='DELIVERY'||(i.purpose==='SWAP'&&i.swap_outcome==='installed')));
@@ -6867,7 +7008,7 @@ async function renderSvcPrep() {
         ? `<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`
         : `<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`
     ):'';
-    wizard.innerHTML=progress('Final Step',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios handoff — field result comes next':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-green' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    wizard.innerHTML=progress('Final Step',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios handoff — field result comes next':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -7608,6 +7749,42 @@ document.addEventListener('click', async e => {
     return renderSvcPrep();
   }
 
+  const heliosFieldAnswer=e.target.closest('[data-wl-helios-field-answer]');
+  if(heliosFieldAnswer){
+    const field=heliosFieldAnswer.dataset.field;
+    const yes=heliosFieldAnswer.dataset.wlHeliosFieldAnswer==='yes';
+    if(!await saveHeliosFieldCheckAnswer(field,yes))return;
+    if(!yes){
+      const msg=heliosFieldAnswer.closest('.wl-question')?.querySelector('.wl-helios-field-message');
+      if(msg)msg.innerHTML="<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>Correct this site-install step, then tap YES before continuing.</div></div>";
+      return;
+    }
+    if(!Number.isInteger(svcHeliosFieldCursor)){
+      const check=await loadServiceSolarCheck(activeSvcPrep.id);
+      const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+      const units=heliosFieldItems(activeSvcPrep);
+      svcHeliosFieldCursor=Math.max(0,heliosFieldTaskIndex(check,evidence,units)-1);
+    }
+    svcHeliosFieldCursor++;
+    return renderSvcPrep();
+  }
+  if(e.target.closest('[data-wl-helios-field-prev]')){
+    const check=await loadServiceSolarCheck(activeSvcPrep.id);
+    const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+    const units=heliosFieldItems(activeSvcPrep);
+    const current=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:heliosFieldTaskIndex(check,evidence,units);
+    svcHeliosFieldCursor=Math.max(0,current-1);
+    return renderSvcPrep();
+  }
+  if(e.target.closest('[data-wl-helios-field-next]')){
+    const check=await loadServiceSolarCheck(activeSvcPrep.id);
+    const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+    const units=heliosFieldItems(activeSvcPrep);
+    const current=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:heliosFieldTaskIndex(check,evidence,units);
+    svcHeliosFieldCursor=Math.min(heliosFieldRuleList().length+2,current+1);
+    return renderSvcPrep();
+  }
+
   if (e.target.closest('[data-wl-save-service-solar]')) return saveServiceSolarChecklist();
   if (e.target.closest('[data-wl-accept-helios]')) return acceptHeliosHandoff();
   if (e.target.closest('[data-wl-helios-old-return]')) return startHeliosOldUnitReturn();
@@ -7663,7 +7840,8 @@ document.addEventListener('click', async e => {
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
     try {
       for (const file of files) await uploadServiceSolarEvidence(activeSvcPrep.id,category,'photo',file);
-      if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
+      if(category==='helios_install' && Number.isInteger(svcHeliosFieldCursor))svcHeliosFieldCursor++;
+      else if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
     } catch (err) {
       solarUpload.disabled=false;
@@ -7688,7 +7866,8 @@ document.addEventListener('click', async e => {
     try {
       const blob=await blobFromCanvas(canvas);
       await uploadServiceSolarEvidence(activeSvcPrep.id,category,'signature',blob);
-      if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
+      if(category==='helios_install' && Number.isInteger(svcHeliosFieldCursor))svcHeliosFieldCursor++;
+      else if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
     } catch (err) {
       return alert(err.message || 'Could not save the verification signature.');
