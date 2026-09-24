@@ -7980,3 +7980,30 @@ html,body{max-width:100%;overflow-x:hidden}
   .ownerAttentionActions{width:100%;display:grid;grid-template-columns:1fr 1fr}
   .ownerAttentionActions button{width:100%;min-height:44px}
 }
+
+/* Owner Quick Find + Review controls v4 */
+.ownerGlobalSearchBar{position:relative;z-index:30;margin:0 0 18px;padding:14px;border:1px solid #284552;border-radius:16px;background:#091720}
+.ownerGlobalSearchTop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.ownerGlobalSearchTop>div{display:grid;gap:2px}.ownerGlobalSearchTop small{font-size:10px;font-weight:950;letter-spacing:.13em;color:#ff5359}.ownerGlobalSearchTop b{font-size:20px;color:#fff}
+.ownerGlobalSearchTop>button{min-height:40px;border:1px solid #3b5664;border-radius:10px;background:#11242e;color:#fff;font-weight:900;padding:0 14px}
+.ownerGlobalSearchInputWrap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.ownerGlobalSearchInputWrap input{min-width:0;min-height:54px;border:1px solid #395564;border-radius:12px;background:#07131a;color:#fff;padding:0 16px;font-size:16px}
+.ownerGlobalSearchInputWrap button{min-height:54px;border:1px solid #ef343a;border-radius:12px;background:#c9141d;color:#fff;font-weight:950;padding:0 18px}
+.ownerGlobalSearchResults{position:absolute;left:14px;right:14px;top:calc(100% - 4px);max-height:min(62vh,600px);overflow:auto;border:1px solid #38515f;border-radius:14px;background:#08151d;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:10px;z-index:200}
+.ownerGlobalSearchResults.hidden{display:none!important}
+.ownerGlobalSearchGroup{display:grid;gap:6px;margin-bottom:10px}.ownerGlobalSearchGroup>span{font-size:10px;font-weight:950;letter-spacing:.12em;color:#91a6b2;padding:4px 4px 2px}
+.ownerGlobalSearchGroup button,.ownerGlobalCameraResult{display:grid;gap:3px;width:100%;text-align:left;border:1px solid #293f4c;border-radius:10px;background:#0e2029;color:#fff;padding:11px 12px}
+.ownerGlobalSearchGroup button:hover,.ownerGlobalCameraResult:hover{border-color:#e7353b}
+.ownerGlobalSearchGroup b,.ownerGlobalCameraResult b{font-size:14px}.ownerGlobalSearchGroup small,.ownerGlobalCameraResult small{font-size:11px;color:#a5b6c0}
+.ownerGlobalCameraResult{border-color:#8b2227;background:#271014}
+.ownerReviewControlButton{min-height:44px;border:1px solid #ef343a!important;border-radius:10px!important;background:#c9141d!important;color:#fff!important;font-weight:950!important;padding:0 14px!important}
+@media(max-width:900px){
+ .ownerGlobalSearchBar{margin:0 0 14px;padding:10px;border-radius:14px}
+ .ownerGlobalSearchTop b{font-size:17px}
+ .ownerGlobalSearchTop>button{min-height:38px;padding:0 10px;font-size:11px}
+ .ownerGlobalSearchInputWrap{grid-template-columns:1fr}
+ .ownerGlobalSearchInputWrap input,.ownerGlobalSearchInputWrap button{min-height:50px;width:100%}
+ .ownerGlobalSearchResults{left:10px;right:10px;top:calc(100% - 2px);max-height:58vh}
+ .ownerAppReviewActions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+ .ownerAppReviewActions button{width:100%!important;min-height:48px!important}
+}
