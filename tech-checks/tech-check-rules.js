@@ -112,7 +112,7 @@
     {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Is the separate panel angle / locking bolt installed and secured?'},
     {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Is the tower cranked to approximately 20 feet?'},
     {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Is the separate tower mast locking bolt inserted and secured?'},
-    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Did IT verify recording after the final camera aim?'},
+    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'After the tower is raised and locked, did IT verify recording after the final camera aim?'},
     {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'Are 4 bags of sand placed on the tower base?'}
   ]);
   const IT_INTAKE_CHECKLIST=Object.freeze([
