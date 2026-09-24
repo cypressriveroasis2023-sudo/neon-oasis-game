@@ -283,60 +283,102 @@ function ownerTestRenderSessionUi(){
     if(!ctx||!state.profile)app.classList.add('hidden');
     else{
       app.classList.remove('hidden');
-      const actual=state.profile.role;
-      const expected=ctx.target_role;
-      const mismatch=expected&&actual!==expected;
-      const primary=actual==='owner'
-        ? '<button class="primary" type="button" onclick="ownerTestOpenCenter()">OWNER TEST CENTER</button>'
-        : '<button class="primary" type="button" onclick="ownerTestSwitchAccount(\''+esc(ctx.ticket)+'\',\''+(actual==='it'?'service':'it')+'\')">SWITCH TO '+(actual==='it'?'SERVICE':'IT')+'</button>';
-      app.innerHTML='<div><small>TEST SESSION · '+esc(actual==='owner'?'OWNER':actual.toUpperCase())+'</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>'+(mismatch?'This TEST session expects '+esc(ownerTestRoleText(expected))+'. You are signed in as '+esc(ownerTestRoleText(actual))+'.':'Real account testing is active. Changes are being made by this signed-in account.')+'</span></div><div class="ownerTestBannerActions">'+primary+(actual!=='owner'?'<button type="button" onclick="ownerTestReturnToOwner()">RETURN TO OWNER</button>':'')+'<button type="button" onclick="ownerTestSwitchLogin()">SWITCH ACCOUNT</button><button class="danger" type="button" onclick="ownerTestEndSession()">END</button></div>';
+      const preview=ctx.preview_role;
+      if(state.profile.role==='owner'&&preview){
+        app.innerHTML='<div><small>OWNER TEST MODE · '+esc(preview.toUpperCase())+'</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>You are still signed in as Owner. This is the real '+esc(ownerTestRoleText(preview))+' work screen with Owner test access.</span></div><div class="ownerTestBannerActions"><button type="button" onclick="ownerTestEnterRole(\''+esc(ctx.ticket)+'\',\'it\')">IT VIEW</button><button type="button" onclick="ownerTestEnterRole(\''+esc(ctx.ticket)+'\',\'service\')">SERVICE VIEW</button><button class="primary" type="button" onclick="ownerTestReturnToOwner()">RETURN TO OWNER</button><button class="danger" type="button" onclick="ownerTestEndSession()">END</button></div>';
+      }else if(state.profile.role==='owner'){
+        app.innerHTML='<div><small>OWNER TEST CENTER</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>Choose IT or Service to test the real technician workflow without signing out.</span></div><div class="ownerTestBannerActions"><button type="button" onclick="ownerTestEnterRole(\''+esc(ctx.ticket)+'\',\'it\')">OPEN IT VIEW</button><button type="button" onclick="ownerTestEnterRole(\''+esc(ctx.ticket)+'\',\'service\')">OPEN SERVICE VIEW</button><button class="danger" type="button" onclick="ownerTestEndSession()">END</button></div>';
+      }
     }
   }
 }
-async function ownerTestSwitchAccount(ticket,targetRole){
+function ownerTestActivePreview(){
+  const ctx=ownerTestSessionRead();
+  return state.profile?.role==='owner' && ctx && ['it','service'].includes(ctx.preview_role) ? ctx : null;
+}
+function ownerTestApplyPresentation(){
+  const ctx=ownerTestActivePreview();
+  const whoName=document.getElementById('whoName');
+  const whoRole=document.getElementById('whoRole');
+  if(!ctx){
+    document.body.classList.remove('owner-test-role-preview','owner-test-role-it','owner-test-role-service');
+    if(state.profile?.role==='owner'){
+      if(whoName)whoName.textContent=state.profile.full_name||state.profile.username||'Owner';
+      if(whoRole)whoRole.textContent='Owner/Admin';
+    }
+    ownerTestRenderSessionUi();
+    return;
+  }
+  document.body.classList.add('owner-test-role-preview');
+  document.body.classList.toggle('owner-test-role-it',ctx.preview_role==='it');
+  document.body.classList.toggle('owner-test-role-service',ctx.preview_role==='service');
+  if(whoName)whoName.textContent='Owner Test';
+  if(whoRole)whoRole.textContent=ctx.preview_role==='it'?'IT Technician':'Service Tech';
+  document.getElementById('appView')?.classList.add('singleRoleView');
+  document.getElementById('tab-owner')?.classList.add('hidden');
+  document.getElementById('tab-it')?.classList.add('hidden');
+  document.getElementById('tab-svc')?.classList.add('hidden');
+  show(ctx.preview_role==='it'?'it':'svc');
+  ownerTestRenderSessionUi();
+}
+async function ownerTestEnterRole(ticket,targetRole){
+  if(state.profile?.role!=='owner')return alert('Owner Test Mode requires the Owner account to stay signed in.');
+  const role=targetRole==='service'?'service':'it';
   const existing=ownerTestSessionRead()||{};
-  const ownerUsername=existing.owner_username||(state.profile?.role==='owner'?state.profile.username:ownerTestLastUser('owner'));
   const ctx={
     ...existing,
     ticket:String(ticket||existing.ticket||'').trim(),
-    target_role:targetRole,
-    owner_username:ownerUsername||'',
+    target_role:role,
+    preview_role:role,
+    owner_username:state.profile.username||existing.owner_username||'',
     started_at:existing.started_at||new Date().toISOString(),
     updated_at:new Date().toISOString()
   };
   if(!ctx.ticket)return alert('A TEST ticket number is required.');
-  ownerTestCacheRoster();
   ownerTestSessionWrite(ctx);
-  const nextUser=targetRole==='owner'?(ctx.owner_username||ownerTestLastUser('owner')):ownerTestLastUser(targetRole);
-  await db.auth.signOut();
-  showAuth();
-  const u=document.getElementById('loginUsername'),p=document.getElementById('loginPassword');
-  if(u){u.value=nextUser||'';u.focus();}
-  if(p)p.value='';
-  msg('loginMessage','TEST SESSION: sign in as '+ownerTestRoleText(targetRole)+' for MHelpDesk #'+ctx.ticket+'.','warn');
-  ownerTestRenderSessionUi();
+  await loadDeferredModules();
+  ownerTestApplyPresentation();
+  if(role==='service'&&typeof window.showSvcHome==='function')await window.showSvcHome();
+  if(role==='it'&&typeof window.showITHome==='function')await window.showITHome();
+  setTimeout(()=>ownerTestFocusTicket(ctx.ticket,role),250);
+}
+async function ownerTestSwitchAccount(ticket,targetRole){
+  return ownerTestEnterRole(ticket,targetRole);
 }
 async function ownerTestSwitchLogin(){
-  const ctx=ownerTestSessionRead();if(!ctx)return;
-  await db.auth.signOut();
-  showAuth();
-  const u=document.getElementById('loginUsername'),p=document.getElementById('loginPassword');
-  if(u)u.value='';if(p)p.value='';if(u)u.focus();
-  msg('loginMessage','TEST SESSION #'+ctx.ticket+': sign in with the account you want to test.','warn');
-  ownerTestRenderSessionUi();
+  const ctx=ownerTestSessionRead(); if(!ctx||state.profile?.role!=='owner')return;
+  const next=ctx.preview_role==='it'?'service':'it';
+  return ownerTestEnterRole(ctx.ticket,next);
 }
 async function ownerTestReturnToOwner(){
-  const ctx=ownerTestSessionRead();if(!ctx)return;
-  await ownerTestSwitchAccount(ctx.ticket,'owner');
+  if(state.profile?.role!=='owner')return;
+  const ctx=ownerTestSessionRead()||{};
+  ownerTestSessionWrite({...ctx,preview_role:null,target_role:null,updated_at:new Date().toISOString()});
+  document.body.classList.remove('owner-test-role-preview','owner-test-role-it','owner-test-role-service');
+  if(document.getElementById('whoName'))document.getElementById('whoName').textContent=state.profile.full_name||state.profile.username||'Owner';
+  if(document.getElementById('whoRole'))document.getElementById('whoRole').textContent='Owner/Admin';
+  configureTabs();
+  ownerAppRoute='testcenter';
+  await ownerAppNavigate('testcenter');
+  ownerTestRenderSessionUi();
 }
 function ownerTestOpenCenter(){
-  if(state.profile?.role!=='owner')return ownerTestReturnToOwner();
+  if(state.profile?.role!=='owner')return;
+  if(ownerTestActivePreview())return ownerTestReturnToOwner();
   ownerAppNavigate('testcenter');
 }
 function ownerTestEndSession(){
   try{localStorage.removeItem(OWNER_TEST_SESSION_KEY);}catch{}
+  document.body.classList.remove('owner-test-role-preview','owner-test-role-it','owner-test-role-service');
   document.getElementById('ownerTestAuthBanner')?.classList.add('hidden');
   document.getElementById('ownerTestAppBanner')?.classList.add('hidden');
+  if(state.profile?.role==='owner'){
+    if(document.getElementById('whoName'))document.getElementById('whoName').textContent=state.profile.full_name||state.profile.username||'Owner';
+    if(document.getElementById('whoRole'))document.getElementById('whoRole').textContent='Owner/Admin';
+    configureTabs();
+    ownerAppRoute='testcenter';
+    ownerAppNavigate('testcenter');
+  }
   msg('loginMessage','');
 }
 function ownerTestFocusTicket(ticket,role,attempt=0){
@@ -361,10 +403,14 @@ function ownerTestApplyAfterLogin(profile){
   if(!ctx){ownerTestRenderSessionUi();return;}
   ownerTestRenderSessionUi();
   if(profile.role==='owner'){
-    ownerAppRoute='testcenter';
-    setTimeout(()=>ownerAppNavigate('testcenter'),700);
-  }else if(profile.role==='it'||profile.role==='service'){
-    setTimeout(()=>ownerTestFocusTicket(ctx.ticket,profile.role),900);
+    if(['it','service'].includes(ctx.preview_role||ctx.target_role||'')){
+      const role=ctx.preview_role||ctx.target_role;
+      ownerTestSessionWrite({...ctx,preview_role:role,target_role:role});
+      setTimeout(()=>ownerTestEnterRole(ctx.ticket,role),500);
+    }else{
+      ownerAppRoute='testcenter';
+      setTimeout(()=>ownerAppNavigate('testcenter'),700);
+    }
   }
 }
 
@@ -927,6 +973,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
   renderIT();
   renderMatched();
   updateMorningStatus();
+  ownerTestApplyPresentation();
   const sync = $('syncStatus');
   if (sync && navigator.onLine) sync.textContent = 'Live work loaded';
 
@@ -2918,8 +2965,8 @@ function ownerTestWorkflowRow(p){
   const items=(p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+String(i.equipment_type||'Equipment')).join(' | ')||'Equipment not completed yet';
   return '<article class="ownerTestWorkflowRow"><header><div><small>TEST</small><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Test site')+'</span></div><strong>'+esc(status)+'</strong></header><p>'+esc(items)+'</p><div class="ownerTestWorkflowActions">'
     +'<button class="primary" type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(p.ticket_no||'')+'\')">OWNER CONTROL</button>'
-    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'it\')">SIGN IN AS IT TECH</button>'
-    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'service\')">SIGN IN AS SERVICE TECH</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'it\')">OPEN AS IT TECH</button>'
+    +'<button type="button" onclick="ownerTestOpenRole(\''+esc(p.ticket_no||'')+'\',\'service\')">OPEN AS SERVICE TECH</button>'
     +(p.status==='released'?'<button type="button" onclick="ownerReopenTestPrep(\''+esc(p.id)+'\')">RETURN TO IT</button>':'')
     +(p.status!=='closed'?'<button class="danger" type="button" onclick="ownerDeleteTestPrep(\''+esc(p.id)+'\')">DELETE TEST</button>':'')
     +'</div></article>';
@@ -3545,6 +3592,7 @@ Object.assign(window, {
   ownerGlobalCameraSearch,
   ownerCreateTestWorkflow,
   ownerTestOpenRole,
+  ownerTestEnterRole,
   ownerTestSwitchAccount,
   ownerTestSwitchLogin,
   ownerTestSelectLogin,
