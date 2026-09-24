@@ -210,6 +210,26 @@ function validUsername(v) {
 
 const OWNER_TEST_SESSION_KEY='techcheck:owner-test-session-v2';
 const OWNER_TEST_LAST_USERS_KEY='techcheck:owner-test-last-users-v1';
+const OWNER_TEST_ROSTER_KEY='techcheck:owner-test-roster-v1';
+
+function ownerTestCacheRoster(){
+  const rows=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&['owner','it','service'].includes(p.role)).map(p=>({user_id:p.user_id,username:p.username,full_name:p.full_name,role:p.role}));
+  if(!rows.length)return;
+  try{localStorage.setItem(OWNER_TEST_ROSTER_KEY,JSON.stringify(rows));}catch{}
+}
+function ownerTestRoster(){
+  try{return JSON.parse(localStorage.getItem(OWNER_TEST_ROSTER_KEY)||'[]')||[];}catch{return [];}
+}
+function ownerTestSelectLogin(username){
+  const u=document.getElementById('loginUsername'),p=document.getElementById('loginPassword');
+  if(u){u.value=String(username||'');u.focus();}
+  if(p){p.value='';setTimeout(()=>p.focus(),50);}
+}
+function ownerTestLoginChoicesHtml(role){
+  const rows=ownerTestRoster().filter(p=>p.role===role);
+  if(!rows.length)return '';
+  return '<div class="ownerTestLoginChoices"><span>CHOOSE '+esc(ownerTestRoleText(role).toUpperCase())+'</span>'+rows.map(p=>'<button type="button" onclick="ownerTestSelectLogin(\''+esc(p.username||'')+'\')"><b>'+esc(p.full_name||p.username||'Technician')+'</b><small>@'+esc(p.username||'')+'</small></button>').join('')+'</div>';
+}
 function ownerTestSessionRead(){
   try{
     const v=JSON.parse(localStorage.getItem(OWNER_TEST_SESSION_KEY)||'null');
@@ -248,7 +268,7 @@ function ownerTestRenderSessionUi(){
     if(!ctx)auth.classList.add('hidden');
     else{
       auth.classList.remove('hidden');
-      auth.innerHTML='<div><small>OWNER TEST SESSION</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>Sign in with a real '+esc(ownerTestRoleText(ctx.target_role))+' account. The TEST ticket stays active while you switch accounts.</span></div><button type="button" onclick="ownerTestEndSession()">END TEST SESSION</button>';
+      auth.innerHTML='<div><small>OWNER TEST SESSION</small><b>MHelpDesk #'+esc(ctx.ticket)+'</b><span>Sign in with a real '+esc(ownerTestRoleText(ctx.target_role))+' account. The TEST ticket stays active while you switch accounts.</span>'+ownerTestLoginChoicesHtml(ctx.target_role)+'</div><button type="button" onclick="ownerTestEndSession()">END TEST SESSION</button>';
     }
   }
   let app=document.getElementById('ownerTestAppBanner');
@@ -285,6 +305,7 @@ async function ownerTestSwitchAccount(ticket,targetRole){
     updated_at:new Date().toISOString()
   };
   if(!ctx.ticket)return alert('A TEST ticket number is required.');
+  ownerTestCacheRoster();
   ownerTestSessionWrite(ctx);
   const nextUser=targetRole==='owner'?(ctx.owner_username||ownerTestLastUser('owner')):ownerTestLastUser(targetRole);
   await db.auth.signOut();
@@ -335,6 +356,7 @@ function ownerTestFocusTicket(ticket,role,attempt=0){
 }
 function ownerTestApplyAfterLogin(profile){
   ownerTestRememberUser(profile);
+  ownerTestCacheRoster();
   const ctx=ownerTestSessionRead();
   if(!ctx){ownerTestRenderSessionUi();return;}
   ownerTestRenderSessionUi();
@@ -3525,6 +3547,7 @@ Object.assign(window, {
   ownerTestOpenRole,
   ownerTestSwitchAccount,
   ownerTestSwitchLogin,
+  ownerTestSelectLogin,
   ownerTestReturnToOwner,
   ownerTestOpenCenter,
   ownerTestEndSession,
