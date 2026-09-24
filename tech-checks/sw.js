@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-helios-field-clarity-20260924p';
+const CACHE_NAME = 'tech-check-helios-field-clarity-20260924q';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -9,9 +9,9 @@ self.addEventListener('install', event => {
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
-      cache.add(new Request('./tech-check-rules.js?v=helios-field-clarity-20260924p', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=helios-field-clarity-20260924p', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=helios-field-clarity-20260924p', { cache:'reload' })),
+      cache.add(new Request('./tech-check-rules.js?v=helios-field-clarity-20260924q', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=helios-field-clarity-20260924q', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=helios-field-clarity-20260924q', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=owner-test-persona-20260923bg', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v33', { cache:'reload' })),
