@@ -6490,6 +6490,12 @@ function advanceSvcVerification() {
   if (q?.kind === 'number') {
     const value = document.getElementById('wlSvcCount')?.value ?? '';
     if (value === '') return alert('Enter the physical count first.');
+    const actual=Number(value);
+    const expected=Number(q.item?.battery_count||0);
+    if(q.item && expected>=0 && actual!==expected){
+      const label=q.item.equipment_type==='Helios'?'Helios battery box count':'battery count';
+      return alert('The '+label+' does not match what IT prepared. IT prepared '+expected+'. Physically verify the handoff before continuing.');
+    }
     q.input.value = value;
   }
   if (svcQuestionIndex < questions.length - 1) svcQuestionIndex++;
