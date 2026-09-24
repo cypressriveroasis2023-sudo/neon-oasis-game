@@ -40,6 +40,7 @@ let activeSvcPrep = null;
 let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
+let svcSolarCursor = null;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
@@ -5906,6 +5907,7 @@ async function matchSvcTicket() {
   activeSvcAssignment = activeSvcAssignment?.ticket_no === activeSvcPrep.ticket_no ? activeSvcAssignment : await myServiceAssignmentForTicket(activeSvcPrep.ticket_no, activeSvcPrep.id);
   svcUnitIndex = 0;
   svcQuestionIndex = 0;
+  svcSolarCursor = null;
   showSvcTicketConfirmation();
 }
 async function showSvcTicketConfirmation() {
@@ -6001,6 +6003,7 @@ async function restartServiceVerificationQuestions(){
     card?.querySelectorAll("input[id^='sbatt_']").forEach(input=>{input.value='';});
     svcUnitIndex=0;
     svcQuestionIndex=0;
+    svcSolarCursor=null;
     return renderSvcPrep();
   }catch(error){
     return alert(error?.message||'Could not restart the Service questions.');
@@ -6206,7 +6209,7 @@ function serviceSolarAnswerTasks(ctx,check) {
     addBool(
       'helios_yard_alibi_visible_ok',
       'ALIBI CAMERA CHECK',
-      'Can you see the cameras for '+unitLabel+' in the Alibi app?'
+      'Can you see Helios Camera 1, Helios Camera 2, and Helios Camera 3 / PTZ for '+unitLabel+' in the Alibi app?'
     );
     addBool('helios_yard_ptz_wrapped_ok','TRANSPORT PREP','Did you remove the PTZ from '+unitLabel+' and bubble wrap it for transport?');
   }else{
@@ -6261,7 +6264,7 @@ function serviceSolarProofTasks(ctx,evidence) {
 function serviceSolarAnswersComplete(ctx,check){
   return serviceSolarAnswerTasks(ctx,check).every(function(task){return task.done;});
 }
-function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
+function serviceSolarSingleProofHtml(task,evidence,stepNo,total,reviewMode=false) {
   const count=serviceSolarEvidenceCount(evidence,task.category,task.kind);
   if(task.kind==='photo'){
     const allowsMultiple=task.category==='mppt'||task.required>1;
@@ -6281,7 +6284,7 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
         (allowsMultiple?"<button class='wl-solar-clear-photos hidden' type='button' data-wl-solar-clear-photos>CLEAR SELECTED PHOTOS</button>":"")+
         "<button class='wl-big wl-blue wl-solar-save-photo' data-wl-solar-upload disabled>SAVE PHOTO"+(allowsMultiple?"S":"")+" →</button>"+
       "</div>"+
-      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+      "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button>"+(reviewMode&&count>=Number(task.required||1)?"<button class='wl-next' data-wl-solar-review-next>NEXT →</button>":"<span></span>")+"</div>"+
     "</div>";
   }
   return "<div class='wl-question wl-solar-one-step'>"+
@@ -6298,15 +6301,17 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
         "</div>"+
       "</div>"+
     "</div>"+
-    "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
+    "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button>"+(reviewMode&&count>=1?"<button class='wl-next' data-wl-solar-review-next>NEXT →</button>":"<span></span>")+"</div>"+
   "</div>";
 }
-function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null) {
+function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null,forcedIndex=null) {
   const answerTasks=serviceSolarAnswerTasks(ctx,check);
   const proofTasks=serviceSolarProofTasks(ctx,evidence);
   const tasks=answerTasks.concat(proofTasks);
-  const index=tasks.findIndex(function(task){return !task.done;});
-  if(index<0){
+  const naturalIndex=tasks.findIndex(function(task){return !task.done;});
+  const hasForced=Number.isInteger(forcedIndex);
+  const index=hasForced ? forcedIndex : naturalIndex;
+  if(index<0 || index>=tasks.length){
     return "<div class='wl-question wl-solar-one-step'>"+
       "<div class='qnum'>"+(ctx?.has_helios?'YARD TEST COMPLETE':'PRE-TRIP COMPLETE')+"</div>"+
       "<div class='qtext'>"+(ctx?.has_helios?'Helios yard solar testing and proof are complete.':'All required Service pre-trip checks and proof are complete.')+"</div>"+
@@ -6357,7 +6362,7 @@ function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null)
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
     "</div>";
   }
-  return serviceSolarSingleProofHtml(task,evidence,stepNo,total);
+  return serviceSolarSingleProofHtml(task,evidence,stepNo,total,hasForced&&Boolean(task.done));
 }
 async function saveServiceSolarProgressField(field,value){
   if(!activeSvcPrep?.id)return false;
@@ -6799,10 +6804,11 @@ async function renderSvcPrep() {
   }else if(solarRequired&&svcUnitIndex===solarStep){
     if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}
     const solarTasks=serviceSolarAnswerTasks(solarCtx,solarCheck).concat(serviceSolarProofTasks(solarCtx,solarEvidence));
-    const solarIndex=solarTasks.findIndex(task=>!task.done);
+    const naturalSolarIndex=solarTasks.findIndex(task=>!task.done);
+    const solarIndex=Number.isInteger(svcSolarCursor) ? svcSolarCursor : naturalSolarIndex;
     const solarOffset=unitQuestionTotal+(hasParts?1:0);
-    const overallStep=solarOffset+(solarIndex<0?solarTasks.length:solarIndex+1);
-    wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',Math.max(1,overallStep),combinedCheckTotal)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence,solarOffset,combinedCheckTotal)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    const overallStep=solarOffset+((solarIndex<0?solarTasks.length:solarIndex)+1);
+    wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',Math.min(combinedCheckTotal,Math.max(1,overallStep)),combinedCheckTotal)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence,solarOffset,combinedCheckTotal,Number.isInteger(svcSolarCursor)?svcSolarCursor:null)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
     wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   }else if(svcUnitIndex===photoStep){
@@ -7493,6 +7499,18 @@ document.addEventListener('click', async e => {
       return showReceiveLookup();
     }
     if (svcUnitIndex === partStep && forms.length) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
+    if(solarRequired && svcUnitIndex===solarStep){
+      const check=await loadServiceSolarCheck(activeSvcPrep.id);
+      const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+      const tasks=serviceSolarAnswerTasks(solarCtx,check).concat(serviceSolarProofTasks(solarCtx,evidence));
+      const naturalIndex=tasks.findIndex(task=>!task.done);
+      const current=Number.isInteger(svcSolarCursor)?svcSolarCursor:(naturalIndex<0?Math.max(0,tasks.length-1):naturalIndex);
+      if(current>0){svcSolarCursor=current-1;return renderSvcPrep();}
+      svcSolarCursor=0;
+      if(hasParts){svcUnitIndex=partStep;return renderSvcPrep();}
+      if(forms.length){svcUnitIndex=forms.length-1;svcQuestionIndex=Math.max(0,svcQuestions(forms[svcUnitIndex]).length-1);return renderSvcPrep();}
+      return showReceiveLookup();
+    }
     svcUnitIndex = Math.max(0, svcUnitIndex - 1); return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-confirm-service-parts]')) {
@@ -7512,12 +7530,14 @@ document.addEventListener('click', async e => {
     if(!await saveServiceSolarProgressField('stand_tag',tags.join('\n')))return;
     if(!await saveServiceSolarProgressField('stand_verified','true'))return;
     await maybeFinalizeServiceSolarProgress();
+    if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
     return renderSvcPrep();
   }
   const solarBatteryConfig=e.target.closest('[data-wl-solar-battery-config]');
   if(solarBatteryConfig){
     if(!await saveServiceSolarProgressField('battery_configuration',solarBatteryConfig.dataset.wlSolarBatteryConfig))return;
     await maybeFinalizeServiceSolarProgress();
+    if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
     return renderSvcPrep();
   }
   const solarStepAnswer=e.target.closest('[data-wl-solar-step-answer]');
@@ -7525,6 +7545,16 @@ document.addEventListener('click', async e => {
     if(solarStepAnswer.dataset.wlSolarStepAnswer==='no'){
       const stepMessage=solarStepAnswer.closest('.wl-question')?.querySelector('.wl-solar-step-message');
       const field=solarStepAnswer.dataset.field||'';
+      const reopen=await liveDb.rpc('reopen_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});
+      if(reopen.error)return alert(reopen.error.message);
+      if(!await saveServiceSolarProgressField(field,'false'))return;
+      if(field==='mppt_tested_ok' && serviceSolarHeliosCount()>0){
+        if(!await saveServiceSolarProgressField('mppt_updated_ok','false'))return;
+        if(!await saveServiceSolarProgressField('helios_yard_updates_status_ok','false'))return;
+      }
+      if(field==='helios_yard_solar_charging_ok'){
+        if(!await saveServiceSolarProgressField('solar_charging_ok','false'))return;
+      }
       if(stepMessage)stepMessage.innerHTML=field==='helios_yard_pv_connected_ok'
         ? "<div class='wl-stop top10'><b>CONNECT HELIOS FIRST.</b><div>Connect the Helios unit to the Helios tower and solar panel for testing, then tap CONNECTED.</div></div>"
         : "<div class='wl-stop top10'><b>STOP — FIX THIS FIRST.</b><div>When it is corrected, tap YES. You cannot continue while this answer is NO.</div></div>";
@@ -7546,6 +7576,14 @@ document.addEventListener('click', async e => {
       if(!await saveServiceSolarProgressField('solar_charging_ok','true'))return;
     }
     await maybeFinalizeServiceSolarProgress();
+    if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
+    return renderSvcPrep();
+  }
+
+  const solarReviewNext=e.target.closest('[data-wl-solar-review-next]');
+  if(solarReviewNext){
+    if(!Number.isInteger(svcSolarCursor))svcSolarCursor=0;
+    svcSolarCursor++;
     return renderSvcPrep();
   }
 
@@ -7604,6 +7642,7 @@ document.addEventListener('click', async e => {
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
     try {
       for (const file of files) await uploadServiceSolarEvidence(activeSvcPrep.id,category,'photo',file);
+      if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
     } catch (err) {
       solarUpload.disabled=false;
@@ -7628,6 +7667,7 @@ document.addEventListener('click', async e => {
     try {
       const blob=await blobFromCanvas(canvas);
       await uploadServiceSolarEvidence(activeSvcPrep.id,category,'signature',blob);
+      if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
     } catch (err) {
       return alert(err.message || 'Could not save the verification signature.');
