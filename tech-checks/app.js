@@ -2529,7 +2529,7 @@ function ownerAppHandoffs(){
   const active=(state.preps||[]).filter(p=>p.status!=='closed'), done=(state.preps||[]).filter(p=>p.status==='closed').slice(-20).reverse();
   const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
   const escalations=(state.ownerFieldEscalations||[]).filter(r=>!r.resolved_at);
-  const card=p=>'<div class="ownerAppHandoffRow"><div><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Site not recorded')+'</span></div><div><b>'+esc(p.status==='draft'?'IT preparing':'IT → Service handoff')+'</b><span>'+esc((p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+eqLabel(i.equipment_type)).join(' | ')||'No equipment recorded')+'</span></div></div>';
+  const card=p=>'<div class="ownerAppHandoffRow ownerControlRow"><div><b>MHelpDesk #'+esc(p.ticket_no||'—')+'</b><span>'+esc(p.site||'Site not recorded')+'</span></div><div><b>'+esc(p.status==='draft'?'IT preparing':p.status==='closed'?'Completed handoff':'IT → Service handoff')+'</b><span>'+esc((p.prep_items||[]).map(i=>(i.unit_tag?i.unit_tag+' · ':'')+eqLabel(i.equipment_type)).join(' | ')||'No equipment recorded')+'</span></div><button type="button" class="ownerControlOpen" onclick="ownerOpenTicketControlByNumber(\''+esc(p.ticket_no||'')+'\')">OWNER CONTROL →</button></div>';
   const returnCard=r=>'<div class="ownerAppHandoffRow '+(r.status==='needs_replacement'?'urgent':'')+'"><div><b>Unit '+esc(r.unit_tag||'—')+' · MHelpDesk #'+esc(r.ticket_no||'—')+'</b><span>'+esc(r.equipment_type||'Returned equipment')+'</span></div><div><b>'+esc(String(r.status||'returned').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(r.status==='needs_replacement'?'Damage hold — not available Shop Inventory':r.status==='waiting_it'?'Waiting for IT Intake':r.status==='pending_mhelp_inventory'?'IT Intake complete — Owner/MHelpDesk inventory action required':'Return in progress')+'</span></div></div>';
   const escalationCard=r=>'<div class="ownerAppHandoffRow urgent"><div><b>Offline Unit '+esc(r.unit_tag||'—')+' · MHelpDesk #'+esc(r.ticket_no||'—')+'</b><span>'+esc(r.site||'Site not recorded')+'</span></div><div><b>'+esc(String(r.status||'escalated').replaceAll('_',' ').toUpperCase())+'</b><span>'+esc(r.status==='unresolved_owner'?'Service and IT could not resolve it — Owner decision required':'Active IT / Service troubleshooting escalation')+'</span></div></div>';
   let body='';
@@ -2541,6 +2541,38 @@ function ownerAppHandoffs(){
   if(done.length)body+='<section class="ownerAppGroup"><h2>Completed handoffs <span>'+done.length+'</span></h2>'+done.map(card).join('')+'</section>';
   return ownerAppHeader('IT → SERVICE','Handoffs','Equipment preparation, Service acceptance, returns, IT Intake, and unresolved equipment workflow.')+(body||ownerAppEmpty('NO ACTIVE HANDOFF OR RETURN WORK'));
 }
+
+function ownerOpenTicketControlByNumber(ticketNo){
+  const ticket=String(ticketNo||'').trim();
+  if(!ticket)return;
+  const assignment=(state.ownerAssignments||[]).find(a=>String(a.ticket_no||'')===ticket);
+  const prep=(state.preps||[]).find(p=>String(p.ticket_no||'')===ticket);
+  const review=(state.ownerReviewQueue||[]).find(r=>String(r.ticket_no||'')===ticket);
+  const site=assignment?.site||prep?.site||review?.site||'Site not recorded';
+  const role=assignment?.assigned_role==='it'?'IT':assignment?.assigned_role==='service'?'SERVICE':'UNASSIGNED';
+  const tech=assignment?.assignee_name||assignment?.assignee_username||assignment?.job_lead_name||'Department queue';
+  const status=String(assignment?.status||prep?.status||review?.review_status||'open').replaceAll('_',' ').toUpperCase();
+  let overlay=document.getElementById('ownerSimpleControlOverlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='ownerSimpleControlOverlay';overlay.className='ownerSimpleControlOverlay';document.body.append(overlay);}
+  overlay.innerHTML='<section class="ownerSimpleControlPanel"><header><div><small>OWNER CONTROL</small><h2>MHelpDesk #'+esc(ticket)+'</h2><p>'+esc(site)+'</p></div><button type="button" onclick="ownerCloseSimpleControl()">×</button></header>'
+    +'<div class="ownerSimpleControlStatus"><div><span>STATUS</span><b>'+esc(status)+'</b></div><div><span>CURRENT OWNER</span><b>'+esc(role+' · '+tech)+'</b></div></div>'
+    +'<div class="ownerSimpleControlGrid">'
+    +'<button class="primary" type="button" onclick="ownerControlEditTicket(\''+esc(ticket)+'\')"><b>EDIT TICKET</b><span>Date, time, site, notes & assignment</span></button>'
+    +'<button type="button" onclick="ownerControlAssignTicket(\''+esc(ticket)+'\')"><b>REASSIGN TECH</b><span>Change IT or Service ownership</span></button>'
+    +'<button type="button" onclick="ownerControlEquipment(\''+esc(ticket)+'\')"><b>ADJUST EQUIPMENT</b><span>Units, parts & quantities</span></button>'
+    +'<button type="button" onclick="ownerControlHistory(\''+esc(ticket)+'\')"><b>VIEW HISTORY</b><span>See what changed and who did it</span></button>'
+    +'<button type="button" onclick="ownerControlTest(\''+esc(ticket)+'\',\'it\')"><b>TEST AS IT</b><span>Open the IT side without changing permissions</span></button>'
+    +'<button type="button" onclick="ownerControlTest(\''+esc(ticket)+'\',\'service\')"><b>TEST AS SERVICE</b><span>Open the Service side without changing permissions</span></button>'
+    +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
+  overlay.classList.add('open');
+}
+function ownerCloseSimpleControl(){document.getElementById('ownerSimpleControlOverlay')?.classList.remove('open');}
+async function ownerControlEditTicket(ticket){ownerCloseSimpleControl();ownerCalendarSelectedJobId='';const a=(state.ownerAssignments||[]).find(x=>String(x.ticket_no||'')===String(ticket));if(a){ownerCalendarSelected=String(a.scheduled_for||ownerCalendarSelected);ownerCalendarSelectedJobId=String(a.id||'');}await ownerAppNavigate('calendar');}
+async function ownerControlAssignTicket(ticket){ownerCloseSimpleControl();const a=(state.ownerAssignments||[]).find(x=>String(x.ticket_no||'')===String(ticket));if(a){ownerCalendarSelected=String(a.scheduled_for||ownerCalendarSelected);ownerCalendarSelectedJobId=String(a.id||'');}await ownerAppNavigate('calendar');}
+async function ownerControlEquipment(ticket){ownerCloseSimpleControl();await ownerAppNavigate('handoffs');requestAnimationFrame(()=>{const row=[...document.querySelectorAll('.ownerAppHandoffRow')].find(x=>x.textContent.includes('#'+ticket));row?.scrollIntoView({behavior:'smooth',block:'center'});});}
+async function ownerControlHistory(ticket){ownerCloseSimpleControl();await ownerAppNavigate('history');const kind=document.getElementById('ownerAppHistoryKind'),q=document.getElementById('ownerAppHistoryQuery');if(kind)kind.value='site';if(q)q.value=ticket;const h=document.getElementById('ownerAppHistoryResults');if(h)h.innerHTML='<div class="ownerAppEmpty"><b>Use MHelpDesk #'+esc(ticket)+'</b><span>Ticket events are also visible in Activity.</span></div>';}
+function ownerControlTest(ticket,role){ownerCloseSimpleControl();alert('OWNER TEST MODE · '+String(role).toUpperCase()+'\n\nMHelpDesk #'+ticket+'\n\nThis control is Owner-only. It does not grant technician permissions or change ticket ownership.');}
+
 function ownerAppHistory(){
   return ownerAppHeader('PERMANENT RECORD','History','Search permanent Technician, Unit, Customer / Site, or MHelpDesk history.')
     +'<div class="ownerAppHistoryControls"><select id="ownerAppHistoryKind"><option value="technician">Technician</option><option value="unit">Unit</option><option value="site">Customer / Site</option></select><input id="ownerAppHistoryQuery" placeholder="Search history"><button class="btn" type="button" onclick="ownerAppRunHistory()">Search History</button></div><div id="ownerAppHistoryResults">'+ownerAppEmpty('ENTER A SEARCH TO VIEW HISTORY')+'</div>';
