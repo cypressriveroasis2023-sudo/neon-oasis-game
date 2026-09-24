@@ -8007,3 +8007,22 @@ html,body{max-width:100%;overflow-x:hidden}
  .ownerAppReviewActions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
  .ownerAppReviewActions button{width:100%!important;min-height:48px!important}
 }
+
+/* Owner More command page v5 */
+.ownerMoreSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 16px}
+.ownerMoreSummary>div{display:grid;gap:3px;border:1px solid #2b4552;border-radius:14px;background:#0a1921;padding:16px}
+.ownerMoreSummary b{font-size:28px;color:#fff}.ownerMoreSummary span{font-size:10px;font-weight:950;letter-spacing:.1em;color:#93a8b4}
+.ownerMoreGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ownerMoreGrid button,.ownerMoreGrid a{display:grid;gap:6px;min-height:104px;text-align:left;text-decoration:none;border:1px solid #314c5a;border-radius:14px;background:#10222c;color:#fff;padding:18px;cursor:pointer}
+.ownerMoreGrid button:hover,.ownerMoreGrid a:hover{border-color:#e52f36}
+.ownerMoreGrid b{font-size:17px}.ownerMoreGrid span{font-size:12px;line-height:1.35;color:#9fb0ba}
+.ownerMoreGrid>button:first-child,.ownerMoreGrid>button:nth-child(2){border-color:#e52f36;background:#241217}
+.ownerMoreDanger{margin-top:16px}.ownerMoreDanger button{width:100%;min-height:54px;border:1px solid #9d2930;border-radius:12px;background:#2a1115;color:#ffb6b9;font-weight:950}
+@media(max-width:900px){
+ .ownerMoreSummary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .ownerMoreSummary>div{padding:13px}.ownerMoreSummary b{font-size:24px}
+ .ownerMoreGrid{grid-template-columns:1fr;gap:9px}
+ .ownerMoreGrid button,.ownerMoreGrid a{min-height:82px;padding:15px}
+ .ownerMoreGrid b{font-size:16px}
+ .ownerMoreDanger{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+}
