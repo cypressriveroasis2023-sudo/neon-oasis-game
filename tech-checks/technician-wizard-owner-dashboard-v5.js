@@ -5993,6 +5993,8 @@ async function restartServiceVerificationQuestions(){
   try{
     const {error}=await liveDb.rpc('restart_service_verification_questions_v1',{p_prep_id:activeSvcPrep.id});
     if(error)throw error;
+    const alibiReset=await liveDb.rpc('save_service_alibi_camera_check_v1',{p_prep_id:activeSvcPrep.id,p_value:false});
+    if(alibiReset.error)throw alibiReset.error;
     activeSvcPrep=await getPrep(activeSvcPrep.id);
     const card=findSvcCard(activeSvcPrep.ticket_no);
     card?.querySelectorAll("input[id^='exact_'],input[id^='sbattok_']").forEach(input=>{input.checked=false;delete input.dataset.wlAnswered;});
@@ -6144,6 +6146,15 @@ function serviceSolarChecklistHtml(ctx, check, evidence) {
     <div class='${complete?'ok':'warn'} top10'><b>${complete?'✓ Pre-trip complete — equipment may leave the shop after handoff acceptance':'Pre-trip still needs verification'}</b></div></div>`;
 }
 
+function servicePrimaryEquipmentLabel(){
+  const items=[...(activeSvcPrep?.prep_items||[])].filter(item=>String(item?.purpose||'')!=='RETURN');
+  const helios=items.find(item=>item?.equipment_type==='Helios');
+  const item=helios||items[0]||null;
+  if(!item)return 'EQUIPMENT';
+  const type=equipmentDisplayLabel(item.equipment_type||'Equipment');
+  const unit=String(item.unit_tag||'').trim();
+  return (type+(unit?' '+unit:'')).trim();
+}
 function serviceSolarAnswerTasks(ctx,check) {
   const tasks=[];
   const spotters=Number(ctx?.solar_spotter_count||0);
@@ -6176,22 +6187,28 @@ function serviceSolarAnswerTasks(ctx,check) {
     tasks.push({key:field,field:field,kind:'bool',title:title,question:question,done:done===undefined?Boolean(check?.[field]):Boolean(done),extra:extra||null});
   }
   if(ctx?.has_helios){
-    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Please connect the Helios unit to the Helios tower and solar panel for testing.');
-    addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal Helios switch to PV?');
-    addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to the Helios MPPT in the Victron Bluetooth app?');
+    const unitLabel=servicePrimaryEquipmentLabel();
+    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Please connect '+unitLabel+' to the Helios tower and solar panel for testing.');
+    addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal switch on '+unitLabel+' to PV?');
+    addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to the MPPT for '+unitLabel+' in the Victron Bluetooth app?');
     addBool(
       'mppt_tested_ok',
       'MPPT CHECK',
-      'Does the Victron MPPT show the configuration is current and the MPPT is healthy?',
+      'Does the Victron MPPT for '+unitLabel+' show the configuration is current and the MPPT is healthy?',
       Boolean(check?.mppt_updated_ok&&check?.mppt_tested_ok&&check?.helios_yard_updates_status_ok)
     );
     addBool(
       'helios_yard_solar_charging_ok',
       'CHARGING CHECK',
-      'Does the MPPT show the Helios battery is actively charging from the tower solar panel?',
+      'Does the MPPT show '+unitLabel+' is actively charging from the tower solar panel?',
       Boolean(check?.helios_yard_solar_charging_ok&&(!heliosOnly||check?.solar_charging_ok))
     );
-    addBool('helios_yard_ptz_wrapped_ok','TRANSPORT PREP','Did you remove the PTZ from the door/front plate and bubble wrap it for transport?');
+    addBool(
+      'helios_yard_alibi_visible_ok',
+      'ALIBI CAMERA CHECK',
+      'Can you see the cameras for '+unitLabel+' in the Alibi app?'
+    );
+    addBool('helios_yard_ptz_wrapped_ok','TRANSPORT PREP','Did you remove the PTZ from '+unitLabel+' and bubble wrap it for transport?');
   }else{
     addBool('mppt_updated_ok','MPPT CHECK','Is the MPPT firmware / configuration updated and current?');
     addBool('mppt_tested_ok','MPPT CHECK','Is the MPPT powered, tested, and working?');
@@ -6345,9 +6362,13 @@ function serviceSolarOneStepHtml(ctx,check,evidence,offset=0,totalOverride=null)
 async function saveServiceSolarProgressField(field,value){
   if(!activeSvcPrep?.id)return false;
   document.body.classList.add('busy');
-  const result=await liveDb.rpc('save_service_solar_progress_v1',{
-    p_prep_id:activeSvcPrep.id,p_field:String(field),p_value:String(value)
-  });
+  const result=field==='helios_yard_alibi_visible_ok'
+    ? await liveDb.rpc('save_service_alibi_camera_check_v1',{
+        p_prep_id:activeSvcPrep.id,p_value:String(value)==='true'
+      })
+    : await liveDb.rpc('save_service_solar_progress_v1',{
+        p_prep_id:activeSvcPrep.id,p_field:String(field),p_value:String(value)
+      });
   document.body.classList.remove('busy');
   if(result.error){alert(result.error.message);return false;}
   return true;
@@ -6754,7 +6775,7 @@ async function renderSvcPrep() {
     ? serviceSolarAnswerTasks(solarCtx,solarCheck).length+serviceSolarProofTasks(solarCtx,solarEvidence).length
     : 0;
   const combinedCheckTotal=Math.max(1,unitQuestionTotal+(hasParts?1:0)+solarTaskTotal);
-  const combinedCheckTitle=solarCtx?.has_helios?'HELIOS SERVICE CHECK':'SERVICE CHECK';
+  const combinedCheckTitle=(servicePrimaryEquipmentLabel()+' SERVICE CHECK').toUpperCase();
   hideChildren(viewSvc(),[wizard]);base.style.display='none';
   if(heliosHandoff.length&&solarCheck?.handoff_accepted_at){
     const heliosScope=swapState.swaps.filter(i=>i.equipment_type==='Helios');
