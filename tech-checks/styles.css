@@ -8056,3 +8056,87 @@ html,body{max-width:100%;overflow-x:hidden}
  .ownerTestWorkflowActions .primary,.ownerTestWorkflowActions .danger{grid-column:1/-1}
  .ownerTestCleanup{display:grid}.ownerTestCleanup button{width:100%;min-height:50px}
 }
+
+/* Real-account Owner Test Session switcher v7 */
+.ownerTestAuthBanner{
+  margin:0 auto 14px;
+  max-width:760px;
+  border:1px solid #d7353d;
+  border-radius:16px;
+  background:#261114;
+  color:#fff;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+.ownerTestAuthBanner.hidden{display:none!important}
+.ownerTestAuthBanner>div{display:grid;gap:3px}
+.ownerTestAuthBanner small{font-size:10px;font-weight:950;letter-spacing:.14em;color:#ff555c}
+.ownerTestAuthBanner b{font-size:18px}
+.ownerTestAuthBanner span{font-size:12px;line-height:1.35;color:#d8b4b7}
+.ownerTestAuthBanner button{
+  min-height:44px;
+  border:1px solid #8b2b32;
+  border-radius:10px;
+  background:#341317;
+  color:#ffbdc0;
+  font-weight:950;
+  padding:0 14px;
+  white-space:nowrap;
+}
+.ownerTestAppBanner{
+  margin:10px 0 14px;
+  border:1px solid #e43a41;
+  border-radius:16px;
+  background:linear-gradient(135deg,#2b1014,#101a22);
+  color:#fff;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  position:sticky;
+  top:8px;
+  z-index:1500;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.ownerTestAppBanner.hidden{display:none!important}
+.ownerTestAppBanner>div:first-child{display:grid;gap:2px;min-width:0}
+.ownerTestAppBanner small{font-size:10px;font-weight:950;letter-spacing:.14em;color:#ff6268}
+.ownerTestAppBanner b{font-size:16px}
+.ownerTestAppBanner span{font-size:11px;line-height:1.3;color:#c9d3d9}
+.ownerTestBannerActions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ownerTestBannerActions button{
+  min-height:40px;
+  border:1px solid #3b5360;
+  border-radius:10px;
+  background:#11232d;
+  color:#fff;
+  font-weight:900;
+  font-size:11px;
+  padding:0 12px;
+}
+.ownerTestBannerActions button.primary{border-color:#ff363d;background:#c9141d}
+.ownerTestBannerActions button.danger{border-color:#8f3036;background:#2b1115;color:#ffb5b8}
+@media(max-width:900px){
+  .ownerTestAuthBanner{margin:0 18px 14px;display:grid;gap:10px}
+  .ownerTestAuthBanner button{width:100%;min-height:48px}
+  .ownerTestAppBanner{
+    position:sticky;
+    top:0;
+    margin:0 0 12px;
+    border-radius:0 0 14px 14px;
+    padding:10px 12px;
+    display:grid;
+    gap:9px;
+  }
+  .ownerTestBannerActions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:100%;
+  }
+  .ownerTestBannerActions button{width:100%;min-height:46px}
+  .ownerTestBannerActions .primary{grid-column:1/-1}
+}
