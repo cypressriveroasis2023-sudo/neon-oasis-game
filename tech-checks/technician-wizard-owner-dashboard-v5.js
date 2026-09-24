@@ -1137,18 +1137,30 @@ function injectStyles() {
     }
   `;
     s.textContent += `
-    #view-svc .wl-field-context{border:1px solid #2d4652;border-radius:14px;background:#0a171e;padding:13px;margin:10px 0;color:#fff}
-    #view-svc .wl-field-context>b{display:block;font-size:17px}
-    #view-svc .wl-field-context>span{display:block;margin-top:5px;color:#aebdc5;font-size:12px;font-weight:750}
-    #view-svc .wl-field-unit{border:1px solid #315244;border-radius:13px;background:#0d2119;padding:12px;margin:9px 0;color:#fff}
-    #view-svc .wl-field-unit b{display:block;font-size:15px}.wl-field-unit span{display:block;margin-top:4px;color:#a8bbb1;font-size:11px}
+    #view-svc .wl-helios-field-head{border:1px solid #314954!important;border-radius:18px!important;background:#07161d!important;color:#fff!important;box-shadow:none!important;padding:18px!important}
+    #view-svc .wl-helios-field-head h2{color:#fff!important;line-height:1.12!important}
+    #view-svc .wl-helios-field-head .kicker{color:#ff3038!important}
+    #view-svc .wl-helios-field-head .wl-progress{background:#20333c!important}
+    #view-svc .wl-field-context{border:1px solid #2d4652;border-left:4px solid #ed1c24;border-radius:14px;background:#0a171e;padding:14px;margin:10px 0;color:#fff}
+    #view-svc .wl-field-context>b{display:block;font-size:17px;color:#fff}
+    #view-svc .wl-field-context>span{display:block;margin-top:6px;color:#aebdc5;font-size:13px;font-weight:800;line-height:1.35}
+    #view-svc .wl-field-unit{border:1px solid #2d4652;border-radius:13px;background:#0a171e;padding:12px;margin:9px 0;color:#fff}
+    #view-svc .wl-field-unit b{display:block;font-size:15px;color:#fff}.wl-field-unit span{display:block;margin-top:4px;color:#aebdc5;font-size:11px}
     #view-svc .wl-field-status{border-radius:14px!important;padding:14px!important;margin:12px 0!important}
     #view-svc .wl-helios-field-step{background:#0a171e!important;border:1px solid #2d4652!important;color:#fff!important;box-shadow:none!important}
+    #view-svc .wl-helios-field-step .qnum{color:#ff3038!important}
     #view-svc .wl-helios-field-step .qtext{color:#fff!important}
     #view-svc .wl-helios-field-step .wl-options .fail{background:#ed1c24!important;border-color:#ff4b52!important;color:#fff!important}
     #view-svc .wl-helios-field-step .wl-options .pass{background:#f7f7f7!important;border-color:#f7f7f7!important;color:#111820!important}
-    #view-svc .wl-ai-final{background:#0a171e!important;border:1px solid #2d4652!important;color:#fff!important}
-    #view-svc .wl-ai-final .wl-ai-head,#view-svc .wl-ai-final .small{color:#aebdc5!important}
+    #view-svc .wl-helios-field-step .wl-options .pass.on{background:#18864b!important;border-color:#24a35d!important;color:#fff!important}
+    #view-svc .wl-helios-field-step .wl-solar-proof{background:#0b1a22!important;border:1px solid #2d4652!important;color:#fff!important}
+    #view-svc .wl-helios-field-step .wl-solar-photo-choice{background:#121f27!important;border:1px solid #425b67!important;color:#fff!important}
+    #view-svc .wl-helios-field-step .wl-solar-selected,#view-svc .wl-helios-field-step .wl-solar-multi-note,#view-svc .wl-helios-field-step .wl-solar-sign-label,#view-svc .wl-helios-field-step .small{color:#aebdc5!important}
+    #view-svc .wl-helios-field-step .wl-sign canvas{border-color:#425b67!important}
+    #view-svc .wl-ai-final{background:#07161d!important;border:1px solid #2d4652!important;border-top:5px solid #ed1c24!important;color:#fff!important;box-shadow:none!important}
+    #view-svc .wl-ai-final .wl-ai-head{color:#fff!important}
+    #view-svc .wl-ai-final .wl-ai-head>b{background:#111d25!important;color:#fff!important;border:1px solid #40535d!important}
+    #view-svc .wl-ai-final .small{color:#aebdc5!important}
     #view-svc .wl-ai-final .wl-ai-good{background:#0d2119!important;border:1px solid #315244!important;color:#dff7e8!important}
     #view-svc [data-wl-accept-helios],#view-svc [data-wl-submit-helios-field]{background:#ed1c24!important;color:#fff!important;border:1px solid #ed1c24!important;border-left:1px solid #ed1c24!important;box-shadow:none!important}
   `;
@@ -6614,7 +6626,7 @@ function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,serv
   if(hasParts&&!partsReady) holds.push('Listed parts have not been physically verified.');
   if(solarRequired&&!solarReady) holds.push('Solar / Helios pre-trip requirements or evidence are incomplete.');
   const ready=holds.length===0;
-  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Final Handoff Gate')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Cross-check complete.</b><br>IT/Service handoff evidence, Service checks, parts, signatures, and applicable solar requirements are consistent with the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>AI READY means the stored Tech Check requirements are complete. The Service Tech still makes the physical verification and final acceptance.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Service Handoff Check')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Handoff record ready.</b><br>IT-to-Service handoff evidence, Service checks, parts, signatures, and required solar pre-trip checks are complete in the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>This confirms the handoff record only. The Helios is not deployed until Service completes the field-install steps at the site.</div></div>`;
 }
 function allSwapItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(row=>row.purpose==='SWAP').sort((a,b)=>a.item_order-b.item_order);
@@ -6643,7 +6655,7 @@ async function acceptHeliosHandoff(){
   if(error)return alert(error.message);
   activeSvcPrep=await getPrep(activeSvcPrep.id);
   svcHeliosFieldCursor=null;
-  alert('Helios handoff accepted. The unit is checked out to Service, but it is NOT deployed yet. Complete the field installation next.');
+  alert('Helios handoff accepted. Next: complete the field installation one step at a time. The unit is NOT deployed until the site steps are finished.');
   return renderSvcPrep();
 }
 async function startHeliosOldUnitReturn(){
@@ -6664,7 +6676,7 @@ function heliosFieldRuleList(){
     {key:'helios_field_panel_bolt_ok',rpc_param:'p_panel_bolt_ok',label:'Is the separate panel angle / locking bolt installed and secured?'},
     {key:'helios_field_tower_20ft_ok',rpc_param:'p_tower_20ft_ok',label:'Is the tower cranked to approximately 20 feet?'},
     {key:'helios_field_mast_lock_bolt_ok',rpc_param:'p_mast_lock_bolt_ok',label:'Is the separate tower mast locking bolt inserted and secured?'},
-    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'Did IT verify recording after the final camera aim?'},
+    {key:'helios_field_recording_ok',rpc_param:'p_recording_ok',label:'After the tower is raised and locked, did IT verify recording after the final camera aim?'},
     {key:'helios_field_4_sandbags_ok',rpc_param:'p_4_sandbags_ok',label:'Are 4 bags of sand placed on the tower base?'}
   ];
 }
@@ -6740,7 +6752,7 @@ async function saveHeliosFieldCheckAnswer(field,value){
     document.body.classList.remove('busy');
   }
 }
-function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
+function heliosFieldProgress(kicker,title,step,total){\n  return progress(kicker,title,step,total).replace("class='wl-head'","class='wl-head wl-helios-field-head'");\n}\nfunction serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const units=heliosFieldItems(prep),swaps=units.filter(x=>x.purpose==='SWAP');
   const unitLabel=heliosFieldUnitLabel(units);
   const rules=heliosFieldRuleList();
@@ -6755,12 +6767,12 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
     : "";
 
   if(operationsDone){
-    return progress(unitLabel+' Field Install','Operations Manager verification complete',total,total)+
+    return heliosFieldProgress('HELIOS FIELD INSTALL','Operations Manager verification complete',total,total)+
       "<div class='ok wl-field-status'><b>✓ OPERATIONS MANAGER VERIFIED</b><div class='small'>"+signatureStamp(check.helios_owner_verified_by_name||'Operations Manager',check.helios_owner_verified_at)+"</div></div>"+
       newUnits+"<div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>← SERVICE HOME</button><span></span></div>";
   }
   if(submitted){
-    return progress(unitLabel+' Field Install','Submitted for Operations Manager verification',total,total)+
+    return heliosFieldProgress('HELIOS FIELD INSTALL','Submitted to Operations Manager',total,total)+
       "<div class='warn wl-field-status'><b>FIELD INSTALL SUBMITTED</b><div>Waiting for Operations Manager final verification.</div><div class='small top8'>"+signatureStamp(check.helios_field_completed_by_name||'Service Tech',check.helios_field_completed_at)+"</div></div>"+
       newUnits+"<div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>← SERVICE HOME</button><span></span></div>";
   }
@@ -6768,8 +6780,8 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
   let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
   index=Math.max(0,Math.min(total,index));
-  const header=progress(unitLabel+' Field Install','One step at a time',Math.min(total,index+1),total);
-  const context="<div class='wl-field-context'><b>MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Complete each site step in order. NO stops the install until it is corrected.</span></div>"+newUnits+oldBlock;
+  const header=heliosFieldProgress('HELIOS FIELD INSTALL',unitLabel+' · Complete one step at a time',Math.min(total,index+1),total);
+  const context="<div class='wl-field-context'><b>"+esc(unitLabel)+" · MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Follow each site step in order. Tap YES only after it is physically complete. Tap NO to stop and correct it before continuing.</span></div>"+newUnits+oldBlock;
 
   if(index<rules.length){
     const rule=rules[index];
@@ -6786,7 +6798,7 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   if(index===rules.length)return header+context+heliosFieldPhotoStepHtml(evidence,units,index+1,total);
   if(index===rules.length+1)return header+context+heliosFieldSignatureStepHtml(evidence,index+1,total);
 
-  return progress(unitLabel+' Field Install','Ready to submit',total,total)+context+
+  return heliosFieldProgress('HELIOS FIELD INSTALL',unitLabel+' · Ready to submit',total,total)+context+
     "<div class='ok wl-field-status'><b>✓ FIELD INSTALLATION COMPLETE</b><div>All ordered site checks, installation photos, and the Service signature are saved.</div></div>"+
     "<button class='wl-big wl-red top10' data-wl-submit-helios-field>SUBMIT TO OPERATIONS MANAGER →</button>"+
     "<div class='wl-nav'><button class='wl-prev' data-wl-helios-field-prev>Back</button><span></span></div>";
@@ -7017,7 +7029,7 @@ async function renderSvcPrep() {
         ? `<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`
         : `<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`
     ):'';
-    wizard.innerHTML=progress('Final Step',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios handoff — field result comes next':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Continue →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   resetWizardPosition();
 }
@@ -8470,8 +8482,8 @@ async function ownerOpenHeliosFinalReview(prepId){
     ${units.some(u=>u.purpose==='SWAP')?`<div class='wl-stop top10'><b>OLD UNIT RETURNING</b>${returns.map(r=>`<div class='small'><b>${esc(r.unit_tag)}</b> · ${esc(r.status||'')}<br>${esc(r.return_notes||'')}${r.tag_scan_status?`<br>Tag scan: ${esc(String(r.tag_scan_status).toUpperCase())}`:''}</div>`).join('')||'<div class="small">No Helios Service Return found yet.</div>'}</div>`:''}
     <div class='wl-review top10'><b>Field checklist</b>${fields.map(([label,key])=>`<div class='small'>${check?.[key]?'✓':'✕'} ${esc(label)}</div>`).join('')}</div>
     <div class='wl-review top10'><b>Final installation photos</b>${install.filter(r=>r.kind==='photo').length?`<div class='wl-gallery top8'>${install.filter(r=>r.kind==='photo').map(p=>`<img src='${esc(p.url)}' alt='Helios final installation'>`).join('')}</div>`:'<div class="warn">No final installation photos found.</div>'}${sig?`<div class='ok top8'><b>✓ Service signature</b><div class='small'>${signatureStamp(sig.created_by_name||check?.helios_field_completed_by_name||'Service Tech',sig.created_at||check?.helios_field_completed_at)}</div></div>`:'<div class="warn top8">Service installation signature missing.</div>'}</div>
-    <div class='warn top10'><b>Owner final verification</b><div>Confirm only after reviewing the completed field checklist, final photos, Service signature, and OLD UNIT RETURNING documentation for any swap.</div></div>
-    <button class='wl-big wl-green top10' data-wl-owner-helios-verify='${esc(prepId)}'>Owner Final Verify Helios →</button>`;
+    <div class='warn top10'><b>Operations Manager final verification</b><div>Confirm only after reviewing the completed field checklist, final photos, Service signature, and OLD UNIT RETURNING documentation for any swap.</div></div>
+    <button class='wl-big wl-green top10' data-wl-owner-helios-verify='${esc(prepId)}'>Operations Manager Final Verify Helios →</button>`;
   host.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function ownerVerifyHeliosFinal(prepId){
