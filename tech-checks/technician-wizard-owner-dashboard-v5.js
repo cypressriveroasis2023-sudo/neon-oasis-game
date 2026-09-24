@@ -9803,6 +9803,18 @@ function handleTechCheckViewChange(event) {
 }
 window.addEventListener('techcheck:app-ready', scheduleBoot);
 window.addEventListener('techcheck:view-changed', handleTechCheckViewChange);
+window.addEventListener('techcheck:owner-test-role', async event => {
+  const role=event?.detail?.preview_role;
+  const ticket=String(event?.detail?.ticket||'');
+  if(role==='service'){
+    document.getElementById('wlSvcHome')?.remove();
+    await showSvcHome();
+    setTimeout(()=>{const input=document.getElementById('wlServiceJobSearch');if(input&&ticket)input.value=ticket;},120);
+  }else if(role==='it'){
+    document.getElementById('wlItHome')?.remove();
+    await showITHome();
+  }
+});
 
 let lastLifecycleRefresh=0;
 function refreshAfterResume() {
