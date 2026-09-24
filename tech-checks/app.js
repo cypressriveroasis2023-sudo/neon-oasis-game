@@ -1685,7 +1685,7 @@ function renderOwnerAttention() {
   const attentionCard = $('ownerAttentionCard');
   if (attentionCard?.tagName === 'DETAILS' && attentionCount > 0) attentionCard.open = true;
   const techName = id => state.profiles.find(p => p.user_id === id)?.full_name || state.profiles.find(p => p.user_id === id)?.username || 'Service Tech';
-  const row = (kind,title,detail,target,urgent=false,context=null) => {const attrs=context?` data-vision-ticket="${esc(context.ticket||'')}" data-vision-alert="${esc(context.alert||'workflow')}" data-vision-detail="${esc(context.detail||detail)}" onclick="ownerOpenVisionAlert(this)"`:` onclick="ownerJump('${target}')"`;return `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><button class='mini'${attrs}>Open →</button></div>`;};
+  const row = (kind,title,detail,target,urgent=false,context=null,ticket='') => {const attrs=context?` data-vision-ticket="${esc(context.ticket||'')}" data-vision-alert="${esc(context.alert||'workflow')}" data-vision-detail="${esc(context.detail||detail)}" onclick="ownerOpenVisionAlert(this)"`:` onclick="ownerJump('${target}')"`;const control=String(ticket||context?.ticket||'').trim();return `<div class='ownerAttentionRow ${urgent ? 'urgent' : ''}'><div><b>${esc(title)}</b><div class='small'>${esc(detail)}</div></div><div class='ownerAttentionActions'><button class='mini'${attrs}>Open →</button>${control?`<button class='mini ownerAttentionControl' onclick="ownerOpenTicketControlByNumber('${esc(control)}')">OWNER CONTROL</button>`:''}</div></div>`;};
   const nextOwner = replacements[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Damaged ${esc(replacements[0].equipment_type || 'equipment')} ${esc(replacements[0].unit_tag || '')} needs replacement / repair</b><div class='small'>MHelpDesk #${esc(replacements[0].ticket_no)} · Held in Maintenance · NOT available Shop Inventory.</div><button class='btn top10' onclick="ownerJump('returns')">Open Damage Record →</button></div>` : offlineOwnerRequired[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Offline Unit ${esc(offlineOwnerRequired[0].unit_tag || '')} needs your decision</b><div class='small'>MHelpDesk #${esc(offlineOwnerRequired[0].ticket_no || '—')} · Service and IT could not determine a solution.</div><button class='btn top10' onclick="ownerJump('offline')">Open Complete Summary →</button></div>` : corrections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Correction active for MHelpDesk #${esc(corrections[0].ticket_no)}</b><div class='small'>Automatically routed to the ${esc(String(corrections[0].correction_role || 'service').toUpperCase())} Department queue · ${esc(corrections[0].correction_reason || 'Owner correction requested')}</div><button class='btn top10' onclick="ownerJump('vision')">Open Correction →</button></div>` : visionAlerts[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>ONSITE VISION ALERT</div><b>Review MHelpDesk #${esc(visionAlerts[0].ticket_no || '—')}</b><div class='small'>${esc(visionAlerts[0].detail || 'Vision detected an active workflow issue.')}${visionAlerts[0].acknowledged?' · ACKNOWLEDGED — remains active until resolved':''}</div><button class='btn top10' data-vision-ticket="${esc(visionAlerts[0].ticket_no||'')}" data-vision-alert="${esc(visionAlerts[0].id||'')}" data-vision-detail="${esc(visionAlerts[0].detail||'Vision detected an active workflow issue.')}" onclick="ownerOpenVisionAlert(this)">Open Vision Alert →</button></div>` : manager[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Return Unit ${esc(manager[0].unit_tag)} to Shop Inventory in MHelpDesk</b><div class='small'>MHelpDesk #${esc(manager[0].ticket_no)} · IT intake is complete.</div><button class='btn top10' onclick="ownerOpenReturn('${manager[0].id}')">Open This Unit →</button></div>` : resetPending[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review password reset for ${esc(resetPending[0].username)}</b><div class='small'>Approve or deny the technician’s reset request.</div><button class='btn top10' onclick="ownerJump('accounts')">Review Reset Request →</button></div>` : failedInspections[0] ? `<div class='ownerNextAction'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>Review failed morning inspection</b><div class='small'>${esc(techName(failedInspections[0].service_tech_id))} has a current failed inspection today.</div><button class='btn top10' onclick="ownerJump('daily')">Open Technician Board →</button></div>` : `<div class='ownerNextAction clear'><div class='ownerNextKicker'>NEXT OWNER ACTION</div><b>✓ No Owner-only action is waiting.</b><div class='small'>You can monitor work in progress below without taking action right now.</div></div>`;
   const parts = [];
   if (offlineEscalations.length) parts.push(row(
@@ -1693,17 +1693,19 @@ function renderOwnerAttention() {
     `${offlineEscalations.length} offline-unit escalation${offlineEscalations.length===1?'':'s'} active`,
     offlineEscalations.map(r => `Unit ${r.unit_tag || '—'} · #${r.ticket_no || '—'} · ${String(r.status || '').replaceAll('_',' ').toUpperCase()}${r.status==='unresolved_owner'?' · OWNER DECISION REQUIRED':''}`).join(' | '),
     'offline',
-    offlineOwnerRequired.length>0
+    offlineOwnerRequired.length>0,
+    null,
+    offlineEscalations[0]?.ticket_no||''
   ));
-  if (replacements.length) parts.push(row('replacement',`${replacements.length} damaged equipment item${replacements.length===1?'':'s'} need replacement / repair`,replacements.map(r => `${r.equipment_type || 'Equipment'} ${r.unit_tag || ''} · #${r.ticket_no}`).join(' | '),'returns',true));
-  if (corrections.length) parts.push(row('correction',`${corrections.length} job${corrections.length===1?'':'s'} returned for correction`,corrections.map(r => `#${r.ticket_no} · ${String(r.correction_role || 'service').toUpperCase()} · ${r.correction_reason || 'Owner correction requested'}`).join(' | '),'review',true));
+  if (replacements.length) parts.push(row('replacement',`${replacements.length} damaged equipment item${replacements.length===1?'':'s'} need replacement / repair`,replacements.map(r => `${r.equipment_type || 'Equipment'} ${r.unit_tag || ''} · #${r.ticket_no}`).join(' | '),'returns',true,null,replacements[0]?.ticket_no||''));
+  if (corrections.length) parts.push(row('correction',`${corrections.length} job${corrections.length===1?'':'s'} returned for correction`,corrections.map(r => `#${r.ticket_no} · ${String(r.correction_role || 'service').toUpperCase()} · ${r.correction_reason || 'Owner correction requested'}`).join(' | '),'review',true,null,corrections[0]?.ticket_no||''));
   if (visionAlerts.length) parts.push(row('vision',`OnSite Vision detected ${visionAlerts.length} active issue${visionAlerts.length===1?'':'s'}`,visionAlerts.map(r => `#${r.ticket_no || '—'} · ${r.detail || 'Workflow issue'}${r.acknowledged?' · ACKNOWLEDGED':''}`).join(' | '),'vision',true,{ticket:visionAlerts[0].ticket_no||'',alert:visionAlerts[0].id||'workflow',detail:visionAlerts[0].detail||'Vision detected an active workflow issue.'}));
-  if (manager.length) parts.push(row('manager',`${manager.length} return${manager.length===1?'':'s'} need your MHelpDesk inventory confirmation`,manager.map(r => `Unit ${r.unit_tag} · #${r.ticket_no}${ownerAgeHours(r.it_received_at || r.updated_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',true));
+  if (manager.length) parts.push(row('manager',`${manager.length} return${manager.length===1?'':'s'} need your MHelpDesk inventory confirmation`,manager.map(r => `Unit ${r.unit_tag} · #${r.ticket_no}${ownerAgeHours(r.it_received_at || r.updated_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',true,null,manager[0]?.ticket_no||''));
   if (resetPending.length) parts.push(row('reset',`${resetPending.length} password reset request${resetPending.length===1?'':'s'} waiting for approval`,resetPending.map(r => r.username).join(' · '),'accounts',true));
   if (failedInspections.length) parts.push(row('inspection',`${failedInspections.length} current failed morning inspection${failedInspections.length===1?'':'s'} today`,failedInspections.map(r => techName(r.service_tech_id)).join(' · '),'activity',true));
   if (waitingIt.length) parts.push(row('intake',`${waitingIt.length} returned unit${waitingIt.length===1?'':'s'} waiting for IT intake`,waitingIt.map(r => `Unit ${r.unit_tag}${ownerAgeHours(r.returned_at)>=24?' · OVER 24H':''}`).join(' | '),'returns',overdueReturns.length>0));
-  if (drafts.length) parts.push(row('prep',`${drafts.length} MHelpDesk ticket${drafts.length===1?'':'s'} still in IT prep`,drafts.map(p => `#${p.ticket_no}${ownerAgeHours(p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueDrafts.length>0));
-  if (released.length) parts.push(row('service',`${released.length} IT handoff${released.length===1?'':'s'} ready for Service`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0));
+  if (drafts.length) parts.push(row('prep',`${drafts.length} MHelpDesk ticket${drafts.length===1?'':'s'} still in IT prep`,drafts.map(p => `#${p.ticket_no}${ownerAgeHours(p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueDrafts.length>0,null,drafts[0]?.ticket_no||''));
+  if (released.length) parts.push(row('service',`${released.length} IT handoff${released.length===1?'':'s'} ready for Service`,released.map(p => `#${p.ticket_no}${ownerAgeHours(p.released_at || p.created_at)>=24?' · OVER 24H':''}`).join(' | '),'prep',overdueReleased.length>0,null,released[0]?.ticket_no||''));
   host.innerHTML = `${nextOwner}<div class='ownerAttentionStats'><span><b>${ownerActions}</b> needs you</span><span><b>${drafts.length + released.length + waitingIt.length + offlineInProgress}</b> in progress</span><span><b>${overdueCount}</b> over 24h</span></div>${parts.join('') || '<div class="ok"><b>✓ Nothing needs attention right now.</b><div class="small">No blocked, overdue, or Owner-action items are showing.</div></div>'}`;
 }
 function unitLifecycleLabel(status) { return ({shop_inventory:'SHOP INVENTORY',assigned_to_tech:'ASSIGNED TO TECH',maintenance:'MAINTENANCE',retired:'RETIRED',it_prep:'IT PREPARING',ready_for_service:'READY FOR SERVICE',deployed:'DEPLOYED / FIELD',returned_waiting_it:'RETURNED — WAITING IT',waiting_manager:'IT COMPLETE — WAITING MANAGER'})[status] || String(status || 'UNKNOWN').replaceAll('_',' ').toUpperCase(); }
@@ -2267,7 +2269,7 @@ function ownerBoardServiceTechCard(tech){
     ? '<div class="ownerCmdRestock"><b>⚠ '+restocks.length+' IT RESTOCK ITEM'+(restocks.length===1?'':'S')+'</b>'+restocks.map(r=>'<span>'+esc(r.item_type)+' · '+esc(String(r.status||'requested').replaceAll('_',' ').toUpperCase())+(r.original_ticket_no?' · #'+esc(r.original_ticket_no):'')+'</span>').join('')+'</div>'
     : '';
   return '<section class="ownerCmdTechCard '+(ready?'ready':'notReady')+'">'
-    +'<header class="ownerCmdTechHead"><div class="ownerCmdAvatar">'+esc(ownerBoardInitials(tech.name))+'</div><div><h2>'+esc(tech.name||'Service Tech')+'</h2><span>SERVICE TECHNICIAN</span></div><strong class="'+(ready?'ready':'danger')+'">'+(ready?'TRUCK READY':'NOT READY')+'</strong></header>'
+    +'<header class="ownerCmdTechHead"><div class="ownerCmdAvatar">'+esc(ownerBoardInitials(tech.name))+'</div><div><h2>'+esc(tech.name||'Service Tech')+'</h2><span>SERVICE TECHNICIAN</span></div><strong class="'+(ready?'ready':'danger')+'">'+(ready?'TRUCK READY':'NOT READY')+'</strong><button type="button" class="ownerTechControlButton" onclick="ownerOpenTechControl(\''+esc(tech.user_id||tech.service_tech_id||'')+'\')">OWNER CONTROL</button></header>'
     +'<div class="ownerCmdSection"><div class="ownerCmdSectionHead"><b>DAILY READINESS</b><span>'+esc(dateLabel((state.ownerTechCommandBoard&&state.ownerTechCommandBoard.date)||localDateKey(new Date())))+'</span></div>'
       +ownerBoardCheckRow('Truck Inspection',truckState,inspection.truck_complete?'COMPLETE':'NOT COMPLETE',inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
       +ownerBoardCheckRow('Trailer Inspection',trailerState,trailerDetail,inspection.taking_trailer&&inspection.submitted?ownerBoardTime(inspection.submitted_at):'')
@@ -2335,7 +2337,7 @@ function ownerBoardITSupportHtml(itTechs){
     +techs.map(t=>{
       const jobs=Array.isArray(t.jobs)?t.jobs:[];
       const current=jobs.find(j=>j.status==='started')||jobs.find(j=>j.status==='assigned')||jobs[0];
-      return '<article class="ownerCmdITCard"><div class="ownerCmdAvatar small">'+esc(ownerBoardInitials(t.name))+'</div><div><b>'+esc(t.name||'IT Technician')+'</b><span>IT TECHNICIAN</span></div><div class="ownerCmdITWork"><b>'+(current?'MHelpDesk #'+esc(current.ticket_no):'No active job')+'</b><span>'+esc(current?(String(current.status||'').toUpperCase()+' · '+(current.site||'No site')):'Available / waiting')+'</span></div><strong>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</strong></article>';
+      return '<article class="ownerCmdITCard"><div class="ownerCmdAvatar small">'+esc(ownerBoardInitials(t.name))+'</div><div><b>'+esc(t.name||'IT Technician')+'</b><span>IT TECHNICIAN</span></div><div class="ownerCmdITWork"><b>'+(current?'MHelpDesk #'+esc(current.ticket_no):'No active job')+'</b><span>'+esc(current?(String(current.status||'').toUpperCase()+' · '+(current.site||'No site')):'Available / waiting')+'</span></div><strong>'+jobs.length+' job'+(jobs.length===1?'':'s')+'</strong><button type="button" class="ownerTechControlButton compact" onclick="ownerOpenTechControl(\''+esc(t.user_id||t.it_tech_id||t.tech_id||'')+'\')">OWNER CONTROL</button></article>';
     }).join('')
     +'</div></section>';
 }
@@ -2519,7 +2521,7 @@ function ownerAppUnits(){
 }
 function ownerAppUnitRows(rows){
   if(!rows.length)return ownerAppEmpty('NO UNITS MATCH YOUR SEARCH');
-  return rows.map(r=>'<div class="ownerAppUnitRow"><div><b>'+esc(r.equipment_type||'Equipment')+' · '+esc(r.unit_tag||'—')+'</b><span>'+esc(unitLifecycleLabel(r.lifecycle_status))+'</span></div><div><b>'+esc(r.current_holder_name||'No technician assigned')+'</b><span>'+esc(r.last_event||'No activity recorded')+'</span></div><div><b>'+(r.ticket_no?'MHelpDesk #'+esc(r.ticket_no):'No MHelpDesk ticket')+'</b><span>'+esc(r.current_site||'Location not recorded')+'</span></div></div>').join('');
+  return rows.map(r=>'<div class="ownerAppUnitRow ownerUnitControlRow"><div><b>'+esc(r.equipment_type||'Equipment')+' · '+esc(r.unit_tag||'—')+'</b><span>'+esc(unitLifecycleLabel(r.lifecycle_status))+'</span></div><div><b>'+esc(r.current_holder_name||'No technician assigned')+'</b><span>'+esc(r.last_event||'No activity recorded')+'</span></div><div><b>'+(r.ticket_no?'MHelpDesk #'+esc(r.ticket_no):'No MHelpDesk ticket')+'</b><span>'+esc(r.current_site||'Location not recorded')+'</span></div><button type="button" class="ownerUnitControlButton" onclick="ownerOpenUnitControl(\''+esc(r.unit_tag||'')+'\')">OWNER CONTROL →</button></div>').join('');
 }
 function ownerAppFilterUnits(q){
   q=String(q||'').trim().toLowerCase();
@@ -2615,6 +2617,75 @@ function ownerControlTest(ticket,role){
       if(input){input.value=String(ticket);input.focus();}
     },180);
   },180);
+}
+
+
+function ownerOpenUnitControl(unitTag){
+  const tag=String(unitTag||'').trim(); if(!tag)return;
+  const unit=(state.unitRegistry||[]).find(r=>String(r.unit_tag||'')===tag)||{};
+  const asset=(state.assetInventory||[]).find(r=>String(r.unit_tag||'')===tag||String(r.unit_key||'')===tag);
+  const ticket=String(unit.ticket_no||'').trim();
+  let overlay=document.getElementById('ownerSimpleControlOverlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='ownerSimpleControlOverlay';overlay.className='ownerSimpleControlOverlay';document.body.append(overlay);}
+  overlay.innerHTML='<section class="ownerSimpleControlPanel"><header><div><small>OWNER UNIT CONTROL</small><h2>'+esc(unit.equipment_type||asset?.asset_type||'Unit')+' · '+esc(tag)+'</h2><p>'+esc(unit.current_site||'Location not recorded')+'</p></div><button type="button" onclick="ownerCloseSimpleControl()">×</button></header>'
+   +'<div class="ownerSimpleControlStatus"><div><span>STATUS</span><b>'+esc(unitLifecycleLabel(unit.lifecycle_status||asset?.availability_status||'unknown'))+'</b></div><div><span>CURRENT HOLDER</span><b>'+esc(unit.current_holder_name||asset?.assigned_to_name||'No technician assigned')+'</b></div></div>'
+   +'<div class="ownerSimpleControlGrid">'
+   +(ticket?'<button class="primary" type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(ticket)+'\')"><b>OPEN RELATED TICKET</b><span>MHelpDesk #'+esc(ticket)+'</span></button>':'')
+   +'<button type="button" onclick="ownerUnitHistory(\''+esc(tag)+'\')"><b>VIEW UNIT HISTORY</b><span>See every recorded movement and change</span></button>'
+   +'<button type="button" onclick="ownerUnitCameraHealth(\''+esc(tag)+'\')"><b>CAMERA HEALTH</b><span>Find this unit in camera monitoring</span></button>'
+   +(asset?'<button class="closeAction" type="button" onclick="ownerUnitSetStatus(\''+esc(asset.unit_key||'')+'\',\'shop\')"><b>RETURN TO SHOP</b><span>Put this inventory asset back on the shelf</span></button><button class="warnAction" type="button" onclick="ownerUnitSetStatus(\''+esc(asset.unit_key||'')+'\',\'maintenance\')"><b>MOVE TO MAINTENANCE</b><span>Hold the asset out of available inventory</span></button>':'')
+   +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
+  overlay.classList.add('open');
+}
+async function ownerUnitHistory(tag){
+  ownerCloseSimpleControl(); await ownerAppNavigate('history');
+  const kind=document.getElementById('ownerAppHistoryKind'),q=document.getElementById('ownerAppHistoryQuery');
+  if(kind)kind.value='unit'; if(q)q.value=String(tag);
+  await ownerAppRunHistory();
+}
+function ownerUnitCameraHealth(tag){
+  ownerCloseSimpleControl();
+  window.location.href='./camera-health.html?q='+encodeURIComponent(String(tag));
+}
+async function ownerUnitSetStatus(unitKey,status){
+  ownerCloseSimpleControl();
+  await setInventoryAssetStatus(String(unitKey),String(status));
+}
+function ownerOpenTechControl(userId){
+  const id=String(userId||'').trim(); if(!id)return;
+  const tech=(state.profiles||[]).find(p=>String(p.user_id)===id);
+  const boardService=(state.ownerTechCommandBoard?.service_techs||[]).find(t=>String(t.user_id||t.service_tech_id)===id);
+  const boardIT=(state.ownerTechCommandBoard?.it_techs||[]).find(t=>String(t.user_id||t.it_tech_id||t.tech_id)===id);
+  const name=tech?.full_name||tech?.username||boardService?.name||boardIT?.name||'Technician';
+  const role=tech?.role||(boardService?'service':'it');
+  const jobs=(state.ownerAssignments||[]).filter(a=>String(a.assignee_user_id||'')===id&&a.status!=='cancelled');
+  const assets=(state.assetInventory||[]).filter(a=>String(a.assigned_to||'')===id&&a.availability_status==='assigned');
+  let overlay=document.getElementById('ownerSimpleControlOverlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='ownerSimpleControlOverlay';overlay.className='ownerSimpleControlOverlay';document.body.append(overlay);}
+  overlay.innerHTML='<section class="ownerSimpleControlPanel"><header><div><small>OWNER TECHNICIAN CONTROL</small><h2>'+esc(name)+'</h2><p>'+esc(role==='service'?'Service Technician':'IT Technician')+'</p></div><button type="button" onclick="ownerCloseSimpleControl()">×</button></header>'
+   +'<div class="ownerSimpleControlStatus"><div><span>ACTIVE JOBS</span><b>'+jobs.length+'</b></div><div><span>ASSIGNED ASSETS</span><b>'+assets.length+'</b></div></div>'
+   +(jobs.length?'<div class="ownerTechControlJobs">'+jobs.slice(0,8).map(j=>'<button type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(j.ticket_no||'')+'\')"><b>MHelpDesk #'+esc(j.ticket_no||'—')+'</b><span>'+esc(j.site||'Site not recorded')+' · '+esc(String(j.status||'').toUpperCase())+'</span></button>').join('')+'</div>':'')
+   +'<div class="ownerSimpleControlGrid">'
+   +'<button class="primary" type="button" onclick="ownerTechAssignJob(\''+esc(id)+'\')"><b>GIVE JOB</b><span>Create or assign Tech Check work</span></button>'
+   +'<button type="button" onclick="ownerTechHistory(\''+esc(id)+'\')"><b>VIEW HISTORY</b><span>See this technician’s recorded activity</span></button>'
+   +(role==='service'?'<button type="button" onclick="ownerTechManageTruck(\''+esc(id)+'\')"><b>MANAGE TRUCK</b><span>Adjust units, SIMs and truck stock</span></button>':'')
+   +'<button type="button" onclick="ownerTechTestScreen(\''+esc(role)+'\')"><b>TEST '+esc(role==='service'?'SERVICE':'IT')+' SCREEN</b><span>Open the technician-side workflow screen</span></button>'
+   +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
+  overlay.classList.add('open');
+}
+async function ownerTechAssignJob(){ownerCloseSimpleControl();await ownerAppNavigate('assign');}
+async function ownerTechHistory(userId){
+  const tech=(state.profiles||[]).find(p=>String(p.user_id)===String(userId)); ownerCloseSimpleControl(); await ownerAppNavigate('history');
+  const kind=document.getElementById('ownerAppHistoryKind'),q=document.getElementById('ownerAppHistoryQuery');
+  if(kind)kind.value='technician'; if(q)q.value=tech?.full_name||tech?.username||'';
+  if(q?.value)await ownerAppRunHistory();
+}
+async function ownerTechManageTruck(userId){
+  ownerCloseSimpleControl(); await ownerAppNavigate('team');
+  requestAnimationFrame(()=>ownerToggleTruckInventoryEditor(String(userId)));
+}
+function ownerTechTestScreen(role){
+  ownerCloseSimpleControl(); show(role==='service'?'svc':'it');
 }
 
 function ownerAppHistory(){
@@ -3189,6 +3260,15 @@ Object.assign(window, {
   ownerControlClose,
   ownerControlReopen,
   ownerControlReturn,
+  ownerOpenUnitControl,
+  ownerUnitHistory,
+  ownerUnitCameraHealth,
+  ownerUnitSetStatus,
+  ownerOpenTechControl,
+  ownerTechAssignJob,
+  ownerTechHistory,
+  ownerTechManageTruck,
+  ownerTechTestScreen,
   ownerCloseJob,
   ownerReturnJobForCorrection,
   ownerJump,
