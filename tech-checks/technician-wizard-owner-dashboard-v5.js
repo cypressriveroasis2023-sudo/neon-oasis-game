@@ -1071,21 +1071,21 @@ async function returnPhotoHtml(paths) {
 async function myReturnCounts() { const { data: { session } } = await liveDb.auth.getSession(); if (!session?.user?.id) return { waiting:0, inventory:0, replacement:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', session.user.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, replacement:rows.filter(r=>r.status==='needs_replacement').length, completed:rows.filter(r=>r.status==='completed').length }; }
 async function releasedPrepCount() { const { data } = await liveDb.from('prep_tickets').select('id').eq('status','released'); return (data||[]).length; }
 async function myTruckSpareData() {
-  const { data:{ session } }=await liveDb.auth.getSession();
-  if (!session?.user?.id) return {units:[],batteries:[]};
+  const tech=await currentTechIdentity().catch(()=>null);
+  if (!tech?.id) return {units:[],batteries:[]};
   const [prepQ,batteryQ]=await Promise.all([
     liveDb.from('prep_tickets')
       .select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,spare_checked_out_at,spare_checked_out_to)')
-      .eq('status','closed').eq('closed_by',session.user.id)
+      .eq('status','closed').eq('closed_by',tech.id)
       .order('closed_at',{ascending:false}).limit(50),
     liveDb.from('truck_spare_batteries').select('*')
-      .eq('service_tech_id',session.user.id).eq('status','in_truck')
+      .eq('service_tech_id',tech.id).eq('status','in_truck')
       .order('accepted_at',{ascending:true})
   ]);
   if (prepQ.error) throw prepQ.error;
   if (batteryQ.error) throw batteryQ.error;
   const units=(prepQ.data||[]).flatMap(p=>(p.prep_items||[])
-    .filter(i=>i.purpose==='BACKUP' && i.spare_checked_out_at && i.spare_checked_out_to===session.user.id && !i.spare_outcome)
+    .filter(i=>i.purpose==='BACKUP' && i.spare_checked_out_at && i.spare_checked_out_to===tech.id && !i.spare_outcome)
     .map(i=>({...i,ticket_no:p.ticket_no,site:p.site,closed_at:p.closed_at})));
   return {units,batteries:batteryQ.data||[]};
 }
@@ -1102,16 +1102,16 @@ function truckSpareServiceHtml(spares) {
 }
 
 async function serviceWorkData() {
-  const { data:{ session } } = await liveDb.auth.getSession();
+  const tech=await currentTechIdentity().catch(()=>null);
   const inspectionRequired=serviceInspectionRequiredToday();
-  if (!session?.user?.id) return { assignments:[], released:[], inspectionDone:false, inspectionRequired, deployed:[] };
+  if (!tech?.id) return { assignments:[], released:[], inspectionDone:false, inspectionRequired, deployed:[] };
   const dayStart = new Date(); dayStart.setHours(0,0,0,0);
   const [assignments,releasedQ,returnedQ,deployedQ,inspectionQ] = await Promise.all([
     myActiveAssignments('service'),
     liveDb.from('prep_tickets').select('id,ticket_no,site,released_at,created_at').eq('status','released').order('released_at',{ascending:true}),
-    liveDb.from('unit_returns').select('ticket_no,unit_tag').eq('service_tech_id',session.user.id),
-    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,swap_outcome,swap_installed_site,swap_site_registration_status)').eq('status','closed').eq('closed_by',session.user.id).order('closed_at',{ascending:false}).limit(30),
-    liveDb.from('morning_checks').select('id').eq('service_tech_id',session.user.id).gte('submitted_at',dayStart.toISOString()).limit(1)
+    liveDb.from('unit_returns').select('ticket_no,unit_tag').eq('service_tech_id',tech.id),
+    liveDb.from('prep_tickets').select('id,ticket_no,site,closed_at,closed_by,prep_items(id,unit_tag,equipment_type,purpose,spare_outcome,swap_outcome,swap_installed_site,swap_site_registration_status)').eq('status','closed').eq('closed_by',tech.id).order('closed_at',{ascending:false}).limit(30),
+    liveDb.from('morning_checks').select('id').eq('service_tech_id',tech.id).gte('submitted_at',dayStart.toISOString()).limit(1)
   ]);
   const activeTickets=new Set((assignments||[]).map(a=>norm(a.ticket_no)));
   const released=(releasedQ.data||[]).filter(p=>activeTickets.has(norm(p.ticket_no)));
@@ -1157,11 +1157,39 @@ async function uploadReturnPhotos(files, returnId, stage) {
     throw new Error(err?.message === 'Failed to fetch' ? 'The photo upload lost its connection. Nothing was submitted. Check your connection and tap SEND THIS UNIT TO IT INTAKE again.' : (err?.message || 'Could not upload the return photos. Nothing was submitted.'));
   }
 }
+function ownerTestPreviewContext(){
+  if(!document.body.classList.contains('owner-test-role-preview')) return null;
+  try{
+    const ctx=JSON.parse(localStorage.getItem('techcheck:owner-test-session-v2')||'null');
+    if(!ctx?.ticket||!ctx?.preview_role||!ctx?.persona_id)return null;
+    return ctx;
+  }catch{return null;}
+}
+function ownerTestPreviewFor(role){
+  const ctx=ownerTestPreviewContext();
+  return ctx&&(!role||ctx.preview_role===role)?ctx:null;
+}
 async function currentTechIdentity() {
+  const preview=ownerTestPreviewContext();
+  if(preview){
+    return { id:preview.persona_id, name:preview.persona_name||'Test Technician', username:preview.persona_username||'', owner_test:true, ticket:preview.ticket, role:preview.preview_role };
+  }
   const { data } = await liveDb.auth.getUser();
   const user = data?.user;
   if (!user?.id) throw new Error('Please sign in again.');
   return { id: user.id, name: document.getElementById('whoName')?.textContent?.trim() || 'Technician' };
+}
+async function setJobAssignmentStatusCompat(id,status){
+  const preview=ownerTestPreviewContext();
+  return preview
+    ? liveDb.rpc('owner_test_set_assignment_status_v1',{p_assignment_id:id,p_status:status})
+    : setJobAssignmentStatusCompat(id,status);
+}
+async function linkAssignmentToPrepCompat(id,prepId){
+  const preview=ownerTestPreviewContext();
+  return preview
+    ? liveDb.rpc('owner_test_link_assignment_to_prep_v1',{p_assignment_id:id,p_prep_id:prepId})
+    : linkAssignmentToPrepCompat(id,prepId);
 }
 
 let notificationRealtimeChannel = null;
@@ -2099,6 +2127,15 @@ async function maybeShowFirstTimeWalkthrough() {
 async function myActiveAssignments(role = null) {
   const wantedRole = role || currentRoleKey();
   if (!['it','service'].includes(wantedRole)) return [];
+  const preview=ownerTestPreviewFor(wantedRole);
+  if(preview){
+    const {data,error}=await liveDb.from('job_assignments').select('*')
+      .eq('assigned_role',wantedRole)
+      .in('status',['assigned','started'])
+      .order('assigned_at',{ascending:true});
+    if(error){console.warn('Could not load Owner Test assignment queue',error);return [];}
+    return (data||[]).filter(a=>String(a.ticket_no||'')===String(preview.ticket||'') || a.assignee_user_id===preview.persona_id);
+  }
   const { data, error } = await liveDb.rpc('my_available_assignments', { p_role: wantedRole });
   if (error) { console.warn('Could not load assignment queue', error); return []; }
   return data || [];
@@ -2361,7 +2398,8 @@ function techCheckAIHtml(a,role){
     <div class='small top8'>AI Assist is advisory only. It cannot change, claim, complete, or reassign a ticket.</div></div>`;
 }
 async function assignmentGateState(assignment) {
-  if(assignment?.assigned_role==='service' && assignment?.status!=='started'){
+  const testPreview=ownerTestPreviewContext();
+  if(assignment?.assigned_role==='service' && assignment?.status!=='started' && !testPreview){
     const {data:departure,error:departureError}=await liveDb.rpc('service_departure_readiness_v1');
     if(departureError)return {ready:false,label:'START-DAY CHECK REQUIRED',detail:departureError.message||'Truck readiness could not be verified.'};
     if(!departure?.inspection_ready)return {ready:false,label:'TRUCK / TRAILER INSPECTION REQUIRED',detail:'Complete and pass today’s mandatory Truck Check and Trailer Check when a trailer is being used.'};
@@ -2414,7 +2452,7 @@ async function beginServiceReturnForAssignment(id) {
   if(!tech?.id || a.assignee_user_id!==tech.id)return alert('Claim or open this Service job from My Work Today before returning equipment.');
   activeSvcAssignment=a;
   if(a.status!=='started') {
-    const {error:startError}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'started'});
+    const {error:startError}=await setJobAssignmentStatusCompat(id,'started');
     if(startError)return alert(startError.message);
   }
   serviceReturn={ step:1, ticket:String(a.ticket_no||''), unit:'', type:'', notes:'', photo:null, conditionPhotos:[], damagePhotos:[], knownUnits:await rememberedUnitsForTicket(a.ticket_no) };
@@ -2426,7 +2464,7 @@ async function completeServiceFieldAssignment(id) {
   if(!confirm('Mark this Tech Check Service task complete?\n\nThis only updates Tech Check. It does not change MHelpDesk.')) return;
   const {data:rows}=await liveDb.from('job_assignments').select('ticket_no').eq('id',id).limit(1);
   const ticket=rows?.[0]?.ticket_no||activeSvcAssignment?.ticket_no||'';
-  const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'completed'});
+  const {error}=await setJobAssignmentStatusCompat(id,'completed');
   if(error)return alert(error.message);
   activeSvcAssignment=null;
   rememberTechCompletion('service',ticket,'JOB COMPLETE');
@@ -2454,7 +2492,7 @@ async function syncServiceAssignmentAfterReturn(ticket,techId) {
 
   const required=assignmentEquipmentCount(a);
   if(count>=required){
-    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
+    const {error}=await setJobAssignmentStatusCompat(a.id,'completed');
     if(error)console.warn('Return saved but Service assignment could not be completed',error);
     else return {completed:true,count,required};
   }
@@ -2467,7 +2505,7 @@ async function syncITReturnAssignmentAfterIntake(ticket,techId) {
   const {data:returns}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',String(ticket||''));
   const processed=(returns||[]).filter(r=>['pending_mhelp_inventory','needs_replacement','completed'].includes(r.status)).length;
   if(processed>=required){
-    const {error}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:a.id,p_status:'completed'});
+    const {error}=await setJobAssignmentStatusCompat(a.id,'completed');
     if(error)console.warn('IT Intake saved but IT assignment could not be completed',error);
   }
 }
@@ -2498,7 +2536,7 @@ async function startAssignedJob(id) {
 
   if (assignment.assigned_role === 'it') {
     if (String(assignment.work_type||'').toLowerCase()==='pickup' || (!assignment.work_type && /\bpick[ -]?up\b/i.test(String(assignment.job_description||'')))) {
-      if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id:id, p_status:'started' });
+      if (assignment.status !== 'started') await setJobAssignmentStatusCompat(id,'started');
       const { data: returns } = await liveDb.from('unit_returns').select('id,status').eq('ticket_no',assignment.ticket_no).eq('status','waiting_it').order('returned_at',{ascending:true}).limit(1);
       if (!returns?.length) return alert('WAITING FOR SERVICE RETURN\n\nPickup starts with Service. IT Intake cannot begin until Service checks the returned equipment in.');
       return startITIntake(returns[0].id);
@@ -2512,12 +2550,12 @@ async function startAssignedJob(id) {
       .order('created_at', { ascending: false })
       .limit(1);
     if (existing?.[0]) {
-      const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: existing[0].id });
+      const { error: linkError } = await linkAssignmentToPrepCompat( id,existing[0].id );
       if (linkError) return alert(linkError.message);
       pendingAssignmentLinkId = null;
       return showItPrep(existing[0].id);
     }
-    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    if (assignment.status !== 'started') await setJobAssignmentStatusCompat( id,'started');
     pendingAssignmentLinkId = id;
     pendingAssignmentManifest = normalizedEquipmentManifest(assignment.equipment_manifest);
     pendingAssignmentWorkType = assignment.work_type || 'service';
@@ -2541,7 +2579,7 @@ async function startAssignedJob(id) {
   }
   if (!assignment.requires_it_handoff) {
     if (assignment.status !== 'started') {
-      const {error:startError}=await liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:'started'});
+      const {error:startError}=await setJobAssignmentStatusCompat(id,'started');
       if(startError)return alert(startError.message);
       assignment.status='started';
     }
@@ -2555,10 +2593,10 @@ async function startAssignedJob(id) {
     .order('released_at', { ascending: false })
     .limit(1);
   if (!released?.length) {
-    if (assignment.status !== 'started') await liveDb.rpc('set_my_job_assignment_status', { p_assignment_id: id, p_status: 'started' });
+    if (assignment.status !== 'started') await setJobAssignmentStatusCompat( id,'started');
     return alert('This MHelpDesk job is assigned to you, but IT has not created the Service handoff yet. It will stay under My Work Today.');
   }
-  const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: id, p_prep_id: released[0].id });
+  const { error: linkError } = await linkAssignmentToPrepCompat( id,released[0].id );
   if (linkError) return alert(linkError.message);
   return openServiceTicket(assignment.ticket_no);
 }
@@ -2746,11 +2784,14 @@ async function assignmentGateRows(assignments=[]){
   }));
 }
 async function serviceDayState(){
+  const preview=ownerTestPreviewFor('service');
+  const tech=await currentTechIdentity().catch(()=>null);
   const [work,spares,healthQ,truckQ]=await Promise.all([
     serviceWorkData(),
     myTruckSpareData(),
-    liveDb.rpc('get_workflow_health_v1'),
-    liveDb.rpc('service_departure_readiness_v1')
+    preview?Promise.resolve({data:{recovery:null}}):liveDb.rpc('get_workflow_health_v1'),
+    preview?Promise.resolve({data:{inspection_ready:true,inventory_ready:true,departure_ready:true,units:[],sims:[],stock:{},restock_requests:[]}})
+      : liveDb.rpc('service_departure_readiness_v1',tech?.id?{p_service_tech_id:tech.id}:{})
   ]);
   const today=techCheckDateKey();
   const currentAssignments=(work.assignments||[]).filter(a=>techAssignmentIsCurrent(a,today));
@@ -2764,8 +2805,8 @@ async function serviceDayState(){
     work,
     spares,
     truckReadiness,
-    inspectionDue:!Boolean(truckReadiness.inspection_ready),
-    inventoryDue:Boolean(truckReadiness.inspection_ready&&!truckReadiness.inventory_ready),
+    inspectionDue:preview?false:!Boolean(truckReadiness.inspection_ready),
+    inventoryDue:preview?false:Boolean(truckReadiness.inspection_ready&&!truckReadiness.inventory_ready),
     spareCount:(spares?.units?.length||0)+(spares?.batteries?.length||0),
     currentAssignments,
     futureAssignments,
@@ -2779,11 +2820,10 @@ async function serviceDayState(){
 async function myITDraftPreps(){
   const tech=await currentTechIdentity().catch(()=>null);
   if(!tech?.id)return [];
-  const {data,error}=await liveDb.from('prep_tickets')
-    .select('id,ticket_no,site,status,created_at,work_type')
-    .eq('status','draft')
-    .eq('created_by',tech.id)
-    .order('created_at',{ascending:true});
+  const preview=ownerTestPreviewFor('it');
+  let q=liveDb.from('prep_tickets').select('id,ticket_no,site,status,created_at,work_type').eq('status','draft');
+  q=preview?q.eq('ticket_no',preview.ticket):q.eq('created_by',tech.id);
+  const {data,error}=await q.order('created_at',{ascending:true});
   if(error)throw error;
   return data||[];
 }
@@ -3990,7 +4030,7 @@ async function createPrepAndStartChecks() {
   document.body.classList.remove('busy');
   if (error) return alert(error.message);
   if (pendingAssignmentLinkId) {
-    const { error: linkError } = await liveDb.rpc('link_my_assignment_to_prep', { p_assignment_id: pendingAssignmentLinkId, p_prep_id: prepId });
+    const { error: linkError } = await linkAssignmentToPrepCompat( pendingAssignmentLinkId,prepId );
     if (linkError) return alert(linkError.message);
     pendingAssignmentLinkId = null;
   }
@@ -5198,6 +5238,12 @@ function techDashboardSettled(results){
 
 
 async function loadMyServiceTruckReadiness(){
+  const preview=ownerTestPreviewFor('service');
+  if(preview){
+    const {data,error}=await liveDb.rpc('service_departure_readiness_v1',{p_service_tech_id:preview.persona_id});
+    if(error)throw error;
+    return data||{};
+  }
   const {data,error}=await liveDb.rpc('service_departure_readiness_v1');
   if(error)throw error;
   return data||{};
