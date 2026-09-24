@@ -1183,13 +1183,13 @@ async function setJobAssignmentStatusCompat(id,status){
   const preview=ownerTestPreviewContext();
   return preview
     ? liveDb.rpc('owner_test_set_assignment_status_v1',{p_assignment_id:id,p_status:status})
-    : setJobAssignmentStatusCompat(id,status);
+    : liveDb.rpc('set_my_job_assignment_status',{p_assignment_id:id,p_status:status});
 }
 async function linkAssignmentToPrepCompat(id,prepId){
   const preview=ownerTestPreviewContext();
   return preview
     ? liveDb.rpc('owner_test_link_assignment_to_prep_v1',{p_assignment_id:id,p_prep_id:prepId})
-    : linkAssignmentToPrepCompat(id,prepId);
+    : liveDb.rpc('link_my_assignment_to_prep',{p_assignment_id:id,p_prep_id:prepId});
 }
 
 let notificationRealtimeChannel = null;
@@ -2542,11 +2542,14 @@ async function startAssignedJob(id) {
       return startITIntake(returns[0].id);
     }
     const tech = await currentTechIdentity();
-    const { data: existing } = await liveDb.from('prep_tickets')
-      .select('id,ticket_no,status,created_by')
+    const testPreview=ownerTestPreviewFor('it');
+    let existingQuery=liveDb.from('prep_tickets')
+      .select('id,ticket_no,status,created_by,is_test')
       .eq('ticket_no', assignment.ticket_no)
-      .eq('status', 'draft')
-      .eq('created_by', tech.id)
+      .eq('status', 'draft');
+    if(!testPreview) existingQuery=existingQuery.eq('created_by', tech.id);
+    else existingQuery=existingQuery.eq('is_test',true);
+    const { data: existing } = await existingQuery
       .order('created_at', { ascending: false })
       .limit(1);
     if (existing?.[0]) {
