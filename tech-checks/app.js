@@ -2518,7 +2518,7 @@ function ownerGlobalSearch(query){
   host.classList.remove('hidden');
 }
 function ownerGlobalCameraSearch(value){
-  const q=String(value??document.getElementById('ownerGlobalSearchInput')?.value||'').trim();
+  const q=String(value ?? (document.getElementById('ownerGlobalSearchInput')?.value || '')).trim();
   window.location.href='./camera-health.html'+(q?'?q='+encodeURIComponent(q):'');
 }
 function ownerAppReview(){
