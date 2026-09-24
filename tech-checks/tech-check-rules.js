@@ -437,10 +437,9 @@
       requirements.push({category:'solar_stand',kind:'signature',minimum:1,label:'Solar Stand verification signature'});
     }
     requirements.push({category:'batteries',kind:'photo',minimum:1,label:'Battery proof photo'});
-    requirements.push({category:'batteries',kind:'signature',minimum:1,label:'Battery verification signature'});
-    requirements.push({category:'mppt',kind:'photo',minimum:1,label:'MPPT / charging readings photo'});
+    if(!ctx.has_helios)requirements.push({category:'batteries',kind:'signature',minimum:1,label:'Battery verification signature'});
+    requirements.push({category:'mppt',kind:'photo',minimum:1,label:ctx.has_helios?'MPPT screenshot / charging photo':'MPPT / charging readings photo'});
     if(ctx.has_helios){
-      requirements.push({category:'helios_cerbo_mppt',kind:'photo',minimum:1,label:'Helios Cerbo / MPPT proof photo'});
       requirements.push({category:'helios_yard',kind:'photo',minimum:1,label:'Helios yard-test photo'});
       requirements.push({category:'helios_yard',kind:'signature',minimum:1,label:'Helios yard-test signature'});
     }
@@ -469,7 +468,7 @@
   }
 
   const api=Object.freeze({
-    version:'rules-v8',
+    version:'rules-v9',
     equipment:EQUIPMENT,
     equipmentAliases:ALIASES,
     deviceTypes:DEVICE_TYPES,
