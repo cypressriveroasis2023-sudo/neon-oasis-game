@@ -8150,3 +8150,57 @@ html,body{max-width:100%;overflow-x:hidden}
   .ownerTestLoginChoices{grid-template-columns:1fr}
   .ownerTestLoginChoices button{min-height:58px}
 }
+
+/* Owner Test Mode · no-login role preview v9 */
+body.owner-test-role-preview .mainRoleTabs{display:none!important}
+body.owner-test-role-preview .accountActions button.danger[onclick="logout()"]{display:none!important}
+body.owner-test-role-preview #ownerTestAuthBanner{display:none!important}
+body.owner-test-role-preview .ownerTestAppBanner{
+  border-color:#f13a41;
+  background:#220f13;
+  box-shadow:0 8px 26px rgba(0,0,0,.4);
+}
+body.owner-test-role-preview .ownerTestAppBanner>div:first-child span{
+  color:#d7bfc1;
+}
+body.owner-test-role-preview .ownerTestBannerActions button{
+  min-height:38px;
+}
+body.owner-test-role-preview .ownerTestBannerActions button.primary{
+  background:#e91b24;
+  border-color:#ff464d;
+}
+@media(max-width:900px){
+  body.owner-test-role-preview .mobileTop{
+    display:block!important;
+  }
+  body.owner-test-role-preview .ownerTestAppBanner{
+    position:sticky!important;
+    top:0!important;
+    z-index:12000!important;
+    margin:0!important;
+    border-left:0!important;
+    border-right:0!important;
+    border-radius:0!important;
+    padding:8px 10px!important;
+    gap:7px!important;
+  }
+  body.owner-test-role-preview .ownerTestAppBanner>div:first-child span{
+    display:none!important;
+  }
+  body.owner-test-role-preview .ownerTestBannerActions{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:5px!important;
+  }
+  body.owner-test-role-preview .ownerTestBannerActions button{
+    min-height:42px!important;
+    padding:0 6px!important;
+    font-size:10px!important;
+  }
+  body.owner-test-role-preview .ownerTestBannerActions .primary{
+    grid-column:auto!important;
+  }
+  body.owner-test-role-preview .ownerTestBannerActions .danger{
+    display:none!important;
+  }
+}
