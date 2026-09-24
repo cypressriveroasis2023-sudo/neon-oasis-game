@@ -1940,7 +1940,7 @@ function ownerAppJobRow(a){
     +'<div class="ownerTodayJobMain"><div class="ownerTodayTicket"><span>MHELPDESK</span><b>#'+esc(a.ticket_no||'—')+'</b></div><div class="ownerTodaySite"><b>'+esc(a.site||'Customer / site not recorded')+'</b><span>'+esc(a.job_description||'No job description recorded')+'</span></div></div>'
     +'<div class="ownerTodayMeta"><span class="ownerTodayType">'+esc(type)+'</span><span class="ownerTodayRole '+role.toLowerCase()+'">'+role+'</span></div>'
     +'<div class="ownerTodayOwner"><b>'+esc(who)+'</b><span>'+esc(a.status==='started'?'Working now':a.status==='completed'?'Work complete':'Waiting to start')+'</span></div>'
-    +'<div class="ownerTodayState"><span class="'+(a.status==='started'?'working':a.status==='completed'?'complete':'waiting')+'">'+status+'</span></div></article>';
+    +'<div class="ownerTodayState"><span class="'+(a.status==='started'?'working':a.status==='completed'?'complete':'waiting')+'">'+status+'</span><button type="button" class="ownerInlineControl" onclick="ownerOpenTicketControlByNumber(\''+esc(a.ticket_no||'')+'\')">OWNER CONTROL</button></div></article>';
 }
 
 let ownerCalendarDate=new Date(), ownerCalendarMode='month', ownerCalendarSelected=null, ownerCalendarRoleFilter='all';
@@ -2139,6 +2139,7 @@ function ownerCalendarInspector(){
   if(!job)return '<section class="ownerCalInspector"><div class="ownerCalRailEmpty"><b>No job selected</b><span>Select a job from the selected day to see and edit the full Tech Check ticket.</span></div></section>';
   const who=job.assignee_name||job.assigned_to_name||(job.assignment_scope==='department'?'Department Queue':'Unassigned');
   return '<section class="ownerCalInspector"><div class="ownerCalInspectorHead"><div><small>OWNER TICKET CONTROL</small><h3>MHelpDesk #'+esc(job.ticket_no||'—')+'</h3><span>'+esc(job.site||'Customer / Site')+'</span></div><strong>'+esc(ownerCalendarStatusLabel(job))+'</strong></div>'
+    +'<button class="ownerCalendarBigControl" type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(job.ticket_no||'')+'\')">OPEN SIMPLE OWNER CONTROL →</button>'
     +'<div class="ownerCalInspectorSection"><small>FULL OWNER OVERRIDE</small><p>You can change this assignment directly. Every override is recorded in History.</p></div>'
     +'<label>Customer / Site<input id="ownerCalEditSite" value="'+esc(job.site||'')+'"></label>'
     +'<label>Job Description<textarea id="ownerCalEditDescription" rows="5">'+esc(job.job_description||'')+'</textarea></label>'
@@ -2563,6 +2564,10 @@ function ownerOpenTicketControlByNumber(ticketNo){
     +'<button type="button" onclick="ownerControlHistory(\''+esc(ticket)+'\')"><b>VIEW HISTORY</b><span>See what changed and who did it</span></button>'
     +'<button type="button" onclick="ownerControlTest(\''+esc(ticket)+'\',\'it\')"><b>TEST AS IT</b><span>Open the IT side without changing permissions</span></button>'
     +'<button type="button" onclick="ownerControlTest(\''+esc(ticket)+'\',\'service\')"><b>TEST AS SERVICE</b><span>Open the Service side without changing permissions</span></button>'
+    +'<button class="warnAction" type="button" onclick="ownerControlReturn(\''+esc(ticket)+'\',\'it\')"><b>SEND BACK TO IT</b><span>Reopen work for IT correction or testing</span></button>'
+    +'<button class="warnAction" type="button" onclick="ownerControlReturn(\''+esc(ticket)+'\',\'service\')"><b>SEND BACK TO SERVICE</b><span>Reopen work for Service correction or testing</span></button>'
+    +'<button class="closeAction" type="button" onclick="ownerControlClose(\''+esc(ticket)+'\')"><b>CLOSE TECH CHECK</b><span>Final Owner closeout when workflow is ready</span></button>'
+    +'<button class="reopenAction" type="button" onclick="ownerControlReopen(\''+esc(ticket)+'\')"><b>REOPEN TECH CHECK</b><span>Reopen an Owner-closed Tech Check ticket</span></button>'
     +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
   overlay.classList.add('open');
 }
@@ -2571,7 +2576,46 @@ async function ownerControlEditTicket(ticket){ownerCloseSimpleControl();ownerCal
 async function ownerControlAssignTicket(ticket){ownerCloseSimpleControl();const a=(state.ownerAssignments||[]).find(x=>String(x.ticket_no||'')===String(ticket));if(a){ownerCalendarSelected=String(a.scheduled_for||ownerCalendarSelected);ownerCalendarSelectedJobId=String(a.id||'');}await ownerAppNavigate('calendar');}
 async function ownerControlEquipment(ticket){ownerCloseSimpleControl();await ownerAppNavigate('handoffs');requestAnimationFrame(()=>{const row=[...document.querySelectorAll('.ownerAppHandoffRow')].find(x=>x.textContent.includes('#'+ticket));row?.scrollIntoView({behavior:'smooth',block:'center'});});}
 async function ownerControlHistory(ticket){ownerCloseSimpleControl();await ownerAppNavigate('history');const kind=document.getElementById('ownerAppHistoryKind'),q=document.getElementById('ownerAppHistoryQuery');if(kind)kind.value='site';if(q)q.value=ticket;const h=document.getElementById('ownerAppHistoryResults');if(h)h.innerHTML='<div class="ownerAppEmpty"><b>Use MHelpDesk #'+esc(ticket)+'</b><span>Ticket events are also visible in Activity.</span></div>';}
-function ownerControlTest(ticket,role){ownerCloseSimpleControl();alert('OWNER TEST MODE · '+String(role).toUpperCase()+'\n\nMHelpDesk #'+ticket+'\n\nThis control is Owner-only. It does not grant technician permissions or change ticket ownership.');}
+async function ownerControlClose(ticket){
+  ownerCloseSimpleControl();
+  await ownerCloseJob(ticket);
+}
+async function ownerControlReopen(ticket){
+  const reason=prompt('Why are you reopening this Tech Check ticket?','Owner testing / correction');
+  if(reason===null)return;
+  if(!String(reason).trim())return alert('Enter a reason for reopening the ticket.');
+  setBusy(true);
+  const {data,error}=await db.rpc('owner_reopen_job_v1',{p_ticket_no:String(ticket),p_reason:String(reason).trim()});
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData();
+  alert(data?.reopened===false?(data?.message||'Ticket is already open in Tech Check.'):'Tech Check ticket reopened. MHelpDesk was not changed.');
+}
+async function ownerControlReturn(ticket,role){
+  ownerCloseSimpleControl();
+  const reason=prompt('What do you want '+String(role).toUpperCase()+' to correct or retest?','Owner testing / workflow check');
+  if(reason===null)return;
+  if(!String(reason).trim())return alert('Enter what needs to be corrected or retested.');
+  setBusy(true);
+  const {error}=await db.rpc('owner_return_job_for_correction_v1',{p_ticket_no:String(ticket),p_reason:String(reason).trim(),p_role:String(role)});
+  setBusy(false);
+  if(error)return alert(error.message);
+  await refreshData();
+  alert('Ticket sent back to '+String(role).toUpperCase()+' for correction/retest. Existing history was preserved.');
+}
+function ownerControlTest(ticket,role){
+  ownerCloseSimpleControl();
+  const target=role==='it'?'it':'svc';
+  show(target);
+  setTimeout(()=>{
+    const selector=role==='it'?'#view-it [data-wl-it-open-job]':'#view-svc [data-wl-service-open-job]';
+    document.querySelector(selector)?.click();
+    setTimeout(()=>{
+      const input=document.getElementById(role==='it'?'wlITJobSearch':'wlServiceJobSearch');
+      if(input){input.value=String(ticket);input.focus();}
+    },180);
+  },180);
+}
 
 function ownerAppHistory(){
   return ownerAppHeader('PERMANENT RECORD','History','Search permanent Technician, Unit, Customer / Site, or MHelpDesk history.')
@@ -3135,6 +3179,16 @@ Object.assign(window, {
   ownerAppFilterUnits,
   ownerAppShowTechHistory,
   ownerAppCreateTech,
+  ownerOpenTicketControlByNumber,
+  ownerCloseSimpleControl,
+  ownerControlEditTicket,
+  ownerControlAssignTicket,
+  ownerControlEquipment,
+  ownerControlHistory,
+  ownerControlTest,
+  ownerControlClose,
+  ownerControlReopen,
+  ownerControlReturn,
   ownerJump,
   ownerOpenReturn,
   setOwnerDailyDate,
