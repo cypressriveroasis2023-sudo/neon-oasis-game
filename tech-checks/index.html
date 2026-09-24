@@ -509,7 +509,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=owner-test-persona-20260923bg"></script>
+    <script type="module" src="./app.js?v=service-verify-20260924a"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -520,7 +520,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-test-persona-20260923bg');
+            const registration = await navigator.serviceWorker.register('./sw.js?v=service-verify-20260924a');
             registration.update().catch(() => {});
           } catch (error) {
             console.warn('Tech Check service worker unavailable', error);
