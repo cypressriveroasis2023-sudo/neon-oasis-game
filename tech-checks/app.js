@@ -2746,6 +2746,27 @@ function ownerAppActivity(){
   return ownerAppHeader('COMPANY LOG','Activity','Chronological Tech Check activity from recorded production events.')
     +(rows.length?rows.slice(0,100).map(r=>'<div class="ownerAppActivityRow"><div><b>'+esc(ownerWorkflowDisplayText(r.kind))+'</b><span>'+new Date(r.created_at).toLocaleString()+'</span></div><p>'+esc(ownerWorkflowDisplayText(r.text))+'</p></div>').join(''):ownerAppEmpty('NO ACTIVITY RECORDED'));
 }
+function ownerAppMore(){
+  const activeTechs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service')).length;
+  const activeUnits=(state.unitRegistry||[]).length;
+  const handoffs=(state.preps||[]).filter(p=>p.status!=='closed').length;
+  const review=(state.ownerReviewQueue||[]).filter(r=>r.review_status!=='closed').length;
+  return ownerAppHeader('OWNER TOOLS','More','Everything else you need, in one simple place.')
+    +'<section class="ownerMoreSummary"><div><b>'+activeTechs+'</b><span>TECHNICIANS</span></div><div><b>'+activeUnits+'</b><span>UNITS</span></div><div><b>'+handoffs+'</b><span>HANDOFFS</span></div><div><b>'+review+'</b><span>OWNER REVIEW</span></div></section>'
+    +'<section class="ownerMoreGrid">'
+    +'<button type="button" data-owner-route="team"><b>TEAM</b><span>See Teddy, Victor, Abel, Josh and their current work.</span></button>'
+    +'<button type="button" data-owner-route="units"><b>UNITS</b><span>Find equipment and open Owner Unit Control.</span></button>'
+    +'<button type="button" data-owner-route="handoffs"><b>HANDOFFS</b><span>IT → Service, returns, intake and corrections.</span></button>'
+    +'<button type="button" data-owner-route="review"><b>OWNER REVIEW</b><span>Close, reopen or return completed Tech Check work.</span></button>'
+    +'<button type="button" data-owner-route="history"><b>HISTORY</b><span>Search permanent technician, unit and site history.</span></button>'
+    +'<button type="button" data-owner-route="activity"><b>ACTIVITY</b><span>See the chronological Tech Check company log.</span></button>'
+    +'<button type="button" data-owner-route="accounts"><b>TECHNICIAN ACCOUNTS</b><span>Create, disable, restore and manage logins.</span></button>'
+    +'<a href="./onsite-vision.html"><b>ONSITE VISION</b><span>Open the AI command center.</span></a>'
+    +'<a href="./camera-health.html"><b>CAMERA HEALTH</b><span>Open live camera monitoring and troubleshooting.</span></a>'
+    +'<button type="button" onclick="refreshData()"><b>REFRESH APP</b><span>Reload live Tech Check data now.</span></button>'
+    +'</section>'
+    +'<section class="ownerMoreDanger"><button type="button" onclick="logout()">SIGN OUT</button></section>';
+}
 function ownerAppAccounts(){
   renderPasswordResetRequests();renderUsers();
   return ownerAppHeader('ACCESS','Technician Accounts','Create logins, change usernames, disable/reactivate access, and review disabled or former accounts.')
@@ -2803,6 +2824,7 @@ async function ownerAppRender(){
   else if(route==='history')html=ownerAppHistory();
   else if(route==='activity')html=ownerAppActivity();
   else if(route==='accounts')html=ownerAppAccounts();
+  else if(route==='more')html=ownerAppMore();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
   host.innerHTML=ownerGlobalSearchBarHtml()+html;
@@ -2822,7 +2844,7 @@ async function ownerAppRender(){
   ownerInteractionSafety();
 }
 async function ownerAppNavigate(route){
-  if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts'].includes(route))return;
+  if(!['today','calendar','attention','review','assign','team','units','handoffs','history','activity','accounts','more'].includes(route))return;
   const ws=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ws)ws.scrollLeft=0;
   ownerAppRoute=route;
