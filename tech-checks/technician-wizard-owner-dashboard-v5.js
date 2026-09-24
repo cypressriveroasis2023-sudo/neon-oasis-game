@@ -7346,7 +7346,7 @@ document.addEventListener('click', async e => {
     if(extraField && !await saveServiceSolarProgressField(extraField,extraValue))return;
     const field=solarStepAnswer.dataset.field;
     if(!await saveServiceSolarProgressField(field,'true'))return;
-    if(field==='mppt_tested_ok'){
+    if(field==='mppt_tested_ok' && serviceSolarHeliosCount()>0){
       if(!await saveServiceSolarProgressField('mppt_updated_ok','true'))return;
       if(!await saveServiceSolarProgressField('helios_yard_updates_status_ok','true'))return;
     }
