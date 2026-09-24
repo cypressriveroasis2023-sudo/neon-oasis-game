@@ -2489,6 +2489,38 @@ function ownerAppToday(){
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
 }
+
+function ownerGlobalSearchBarHtml(){
+  return '<section class="ownerGlobalSearchBar"><div class="ownerGlobalSearchTop"><div><small>OWNER QUICK FIND</small><b>Find anything</b></div><button type="button" onclick="ownerGlobalCameraSearch()">CAMERA HEALTH</button></div><div class="ownerGlobalSearchInputWrap"><input id="ownerGlobalSearchInput" type="search" autocomplete="off" placeholder="Ticket #, unit, technician, customer/site, or IP…" oninput="ownerGlobalSearch(this.value)"><button type="button" onclick="ownerGlobalSearch(document.getElementById(\'ownerGlobalSearchInput\')?.value||\'\')">SEARCH</button></div><div id="ownerGlobalSearchResults" class="ownerGlobalSearchResults hidden"></div></section>';
+}
+function ownerGlobalTicketRows(){
+  const map=new Map();
+  const take=(row={})=>{const t=String(row.ticket_no||'').trim();if(!t)return;const prev=map.get(t)||{};map.set(t,{ticket_no:t,site:row.site||prev.site||'',job_description:row.job_description||prev.job_description||'',status:row.status||row.review_status||prev.status||'',assignee_name:row.assignee_name||row.job_lead_name||prev.assignee_name||''});};
+  (state.ownerAssignments||[]).forEach(take);(state.preps||[]).forEach(take);(state.ownerReviewQueue||[]).forEach(take);(state.ownerReturns||[]).forEach(take);(state.ownerFieldEscalations||[]).forEach(take);
+  return [...map.values()];
+}
+function ownerGlobalSearch(query){
+  const q=String(query||'').trim().toLowerCase();
+  const host=document.getElementById('ownerGlobalSearchResults');if(!host)return;
+  if(q.length<2){host.classList.add('hidden');host.innerHTML='';return;}
+  const tickets=ownerGlobalTicketRows().filter(r=>[r.ticket_no,r.site,r.job_description,r.assignee_name,r.status].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,7);
+  const unitMap=new Map();
+  (state.unitRegistry||[]).forEach(r=>{const k=String(r.unit_tag||'').trim();if(k)unitMap.set(k,{...r});});
+  (state.assetInventory||[]).forEach(r=>{const k=String(r.unit_tag||r.unit_key||'').trim();if(k&&!unitMap.has(k))unitMap.set(k,{unit_tag:k,equipment_type:r.asset_type||r.asset_category,current_holder_name:r.assigned_to_name,current_site:r.availability_status,last_event:'Master Equipment Inventory'});});
+  const units=[...unitMap.values()].filter(r=>[r.unit_tag,r.equipment_type,r.current_holder_name,r.current_site,r.ticket_no,r.last_event].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,7);
+  const techs=(state.profiles||[]).filter(p=>p.active&&!p.archived_at&&(p.role==='it'||p.role==='service')&&[p.full_name,p.username,p.role].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,7);
+  let html='';
+  if(tickets.length)html+='<div class="ownerGlobalSearchGroup"><span>TICKETS</span>'+tickets.map(r=>'<button type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(r.ticket_no)+'\')"><b>MHelpDesk #'+esc(r.ticket_no)+'</b><small>'+esc(r.site||'Site not recorded')+(r.assignee_name?' · '+esc(r.assignee_name):'')+'</small></button>').join('')+'</div>';
+  if(units.length)html+='<div class="ownerGlobalSearchGroup"><span>UNITS / EQUIPMENT</span>'+units.map(r=>'<button type="button" onclick="ownerOpenUnitControl(\''+esc(r.unit_tag||'')+'\')"><b>'+esc(r.equipment_type||'Unit')+' · '+esc(r.unit_tag||'—')+'</b><small>'+esc(r.current_holder_name||r.current_site||'Inventory')+'</small></button>').join('')+'</div>';
+  if(techs.length)html+='<div class="ownerGlobalSearchGroup"><span>TECHNICIANS</span>'+techs.map(p=>'<button type="button" onclick="ownerOpenTechControl(\''+esc(p.user_id)+'\')"><b>'+esc(p.full_name||p.username||'Technician')+'</b><small>'+esc(p.role==='it'?'IT Technician':'Service Technician')+'</small></button>').join('')+'</div>';
+  html+='<button class="ownerGlobalCameraResult" type="button" onclick="ownerGlobalCameraSearch(\''+esc(String(query||''))+'\')"><b>SEARCH CAMERA HEALTH</b><small>Look for “'+esc(String(query||''))+'” in cameras, IPs, sites and monitoring inventory →</small></button>';
+  host.innerHTML=html||'<div class="ownerGlobalNoResults">No Tech Check match found. Search Camera Health for cameras / IP addresses.</div>';
+  host.classList.remove('hidden');
+}
+function ownerGlobalCameraSearch(value){
+  const q=String(value??document.getElementById('ownerGlobalSearchInput')?.value||'').trim();
+  window.location.href='./camera-health.html'+(q?'?q='+encodeURIComponent(q):'');
+}
 function ownerAppReview(){
   const rows=state.ownerReviewQueue||[];
   const ready=rows.filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed');
@@ -2496,9 +2528,9 @@ function ownerAppReview(){
   const rowHtml=r=>{
     const ticket=esc(r.ticket_no||''),site=esc(r.site||'Site not recorded');
     if(r.review_status==='correction_requested'&&r.ready_for_owner_review!==true){
-      return '<article class="ownerAppReviewRow correction"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>RETURNED FOR CORRECTION</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewNote"><b>'+esc(String(r.correction_role||'service').toUpperCase())+' correction active</b><span>'+esc(r.correction_reason||'Owner correction requested')+'</span></div></article>';
+      return '<article class="ownerAppReviewRow correction"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>RETURNED FOR CORRECTION</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewNote"><b>'+esc(String(r.correction_role||'service').toUpperCase())+' correction active</b><span>'+esc(r.correction_reason||'Owner correction requested')+'</span></div><button class="ownerReviewControlButton" type="button" onclick="ownerOpenTicketControlByNumber(\''+ticket+'\')">OWNER CONTROL →</button></article>';
     }
-    return '<article class="ownerAppReviewRow ready"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>READY FOR OWNER REVIEW</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewActions"><button class="btn" type="button" onclick="ownerCloseJob(\''+ticket+'\')">Close Job</button><button class="mini danger" type="button" onclick="ownerReturnJobForCorrection(\''+ticket+'\')">Return for Correction</button></div><p>Closing here finalizes Tech Check only. MHelpDesk remains separate.</p></article>';
+    return '<article class="ownerAppReviewRow ready"><header><div><small>MHELPDESK</small><b>#'+ticket+' · '+site+'</b></div><strong>READY FOR OWNER REVIEW</strong></header>'+ownerReviewOverviewHtml(r)+'<div class="ownerAppReviewActions"><button class="btn" type="button" onclick="ownerCloseJob(\''+ticket+'\')">Close Job</button><button class="mini danger" type="button" onclick="ownerReturnJobForCorrection(\''+ticket+'\')">Return for Correction</button><button class="ownerReviewControlButton" type="button" onclick="ownerOpenTicketControlByNumber(\''+ticket+'\')">OWNER CONTROL →</button></div><p>Closing here finalizes Tech Check only. MHelpDesk remains separate.</p></article>';
   };
   let body='';
   if(ready.length)body+='<section class="ownerAppGroup"><h2>Ready for your review <span>'+ready.length+'</span></h2>'+ready.map(rowHtml).join('')+'</section>';
@@ -2773,7 +2805,7 @@ async function ownerAppRender(){
   else if(route==='accounts')html=ownerAppAccounts();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
-  host.innerHTML=html;
+  host.innerHTML=ownerGlobalSearchBarHtml()+html;
   ownerSetPersistentSurface(route);
   const ownerWs=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ownerWs){
@@ -3260,6 +3292,8 @@ Object.assign(window, {
   ownerControlClose,
   ownerControlReopen,
   ownerControlReturn,
+  ownerGlobalSearch,
+  ownerGlobalCameraSearch,
   ownerOpenUnitControl,
   ownerUnitHistory,
   ownerUnitCameraHealth,
