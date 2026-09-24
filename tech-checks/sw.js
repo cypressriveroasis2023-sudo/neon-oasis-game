@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-menu-layer-20260924e';
+const CACHE_NAME = 'tech-check-helios-simple-proof-20260924f';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -9,9 +9,9 @@ self.addEventListener('install', event => {
     await cache.add(new Request(APP_SHELL, { cache:'reload' }));
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
-      cache.add(new Request('./tech-check-rules.js?v=rules-v10', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=menu-layer-20260924e', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=menu-layer-20260924e', { cache:'reload' })),
+      cache.add(new Request('./tech-check-rules.js?v=helios-simple-proof-20260924f', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=helios-simple-proof-20260924f', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=helios-simple-proof-20260924f', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=owner-test-persona-20260923bg', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v33', { cache:'reload' })),
