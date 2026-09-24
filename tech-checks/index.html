@@ -508,8 +508,8 @@
       </div>
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
-    <script src="./tech-check-rules.js?v=helios-back-nav-20260924m"></script>
-    <script type="module" src="./app.js?v=helios-back-nav-20260924m"></script>
+    <script src="./tech-check-rules.js?v=service-photo-library-20260924n"></script>
+    <script type="module" src="./app.js?v=service-photo-library-20260924n"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -520,7 +520,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=helios-back-nav-20260924m');
+            const registration = await navigator.serviceWorker.register('./sw.js?v=service-photo-library-20260924n');
             registration.update().catch(() => {});
           } catch (error) {
             console.warn('Tech Check service worker unavailable', error);
