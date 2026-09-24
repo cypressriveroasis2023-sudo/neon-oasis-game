@@ -6744,7 +6744,7 @@ async function renderSvcPrep() {
   if(!base||!card)return alert('Could not open the matched equipment.');
   const forms=svcForms(card),wizard=svcWizardCard(),partsTotal=ticketPartsTotal(activeSvcPrep),hasParts=partsTotal>0;
   const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
-  const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null,solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[],solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
+  let solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null; const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[]; const solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
   const swapState=await swapWorkflowState(activeSvcPrep);
   const allSwaps=swapState.swaps,nonHeliosSwaps=allSwaps.filter(i=>i.equipment_type!=='Helios'),heliosHandoff=heliosHandoffItems(activeSvcPrep),heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep);
   const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
