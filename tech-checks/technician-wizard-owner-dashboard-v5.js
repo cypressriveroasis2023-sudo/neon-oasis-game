@@ -1094,7 +1094,25 @@ function injectStyles() {
       #view-svc .wl-solar-sign-actions{grid-template-columns:.8fr 1.45fr}
     }
   `;
-  document.head.appendChild(s);
+  s.textContent += `
+    #view-svc .wl-svc-ticket-brief{background:#071117!important;border:1px solid #29404c!important;color:#fff!important;box-shadow:none!important}
+    #view-svc .wl-svc-summary-kicker{font-size:13px;font-weight:1000;letter-spacing:.12em;color:#ff4b52;margin-bottom:12px}
+    #view-svc .wl-svc-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    #view-svc .wl-svc-summary-grid>div{background:#0d1c24;border:1px solid #2c4350;border-radius:11px;padding:10px 11px;min-width:0}
+    #view-svc .wl-svc-summary-grid span,#view-svc .wl-svc-summary-label{display:block;color:#8fa3ae;font-size:9px;font-weight:1000;letter-spacing:.11em;text-transform:uppercase}
+    #view-svc .wl-svc-summary-grid b{display:block;margin-top:4px;color:#fff;font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+    #view-svc .wl-svc-summary-label{margin:14px 0 7px;color:#ff4b52}
+    #view-svc .wl-svc-summary-equipment-list{display:grid;gap:7px}
+    #view-svc .wl-svc-summary-equipment{border:1px solid #304955;border-radius:11px;background:#0b1820;padding:11px 12px}
+    #view-svc .wl-svc-summary-equipment b{display:block;color:#fff;font-size:16px}
+    #view-svc .wl-svc-summary-equipment span{display:block;margin-top:4px;color:#b4c2c9;font-size:12px;font-weight:800}
+    #view-svc .wl-svc-summary-extra{margin-top:8px;color:#b8c5cb;font-size:12px}
+    #view-svc .wl-svc-summary-question{margin-top:18px!important}
+    #view-svc .wl-svc-question-note{margin:-8px 0 12px;padding:9px 11px;border:1px solid #344d59;border-radius:10px;background:#0a171e;color:#b8c7ce;font-size:12px;font-weight:800}
+    #view-svc .wl-svc-restart-questions{width:100%;min-height:48px;margin-top:12px;border:1px solid #425a66;border-radius:999px;background:#0d1c24;color:#cdd8dd;font-size:12px;font-weight:1000;letter-spacing:.05em}
+    @media(max-width:520px){#view-svc .wl-svc-summary-grid{grid-template-columns:1fr}}
+  `;
+    document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
   const ticketRef = activeItPrep?.ticket_no && isIT() ? `<div class='small' style='margin-top:6px;font-weight:850'>MHelpDesk Ticket #${esc(activeItPrep.ticket_no)}</div>` : '';
@@ -5905,12 +5923,83 @@ async function showSvcTicketConfirmation() {
     : '';
   hideChildren(viewSvc(), [wizard]);
   base.style.display = 'none';
-  const equipmentSummary = equipmentManifestText(activeSvcPrep.equipment_manifest || []) || (types.length ? types.map(equipmentDisplayLabel).join(' · ') : (forms.length + ' equipment item' + (forms.length===1?'':'s')));
-  const workRows = ticketPartsRows(activeSvcPrep).filter(row => row.qty > 0);
-  const workSummary = workRows.map(row => row.qty + ' × ' + row.label).join(' · ');
+  if(!activeSvcAssignment || norm(activeSvcAssignment.ticket_no)!==norm(activeSvcPrep.ticket_no)){
+    const {data:assignmentRows}=await liveDb.from('job_assignments')
+      .select('*')
+      .eq('ticket_no',activeSvcPrep.ticket_no)
+      .eq('assigned_role','service')
+      .order('assigned_at',{ascending:false})
+      .limit(1);
+    if(assignmentRows?.[0])activeSvcAssignment=assignmentRows[0];
+  }
+  const assignment=activeSvcAssignment||{};
+  const jobName=String(assignment.job_description||'').trim() || String(activeSvcPrep.site||'Service job').trim();
+  const jobDate=serviceSummaryDate(assignment.scheduled_for);
+  const jobTime=serviceSummaryTime(assignment.scheduled_time);
+  const equipmentRows=[...(activeSvcPrep.prep_items||[])].sort((a,b)=>Number(a.item_order||0)-Number(b.item_order||0)).map(item=>{
+    const type=equipmentDisplayLabel(item.equipment_type||'Equipment');
+    const unit=String(item.unit_tag||'').trim();
+    const preparedBatteries=Math.max(0,Number(item.battery_count||0));
+    const batteryText=item.equipment_type==='Helios'
+      ? (preparedBatteries||1)+' Helios battery box'+((preparedBatteries||1)===1?'':'es')
+      : preparedBatteries>0 ? preparedBatteries+' prepared batter'+(preparedBatteries===1?'y':'ies') : '';
+    return `<div class='wl-svc-summary-equipment'><b>${esc(type)}${unit?' · Unit '+esc(unit):''}</b>${batteryText?`<span>${esc(batteryText)}</span>`:''}</div>`;
+  }).join('') || `<div class='wl-svc-summary-equipment'><b>${esc(equipmentManifestText(activeSvcPrep.equipment_manifest||[])||'Equipment not listed')}</b></div>`;
   const spareQty = spareUnits.length + spareBatteries.reduce((sum,row) => sum + Math.max(0,Number(row.qty_prepared || 0)),0);
-  wizard.innerHTML = progress('Verify Ticket', 'Is this the right MHelpDesk ticket?', 2, 6) + `<div class='wl-question wl-svc-ticket-brief' style='background:#071117!important;border:1px solid #29404c!important;color:#fff!important;box-shadow:none!important'><div style='font-size:12px;font-weight:950;letter-spacing:.08em;color:#ff4b52'>MHELPDESK</div><div style='font-size:28px;font-weight:1000;line-height:1.08;margin-top:3px'>#${esc(activeSvcPrep.ticket_no)}</div><div style='font-size:19px;font-weight:900;line-height:1.2;margin-top:12px'>${esc(activeSvcPrep.site || 'Site not entered')}</div><div style='margin-top:12px;color:#d7e1e6;font-weight:800'><b style='color:#fff'>Equipment:</b> ${esc(equipmentSummary)}</div>${workSummary ? `<div style='margin-top:7px;color:#d7e1e6;font-weight:800'><b style='color:#fff'>Work:</b> ${esc(workSummary)}</div>` : ''}${spareQty ? `<div style='margin-top:7px;color:#d7e1e6;font-weight:800'><b style='color:#fff'>Truck spares:</b> ${spareQty}</div>` : ''}<div class='qtext' style='color:#fff!important;margin-top:20px!important;margin-bottom:14px!important'>Is this the right ticket?</div><div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG</button><button class='pass' data-wl-svc-ticket='match'>YES — CONTINUE</button></div></div>`;
+  wizard.innerHTML = progress('Verify Ticket', 'Check the job before you start', 1, 1) + `<div class='wl-question wl-svc-ticket-brief'>
+    <div class='wl-svc-summary-kicker'>MHELPDESK #${esc(activeSvcPrep.ticket_no)}</div>
+    <div class='wl-svc-summary-grid'>
+      <div><span>JOB</span><b>${esc(jobName)}</b></div>
+      <div><span>DATE</span><b>${esc(jobDate)}</b></div>
+      <div><span>TIME</span><b>${esc(jobTime)}</b></div>
+      <div><span>SITE</span><b>${esc(assignment.site||activeSvcPrep.site||'Site not entered')}</b></div>
+    </div>
+    <div class='wl-svc-summary-label'>EQUIPMENT</div>
+    <div class='wl-svc-summary-equipment-list'>${equipmentRows}</div>
+    ${spareQty?`<div class='wl-svc-summary-extra'>Truck spares: <b>${spareQty}</b></div>`:''}
+    <div class='qtext wl-svc-summary-question'>Is this the right ticket?</div>
+    <div class='wl-options'><button class='fail' data-wl-svc-ticket='wrong'>NO — WRONG</button><button class='pass' data-wl-svc-ticket='match'>YES — CONTINUE</button></div>
+    ${serviceRestartButtonHtml()}
+  </div>`;
   resetWizardPosition();
+}
+function serviceSummaryDate(value){
+  if(!value)return 'Date not set';
+  const raw=String(value).slice(0,10);
+  const d=new Date(raw+'T12:00:00');
+  return Number.isNaN(d.getTime())?raw:new Intl.DateTimeFormat(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}).format(d);
+}
+function serviceSummaryTime(value){
+  if(!value)return 'Time not set';
+  const parts=String(value).split(':');
+  const h=Number(parts[0]),m=Number(parts[1]||0);
+  if(!Number.isFinite(h)||!Number.isFinite(m))return String(value);
+  const d=new Date(2000,0,1,h,m,0);
+  return new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'}).format(d);
+}
+function serviceRestartButtonHtml(){
+  return "<button class='wl-svc-restart-questions' data-wl-svc-restart-questions>START QUESTIONS OVER</button>";
+}
+async function restartServiceVerificationQuestions(){
+  if(!activeSvcPrep?.id)return;
+  const ok=confirm('Start the Service questions over?\n\nYour saved photos and signatures will stay. Your unit checks, battery counts, parts confirmation, and yes/no answers will reset.');
+  if(!ok)return;
+  document.body.classList.add('busy');
+  try{
+    const {error}=await liveDb.rpc('restart_service_verification_questions_v1',{p_prep_id:activeSvcPrep.id});
+    if(error)throw error;
+    activeSvcPrep=await getPrep(activeSvcPrep.id);
+    const card=findSvcCard(activeSvcPrep.ticket_no);
+    card?.querySelectorAll("input[id^='exact_'],input[id^='sbattok_']").forEach(input=>{input.checked=false;delete input.dataset.wlAnswered;});
+    card?.querySelectorAll("input[id^='sbatt_']").forEach(input=>{input.value='';});
+    svcUnitIndex=0;
+    svcQuestionIndex=0;
+    return renderSvcPrep();
+  }catch(error){
+    return alert(error?.message||'Could not restart the Service questions.');
+  }finally{
+    document.body.classList.remove('busy');
+  }
 }
 function findSvcCard(ticket) { return [...document.querySelectorAll('#matchedPreps > .item.prepared')].find(c => c.textContent.includes(`MHelpDesk Ticket #${ticket}`)); }
 function svcForms(card) { return [...card.querySelectorAll('.unitConfirm')]; }
@@ -6090,12 +6179,6 @@ function serviceSolarAnswerTasks(ctx,check) {
       'MPPT CHECK',
       'Does the Victron MPPT show the configuration is current and the MPPT is healthy?',
       Boolean(check?.mppt_updated_ok&&check?.mppt_tested_ok&&check?.helios_yard_updates_status_ok)
-    );
-    addBool(
-      'helios_battery_box_charging_ok',
-      'BATTERY CHECK',
-      'Is the internal Helios battery box present and charged?',
-      Boolean(check?.helios_battery_box_charging_ok&&(!heliosOnly||check?.batteries_charged_ok))
     );
     addBool(
       'helios_yard_solar_charging_ok',
@@ -6341,15 +6424,48 @@ async function uploadServiceSolarEvidence(prepId,category,kind,file) {
 function svcQuestions(form) {
   const out = [];
   const exact = form.querySelector("input[id^='exact_']");
-  if (exact) { if (exact.checked && !exact.dataset.wlAnswered) exact.dataset.wlAnswered = '1'; out.push({ kind: 'bool', input: exact, label: form.querySelector('.row b')?.textContent?.trim() ? `Do you physically have ${form.querySelector('.row b').textContent.trim()}?` : 'Do you physically have this exact unit?' }); }
+  const itemId=String(exact?.id||'').replace(/^exact_/,'');
+  const item=(activeSvcPrep?.prep_items||[]).find(row=>String(row.id)===itemId)||null;
+  const type=item?.equipment_type ? equipmentDisplayLabel(item.equipment_type) : '';
+  const unit=String(item?.unit_tag||'').trim();
+  const required=Math.max(0,Number(item?.required_battery_count||0));
+  const prepared=Math.max(0,Number(item?.battery_count||0));
+  const helios=item?.equipment_type==='Helios';
+  if (exact) {
+    if (exact.checked && !exact.dataset.wlAnswered) exact.dataset.wlAnswered = '1';
+    out.push({
+      kind:'bool',
+      input:exact,
+      item:item,
+      label:item ? `Do you physically have ${type}${unit?' '+unit:''}?` : 'Do you physically have this exact unit?'
+    });
+  }
   const batt = form.querySelector("input[id^='sbatt_']");
-  if (batt) out.push({ kind: 'number', input: batt, label: 'How many batteries / battery boxes are physically in hand?' });
+  if (batt) out.push({
+    kind:'number',
+    input:batt,
+    item:item,
+    label:helios?'How many Helios battery boxes do you physically have?':'How many batteries / battery boxes are physically in hand?',
+    note:helios?`IT prepared: ${prepared||required||1} Helios battery box${(prepared||required||1)===1?'':'es'} for ${type}${unit?' '+unit:''}.`:`IT prepared: ${prepared} · Required: ${required}`
+  });
   const battOk = form.querySelector("input[id^='sbattok_']");
-  if (battOk) { if (battOk.checked && !battOk.dataset.wlAnswered) battOk.dataset.wlAnswered = '1'; out.push({ kind: 'bool', input: battOk, label: 'Did you physically count and verify the required batteries / battery box?' }); }
+  if (battOk) {
+    if (battOk.checked && !battOk.dataset.wlAnswered) battOk.dataset.wlAnswered = '1';
+    const expected=prepared||required||1;
+    out.push({
+      kind:'bool',
+      input:battOk,
+      item:item,
+      heliosBattery:helios,
+      label:helios
+        ? `Did you physically verify the ${expected} Helios battery box${expected===1?'':'es'} IT prepared ${expected===1?'is':'are'} present and charged?`
+        : 'Did you physically count and verify the required batteries / battery box?'
+    });
+  }
   return out;
 }
 function svcQuestionHtml(q, index, total) {
-  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div><input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='ENTER COUNT'></div>`;
+  if (q.kind === 'number') return `<div class='wl-question'><div class='qnum'>STEP ${index + 1} OF ${total}</div><div class='qtext'>${esc(q.label)}</div>${q.note?`<div class='wl-svc-question-note'>${esc(q.note)}</div>`:''}<input id='wlSvcCount' type='number' inputmode='numeric' min='${esc(q.input.min || '0')}' value='${esc(q.input.value || '')}' placeholder='ENTER COUNT'></div>`;
   const answered = q.input.dataset.wlAnswered === '1';
   const yes = answered && q.input.checked;
   const no = answered && !q.input.checked;
@@ -6632,12 +6748,12 @@ async function renderSvcPrep() {
   }
   if(svcUnitIndex<forms.length){
     const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Verify Parts →':solarRequired?'Solar / Helios Check →':'Compare IT Photos →';
-    wizard.innerHTML=progress(`Unit ${svcUnitIndex+1} of ${forms.length}`,q?.label||'Verify this unit',svcQuestionIndex+1,Math.max(1,questions.length))+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`;
+    wizard.innerHTML=progress(`Unit ${svcUnitIndex+1} of ${forms.length}`,q?.label||'Verify this unit',svcQuestionIndex+1,Math.max(1,questions.length))+(q?svcQuestionHtml(q,svcQuestionIndex,questions.length):`<div class='ok'><b>This unit has no additional checks.</b></div>`)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${svcQuestionIndex===questions.length-1?(svcUnitIndex===forms.length-1?afterLast:'Next Unit →'):'Next →'}</button></div>`+serviceRestartButtonHtml();
   }else if(hasParts&&svcUnitIndex===partStep){
     const confirmed=Boolean(activeSvcPrep.service_parts_confirmed);
     wizard.innerHTML=progress('Parts Handoff',`Verify parts from IT Tech ${preparedBy}`,1,1)+`<div class='wl-review'><b>Physically verify every part before accepting it.</b><div class='small'>MHelpDesk #${esc(activeSvcPrep.ticket_no)} · Prepared by IT Tech ${esc(preparedBy)}</div>${ticketPartsInlineHtml(activeSvcPrep)}</div>${confirmed?`<div class='ok'><b>✓ Parts verified.</b></div>`:`<div class='wl-question'><div class='qtext'>Do you physically have the exact quantities listed above?</div><div class='wl-options'><button class='pass' data-wl-confirm-service-parts>YES — I HAVE THEM</button><button class='fail' data-wl-service-parts-mismatch>NO — MISMATCH</button></div></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${confirmed?'':'disabled'}>${solarRequired?'Solar / Helios Check →':'Compare IT Photos →'}</button></div>`;
   }else if(solarRequired&&svcUnitIndex===solarStep){
-    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress(solarCtx?.has_helios?'Helios Yard Solar Test':'Solar Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence);wizard.querySelectorAll('canvas').forEach(wireCanvas);
+    if(serviceSolarAnswersComplete(solarCtx,solarCheck)&&!solarCheck?.completed_at){const fin=await liveDb.rpc('finalize_service_solar_progress_v1',{p_prep_id:activeSvcPrep.id});if(!fin.error)solarCheck=await loadServiceSolarCheck(activeSvcPrep.id);}wizard.innerHTML=progress(solarCtx?.has_helios?'Helios Yard Solar Test':'Solar Pre-Trip','One step at a time',1,1)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
     wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
   }else if(svcUnitIndex===photoStep){
@@ -7244,6 +7360,7 @@ document.addEventListener('click', async e => {
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
   if(takeServiceJob) return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob);
   if (e.target.closest('[data-wl-match]')) return matchSvcTicket();
+  if(e.target.closest('[data-wl-svc-restart-questions]')) return restartServiceVerificationQuestions();
   const svcTicket = e.target.closest('[data-wl-svc-ticket]');
   if (svcTicket) { if (svcTicket.dataset.wlSvcTicket === 'wrong') { activeSvcPrep = null; return showReceiveLookup(); } return renderSvcPrep(); }
   const svcAnswer = e.target.closest('[data-wl-svc-answer]');
@@ -7254,6 +7371,10 @@ document.addEventListener('click', async e => {
     const yes = svcAnswer.dataset.wlSvcAnswer === 'yes';
     q.input.checked = yes;
     q.input.dataset.wlAnswered = '1';
+    if(q.heliosBattery){
+      if(!await saveServiceSolarProgressField('helios_battery_box_charging_ok',yes?'true':'false'))return;
+      if(!await saveServiceSolarProgressField('batteries_charged_ok',yes?'true':'false'))return;
+    }
     if (yes) return advanceSvcVerification();
     return renderSvcPrep();
   }
