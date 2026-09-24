@@ -144,45 +144,31 @@
 
 <style id="owner-mobile-bottom-nav-fix-v2">
 @media (max-width:900px){
-  body.owner-mobile-active #appView>.mobileTop{display:none!important}
-  body.owner-mobile-active #view-owner{padding-bottom:84px!important}
-  body.owner-mobile-active #view-owner .ownerAppShell{display:block!important;width:100%!important;max-width:100%!important}
-  body.owner-mobile-active #view-owner .ownerAppWorkspace{margin:0!important;width:100%!important;max-width:100%!important;padding-bottom:90px!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar{position:fixed!important;z-index:10000!important;left:8px!important;right:8px!important;bottom:calc(6px + env(safe-area-inset-bottom))!important;top:auto!important;width:auto!important;max-width:none!important;height:66px!important;min-height:66px!important;overflow:hidden!important;padding:5px!important;margin:0!important;border:1px solid #294552!important;border-radius:18px!important;background:#07151e!important;box-shadow:0 -8px 28px rgba(0,0,0,.45)!important;transform:none!important}
-  body.owner-mobile-active #view-owner .ownerAppBrand,body.owner-mobile-active #view-owner .ownerAppSidebarUtility{display:none!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;overflow:hidden!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav>*{display:none!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="today"],
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav a[href*="camera-health"],
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;position:static!important;transform:none!important;min-width:0!important;width:auto!important;height:56px!important;min-height:56px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-radius:12px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.05!important;white-space:normal!important;overflow:hidden!important;background:transparent!important;color:#b9c9d2!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
-  body.owner-mobile-active #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
-  body.owner-mobile-active.cc-mobile-nav-open #view-owner .ownerAppSidebar{height:66px!important;width:auto!important;inset:auto 8px calc(6px + env(safe-area-inset-bottom)) 8px!important}
+  body:has(#view-owner:not(.hidden)) #appView>.mobileTop{display:none!important}
+  body:has(#view-owner:not(.hidden)) #view-owner{padding-bottom:84px!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppShell{display:block!important;width:100%!important;max-width:100%!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppWorkspace{margin:0!important;width:100%!important;max-width:100%!important;padding-bottom:90px!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar{position:fixed!important;z-index:10000!important;left:8px!important;right:8px!important;bottom:calc(6px + env(safe-area-inset-bottom))!important;top:auto!important;width:auto!important;max-width:none!important;height:66px!important;min-height:66px!important;overflow:hidden!important;padding:5px!important;margin:0!important;border:1px solid #294552!important;border-radius:18px!important;background:#07151e!important;box-shadow:0 -8px 28px rgba(0,0,0,.45)!important;transform:none!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppBrand,body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebarUtility{display:none!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:2px!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;overflow:hidden!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav>*{display:none!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="today"],
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav a[href*="camera-health"],
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{display:flex!important;position:static!important;transform:none!important;min-width:0!important;width:auto!important;height:56px!important;min-height:56px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-radius:12px!important;align-items:center!important;justify-content:center!important;text-align:center!important;font-size:10px!important;line-height:1.05!important;white-space:normal!important;overflow:hidden!important;background:transparent!important;color:#b9c9d2!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="today"]{order:1}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="calendar"]{order:2}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="assign"]{order:3}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="attention"]{order:4}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav a[href*="camera-health"]{order:5}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]{order:6;font-size:0!important}
+  body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="accounts"]::after{content:"More";font-size:10px!important}
+  body:has(#view-owner:not(.hidden)).cc-mobile-nav-open #view-owner .ownerAppSidebar{height:66px!important;width:auto!important;inset:auto 8px calc(6px + env(safe-area-inset-bottom)) 8px!important}
 }
 </style>
-<script>
-(function(){
- function syncOwnerMobile(){
-   var owner=document.getElementById('view-owner');
-   var on=!!owner&&!owner.classList.contains('hidden')&&window.matchMedia('(max-width:900px)').matches;
-   document.body.classList.toggle('owner-mobile-active',on);
-   if(on) document.body.classList.remove('cc-mobile-nav-open');
- }
- document.addEventListener('click',function(){setTimeout(syncOwnerMobile,0)},true);
- window.addEventListener('resize',syncOwnerMobile);
- window.addEventListener('pageshow',syncOwnerMobile);
- new MutationObserver(syncOwnerMobile).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class']});
- document.addEventListener('DOMContentLoaded',syncOwnerMobile);
-})();
-</script>
+
 </head>
   <body>
     <div id="app">
@@ -523,7 +509,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-wording-20260922a"></script>
-    <script type="module" src="./app.js?v=owner-save-handler-20260923am"></script>
+    <script type="module" src="./app.js?v=mobile-desktop-auth-20260923ap"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -534,4 +520,4 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-save-handler-20260923am
+            const registration = await navigator.serviceWorker.register('./sw.js?v=mobile-desktop-auth-20260923ap
