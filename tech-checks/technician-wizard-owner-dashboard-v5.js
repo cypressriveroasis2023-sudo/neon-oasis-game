@@ -46,7 +46,7 @@ let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
 const FIELD_DRAFT_TTL = 24 * 60 * 60 * 1000;
-async function deviceDraftKey(kind) { const { data:{ session } } = await liveDb.auth.getSession(); return session?.user?.id ? `cos-tech-field-draft-v1:${session.user.id}:${kind}` : ''; }
+async function deviceDraftKey(kind) { const tech=await currentTechIdentity().catch(()=>null); return tech?.id ? `cos-tech-field-draft-v1:${tech.id}:${kind}` : ''; }
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
 async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (!key) return null; try { const value=JSON.parse(localStorage.getItem(key)||'null'); if (!value) return null; if (Date.now()-Number(value.savedAt||0)>FIELD_DRAFT_TTL) { localStorage.removeItem(key); return null; } return value; } catch { return null; } }
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
@@ -1068,7 +1068,7 @@ async function returnPhotoHtml(paths) {
   }));
   return items.join('');
 }
-async function myReturnCounts() { const { data: { session } } = await liveDb.auth.getSession(); if (!session?.user?.id) return { waiting:0, inventory:0, replacement:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', session.user.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, replacement:rows.filter(r=>r.status==='needs_replacement').length, completed:rows.filter(r=>r.status==='completed').length }; }
+async function myReturnCounts() { const tech=await currentTechIdentity().catch(()=>null); if (!tech?.id) return { waiting:0, inventory:0, replacement:0, completed:0 }; const { data } = await liveDb.from('unit_returns').select('status').eq('service_tech_id', tech.id); const rows=data||[]; return { waiting:rows.filter(r=>r.status==='waiting_it').length, inventory:rows.filter(r=>r.status==='pending_mhelp_inventory').length, replacement:rows.filter(r=>r.status==='needs_replacement').length, completed:rows.filter(r=>r.status==='completed').length }; }
 async function releasedPrepCount() { const { data } = await liveDb.from('prep_tickets').select('id').eq('status','released'); return (data||[]).length; }
 async function myTruckSpareData() {
   const tech=await currentTechIdentity().catch(()=>null);
