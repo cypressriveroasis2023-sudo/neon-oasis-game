@@ -1046,6 +1046,54 @@ function injectStyles() {
     @keyframes wlLivePulse{0%,100%{opacity:.35}50%{opacity:1}}
     @media(max-width:700px){.wl-tech-live-status{right:8px;top:calc(env(safe-area-inset-top,0px) + 58px);font-size:9px;padding:5px 8px}}
   `;
+  s.textContent += `
+    #view-svc .wl-solar-photo-card,
+    #view-svc .wl-solar-sign-card{
+      background:#0a171e!important;border:1px solid #314a57!important;border-radius:16px!important;
+      padding:14px!important;box-shadow:none!important;color:#fff!important
+    }
+    #view-svc .wl-solar-proof-status,
+    #view-svc .wl-solar-sign-label{
+      font-size:11px!important;font-weight:1000!important;letter-spacing:.12em!important;color:#ff4b52!important;
+      margin-bottom:10px!important
+    }
+    #view-svc .wl-solar-photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 10px}
+    #view-svc .wl-solar-photo-choice{
+      min-height:70px;border:1px solid #395361;border-radius:13px;background:#11242d;color:#fff;
+      display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;font-weight:1000;cursor:pointer
+    }
+    #view-svc .wl-solar-photo-choice span{font-size:20px}
+    #view-svc .wl-solar-photo-choice b{font-size:13px;letter-spacing:.03em}
+    #view-svc .wl-solar-file-hidden{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+    #view-svc .wl-solar-selected{
+      min-height:44px;display:flex;align-items:center;padding:10px 12px;border:1px solid #2d4652;border-radius:11px;
+      background:#071117;color:#b8c7ce;font-size:13px;font-weight:800;overflow-wrap:anywhere
+    }
+    #view-svc .wl-solar-preview{
+      margin-top:10px;padding:10px;border:1px solid #35515f;border-radius:12px;background:#071117;
+      display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center
+    }
+    #view-svc .wl-solar-preview.hidden{display:none!important}
+    #view-svc .wl-solar-preview img{width:72px;height:72px;object-fit:cover;border-radius:9px;border:1px solid #3c5662}
+    #view-svc .wl-solar-preview b{display:block;color:#75d99e;font-size:11px;letter-spacing:.08em}
+    #view-svc .wl-solar-preview span{display:block;margin-top:4px;color:#d9e3e8;font-size:12px;overflow-wrap:anywhere}
+    #view-svc .wl-solar-save-photo{margin-top:12px!important;min-height:62px!important}
+    #view-svc .wl-solar-save-photo:disabled{opacity:.42!important}
+    #view-svc .wl-solar-sign-card .small{margin-bottom:10px!important}
+    #view-svc .wl-solar-sign-card .wl-sign{background:transparent!important}
+    #view-svc .wl-solar-sign-card canvas{
+      display:block;width:100%!important;height:150px!important;background:#fff!important;border:2px solid #6f8792!important;
+      border-radius:12px!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)
+    }
+    #view-svc .wl-solar-sign-actions{display:grid;grid-template-columns:.8fr 1.35fr;gap:10px;margin-top:10px}
+    #view-svc .wl-solar-sign-actions button{min-height:58px!important;border-radius:999px!important;font-size:16px!important;font-weight:1000!important}
+    @media(max-width:520px){
+      #view-svc .wl-solar-photo-actions{grid-template-columns:1fr 1fr}
+      #view-svc .wl-solar-photo-choice{min-height:66px;padding:8px}
+      #view-svc .wl-solar-photo-choice b{font-size:11px}
+      #view-svc .wl-solar-sign-actions{grid-template-columns:.8fr 1.45fr}
+    }
+  `;
   document.head.appendChild(s);
 }
 function progress(kicker, title, step, total) {
@@ -4360,13 +4408,14 @@ function wireCanvas(canvas) {
   canvas.style.touchAction = 'none';
   const dpr = Math.max(1, devicePixelRatio || 1);
   const w = Math.max(280, canvas.getBoundingClientRect().width || 300);
+  const targetHeight = canvas.closest('.wl-solar-sign-card') ? 150 : 135;
   canvas.width = w * dpr;
-  canvas.height = 135 * dpr;
+  canvas.height = targetHeight * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
-  ctx.strokeStyle = '#f4f8fa';
+  ctx.strokeStyle = '#0b1720';
   let draw = false;
   const blockTouch = e => { e.preventDefault(); e.stopPropagation(); };
   canvas.addEventListener('touchstart', blockTouch, { passive: false });
@@ -5900,10 +5949,10 @@ function serviceSolarReady(ctx, check, evidence) {
   }
   const requiredStandPhotos=ctx.need_stand ? Math.max(1,Number(ctx.solar_spotter_count || 0)) : 0;
   if (ctx.need_stand && (serviceSolarEvidenceCount(evidence,'solar_stand','photo')<requiredStandPhotos || serviceSolarEvidenceCount(evidence,'solar_stand','signature')<1)) return false;
-  if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1 || serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
+  if (serviceSolarEvidenceCount(evidence,'batteries','photo')<1) return false;
+  if (!ctx.has_helios && serviceSolarEvidenceCount(evidence,'batteries','signature')<1) return false;
   if (serviceSolarEvidenceCount(evidence,'mppt','photo')<1) return false;
   if (ctx.has_helios) {
-    if (serviceSolarEvidenceCount(evidence,'helios_cerbo_mppt','photo')<1) return false;
     if (serviceSolarEvidenceCount(evidence,'helios_yard','photo')<1 || serviceSolarEvidenceCount(evidence,'helios_yard','signature')<1) return false;
   }
   return true;
@@ -6004,9 +6053,11 @@ function serviceSolarChecklistHtml(ctx, check, evidence) {
 function serviceSolarAnswerTasks(ctx,check) {
   const tasks=[];
   const spotters=Number(ctx?.solar_spotter_count||0);
+  const rangers=Number(ctx?.ranger_count||0);
   const expectedPanels=Number(ctx?.expected_solar_panels||0);
   const requiredStands=serviceSolarRequiredStandCount(ctx);
   const standTags=serviceSolarStandTagsValue(check).split(/\n+/).map(function(v){return v.trim();}).filter(Boolean);
+  const heliosOnly=Boolean(ctx?.has_helios)&&spotters===0&&rangers===0;
   if(ctx?.need_stand){
     tasks.push({
       key:'stand_tag',
@@ -6031,19 +6082,28 @@ function serviceSolarAnswerTasks(ctx,check) {
     tasks.push({key:field,field:field,kind:'bool',title:title,question:question,done:done===undefined?Boolean(check?.[field]):Boolean(done),extra:extra||null});
   }
   if(ctx?.has_helios){
-    // Helios MPPT status cannot be verified until Service is physically outside
-    // with the unit connected to the yard tower solar panel.
     addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Please connect the Helios unit to the Helios tower and solar panel for testing.');
     addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal Helios switch to PV?');
-    addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to this Helios in the Victron Bluetooth app?');
-    addBool('mppt_updated_ok','HELIOS YARD TEST','With the Helios connected to yard solar, does Victron show the MPPT firmware / configuration is current?');
-    addBool('mppt_tested_ok','HELIOS YARD TEST','With yard solar connected, is the MPPT powered and working correctly?');
-    addBool('cerbo_updated_ok','HELIOS YARD TEST','Does Victron show the Helios Cerbo / configuration is current?');
-    addBool('cerbo_online_ok','HELIOS YARD TEST','Is the Helios Cerbo online and communicating?');
-    addBool('helios_yard_updates_status_ok','HELIOS YARD TEST','Does Victron show the unit healthy and current?');
-    addBool('helios_battery_box_charging_ok','HELIOS YARD TEST','Is the internal Helios battery box present and charged?');
-    addBool('helios_yard_solar_charging_ok','HELIOS YARD TEST','Did you verify solar charging from the yard tower panel?');
-    addBool('helios_yard_ptz_wrapped_ok','HELIOS YARD TEST','Did you remove the PTZ from the door/front plate and bubble wrap it for transport?');
+    addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to the Helios MPPT in the Victron Bluetooth app?');
+    addBool(
+      'mppt_tested_ok',
+      'MPPT CHECK',
+      'Does the Victron MPPT show the configuration is current and the MPPT is healthy?',
+      Boolean(check?.mppt_updated_ok&&check?.mppt_tested_ok&&check?.helios_yard_updates_status_ok)
+    );
+    addBool(
+      'helios_battery_box_charging_ok',
+      'BATTERY CHECK',
+      'Is the internal Helios battery box present and charged?',
+      Boolean(check?.helios_battery_box_charging_ok&&(!heliosOnly||check?.batteries_charged_ok))
+    );
+    addBool(
+      'helios_yard_solar_charging_ok',
+      'CHARGING CHECK',
+      'Does the MPPT show the Helios battery is actively charging from the tower solar panel?',
+      Boolean(check?.helios_yard_solar_charging_ok&&(!heliosOnly||check?.solar_charging_ok))
+    );
+    addBool('helios_yard_ptz_wrapped_ok','TRANSPORT PREP','Did you remove the PTZ from the door/front plate and bubble wrap it for transport?');
   }else{
     addBool('mppt_updated_ok','MPPT CHECK','Is the MPPT firmware / configuration updated and current?');
     addBool('mppt_tested_ok','MPPT CHECK','Is the MPPT powered, tested, and working?');
@@ -6057,8 +6117,10 @@ function serviceSolarAnswerTasks(ctx,check) {
       {field:'solar_panel_count',value:String(expectedPanels)}
     );
   }
-  addBool('batteries_charged_ok','BATTERY CHECK','Is the required battery / battery-box setup physically present and charged?');
-  addBool('solar_charging_ok','CHARGING CHECK','Is the battery system actively charging through MPPT / PV?');
+  if(!heliosOnly){
+    addBool('batteries_charged_ok','BATTERY CHECK','Is the required battery / battery-box setup physically present and charged?');
+    addBool('solar_charging_ok','CHARGING CHECK','Is the battery system actively charging through MPPT / PV?');
+  }
   return tasks;
 }
 function serviceSolarProofTasks(ctx,evidence) {
@@ -6072,16 +6134,22 @@ function serviceSolarProofTasks(ctx,evidence) {
     tasks.push({key:category+':signature',kind:'signature',category:category,title:title,question:question,required:1,done:serviceSolarEvidenceCount(evidence,category,'signature')>=1});
   }
   if(ctx?.need_stand){
-    addPhoto('solar_stand','SOLAR STAND PHOTO',spotters===1?'Take one clear photo of the exact Solar Stand tag.':'Take '+spotters+' clear Solar Stand tag photos — one per stand.',spotters);
+    addPhoto('solar_stand','SOLAR STAND PHOTO',spotters===1?'Upload one clear photo of the exact Solar Stand tag.':'Upload '+spotters+' clear Solar Stand tag photos — one per stand.',spotters);
     addSign('solar_stand','SOLAR STAND SIGN-OFF','Sign to confirm the exact Solar Stand tag(s) were physically verified.');
   }
-  addPhoto('batteries','BATTERY PHOTO','Take one clear photo of the verified battery / battery-box setup.',1);
-  addSign('batteries','BATTERY SIGN-OFF','Sign to confirm the battery / battery-box setup was physically verified.');
-  addPhoto('mppt','MPPT / CHARGING PHOTO','Take one photo showing the MPPT / charging readings while the system is actively charging.',1);
+  addPhoto('batteries','BATTERY PHOTO','Upload one clear photo of the battery / battery-box setup.',1);
+  if(!ctx?.has_helios) addSign('batteries','BATTERY SIGN-OFF','Sign to confirm you physically verified the battery / battery-box setup.');
+  addPhoto(
+    'mppt',
+    'MPPT / CHARGING',
+    ctx?.has_helios
+      ? 'Upload one MPPT screenshot or photo showing the charging readings.'
+      : 'Upload one photo showing the MPPT / charging readings while the system is actively charging.',
+    1
+  );
   if(ctx?.has_helios){
-    addPhoto('helios_cerbo_mppt','HELIOS CERBO + MPPT PHOTO','Take one photo showing the Helios Cerbo and MPPT current, online, and tested.',1);
-    addPhoto('helios_yard','HELIOS YARD TEST PHOTO','Take one photo of the Helios connected to the yard tower during the PV / Victron charging test.',1);
-    addSign('helios_yard','HELIOS YARD TEST SIGN-OFF','Sign after the Helios yard test and PTZ transport prep are complete.');
+    addPhoto('helios_yard','HELIOS YARD TEST PHOTO','Upload one photo of the Helios connected to the Helios tower and solar panel for testing.',1);
+    addSign('helios_yard','HELIOS YARD TEST SIGN-OFF','Sign to confirm you completed the Helios yard solar test and transport prep.');
   }
   return tasks;
 }
@@ -6091,13 +6159,19 @@ function serviceSolarAnswersComplete(ctx,check){
 function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
   const count=serviceSolarEvidenceCount(evidence,task.category,task.kind);
   if(task.kind==='photo'){
+    const multiple=task.required>1?' multiple':'';
     return "<div class='wl-question wl-solar-one-step'>"+
       "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
       "<div class='qtext'>"+esc(task.question)+"</div>"+
-      "<div class='wl-solar-proof top10' data-solar-category='"+esc(task.category)+"'>"+
-        "<div class='small'>Saved: "+count+" of "+task.required+"</div>"+
-        "<input class='wl-solar-file top10' type='file' accept='image/*' capture='environment' "+(task.required>1?"multiple":"")+">"+
-        "<button class='wl-big wl-blue top10' data-wl-solar-upload>SAVE PHOTO"+(task.required>1?"S":"")+" →</button>"+
+      "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='"+esc(task.category)+"'>"+
+        "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" of "+task.required+" saved":"PHOTO REQUIRED")+"</div>"+
+        "<div class='wl-solar-photo-actions'>"+
+          "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'"+multiple+"></label>"+
+          "<label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*'"+multiple+"></label>"+
+        "</div>"+
+        "<div class='wl-solar-selected' data-wl-solar-selected>No photo selected yet.</div>"+
+        "<div class='wl-solar-preview hidden' data-wl-solar-preview></div>"+
+        "<button class='wl-big wl-blue wl-solar-save-photo' data-wl-solar-upload disabled>SAVE PHOTO"+(task.required>1?"S":"")+" →</button>"+
       "</div>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
     "</div>";
@@ -6105,11 +6179,16 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total) {
   return "<div class='wl-question wl-solar-one-step'>"+
     "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
     "<div class='qtext'>"+esc(task.question)+"</div>"+
-    "<div class='wl-solar-proof top10' data-solar-category='"+esc(task.category)+"'>"+
-      "<div class='wl-sign'><canvas></canvas><div class='wl-nav'>"+
-        "<button class='wl-prev' data-wl-solar-clear>Clear</button>"+
-        "<button class='wl-next' data-wl-solar-save-sign>SAVE SIGNATURE →</button>"+
-      "</div></div>"+
+    "<div class='wl-solar-proof wl-solar-sign-card top10' data-solar-category='"+esc(task.category)+"'>"+
+      "<div class='wl-solar-sign-label'>SIGN BELOW</div>"+
+      "<div class='small'>Use your finger to sign inside the box.</div>"+
+      "<div class='wl-sign'>"+
+        "<canvas></canvas>"+
+        "<div class='wl-solar-sign-actions'>"+
+          "<button class='wl-prev' data-wl-solar-clear>CLEAR</button>"+
+          "<button class='wl-next' data-wl-solar-save-sign>SAVE SIGNATURE →</button>"+
+        "</div>"+
+      "</div>"+
     "</div>"+
     "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
   "</div>";
@@ -6737,6 +6816,32 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('change', async e => {
+  if (e.target.matches?.('.wl-solar-file')) {
+    const panel=e.target.closest('.wl-solar-proof');
+    if(!panel)return;
+    panel.querySelectorAll('.wl-solar-file').forEach(input=>{if(input!==e.target)input.value='';});
+    const files=[...(e.target.files||[])];
+    const selected=panel.querySelector('[data-wl-solar-selected]');
+    const preview=panel.querySelector('[data-wl-solar-preview]');
+    const save=panel.querySelector('[data-wl-solar-upload]');
+    if(preview?.dataset.objectUrl){try{URL.revokeObjectURL(preview.dataset.objectUrl);}catch{} delete preview.dataset.objectUrl;}
+    if(!files.length){
+      if(selected)selected.textContent='No photo selected yet.';
+      preview?.classList.add('hidden');
+      if(preview)preview.innerHTML='';
+      if(save)save.disabled=true;
+      return;
+    }
+    if(selected)selected.textContent=files.length===1?'✓ '+files[0].name:'✓ '+files.length+' photos selected';
+    if(preview){
+      const url=URL.createObjectURL(files[0]);
+      preview.dataset.objectUrl=url;
+      preview.classList.remove('hidden');
+      preview.innerHTML="<img src='"+url+"' alt='Selected photo preview'><div><b>READY TO SAVE</b><span>"+esc(files.length===1?files[0].name:(files.length+' photos selected'))+"</span></div>";
+    }
+    if(save)save.disabled=false;
+    return;
+  }
   if (e.target.id === 'wlReturnPhoto') {
     const file=e.target.files?.[0];
     if (!file) return;
@@ -7239,7 +7344,18 @@ document.addEventListener('click', async e => {
     const extraField=solarStepAnswer.dataset.extraField;
     const extraValue=solarStepAnswer.dataset.extraValue;
     if(extraField && !await saveServiceSolarProgressField(extraField,extraValue))return;
-    if(!await saveServiceSolarProgressField(solarStepAnswer.dataset.field,'true'))return;
+    const field=solarStepAnswer.dataset.field;
+    if(!await saveServiceSolarProgressField(field,'true'))return;
+    if(field==='mppt_tested_ok'){
+      if(!await saveServiceSolarProgressField('mppt_updated_ok','true'))return;
+      if(!await saveServiceSolarProgressField('helios_yard_updates_status_ok','true'))return;
+    }
+    if(field==='helios_battery_box_charging_ok'){
+      if(!await saveServiceSolarProgressField('batteries_charged_ok','true'))return;
+    }
+    if(field==='helios_yard_solar_charging_ok'){
+      if(!await saveServiceSolarProgressField('solar_charging_ok','true'))return;
+    }
     await maybeFinalizeServiceSolarProgress();
     return renderSvcPrep();
   }
@@ -7273,7 +7389,7 @@ document.addEventListener('click', async e => {
   if (solarUpload) {
     const panel=solarUpload.closest('.wl-solar-proof');
     const category=panel?.dataset.solarCategory;
-    const files=[...(panel?.querySelector('.wl-solar-file')?.files || [])];
+    const files=[...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
     if (!category || !files.length) return alert('Take or select at least one photo first.');
     solarUpload.disabled=true;
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
