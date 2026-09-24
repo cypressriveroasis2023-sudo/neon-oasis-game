@@ -3189,6 +3189,8 @@ Object.assign(window, {
   ownerControlClose,
   ownerControlReopen,
   ownerControlReturn,
+  ownerCloseJob,
+  ownerReturnJobForCorrection,
   ownerJump,
   ownerOpenReturn,
   setOwnerDailyDate,
