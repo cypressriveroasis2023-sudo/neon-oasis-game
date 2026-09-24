@@ -1128,16 +1128,18 @@ async function liveRefresh(force=false){
 }
 function startLiveUpdates(){
   if(liveRefreshTimer)return;
-  liveRefreshTimer=setInterval(()=>liveRefresh(false),15000);
+  // Realtime is the primary refresh path. The slower timer is only a safety net,
+  // preventing the camera board from re-downloading every table every 15 seconds.
+  liveRefreshTimer=setInterval(()=>liveRefresh(false),120000);
   try{
     ['camera_devices','camera_health_current'].forEach((table,i)=>{
       const ch=db.channel('camera-health-live-'+i).on('postgres_changes',{event:'*',schema:'public',table},()=>{
         clearTimeout(window.__cameraHealthLiveDebounce);
-        window.__cameraHealthLiveDebounce=setTimeout(()=>liveRefresh(false),1800);
+        window.__cameraHealthLiveDebounce=setTimeout(()=>liveRefresh(false),5000);
       }).subscribe();
       liveChannels.push(ch);
     });
-  }catch(e){console.warn('Realtime subscription unavailable; 15-second refresh remains active.',e)}
+  }catch(e){console.warn('Realtime subscription unavailable; 2-minute safety refresh remains active.',e)}
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)liveRefresh(true)});
   window.addEventListener('pageshow',event=>{if(event.persisted&&profile)liveRefresh(true)});
 }
