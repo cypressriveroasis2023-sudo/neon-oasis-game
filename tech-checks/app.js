@@ -88,7 +88,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-test-persona-20260923bd')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-test-persona-20260923be')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -347,7 +347,15 @@ async function ownerTestEnterRole(ticket,targetRole){
     p_role:role,
     p_test_tech_id:ctx.persona_id
   });
-  if(ensure.error)return alert(ensure.error.message||'Could not open the test technician workflow.');
+  if(ensure.error){
+    const message=ensure.error.message||'Could not open the test technician workflow.';
+    if(/Owner Test Center ticket not found/i.test(message)){
+      ownerTestEndSession();
+      alert('That TEST workflow was deleted or cleared. You were returned to Owner Test Center so you can create a fresh TEST workflow.');
+      return;
+    }
+    return alert(message);
+  }
   ownerTestSessionWrite(ctx);
   await loadDeferredModules();
   ownerTestApplyPresentation();
@@ -3015,10 +3023,14 @@ async function ownerReopenTestPrep(prepId){
 }
 async function ownerDeleteTestPrep(prepId){
   if(!confirm('Delete this TEST workflow? Production jobs are not affected.'))return;
+  const deleting=(state.preps||[]).find(p=>String(p.id||'')===String(prepId||''));
+  const deletingTicket=String(deleting?.ticket_no||'');
   setBusy(true);
   const {error}=await db.rpc('delete_it_prep_with_reason',{p_prep_id:String(prepId),p_reason:'Owner deleted TEST workflow from Test Center'});
   setBusy(false);
   if(error)return alert(error.message);
+  const ctx=ownerTestSessionRead();
+  if(deletingTicket && String(ctx?.ticket||'')===deletingTicket) ownerTestEndSession();
   await refreshData(); await ownerAppNavigate('testcenter');
 }
 async function ownerClearAllTestWorkflows(){
@@ -3027,6 +3039,7 @@ async function ownerClearAllTestWorkflows(){
   const {error}=await db.rpc('owner_clear_test_data');
   setBusy(false);
   if(error)return alert(error.message);
+  ownerTestEndSession();
   await refreshData(); await ownerAppNavigate('testcenter');
   alert('All TEST workflow data was cleared.');
 }
