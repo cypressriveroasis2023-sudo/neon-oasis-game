@@ -6033,7 +6033,7 @@ function serviceSolarAnswerTasks(ctx,check) {
   if(ctx?.has_helios){
     // Helios MPPT status cannot be verified until Service is physically outside
     // with the unit connected to the yard tower solar panel.
-    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Is the Helios outside and connected to the yard tower solar panel?');
+    addBool('helios_yard_pv_connected_ok','HELIOS YARD TEST','Please connect the Helios unit to the Helios tower and solar panel for testing.');
     addBool('helios_yard_switch_pv_ok','HELIOS YARD TEST','Did you flip the internal Helios switch to PV?');
     addBool('helios_yard_victron_bluetooth_ok','HELIOS YARD TEST','Did you connect to this Helios in the Victron Bluetooth app?');
     addBool('mppt_updated_ok','HELIOS YARD TEST','With the Helios connected to yard solar, does Victron show the MPPT firmware / configuration is current?');
@@ -6156,12 +6156,15 @@ function serviceSolarOneStepHtml(ctx,check,evidence) {
     const extra=task.extra
       ? " data-extra-field='"+esc(task.extra.field)+"' data-extra-value='"+esc(task.extra.value)+"'"
       : "";
+    const heliosConnectStep=task.field==='helios_yard_pv_connected_ok';
+    const yesLabel=heliosConnectStep?'CONNECTED':'YES';
+    const noLabel=heliosConnectStep?'NOT CONNECTED':'NO';
     return "<div class='wl-question wl-solar-one-step'>"+
       "<div class='qnum'>STEP "+stepNo+" OF "+total+"</div>"+
       "<div class='qtext'>"+esc(task.question)+"</div>"+
       "<div class='wl-options'>"+
-        "<button class='pass' data-wl-solar-step-answer='yes' data-field='"+esc(task.field)+"'"+extra+">YES</button>"+
-        "<button class='fail' data-wl-solar-step-answer='no'>NO</button>"+
+        "<button class='pass' data-wl-solar-step-answer='yes' data-field='"+esc(task.field)+"'"+extra+">"+yesLabel+"</button>"+
+        "<button class='fail' data-wl-solar-step-answer='no' data-field='"+esc(task.field)+"'>"+noLabel+"</button>"+
       "</div>"+
       "<div class='wl-solar-step-message'></div>"+
       "<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>"+
@@ -7227,7 +7230,10 @@ document.addEventListener('click', async e => {
   if(solarStepAnswer){
     if(solarStepAnswer.dataset.wlSolarStepAnswer==='no'){
       const stepMessage=solarStepAnswer.closest('.wl-question')?.querySelector('.wl-solar-step-message');
-      if(stepMessage)stepMessage.innerHTML="<div class='wl-stop top10'><b>STOP — FIX THIS FIRST.</b><div>When it is corrected, tap YES. You cannot continue while this answer is NO.</div></div>";
+      const field=solarStepAnswer.dataset.field||'';
+      if(stepMessage)stepMessage.innerHTML=field==='helios_yard_pv_connected_ok'
+        ? "<div class='wl-stop top10'><b>CONNECT HELIOS FIRST.</b><div>Connect the Helios unit to the Helios tower and solar panel for testing, then tap CONNECTED.</div></div>"
+        : "<div class='wl-stop top10'><b>STOP — FIX THIS FIRST.</b><div>When it is corrected, tap YES. You cannot continue while this answer is NO.</div></div>";
       return;
     }
     const extraField=solarStepAnswer.dataset.extraField;
