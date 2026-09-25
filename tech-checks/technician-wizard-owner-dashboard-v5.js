@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=5';
+import './it-prep-wizard-v1.js?v=6';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=2';
 import './it-intake-wizard-v1.js?v=1';
@@ -4632,16 +4632,12 @@ async function renderItUnitStep() {
   if (itUnitIndex >= totalUnits || itUnitPhase === 'final') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const spareBatteries = await loadTruckSpareBatteries(activeItPrep.id);
-    const itemReady = items.length === totalUnits && items.every((item, index) => itUnitIssues(item, ev, index + 1).length === 0);
-    const spareUnits=items.filter(row=>row.purpose==='BACKUP');
-    const spareUnitsCheckedOut=spareUnits.every(row=>Boolean(row.spare_it_checked_out_at));
-    const spareBatteriesReady = spareBatteries.every(row => Boolean(row.ready_ok));
-    const spareBatteriesCheckedOut = spareBatteries.every(row => Boolean(row.it_checked_out_at));
-    const partsOnly=totalUnits===0 && items.length===0 && ticketPartsTotal(activeItPrep)>0;
-    const globalItPhotos=ev.filter(row=>row.kind==='photo'&&!row.prep_item_id);
-    const globalItSignature=[...ev].reverse().find(row=>row.kind==='signature'&&!row.prep_item_id);
-    const partsOnlyProofReady=!partsOnly || (globalItPhotos.length>=1 && Boolean(globalItSignature));
-    const ready = itemReady && spareUnitsCheckedOut && spareBatteriesReady && spareBatteriesCheckedOut && partsOnlyProofReady;
+    const finalState=window.TechCheckITPrepWizard.finalReadiness(activeItPrep,items,ev,spareBatteries,{
+      expectedUnits:itExpectedUnits,
+      issues:itUnitIssues,
+      partsTotal:ticketPartsTotal
+    });
+    const {partsOnly,ready,spareUnitsCheckedOut,spareBatteriesReady,spareBatteriesCheckedOut}=finalState;
 
     // Final handoff is read-only. Corrections go through Review / Adjust Unit.
     if (itFinalView!=='summary') itFinalView='summary';
