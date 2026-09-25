@@ -1,4 +1,4 @@
-import './it-prep-view-v1.js?v=2';
+import './it-prep-view-v1.js?v=3';
 import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
@@ -4603,24 +4603,8 @@ function itUnitIssues(item, evidence, unitNo) {
   if (!unitSignature(evidence, unitNo)) issues.push({ phase: 'signature', index: 0, label: 'IT technician signature is missing.' });
   return issues;
 }
-function itIssueLinksHtml(item, evidence, unitNo) {
-  const issues = itUnitIssues(item, evidence, unitNo);
-  if (!issues.length) return '';
-  return `<div class='wl-stop'><b>${issues.length} issue${issues.length === 1 ? '' : 's'} need attention.</b><div>Tap an issue to go directly back to it.</div><div class='wl-issue-list'>${issues.map((issue, index) => `<button class='wl-issue-link' data-wl-issue-unit='${unitNo - 1}' data-wl-issue-phase='${issue.phase}' data-wl-issue-index='${issue.index}'><b>Issue ${index + 1}: ${esc(issue.label)}</b><span>Go to this issue →</span></button>`).join('')}</div></div>`;
-}
-function itUnitReviewHtml(item, evidence, unitNo) {
-  const photos = unitEvidence(evidence, unitNo, 'photo');
-  const steps = itUnitStepsData(item, unitNo).filter(s => s.kind === 'bool');
-  const passed = steps.filter(s => itBoolValue(item, s.field) === true).length;
-  const identity = itItemIdentity(item, unitNo);
-  const sig = unitSignature(evidence, unitNo);
-  return `<div class='wl-simple-complete'>
-    <div class='wl-simple-complete-title'>${esc(identity)} is ready</div>
-    <div>✓ ${passed} checks complete</div>
-    <div>✓ ${photos.length ? 'Photo saved' : 'Photo needed'}</div>
-    <div>✓ ${sig ? 'Signed by '+esc(sig.created_by_name||'IT Technician') : 'Signature needed'}</div>
-  </div>`;
-}
+function itIssueLinksHtml(item,evidence,unitNo){return window.TechCheckITPrepView.issueLinksHtml(item,evidence,unitNo,{esc,issues:itUnitIssues});}
+function itUnitReviewHtml(item,evidence,unitNo){return window.TechCheckITPrepView.unitReviewHtml(item,evidence,unitNo,{esc,unitEvidence,stepsData:itUnitStepsData,boolValue:itBoolValue,itemIdentity:itItemIdentity,unitSignature});}
 const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
   { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
   { key:'spotter-350', equipment_type:'Solar Spotter', battery_type:'12V 350Ah', label:'Solar Spotter · 12V 350Ah' },
