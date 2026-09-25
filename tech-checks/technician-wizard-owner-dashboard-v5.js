@@ -55,7 +55,7 @@ let svcHeliosFieldCursor = null;
 let heliosFieldAnswerSubmitting = false;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
-let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
+let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [], submissionId:null, pendingUploadPaths:[] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
 let serviceCloseSubmitting = false;
@@ -65,7 +65,7 @@ async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey
 async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (!key) return null; try { const value=JSON.parse(localStorage.getItem(key)||'null'); if (!value) return null; if (Date.now()-Number(value.savedAt||0)>FIELD_DRAFT_TTL) { localStorage.removeItem(key); return null; } return value; } catch { return null; } }
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
 function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer] }); }
-function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag), offlineEscalationId:serviceReturn.offlineEscalationId||null }); }
+function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag), offlineEscalationId:serviceReturn.offlineEscalationId||null, submissionId:serviceReturn.submissionId||null, pendingUploadPaths:Array.isArray(serviceReturn.pendingUploadPaths)?serviceReturn.pendingUploadPaths:[] }); }
 const intakeLabels = window.TechCheckITIntake.labels;
 let intakeWizard = window.TechCheckITIntake.getState();
 let ownerReturnRows = new Map();
@@ -6848,7 +6848,7 @@ document.addEventListener('click', async e => {
 });
 async function showServiceReturn() {
   const saved=await loadDeviceDraft('service-return');
-  if (saved?.ticket) { serviceReturn={ step:Math.min(Number(saved.step||0),3), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[], offlineEscalationId:saved.offlineEscalationId||null }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
+  if (saved?.ticket) { serviceReturn={ step:Math.min(Number(saved.step||0),3), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[], offlineEscalationId:saved.offlineEscalationId||null, submissionId:saved.submissionId||null, pendingUploadPaths:Array.isArray(saved.pendingUploadPaths)?saved.pendingUploadPaths:[] }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
   else { serviceReturn={ step:0, ticket:'', unit:'', type:'', notes:'', noTag:false, photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; serviceReturnRecovered=false; }
   return renderServiceReturn();
 }
@@ -6935,23 +6935,52 @@ async function submitServiceReturn() {
   if (serviceReturnSubmitting) return;
   serviceReturn.notes = document.getElementById('wlReturnNotes')?.value || serviceReturn.notes || '';
   await saveServiceReturnDraft();
-  if (!serviceReturn.ticket || !serviceReturn.type || !serviceReturn.photo || (!serviceReturn.unit && !isTagless110VReturn())) return alert(isTagless110VReturn() ? 'Ticket, 110V Stand type, and stand photo are required.' : 'Ticket, unit, equipment type, and unit tag photo are required.');
+  if (!serviceReturn.ticket || !serviceReturn.type || (!serviceReturn.unit && !isTagless110VReturn())) return alert(isTagless110VReturn() ? 'Ticket and 110V Stand type are required.' : 'Ticket, unit, and equipment type are required.');
   const isHeliosSwapReturn=serviceReturn.type==='Helios' && activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP');
   if (isHeliosSwapReturn && !serviceReturn.notes.trim()) return alert('For OLD UNIT RETURNING, document why the Helios is being swapped and the damage / issues / symptoms / repair needed before sending it to IT Intake.');
   if ((serviceReturn.damagePhotos || []).length && !serviceReturn.notes.trim()) return alert('Damage photos were added. Describe what is damaged in Return notes / damage noticed so IT knows what to inspect.');
   if (!navigator.onLine) return alert(`No connection. This return is saved as an unsent draft on this device. Reconnect before ${is110VStandReturn()?'returning the stand to Shop':'sending it to IT Intake'}.`);
   serviceReturnSubmitting=true; document.body.classList.add('busy');
   let uploadedPaths=[];
+  const returnId=serviceReturn.submissionId||crypto.randomUUID();
+  serviceReturn.submissionId=returnId;
+  await saveServiceReturnDraft();
   try {
     const tech=await currentTechIdentity();
-    const existingReturns=isTagless110VReturn()?[]:(await returnRows()).filter(r => norm(r.ticket_no)===norm(serviceReturn.ticket) && norm(r.unit_tag)===norm(serviceReturn.unit));
+
+    // A prior request may have committed even if this phone never received the response.
+    // Always resolve the same stable return id before uploading or inserting again.
+    const {data:priorReturn,error:priorLookupError}=await liveDb.from('unit_returns')
+      .select('id,ticket_no,unit_tag,equipment_type,status')
+      .eq('id',returnId)
+      .maybeSingle();
+    if(priorLookupError)throw new Error('Could not verify whether this return was already saved. Reconnect and tap submit again; Tech Check will check the same return instead of creating another.');
+    if(priorReturn){
+      await clearDeviceDraft('service-return');
+      serviceReturnRecovered=false;
+      serviceReturn.pendingUploadPaths=[];
+      alert(`Return already saved successfully for MHelpDesk #${priorReturn.ticket_no}. No duplicate was created.`);
+      if(activeSvcPrep?.ticket_no&&norm(activeSvcPrep.ticket_no)===norm(priorReturn.ticket_no))return renderSvcPrep();
+      return showSvcHome();
+    }
+
+    if((serviceReturn.pendingUploadPaths||[]).length){
+      await liveDb.storage.from(EVIDENCE_BUCKET).remove(serviceReturn.pendingUploadPaths).catch(()=>null);
+      serviceReturn.pendingUploadPaths=[];
+      await saveServiceReturnDraft();
+    }
+
+    if (!serviceReturn.photo) return alert(isTagless110VReturn() ? 'Take or choose a clear photo of the 110V Stand first.' : `Take or choose a clear unit tag photo showing ${serviceReturn.unit} first.`);
+
+    const existingReturns=isTagless110VReturn()?[]:(await returnRows()).filter(r => norm(r.ticket_no)===norm(serviceReturn.ticket) && norm(r.unit_tag)===norm(serviceReturn.unit) && String(r.id)!==String(returnId));
     if (existingReturns.length) return alert(`Unit ${serviceReturn.unit} has already been returned for MHelpDesk #${serviceReturn.ticket}. It cannot be returned again from this ticket.`);
-    const returnId=crypto.randomUUID();
     const safeUnit=(String(serviceReturn.unit||'').trim()||'no-tag-110v-stand').replace(/[^a-zA-Z0-9._-]/g,'_');
     const taggedPhoto=new File([serviceReturn.photo],isTagless110VReturn()?`110v-stand-no-tag-${serviceReturn.photo.name || 'photo.jpg'}`:`unit-${safeUnit}-tag-${serviceReturn.photo.name || 'photo.jpg'}`,{type:serviceReturn.photo.type || 'image/jpeg'});
     const conditionPhotos=(serviceReturn.conditionPhotos || []).map((file,index) => new File([file],`unit-${safeUnit}-site-condition-${index + 1}-${file.name || 'photo.jpg'}`,{type:file.type || 'image/jpeg'}));
     const damagePhotos=(serviceReturn.damagePhotos || []).map((file,index) => new File([file],`unit-${safeUnit}-DAMAGE-${index + 1}-${file.name || 'photo.jpg'}`,{type:file.type || 'image/jpeg'}));
     uploadedPaths=await uploadReturnPhotos([taggedPhoto,...conditionPhotos,...damagePhotos],returnId,`service/unit-${safeUnit}`);
+    serviceReturn.pendingUploadPaths=[...uploadedPaths];
+    await saveServiceReturnDraft();
     const scan=!is110VStandReturn() && serviceReturn.tagScan && ['match','mismatch','unreadable'].includes(serviceReturn.tagScan.status) ? serviceReturn.tagScan : null;
     let error=null;
     if (is110VStandReturn()) {
@@ -6989,7 +7018,7 @@ async function submitServiceReturn() {
       if(!offlineLinkError)serviceReturn.offlineEscalationId=null;
     }
     const assignmentProgress=await serviceReturnAssignmentProgress(serviceReturn.ticket,tech.id);
-    await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
+    await clearDeviceDraft('service-return'); serviceReturnRecovered=false; serviceReturn.submissionId=null; serviceReturn.pendingUploadPaths=[];
     const card=serviceReturnCard();
     const continuationHtml=
       (!is110VStandReturn() && activeSvcPrep?.ticket_no && norm(activeSvcPrep.ticket_no)===norm(serviceReturn.ticket) && heliosFieldItems(activeSvcPrep).some(x=>x.purpose==='SWAP')
@@ -7008,9 +7037,35 @@ async function submitServiceReturn() {
       + continuationHtml + actionHtml;
     resetWizardPosition();
   } catch(err) {
-    if (uploadedPaths.length) await liveDb.storage.from(EVIDENCE_BUCKET).remove(uploadedPaths).catch(() => null);
+    let confirmed=null,verificationError=null;
+    try{
+      const check=await liveDb.from('unit_returns').select('id,ticket_no').eq('id',returnId).maybeSingle();
+      confirmed=check.data||null;
+      verificationError=check.error||null;
+    }catch(error){verificationError=error;}
+
+    if(confirmed){
+      serviceReturn.pendingUploadPaths=[];
+      serviceReturn.submissionId=null;
+      await clearDeviceDraft('service-return');
+      serviceReturnRecovered=false;
+      alert(`Return saved successfully for MHelpDesk #${confirmed.ticket_no} even though the connection was interrupted. No duplicate was created.`);
+      if(activeSvcPrep?.ticket_no&&norm(activeSvcPrep.ticket_no)===norm(confirmed.ticket_no))return renderSvcPrep();
+      return showSvcHome();
+    }
+
+    if(!verificationError){
+      const cleanup=[...new Set([...(uploadedPaths||[]),...(serviceReturn.pendingUploadPaths||[])])];
+      if(cleanup.length)await liveDb.storage.from(EVIDENCE_BUCKET).remove(cleanup).catch(()=>null);
+      serviceReturn.pendingUploadPaths=[];
+    }
     await saveServiceReturnDraft();
-    alert(err?.message === 'Failed to fetch' ? 'Connection lost. Nothing was marked submitted. Your return details are still saved on this device; reconnect and try again.' : (err?.message || 'Could not submit the return. Nothing was marked submitted.'));
+
+    if(verificationError){
+      alert('Connection was interrupted and Tech Check could not verify whether the return reached Supabase. Your return is saved on this device with the same retry ID. Reconnect and tap submit again; Tech Check will verify that same return before creating anything.');
+    }else{
+      alert(err?.message === 'Failed to fetch' ? 'Connection lost before the return could be confirmed. Your return details are still saved on this device; reconnect and tap submit again.' : (err?.message || 'Could not submit the return. Nothing was marked submitted.'));
+    }
   } finally { serviceReturnSubmitting=false; document.body.classList.remove('busy'); }
 }
 function installTabs() {
