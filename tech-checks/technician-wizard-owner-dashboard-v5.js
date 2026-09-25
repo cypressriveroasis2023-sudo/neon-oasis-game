@@ -9320,9 +9320,14 @@ document.addEventListener('change', e => {
     }
     const count=e.target.files?.length||0;
     const status=panel?.querySelector('[data-wl-photo-selected]');
-    if(status) status.textContent=count ? (count===1?'1 photo selected':count+' photos selected') : 'No photo selected yet.';
+    if(status) status.textContent=count ? (count===1?'✓ PHOTO READY TO SAVE':('✓ '+count+' PHOTOS READY TO SAVE')) : 'No photo selected yet.';
+    const preview=panel?.querySelector('[data-wl-photo-preview]');
+    if(preview){
+      const files=[...(e.target.files||[])];
+      preview.innerHTML=files.length ? "<div class='wl-solar-preview-grid'>"+files.map((file,index)=>"<img src='"+URL.createObjectURL(file)+"' alt='Selected photo "+(index+1)+"'>").join('')+"</div>" : '';
+    }
     const save=panel?.querySelector('[data-wl-upload]');
-    if(save) save.disabled=!count;
+    if(save){save.disabled=!count;save.textContent=count?(count===1?'SAVE PHOTO →':('SAVE '+count+' PHOTOS →')):'Save Photo';}
   }
 
   if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
