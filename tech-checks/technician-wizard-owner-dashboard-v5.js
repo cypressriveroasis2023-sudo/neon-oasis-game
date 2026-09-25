@@ -6487,7 +6487,8 @@ document.addEventListener('click', async e => {
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
   if(takeServiceJob){
     const fromTicketLookup=Boolean(takeServiceJob.closest('#wlSvcLookup')&&document.getElementById('wlServiceJobSearch'));
-    const enteredTicket=fromTicketLookup ? String(document.getElementById('wlServiceJobSearch')?.value||'').trim().replace(/^#\s*/,'') : '';
+    if(!fromTicketLookup)return startAssignedJob(takeServiceJob.dataset.wlServiceTakeJob);
+    const enteredTicket=String(document.getElementById('wlServiceJobSearch')?.value||'').trim().replace(/^#\s*/,'');
     return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob,enteredTicket);
   }
   if (e.target.closest('[data-wl-match]')) return matchSvcTicket();
