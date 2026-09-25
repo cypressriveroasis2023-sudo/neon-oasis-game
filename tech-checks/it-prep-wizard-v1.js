@@ -125,4 +125,44 @@ function unitIssues(item,evidence,unitNo,deps={}){
   return issues;
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues});
+
+function initialState(prep,items=[],evidence=[],deps={}){
+  const expectedUnits=prep?.expected_unit_count||items.length;
+  const issues=deps.issues||(()=>[]);
+  let firstIncomplete=items.findIndex((item,index)=>issues(item,evidence,index+1).length>0);
+  if(firstIncomplete<0)firstIncomplete=items.length;
+  const state={expectedUnits,unitIndex:firstIncomplete,questionIndex:0,phase:'type'};
+  if(state.unitIndex>=expectedUnits){
+    state.phase='final';
+    state.finalView='summary';
+    return state;
+  }
+  const manifestExpanded=deps.manifestExpanded||(()=>[]);
+  const purposeFromWorkType=deps.purposeFromWorkType||(()=> '');
+  if(state.unitIndex>=items.length){
+    state.typeChoice=manifestExpanded(prep?.equipment_manifest||[])[state.unitIndex]||'';
+    state.purposeChoice=purposeFromWorkType(prep?.work_type)||'';
+    state.reconRequired=1;
+    return state;
+  }
+  const item=items[state.unitIndex],unitNo=state.unitIndex+1;
+  state.typeChoice=item?.equipment_type||'';
+  state.purposeChoice=item?.purpose||'';
+  state.reconRequired=Number(item?.recon_camera_count||1);
+  const requiredType=manifestExpanded(prep?.equipment_manifest||[])[state.unitIndex]||'';
+  if((requiredType&&item?.equipment_type!==requiredType)||!item?.equipment_type||!item?.purpose){
+    state.phase='type';
+    state.typeChoice=requiredType||item?.equipment_type||'';
+    state.purposeChoice=item?.purpose||purposeFromWorkType(prep?.work_type)||'';
+    return state;
+  }
+  const found=issues(item,evidence,unitNo);
+  if(!found.length)state.phase='review';
+  else{
+    state.phase=found[0].phase;
+    state.questionIndex=found[0].index||0;
+  }
+  return state;
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState});
