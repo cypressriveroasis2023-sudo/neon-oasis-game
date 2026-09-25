@@ -196,4 +196,16 @@ function typePhaseDecision({lockedType='',autoPurpose='',currentItem=null,purpos
   return {...base,purposeChoice:currentItem?.purpose||'',phase:'purpose',configure:false};
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision});
+
+function releaseReadiness(prep,items=[],evidence=[],deps={}){
+  const expected=prep?.expected_unit_count||deps.expectedUnits||items.length;
+  const partsOnly=expected===0&&items.length===0&&(deps.partsTotal||(()=>0))(prep)>0;
+  const issues=deps.issues||(()=>[]);
+  const itemReady=items.length===expected&&items.every((item,index)=>issues(item,evidence,index+1).length===0);
+  const partsPhotoReady=!partsOnly||(evidence||[]).some(row=>row?.kind==='photo'&&!row?.prep_item_id);
+  const partsSignatureReady=!partsOnly||(evidence||[]).some(row=>row?.kind==='signature'&&!row?.prep_item_id);
+  const ready=itemReady&&partsPhotoReady&&partsSignatureReady;
+  return {expected,partsOnly,itemReady,partsPhotoReady,partsSignatureReady,ready};
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness});
