@@ -85,7 +85,7 @@ function checksHtml(item,unitNo,totalUnits,questionIndex,steps,deps={}){
   return progress(`Unit ${unitNo} of ${totalUnits}`,`${equipmentName} · Step ${questionIndex+1} of ${stepCount}`,questionIndex+1,stepCount)+question+nav;
 }
 function reviewPhaseHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml){
-  return `<div class='wl-review-phase'>${reviewHtml||''}${ready?'':(issuesHtml||'')}${ready?'':`<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready?'':'disabled'}>${unitNo<totalUnits?`Next: Unit ${unitNo+1} →`:'Next: Ticket Summary →'}</button></div></div>`;
+  return `${reviewHtml||''}${ready?'':(issuesHtml||'')}${ready?'':`<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready?'':'disabled'}>${unitNo<totalUnits?`Next: Unit ${unitNo+1} →`:'Next: Ticket Summary →'}</button></div>`;
 }
 
 window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml});
