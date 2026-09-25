@@ -2,7 +2,7 @@ import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
-import './it-prep-shared-v1.js?v=5';
+import './it-prep-shared-v1.js?v=6';
 import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
@@ -4128,16 +4128,7 @@ function returnTagScan(row) {
     engine:row.tag_scan_engine||''
   } : null;
 }
-async function saveItTagScan(itemId,scan) {
-  const { error }=await liveDb.rpc('record_it_unit_ai_tag_scan',{
-    p_item_id:itemId,
-    p_status:scan.status,
-    p_detected:scan.detected||null,
-    p_confidence:scan.confidence==null?null:Number(scan.confidence),
-    p_engine:scan.engine||'tesseract.js-7.0.0'
-  });
-  if (error) throw error;
-}
+async function saveItTagScan(itemId,scan){return window.TechCheckITPrep.saveTagScan(itemId,scan);}
 
 async function uploadEvidence(prepId, stage, kind, file, name, itemId = null) {
   const { data: { session } } = await liveDb.auth.getSession();
