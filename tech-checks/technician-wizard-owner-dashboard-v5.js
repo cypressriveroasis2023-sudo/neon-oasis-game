@@ -1,7 +1,7 @@
 import './it-prep-view-v1.js?v=6';
 import './it-prep-wizard-v1.js?v=8';
 import './it-prep-rules-v1.js?v=1';
-import './it-prep-shared-v1.js?v=3';
+import './it-prep-shared-v1.js?v=4';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
 import './notifications-v1.js?v=1';
@@ -4576,8 +4576,7 @@ async function releaseItPrepUnitByUnit() {
   try {
     const ticketNo = activeItPrep.ticket_no;
     await window.TechCheckITPrep.verifyItemsForRelease(items);
-    const { error } = await liveDb.rpc('release_prep', { p_prep_id: activeItPrep.id });
-    if (error) throw error;
+    await window.TechCheckITPrep.releasePrep(activeItPrep.id);
     await window.refreshData?.();
     activeItPrep = null;
     itUnitIndex = 0;
