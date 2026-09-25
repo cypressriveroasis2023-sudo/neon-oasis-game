@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=3';
+import './it-prep-wizard-v1.js?v=4';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -4503,44 +4503,10 @@ function legacyItUnitStepsData(item, unitNo) {
 function itUnitStepsData(item, unitNo) {
   return window.TechCheckITPrepRules.checklist(item,unitNo,{fallbackChecklist:legacyItUnitStepsData});
 }
-function itUnitReady(item) {
-  if (window.TechCheckRules?.itReady) return window.TechCheckRules.itReady(item);
-  if (!item?.unit_tag) return false;
-  if (isSolarSupport(item.equipment_type) || isSimpleSupport(item.equipment_type)) return Boolean(item.ticket_item_match_ok && (isSimpleSupport(item.equipment_type) || item.safe_ok));
-  if (!item.power_ok || !item.functions_ok || !item.safe_ok) return false;
-  if (item.equipment_type !== 'Solar Spotter' && Number(item.battery_count || 0) < Number(item.required_battery_count || 0)) return false;
-  if (isHeliosDeploy(item)) {
-    const core=Boolean(
-      item.helios_camera1_hardware_ok && item.helios_camera2_hardware_ok && item.helios_ptz_assembly_ok &&
-      item.helios_proxicast_4x4_ok && item.helios_router_sim_ok && item.helios_speaker_24v_ok &&
-      item.helios_cameras_12v_ok && item.helios_ptz_plate_4bolts_ok && item.helios_cerbo_network_ok &&
-      item.helios_cerbo_vrm_ok && item.helios_rear_unit_tag_ok && item.helios_battery_box_installed_ok &&
-      item.helios_battery_120v_charged_ok && item.helios_camera_router_programming_ok && item.helios_alibi_vigilant_ok &&
-      item.helios_3x1tb_sd_ok && item.helios_camera1_ports_ok && item.helios_camera2_ports_ok &&
-      item.helios_ptz_ports_ok && item.helios_speaker_ports_ok && item.delivery_sim_ok &&
-      item.delivery_camera_app_ok && item.delivery_batteries_charged_ok && item.delivery_sd_formatted_ok &&
-      item.delivery_recording_ok
-    );
-    if(!core) return false;
-    return item.purpose==='BACKUP' ? true : Boolean(item.delivery_customer_email_app_ok && item.delivery_monitoring_ok);
-  }
-  if (item.equipment_type === 'Spotter' && !(item.unit_programmed_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
-  if (item.equipment_type === 'Recon 2' && !(item.unit_programmed_ok && Number(item.recon_camera_count || 0) >= 1 && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
-  if (item.equipment_type === 'Ranger' && !(item.solar_mppt_updated_ok && item.solar_mppt_tested_ok && item.camera_port_81_ok && item.camera_port_554_ok)) return false;
-  const customerSwap = ['Sniper','Spotter','Recon 2','Ranger'].includes(item.equipment_type) && item.purpose === 'SWAP';
-  if (!['DELIVERY','BACKUP'].includes(item.purpose) && !customerSwap) return true;
-  const batteryReady = ['Solar Spotter','Spotter'].includes(item.equipment_type) || item.delivery_batteries_charged_ok;
-  const hardwareReady = Boolean(item.delivery_sim_ok && item.delivery_camera_app_ok && item.delivery_sd_formatted_ok && item.delivery_recording_ok && batteryReady);
-  if (item.purpose === 'BACKUP') return hardwareReady;
-  return Boolean(hardwareReady && item.delivery_customer_email_app_ok && item.delivery_monitoring_ok && item.delivery_ticket_count_ok);
-}
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
 function itBoolAnswered(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) || item[field] === true || itAnswered.has(key); }
-function itPhotoTagReady(item) {
-  if (item?.equipment_type === '110V Stand' && !String(item?.unit_tag || '').trim()) return true;
-  return item?.photo_tag_match_ok === true;
-}
+function itPhotoTagReady(item){return window.TechCheckITPrepWizard.photoTagReady(item);}
 async function configureCurrentItItem() {
   const item = currentItItem();
   if (!itTypeChoice || !itPurposeChoice) return false;
@@ -4590,17 +4556,8 @@ async function persistCurrentItItem() {
   return true;
 }
 
-function itUnitIssues(item, evidence, unitNo) {
-  const steps = itUnitStepsData(item, unitNo);
-  const issues = [];
-  steps.forEach((step, index) => {
-    const failed = step.kind === 'number' ? Number(item[step.field] || 0) < Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1) : step.kind === 'tag' ? (!step.optional && !String(item[step.field] || '').trim()) : itBoolValue(item, step.field) !== true;
-    if (failed) issues.push({ phase: 'checks', index, label: step.label });
-  });
-  if (!unitEvidence(evidence, unitNo, 'photo').length) issues.push({ phase: 'photo', index: 0, label: 'Required equipment photo is missing.' });
-  else if (!itPhotoTagReady(item)) issues.push({ phase: 'photo', index: 0, label: `Confirm the photo clearly shows and matches unit tag ${item.unit_tag || ''}.` });
-  if (!unitSignature(evidence, unitNo)) issues.push({ phase: 'signature', index: 0, label: 'IT technician signature is missing.' });
-  return issues;
+function itUnitIssues(item,evidence,unitNo){
+  return window.TechCheckITPrepWizard.unitIssues(item,evidence,unitNo,{steps:itUnitStepsData,boolValue:itBoolValue,unitEvidence,photoTagReady:itPhotoTagReady,unitSignature});
 }
 function itIssueLinksHtml(item,evidence,unitNo){return window.TechCheckITPrepView.issueLinksHtml(item,evidence,unitNo,{esc,issues:itUnitIssues});}
 function itUnitReviewHtml(item,evidence,unitNo){return window.TechCheckITPrepView.unitReviewHtml(item,evidence,unitNo,{esc,unitEvidence,stepsData:itUnitStepsData,boolValue:itBoolValue,itemIdentity:itItemIdentity,unitSignature});}
