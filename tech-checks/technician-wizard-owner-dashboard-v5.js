@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './handoff-evidence-view-v1.js?v=2';
+import './handoff-evidence-view-v1.js?v=3';
 import './handoff-evidence-shared-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=12';
 import './it-prep-rules-v1.js?v=3';
@@ -6107,17 +6107,7 @@ async function showInspectionHistory() {
   hideChildren(viewSvc(), [card]); resetWizardPosition();
 }
 async function refreshProofPanel(panel) {
-  if (!panel) return;
-  const prepId = panel.dataset.proof;
-  const stage = panel.dataset.stage;
-  const mode = panel.dataset.mode || 'full';
-  const unitNo = Number(panel.dataset.unit || 0) || null;
-  const expectedCount = Number(panel.dataset.expected || 0) || null;
-  const html = mode === 'photo' ? await photoOnlyHtml(prepId, stage, unitNo, expectedCount) : mode === 'signature' ? await signatureOnlyHtml(prepId, stage, unitNo) : await proofHtml(prepId, stage, true);
-  panel.outerHTML = html;
-  const selector = `[data-proof='${prepId}'][data-stage='${stage}']${unitNo ? `[data-unit='${unitNo}']` : ''}`;
-  const next = document.querySelector(selector);
-  next?.querySelectorAll('canvas').forEach(wireCanvas);
+  return window.TechCheckEvidenceView.refreshPanel(panel,{photoOnlyHtml,signatureOnlyHtml,proofHtml,wireCanvas,document});
 }
 document.addEventListener('keydown', e => {
   if(e.target?.id==='ownerAIDispatchPrompt' && e.key==='Enter' && !e.shiftKey){
@@ -6818,9 +6808,23 @@ document.addEventListener('click', async e => {
     }
     return;
   }
-  const clear = e.target.closest('[data-wl-clear]'); if (clear) { const c = clear.closest('.wl-sign').querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); c.dataset.ink = ''; return; }
-  const save = e.target.closest('[data-wl-save-sign]'); if (save) { const panel = save.closest('.wl-proof'); const canvas = panel.querySelector('canvas'); if (!canvas?.dataset.ink) return alert('Sign in the box first.'); const blob = await blobFromCanvas(canvas); const unitNo = Number(panel.dataset.unit || 0) || null; const itemId = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1]?.id || null : null; const signatureName = unitNo ? `unit-${unitNo}-signature.png` : 'signature.png'; await uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'signature', blob, signatureName, itemId); if (panel.dataset.stage === 'it' && panel.dataset.mode === 'signature' && activeItPrep) return renderItUnitStep(); await refreshProofPanel(panel); return; }
-  const replace = e.target.closest('[data-wl-replace]'); if (replace) { const panel = replace.closest('.wl-proof'); const saved = panel.querySelector('.wl-saved'); const btn = replace; saved?.remove(); btn.remove(); const d = document.createElement('div'); d.className = 'wl-sign top8'; d.innerHTML = `<b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${panel.dataset.stage}'>Save Signature</button></div>`; panel.append(d); wireCanvas(d.querySelector('canvas')); return; }
+  const evidenceSignatureResult=await window.TechCheckEvidenceView.handleSignatureClick(e,{
+    blobFromCanvas,
+    uploadEvidence,
+    resolveItemId:(panel,unitNo)=>panel.dataset.stage==='it'&&unitNo?itItems()[unitNo-1]?.id||null:null,
+    afterSave:async({panel})=>{
+      if(panel.dataset.stage==='it'&&panel.dataset.mode==='signature'&&activeItPrep){
+        await renderItUnitStep();
+        return true;
+      }
+      return false;
+    },
+    refreshPanel:refreshProofPanel,
+    wireCanvas,
+    alert,
+    document
+  });
+  if(evidenceSignatureResult.handled)return;
   const ans = e.target.closest('[data-wl-answer]'); if (ans) { const val = ans.dataset.wlAnswer === 'pass'; if (inspection.step < 8) inspection.truck[inspection.step] = val; else if (inspection.takingTrailer === true && inspection.step < 16) inspection.trailer[inspection.step - 9] = val; if (val) inspection.step++; saveInspectionDraft(); return inspectionQuestion(); }
   const tr = e.target.closest('[data-wl-trailer]'); if (tr) { inspection.takingTrailer = tr.dataset.wlTrailer === 'yes'; inspection.step = inspection.takingTrailer ? 9 : 16; saveInspectionDraft(); return inspectionQuestion(); }
   if (e.target.closest('[data-wl-inspect-next]')) { if (inspection.step < 8 && inspection.truck[inspection.step] === null) return alert('Choose PASS or FAIL first.'); if (inspection.step === 8 && inspection.takingTrailer === null) return alert('Choose whether you are taking a trailer.'); if (inspection.takingTrailer === true && inspection.step >= 9 && inspection.step < 16 && inspection.trailer[inspection.step - 9] === null) return alert('Choose PASS or FAIL first.'); inspection.step++; if (inspection.step === 9 && inspection.takingTrailer === false) inspection.step = 16; saveInspectionDraft(); return inspectionQuestion(); }
