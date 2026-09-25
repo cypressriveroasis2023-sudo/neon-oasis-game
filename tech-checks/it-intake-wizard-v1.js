@@ -2,6 +2,7 @@
 // Database transitions remain in intake-shared-v1.js.
 const labels=window.TechCheckRules?.itIntakeChecklist||[];
 let wizard={row:null,step:0,answers:Array(labels.length).fill(null),notes:'',photo:null,meta:{}};
+let intakeActionSubmitting=false;
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 function getState(){return wizard;}
 function setState(next){wizard=next;return wizard;}
@@ -64,20 +65,57 @@ async function handleClick(event,deps={}){
     wizard.step++;await render();return true;
   }
   if(target.closest('[data-wl-intake-prev]')){if(wizard.step===labels.length+1)wizard.notes=document.getElementById('wlIntakeNotes')?.value||wizard.notes;wizard.step=Math.max(0,wizard.step-1);await render();return true;}
-  if(target.closest('[data-wl-intake-replacement]')){
+  const replacementAction=target.closest('[data-wl-intake-replacement]');
+  if(replacementAction){
+    if(intakeActionSubmitting)return true;
     wizard.notes=document.getElementById('wlIntakeNotes')?.value||wizard.notes||'';const row=wizard.row;
     if(!row?.id){alert('This intake record is no longer available.');return true;}
     if(!wizard.notes.trim()){alert('Describe the damage and what needs replacement before notifying the Owner.');return true;}
-    const file=document.getElementById('wlIntakePhoto')?.files?.[0];if(file)wizard.photo=file;let paths=row.intake_photo_paths||[];
-    try{if(wizard.photo)paths=await deps.uploadPhotos([wizard.photo],row.id,'it-replacement');if(!paths.length){alert('Take or choose an IT Intake photo showing the damaged equipment first.');return true;}await window.TechCheckIntake.markNeedsReplacement({returnId:row.id,damageNotes:wizard.notes,intakePhotoPaths:paths});const tech=await deps.identity();reset();deps.remember?.('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');await deps.home?.();}catch(error){alert(error?.message||'Could not mark this equipment as needing replacement.');}
+    intakeActionSubmitting=true;
+    const originalText=replacementAction.textContent;
+    replacementAction.disabled=true;
+    replacementAction.textContent='SAVING…';
+    try{
+      const file=document.getElementById('wlIntakePhoto')?.files?.[0];if(file)wizard.photo=file;let paths=row.intake_photo_paths||[];
+      if(wizard.photo)paths=await deps.uploadPhotos([wizard.photo],row.id,'it-replacement');
+      if(!paths.length){alert('Take or choose an IT Intake photo showing the damaged equipment first.');return true;}
+      await window.TechCheckIntake.markNeedsReplacement({returnId:row.id,damageNotes:wizard.notes,intakePhotoPaths:paths});
+      await deps.identity();
+      reset();deps.remember?.('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');await deps.home?.();
+    }catch(error){
+      alert(error?.message||'Could not mark this equipment as needing replacement.');
+    }finally{
+      intakeActionSubmitting=false;
+      if(document.contains(replacementAction)){replacementAction.disabled=false;replacementAction.textContent=originalText;}
+    }
     return true;
   }
-  if(target.closest('[data-wl-intake-finish]')){
-    wizard.notes=document.getElementById('wlIntakeNotes')?.value||'';const row=wizard.row,tech=await deps.identity(),paths=wizard.photo?await deps.uploadPhotos([wizard.photo],row.id,'it'):row.intake_photo_paths||[],answers=wizard.answers;
+  const finishAction=target.closest('[data-wl-intake-finish]');
+  if(finishAction){
+    if(intakeActionSubmitting)return true;
+    wizard.notes=document.getElementById('wlIntakeNotes')?.value||'';
+    const row=wizard.row,answers=wizard.answers;
+    if(!row?.id){alert('This intake record is no longer available.');return true;}
     if(!answers.every(v=>v===true)){alert('Every IT intake check must be YES before this unit can move to MHelpDesk inventory.');return true;}
-    wizard.meta.answers=[...answers];
-    try{const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths});wizard.meta=result.meta;}catch(error){alert(error.message);return true;}
-    reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();return true;
+    intakeActionSubmitting=true;
+    const originalText=finishAction.textContent;
+    finishAction.disabled=true;
+    finishAction.textContent='SAVING INTAKE…';
+    try{
+      const tech=await deps.identity();
+      const paths=wizard.photo?await deps.uploadPhotos([wizard.photo],row.id,'it'):row.intake_photo_paths||[];
+      if(!paths.length){alert('Take or choose the required IT Intake photo before finishing intake.');return true;}
+      wizard.meta.answers=[...answers];
+      const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths});
+      wizard.meta=result.meta;
+      reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();
+    }catch(error){
+      alert(error?.message||'Could not complete IT Intake.');
+    }finally{
+      intakeActionSubmitting=false;
+      if(document.contains(finishAction)){finishAction.disabled=false;finishAction.textContent=originalText;}
+    }
+    return true;
   }
   return false;
 }
