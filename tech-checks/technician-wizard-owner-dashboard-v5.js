@@ -2390,33 +2390,28 @@ async function completeServiceFieldAssignment(id) {
   rememberTechCompletion('service',ticket,'JOB COMPLETE');
   await showSvcHome();
 }
-async function syncServiceAssignmentAfterReturn(ticket,techId) {
-  const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','service').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
-  const a=rows?.[0];if(!a)return {completed:false,count:0,required:0};
+async function serviceReturnAssignmentProgress(ticket,techId) {
+  const {data:rows}=await liveDb.from('job_assignments').select('id,status,work_type').eq('ticket_no',String(ticket||'')).eq('assigned_role','service').eq('assignee_user_id',techId).order('assigned_at',{ascending:false}).limit(1);
+  const a=rows?.[0]||null;
   const {data:returns}=await liveDb.from('unit_returns').select('id,equipment_type').eq('ticket_no',String(ticket||'')).eq('service_tech_id',techId);
   const returnRows=returns||[];
-  const count=returnRows.length;
   const {data:preps}=await liveDb.from('prep_tickets').select('id,status,prep_items(id,unit_tag,equipment_type,purpose,swap_outcome)').eq('ticket_no',String(ticket||'')).eq('status','released').order('released_at',{ascending:false}).limit(5);
 
-  // Any SWAP stays in the field-result workflow until Service records whether
-  // the replacement was installed and the required return path is satisfied.
+  // Display-only progress. Assignment completion is authoritative in Supabase:
+  // PICKUP is completed from saved return/intake records; SWAP/handoff work
+  // completes through the field/close gates. The browser never decides completion.
   const activeSwapPrep=(preps||[]).find(p=>(p.prep_items||[]).some(i=>i.purpose==='SWAP'));
   if(activeSwapPrep){
     const swaps=(activeSwapPrep.prep_items||[]).filter(i=>i.purpose==='SWAP');
     const replacementKeys=new Set(swaps.map(i=>norm(i.unit_tag)).filter(Boolean));
     const installed=swaps.filter(i=>i.swap_outcome==='installed');
     const oldReturnRows=returnRows.filter(r=>!replacementKeys.has(norm(r.unit_tag)));
-    const required=installed.length;
-    return {completed:false,count:oldReturnRows.length,required,fieldPending:true};
+    return {completed:a?.status==='completed',count:oldReturnRows.length,required:installed.length,fieldPending:true};
   }
 
-  const required=assignmentEquipmentCount(a);
-  if(count>=required){
-    const {error}=await setJobAssignmentStatusCompat(a.id,'completed');
-    if(error)console.warn('Return saved but Service assignment could not be completed',error);
-    else return {completed:true,count,required};
-  }
-  return {completed:false,count,required};
+  // Do not duplicate database equipment-count semantics here. Re-read the
+  // assignment only to reflect whether the authoritative trigger completed it.
+  return {completed:a?.status==='completed',count:returnRows.length,required:0};
 }
 async function startAssignedJob(id,{serviceTicketVerified=false}={}) {
   let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
@@ -6993,7 +6988,7 @@ async function submitServiceReturn() {
       offlineLinkError=link.error||null;
       if(!offlineLinkError)serviceReturn.offlineEscalationId=null;
     }
-    const assignmentProgress=await syncServiceAssignmentAfterReturn(serviceReturn.ticket,tech.id);
+    const assignmentProgress=await serviceReturnAssignmentProgress(serviceReturn.ticket,tech.id);
     await clearDeviceDraft('service-return'); serviceReturnRecovered=false;
     const card=serviceReturnCard();
     const continuationHtml=
