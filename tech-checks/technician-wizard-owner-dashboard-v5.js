@@ -2,6 +2,7 @@ import './it-prep-view-v1.js?v=6';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=2';
 import './it-prep-shared-v1.js?v=4';
+import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
 import './notifications-v1.js?v=1';
@@ -4460,12 +4461,7 @@ function itUnitIssues(item,evidence,unitNo){
 }
 function itIssueLinksHtml(item,evidence,unitNo){return window.TechCheckITPrepView.issueLinksHtml(item,evidence,unitNo,{esc,issues:itUnitIssues});}
 function itUnitReviewHtml(item,evidence,unitNo){return window.TechCheckITPrepView.unitReviewHtml(item,evidence,unitNo,{esc,unitEvidence,stepsData:itUnitStepsData,boolValue:itBoolValue,itemIdentity:itItemIdentity,unitSignature});}
-async function loadTruckSpareBatteries(prepId) {
-  if (!prepId) return [];
-  const { data,error } = await liveDb.from('truck_spare_batteries').select('*').eq('prep_ticket_id',prepId).order('created_at',{ascending:true});
-  if (error) throw error;
-  return data || [];
-}
+const loadTruckSpareBatteries=(prepId)=>window.TechCheckTruckSpares.load(prepId);
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items=itItems();
