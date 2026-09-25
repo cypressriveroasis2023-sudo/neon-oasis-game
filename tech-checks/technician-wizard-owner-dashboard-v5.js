@@ -2418,12 +2418,16 @@ async function syncServiceAssignmentAfterReturn(ticket,techId) {
   }
   return {completed:false,count,required};
 }
-async function startAssignedJob(id) {
+async function startAssignedJob(id,{serviceTicketVerified=false}={}) {
   let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
   let assignment = rows?.[0];
   if (!assignment) return alert('That assignment is no longer available.');
   const gate = await assignmentGateState(assignment);
   if (!gate.ready) return alert(gate.label + '\n\n' + gate.detail);
+
+  if (assignment.assigned_role==='service' && !serviceTicketVerified) {
+    return showServiceJobLookup();
+  }
 
   if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
     if(assignment.assigned_role==='service'){
@@ -4869,7 +4873,7 @@ async function serviceTakeVerifiedJob(id){
     if(claimError)return alert(claimError.message||'Another Service Tech already claimed this ticket.');
     await sendTechWorkflowBroadcast('assignment_claimed',{assignment_id:id,role:'service',ticket_no:a.ticket_no});
   }
-  return startAssignedJob(id);
+  return startAssignedJob(id,{serviceTicketVerified:true});
 }
 async function showReceiveLookup() {
   let card = document.getElementById('wlSvcLookup'); if (!card) { card = document.createElement('div'); card.id = 'wlSvcLookup'; card.className = 'card'; viewSvc().append(card); }
