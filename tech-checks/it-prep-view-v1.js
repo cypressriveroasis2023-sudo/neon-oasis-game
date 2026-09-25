@@ -53,4 +53,39 @@ function unitReviewHtml(item,evidence,unitNo,deps={}){
   </div>`;
 }
 
-window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml});
+
+function wizardCard(view){
+  let wizard=document.getElementById('wlItWizardOnly');
+  if(!wizard){wizard=document.createElement('div');wizard.id='wlItWizardOnly';wizard.className='card';view?.append(wizard);}
+  return wizard;
+}
+function typeMissingHtml(unitNo,totalUnits,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??''));
+  return progress(`Item ${unitNo} of ${totalUnits}`,'Equipment type missing',1,1)+`<div class='wl-stop'><b>OWNER ACTION NEEDED</b><div>This ticket does not say what equipment IT should prepare. Go back and have the Owner correct the assignment.</div></div><div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><span></span></div>`;
+}
+function purposeHtml(unitNo,totalUnits,typeChoice,purposeChoice,options,serviceJob,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??''));
+  const question=serviceJob?'IS THIS UNIT REPLACING A UNIT ALREADY AT THE SITE?':'Confirm this unit purpose';
+  const note=serviceJob
+    ? (typeChoice==='110V Stand'?'110V Stand is swap-only. If it is not replacing a site stand, the Owner assignment needs to be corrected.':'YES uses the SWAP return path. NO treats the unit as Service support / backup equipment.')
+    : 'Tech Check selected the purpose from the Owner job type.';
+  return progress(`Unit ${unitNo} of ${totalUnits}`,serviceJob?'One simple purpose question':'Confirm unit purpose',1,1)+
+    `<div class='wl-question'><div class='qtext'>${esc(question)}</div><div class='wl-options'>${(options||[]).map(row=>`<button class='${purposeChoice===row.value?'pass on':'pass'}' data-wl-unit-purpose='${row.value}'>${esc(row.label)}</button>`).join('')}</div><div class='wl-note'>${esc(note)}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+}
+function reconHtml(unitNo,totalUnits,reconRequired,deps={}){
+  const progress=deps.progress||(()=>''),value=Math.max(1,Number(reconRequired||1));
+  return progress(`Unit ${unitNo} of ${totalUnits}`,'Recon II camera count',1,1)+`<div class='wl-question'><div class='qtext'>How many cameras are going on this Recon II for this deployment?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${value}'></div><div class='wl-note top8'>Battery quantity is entered separately during the unit check after the Recon II is programmed and ready.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+}
+function checksHtml(item,unitNo,totalUnits,questionIndex,steps,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??'')),step=(steps||[])[questionIndex],stepCount=Math.max(1,(steps||[]).length),equipmentName=item?.equipment_type||'Equipment';
+  const question=stepHtml(item,step,questionIndex,(steps||[]).length,unitNo,{esc,boolAnswered:deps.boolAnswered,boolValue:deps.boolValue});
+  const nav=step?.kind==='bool'
+    ? `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`
+    : `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${questionIndex===(steps||[]).length-1?'Next: Photo →':'Next →'}</button></div>`;
+  return progress(`Unit ${unitNo} of ${totalUnits}`,`${equipmentName} · Step ${questionIndex+1} of ${stepCount}`,questionIndex+1,stepCount)+question+nav;
+}
+function reviewPhaseHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml){
+  return `<div class='wl-review-phase'>${reviewHtml||''}${ready?'':(issuesHtml||'')}${ready?'':`<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready?'':'disabled'}>${unitNo<totalUnits?`Next: Unit ${unitNo+1} →`:'Next: Ticket Summary →'}</button></div></div>`;
+}
+
+window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml});
