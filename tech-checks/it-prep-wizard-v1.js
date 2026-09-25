@@ -183,4 +183,17 @@ function finalReadiness(prep,items=[],evidence=[],spareBatteries=[],deps={}){
   return {totalUnits,itemReady,spareUnitsCheckedOut,spareBatteriesReady,spareBatteriesCheckedOut,partsOnly,partsOnlyProofReady,ready};
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness});
+
+function typePhaseDecision({lockedType='',autoPurpose='',currentItem=null,purposeAllowed=()=>false}={}){
+  if(!lockedType)return {phase:'type',missingType:true};
+  const base={typeChoice:lockedType};
+  if(autoPurpose&&purposeAllowed(lockedType,autoPurpose)){
+    const purposeChoice=autoPurpose;
+    if(lockedType==='Recon 2')return {...base,purposeChoice,phase:'recon',configure:false};
+    const configure=!currentItem||currentItem.equipment_type!==lockedType||currentItem.purpose!==autoPurpose;
+    return {...base,purposeChoice,phase:'checks',questionIndex:0,configure};
+  }
+  return {...base,purposeChoice:currentItem?.purpose||'',phase:'purpose',configure:false};
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision});
