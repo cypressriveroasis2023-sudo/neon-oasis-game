@@ -69,7 +69,7 @@ async function handleClick(event,deps={}){
     if(!row?.id){alert('This intake record is no longer available.');return true;}
     if(!wizard.notes.trim()){alert('Describe the damage and what needs replacement before notifying the Owner.');return true;}
     const file=document.getElementById('wlIntakePhoto')?.files?.[0];if(file)wizard.photo=file;let paths=row.intake_photo_paths||[];
-    try{if(wizard.photo)paths=await deps.uploadPhotos([wizard.photo],row.id,'it-replacement');if(!paths.length){alert('Take or choose an IT Intake photo showing the damaged equipment first.');return true;}await window.TechCheckIntake.markNeedsReplacement({returnId:row.id,damageNotes:wizard.notes,intakePhotoPaths:paths});const tech=await deps.identity();await deps.syncAssignment(row.ticket_no,tech.id);reset();deps.remember?.('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');await deps.home?.();}catch(error){alert(error?.message||'Could not mark this equipment as needing replacement.');}
+    try{if(wizard.photo)paths=await deps.uploadPhotos([wizard.photo],row.id,'it-replacement');if(!paths.length){alert('Take or choose an IT Intake photo showing the damaged equipment first.');return true;}await window.TechCheckIntake.markNeedsReplacement({returnId:row.id,damageNotes:wizard.notes,intakePhotoPaths:paths});const tech=await deps.identity();reset();deps.remember?.('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');await deps.home?.();}catch(error){alert(error?.message||'Could not mark this equipment as needing replacement.');}
     return true;
   }
   if(target.closest('[data-wl-intake-finish]')){
@@ -77,7 +77,7 @@ async function handleClick(event,deps={}){
     if(!answers.every(v=>v===true)){alert('Every IT intake check must be YES before this unit can move to MHelpDesk inventory.');return true;}
     wizard.meta.answers=[...answers];
     try{const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths});wizard.meta=result.meta;}catch(error){alert(error.message);return true;}
-    await deps.syncAssignment(row.ticket_no,tech.id);reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();return true;
+    reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();return true;
   }
   return false;
 }
