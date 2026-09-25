@@ -50,6 +50,7 @@ let activeSvcPrep = null;
 let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
+let serviceQuestionAdvancing = false;
 let svcSolarCursor = null;
 let svcHeliosFieldCursor = null;
 let heliosFieldAnswerSubmitting = false;
@@ -6376,52 +6377,71 @@ document.addEventListener('click', async e => {
   if (svcTicket) { if (svcTicket.dataset.wlSvcTicket === 'wrong') { activeSvcPrep = null; return showReceiveLookup(); } return renderSvcPrep(); }
   const svcAnswer = e.target.closest('[data-wl-svc-answer]');
   if (svcAnswer) {
-    const card = findSvcCard(activeSvcPrep.ticket_no);
-    const q = svcQuestions(svcForms(card)[svcUnitIndex])[svcQuestionIndex];
-    if (!q || q.kind !== 'bool') return;
-    const yes = svcAnswer.dataset.wlSvcAnswer === 'yes';
-    q.input.checked = yes;
-    q.input.dataset.wlAnswered = '1';
-    if(q.heliosBattery){
-      if(!await saveServiceSolarProgressField('helios_battery_box_charging_ok',yes?'true':'false'))return;
-      if(!await saveServiceSolarProgressField('batteries_charged_ok',yes?'true':'false'))return;
+    if(serviceQuestionAdvancing)return;
+    serviceQuestionAdvancing=true;
+    const answerButtons=[...(svcAnswer.closest('.wl-options')?.querySelectorAll('button')||[])];
+    answerButtons.forEach(button=>button.disabled=true);
+    try{
+      const card = findSvcCard(activeSvcPrep.ticket_no);
+      const q = svcQuestions(svcForms(card)[svcUnitIndex])[svcQuestionIndex];
+      if (!q || q.kind !== 'bool') return;
+      const yes = svcAnswer.dataset.wlSvcAnswer === 'yes';
+      q.input.checked = yes;
+      q.input.dataset.wlAnswered = '1';
+      if(q.heliosBattery){
+        if(!await saveServiceSolarProgressField('helios_battery_box_charging_ok',yes?'true':'false'))return;
+        if(!await saveServiceSolarProgressField('batteries_charged_ok',yes?'true':'false'))return;
+      }
+      if (yes) return await advanceSvcVerification();
+      return await renderSvcPrep();
+    }finally{
+      serviceQuestionAdvancing=false;
+      answerButtons.forEach(button=>{if(document.contains(button))button.disabled=false;});
     }
-    if (yes) return advanceSvcVerification();
-    return renderSvcPrep();
   }
-  if (e.target.closest('[data-wl-svc-next]')) {
-    const card = findSvcCard(activeSvcPrep.ticket_no);
-    const forms = svcForms(card);
-    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
-    const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
-    const solarRequired = Boolean(solarCtx?.need_solar);
-    const partStep = forms.length;
-    const solarStep = forms.length + (hasParts ? 1 : 0);
-    const proofStep = solarStep + (solarRequired ? 1 : 0);
-    const photoStep = proofStep + 1;
-    const signStep = proofStep + 2;
-    const swapStep = signStep + 1;
-    const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
-    const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
-    const rangerField = rangerFieldItems(activeSvcPrep);
-    if (svcUnitIndex < forms.length) return advanceSvcVerification();
-    if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
-    if (solarRequired && svcUnitIndex === solarStep) {
-      const check=await loadServiceSolarCheck(activeSvcPrep.id);
-      const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
-      if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
+  const svcNext=e.target.closest('[data-wl-svc-next]');
+  if (svcNext) {
+    if(serviceQuestionAdvancing)return;
+    serviceQuestionAdvancing=true;
+    svcNext.disabled=true;
+    try{
+      const card = findSvcCard(activeSvcPrep.ticket_no);
+      const forms = svcForms(card);
+      const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+      const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
+      const solarRequired = Boolean(solarCtx?.need_solar);
+      const partStep = forms.length;
+      const solarStep = forms.length + (hasParts ? 1 : 0);
+      const proofStep = solarStep + (solarRequired ? 1 : 0);
+      const photoStep = proofStep + 1;
+      const signStep = proofStep + 2;
+      const swapStep = signStep + 1;
+      const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
+      const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
+      const rangerField = rangerFieldItems(activeSvcPrep);
+      if (svcUnitIndex < forms.length) return await advanceSvcVerification();
+      if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
+      if (solarRequired && svcUnitIndex === solarStep) {
+        const check=await loadServiceSolarCheck(activeSvcPrep.id);
+        const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+        if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
+      }
+      if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
+      if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+      if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
+        const state=await swapWorkflowState(activeSvcPrep);
+        const unresolved=nonHeliosSwaps.some(i=>!i.swap_outcome)
+          || nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id))
+          || Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>state.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
+        if(unresolved)return alert('Finish the SWAP YES / NO decision and required IT Intake return before continuing.');
+      }
+      if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
+      svcUnitIndex++;
+      return await renderSvcPrep();
+    }finally{
+      serviceQuestionAdvancing=false;
+      if(document.contains(svcNext))svcNext.disabled=false;
     }
-    if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
-    if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
-    if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
-      const state=await swapWorkflowState(activeSvcPrep);
-      const unresolved=nonHeliosSwaps.some(i=>!i.swap_outcome)
-        || nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id))
-        || Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>state.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
-      if(unresolved)return alert('Finish the SWAP YES / NO decision and required IT Intake return before continuing.');
-    }
-    if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
-    svcUnitIndex++; return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-svc-prev]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
