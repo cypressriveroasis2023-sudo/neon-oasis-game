@@ -7029,74 +7029,15 @@ document.addEventListener('click', async e => {
   if (mode) { if (mode.dataset.wlMode === 'intake') return showITIntake(); return showITHome(); }
   const intakeView = e.target.closest('[data-wl-intake-view]');
   if (intakeView) return showITIntakeList(intakeView.dataset.wlIntakeView);
-  const intakeStart = e.target.closest('[data-wl-intake-start]');
-  if (intakeStart) return startITIntake(intakeStart.dataset.wlIntakeStart);
-  const intakeAnswer = e.target.closest('[data-wl-intake-answer]');
-  if (intakeAnswer) {
-    const value = intakeAnswer.dataset.wlIntakeAnswer === 'yes';
-    intakeWizard.answers[intakeWizard.step] = value;
-    const row = intakeWizard.row;
-    if (row?.id) {
-      const tech = await currentTechIdentity();
-      if (intakeWizard.step === 12 && value) intakeWizard.meta.cancellationDoc = intakeDocumentation(row, tech);
-      intakeWizard.meta.answers = [...intakeWizard.answers];
-      try {
-        const update = await window.TechCheckIntake.saveProgress({ returnId: row.id, notes: intakeWizard.notes, meta: intakeWizard.meta });
-        row.damage_notes = update.damage_notes;
-      } catch (error) { return alert(error.message); }
-    }
-    if (value) intakeWizard.step++;
-    return renderITIntakeWizard();
-  }
-  if (e.target.closest('[data-wl-intake-escalate]')) {
-    intakeWizard.step = intakeLabels.length;
-    return renderITIntakeWizard();
-  }
-  if (e.target.closest('[data-wl-intake-next]')) {
-    if (intakeWizard.step < intakeLabels.length && intakeWizard.answers[intakeWizard.step] !== true) return alert('This step is blocked. Fix the issue and tap YES, or document it as Needs Replacement.');
-    if (intakeWizard.step === intakeLabels.length) { const file = document.getElementById('wlIntakePhoto')?.files?.[0]; if (!file && !intakeWizard.photo) return alert('Take or choose the IT intake photo first.'); if (file) intakeWizard.photo = file; }
-    intakeWizard.step++;
-    return renderITIntakeWizard();
-  }
-  if (e.target.closest('[data-wl-intake-prev]')) { if (intakeWizard.step === intakeLabels.length + 1) intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || intakeWizard.notes; intakeWizard.step = Math.max(0, intakeWizard.step - 1); return renderITIntakeWizard(); }
-  if (e.target.closest('[data-wl-intake-replacement]')) {
-    intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || intakeWizard.notes || '';
-    const row = intakeWizard.row;
-    if (!row?.id) return alert('This intake record is no longer available.');
-    if (!intakeWizard.notes.trim()) return alert('Describe the damage and what needs replacement before notifying the Owner.');
-    const file = document.getElementById('wlIntakePhoto')?.files?.[0];
-    if (file) intakeWizard.photo = file;
-    let paths = row.intake_photo_paths || [];
-    try {
-      if (intakeWizard.photo) paths = await uploadReturnPhotos([intakeWizard.photo], row.id, 'it-replacement');
-      if (!paths.length) return alert('Take or choose an IT Intake photo showing the damaged equipment first.');
-      await window.TechCheckIntake.markNeedsReplacement({ returnId: row.id, damageNotes: intakeWizard.notes, intakePhotoPaths: paths });
-      const tech = await currentTechIdentity();
-      await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
-      intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
-      rememberTechCompletion('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');
-      return showITHome();
-    } catch (error) {
-      return alert(error?.message || 'Could not mark this equipment as needing replacement.');
-    }
-  }
-  if (e.target.closest('[data-wl-intake-finish]')) {
-    intakeWizard.notes = document.getElementById('wlIntakeNotes')?.value || '';
-    const row = intakeWizard.row;
-    const tech = await currentTechIdentity();
-    const paths = intakeWizard.photo ? await uploadReturnPhotos([intakeWizard.photo], row.id, 'it') : row.intake_photo_paths || [];
-    const a = intakeWizard.answers;
-    if (!a.every(v => v === true)) return alert('Every IT intake check must be YES before this unit can move to MHelpDesk inventory.');
-    intakeWizard.meta.answers = [...a];
-    try {
-      const result = await window.TechCheckIntake.finishIntake({ row, tech, notes: intakeWizard.notes, meta: intakeWizard.meta, intakePhotoPaths: paths });
-      intakeWizard.meta = result.meta;
-    } catch (error) { return alert(error.message); }
-    await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
-    intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
-    rememberTechCompletion('it',row.ticket_no,'IT INTAKE COMPLETE');
-    return showITHome();
-  }
+  if (await window.TechCheckITIntake.handleClick(e,{
+    start:startITIntake,
+    render:async()=>{ intakeWizard=window.TechCheckITIntake.getState(); return renderITIntakeWizard(); },
+    identity:currentTechIdentity,
+    uploadPhotos:uploadReturnPhotos,
+    syncAssignment:syncITReturnAssignmentAfterIntake,
+    remember:rememberTechCompletion,
+    home:showITHome
+  })) { intakeWizard=window.TechCheckITIntake.getState(); return; }
   const ownerRemoveReturn = e.target.closest('[data-wl-owner-remove-return]'); if (ownerRemoveReturn) { if (!roleText().includes('Owner/Admin')) return alert('Only the Owner/Admin can remove Return & Intake tracking records.'); const unit = ownerRemoveReturn.dataset.wlUnit || 'this unit'; const ticket = ownerRemoveReturn.dataset.wlTicket || ''; if (!confirm(`Remove Unit ${unit}${ticket ? ` from MHelpDesk #${ticket}` : ''} from Return & Intake Tracking?\n\nThis deletes this tracking record from the app and cannot be undone.`)) return; ownerRemoveReturn.disabled = true; ownerRemoveReturn.textContent = 'Removing…'; const { error } = await liveDb.rpc('owner_remove_unit_return', { p_return_id: ownerRemoveReturn.dataset.wlOwnerRemoveReturn }); if (error) { ownerRemoveReturn.disabled = false; ownerRemoveReturn.textContent = 'Remove from Tracking'; return alert(error.message); } await installOwnerIntake(true); if (typeof window.refreshData === 'function') await window.refreshData(); return; } const ownerMhelpDone = e.target.closest('[data-wl-owner-mhelp-done]');
   if (ownerMhelpDone) {
     if (!roleText().includes('Owner/Admin')) return alert('Only the Owner/Manager can confirm MHelpDesk shop inventory.');
