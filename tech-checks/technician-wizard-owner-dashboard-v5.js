@@ -1,3 +1,4 @@
+import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
 import './notifications-v1.js?v=1';
 const LIVE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
@@ -56,8 +57,8 @@ async function loadDeviceDraft(kind) { const key = await deviceDraftKey(kind); i
 async function clearDeviceDraft(kind) { const key = await deviceDraftKey(kind); if (key) try { localStorage.removeItem(key); } catch {} }
 function saveInspectionDraft() { return saveDeviceDraft('inspection',{ step:inspection.step, truck:[...inspection.truck], takingTrailer:inspection.takingTrailer, trailer:[...inspection.trailer] }); }
 function saveServiceReturnDraft() { return saveDeviceDraft('service-return',{ step:serviceReturn.step, ticket:serviceReturn.ticket, unit:serviceReturn.unit, type:serviceReturn.type, notes:serviceReturn.notes, noTag:Boolean(serviceReturn.noTag), offlineEscalationId:serviceReturn.offlineEscalationId||null }); }
-const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the returned unit tag / number correct?', 'Did you review the Service Tech site / damage photos and verify any damage found?', 'Are the returned accessories / equipment accounted for?', 'Are the batteries / battery box accounted for?', 'Are the SD cards / storage accounted for where applicable?', 'Did you power the unit and verify it comes online / functions correctly?', 'Were the SD cards formatted and made ready for the next deployment?', 'Was the SIM card turned off / canceled for this returned unit?', 'Was monitoring canceled for this returned unit?', 'Was this unit removed from Alibi?', 'Was the unit cleaned and made physically ready for reuse?', 'Was the unit added back to the 2026 Unit Tracker as Shop Inventory?', 'Was the SIM cancellation documented with the date, MHelpDesk job, unit number, and IT technician initials?', 'Is the unit back on the shelf and ready for a future deployment?', 'Was this returned unit removed from the customer email account in the camera app?'];
-let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
+const intakeLabels = window.TechCheckITIntake.labels;
+let intakeWizard = window.TechCheckITIntake.getState();
 let ownerReturnRows = new Map();
 let serviceReturnRows = new Map();
 const readIntakeRecord = (...args) => window.TechCheckIntake.readRecord(...args);
@@ -3982,77 +3983,18 @@ async function showITIntakeList(kind = 'waiting') {
   resetWizardPosition();
 }
 async function startITIntake(id) {
-  const rows = await returnRows();
-  const row = rows.find(x => x.id === id);
-  if (!row) return;
-  const record = readIntakeRecord(row.damage_notes);
-  const savedAnswers = Array.isArray(record.meta?.answers) ? record.meta.answers : [];
-  const answers = Array(intakeLabels.length).fill(null).map((_, i) => typeof savedAnswers[i] === 'boolean' ? savedAnswers[i] : null);
-  let step = answers.findIndex(v => v !== true);
-  if (step < 0) step = row.intake_photo_paths?.length ? intakeLabels.length + 1 : intakeLabels.length;
-  intakeWizard = { row, step, answers, notes: record.notes, photo: null, meta: record.meta || {} }; 
-  return renderITIntakeWizard();
+  const rows=await returnRows(),row=rows.find(x=>x.id===id);if(!row)return;
+  intakeWizard=window.TechCheckITIntake.start(row);return renderITIntakeWizard();
 }
 function intakeAIReview(row){
-  const answered=intakeWizard.answers.filter(v=>v!==null).length,noCount=intakeWizard.answers.filter(v=>v===false).length,remaining=intakeWizard.answers.length-answered,flags=[];
-  const yes=(i)=>intakeWizard.answers[i]===true, servicePhotos=Array.isArray(row?.return_photo_paths)?row.return_photo_paths:[], intakePhotos=Array.isArray(row?.intake_photo_paths)?row.intake_photo_paths:[];
-  if(yes(1)&&!servicePhotos.length) flags.push('Evidence mismatch: Service damage/photo review is YES, but no Service return photo is attached.');
-  if(yes(0)&&!String(row?.unit_tag||'').trim()) flags.push('Evidence mismatch: unit/tag verification is YES, but the returned unit tag is missing.');
-  if(intakeWizard.step>intakeLabels.length && !intakeWizard.photo && !intakePhotos.length) flags.push('Required IT Intake photo is still missing.');
-  if(yes(12)&&!intakeWizard.meta?.cancellationDoc) flags.push('Evidence mismatch: SIM cancellation documentation is YES, but the date/job/unit/initials record is missing.');
-  if(noCount) flags.push(noCount+' intake check'+(noCount===1?' is':'s are')+' marked NO.');
-  if(row?.return_notes) flags.push('Service documented return/damage notes — review them against the photos.');
-  if(!row?.return_photo_paths?.length) flags.push('No Service return photo is attached.');
-  const pct=Math.round(answered/intakeWizard.answers.length*100);
-  return `<div class='wl-ai-panel wl-ai-progress'><div class='wl-ai-head'>${onsiteVisionTitle('Intake Review')}<b>${noCount?'ATTENTION':remaining?'IN PROGRESS':'CHECKS COMPLETE'}</b></div><div class='wl-ai-line'><b>Checklist:</b> ${answered}/${intakeWizard.answers.length} answered · ${pct}%</div>${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No checklist conflicts detected so far.</div>`}<div class='small top8'>AI reviews recorded answers and evidence status only. Technician verification is still required.</div></div>`;
+  const r=window.TechCheckITIntake.reviewFlags();
+  return `<div class='wl-ai-panel wl-ai-progress'><div class='wl-ai-head'>${onsiteVisionTitle('Intake Review')}<b>${r.noCount?'ATTENTION':r.remaining?'IN PROGRESS':'CHECKS COMPLETE'}</b></div><div class='wl-ai-line'><b>Checklist:</b> ${r.answered}/${intakeWizard.answers.length} answered · ${r.pct}%</div>${r.flags.length?`<div class='wl-ai-warn'>${r.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No checklist conflicts detected so far.</div>`}<div class='small top8'>AI reviews recorded answers and evidence status only. Technician verification is still required.</div></div>`;
 }
-async function renderITIntakeWizard() {
-  const row = intakeWizard.row;
-  if (!row) return showITIntake();
-  let card = document.getElementById('wlIntakeForm');
-  if (!card) {
-    card = document.createElement('div');
-    card.id = 'wlIntakeForm';
-    card.className = 'card wl-it-simple-card';
-    viewIT().append(card);
-  }
-  const photoHtml = await returnPhotoHtml(row.return_photo_paths);
+async function renderITIntakeWizard(){
+  window.TechCheckITIntake.setState(intakeWizard);
+  return window.TechCheckITIntake.render({view:viewIT(),progress,photoHtml:returnPhotoHtml,hideChildren,resetPosition:resetWizardPosition,onEmpty:showITIntake});
+}
 
-  if (intakeWizard.step < intakeLabels.length) {
-    const i = intakeWizard.step;
-    const answer = intakeWizard.answers[i];
-    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, intakeLabels[i], i + 1, intakeLabels.length + 2)}
-      <div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div>MHelpDesk #${esc(row.ticket_no)}</div><div>Returned by ${esc(row.service_tech_name)}</div>${row.return_notes ? `<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>` : ''}${photoHtml?`<div class='wl-return-gallery top8'>${photoHtml}</div>`:''}</div>
-      <div class='wl-question wl-it-intake-bool'>
-        <div class='qnum'>INTAKE CHECK ${i + 1} OF ${intakeLabels.length}</div>
-        <div class='qtext'>${esc(intakeLabels[i])}</div>
-        <div class='wl-options'>
-          <button class='pass ${answer === true ? 'on' : ''}' data-wl-intake-answer='yes'>YES</button>
-          <button class='fail ${answer === false ? 'on' : ''}' data-wl-intake-answer='no'>NO</button>
-        </div>
-        ${answer === false ? `<div class='wl-stop'><b>STOP — THIS UNIT CANNOT CONTINUE TO INVENTORY.</b><div>Fix the problem and tap YES. If it cannot be corrected, document it as damaged / needs replacement.</div><button class='wl-it-escalate top10' data-wl-intake-escalate>DOCUMENT DAMAGE / REPLACEMENT →</button></div>` : ''}
-      </div>
-      <button class='wl-service-backstep' data-wl-intake-prev ${i===0?'disabled':''}>← PREVIOUS QUESTION</button>`;
-  } else if (intakeWizard.step === intakeLabels.length) {
-    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, 'TAKE AN IT INTAKE PHOTO', intakeLabels.length + 1, intakeLabels.length + 2)}
-      <div class='wl-review'><b>Service return evidence</b>${row.return_notes ? `<div class='warn top8'><b>Service notes</b><div>${esc(row.return_notes)}</div></div>` : ''}<div class='wl-return-gallery'>${photoHtml}</div></div>
-      <div class='wl-question'><div class='qtext'>TAKE A CURRENT PHOTO OF ${esc(row.unit_tag)} IN THE SHOP.</div><label class='wl-photo-button' for='wlIntakePhoto'>📷 TAKE / CHOOSE UNIT PHOTO</label><input id='wlIntakePhoto' class='wl-photo-input' type='file' accept='image/*'><div class='wl-return-preview ${intakeWizard.photo ? '' : 'hidden'}'>${intakeWizard.photo ? `<img src='${URL.createObjectURL(intakeWizard.photo)}' alt='Selected IT intake unit photo'>` : ''}</div></div>
-      <div class='wl-nav'><button class='wl-prev' data-wl-intake-prev>Back</button><button class='wl-next' data-wl-intake-next>REVIEW →</button></div>`;
-  } else {
-    const noCount = intakeWizard.answers.filter(v => v === false).length;
-    const ready = noCount === 0 && intakeWizard.answers.every(v => v === true);
-    const doc = intakeWizard.meta?.cancellationDoc;
-    card.innerHTML = `${progress(`${row.unit_tag} · IT INTAKE`, ready?'READY FOR PENDING MHELPDESK INVENTORY':'UNIT NEEDS ATTENTION', intakeLabels.length + 2, intakeLabels.length + 2)}
-      <div class='wl-review'><b>${esc(row.unit_tag)} · ${esc(row.equipment_type || 'Unit')}</b><div><b>MHelpDesk #${esc(row.ticket_no)}</b></div><div>${ready ? `✓ All ${intakeLabels.length} required intake checks are YES.` : `${noCount} failed check${noCount === 1 ? '' : 's'} — this unit cannot become Shop Inventory.`}</div>${doc ? `<div class='ok top8'>SIM cancellation documentation recorded.</div>` : ''}</div>
-      <label>Damage / intake notes</label><textarea id='wlIntakeNotes' rows='4' placeholder='Describe damage, missing items, repair needed, or other notes'>${esc(intakeWizard.notes)}</textarea>
-      ${ready
-        ? `<div class='wl-it-good top10'>✓ IT INTAKE COMPLETE</div><button class='wl-it-start top10' data-wl-intake-finish>SEND TO PENDING MHELPDESK INVENTORY →</button>`
-        : `<div class='wl-stop'><b>DO NOT RETURN THIS UNIT TO INVENTORY.</b><div>Document what is wrong and send it to the Owner as Needs Replacement.</div></div><button class='wl-it-start top10' data-wl-intake-replacement>MARK NEEDS REPLACEMENT → OWNER</button>`}
-      <button class='wl-service-backstep top10' data-wl-intake-prev>← BACK</button>`;
-  }
-  hideChildren(viewIT(), [card]);
-  resetWizardPosition();
-}
 async function showPendingList() {
   const { data } = await liveDb.from('prep_tickets').select('id,ticket_no,site,status,created_at,expected_unit_count,solar_panel_qty,battery_replacement_qty,camera_replacement_qty,sim_replacement_qty,micro_sd_qty,prep_items(id)').eq('status', 'draft').order('created_at', { ascending: true });
   let card = document.getElementById('wlPendingList'); if (!card) { card = document.createElement('div'); card.id = 'wlPendingList'; card.className = 'card'; viewIT().append(card); }
