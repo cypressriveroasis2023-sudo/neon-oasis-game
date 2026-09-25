@@ -9,11 +9,11 @@ window.TechCheckContext = Object.freeze({
   getRole: () => state.profile?.role || null,
   getOwnerTestSession: () => ownerTestSessionRead(),
   getEffectiveRole: () => {
-    const test = ownerTestSessionRead();
+    const test = document.body?.classList.contains('owner-test-role-preview') ? ownerTestSessionRead() : null;
     return state.profile?.role === 'owner' && test?.preview_role ? test.preview_role : (state.profile?.role || null);
   },
   getEffectiveIdentity: () => {
-    const test = ownerTestSessionRead();
+    const test = document.body?.classList.contains('owner-test-role-preview') ? ownerTestSessionRead() : null;
     if (state.profile?.role === 'owner' && test?.preview_role && test?.persona_id) {
       return { id:test.persona_id, name:test.persona_name||'Test Technician', username:test.persona_username||'', role:test.preview_role, owner_test:true, ticket:test.ticket||'' };
     }
