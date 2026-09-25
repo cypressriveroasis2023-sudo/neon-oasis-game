@@ -1,6 +1,6 @@
 import './it-prep-view-v1.js?v=6';
 import './it-prep-wizard-v1.js?v=9';
-import './it-prep-rules-v1.js?v=2';
+import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=4';
 import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -4369,53 +4369,20 @@ function itSummaryHtml(forms, evidence) {
 }
 const CAMERA_UNIT_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','110V Stand','Pole'];
-function isSolarSupport(type) { return window.TechCheckRules?.isSolarSupport ? window.TechCheckRules.isSolarSupport(type) : type==='Solar Stand'; }
-function isSimpleSupport(type) { return window.TechCheckRules?.isSimpleSupport ? window.TechCheckRules.isSimpleSupport(type) : ['110V Stand','Pole'].includes(type); }
-function isSupport(type) { return window.TechCheckRules?.isSupport ? window.TechCheckRules.isSupport(type) : (isSolarSupport(type) || isSimpleSupport(type)); }
 function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
 function currentItItem() { return itItems()[itUnitIndex] || null; }
-function itAllowedPurposes(type) { if (type === '110V Stand') return ['SWAP']; if (type === 'Solar Stand') return ['SWAP','DELIVERY']; return ['SWAP','DELIVERY']; }
-
-function itPurposeOptionsForCurrentJob(type) {
+function itPurposeOptionsForCurrentJob(type){
   const workType=String(activeItPrep?.work_type||pendingAssignmentWorkType||'service').toLowerCase();
-  if(workType==='delivery') return itAllowedPurposes(type).includes('DELIVERY') ? [{value:'DELIVERY',label:'DELIVERY'}] : itAllowedPurposes(type).map(value=>({value,label:value}));
-  if(workType==='swap') return itAllowedPurposes(type).includes('SWAP') ? [{value:'SWAP',label:'SWAP'}] : itAllowedPurposes(type).map(value=>({value,label:value}));
-  if(workType==='service'){
-    if(type==='110V Stand') return [{value:'SWAP',label:'YES — REPLACING SITE STAND'}];
-    if(type==='Solar Stand') return [
-      {value:'SWAP',label:'YES — REPLACING SITE STAND'},
-      {value:'DELIVERY',label:'NO — SUPPORT STAND'}
-    ];
-    return [
-      {value:'SWAP',label:'YES — REPLACING SITE UNIT'},
-      {value:'BACKUP',label:'NO — SUPPORT / BACKUP'}
-    ];
-  }
-  return itAllowedPurposes(type).map(value=>({value,label:value}));
+  return window.TechCheckITPrepRules.purposeOptions(type,workType);
 }
-function itPurposeAllowedForCurrentJob(type,purpose) {
-  return itPurposeOptionsForCurrentJob(type).some(row=>row.value===purpose);
+function itPurposeAllowedForCurrentJob(type,purpose){
+  const workType=String(activeItPrep?.work_type||pendingAssignmentWorkType||'service').toLowerCase();
+  return window.TechCheckITPrepRules.purposeAllowed(type,purpose,workType);
 }
 function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; return rows.filter(r => r.kind === kind && String(r.original_name || '').startsWith(prefix)); }
 function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
-function itItemIdentity(item, unitNo) {
-  const tag = String(item?.unit_tag || '').trim();
-  if (tag) return `${item.equipment_type} ${tag}`;
-  if (item?.equipment_type === '110V Stand') return '110V Stand · no tag';
-  return `Unit ${unitNo}`;
-}
-function isHeliosDeploy(item){
-  return window.TechCheckRules?.isHeliosDeploy ? window.TechCheckRules.isHeliosDeploy(item) : (item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose));
-}
-function itUnitStepsData(item,unitNo){
-  return window.TechCheckITPrepRules.checklist(item,unitNo,{
-    isSupport,
-    isSolarSupport,
-    isSimpleSupport,
-    identity:itItemIdentity,
-    isHeliosDeploy
-  });
-}
+function itItemIdentity(item,unitNo){return window.TechCheckITPrepRules.itemIdentity(item,unitNo);}
+function itUnitStepsData(item,unitNo){return window.TechCheckITPrepRules.checklist(item,unitNo);}
 function itAnswerKey(item, field) { return `${item.id}:${field}`; }
 function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
 function itBoolAnswered(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) || item[field] === true || itAnswered.has(key); }
