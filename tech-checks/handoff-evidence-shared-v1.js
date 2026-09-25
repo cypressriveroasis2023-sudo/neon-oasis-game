@@ -111,4 +111,62 @@ function unitSignature(rows,unitNo){
   return [...(rows||[])].reverse().find(row=>row?.kind==='signature'&&row?.original_name===`unit-${unitNo}-signature.png`)||null;
 }
 
-window.TechCheckEvidence=Object.freeze({rows,optimizePhoto,upload,wireCanvas,blobFromCanvas,unitRows,unitSignature});
+
+async function handlePhotoUpload(event,deps={}){
+  const target=event?.target;
+  if(!target?.closest)return {handled:false};
+  const button=target.closest('[data-wl-upload]');
+  if(!button)return {handled:false};
+
+  const panel=button.closest('.wl-proof');
+  if(!panel)return {handled:true,saved:false,reason:'missing_panel'};
+  const inputs=[...(panel.querySelectorAll('.wl-file')||[])];
+  const files=inputs.flatMap(input=>[...(input.files||[])]);
+  const notify=deps.alert||globalThis.alert;
+  if(!files.length){
+    notify?.('Take or select at least one photo.');
+    return {handled:true,saved:false,reason:'missing_photo'};
+  }
+
+  const unitNo=Number(panel.dataset.unit||0)||null;
+  const expected=Number(panel.dataset.expected||0)||null;
+  const item=await deps.resolveItem?.({panel,unitNo})||null;
+  const itemId=item?.id||null;
+
+  if(unitNo&&files.length!==1){
+    notify?.('Take exactly one photo for this item.');
+    return {handled:true,saved:false,reason:'wrong_unit_photo_count'};
+  }
+
+  const valid=await deps.validate?.({panel,files,unitNo,expected,item,itemId});
+  if(valid===false)return {handled:true,saved:false,reason:'validation_failed'};
+
+  button.disabled=true;
+  button.textContent=files.length>1?`Preparing ${files.length} photos…`:'Preparing photo…';
+
+  try{
+    const optimize=deps.optimizePhoto||optimizePhoto;
+    const optimized=await Promise.all(files.map(optimize));
+    const extra=await deps.beforeUpload?.({button,panel,files,optimized,unitNo,expected,item,itemId})||null;
+    button.textContent=files.length>1?`Saving ${files.length} photos…`:'Saving photo…';
+
+    const saveEvidence=deps.uploadEvidence||upload;
+    await Promise.all(optimized.map((file,index)=>{
+      const original=file.name||files[index].name;
+      const evidenceName=unitNo?`unit-${unitNo}-photo-${original}`:original;
+      return saveEvidence(panel.dataset.proof,panel.dataset.stage,'photo',file,evidenceName,itemId);
+    }));
+
+    await deps.afterUpload?.({button,panel,files,optimized,unitNo,expected,item,itemId,extra});
+    const consumed=await deps.afterSuccess?.({button,panel,files,optimized,unitNo,expected,item,itemId,extra});
+    if(!consumed)await deps.refreshPanel?.(panel);
+    return {handled:true,saved:true,unitNo,itemId};
+  }catch(error){
+    button.disabled=false;
+    button.textContent='Save Photo';
+    notify?.(error?.message||'Upload failed.');
+    return {handled:true,saved:false,error};
+  }
+}
+
+window.TechCheckEvidence=Object.freeze({rows,optimizePhoto,upload,wireCanvas,blobFromCanvas,unitRows,unitSignature,handlePhotoUpload});
