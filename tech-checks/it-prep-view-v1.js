@@ -117,4 +117,18 @@ function finalTicketHtml(prep,items,spareBatteries,state={},deps={}){
     <div class='wl-nav wl-simple-final-nav'><button class='wl-prev' data-wl-final-last-unit>← Back</button><span></span></div>`;
 }
 
-window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml,partsOnlyFinalHtml,finalTicketHtml});
+
+function photoPhaseHtml(identity,unitNo,totalUnits,photoReady,photoHtml,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??''));
+  return progress(`${identity} · Unit ${unitNo} of ${totalUnits}`,`Take 1 photo of ${identity}`,1,3)+(photoHtml||'')+`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${photoReady?'':'disabled'}>Next: Signature →</button></div>`;
+}
+function signaturePhaseHtml(identity,unitNo,totalUnits,signed,signatureHtml,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??''));
+  return progress(`${identity} · Unit ${unitNo} of ${totalUnits}`,'Sign Here',2,3)+(signatureHtml||'')+`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${signed?'':'disabled'}>Next →</button></div>`;
+}
+function reviewScreenHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml,deps={}){
+  const progress=deps.progress||(()=>''),body=reviewPhaseHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml);
+  return progress(`${identity} · Unit ${unitNo} of ${totalUnits}`,ready?`${identity} is ready`:`Finish ${identity}`,3,3)+body;
+}
+
+window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml,partsOnlyFinalHtml,finalTicketHtml,photoPhaseHtml,signaturePhaseHtml,reviewScreenHtml});
