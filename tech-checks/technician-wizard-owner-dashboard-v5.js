@@ -2416,18 +2416,6 @@ async function syncServiceAssignmentAfterReturn(ticket,techId) {
   }
   return {completed:false,count,required};
 }
-async function syncITReturnAssignmentAfterIntake(ticket,techId) {
-  const {data:rows}=await liveDb.from('job_assignments').select('*').eq('ticket_no',String(ticket||'')).eq('assigned_role','it').eq('assignee_user_id',techId).in('status',['assigned','started']).order('assigned_at',{ascending:false}).limit(1);
-  const a=rows?.[0]; if(!a)return;
-  const required=assignmentEquipmentCount(a);
-  const {data:returns}=await liveDb.from('unit_returns').select('id,status').eq('ticket_no',String(ticket||''));
-  const processed=(returns||[]).filter(r=>['pending_mhelp_inventory','needs_replacement','completed'].includes(r.status)).length;
-  if(processed>=required){
-    const {error}=await setJobAssignmentStatusCompat(a.id,'completed');
-    if(error)console.warn('IT Intake saved but IT assignment could not be completed',error);
-  }
-}
-
 async function startAssignedJob(id) {
   let { data: rows } = await liveDb.from('job_assignments').select('*').eq('id', id).limit(1);
   let assignment = rows?.[0];
@@ -6243,7 +6231,6 @@ document.addEventListener('click', async e => {
     render:async()=>{ intakeWizard=window.TechCheckITIntake.getState(); return renderITIntakeWizard(); },
     identity:currentTechIdentity,
     uploadPhotos:uploadReturnPhotos,
-    syncAssignment:syncITReturnAssignmentAfterIntake,
     remember:rememberTechCompletion,
     home:showITHome
   })) { intakeWizard=window.TechCheckITIntake.getState(); return; }
