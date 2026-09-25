@@ -58,6 +58,7 @@ let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, tra
 let inspectionRecovered = false;
 let inspectionSubmitting = false;
 let serviceTruckInventorySubmitting = false;
+let serviceTruckUsageSubmitting = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [], submissionId:null, pendingUploadPaths:[] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
@@ -4561,17 +4562,52 @@ async function recordServiceTruckSimUsed(){
   finally{document.body.classList.remove('busy');}
 }
 async function recordServiceTruckStockUsed(){
+  if(serviceTruckUsageSubmitting)return;
   const ticket=document.getElementById('wlTruckUseStockTicket')?.value||'';
   const type=document.getElementById('wlTruckUseStockType')?.value||'';
   const qty=Math.max(1,Math.floor(Number(document.getElementById('wlTruckUseStockQty')?.value||0)));
+  const fieldByType={'Recon Battery':'recon_battery_qty','AGM 12V 110Ah':'agm_12v_110ah_qty','LiTime 12V 100Ah':'litime_12v_100ah_qty'};
+  const field=fieldByType[type];
+  if(!ticket||!field)return alert('Choose the active MHelpDesk job and the truck battery stock you used.');
+  let before;
+  try{
+    const readiness=await loadMyServiceTruckReadiness();
+    before=Number(readiness?.stock?.[field]);
+  }catch(error){
+    return alert(error?.message||'Could not verify current truck stock. Refresh before recording battery usage.');
+  }
+  if(!Number.isFinite(before))return alert('Could not verify the current truck battery quantity. Refresh before continuing.');
+  if(before<qty)return alert('You cannot use more '+type+' than Tech Check currently records on the truck.');
+  const button=document.querySelector('[data-wl-service-record-truck-stock-used]');
+  serviceTruckUsageSubmitting=true;
+  if(button){button.disabled=true;button.textContent='RECORDING USAGE…';}
   document.body.classList.add('busy');
+  const finish=async()=>{
+    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
+    return showSvcHome();
+  };
   try{
     const {error}=await liveDb.rpc('service_use_truck_stock_v1',{p_ticket_no:ticket,p_item_type:type,p_qty:qty});
     if(error)throw error;
-    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
-    return showSvcHome();
-  }catch(error){alert(error?.message||'Could not record truck stock used.');}
-  finally{document.body.classList.remove('busy');}
+    return await finish();
+  }catch(error){
+    let after=NaN;
+    try{
+      const readiness=await loadMyServiceTruckReadiness();
+      after=Number(readiness?.stock?.[field]);
+    }catch{}
+    if(Number.isFinite(after)&&after===before-qty)return await finish();
+    if(Number.isFinite(after)&&after!==before){
+      return alert('Truck stock changed while Tech Check was saving this usage. The app will not subtract anything again. Return to Service Home, refresh the live truck inventory, and verify the physical quantity before recording another usage.');
+    }
+    return alert(error?.message==='Failed to fetch'
+      ? 'Connection was interrupted and Tech Check could not confirm whether the battery usage saved. Do not tap again until the live truck inventory can be reloaded.'
+      : (error?.message||'Could not record truck stock used.'));
+  }finally{
+    serviceTruckUsageSubmitting=false;
+    document.body.classList.remove('busy');
+    if(document.contains(button)){button.disabled=false;button.textContent='RECORD STOCK USED →';}
+  }
 }
 
 async function loadITServiceTruckInventory(){
