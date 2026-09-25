@@ -2425,7 +2425,9 @@ async function startAssignedJob(id,{serviceTicketVerified=false}={}) {
   if (!gate.ready) return alert(gate.label + '\n\n' + gate.detail);
 
   if (assignment.assigned_role==='service' && !serviceTicketVerified) {
-    return showServiceJobLookup();
+    const tech=await currentTechIdentity().catch(()=>null);
+    const alreadyMine=assignment.status==='started'&&tech?.id&&assignment.assignee_user_id===tech.id;
+    if(!alreadyMine)return showServiceJobLookup();
   }
 
   if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
