@@ -3979,10 +3979,6 @@ async function startITIntake(id) {
   const rows=await returnRows(),row=rows.find(x=>x.id===id);if(!row)return;
   intakeWizard=window.TechCheckITIntake.start(row);return renderITIntakeWizard();
 }
-function intakeAIReview(row){
-  const r=window.TechCheckITIntake.reviewFlags();
-  return `<div class='wl-ai-panel wl-ai-progress'><div class='wl-ai-head'>${onsiteVisionTitle('Intake Review')}<b>${r.noCount?'ATTENTION':r.remaining?'IN PROGRESS':'CHECKS COMPLETE'}</b></div><div class='wl-ai-line'><b>Checklist:</b> ${r.answered}/${intakeWizard.answers.length} answered · ${r.pct}%</div>${r.flags.length?`<div class='wl-ai-warn'>${r.flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No checklist conflicts detected so far.</div>`}<div class='small top8'>AI reviews recorded answers and evidence status only. Technician verification is still required.</div></div>`;
-}
 async function renderITIntakeWizard(){
   window.TechCheckITIntake.setState(intakeWizard);
   return window.TechCheckITIntake.render({view:viewIT(),progress,photoHtml:returnPhotoHtml,hideChildren,resetPosition:resetWizardPosition,onEmpty:showITIntake});
@@ -4020,9 +4016,6 @@ async function editItPrepUnitCount(nextValue) {
   if (itUnitIndex >= next) { itUnitIndex = Math.max(0, next - 1); itUnitPhase = started >= next ? 'final' : 'type'; }
   showItWizard();
   return;
-}
-function unitCountEditor(totalUnits) {
-  return `<div class='wl-count-editor wl-count-readonly' aria-label='Total prepared equipment items'><b>${Number(totalUnits || 0)}</b><span>Total prepared items: job equipment + any Truck Spares</span></div>`;
 }
 async function getPrep(id) {
   const { data } = await liveDb.from('prep_tickets').select('*,prep_items(*)').eq('id', id).single(); return data;
@@ -4424,11 +4417,6 @@ function techDashboardTimeout(promise,fallback,ms=7000){
     throw error;
   });
 }
-function techDashboardSettled(results){
-  return results.some(r=>r.status==='rejected');
-}
-
-
 async function loadMyServiceTruckReadiness(){
   const preview=ownerTestPreviewFor('service');
   if(preview){
