@@ -145,4 +145,23 @@ async function saveTagScan(itemId,scan={}){
   return true;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag,saveTagScan});
+
+async function createPrepShell({ticket='',site='',requestedUnits=0,manifest=[],parts={},workType='service'}={}){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  const {data,error}=await ctx.db.rpc('create_it_prep_shell_v4',{
+    p_ticket_no:ticket,
+    p_site:site,
+    p_requested_unit_count:Number(requestedUnits||0),
+    p_equipment_manifest:manifest,
+    p_solar_panel_qty:Number(parts?.solar_panel_qty||0),
+    p_battery_replacement_qty:Number(parts?.battery_replacement_qty||0),
+    p_camera_replacement_qty:Number(parts?.camera_replacement_qty||0),
+    p_sim_replacement_qty:Number(parts?.sim_replacement_qty||0),
+    p_micro_sd_qty:Number(parts?.micro_sd_qty||0),
+    p_work_type:workType||'service'
+  });
+  if(error)throw error;
+  return data;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag,saveTagScan,createPrepShell});
