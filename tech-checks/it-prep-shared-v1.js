@@ -112,4 +112,13 @@ async function verifyItemsForRelease(items=[]){
   return true;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease});
+
+async function releasePrep(prepId){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!prepId)throw new Error('IT prep ticket is not available.');
+  const {error}=await ctx.db.rpc('release_prep',{p_prep_id:prepId});
+  if(error)throw error;
+  return true;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep});
