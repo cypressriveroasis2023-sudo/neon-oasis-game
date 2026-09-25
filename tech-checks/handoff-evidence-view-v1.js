@@ -31,6 +31,7 @@ async function photoOnlyHtml(prepId,stage,unitNo=null,expectedCount=null,deps={}
         <label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>
       </div>
       <div class='wl-photo-selected' data-wl-photo-selected>${complete?'Photo already saved.':'No photo selected yet.'}</div>
+      <div class='wl-photo-preview' data-wl-photo-preview></div>
     </div>
     <div class='wl-photo-step'>
       <div class='wl-photo-step-num'>STEP 2</div>
@@ -49,6 +50,7 @@ async function photoOnlyHtml(prepId,stage,unitNo=null,expectedCount=null,deps={}
         <span>${complete?'Choose a New Photo':'Choose Photo'}</span>
       </label>
       <div class='wl-photo-selected' data-wl-photo-selected>${complete?'Photo already saved.':'No photo selected yet.'}</div>
+      <div class='wl-photo-preview' data-wl-photo-preview></div>
     </div>
     <div class='wl-photo-step'>
       <div class='wl-photo-step-num'>STEP 2</div>
