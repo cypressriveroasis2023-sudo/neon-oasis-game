@@ -114,4 +114,76 @@ async function proofHtml(prepId,stage,editable,deps={}){
   return `<div class='wl-proof ${stage==='service'?'service':''}' data-proof='${prepId}' data-stage='${stage}'><b>${title}</b><div class='wl-note'>${stage==='it'?'Photograph exactly what is leaving the shop.':'Photograph exactly what you received from IT.'}</div>${photos.length?`<div class='wl-gallery'>${photos.map(p=>`<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div>`:`<div class='warn top8'>No photos saved yet.</div>`}${editable?`<input class='wl-file top8' type='file' accept='image/*' capture='environment' multiple><button class='mini full top8' data-wl-upload='${stage}'>Save Photo(s)</button>`:''}${sig?`<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name||'')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url?`<img src='${esc(sig.url)}' alt='Saved signature'>`:''}</div>${editable?`<button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>`:''}`:editable?`<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>`:`<div class='warn top8'>No signature saved yet.</div>`}</div>`;
 }
 
-window.TechCheckEvidenceView=Object.freeze({photoOnlyHtml,signatureOnlyHtml,proofHtml});
+
+async function refreshPanel(panel,deps={}){
+  if(!panel)return null;
+  const prepId=panel.dataset.proof;
+  const stage=panel.dataset.stage;
+  const mode=panel.dataset.mode||'full';
+  const unitNo=Number(panel.dataset.unit||0)||null;
+  const expectedCount=Number(panel.dataset.expected||0)||null;
+  const html=mode==='photo'
+    ? await deps.photoOnlyHtml?.(prepId,stage,unitNo,expectedCount)
+    : mode==='signature'
+      ? await deps.signatureOnlyHtml?.(prepId,stage,unitNo)
+      : await deps.proofHtml?.(prepId,stage,true);
+  if(typeof html!=='string')return null;
+  panel.outerHTML=html;
+  const doc=deps.document||document;
+  const selector=`[data-proof='${prepId}'][data-stage='${stage}']${unitNo?`[data-unit='${unitNo}']`:''}`;
+  const next=doc.querySelector?.(selector)||null;
+  next?.querySelectorAll?.('canvas')?.forEach?.(deps.wireCanvas||(()=>{}));
+  return next;
+}
+
+async function handleSignatureClick(event,deps={}){
+  const target=event?.target;
+  if(!target?.closest)return {handled:false};
+
+  const clear=target.closest('[data-wl-clear]');
+  if(clear){
+    const canvas=clear.closest('.wl-sign')?.querySelector('canvas');
+    if(canvas){
+      canvas.getContext('2d')?.clearRect(0,0,canvas.width,canvas.height);
+      canvas.dataset.ink='';
+    }
+    return {handled:true,action:'clear'};
+  }
+
+  const save=target.closest('[data-wl-save-sign]');
+  if(save){
+    const panel=save.closest('.wl-proof');
+    const canvas=panel?.querySelector('canvas');
+    const notify=deps.alert||globalThis.alert;
+    if(!canvas?.dataset.ink){
+      notify?.('Sign in the box first.');
+      return {handled:true,action:'save',saved:false};
+    }
+    const blob=await deps.blobFromCanvas?.(canvas);
+    const unitNo=Number(panel?.dataset?.unit||0)||null;
+    const itemId=await deps.resolveItemId?.(panel,unitNo)||null;
+    const signatureName=unitNo?`unit-${unitNo}-signature.png`:'signature.png';
+    await deps.uploadEvidence?.(panel.dataset.proof,panel.dataset.stage,'signature',blob,signatureName,itemId);
+    const consumed=await deps.afterSave?.({panel,unitNo,itemId,signatureName});
+    if(!consumed)await deps.refreshPanel?.(panel);
+    return {handled:true,action:'save',saved:true};
+  }
+
+  const replace=target.closest('[data-wl-replace]');
+  if(replace){
+    const panel=replace.closest('.wl-proof');
+    panel?.querySelector('.wl-saved')?.remove();
+    replace.remove();
+    const doc=deps.document||document;
+    const section=doc.createElement('div');
+    section.className='wl-sign top8';
+    section.innerHTML=`<b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${panel?.dataset?.stage||''}'>Save Signature</button></div>`;
+    panel?.append(section);
+    deps.wireCanvas?.(section.querySelector('canvas'));
+    return {handled:true,action:'replace'};
+  }
+
+  return {handled:false};
+}
+
+window.TechCheckEvidenceView=Object.freeze({photoOnlyHtml,signatureOnlyHtml,proofHtml,refreshPanel,handleSignatureClick});
