@@ -4857,9 +4857,17 @@ async function serviceFindJobByTicket(){
       : `<div class='wl-stop top10'><b>YOU CANNOT START YET.</b><div>${esc(gate.detail||'The required handoff is not ready.')}</div></div>`}
   </div>`;
 }
-async function serviceTakeVerifiedJob(id){
+async function serviceTakeVerifiedJob(id,enteredTicket=''){
   const {data:rows,error}=await liveDb.from('job_assignments').select('*').eq('id',id).eq('assigned_role','service').limit(1);
   if(error)return alert(error.message); const a=rows?.[0]; if(!a)return alert('This Service job is no longer available.');
+
+  if(norm(enteredTicket)!==norm(a.ticket_no)){
+    showServiceJobLookup();
+    const msg=document.getElementById('wlServiceJobSearchMsg');
+    if(msg)msg.innerHTML='<div class="wl-stop"><b>ENTER THE CURRENT MHELPDESK TICKET # TO OPEN THIS JOB.</b><div>Service must verify the ticket before Tech Check shows or starts the field task.</div></div>';
+    return;
+  }
+
   const gate=await assignmentGateState(a); if(!gate.ready)return alert(gate.label+'\n\n'+gate.detail);
   const tech=await currentTechIdentity().catch(()=>null); if(!tech?.id)return alert('Active Service Tech account required.');
   if(a.assignee_user_id&&a.assignee_user_id!==tech.id)return alert('This ticket has already been assigned to another Service Tech.');
@@ -6217,7 +6225,7 @@ document.addEventListener('click', async e => {
   const offlineItSave=e.target.closest('[data-wl-offline-it-save]'); if(offlineItSave)return saveOfflineITDecision(offlineItSave.dataset.wlOfflineItSave);
   const offlineSwap=e.target.closest('[data-wl-offline-complete-swap]'); if(offlineSwap)return completeAuthorizedOfflineSwap(offlineSwap.dataset.wlOfflineCompleteSwap,offlineSwap.dataset.wlOfflineBackup);
   const nextItIntake = e.target.closest('[data-wl-next-it-intake]'); if (nextItIntake) return startITIntake(nextItIntake.dataset.wlNextItIntake);
-  const nextSvcReceive = e.target.closest('[data-wl-next-svc-receive]'); if (nextSvcReceive) return openServiceTicket(nextSvcReceive.dataset.wlNextSvcReceive);
+  const nextSvcReceive = e.target.closest('[data-wl-next-svc-receive]'); if (nextSvcReceive) return showServiceJobLookup();
   if (e.target.closest('[data-wl-next-svc-inspect]')) return startInspection();
   const nextSvcReturn = e.target.closest('[data-wl-next-svc-return]'); if (nextSvcReturn) return showServiceReturnPreset(nextSvcReturn.dataset.ticket,nextSvcReturn.dataset.unit,nextSvcReturn.dataset.type);
   if (e.target.closest('[data-wl-service-return]')) return showServiceReturn();
@@ -6357,7 +6365,11 @@ document.addEventListener('click', async e => {
   if(completeServiceAssignment) return completeServiceFieldAssignment(completeServiceAssignment.dataset.wlServiceCompleteAssignment);
   if (e.target.closest('[data-wl-service-find-job]')) return serviceFindJobByTicket();
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
-  if(takeServiceJob) return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob);
+  if(takeServiceJob){
+    const fromTicketLookup=Boolean(takeServiceJob.closest('#wlSvcLookup')&&document.getElementById('wlServiceJobSearch'));
+    const enteredTicket=fromTicketLookup ? String(document.getElementById('wlServiceJobSearch')?.value||'').trim().replace(/^#\s*/,'') : '';
+    return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob,enteredTicket);
+  }
   if (e.target.closest('[data-wl-match]')) return matchSvcTicket();
   if(e.target.closest('[data-wl-svc-restart-questions]')) return restartServiceVerificationQuestions();
   const svcTicket = e.target.closest('[data-wl-svc-ticket]');
