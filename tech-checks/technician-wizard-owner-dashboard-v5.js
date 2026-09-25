@@ -7098,10 +7098,10 @@ document.addEventListener('click', async e => {
       const tech = await currentTechIdentity();
       if (intakeWizard.step === 12 && value) intakeWizard.meta.cancellationDoc = intakeDocumentation(row, tech);
       intakeWizard.meta.answers = [...intakeWizard.answers];
-      const update = { damage_notes: writeIntakeRecord(intakeWizard.notes, intakeWizard.meta), updated_at: new Date().toISOString() };
-      const { error } = await liveDb.from('unit_returns').update(update).eq('id', row.id);
-      if (error) return alert(error.message);
-      row.damage_notes = update.damage_notes;
+      try {
+        const update = await window.TechCheckIntake.saveProgress({ returnId: row.id, notes: intakeWizard.notes, meta: intakeWizard.meta });
+        row.damage_notes = update.damage_notes;
+      } catch (error) { return alert(error.message); }
     }
     if (value) intakeWizard.step++;
     return renderITIntakeWizard();
@@ -7128,12 +7128,7 @@ document.addEventListener('click', async e => {
     try {
       if (intakeWizard.photo) paths = await uploadReturnPhotos([intakeWizard.photo], row.id, 'it-replacement');
       if (!paths.length) return alert('Take or choose an IT Intake photo showing the damaged equipment first.');
-      const { error } = await liveDb.rpc('it_mark_return_needs_replacement_v1', {
-        p_return_id: row.id,
-        p_damage_notes: intakeWizard.notes.trim(),
-        p_intake_photo_paths: paths
-      });
-      if (error) throw error;
+      await window.TechCheckIntake.markNeedsReplacement({ returnId: row.id, damageNotes: intakeWizard.notes, intakePhotoPaths: paths });
       const tech = await currentTechIdentity();
       await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
       intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
@@ -7148,13 +7143,13 @@ document.addEventListener('click', async e => {
     const row = intakeWizard.row;
     const tech = await currentTechIdentity();
     const paths = intakeWizard.photo ? await uploadReturnPhotos([intakeWizard.photo], row.id, 'it') : row.intake_photo_paths || [];
-    const now = new Date().toISOString();
     const a = intakeWizard.answers;
     if (!a.every(v => v === true)) return alert('Every IT intake check must be YES before this unit can move to MHelpDesk inventory.');
-    if (!intakeWizard.meta.cancellationDoc) intakeWizard.meta.cancellationDoc = intakeDocumentation(row, tech, new Date(now));
     intakeWizard.meta.answers = [...a];
-    const { error } = await liveDb.from('unit_returns').update({ status: 'pending_mhelp_inventory', it_tech_id: tech.id, it_tech_name: tech.name, it_received_at: now, damage_notes: writeIntakeRecord(intakeWizard.notes, intakeWizard.meta), intake_photo_paths: paths, updated_at: now }).eq('id', row.id);
-    if (error) return alert(error.message);
+    try {
+      const result = await window.TechCheckIntake.finishIntake({ row, tech, notes: intakeWizard.notes, meta: intakeWizard.meta, intakePhotoPaths: paths });
+      intakeWizard.meta = result.meta;
+    } catch (error) { return alert(error.message); }
     await syncITReturnAssignmentAfterIntake(row.ticket_no,tech.id);
     intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
     rememberTechCompletion('it',row.ticket_no,'IT INTAKE COMPLETE');
@@ -7164,9 +7159,8 @@ document.addEventListener('click', async e => {
   if (ownerMhelpDone) {
     if (!roleText().includes('Owner/Admin')) return alert('Only the Owner/Manager can confirm MHelpDesk shop inventory.');
     if (!confirm('Confirm you have returned this unit to Shop Inventory in MHelpDesk?')) return;
-    const now = new Date().toISOString();
-    const { error } = await liveDb.from('unit_returns').update({ status: 'completed', mhelp_inventory_confirmed: true, mhelp_confirmed_at: now, completed_at: now, updated_at: now }).eq('id', ownerMhelpDone.dataset.wlOwnerMhelpDone);
-    if (error) return alert(error.message);
+    try { await window.TechCheckIntake.confirmMHelpInventory(ownerMhelpDone.dataset.wlOwnerMhelpDone); }
+    catch (error) { return alert(error.message); }
     await installOwnerIntake(true);
     if (typeof window.refreshData === 'function') await window.refreshData();
     return;
