@@ -2,7 +2,7 @@ import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
-import './it-prep-shared-v1.js?v=6';
+import './it-prep-shared-v1.js?v=7';
 import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
@@ -3935,20 +3935,21 @@ async function createPrepAndStartChecks() {
   const totalItems = requestedUnits + equipmentManifestStandTotal(manifest);
   const parts = readTicketPartInputs('wlPart');
   document.body.classList.add('busy');
-  const { data: prepId, error } = await liveDb.rpc('create_it_prep_shell_v4', {
-    p_ticket_no: ticket,
-    p_site: site,
-    p_requested_unit_count: requestedUnits,
-    p_equipment_manifest: manifest,
-    p_solar_panel_qty: parts.solar_panel_qty,
-    p_battery_replacement_qty: parts.battery_replacement_qty,
-    p_camera_replacement_qty: parts.camera_replacement_qty,
-    p_sim_replacement_qty: parts.sim_replacement_qty,
-    p_micro_sd_qty: parts.micro_sd_qty,
-    p_work_type: pendingAssignmentWorkType || 'service',
-  });
+  let prepId;
+  try{
+    prepId=await window.TechCheckITPrep.createPrepShell({
+      ticket,
+      site,
+      requestedUnits,
+      manifest,
+      parts,
+      workType:pendingAssignmentWorkType||'service'
+    });
+  }catch(error){
+    document.body.classList.remove('busy');
+    return alert(error?.message||'Could not create the IT prep ticket.');
+  }
   document.body.classList.remove('busy');
-  if (error) return alert(error.message);
   if (pendingAssignmentLinkId) {
     const { error: linkError } = await linkAssignmentToPrepCompat( pendingAssignmentLinkId,prepId );
     if (linkError) return alert(linkError.message);
