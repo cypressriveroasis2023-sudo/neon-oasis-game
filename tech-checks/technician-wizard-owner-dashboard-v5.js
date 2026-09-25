@@ -1,3 +1,4 @@
+import './it-prep-wizard-v1.js?v=1';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -7036,7 +7037,7 @@ document.addEventListener('click', async e => {
     answerButtons.forEach(button => button.disabled = true);
     const saved = await persistCurrentItItem();
     if (!saved) { answerButtons.forEach(button => button.disabled = false); return; }
-    if (value) { const steps = itUnitStepsData(currentItItem(), itUnitIndex + 1); if (itQuestionIndex < steps.length - 1) itQuestionIndex++; else itUnitPhase = 'photo'; }
+    if (value) { const steps=itUnitStepsData(currentItItem(),itUnitIndex+1),next=window.TechCheckITPrepWizard.nextAfterCheck({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase},steps.length); itQuestionIndex=next.questionIndex; itUnitPhase=next.phase; }
     return renderItUnitStep();
   }
   if (e.target.closest('[data-wl-it-next]')) {
@@ -7108,18 +7109,8 @@ document.addEventListener('click', async e => {
         itQuestionIndex = issues[0].index || 0;
         return renderItUnitStep();
       }
-      if (itUnitIndex < totalUnits - 1) {
-        itUnitIndex++;
-        itQuestionIndex = 0;
-        itUnitPhase = 'type';
-        itTypeChoice = '';
-        itPurposeChoice = '';
-        itReconRequired = 1;
-      } else {
-        itUnitIndex = totalUnits;
-        itUnitPhase = 'final';
-        itFinalView = 'summary';
-      }
+      const next=window.TechCheckITPrepWizard.nextAfterReview({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},totalUnits);
+      itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itReconRequired=next.reconRequired;itFinalView=next.finalView;
       return renderItUnitStep();
     }
   }
@@ -7154,41 +7145,17 @@ document.addEventListener('click', async e => {
     return renderItUnitStep();
   }
   if (e.target.closest('[data-wl-final-last-unit]') && itUnitPhase==='final') {
-    itFinalView='summary';
-    const jobItems=itItems().map((item,index)=>({item,index})).filter(row=>row.item.purpose!=='BACKUP');
-    itUnitIndex=jobItems.length ? jobItems[jobItems.length-1].index : Math.max(0,itItems().length-1);
-    itUnitPhase='review';
+    const next=window.TechCheckITPrepWizard.finalLastUnit({unitIndex:itUnitIndex,phase:itUnitPhase,finalView:itFinalView},itItems());
+    itFinalView=next.finalView;itUnitIndex=next.unitIndex;itUnitPhase=next.phase;
     return renderItUnitStep();
   }
 
   if (e.target.closest('[data-wl-it-prev]')) {
-    const items = itItems();
-    if (itUnitPhase === 'final') { itFinalView='summary'; itUnitIndex = Math.max(0, items.length - 1); itUnitPhase = 'review'; return renderItUnitStep(); }
-    if (itUnitPhase === 'signature') { itUnitPhase = 'photo'; return renderItUnitStep(); }
-    if (itUnitPhase === 'review') { itUnitPhase = 'signature'; return renderItUnitStep(); }
-    if (itUnitPhase === 'photo') { itUnitPhase = 'checks'; itQuestionIndex = Math.max(0, itUnitStepsData(currentItItem(), itUnitIndex + 1).length - 1); return renderItUnitStep(); }
-    if (itUnitPhase === 'checks') {
-      if (itQuestionIndex > 0) { itQuestionIndex--; return renderItUnitStep(); }
-      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
-      if (autoPurpose) {
-        if (itUnitIndex===0) return showPendingList();
-        itUnitIndex--;
-        itUnitPhase='review';
-        return renderItUnitStep();
-      }
-      itUnitPhase = 'purpose';
-      itTypeChoice = currentItItem()?.equipment_type || requiredItEquipmentType(itUnitIndex) || '';
-      itPurposeChoice = currentItItem()?.purpose || '';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'recon') { itUnitPhase = 'purpose'; return renderItUnitStep(); }
-    if (itUnitPhase === 'purpose') {
-      if (itUnitIndex===0) return showPendingList();
-      itUnitIndex--;
-      itUnitPhase='review';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'type') { if (itUnitIndex === 0) return showPendingList(); itUnitIndex--; itUnitPhase = 'review'; return renderItUnitStep(); }
+    const items=itItems(),stepCount=currentItItem()?itUnitStepsData(currentItItem(),itUnitIndex+1).length:0;
+    const result=window.TechCheckITPrepWizard.previous({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,finalView:itFinalView},{itemCount:items.length,stepCount,autoPurpose:Boolean(prepPurposeFromWorkType(activeItPrep?.work_type))});
+    if(result.action==='pending')return showPendingList();
+    const next=result.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itFinalView=next.finalView;
+    return renderItUnitStep();
   }
   if (e.target.closest('[data-wl-add-truck-spare-unit]')) { e.preventDefault(); e.stopPropagation(); return addTruckSpareUnitFromSummary(); }
   const checkoutSpareUnit=e.target.closest('[data-wl-checkout-truck-spare-unit]');
