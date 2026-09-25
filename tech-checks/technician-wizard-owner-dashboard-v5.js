@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=4';
+import './it-prep-wizard-v1.js?v=5';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -4616,40 +4616,22 @@ function itWizardCard(){return window.TechCheckITPrepView.wizardCard(viewIT());}
 async function showItPrep(prepId) {
   activeItPrep = await getPrep(prepId);
   if (!activeItPrep) return;
-  itExpectedUnits = activeItPrep.expected_unit_count || itItems().length;
   const evidence = await evidenceRows(prepId, 'it');
   const items = itItems();
-  let firstIncomplete = items.findIndex((item, index) => itUnitIssues(item, evidence, index + 1).length > 0);
-  if (firstIncomplete < 0) firstIncomplete = items.length;
-  itUnitIndex = firstIncomplete;
-  itQuestionIndex = 0;
-  itAnswered = new Set();
-  if (itUnitIndex >= itExpectedUnits) {
-    itUnitPhase = 'final';
-    itFinalView = 'summary';
-  } else if (itUnitIndex >= items.length) {
-    itUnitPhase = 'type';
-    itTypeChoice = equipmentManifestExpanded(activeItPrep.equipment_manifest)[itUnitIndex] || '';
-    itPurposeChoice = prepPurposeFromWorkType(activeItPrep.work_type) || '';
-    itReconRequired = 1;
-  } else {
-    const item = items[itUnitIndex];
-    const unitNo = itUnitIndex + 1;
-    itTypeChoice = item.equipment_type || '';
-    itPurposeChoice = item.purpose || '';
-    itReconRequired = Number(item.recon_camera_count || 1);
-    const requiredType=requiredItEquipmentType(itUnitIndex);
-    if ((requiredType && item.equipment_type!==requiredType) || !item.equipment_type || !item.purpose) {
-      itUnitPhase = 'type';
-      itTypeChoice = requiredType || item.equipment_type || '';
-      itPurposeChoice = item.purpose || prepPurposeFromWorkType(activeItPrep.work_type) || '';
-    }
-    else {
-      const issues = itUnitIssues(item, evidence, unitNo);
-      if (!issues.length) itUnitPhase = 'review';
-      else { itUnitPhase = issues[0].phase; itQuestionIndex = issues[0].index || 0; }
-    }
-  }
+  const initial=window.TechCheckITPrepWizard.initialState(activeItPrep,items,evidence,{
+    issues:itUnitIssues,
+    manifestExpanded:equipmentManifestExpanded,
+    purposeFromWorkType:prepPurposeFromWorkType
+  });
+  itExpectedUnits=initial.expectedUnits;
+  itUnitIndex=initial.unitIndex;
+  itQuestionIndex=initial.questionIndex;
+  itAnswered=new Set();
+  itUnitPhase=initial.phase;
+  if('finalView' in initial)itFinalView=initial.finalView;
+  if('typeChoice' in initial)itTypeChoice=initial.typeChoice;
+  if('purposeChoice' in initial)itPurposeChoice=initial.purposeChoice;
+  if('reconRequired' in initial)itReconRequired=initial.reconRequired;
   const wizard = itWizardCard();
   hideChildren(viewIT(), [wizard]);
   wizard.style.display = '';
