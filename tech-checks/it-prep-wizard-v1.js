@@ -261,4 +261,47 @@ function recordAnswer(item,field,value,draftAnswers,answered){
   return key;
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff,answerKey,boolValue,boolAnswered,recordAnswer});
+
+function sortedItems(prep){
+  return [...(prep?.prep_items||[])].sort((a,b)=>Number(a?.item_order||0)-Number(b?.item_order||0));
+}
+async function configureCurrent({prep=null,unitIndex=0,typeChoice='',purposeChoice='',reconRequired=1}={},deps={}){
+  const items=sortedItems(prep),item=items[unitIndex]||null;
+  if(!typeChoice||!purposeChoice)return {ok:false,reason:'missing_selection'};
+  try{
+    await deps.configureBase?.({
+      itemId:item?.id||null,
+      prepId:prep?.id||null,
+      equipmentType:typeChoice,
+      purpose:purposeChoice,
+      requiredBatteryCount:1
+    });
+    let refreshed=await deps.reload?.(prep?.id);
+    const configured=sortedItems(refreshed)[unitIndex]||null;
+    if(configured){
+      const initialized=await deps.initializeConfigured?.({
+        itemId:configured.id,
+        equipmentType:typeChoice,
+        purpose:purposeChoice,
+        reconRequired
+      });
+      if(initialized)refreshed=await deps.reload?.(prep?.id);
+    }
+    return {ok:true,prep:refreshed};
+  }catch(error){
+    return {ok:false,error};
+  }
+}
+async function persistCurrent({prep=null,unitIndex=0}={},deps={}){
+  const item=sortedItems(prep)[unitIndex]||null;
+  if(!item)return {ok:false,reason:'missing_item'};
+  try{
+    await deps.saveItem?.(item);
+    const refreshed=await deps.reload?.(prep?.id);
+    return {ok:true,prep:refreshed};
+  }catch(error){
+    return {ok:false,error};
+  }
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff,answerKey,boolValue,boolAnswered,recordAnswer,sortedItems,configureCurrent,persistCurrent});
