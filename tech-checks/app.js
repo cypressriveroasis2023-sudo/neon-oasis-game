@@ -2,6 +2,26 @@ const SUPABASE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 window.TechCheckDB = db;
+window.TechCheckContext = Object.freeze({
+  db,
+  getSession: () => state.session,
+  getProfile: () => state.profile,
+  getRole: () => state.profile?.role || null,
+  getOwnerTestSession: () => ownerTestSessionRead(),
+  getEffectiveRole: () => {
+    const test = ownerTestSessionRead();
+    return state.profile?.role === 'owner' && test?.preview_role ? test.preview_role : (state.profile?.role || null);
+  },
+  getEffectiveIdentity: () => {
+    const test = ownerTestSessionRead();
+    if (state.profile?.role === 'owner' && test?.preview_role && test?.persona_id) {
+      return { id:test.persona_id, name:test.persona_name||'Test Technician', username:test.persona_username||'', role:test.preview_role, owner_test:true, ticket:test.ticket||'' };
+    }
+    return state.session?.user?.id ? { id:state.session.user.id, name:state.profile?.full_name||state.profile?.username||'Technician', username:state.profile?.username||'', role:state.profile?.role||null, owner_test:false, ticket:'' } : null;
+  },
+  refresh: (options = {}) => refreshData(options),
+  emit: (name, detail = {}) => window.dispatchEvent(new CustomEvent('techcheck:' + name, { detail }))
+});
 const $ = id => document.getElementById(id);
 const AUTH_DOMAIN = 'cameras-on-site.invalid';
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
