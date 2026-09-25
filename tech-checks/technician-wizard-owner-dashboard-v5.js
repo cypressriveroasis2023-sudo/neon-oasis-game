@@ -2,7 +2,7 @@ import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
-import './it-prep-shared-v1.js?v=4';
+import './it-prep-shared-v1.js?v=5';
 import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
@@ -6457,7 +6457,7 @@ document.addEventListener('click', async e => {
   }
   const itReviewResult=await window.TechCheckITPrepWizard.handleReviewClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,finalView:itFinalView},{
     currentItem:currentItItem,items:itItems,hasPrep:()=>Boolean(activeItPrep),identity:itItemIdentity,
-    confirmPhotoTag:async(itemId,matches)=>{const {error}=await liveDb.rpc('confirm_it_unit_photo_tag',{p_item_id:itemId,p_matches:matches});return error||null;},
+    confirmPhotoTag:async(itemId,matches)=>{try{await window.TechCheckITPrep.confirmPhotoTag(itemId,matches);return null;}catch(error){return error;}},
     reload:async()=>{activeItPrep=await getPrep(activeItPrep.id);},
     evidence:()=>evidenceRows(activeItPrep.id,'it'),issues:itUnitIssues
   });
