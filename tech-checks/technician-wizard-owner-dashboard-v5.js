@@ -1,5 +1,6 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
+import './handoff-evidence-shared-v1.js?v=1';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
@@ -4020,33 +4021,8 @@ async function editItPrepUnitCount(nextValue) {
 async function getPrep(id) {
   const { data } = await liveDb.from('prep_tickets').select('*,prep_items(*)').eq('id', id).single(); return data;
 }
-async function evidenceRows(prepId, stage) {
-  const { data } = await liveDb.from('handoff_evidence').select('*').eq('prep_ticket_id', prepId).eq('stage', stage).order('created_at', { ascending: true });
-  const rows = data || [];
-  await Promise.all(rows.map(async r => { const { data: u } = await liveDb.storage.from(EVIDENCE_BUCKET).createSignedUrl(r.storage_path, 3600); r.url = u?.signedUrl || ''; }));
-  return rows;
-}
-async function optimizeEvidencePhoto(file) {
-  if (!file || !file.type?.startsWith('image/')) return file;
-  if (file.size <= 900000 && /image\/jpe?g/i.test(file.type)) return file;
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => { const el = new Image(); el.onload = () => resolve(el); el.onerror = reject; el.src = url; });
-    const maxDimension = 1600;
-    const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round((img.naturalWidth || 1) * scale));
-    canvas.height = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not prepare photo.')), 'image/jpeg', 0.78));
-    const base = (file.name || 'photo').replace(/\.[^.]+$/, '');
-    return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
-  } catch {
-    return file;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
+async function evidenceRows(prepId,stage){return window.TechCheckEvidence.rows(prepId,stage);}
+async function optimizeEvidencePhoto(file){return window.TechCheckEvidence.optimizePhoto(file);}
 let tagScannerModulePromise=null;
 function shouldScanUnitTag(type) {
   return ['Helios','Ranger','Solar Spotter','Solar Stand'].includes(String(type||''));
@@ -4124,64 +4100,9 @@ function returnTagScan(row) {
 }
 async function saveItTagScan(itemId,scan){return window.TechCheckITPrep.saveTagScan(itemId,scan);}
 
-async function uploadEvidence(prepId, stage, kind, file, name, itemId = null) {
-  const { data: { session } } = await liveDb.auth.getSession();
-  if (!session?.user?.id) throw new Error('Please sign in again.');
-  const ext = kind === 'signature' ? 'png' : ((name || 'photo.jpg').split('.').pop() || 'jpg').toLowerCase();
-  const path = `${session.user.id}/${prepId}/${stage}/${itemId || 'ticket'}/${kind}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const { error: up } = await liveDb.storage.from(EVIDENCE_BUCKET).upload(path, file, { contentType: file.type || (kind === 'signature' ? 'image/png' : 'image/jpeg') }); if (up) throw up;
-  const { error: rec } = itemId
-    ? await liveDb.rpc('record_unit_handoff_evidence', { p_prep_id: prepId, p_item_id: itemId, p_stage: stage, p_kind: kind, p_storage_path: path, p_original_name: name || null })
-    : await liveDb.rpc('record_handoff_evidence', { p_prep_id: prepId, p_stage: stage, p_kind: kind, p_storage_path: path, p_original_name: name || null });
-  if (rec) throw rec;
-}
-function wireCanvas(canvas) {
-  if (!canvas || canvas.dataset.wired) return;
-  canvas.dataset.wired = '1';
-  canvas.style.touchAction = 'none';
-  const dpr = Math.max(1, devicePixelRatio || 1);
-  const w = Math.max(280, canvas.getBoundingClientRect().width || 300);
-  const targetHeight = canvas.closest('.wl-solar-sign-card') ? 150 : 135;
-  canvas.width = w * dpr;
-  canvas.height = targetHeight * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#0b1720';
-  let draw = false;
-  const blockTouch = e => { e.preventDefault(); e.stopPropagation(); };
-  canvas.addEventListener('touchstart', blockTouch, { passive: false });
-  canvas.addEventListener('touchmove', blockTouch, { passive: false });
-  const pt = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-  canvas.onpointerdown = e => {
-    draw = true;
-    canvas.setPointerCapture?.(e.pointerId);
-    const p = pt(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    canvas.dataset.ink = '1';
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  canvas.onpointermove = e => {
-    if (!draw) return;
-    const p = pt(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  const finish = e => {
-    draw = false;
-    try { if (e?.pointerId != null && canvas.hasPointerCapture?.(e.pointerId)) canvas.releasePointerCapture(e.pointerId); } catch {}
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-  };
-  canvas.onpointerup = finish;
-  canvas.onpointercancel = finish;
-}
-function blobFromCanvas(canvas) { return new Promise(r => canvas.toBlob(r, 'image/png', .92)); }
+async function uploadEvidence(prepId,stage,kind,file,name,itemId=null){return window.TechCheckEvidence.upload(prepId,stage,kind,file,name,itemId);}
+function wireCanvas(canvas){return window.TechCheckEvidence.wireCanvas(canvas);}
+function blobFromCanvas(canvas){return window.TechCheckEvidence.blobFromCanvas(canvas);}
 async function proofHtml(prepId,stage,editable){
   return window.TechCheckEvidenceView.proofHtml(prepId,stage,editable,{evidenceRows,esc});
 }
