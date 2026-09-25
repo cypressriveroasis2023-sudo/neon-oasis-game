@@ -1,6 +1,6 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
-import './handoff-evidence-shared-v1.js?v=1';
+import './handoff-evidence-shared-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=10';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
@@ -4133,8 +4133,8 @@ function itPurposeAllowedForCurrentJob(type,purpose){
   const workType=String(activeItPrep?.work_type||pendingAssignmentWorkType||'service').toLowerCase();
   return window.TechCheckITPrepRules.purposeAllowed(type,purpose,workType);
 }
-function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; return rows.filter(r => r.kind === kind && String(r.original_name || '').startsWith(prefix)); }
-function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
+const unitEvidence=(rows,unitNo,kind)=>window.TechCheckEvidence.unitRows(rows,unitNo,kind);
+const unitSignature=(rows,unitNo)=>window.TechCheckEvidence.unitSignature(rows,unitNo);
 function itItemIdentity(item,unitNo){return window.TechCheckITPrepRules.itemIdentity(item,unitNo);}
 function itUnitStepsData(item,unitNo){return window.TechCheckITPrepRules.checklist(item,unitNo);}
 function itBoolValue(item,field){return window.TechCheckITPrepWizard.boolValue(item,field,itDraftAnswers);}
