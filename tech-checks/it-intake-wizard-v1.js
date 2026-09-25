@@ -41,4 +41,45 @@ async function render({view,progress,photoHtml,hideChildren,resetPosition,onEmpt
   }
   hideChildren(view,[card]);resetPosition();
 }
-window.TechCheckITIntake=Object.freeze({labels,getState,setState,reset,start,reviewFlags,render});
+async function handleClick(event,deps={}){
+  const target=event?.target;if(!target?.closest)return false;
+  const render=()=>deps.render?.();
+  const startButton=target.closest('[data-wl-intake-start]');
+  if(startButton){await deps.start?.(startButton.dataset.wlIntakeStart);return true;}
+  const answer=target.closest('[data-wl-intake-answer]');
+  if(answer){
+    const value=answer.dataset.wlIntakeAnswer==='yes';wizard.answers[wizard.step]=value;const row=wizard.row;
+    if(row?.id){
+      const tech=await deps.identity();
+      if(wizard.step===12&&value)wizard.meta.cancellationDoc=window.TechCheckIntake.documentation(row,tech);
+      wizard.meta.answers=[...wizard.answers];
+      try{const update=await window.TechCheckIntake.saveProgress({returnId:row.id,notes:wizard.notes,meta:wizard.meta});row.damage_notes=update.damage_notes;}catch(error){alert(error.message);return true;}
+    }
+    if(value)wizard.step++;await render();return true;
+  }
+  if(target.closest('[data-wl-intake-escalate]')){wizard.step=labels.length;await render();return true;}
+  if(target.closest('[data-wl-intake-next]')){
+    if(wizard.step<labels.length&&wizard.answers[wizard.step]!==true){alert('This step is blocked. Fix the issue and tap YES, or document it as Needs Replacement.');return true;}
+    if(wizard.step===labels.length){const file=document.getElementById('wlIntakePhoto')?.files?.[0];if(!file&&!wizard.photo){alert('Take or choose the IT intake photo first.');return true;}if(file)wizard.photo=file;}
+    wizard.step++;await render();return true;
+  }
+  if(target.closest('[data-wl-intake-prev]')){if(wizard.step===labels.length+1)wizard.notes=document.getElementById('wlIntakeNotes')?.value||wizard.notes;wizard.step=Math.max(0,wizard.step-1);await render();return true;}
+  if(target.closest('[data-wl-intake-replacement]')){
+    wizard.notes=document.getElementById('wlIntakeNotes')?.value||wizard.notes||'';const row=wizard.row;
+    if(!row?.id){alert('This intake record is no longer available.');return true;}
+    if(!wizard.notes.trim()){alert('Describe the damage and what needs replacement before notifying the Owner.');return true;}
+    const file=document.getElementById('wlIntakePhoto')?.files?.[0];if(file)wizard.photo=file;let paths=row.intake_photo_paths||[];
+    try{if(wizard.photo)paths=await deps.uploadPhotos([wizard.photo],row.id,'it-replacement');if(!paths.length){alert('Take or choose an IT Intake photo showing the damaged equipment first.');return true;}await window.TechCheckIntake.markNeedsReplacement({returnId:row.id,damageNotes:wizard.notes,intakePhotoPaths:paths});const tech=await deps.identity();await deps.syncAssignment(row.ticket_no,tech.id);reset();deps.remember?.('it',row.ticket_no,'OWNER FOLLOW-UP CREATED');await deps.home?.();}catch(error){alert(error?.message||'Could not mark this equipment as needing replacement.');}
+    return true;
+  }
+  if(target.closest('[data-wl-intake-finish]')){
+    wizard.notes=document.getElementById('wlIntakeNotes')?.value||'';const row=wizard.row,tech=await deps.identity(),paths=wizard.photo?await deps.uploadPhotos([wizard.photo],row.id,'it'):row.intake_photo_paths||[],answers=wizard.answers;
+    if(!answers.every(v=>v===true)){alert('Every IT intake check must be YES before this unit can move to MHelpDesk inventory.');return true;}
+    wizard.meta.answers=[...answers];
+    try{const result=await window.TechCheckIntake.finishIntake({row,tech,notes:wizard.notes,meta:wizard.meta,intakePhotoPaths:paths});wizard.meta=result.meta;}catch(error){alert(error.message);return true;}
+    await deps.syncAssignment(row.ticket_no,tech.id);reset();deps.remember?.('it',row.ticket_no,'IT INTAKE COMPLETE');await deps.home?.();return true;
+  }
+  return false;
+}
+
+window.TechCheckITIntake=Object.freeze({labels,getState,setState,reset,start,reviewFlags,render,handleClick});
