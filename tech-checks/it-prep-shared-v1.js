@@ -121,4 +121,13 @@ async function releasePrep(prepId){
   return true;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep});
+
+async function confirmPhotoTag(itemId,matches){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!itemId)throw new Error('IT prep item is not available.');
+  const {error}=await ctx.db.rpc('confirm_it_unit_photo_tag',{p_item_id:itemId,p_matches:Boolean(matches)});
+  if(error)throw error;
+  return true;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag});
