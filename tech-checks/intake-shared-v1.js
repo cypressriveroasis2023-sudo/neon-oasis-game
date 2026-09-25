@@ -29,9 +29,44 @@ async function finishIntake({row,tech,notes='',meta={},intakePhotoPaths=[]}){
   const now=new Date().toISOString();
   const nextMeta={...(meta||{})};
   if(!nextMeta.cancellationDoc)nextMeta.cancellationDoc=documentation(row,tech,new Date(now));
-  const {error}=await ctx.db.from('unit_returns').update({status:'pending_mhelp_inventory',it_tech_id:tech.id,it_tech_name:tech.name,it_received_at:now,damage_notes:writeRecord(notes,nextMeta),intake_photo_paths:intakePhotoPaths,updated_at:now}).eq('id',row.id);
-  if(error)throw error;
-  return {status:'pending_mhelp_inventory',meta:nextMeta,updated_at:now};
+  const payload={status:'pending_mhelp_inventory',it_tech_id:tech.id,it_tech_name:tech.name,it_received_at:now,damage_notes:writeRecord(notes,nextMeta),intake_photo_paths:intakePhotoPaths,updated_at:now};
+  const expectedPaths=[...(intakePhotoPaths||[])].map(String).sort();
+  const matchesSaved=rowData=>{
+    if(!rowData||rowData.status!=='pending_mhelp_inventory'||String(rowData.it_tech_id||'')!==String(tech.id||''))return false;
+    const actualPaths=[...(rowData.intake_photo_paths||[])].map(String).sort();
+    return actualPaths.length===expectedPaths.length&&actualPaths.every((value,index)=>value===expectedPaths[index]);
+  };
+  let saved=null;
+  let writeError=null;
+  try{
+    const result=await ctx.db.from('unit_returns')
+      .update(payload)
+      .eq('id',row.id)
+      .select('id,status,it_tech_id,intake_photo_paths,updated_at')
+      .maybeSingle();
+    saved=result.data||null;
+    writeError=result.error||null;
+  }catch(error){
+    writeError=error;
+  }
+  if(matchesSaved(saved))return {status:'pending_mhelp_inventory',meta:nextMeta,updated_at:saved.updated_at||now};
+  if(writeError){
+    let confirmed=null,verifyError=null;
+    try{
+      const check=await ctx.db.from('unit_returns')
+        .select('id,status,it_tech_id,intake_photo_paths,updated_at')
+        .eq('id',row.id)
+        .maybeSingle();
+      confirmed=check.data||null;
+      verifyError=check.error||null;
+    }catch(error){
+      verifyError=error;
+    }
+    if(matchesSaved(confirmed))return {status:'pending_mhelp_inventory',meta:nextMeta,updated_at:confirmed.updated_at||now};
+    if(verifyError)throw new Error('Connection was interrupted while finishing IT Intake. Tech Check could not safely verify the result. Reconnect and reopen this return; the saved database status will decide what step is next.');
+    throw writeError;
+  }
+  throw new Error('IT Intake was not confirmed by Supabase. Reload this return before continuing; it has not been treated as complete.');
 }
 async function markNeedsReplacement({returnId,damageNotes,intakePhotoPaths=[]}){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
