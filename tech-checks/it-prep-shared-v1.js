@@ -44,4 +44,41 @@ async function saveItem(item){
   }
   return true;
 }
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy});
+
+async function configureBase({itemId=null,prepId=null,equipmentType='',purpose='',requiredBatteryCount=1}={}){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!equipmentType||!purpose)throw new Error('Equipment type and purpose are required.');
+  const result=itemId
+    ? await ctx.db.rpc('configure_it_prep_item',{p_item_id:itemId,p_equipment_type:equipmentType,p_purpose:purpose,p_required_battery_count:requiredBatteryCount})
+    : await ctx.db.rpc('add_it_prep_item',{p_prep_id:prepId,p_equipment_type:equipmentType,p_purpose:purpose,p_recon_battery_count:requiredBatteryCount});
+  if(result.error)throw result.error;
+  return result.data;
+}
+async function initializeConfigured({itemId,equipmentType='',purpose='',reconRequired=1}={}){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!itemId)return false;
+  if(['Spotter','Recon 2','Ranger'].includes(equipmentType)){
+    const {error}=await ctx.db.rpc('save_it_camera_family_checks_v1',{
+      p_item_id:itemId,p_programmed_ok:false,p_port_81_ok:false,p_port_554_ok:false,
+      p_recon_camera_count:equipmentType==='Recon 2'?Math.max(1,Number(reconRequired||1)):null
+    });
+    if(error)throw error;
+    return true;
+  }
+  if(isHeliosDeploy({equipment_type:equipmentType,purpose})){
+    const {error}=await ctx.db.rpc('save_it_helios_deploy_checks_v1',{
+      p_item_id:itemId,
+      p_camera1_hardware_ok:false,p_camera2_hardware_ok:false,p_ptz_assembly_ok:false,p_proxicast_4x4_ok:false,
+      p_router_sim_ok:false,p_speaker_24v_ok:false,p_cameras_12v_ok:false,p_ptz_plate_4bolts_ok:false,
+      p_cerbo_network_ok:false,p_cerbo_vrm_ok:false,p_rear_unit_tag_ok:false,p_battery_box_installed_ok:false,
+      p_battery_120v_charged_ok:false,p_camera_router_programming_ok:false,p_alibi_vigilant_ok:false,p_3x1tb_sd_ok:false,
+      p_camera1_ports_ok:false,p_camera2_ports_ok:false,p_ptz_ports_ok:false,p_speaker_ports_ok:false,
+      p_sim_ok:false,p_camera_app_ok:false,p_customer_email_app_ok:false,p_monitoring_ok:false,p_sd_formatted_ok:false,p_recording_ok:false
+    });
+    if(error)throw error;
+    return true;
+  }
+  return false;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured});
