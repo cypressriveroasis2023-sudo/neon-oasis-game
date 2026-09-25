@@ -104,4 +104,14 @@ async function signatureOnlyHtml(prepId,stage,unitNo=null,deps={}){
   </div>`;
 }
 
-window.TechCheckEvidenceView=Object.freeze({photoOnlyHtml,signatureOnlyHtml});
+
+async function proofHtml(prepId,stage,editable,deps={}){
+  const evidenceRows=deps.evidenceRows||(async()=>[]),esc=deps.esc||((value)=>String(value??''));
+  const rows=await evidenceRows(prepId,stage);
+  const photos=rows.filter(r=>r.kind==='photo');
+  const sig=[...rows].reverse().find(r=>r.kind==='signature');
+  const title=stage==='it'?'IT Handoff Proof':'Service Receipt Proof';
+  return `<div class='wl-proof ${stage==='service'?'service':''}' data-proof='${prepId}' data-stage='${stage}'><b>${title}</b><div class='wl-note'>${stage==='it'?'Photograph exactly what is leaving the shop.':'Photograph exactly what you received from IT.'}</div>${photos.length?`<div class='wl-gallery'>${photos.map(p=>`<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div>`:`<div class='warn top8'>No photos saved yet.</div>`}${editable?`<input class='wl-file top8' type='file' accept='image/*' capture='environment' multiple><button class='mini full top8' data-wl-upload='${stage}'>Save Photo(s)</button>`:''}${sig?`<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name||'')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url?`<img src='${esc(sig.url)}' alt='Saved signature'>`:''}</div>${editable?`<button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>`:''}`:editable?`<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>`:`<div class='warn top8'>No signature saved yet.</div>`}</div>`;
+}
+
+window.TechCheckEvidenceView=Object.freeze({photoOnlyHtml,signatureOnlyHtml,proofHtml});
