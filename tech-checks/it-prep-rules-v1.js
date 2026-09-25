@@ -110,4 +110,38 @@ function isHeliosDeploy(item){
     ? window.TechCheckRules.isHeliosDeploy(item)
     : (item?.equipment_type==='Helios'&&['DELIVERY','SWAP','BACKUP'].includes(item?.purpose));
 }
-window.TechCheckITPrepRules=Object.freeze({checklist,isHeliosDeploy,legacyChecklist});
+
+function itemIdentity(item,unitNo){
+  const tag=String(item?.unit_tag||'').trim();
+  if(tag)return `${item.equipment_type} ${tag}`;
+  if(item?.equipment_type==='110V Stand')return '110V Stand · no tag';
+  return `Unit ${unitNo}`;
+}
+function allowedPurposes(type){
+  if(type==='110V Stand')return ['SWAP'];
+  if(type==='Solar Stand')return ['SWAP','DELIVERY'];
+  return ['SWAP','DELIVERY'];
+}
+function purposeOptions(type,workType='service'){
+  const normalized=String(workType||'service').toLowerCase();
+  const allowed=allowedPurposes(type);
+  if(normalized==='delivery')return allowed.includes('DELIVERY')?[{value:'DELIVERY',label:'DELIVERY'}]:allowed.map(value=>({value,label:value}));
+  if(normalized==='swap')return allowed.includes('SWAP')?[{value:'SWAP',label:'SWAP'}]:allowed.map(value=>({value,label:value}));
+  if(normalized==='service'){
+    if(type==='110V Stand')return [{value:'SWAP',label:'YES — REPLACING SITE STAND'}];
+    if(type==='Solar Stand')return [
+      {value:'SWAP',label:'YES — REPLACING SITE STAND'},
+      {value:'DELIVERY',label:'NO — SUPPORT STAND'}
+    ];
+    return [
+      {value:'SWAP',label:'YES — REPLACING SITE UNIT'},
+      {value:'BACKUP',label:'NO — SUPPORT / BACKUP'}
+    ];
+  }
+  return allowed.map(value=>({value,label:value}));
+}
+function purposeAllowed(type,purpose,workType='service'){
+  return purposeOptions(type,workType).some(row=>row.value===purpose);
+}
+
+window.TechCheckITPrepRules=Object.freeze({checklist,isHeliosDeploy,legacyChecklist,itemIdentity,allowedPurposes,purposeOptions,purposeAllowed});
