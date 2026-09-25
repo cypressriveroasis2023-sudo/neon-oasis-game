@@ -4828,7 +4828,6 @@ async function showItPrep(prepId) {
   wizard.style.display = '';
   await renderItUnitStep();
 }
-function itEquipmentAIReview(item,ev,unitNo){return window.TechCheckITPrepView.equipmentReviewHtml(item,ev,unitNo,{esc,issues:itUnitIssues,typeChoice:itTypeChoice,title:onsiteVisionTitle});}
 async function renderItUnitStep() {
   const items = itItems();
   const totalUnits = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
