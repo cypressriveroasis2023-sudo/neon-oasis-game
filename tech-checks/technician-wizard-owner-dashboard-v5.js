@@ -1,7 +1,7 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './handoff-evidence-shared-v1.js?v=2';
-import './it-prep-wizard-v1.js?v=11';
+import './it-prep-wizard-v1.js?v=12';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
 import './truck-spares-shared-v1.js?v=1';
@@ -6276,41 +6276,50 @@ document.addEventListener('click', async e => {
 
   if (e.target.closest('[data-wl-edit-total]')) return editItPrepUnitCount();
   if (e.target.closest('[data-wl-it-back]')) return showPendingList();
-  const purpose = e.target.closest('[data-wl-unit-purpose]');
-  if (purpose) { itPurposeChoice = purpose.dataset.wlUnitPurpose; return renderItUnitStep(); }
-  const itQuestionResult=await window.TechCheckITPrepWizard.handleQuestionClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},{
-    currentItem:currentItItem,items:itItems,steps:itUnitStepsData,persist:persistCurrentItItem,
+  const itPrepClickResult=await window.TechCheckITPrepWizard.handlePrepClick(e,{
+    unitIndex:itUnitIndex,
+    questionIndex:itQuestionIndex,
+    phase:itUnitPhase,
+    typeChoice:itTypeChoice,
+    purposeChoice:itPurposeChoice,
+    reconRequired:itReconRequired,
+    finalView:itFinalView
+  },{
+    currentItem:currentItItem,
+    items:itItems,
+    steps:itUnitStepsData,
+    persist:persistCurrentItItem,
     recordAnswer:(item,field,value)=>window.TechCheckITPrepWizard.recordAnswer(item,field,value,itDraftAnswers,itAnswered),
     totalUnits:items=>activeItPrep?.expected_unit_count||itExpectedUnits||items.length,
-    purposeAllowed:itPurposeAllowedForCurrentJob,configure:configureCurrentItItem,setReconRequired:value=>{itReconRequired=value;},
-    boolAnswered:itBoolAnswered,evidence:()=>evidenceRows(activeItPrep.id,'it'),identity:itItemIdentity,
-    unitEvidence,photoTagReady:itPhotoTagReady,unitSignature,issues:itUnitIssues
-  });
-  if(itQuestionResult.handled){
-    const next=itQuestionResult.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itReconRequired=next.reconRequired;itFinalView=next.finalView;
-    if(itQuestionResult.render)return renderItUnitStep();
-    return;
-  }
-  const itReviewResult=await window.TechCheckITPrepWizard.handleReviewClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,finalView:itFinalView},{
-    currentItem:currentItItem,items:itItems,hasPrep:()=>Boolean(activeItPrep),identity:itItemIdentity,
+    purposeAllowed:itPurposeAllowedForCurrentJob,
+    configure:configureCurrentItItem,
+    setReconRequired:value=>{itReconRequired=value;},
+    boolAnswered:itBoolAnswered,
+    evidence:()=>evidenceRows(activeItPrep.id,'it'),
+    identity:itItemIdentity,
+    unitEvidence,
+    photoTagReady:itPhotoTagReady,
+    unitSignature,
+    issues:itUnitIssues,
+    hasPrep:()=>Boolean(activeItPrep),
     confirmPhotoTag:async(itemId,matches)=>{try{await window.TechCheckITPrep.confirmPhotoTag(itemId,matches);return null;}catch(error){return error;}},
     reload:async()=>{activeItPrep=await getPrep(activeItPrep.id);},
-    evidence:()=>evidenceRows(activeItPrep.id,'it'),issues:itUnitIssues
+    autoPurpose:()=>prepPurposeFromWorkType(activeItPrep?.work_type),
+    release:releaseItPrepUnitByUnit
   });
-  if(itReviewResult.handled){
-    const next=itReviewResult.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itFinalView=next.finalView;
-    if(itReviewResult.render)return renderItUnitStep();
+  if(itPrepClickResult.handled){
+    const next=itPrepClickResult.state;
+    itUnitIndex=next.unitIndex;
+    itQuestionIndex=next.questionIndex;
+    itUnitPhase=next.phase;
+    itTypeChoice=next.typeChoice;
+    itPurposeChoice=next.purposeChoice;
+    itReconRequired=next.reconRequired;
+    itFinalView=next.finalView;
+    if(itPrepClickResult.action==='pending')return showPendingList();
+    if(itPrepClickResult.render)return renderItUnitStep();
     return;
   }
-
-  if (e.target.closest('[data-wl-it-prev]')) {
-    const items=itItems(),stepCount=currentItItem()?itUnitStepsData(currentItItem(),itUnitIndex+1).length:0;
-    const result=window.TechCheckITPrepWizard.previous({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,finalView:itFinalView},{itemCount:items.length,stepCount,autoPurpose:Boolean(prepPurposeFromWorkType(activeItPrep?.work_type))});
-    if(result.action==='pending')return showPendingList();
-    const next=result.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itFinalView=next.finalView;
-    return renderItUnitStep();
-  }
-  if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
   if (e.target.closest('[data-wl-service-truck-inventory]')) return showServiceTruckInventoryCheck();
