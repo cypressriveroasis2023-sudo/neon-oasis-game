@@ -8926,26 +8926,6 @@ async function ownerAssignJob() {
   const target = ownerAutomaticFlowLabel(workType,role);
   alert('Assigned to ' + target + ' in Tech Check.' + pushMessage + ' MHelpDesk remains unchanged.');
 }
-async function saveActivePrepParts() {
-  if (!activeItPrep?.id) return;
-  const parts = readTicketPartInputs('wlEditPart');
-  document.body.classList.add('busy');
-  const { error } = await liveDb.rpc('set_prep_parts', {
-    p_prep_id: activeItPrep.id,
-    p_solar_panel_qty: parts.solar_panel_qty,
-    p_battery_replacement_qty: parts.battery_replacement_qty,
-    p_camera_replacement_qty: parts.camera_replacement_qty,
-    p_sim_replacement_qty: parts.sim_replacement_qty,
-    p_micro_sd_qty: parts.micro_sd_qty,
-  });
-  document.body.classList.remove('busy');
-  if (error) return alert(error.message);
-  activeItPrep = await getPrep(activeItPrep.id);
-  await window.refreshData?.();
-  itFinalView='summary';
-  await renderItUnitStep();
-  alert('Parts list updated.');
-}
 async function ownerCancelAssignment(id) {
   if (!confirm('Cancel this Tech Check assignment?')) return;
   const { error } = await liveDb.rpc('owner_cancel_job_assignment', { p_assignment_id: id });
@@ -9156,7 +9136,6 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-owner-ai-dispatch-voice]')) return ownerAIDispatchStartVoice();
   if (e.target.closest('[data-owner-ai-review]')) return ownerAIReview();
   if (e.target.closest('[data-wl-owner-assign]')) return ownerAssignJob();
-  if (e.target.closest('[data-wl-save-prep-parts]')) return saveActivePrepParts();
   const cancelAssignment = e.target.closest('[data-wl-cancel-assignment]');
   if (cancelAssignment) return ownerCancelAssignment(cancelAssignment.dataset.wlCancelAssignment);
 });
