@@ -77,9 +77,38 @@ async function markNeedsReplacement({returnId,damageNotes,intakePhotoPaths=[]}){
 async function confirmMHelpInventory(returnId){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   const now=new Date().toISOString();
-  const {error}=await ctx.db.from('unit_returns').update({status:'completed',mhelp_inventory_confirmed:true,mhelp_confirmed_at:now,completed_at:now,updated_at:now}).eq('id',returnId);
-  if(error)throw error;
-  return {status:'completed',updated_at:now};
+  const payload={status:'completed',mhelp_inventory_confirmed:true,mhelp_confirmed_at:now,completed_at:now,updated_at:now};
+  const verifyCompleted=async()=>{
+    const check=await ctx.db.from('unit_returns')
+      .select('id,status,mhelp_inventory_confirmed,mhelp_confirmed_at,completed_at,updated_at')
+      .eq('id',returnId)
+      .maybeSingle();
+    if(check.error)throw check.error;
+    return check.data||null;
+  };
+  let saved=null,writeError=null;
+  try{
+    const result=await ctx.db.from('unit_returns')
+      .update(payload)
+      .eq('id',returnId)
+      .eq('status','pending_mhelp_inventory')
+      .select('id,status,mhelp_inventory_confirmed,mhelp_confirmed_at,completed_at,updated_at')
+      .maybeSingle();
+    saved=result.data||null;
+    writeError=result.error||null;
+  }catch(error){
+    writeError=error;
+  }
+  if(saved?.status==='completed'&&saved.mhelp_inventory_confirmed===true)return {status:'completed',updated_at:saved.updated_at||now,alreadyCompleted:false};
+  let confirmed=null;
+  try{confirmed=await verifyCompleted();}
+  catch(error){
+    if(writeError)throw new Error('Connection was interrupted while confirming MHelpDesk inventory and Tech Check could not verify the saved status. Reconnect and reopen Return & Intake Tracking before trying again.');
+    throw error;
+  }
+  if(confirmed?.status==='completed'&&confirmed.mhelp_inventory_confirmed===true)return {status:'completed',updated_at:confirmed.updated_at||now,alreadyCompleted:true};
+  if(writeError)throw writeError;
+  throw new Error('This return is no longer waiting for Owner MHelpDesk inventory confirmation. Refresh Return & Intake Tracking before continuing.');
 }
 
 window.TechCheckIntake=Object.freeze({readRecord,writeRecord,documentation,saveProgress,finishIntake,markNeedsReplacement,confirmMHelpInventory});
