@@ -1,4 +1,4 @@
-import './it-prep-view-v1.js?v=4';
+import './it-prep-view-v1.js?v=5';
 import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
@@ -4740,10 +4740,6 @@ async function checkoutTruckSpareBattery(spareId) {
   return renderItUnitStep();
 }
 
-function itTicketSummaryHtml(items,evidence){return window.TechCheckITPrepView.ticketSummaryHtml(activeItPrep,items,{esc});}
-function itFinalPartsSummaryHtml(){return window.TechCheckITPrepView.partsSummaryHtml(activeItPrep,{esc,partsRows:ticketPartsRows});}
-function itFinalSpareSummaryHtml(items,rows){return window.TechCheckITPrepView.spareSummaryHtml(items,rows,{esc});}
-function itFinalLockNoticeHtml(){return window.TechCheckITPrepView.finalLockHtml();}
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items = itItems();
@@ -4856,32 +4852,16 @@ async function renderItUnitStep() {
     if (itFinalView!=='summary') itFinalView='summary';
 
     if(partsOnly){
-      wizard.innerHTML =
-        progress('PARTS-ONLY IT HANDOFF', ready ? 'READY — HAND OFF PARTS' : 'Verify the loose parts', 1, 1) +
-        `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b><div>${esc(activeItPrep.site||'')}</div><div class='small'>No whole unit or stand is leaving the shop on this ticket.</div></div>` +
-        itFinalPartsSummaryHtml() +
-        `<div class='wl-question top10'><div class='qnum'>PARTS-ONLY HANDOFF</div><div class='qtext'>VERIFY THE EXACT PARTS AND QUANTITIES</div><div class='small'>Photograph the actual parts IT is giving Service, then sign the ticket-level IT handoff.</div></div>` +
-        await photoOnlyHtml(activeItPrep.id,'it',null,1) +
-        await signatureOnlyHtml(activeItPrep.id,'it',null) +
-        `<div id='wlSendItMsg'></div>` +
-        (ready ? `<div class='ok top10'><b>✓ PARTS HANDOFF READY</b><div>Service will verify these same parts, photo evidence, and quantities before accepting the handoff.</div></div>` : `<div class='wl-stop top10'><b>PHOTO + IT SIGNATURE REQUIRED</b><div>Save one clear parts photo and the IT final sign-off before handing this ticket to Service.</div></div>`) +
-        `<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready?'':'disabled'}>HAND OFF PARTS TO SERVICE →</button>
-        <div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><button class='wl-next' data-wl-it='history'>Status & History →</button></div>`;
+      const partsPhotoHtml=await photoOnlyHtml(activeItPrep.id,'it',null,1);
+      const partsSignatureHtml=await signatureOnlyHtml(activeItPrep.id,'it',null);
+      wizard.innerHTML=window.TechCheckITPrepView.partsOnlyFinalHtml(activeItPrep,ready,partsPhotoHtml,partsSignatureHtml,{progress,esc,partsRows:ticketPartsRows});
       wizard.querySelectorAll('canvas').forEach(wireCanvas);
       return resetWizardPosition();
     }
 
-    wizard.innerHTML =
-      progress('Ticket Summary', ready ? 'Ready to hand off' : 'Finish this ticket', 1, 1) +
-      itFinalLockNoticeHtml() +
-      itTicketSummaryHtml(items, ev) +
-      itFinalPartsSummaryHtml() +
-      itFinalSpareSummaryHtml(items,spareBatteries) +
-      (!spareUnitsCheckedOut ? `<div class='wl-stop top10'><b>SPARE NOT CHECKED OUT</b><div>Finish the truck spare checkout.</div></div>` : '') +
-      ((!spareBatteriesReady || !spareBatteriesCheckedOut) ? `<div class='wl-stop top10'><b>SPARE BATTERY NOT READY</b><div>Finish the spare battery checkout.</div></div>` : '') +
-      `<div id='wlSendItMsg'></div>` +
-      `<button class='wl-big wl-red wl-primary-handoff top10' data-wl-send-it ${ready ? '' : 'disabled'}>HAND OFF TO SERVICE →</button>
-      <div class='wl-nav wl-simple-final-nav'><button class='wl-prev' data-wl-final-last-unit>← Back</button><span></span></div>`;
+    wizard.innerHTML=window.TechCheckITPrepView.finalTicketHtml(activeItPrep,items,spareBatteries,{
+      ready,spareUnitsCheckedOut,spareBatteriesReady,spareBatteriesCheckedOut
+    },{progress,esc,partsRows:ticketPartsRows});
     return resetWizardPosition();
   }
   const item = items[itUnitIndex] || null;
