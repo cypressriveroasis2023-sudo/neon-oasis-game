@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=7';
+import './it-prep-wizard-v1.js?v=8';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=3';
 import './it-intake-wizard-v1.js?v=1';
@@ -4558,12 +4558,12 @@ async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items = itItems();
   const evidence = await evidenceRows(activeItPrep.id, 'it');
-  const expected = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
-  const partsOnly=expected===0&&items.length===0&&ticketPartsTotal(activeItPrep)>0;
-  const itemReady = items.length === expected && items.every((item, index) => itUnitIssues(item, evidence, index + 1).length === 0);
-  const partsPhotoReady=!partsOnly || evidence.some(row=>row.kind==='photo'&&!row.prep_item_id);
-  const partsSignatureReady=!partsOnly || evidence.some(row=>row.kind==='signature'&&!row.prep_item_id);
-  const ready=itemReady&&partsPhotoReady&&partsSignatureReady;
+  const releaseState=window.TechCheckITPrepWizard.releaseReadiness(activeItPrep,items,evidence,{
+    expectedUnits:itExpectedUnits,
+    issues:itUnitIssues,
+    partsTotal:ticketPartsTotal
+  });
+  const {expected,partsOnly,ready}=releaseState;
   if (!ready) {
     if(partsOnly)return alert('Take one clear photo of the loose parts and save the IT final signature before handing them to Service.');
     return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
