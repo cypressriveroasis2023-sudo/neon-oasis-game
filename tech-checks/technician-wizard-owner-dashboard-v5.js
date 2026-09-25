@@ -56,6 +56,7 @@ let svcHeliosFieldCursor = null;
 let heliosFieldAnswerSubmitting = false;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
+let inspectionSubmitting = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [], submissionId:null, pendingUploadPaths:[] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
@@ -6083,6 +6084,7 @@ async function startInspection() {
   inspectionQuestion();
 }
 async function submitInspection() {
+  if(inspectionSubmitting)return;
   if (inspection.truck.some(v => v !== true)) return alert('Every truck question must be YES before continuing.');
   if (inspection.takingTrailer === true && inspection.trailer.some(v => v !== true)) return alert('Every trailer question must be YES before continuing.');
   if (!navigator.onLine) {
@@ -6093,7 +6095,17 @@ async function submitInspection() {
   const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v);
   const text = document.getElementById('sessionClosed')?.textContent || '';
   const tickets = [...text.matchAll(/MHelpDesk Ticket\s*#([^·\s]+)/gi)].map(m => m[1]);
+  const attemptStartedAt=Date.now();
+  const submitButton=document.querySelector('[data-wl-submit-inspection]');
+  inspectionSubmitting=true;
+  if(submitButton){submitButton.disabled=true;submitButton.textContent='SUBMITTING…';}
   document.body.classList.add('busy');
+  const finishSubmittedInspection=async()=>{
+    await clearDeviceDraft('inspection');
+    inspectionRecovered=false;
+    rememberTechCompletion('service','', 'TRUCK / TRAILER INSPECTION COMPLETE');
+    return showServiceTruckInventoryCheck();
+  };
   try {
     const { error } = await liveDb.rpc('submit_morning_check', {
       p_mhelp_reviewed:true,
@@ -6103,17 +6115,42 @@ async function submitInspection() {
       p_closed_ticket_nos:tickets
     });
     if (error) throw error;
-    await clearDeviceDraft('inspection');
-    inspectionRecovered=false;
-    rememberTechCompletion('service','', 'TRUCK / TRAILER INSPECTION COMPLETE');
-    return showServiceTruckInventoryCheck();
+    return await finishSubmittedInspection();
   } catch(error) {
+    let confirmed=false;
+    try{
+      const {data,error:verifyError}=await liveDb.from('morning_checks')
+        .select('id,submitted_at,mhelp_reviewed,truck_checks,taking_trailer,trailer_checks,closed_ticket_nos')
+        .gte('submitted_at',new Date(attemptStartedAt-60000).toISOString())
+        .order('submitted_at',{ascending:false})
+        .limit(5);
+      if(!verifyError){
+        const sameChecks=(actual,expected,prefix,count)=>{
+          for(let i=1;i<=count;i++)if(Boolean(actual?.[`${prefix}_${i}`])!==Boolean(expected?.[`${prefix}_${i}`]))return false;
+          return true;
+        };
+        const sameTickets=(actual,expected)=>{
+          const a=[...(actual||[])].map(String).sort(),b=[...(expected||[])].map(String).sort();
+          return a.length===b.length&&a.every((value,index)=>value===b[index]);
+        };
+        confirmed=(data||[]).some(row=>
+          row?.mhelp_reviewed===true
+          && Boolean(row?.taking_trailer)===Boolean(inspection.takingTrailer===true)
+          && sameChecks(row?.truck_checks,truck,'truck',8)
+          && (!inspection.takingTrailer || sameChecks(row?.trailer_checks,trailer,'trailer',7))
+          && sameTickets(row?.closed_ticket_nos,tickets)
+        );
+      }
+    }catch{}
+    if(confirmed)return await finishSubmittedInspection();
     await saveInspectionDraft();
     alert(error?.message === 'Failed to fetch'
-      ? 'Connection lost. Your inspection is saved on this device and was not submitted.'
+      ? 'Connection lost. Your inspection is saved on this device and Tech Check could not confirm a submitted record. Reconnect and try again.'
       : (error?.message || 'Could not submit the inspection.'));
   } finally {
+    inspectionSubmitting=false;
     document.body.classList.remove('busy');
+    if(document.contains(submitButton)){submitButton.disabled=false;submitButton.textContent='CONTINUE TO REQUIRED TRUCK INVENTORY →';}
   }
 }
 async function showInspectionHistory() {
