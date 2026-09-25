@@ -81,4 +81,35 @@ async function initializeConfigured({itemId,equipmentType='',purpose='',reconReq
   return false;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured});
+
+async function verifyItemsForRelease(items=[]){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  for(const item of items){
+    const {error:verifyError}=await ctx.db.rpc('verify_prep_item',{
+      p_item_id:item.id,
+      p_unit_tag:item.unit_tag||'',
+      p_battery_count:Number(item.battery_count||0),
+      p_power_ok:Boolean(item.power_ok),
+      p_functions_ok:Boolean(item.functions_ok),
+      p_safe_ok:Boolean(item.safe_ok)
+    });
+    if(verifyError)throw verifyError;
+    if(['DELIVERY','BACKUP'].includes(item.purpose)||(item.equipment_type==='Sniper'&&item.purpose==='SWAP')){
+      const {error:deliveryError}=await ctx.db.rpc('verify_delivery_item_checks',{
+        p_item_id:item.id,
+        p_sim_ok:Boolean(item.delivery_sim_ok),
+        p_camera_app_ok:Boolean(item.delivery_camera_app_ok),
+        p_customer_email_app_ok:Boolean(item.delivery_customer_email_app_ok),
+        p_batteries_charged_ok:item.equipment_type==='Solar Spotter'?true:Boolean(item.delivery_batteries_charged_ok),
+        p_monitoring_ok:Boolean(item.delivery_monitoring_ok),
+        p_ticket_count_ok:item.equipment_type==='Helios'?true:Boolean(item.delivery_ticket_count_ok),
+        p_sd_formatted_ok:Boolean(item.delivery_sd_formatted_ok),
+        p_recording_ok:Boolean(item.delivery_recording_ok)
+      });
+      if(deliveryError)throw deliveryError;
+    }
+  }
+  return true;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease});
