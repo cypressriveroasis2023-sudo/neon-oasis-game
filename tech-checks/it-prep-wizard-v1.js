@@ -304,4 +304,49 @@ async function persistCurrent({prep=null,unitIndex=0}={},deps={}){
   }
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff,answerKey,boolValue,boolAnswered,recordAnswer,sortedItems,configureCurrent,persistCurrent});
+
+async function handlePrepClick(event,state,deps={}){
+  const target=event?.target;
+  if(!target?.closest)return {handled:false,state};
+  let next={...state};
+
+  const purpose=target.closest('[data-wl-unit-purpose]');
+  if(purpose){
+    next.purposeChoice=purpose.dataset.wlUnitPurpose;
+    return {handled:true,state:next,render:true};
+  }
+
+  const question=await handleQuestionClick(event,next,deps);
+  if(question.handled)return question;
+
+  const review=await handleReviewClick(event,next,deps);
+  if(review.handled)return review;
+
+  if(target.closest('[data-wl-it-prev]')){
+    const items=deps.items?.()||[];
+    const item=deps.currentItem?.()||null;
+    const stepCount=item?(deps.steps?.(item,next.unitIndex+1)||[]).length:0;
+    const result=previous(next,{
+      itemCount:items.length,
+      stepCount,
+      autoPurpose:Boolean(deps.autoPurpose?.())
+    });
+    return {
+      handled:true,
+      state:result.state,
+      action:result.action||null,
+      render:!result.action
+    };
+  }
+
+  if(target.closest('[data-wl-send-it]')){
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    await deps.release?.();
+    return {handled:true,state:next};
+  }
+
+  return {handled:false,state:next};
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,handlePrepClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff,answerKey,boolValue,boolAnswered,recordAnswer,sortedItems,configureCurrent,persistCurrent});
