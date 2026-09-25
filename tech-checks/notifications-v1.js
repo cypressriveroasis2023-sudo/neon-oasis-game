@@ -122,6 +122,42 @@ async function setupRealtime(force=false,onInsert=null) {
 }
 
 
+function escHtml(value='') {
+  return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+async function refreshBadge(){
+  if(document.getElementById('appView')?.classList.contains('hidden'))return;
+  try{if('clearAppBadge' in navigator)await navigator.clearAppBadge();}catch{}
+}
+function ensurePanel(){
+  let panel=document.getElementById('wlNotificationPanel'); if(panel)return panel;
+  panel=document.createElement('div'); panel.id='wlNotificationPanel'; panel.className='wl-notify-overlay hidden';
+  panel.innerHTML=`<div class='wl-notify-sheet'><div class='wl-notify-head'><div><div class='wl-next-kicker'>TECH CHECK</div><h2>Notifications</h2></div><button class='mini' data-wl-notify-close>Close</button></div><div id='wlNotifyBody'></div></div>`;
+  document.body.append(panel); return panel;
+}
+function toggleHtml(id,label,checked,detail=''){return `<label class='wl-notify-toggle'><span><b>${escHtml(label)}</b>${detail?`<small>${escHtml(detail)}</small>`:''}</span><input id='${id}' type='checkbox' ${checked?'checked':''}></label>`;}
+async function openPanel(){
+  const panel=ensurePanel(),body=document.getElementById('wlNotifyBody');
+  const [prefs,rows,pushState]=await Promise.all([preferences(),inbox(30),pushAlertState()]);
+  const role=context().getEffectiveRole?.()||context().getRole?.(),permission=pushState.permission,standalone=window.matchMedia?.('(display-mode: standalone)')?.matches||window.navigator.standalone===true;
+  const status=pushState.ready?'Phone alerts are ON. Tech Check can notify this device even when the app is closed.':permission==='denied'?'Alerts are blocked in this device’s notification settings.':!pushState.supported?'Push alerts are not available in this browser. On iPhone, add Tech Check to the Home Screen and open the installed app.':(!standalone&&/iPhone|iPad|iPod/i.test(navigator.userAgent))?'On iPhone, add Tech Check to the Home Screen first, then open it and enable phone alerts.':'Tap Enable to allow Tech Check to notify this phone when work is assigned.';
+  const toggles=[role!=='owner'?toggleHtml('wlPrefAssignments','New job assignments',prefs.new_assignments,'When the Owner assigns an MHelpDesk job directly to you.'):'',role==='it'?toggleHtml('wlPrefReturns','Returned units waiting for IT',prefs.returned_units,'When Service sends a unit back for IT Intake.'):'',role==='service'?toggleHtml('wlPrefService','Equipment ready for Service',prefs.equipment_ready_service,'When IT creates a Service handoff for checkout.'):'',role==='owner'?toggleHtml('wlPrefOwner','Owner actions',prefs.owner_actions,'When IT finishes intake and MHelpDesk inventory confirmation is needed.'):''].join('');
+  const rowsHtml=rows.map(n=>`<button class='wl-notify-item ${n.read_at?'':'unread'}' data-wl-notification-id='${escHtml(n.id)}' ${n.assignment_id?`data-wl-notification-assignment='${escHtml(n.assignment_id)}'`:''}><span class='wl-notify-dot'></span><span><b>${escHtml(n.title)}</b><small>${escHtml(n.body)}</small><em>${new Date(n.created_at).toLocaleString()}</em></span></button>`).join('');
+  body.innerHTML=`<div class='wl-notify-section'><h3>Alert Settings</h3>${toggles}<div class='wl-notify-system'><div><b>iPhone / Browser Alerts</b><div class='small'>${escHtml(status)}</div></div><button class='mini' data-wl-enable-browser-alerts>${pushState.ready?'Enabled':'Enable'}</button></div><div class='small top8'>Once enabled on this device, new Owner-assigned jobs can appear as phone notifications while Tech Check is closed. The Home Screen app badge also reflects unread Tech Check notifications when supported by the phone.</div><button class='btn' data-wl-save-notify>Save Notification Settings</button></div><div class='wl-notify-section'><div class='sectiontitle'><h3>Notification Inbox</h3><button class='mini' data-wl-notify-read-all>Mark all read</button></div><div class='wl-notify-list'>${rowsHtml||"<div class='ok'><b>✓ No notifications yet.</b></div>"}</div></div>`;
+  panel.classList.remove('hidden');
+}
+async function saveSettings(){
+  const prefs=await preferences(),role=context().getEffectiveRole?.()||context().getRole?.(),browserAllowed=typeof Notification!=='undefined'&&Notification.permission==='granted';
+  await savePreferences({new_assignments:role==='owner'?Boolean(prefs.new_assignments):Boolean(document.getElementById('wlPrefAssignments')?.checked??prefs.new_assignments),returned_units:role==='it'?Boolean(document.getElementById('wlPrefReturns')?.checked??prefs.returned_units):Boolean(prefs.returned_units),equipment_ready_service:role==='service'?Boolean(document.getElementById('wlPrefService')?.checked??prefs.equipment_ready_service):Boolean(prefs.equipment_ready_service),owner_actions:role==='owner'?Boolean(document.getElementById('wlPrefOwner')?.checked??prefs.owner_actions):Boolean(prefs.owner_actions),browser_notifications:browserAllowed});
+  alert('Notification settings saved.'); await openPanel();
+}
+async function enableBrowserAlerts(){
+  const state=await pushAlertState(); if(!state.supported)return alert('Phone push notifications are not available here. On iPhone, add Tech Check to the Home Screen, open the installed app, and try again.');
+  const standalone=window.matchMedia?.('(display-mode: standalone)')?.matches||window.navigator.standalone===true;
+  if(/iPhone|iPad|iPod/i.test(navigator.userAgent)&&!standalone)return alert('On iPhone, install Tech Check to your Home Screen first. Then open the Home Screen app and tap Enable again.');
+  try{const permission=await Notification.requestPermission();if(permission!=='granted')return alert('Notification permission was not enabled on this device.');await registerPhonePush();await saveSettings();alert('Phone alerts are enabled for Tech Check on this device.');}catch(error){console.warn('Could not enable Tech Check push notifications',error);alert(error?.message||'Could not enable phone alerts on this device.');}
+}
+
 window.TechCheckNotifications = Object.freeze({
   pushAlertState,
   registerPhonePush,
@@ -130,4 +166,8 @@ window.TechCheckNotifications = Object.freeze({
   savePreferences,
   showSystemNotification,
   setupRealtime,
+  refreshBadge,
+  openPanel,
+  saveSettings,
+  enableBrowserAlerts,
 });
