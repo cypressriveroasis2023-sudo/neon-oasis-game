@@ -1,4 +1,4 @@
-import './it-prep-view-v1.js?v=1';
+import './it-prep-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
@@ -4757,48 +4757,10 @@ async function checkoutTruckSpareBattery(spareId) {
   return renderItUnitStep();
 }
 
-function itTicketSummaryHtml(items, evidence) {
-  const jobItems=items.map((item,index)=>({item,index})).filter(row=>row.item.purpose!=='BACKUP');
-  const units=jobItems.map(({item,index})=>{
-    const unitNo=index+1;
-    return `<div class='wl-simple-unit'>
-      <div><b>${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><span>Unit ${unitNo} · ${esc(item.purpose)}</span></div>
-      <div class='wl-simple-unit-ok'>✓ READY</div>
-      <button class='mini' data-wl-final-unit='${index}'>Review / Adjust Unit</button>
-    </div>`;
-  }).join('');
-  return `<div class='wl-simple-ticket'>
-    <div class='wl-simple-ticket-number'>MHelpDesk #${esc(activeItPrep.ticket_no)}</div>
-    <div class='small'>${esc(activeItPrep.site||'')}</div>
-  </div>
-  <div class='wl-simple-units'>${units||"<div class='small'>No equipment prepared yet.</div>"}</div>`;
-}
-function itFinalPartsSummaryHtml() {
-  const rows=ticketPartsRows(activeItPrep).filter(row=>row.qty>0);
-  if(!rows.length) return '';
-  return `<div class='wl-simple-extra wl-readonly-extra'>
-    <div class='qnum'>ASSIGNED LOOSE PARTS</div>
-    <div><b>${rows.map(row=>row.qty+' × '+esc(row.label)).join(' · ')}</b></div>
-    <div class='small'>ASSIGNED — READ ONLY</div>
-  </div>`;
-}
-function itFinalSpareSummaryHtml(items,rows) {
-  const units=(items||[]).filter(item=>item.purpose==='BACKUP');
-  const batteries=(rows||[]).filter(row=>Number(row.qty_prepared||0)>0);
-  const bits=[];
-  if(units.length) bits.push(units.map(item=>esc(item.equipment_type)+' '+esc(item.unit_tag||'')).join(' · '));
-  if(batteries.length) bits.push(batteries.map(row=>Number(row.qty_prepared)+' × '+esc(row.battery_type)).join(' · '));
-  if(!bits.length) return '';
-  return `<div class='wl-simple-extra wl-readonly-extra'>
-    <div class='qnum'>ASSIGNED TRUCK SPARES / BACKUPS</div>
-    <div><b>${bits.join(' · ')}</b></div>
-    <div class='small'>ASSIGNED — READ ONLY</div>
-  </div>`;
-}
-function itFinalLockNoticeHtml(){
-  return `<div class='wl-it-final-lock'><b>✓ TICKET CONTENTS LOCKED</b><span>At handoff, IT can only review or correct a unit check. Equipment, parts, and spares cannot be added from this screen.</span></div>`;
-}
-
+function itTicketSummaryHtml(items,evidence){return window.TechCheckITPrepView.ticketSummaryHtml(activeItPrep,items,{esc});}
+function itFinalPartsSummaryHtml(){return window.TechCheckITPrepView.partsSummaryHtml(activeItPrep,{esc,partsRows:ticketPartsRows});}
+function itFinalSpareSummaryHtml(items,rows){return window.TechCheckITPrepView.spareSummaryHtml(items,rows,{esc});}
+function itFinalLockNoticeHtml(){return window.TechCheckITPrepView.finalLockHtml();}
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items = itItems();
@@ -4891,15 +4853,7 @@ async function showItPrep(prepId) {
   wizard.style.display = '';
   await renderItUnitStep();
 }
-function itEquipmentAIReview(item,ev,unitNo){
-  const type=String(item?.equipment_type||itTypeChoice||'Equipment'), issues=item?itUnitIssues(item,ev||[],unitNo):[], flags=[];
-  const low=type.toLowerCase();
-  if(low.includes('helios')) flags.push('Helios focus: cameras → modem → antenna → camera/modem programming → ports/configuration; verify 3 × 1TB SD cards.');
-  if(low.includes('solar spotter')) flags.push('Solar Spotter IT check does not include battery checkout. The Solar Stand and its battery setup are verified on the Service side (4 × AGM 12V 110Ah or 1 × 12V 350Ah per stand).');
-  if(low.includes('ranger')) flags.push('Ranger: verify MPPT update, MPPT operation, and charging. Service should receive 1 solar panel per Ranger.');
-  if(low.includes('helios')) flags.push('Verify Camera 1: 81/554/1400 · Camera 2: 81/554/1500 · PTZ: 81/554/1600 · IP Speaker: 81/554/1700.');
-  return `<div class='wl-ai-panel wl-ai-equipment'><div class='wl-ai-head'>${onsiteVisionTitle('Equipment Check')}<b>${issues.length?'VERIFY '+issues.length+' ITEM'+(issues.length===1?'':'S'):'ON TRACK'}</b></div><div class='wl-ai-line'><b>${esc(type)}</b> · Item ${unitNo}</div>${flags.length?`<div class='wl-ai-line'>${flags.map(v=>'• '+esc(v)).join('<br>')}</div>`:''}${issues.length?`<div class='wl-ai-warn'>${issues.slice(0,5).map(v=>'⚠ '+esc(v.label||v.message||v.phase||'Required check incomplete')).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No required-item conflicts detected at this point.</div>`}<div class='small top8'>AI Assist does not answer checks or approve equipment for the technician.</div></div>`;
-}
+function itEquipmentAIReview(item,ev,unitNo){return window.TechCheckITPrepView.equipmentReviewHtml(item,ev,unitNo,{esc,issues:itUnitIssues,typeChoice:itTypeChoice,title:onsiteVisionTitle});}
 async function renderItUnitStep() {
   const items = itItems();
   const totalUnits = activeItPrep.expected_unit_count || itExpectedUnits || items.length;
