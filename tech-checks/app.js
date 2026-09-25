@@ -79,8 +79,11 @@ let refreshQueued = false;
 let deferredModulesPromise = null;
 let realtimeStarted = false;
 function scheduleRefreshData() {
+  // Realtime can emit several related row changes for one technician action.
+  // Coalesce that burst into one shared refresh instead of reloading the entire
+  // role snapshot repeatedly within a few hundred milliseconds.
   clearTimeout(liveRefreshTimer);
-  liveRefreshTimer = setTimeout(() => refreshData(), 240);
+  liveRefreshTimer = setTimeout(() => refreshData(), 900);
 }
 function scheduleIdle(task, timeout=700) {
   if ('requestIdleCallback' in window) return requestIdleCallback(task, { timeout });
