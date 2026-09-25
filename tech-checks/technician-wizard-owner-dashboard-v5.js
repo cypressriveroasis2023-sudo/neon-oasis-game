@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './handoff-evidence-view-v1.js?v=1';
+import './handoff-evidence-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=4';
@@ -4245,10 +4245,8 @@ function wireCanvas(canvas) {
   canvas.onpointercancel = finish;
 }
 function blobFromCanvas(canvas) { return new Promise(r => canvas.toBlob(r, 'image/png', .92)); }
-async function proofHtml(prepId, stage, editable) {
-  const rows = await evidenceRows(prepId, stage); const photos = rows.filter(r => r.kind === 'photo'); const sig = [...rows].reverse().find(r => r.kind === 'signature');
-  const title = stage === 'it' ? 'IT Handoff Proof' : 'Service Receipt Proof';
-  return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}'><b>${title}</b><div class='wl-note'>${stage === 'it' ? 'Photograph exactly what is leaving the shop.' : 'Photograph exactly what you received from IT.'}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div>` : `<div class='warn top8'>No photos saved yet.</div>`}${editable ? `<input class='wl-file top8' type='file' accept='image/*' capture='environment' multiple><button class='mini full top8' data-wl-upload='${stage}'>Save Photo(s)</button>` : ''}${sig ? `<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || '')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div>${editable ? `<button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>` : ''}` : editable ? `<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>` : `<div class='warn top8'>No signature saved yet.</div>`}</div>`;
+async function proofHtml(prepId,stage,editable){
+  return window.TechCheckEvidenceView.proofHtml(prepId,stage,editable,{evidenceRows,esc});
 }
 async function photoOnlyHtml(prepId,stage,unitNo=null,expectedCount=null){
   return window.TechCheckEvidenceView.photoOnlyHtml(prepId,stage,unitNo,expectedCount,{
