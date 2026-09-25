@@ -1,6 +1,6 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=3';
-import './handoff-evidence-shared-v1.js?v=2';
+import './handoff-evidence-shared-v1.js?v=3';
 import './it-prep-wizard-v1.js?v=12';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
@@ -6759,55 +6759,51 @@ document.addEventListener('click', async e => {
     setTimeout(showSvcHome,300);
     return;
   }
-  const upload = e.target.closest('[data-wl-upload]'); if (upload) {
-    const panel = upload.closest('.wl-proof');
-    const inputs=[...(panel.querySelectorAll('.wl-file')||[])];
-    const files=inputs.flatMap(input=>[...(input.files||[])]);
-    if (!files.length) return alert('Take or select at least one photo.');
-    const unitNo = Number(panel.dataset.unit || 0) || null;
-    const item = panel.dataset.stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
-    const itemId = item?.id || null;
-    const expected = Number(panel.dataset.expected || 0) || null;
-    if (unitNo && files.length !== 1) return alert('Take exactly one photo for this item.');
-    if (panel.dataset.stage === 'service' && expected) {
-      const existing = (await evidenceRows(panel.dataset.proof, 'service')).filter(x => x.kind === 'photo').length;
-      if (existing + files.length > expected) return alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`);
-    }
-    upload.disabled = true;
-    upload.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing photo…';
-    try {
-      const optimized = await Promise.all(files.map(optimizeEvidencePhoto));
+  const evidencePhotoResult=await window.TechCheckEvidence.handlePhotoUpload(e,{
+    optimizePhoto:optimizeEvidencePhoto,
+    uploadEvidence,
+    resolveItem:({panel,unitNo})=>panel.dataset.stage==='it'&&unitNo?itItems()[unitNo-1]||null:null,
+    validate:async({panel,files,expected})=>{
+      if(panel.dataset.stage==='service'&&expected){
+        const existing=(await evidenceRows(panel.dataset.proof,'service')).filter(row=>row.kind==='photo').length;
+        if(existing+files.length>expected){
+          alert(`Service needs exactly ${expected} photos total. You already have ${existing}.`);
+          return false;
+        }
+      }
+      return true;
+    },
+    beforeUpload:async({button,panel,optimized,unitNo,item})=>{
       let tagScan=null;
-      if (panel.dataset.stage==='it' && unitNo && item && shouldScanUnitTag(item.equipment_type) && item.unit_tag) {
-        upload.textContent='OnSite Vision is scanning…';
+      if(panel.dataset.stage==='it'&&unitNo&&item&&shouldScanUnitTag(item.equipment_type)&&item.unit_tag){
+        button.textContent='OnSite Vision is scanning…';
         showLiveTagScan(panel,item.unit_tag);
         tagScan=await scanUnitTagPhoto(optimized[0],item.unit_tag);
         const liveScan=panel.querySelector('.wl-ai-scan-live');
-        if(liveScan) liveScan.outerHTML=tagScanStatusHtml(tagScan,item.unit_tag);
+        if(liveScan)liveScan.outerHTML=tagScanStatusHtml(tagScan,item.unit_tag);
       }
-      upload.textContent = files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…';
-      await Promise.all(optimized.map((f, i) => {
-        const original = f.name || files[i].name;
-        const evidenceName = unitNo ? `unit-${unitNo}-photo-${original}` : original;
-        return uploadEvidence(panel.dataset.proof, panel.dataset.stage, 'photo', f, evidenceName, itemId);
-      }));
-      if (tagScan && itemId) await saveItTagScan(itemId,tagScan);
-      if (panel.dataset.stage === 'it' && unitNo && activeItPrep) {
-        activeItPrep = await getPrep(activeItPrep.id);
-        return renderItUnitStep();
+      return {tagScan};
+    },
+    afterUpload:async({itemId,extra})=>{
+      if(extra?.tagScan&&itemId)await saveItTagScan(itemId,extra.tagScan);
+    },
+    afterSuccess:async({panel,unitNo})=>{
+      if(panel.dataset.stage==='it'&&unitNo&&activeItPrep){
+        activeItPrep=await getPrep(activeItPrep.id);
+        await renderItUnitStep();
+        return true;
       }
-      if (panel.dataset.stage === 'it' && !unitNo && activeItPrep?.id === panel.dataset.proof && activeItPrep.expected_unit_count == null && itItems().length === 0) {
-        activeItPrep = await getPrep(activeItPrep.id);
-        return renderItUnitStep();
+      if(panel.dataset.stage==='it'&&!unitNo&&activeItPrep?.id===panel.dataset.proof&&activeItPrep.expected_unit_count==null&&itItems().length===0){
+        activeItPrep=await getPrep(activeItPrep.id);
+        await renderItUnitStep();
+        return true;
       }
-      await refreshProofPanel(panel);
-    } catch (err) {
-      upload.disabled = false;
-      upload.textContent = 'Save Photo';
-      alert(err.message || 'Upload failed.');
-    }
-    return;
-  }
+      return false;
+    },
+    refreshPanel:refreshProofPanel,
+    alert
+  });
+  if(evidencePhotoResult.handled)return;
   const evidenceSignatureResult=await window.TechCheckEvidenceView.handleSignatureClick(e,{
     blobFromCanvas,
     uploadEvidence,
