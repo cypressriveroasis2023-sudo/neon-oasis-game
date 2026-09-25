@@ -2796,8 +2796,7 @@ function serviceNextActionHtml(state){
     if(a)return `<div class='wl-day-next-card urgent'><span>CONTINUE WHERE YOU STOPPED</span><b>${esc(state.recovery.title)}</b><small>${esc(state.recovery.step||'Continue this field job.')}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>RESUME JOB</button></div>`;
   }
   if(state.nextReady){
-    const a=state.nextReady.assignment;
-    return `<div class='wl-day-next-card'><span>NEXT JOB</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(a.site||'No site listed')} · ${esc(String(a.work_type||'service').toUpperCase())} · ${esc(techAssignmentScheduleText(a))}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>OPEN NEXT JOB</button></div>`;
+    return `<div class='wl-day-next-card'><span>NEXT JOB</span><b>ENTER MHELPDESK TICKET NUMBER</b><small>Open MHelpDesk, enter the ticket assigned to you, and Tech Check will verify the assignment and handoff before showing the job.</small><button class='wl-service-start' data-wl-service-open-job>ENTER TICKET NUMBER</button></div>`;
   }
   if(state.nextBlocked){
     const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
