@@ -1,4 +1,4 @@
-import './it-prep-view-v1.js?v=5';
+import './it-prep-view-v1.js?v=6';
 import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
@@ -4903,17 +4903,18 @@ async function renderItUnitStep() {
   } else if (itUnitPhase === 'photo') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const photoReady = unitEvidence(ev, unitNo, 'photo').length === 1 && itPhotoTagReady(item);
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, `Take 1 photo of ${identity}`, 1, 3) + await photoOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${photoReady?'':'disabled'}>Next: Signature →</button></div>`;
+    const photoHtml=await photoOnlyHtml(activeItPrep.id,'it',unitNo);
+    wizard.innerHTML=window.TechCheckITPrepView.photoPhaseHtml(identity,unitNo,totalUnits,photoReady,photoHtml,{progress,esc});
   } else if (itUnitPhase === 'review') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const issues = itUnitIssues(item, ev, unitNo);
     const ready = issues.length === 0;
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, ready ? `${identity} is ready` : `Finish ${identity}`, 3, 3) +
-      window.TechCheckITPrepView.reviewPhaseHtml(identity,unitNo,totalUnits,ready,itUnitReviewHtml(item,ev,unitNo),ready?'':itIssueLinksHtml(item,ev,unitNo));
+    wizard.innerHTML=window.TechCheckITPrepView.reviewScreenHtml(identity,unitNo,totalUnits,ready,itUnitReviewHtml(item,ev,unitNo),ready?'':itIssueLinksHtml(item,ev,unitNo),{progress});
   } else if (itUnitPhase === 'signature') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const sig = unitSignature(ev, unitNo);
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, 'Sign Here', 2, 3) + await signatureOnlyHtml(activeItPrep.id, 'it', unitNo) + `<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${sig ? '' : 'disabled'}>Next →</button></div>`;
+    const signatureHtml=await signatureOnlyHtml(activeItPrep.id,'it',unitNo);
+    wizard.innerHTML=window.TechCheckITPrepView.signaturePhaseHtml(identity,unitNo,totalUnits,Boolean(sig),signatureHtml,{progress,esc});
     wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }
   resetWizardPosition();
