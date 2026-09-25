@@ -57,6 +57,7 @@ let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
+let serviceCloseSubmitting = false;
 const FIELD_DRAFT_TTL = 24 * 60 * 60 * 1000;
 async function deviceDraftKey(kind) { const tech=await currentTechIdentity().catch(()=>null); return tech?.id ? `cos-tech-field-draft-v1:${tech.id}:${kind}` : ''; }
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
@@ -6739,9 +6740,33 @@ document.addEventListener('click', async e => {
     return showSvcHome();
   }
 
-  if (e.target.closest('[data-wl-close-svc]')) {
+  const closeSvc=e.target.closest('[data-wl-close-svc]');
+  if (closeSvc) {
+    if(serviceCloseSubmitting)return;
+    const prepId=activeSvcPrep?.id;
     const ticket=activeSvcPrep?.ticket_no||'';
-    await window.closePreparedTicket(activeSvcPrep.id);
+    if(!prepId)return;
+    serviceCloseSubmitting=true;
+    const originalText=closeSvc.textContent;
+    closeSvc.disabled=true;
+    closeSvc.textContent='Saving completion…';
+    let closeError=null;
+    try {
+      await window.closePreparedTicket(prepId);
+    } catch(error) {
+      closeError=error;
+      console.warn('Service close request failed before it could be verified',error);
+    }
+    let verified=null;
+    try { verified=await getPrep(prepId); } catch(error) { closeError=closeError||error; }
+    serviceCloseSubmitting=false;
+    if(verified?.status!=='closed'){
+      if(document.contains(closeSvc)){closeSvc.disabled=false;closeSvc.textContent=originalText;}
+      if(closeError)alert('Could not verify that this Tech Check closed. Your work is still on this screen; reconnect and try Complete Tech Check again.');
+      if(verified)activeSvcPrep=verified;
+      return renderSvcPrep();
+    }
+    activeSvcPrep=verified;
     rememberTechCompletion('service',ticket,'JOB COMPLETE');
     setTimeout(showSvcHome,300);
     return;
