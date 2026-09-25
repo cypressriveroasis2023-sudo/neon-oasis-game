@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=8';
+import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=2';
 import './it-prep-shared-v1.js?v=4';
 import './it-intake-wizard-v1.js?v=1';
@@ -4468,40 +4468,24 @@ async function loadTruckSpareBatteries(prepId) {
 }
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
-  const items = itItems();
-  const evidence = await evidenceRows(activeItPrep.id, 'it');
-  const releaseState=window.TechCheckITPrepWizard.releaseReadiness(activeItPrep,items,evidence,{
+  const items=itItems();
+  const evidence=await evidenceRows(activeItPrep.id,'it');
+  const result=await window.TechCheckITPrepWizard.releaseHandoff(activeItPrep,items,evidence,{
     expectedUnits:itExpectedUnits,
     issues:itUnitIssues,
-    partsTotal:ticketPartsTotal
+    partsTotal:ticketPartsTotal,
+    verifyItems:rows=>window.TechCheckITPrep.verifyItemsForRelease(rows),
+    releasePrep:prepId=>window.TechCheckITPrep.releasePrep(prepId),
+    refresh:()=>window.refreshData?.(),
+    escape:esc
   });
-  const {expected,partsOnly,ready}=releaseState;
-  if (!ready) {
-    if(partsOnly)return alert('Take one clear photo of the loose parts and save the IT final signature before handing them to Service.');
-    return alert(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
-  }
-  const button = document.querySelector('[data-wl-send-it]');
-  const msg = document.getElementById('wlSendItMsg');
-  if (button) { button.disabled = true; button.textContent = 'Creating Service handoff…'; }
-  if (msg) msg.innerHTML = `<div class='warn top10'><b>Creating Service handoff…</b></div>`;
-  document.body.classList.add('busy');
-  try {
-    const ticketNo = activeItPrep.ticket_no;
-    await window.TechCheckITPrep.verifyItemsForRelease(items);
-    await window.TechCheckITPrep.releasePrep(activeItPrep.id);
-    await window.refreshData?.();
-    activeItPrep = null;
-    itUnitIndex = 0;
-    itQuestionIndex = 0;
-    itUnitPhase = 'type';
-    rememberTechCompletion('it',ticketNo,partsOnly?'PARTS HANDOFF COMPLETE':'IT HANDOFF COMPLETE');
-    await showITHome();
-  } catch (error) {
-    if (button) { button.disabled = false; button.textContent = partsOnly ? 'Hand Off Parts to Service →' : 'Hand Off to Service Tech →'; }
-    if (msg) msg.innerHTML = `<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message || 'Please try again.')}</div></div>`;
-  } finally {
-    document.body.classList.remove('busy');
-  }
+  if(!result?.completed)return;
+  activeItPrep=null;
+  itUnitIndex=0;
+  itQuestionIndex=0;
+  itUnitPhase='type';
+  rememberTechCompletion('it',result.ticketNo,result.partsOnly?'PARTS HANDOFF COMPLETE':'IT HANDOFF COMPLETE');
+  await showITHome();
 }
 function itWizardCard(){return window.TechCheckITPrepView.wizardCard(viewIT());}
 async function showItPrep(prepId) {
