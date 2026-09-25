@@ -52,6 +52,7 @@ let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
 let svcSolarCursor = null;
 let svcHeliosFieldCursor = null;
+let heliosFieldAnswerSubmitting = false;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [] };
@@ -6497,22 +6498,29 @@ document.addEventListener('click', async e => {
 
   const heliosFieldAnswer=e.target.closest('[data-wl-helios-field-answer]');
   if(heliosFieldAnswer){
+    if(heliosFieldAnswerSubmitting)return;
+    heliosFieldAnswerSubmitting=true;
+    const answerButtons=[...(heliosFieldAnswer.closest('.wl-options')?.querySelectorAll('[data-wl-helios-field-answer]')||[])];
+    answerButtons.forEach(button=>button.disabled=true);
     const field=heliosFieldAnswer.dataset.field;
     const yes=heliosFieldAnswer.dataset.wlHeliosFieldAnswer==='yes';
-    if(!await saveHeliosFieldCheckAnswer(field,yes))return;
-    if(!yes){
-      const msg=heliosFieldAnswer.closest('.wl-question')?.querySelector('.wl-helios-field-message');
-      if(msg)msg.innerHTML="<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>Correct this site-install step, then tap YES before continuing.</div></div>";
-      return;
-    }
-    if(!Number.isInteger(svcHeliosFieldCursor)){
+    try{
+      if(!await saveHeliosFieldCheckAnswer(field,yes))return;
+      if(!yes){
+        const msg=heliosFieldAnswer.closest('.wl-question')?.querySelector('.wl-helios-field-message');
+        if(msg)msg.innerHTML="<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>Correct this site-install step, then tap YES before continuing.</div></div>";
+        svcHeliosFieldCursor=null;
+        return;
+      }
       const check=await loadServiceSolarCheck(activeSvcPrep.id);
       const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
       const units=heliosFieldItems(activeSvcPrep);
-      svcHeliosFieldCursor=Math.max(0,heliosFieldTaskIndex(check,evidence,units)-1);
+      svcHeliosFieldCursor=heliosFieldTaskIndex(check,evidence,units);
+      return renderSvcPrep();
+    }finally{
+      heliosFieldAnswerSubmitting=false;
+      answerButtons.forEach(button=>{if(document.contains(button))button.disabled=false;});
     }
-    svcHeliosFieldCursor++;
-    return renderSvcPrep();
   }
   if(e.target.closest('[data-wl-helios-field-prev]')){
     const check=await loadServiceSolarCheck(activeSvcPrep.id);
