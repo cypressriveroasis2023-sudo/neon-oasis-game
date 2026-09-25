@@ -1,7 +1,7 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './handoff-evidence-shared-v1.js?v=1';
-import './it-prep-wizard-v1.js?v=9';
+import './it-prep-wizard-v1.js?v=10';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
 import './truck-spares-shared-v1.js?v=1';
@@ -4137,9 +4137,8 @@ function unitEvidence(rows, unitNo, kind) { const prefix = `unit-${unitNo}-`; re
 function unitSignature(rows, unitNo) { return [...rows].reverse().find(r => r.kind === 'signature' && r.original_name === `unit-${unitNo}-signature.png`); }
 function itItemIdentity(item,unitNo){return window.TechCheckITPrepRules.itemIdentity(item,unitNo);}
 function itUnitStepsData(item,unitNo){return window.TechCheckITPrepRules.checklist(item,unitNo);}
-function itAnswerKey(item, field) { return `${item.id}:${field}`; }
-function itBoolValue(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) ? itDraftAnswers.get(key) : item[field]; }
-function itBoolAnswered(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) || item[field] === true || itAnswered.has(key); }
+function itBoolValue(item,field){return window.TechCheckITPrepWizard.boolValue(item,field,itDraftAnswers);}
+function itBoolAnswered(item,field){return window.TechCheckITPrepWizard.boolAnswered(item,field,itDraftAnswers,itAnswered);}
 function itPhotoTagReady(item){return window.TechCheckITPrepWizard.photoTagReady(item);}
 async function configureCurrentItItem() {
   const item=currentItItem();
@@ -6285,7 +6284,7 @@ document.addEventListener('click', async e => {
   if (purpose) { itPurposeChoice = purpose.dataset.wlUnitPurpose; return renderItUnitStep(); }
   const itQuestionResult=await window.TechCheckITPrepWizard.handleQuestionClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},{
     currentItem:currentItItem,items:itItems,steps:itUnitStepsData,persist:persistCurrentItItem,
-    recordAnswer:(item,field,value)=>{itDraftAnswers.set(itAnswerKey(item,field),value);itAnswered.add(itAnswerKey(item,field));},
+    recordAnswer:(item,field,value)=>window.TechCheckITPrepWizard.recordAnswer(item,field,value,itDraftAnswers,itAnswered),
     totalUnits:items=>activeItPrep?.expected_unit_count||itExpectedUnits||items.length,
     purposeAllowed:itPurposeAllowedForCurrentJob,configure:configureCurrentItItem,setReconRequired:value=>{itReconRequired=value;},
     boolAnswered:itBoolAnswered,evidence:()=>evidenceRows(activeItPrep.id,'it'),identity:itItemIdentity,
