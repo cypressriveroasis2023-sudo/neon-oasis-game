@@ -7592,6 +7592,7 @@ async function ownerLookupUnitHistory(){
 }
 function ownerApplyAIFilter(state,button){const live=document.getElementById('ownerLiveJobProgress');if(!live)return;const off=button.classList.contains('selected');live.querySelectorAll('[data-owner-ai-filter]').forEach(b=>b.classList.remove('selected'));const target=off?'':state;if(!off)button.classList.add('selected');live.querySelectorAll('.wl-assignment-row[data-owner-ai-state]').forEach(row=>row.classList.toggle('wl-ai-filter-hidden',!!target&&row.dataset.ownerAiState!==target));}
 const OWNER_ASSIGN_DRAFT_KEY='cos-techcheck-owner-assign-draft-v1';
+let ownerAssignSubmitting=false;
 let ownerAssignDraftRestoring=false;
 function ownerAssignDraftStatus(message){
   const el=document.getElementById('ownerAssignDraftStatus');
@@ -8790,49 +8791,53 @@ async function ownerAssignJob() {
     if (!confirm(confirmText)) return;
   }
 
+  if(ownerAssignSubmitting)return;
+  ownerAssignSubmitting=true;
   document.body.classList.add('busy');
+  const assignButton=document.querySelector('[data-wl-owner-assign]');
+  const originalAssignText=assignButton?.textContent||'Assign Job →';
+  if(assignButton){assignButton.disabled=true;assignButton.textContent='Assigning…';}
   const dualDept = role === 'it_service' || role === 'service_it';
   const orderedRoles = workType === 'pickup' && dualDept ? ['service','it'] : (role === 'service_it' ? ['service','it'] : ['it','service']);
   const targets = dualDept
     ? orderedRoles.flatMap(r => { const ids=assignees.filter(id => ownerAssignmentProfiles.find(p=>p.user_id===id)?.role===r); if(r==='service' && serviceQueueSelected) return [{role:'service',assignee:null}]; return ids.length ? ids.map(id=>({role:r,assignee:id})) : [{role:r,assignee:null}]; })
     : (assignees.length ? assignees.map(id => ({ role, assignee:id })) : [{ role, assignee:null }]);
-  const rolesToSend = targets.map(t => t.role);
-  const assignmentIds = [];
-  const pushAssignmentIds = [];
-  for (const target of targets) {
-    const targetRole = target.role;
-    const { data: assignmentId, error } = await liveDb.rpc('owner_assign_job_v8', {
-      p_ticket_no: ticket,
-      p_site: site,
-      p_assigned_role: targetRole,
-      p_assignee_user_id: target.assignee,
-      p_requested_unit_count: requestedUnitCount,
-      p_unit_summary: [units, unitNumbers ? 'Unit #s: '+unitNumbers : '', standNumbers ? 'Stand / Solar Stand #s: '+standNumbers : ''].filter(Boolean).join(' | '),
-      p_job_description: description,
-      p_notes: notes,
-      p_solar_panel_qty: parts.solar_panel_qty,
-      p_battery_replacement_qty: parts.battery_replacement_qty,
-      p_camera_replacement_qty: parts.camera_replacement_qty,
-      p_sim_replacement_qty: parts.sim_replacement_qty,
-      p_micro_sd_qty: parts.micro_sd_qty,
-      p_equipment_manifest: equipmentManifest,
-      p_requires_it_handoff: workType === 'pickup'
-        ? false
-        : ((role === 'it_service' && targetRole === 'service') || (role === 'service_it' && targetRole === 'it')),
-      p_scheduled_for: scheduledFor,
-      p_work_type: workType,
-    });
-    if (error) { document.body.classList.remove('busy'); return alert(error.message); }
-    if (assignmentId && scheduledTime) {
-      const { error: timeError } = await liveDb.from('job_assignments').update({ scheduled_time: scheduledTime, updated_at:new Date().toISOString() }).eq('id', assignmentId);
-      if (timeError) { document.body.classList.remove('busy'); return alert(timeError.message); }
+  const unitSummary=[units, unitNumbers ? 'Unit #s: '+unitNumbers : '', standNumbers ? 'Stand / Solar Stand #s: '+standNumbers : ''].filter(Boolean).join(' | ');
+  const bundleTargets=targets.map(target=>({
+    role:target.role,
+    assignee_user_id:target.assignee||null,
+    requires_it_handoff:workType==='pickup'
+      ? false
+      : (role==='it_service' && target.role==='service')
+  }));
+  const { data: assignmentBundle, error: assignmentError } = await liveDb.rpc('owner_assign_job_bundle_v1', {
+    p_request:{
+      ticket_no:ticket,
+      site,
+      targets:bundleTargets,
+      requested_unit_count:requestedUnitCount,
+      unit_summary:unitSummary,
+      job_description:description,
+      notes,
+      solar_panel_qty:parts.solar_panel_qty,
+      battery_replacement_qty:parts.battery_replacement_qty,
+      camera_replacement_qty:parts.camera_replacement_qty,
+      sim_replacement_qty:parts.sim_replacement_qty,
+      micro_sd_qty:parts.micro_sd_qty,
+      equipment_manifest:equipmentManifest,
+      scheduled_for:scheduledFor,
+      scheduled_time:scheduledTime||null,
+      work_type:workType
     }
-    if (assignmentId) {
-      assignmentIds.push(assignmentId);
-      if (!(workType==='pickup' && targetRole==='it')) pushAssignmentIds.push(assignmentId);
-    }
+  });
+  if (assignmentError) {
+    ownerAssignSubmitting=false;
+    document.body.classList.remove('busy');
+    if(assignButton&&document.contains(assignButton)){assignButton.disabled=false;assignButton.textContent=originalAssignText;}
+    return alert(assignmentError.message);
   }
-  document.body.classList.remove('busy');
+  const assignmentIds=(assignmentBundle?.assignments||[]).map(row=>row?.assignment_id).filter(Boolean);
+  const pushAssignmentIds=(assignmentBundle?.push_assignment_ids||[]).filter(Boolean);
 
   let pushMessage = '';
   let pushed = 0;
@@ -8847,6 +8852,9 @@ async function ownerAssignJob() {
   }
   pushMessage = pushed > 0 ? ` Phone notifications sent to ${pushed} device${pushed === 1 ? '' : 's'}.` : ' Tech Check inbox alert created.';
 
+  ownerAssignSubmitting=false;
+  document.body.classList.remove('busy');
+  if(assignButton&&document.contains(assignButton)){assignButton.disabled=false;assignButton.textContent=originalAssignText;}
   ownerClearAssignDraft();
   ['ownerAssignTicket','ownerAssignSite','ownerAssignUnitNumbers','ownerAssignStandNumbers','ownerAssignDescription','ownerAssignNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateInput=document.getElementById('ownerAssignDate'); if (dateInput) dateInput.value=techCheckDateKey(new Date());
