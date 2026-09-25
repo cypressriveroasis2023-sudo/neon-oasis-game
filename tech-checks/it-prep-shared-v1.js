@@ -117,9 +117,28 @@ async function verifyItemsForRelease(items=[]){
 async function releasePrep(prepId){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   if(!prepId)throw new Error('IT prep ticket is not available.');
-  const {error}=await ctx.db.rpc('release_prep',{p_prep_id:prepId});
-  if(error)throw error;
-  return true;
+  let writeError=null;
+  try{
+    const {error}=await ctx.db.rpc('release_prep',{p_prep_id:prepId});
+    if(error)throw error;
+    return true;
+  }catch(error){
+    writeError=error;
+  }
+  let confirmed=null,verifyError=null;
+  try{
+    const check=await ctx.db.from('prep_tickets')
+      .select('id,status,released_at,closed_at')
+      .eq('id',prepId)
+      .maybeSingle();
+    confirmed=check.data||null;
+    verifyError=check.error||null;
+  }catch(error){
+    verifyError=error;
+  }
+  if(confirmed&&['released','closed'].includes(String(confirmed.status||'')))return true;
+  if(verifyError)throw new Error('Connection was interrupted while creating the IT → Service handoff. Tech Check could not safely verify whether the release committed. Reconnect and reopen this job; the live prep status will decide what step is next.');
+  throw writeError;
 }
 
 
