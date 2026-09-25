@@ -4026,54 +4026,6 @@ function unitCountEditor(totalUnits) {
 async function getPrep(id) {
   const { data } = await liveDb.from('prep_tickets').select('*,prep_items(*)').eq('id', id).single(); return data;
 }
-function pendingUnitForms(card) { return [...card.querySelectorAll('.unitForm')]; }
-function itQuestions(form) {
-  return [...form.querySelectorAll('.check')].map(check => {
-    const input = check.querySelector("input[type='checkbox']");
-    if (!input) return null;
-    if (input.checked && !input.dataset.wlAnswered) input.dataset.wlAnswered = '1';
-    return { input, label: check.querySelector('b')?.textContent?.trim() || 'Confirm this check' };
-  }).filter(Boolean);
-}
-function unitChoiceHtml(form) {
-  const tag = form.querySelector("input[id^='tag_']");
-  const batt = form.querySelector("input[id^='batt_']");
-  const title = form.querySelector('.row b')?.textContent?.trim() || 'Equipment';
-  return `<div class='wl-question'><div class='qnum'>Choose Unit</div><div class='qtext'>${esc(title)}</div><label>Exact Unit Tag</label><input id='wlUnitTag' value='${esc(tag?.value || '')}' placeholder='Enter unit tag'>${batt ? `<label class='top10'>Battery / Battery Box Count</label><input id='wlUnitBatt' type='number' min='${esc(batt.min || '0')}' value='${esc(batt.value || batt.min || '')}'>` : ''}</div>`;
-}
-function saveUnitChoice(form) {
-  const tag = form.querySelector("input[id^='tag_']");
-  const batt = form.querySelector("input[id^='batt_']");
-  const chosenTag = document.getElementById('wlUnitTag')?.value.trim() || '';
-  if (!chosenTag) { alert('Enter the exact unit tag before continuing.'); return false; }
-  if (tag) tag.value = chosenTag;
-  if (batt) {
-    const chosenBatt = Number(document.getElementById('wlUnitBatt')?.value || 0);
-    if (chosenBatt < Number(batt.min || 0)) { alert('Enter the required battery / battery-box count.'); return false; }
-    batt.value = String(chosenBatt);
-  }
-  return true;
-}
-function unitQuestionHtml(q, index, total) {
-  const answered = q.input.dataset.wlAnswered === '1';
-  const yes = answered && q.input.checked;
-  const no = answered && !q.input.checked;
-  return `<div class='wl-question'><div class='qnum'>Check ${index + 1} of ${total}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='pass ${yes ? 'on' : ''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no ? 'on' : ''}' data-wl-it-answer='no'>NO</button></div>${no ? `<div class='wl-stop'><b>NO recorded.</b><div>You may continue documenting the remaining checks, but this unit cannot be handed off to Service until this answer is corrected to YES.</div></div>` : ''}</div>`;
-}
-function itUnitSteps(form) {
-  const steps = [];
-  const tag = form.querySelector("input[id^='tag_']");
-  const batt = form.querySelector("input[id^='batt_']");
-  if (tag) steps.push({ kind: 'tag', input: tag, label: 'Enter the exact unit tag' });
-  if (batt) steps.push({ kind: 'battery', input: batt, label: 'Enter the battery / battery-box count' });
-  itQuestions(form).forEach(q => steps.push({ kind: 'check', q, label: q.label }));
-  return steps;
-}
-function itStepHtml(step, index, total, title) {
-  if (step.kind === 'tag') return `<div class='wl-question'><div class='qnum'>Step ${index + 1} of ${total}</div><div class='qtext'>${esc(title)}</div><label>Exact Unit Tag</label><input id='wlItSingleValue' value='${esc(step.input.value || '')}' placeholder='Enter unit tag'></div>`;
-  if (step.kind === 'battery') return `<div class='wl-question'><div class='qnum'>Step ${index + 1} of ${total}</div><div class='qtext'>How many batteries / battery boxes are prepared?</div><input id='wlItSingleValue' type='number' inputmode='numeric' min='${esc(step.input.min || '0')}' value='${esc(step.input.value || step.input.min || '')}'><div class='wl-note top8'>Required minimum: ${esc(step.input.min || '0')}</div></div>`;
-  return unitQuestionHtml(step.q, index, total);
-}
 async function evidenceRows(prepId, stage) {
   const { data } = await liveDb.from('handoff_evidence').select('*').eq('prep_ticket_id', prepId).eq('stage', stage).order('created_at', { ascending: true });
   const rows = data || [];
@@ -4262,18 +4214,6 @@ function signatureStamp(name,at){
 }
 async function signatureOnlyHtml(prepId,stage,unitNo=null){
   return window.TechCheckEvidenceView.signatureOnlyHtml(prepId,stage,unitNo,{evidenceRows,signatureStamp});
-}
-function itSummaryHtml(forms, evidence) {
-  const photos = evidence.filter(r => r.kind === 'photo');
-  const units = forms.map((form, index) => {
-    const title = form.querySelector('.row b')?.textContent?.trim() || `Unit ${index + 1}`;
-    const tag = form.querySelector("input[id^='tag_']")?.value || 'Not entered';
-    const batt = form.querySelector("input[id^='batt_']")?.value;
-    const checks = itQuestions(form);
-    const passed = checks.filter(q => q.input.checked).length;
-    return `<div class='wl-ticket'><b>Unit ${index + 1} — ${esc(title)}</b><div>Unit tag: <b>${esc(tag)}</b></div>${batt != null ? `<div>Battery / box count: <b>${esc(batt)}</b></div>` : ''}<div>${passed === checks.length ? `✓ All ${checks.length} verification checks passed` : `${passed} of ${checks.length} checks passed`}</div></div>`;
-  }).join('');
-  return `<div class='wl-review'><b>MHelpDesk #${esc(activeItPrep.ticket_no)}</b>${activeItPrep.site ? `<div>Ticket Name / Site: <b>${esc(activeItPrep.site)}</b></div>` : ''}<div>Total units checked: <b>${forms.length}</b></div></div>${units}<div class='wl-review'><div>📷 <b>${photos.length} photo${photos.length === 1 ? '' : 's'} saved</b></div><div class='small'>Review these unit checks and photo proof. Your final signature comes next.</div></div>`;
 }
 const CAMERA_UNIT_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','110V Stand','Pole'];
