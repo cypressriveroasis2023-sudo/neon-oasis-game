@@ -1,7 +1,7 @@
 import './it-prep-view-v1.js?v=6';
 import './it-prep-wizard-v1.js?v=5';
 import './it-prep-rules-v1.js?v=1';
-import './it-prep-shared-v1.js?v=1';
+import './it-prep-shared-v1.js?v=2';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
 import './notifications-v1.js?v=1';
@@ -4508,45 +4508,32 @@ function itBoolValue(item, field) { const key = itAnswerKey(item, field); return
 function itBoolAnswered(item, field) { const key = itAnswerKey(item, field); return itDraftAnswers.has(key) || item[field] === true || itAnswered.has(key); }
 function itPhotoTagReady(item){return window.TechCheckITPrepWizard.photoTagReady(item);}
 async function configureCurrentItItem() {
-  const item = currentItItem();
-  if (!itTypeChoice || !itPurposeChoice) return false;
-  const required = 1;
-  const result = item
-    ? await liveDb.rpc('configure_it_prep_item', { p_item_id: item.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_required_battery_count: required })
-    : await liveDb.rpc('add_it_prep_item', { p_prep_id: activeItPrep.id, p_equipment_type: itTypeChoice, p_purpose: itPurposeChoice, p_recon_battery_count: required });
-  if (result.error) { alert(result.error.message); return false; }
-  activeItPrep = await getPrep(activeItPrep.id);
-  if (['Spotter','Recon 2','Ranger'].includes(itTypeChoice)) {
+  const item=currentItItem();
+  if(!itTypeChoice||!itPurposeChoice)return false;
+  try{
+    await window.TechCheckITPrep.configureBase({
+      itemId:item?.id||null,
+      prepId:activeItPrep?.id||null,
+      equipmentType:itTypeChoice,
+      purpose:itPurposeChoice,
+      requiredBatteryCount:1
+    });
+    activeItPrep=await getPrep(activeItPrep.id);
     const configured=currentItItem();
-    if (configured) {
-      const { error:familyError }=await liveDb.rpc('save_it_camera_family_checks_v1',{
-        p_item_id:configured.id,
-        p_programmed_ok:false,
-        p_port_81_ok:false,
-        p_port_554_ok:false,
-        p_recon_camera_count:itTypeChoice==='Recon 2'?Math.max(1,Number(itReconRequired||1)):null
+    if(configured){
+      const initialized=await window.TechCheckITPrep.initializeConfigured({
+        itemId:configured.id,
+        equipmentType:itTypeChoice,
+        purpose:itPurposeChoice,
+        reconRequired:itReconRequired
       });
-      if (familyError) { alert(familyError.message); return false; }
-      activeItPrep=await getPrep(activeItPrep.id);
+      if(initialized)activeItPrep=await getPrep(activeItPrep.id);
     }
+    return true;
+  }catch(error){
+    alert(error?.message||'Could not configure this IT prep item.');
+    return false;
   }
-  if (itTypeChoice === 'Helios' && ['DELIVERY','SWAP','BACKUP'].includes(itPurposeChoice)) {
-    const configured = currentItItem();
-    if (configured) {
-      const { error }=await liveDb.rpc('save_it_helios_deploy_checks_v1',{
-        p_item_id:configured.id,
-        p_camera1_hardware_ok:false,p_camera2_hardware_ok:false,p_ptz_assembly_ok:false,p_proxicast_4x4_ok:false,
-        p_router_sim_ok:false,p_speaker_24v_ok:false,p_cameras_12v_ok:false,p_ptz_plate_4bolts_ok:false,
-        p_cerbo_network_ok:false,p_cerbo_vrm_ok:false,p_rear_unit_tag_ok:false,p_battery_box_installed_ok:false,
-        p_battery_120v_charged_ok:false,p_camera_router_programming_ok:false,p_alibi_vigilant_ok:false,p_3x1tb_sd_ok:false,
-        p_camera1_ports_ok:false,p_camera2_ports_ok:false,p_ptz_ports_ok:false,p_speaker_ports_ok:false,
-        p_sim_ok:false,p_camera_app_ok:false,p_customer_email_app_ok:false,p_monitoring_ok:false,p_sd_formatted_ok:false,p_recording_ok:false
-      });
-      if (error) { alert(error.message); return false; }
-      activeItPrep = await getPrep(activeItPrep.id);
-    }
-  }
-  return true;
 }
 async function persistCurrentItItem() {
   const item=currentItItem();if(!item)return false;
