@@ -75,4 +75,30 @@ async function handleQuestionClick(event,state,deps={}){
   return {handled:true,state:next};
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick});
+async function handleReviewClick(event,state,deps={}){
+  const target=event?.target;if(!target?.closest)return {handled:false,state};let next={...state};
+  const photoTag=target.closest('[data-wl-photo-tag]');
+  if(photoTag&&next.phase==='photo'){
+    const item=deps.currentItem();if(!item)return {handled:true,state:next};
+    const matches=photoTag.dataset.wlPhotoTag==='yes';
+    if(matches&&item.ai_tag_scan_status==='mismatch'){alert(`AI read a different tag than ${item.unit_tag}. Retake a clear tag photo before approving this unit.`);return {handled:true,state:next};}
+    const error=await deps.confirmPhotoTag(item.id,matches);if(error){alert(error.message);return {handled:true,state:next};}
+    await deps.reload();
+    if(!matches)alert(`Retake the photo so the unit tag for ${deps.identity(deps.currentItem(),next.unitIndex+1)} is clearly visible and matches the equipment.`);
+    return {handled:true,state:next,render:true};
+  }
+  const issue=target.closest('[data-wl-issue-unit]');
+  if(issue){if(!deps.hasPrep())return {handled:true,state:next};next.unitIndex=Number(issue.dataset.wlIssueUnit||0);next.phase=issue.dataset.wlIssuePhase||'checks';next.questionIndex=Number(issue.dataset.wlIssueIndex||0);return {handled:true,state:next,render:true};}
+  if(target.closest('[data-wl-fix-issues]')){
+    if(!deps.hasPrep())return {handled:true,state:next};const item=deps.items()[next.unitIndex],ev=await deps.evidence(),first=deps.issues(item,ev,next.unitIndex+1)[0];
+    if(first){next.phase=first.phase;next.questionIndex=first.index||0;}return {handled:true,state:next,render:true};
+  }
+  const view=target.closest('[data-wl-final-view]');
+  if(view&&next.phase==='final'){next.finalView=view.dataset.wlFinalView||'summary';return {handled:true,state:next,render:true};}
+  const unit=target.closest('[data-wl-final-unit]');
+  if(unit&&next.phase==='final'){next.finalView='summary';next.unitIndex=Math.max(0,Number(unit.dataset.wlFinalUnit||0));next.phase='review';return {handled:true,state:next,render:true};}
+  if(target.closest('[data-wl-final-last-unit]')&&next.phase==='final')return {handled:true,state:finalLastUnit(next,deps.items()),render:true};
+  return {handled:false,state:next};
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick});
