@@ -1,5 +1,5 @@
 import './it-prep-view-v1.js?v=6';
-import './it-prep-wizard-v1.js?v=6';
+import './it-prep-wizard-v1.js?v=7';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=2';
 import './it-intake-wizard-v1.js?v=1';
@@ -4659,26 +4659,18 @@ async function renderItUnitStep() {
   const unitNo = itUnitIndex + 1;
   const identity = item ? itItemIdentity(item, unitNo) : `Unit ${unitNo}`;
   if (itUnitPhase === 'type') {
-    const lockedType=requiredItEquipmentType(itUnitIndex);
-    if (lockedType) {
-      itTypeChoice=lockedType;
-      const autoPurpose=prepPurposeFromWorkType(activeItPrep?.work_type);
-      if (autoPurpose && itPurposeAllowedForCurrentJob(lockedType,autoPurpose)) {
-        itPurposeChoice=autoPurpose;
-        if (lockedType==='Recon 2') {
-          itUnitPhase='recon';
-          return renderItUnitStep();
-        }
-        const current=currentItItem();
-        if (!current || current.equipment_type!==lockedType || current.purpose!==autoPurpose) {
-          if (!await configureCurrentItItem()) return;
-        }
-        itQuestionIndex=0;
-        itUnitPhase='checks';
-        return renderItUnitStep();
-      }
-      itPurposeChoice=currentItItem()?.purpose || '';
-      itUnitPhase='purpose';
+    const typeDecision=window.TechCheckITPrepWizard.typePhaseDecision({
+      lockedType:requiredItEquipmentType(itUnitIndex),
+      autoPurpose:prepPurposeFromWorkType(activeItPrep?.work_type),
+      currentItem:currentItItem(),
+      purposeAllowed:itPurposeAllowedForCurrentJob
+    });
+    if(!typeDecision.missingType){
+      itTypeChoice=typeDecision.typeChoice;
+      itPurposeChoice=typeDecision.purposeChoice;
+      itUnitPhase=typeDecision.phase;
+      if('questionIndex' in typeDecision)itQuestionIndex=typeDecision.questionIndex;
+      if(typeDecision.configure&&!await configureCurrentItItem())return;
       return renderItUnitStep();
     }
     wizard.innerHTML = window.TechCheckITPrepView.typeMissingHtml(unitNo,totalUnits,{progress,esc});
