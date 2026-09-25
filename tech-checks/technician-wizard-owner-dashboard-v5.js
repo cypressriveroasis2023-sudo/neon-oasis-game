@@ -4604,142 +4604,12 @@ function itUnitIssues(item, evidence, unitNo) {
 }
 function itIssueLinksHtml(item,evidence,unitNo){return window.TechCheckITPrepView.issueLinksHtml(item,evidence,unitNo,{esc,issues:itUnitIssues});}
 function itUnitReviewHtml(item,evidence,unitNo){return window.TechCheckITPrepView.unitReviewHtml(item,evidence,unitNo,{esc,unitEvidence,stepsData:itUnitStepsData,boolValue:itBoolValue,itemIdentity:itItemIdentity,unitSignature});}
-const TRUCK_SPARE_BATTERY_OPTIONS = window.TechCheckRules?.truckSpareBatteryOptions || [
-  { key:'spotter-agm', equipment_type:'Solar Spotter', battery_type:'AGM 12V 110Ah', label:'Solar Spotter · AGM 12V 110Ah' },
-  { key:'spotter-350', equipment_type:'Solar Spotter', battery_type:'12V 350Ah', label:'Solar Spotter · 12V 350Ah' },
-  { key:'ranger-litime', equipment_type:'Ranger', battery_type:'LiTime 12V 110Ah', label:'Ranger · LiTime 12V 110Ah' },
-  { key:'helios-box', equipment_type:'Helios', battery_type:'Helios Battery Box', label:'Helios · Battery Box' },
-  { key:'recon-battery', equipment_type:'Recon 2', battery_type:'Recon II Battery', label:'Recon II · Spare Battery' },
-];
 async function loadTruckSpareBatteries(prepId) {
   if (!prepId) return [];
   const { data,error } = await liveDb.from('truck_spare_batteries').select('*').eq('prep_ticket_id',prepId).order('created_at',{ascending:true});
   if (error) throw error;
   return data || [];
 }
-function truckSpareITPanelHtml(rows,items,evidence=[]) {
-  const byKey=new Map((rows||[]).map(r=>[r.equipment_type+'|'+r.battery_type,r]));
-  const indexed=(items||[]).map((item,index)=>({item,index}));
-  const backups=indexed.filter(row=>row.item.purpose==='BACKUP');
-  const backupHtml=backups.length
-    ? backups.map(({item:i,index})=>{
-        const checkedOut=Boolean(i.spare_it_checked_out_at);
-        const issues=itUnitIssues(i,evidence,index+1);
-        const canCheckout=issues.length===0;
-        const status=checkedOut
-          ? `<div class='ok top8'><b>✓ IT CHECKED OUT</b><div class='small'>${esc(i.spare_it_checked_out_by_name||'IT Technician')} · ${new Date(i.spare_it_checked_out_at).toLocaleString()}</div></div>`
-          : canCheckout
-            ? `<button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-checkout-truck-spare-unit='${i.id}'>CHECK OUT SPARE →</button><div class='small'>IT must check this spare out before Service can take it.</div>`
-            : `<div class='warn top8'><b>CHECKOUT PENDING</b><div class='small'>Finish this spare's IT checks, matching-tag photo, and signature first.</div></div>`;
-        return `<div class='wl-ticket'><b>TRUCK SPARE · ${esc(i.equipment_type)}</b><div>Unit ${esc(i.unit_tag||'Tag pending')} · ${i.verified_at?'IT check complete':'IT check pending'}</div><div class='small'>This is contingency equipment for MHelpDesk #${esc(activeItPrep?.ticket_no||'')}. IT checkout happens before the Service handoff.</div>${status}</div>`;
-      }).join('')
-    : `<div class='small'>No spare unit added yet. Add one only when Service should carry an emergency replacement for this ticket.</div>`;
-
-  const batteryRows=TRUCK_SPARE_BATTERY_OPTIONS.map(opt=>{
-    const row=byKey.get(opt.equipment_type+'|'+opt.battery_type);
-    const qty=Number(row?.qty_prepared||0);
-    const ready=Boolean(row?.ready_ok);
-    const checkedOut=Boolean(row?.it_checked_out_at);
-    const locked=checkedOut ? 'disabled' : '';
-    const checkout=qty>0
-      ? checkedOut
-        ? `<div class='ok top8'><b>✓ IT CHECKED OUT</b><div class='small'>${esc(row?.it_checked_out_by_name||'IT Technician')} · ${new Date(row.it_checked_out_at).toLocaleString()}</div></div>`
-        : ready
-          ? `<button class='wl-big wl-blue top8' style='min-height:50px;font-size:15px' data-wl-checkout-truck-spare-battery='${row.id}'>CHECK OUT SPARE BATTERIES →</button>`
-          : `<div class='warn top8'><b>CHECKOUT PENDING</b><div class='small'>Mark this battery batch physically present, charged & READY, save the plan, then check it out.</div></div>`
-      : '';
-    return `<div class='wl-ticket'><b>${esc(opt.label)}</b><div class='grid2 top8'><label>Spare Qty<input id='wlSpareQty_${opt.key}' type='number' inputmode='numeric' min='0' value='${qty}' ${locked}></label><label class='check' style='align-self:end'><input id='wlSpareReady_${opt.key}' type='checkbox' ${ready?'checked':''} ${locked}><span>Physically present, charged & READY</span></label></div>${qty&&!ready?`<div class='warn top8'><b>Pending:</b> mark this battery batch READY before checkout.</div>`:''}${checkout}</div>`;
-  }).join('');
-
-  return `<div class='wl-question top10' data-wl-truck-spares-it>
-    <div class='qnum'>TRUCK SPARES / BACKUPS</div>
-    <div class='qtext'>Contingency equipment for this Service call</div>
-    <div class='small'>The flow remains <b>IT check → photo/signature → IT CHECK OUT → Service handoff</b>. A spare cannot leave with Service until IT checks it out. After the field call, Service resolves it as USED or RETURN UNUSED.</div>
-    <div class='top10'><b>Spare Units</b></div>
-    ${backupHtml}
-    <div class='grid2 top10'><label>Spare Unit Type<select id='wlTruckSpareUnitType'><option value=''>Choose spare…</option>${['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'].map(v=>`<option value='${esc(v)}'>${esc(v)}</option>`).join('')}</select></label><label>Recon II camera count<input id='wlTruckSpareReconCount' type='number' inputmode='numeric' min='1' value='1'></label></div>
-    <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-add-truck-spare-unit>＋ Add Spare Unit & Run IT Check</button>
-    <div class='top10'><b>Spare Batteries</b><div class='small'>Enter and save the spare quantity first. Then IT must use CHECK OUT SPARE BATTERIES before the Service handoff.</div></div>
-    ${batteryRows}
-    <button class='wl-big wl-blue top10' style='min-height:52px;font-size:16px' data-wl-save-truck-spare-batteries>Save Spare Battery Plan</button>
-  </div>`;
-}
-async function addTruckSpareUnitFromSummary() {
-  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Truck spares can only be added before the Service handoff.');
-  const type=document.getElementById('wlTruckSpareUnitType')?.value || '';
-  if (!type) return alert('Choose the spare unit type first.');
-  const recon=Math.max(1,Number(document.getElementById('wlTruckSpareReconCount')?.value||1));
-  const { data,error }=await liveDb.rpc('add_it_truck_spare_unit',{
-    p_prep_id:activeItPrep.id,
-    p_equipment_type:type,
-    p_recon_battery_count:type==='Recon 2'?1:null
-  });
-  if (error) return alert(error.message);
-  activeItPrep=await getPrep(activeItPrep.id);
-  if (['Spotter','Recon 2','Ranger'].includes(type)) {
-    const added=itItems().find(i=>i.id===data);
-    if (added) {
-      const { error:familyError }=await liveDb.rpc('save_it_camera_family_checks_v1',{
-        p_item_id:added.id,p_programmed_ok:false,p_port_81_ok:false,p_port_554_ok:false,
-        p_recon_camera_count:type==='Recon 2'?recon:null
-      });
-      if (familyError) return alert(familyError.message);
-      activeItPrep=await getPrep(activeItPrep.id);
-    }
-  }
-  itExpectedUnits=activeItPrep.expected_unit_count||itItems().length;
-  const items=itItems();
-  const found=items.findIndex(i=>i.id===data);
-  itUnitIndex=found>=0?found:Math.max(0,items.length-1);
-  itTypeChoice=type;
-  itPurposeChoice='BACKUP';
-  itReconRequired=recon;
-  itQuestionIndex=0;
-  itUnitPhase='checks';
-  return renderItUnitStep();
-}
-async function saveTruckSpareBatteriesFromSummary() {
-  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Spare batteries can only be changed before the Service handoff.');
-  for (const opt of TRUCK_SPARE_BATTERY_OPTIONS) {
-    const qtyInput=document.getElementById('wlSpareQty_'+opt.key);
-    if (qtyInput?.disabled) continue;
-    const qty=Math.max(0,Math.floor(Number(qtyInput?.value||0)));
-    const ready=Boolean(document.getElementById('wlSpareReady_'+opt.key)?.checked);
-    const { error }=await liveDb.rpc('save_it_truck_spare_battery',{
-      p_prep_id:activeItPrep.id,
-      p_equipment_type:opt.equipment_type,
-      p_battery_type:opt.battery_type,
-      p_qty:qty,
-      p_ready_ok:ready
-    });
-    if (error) return alert(error.message);
-  }
-  alert('Truck spare battery plan saved.');
-  return renderItUnitStep();
-}
-
-
-async function checkoutTruckSpareUnit(itemId) {
-  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Truck spare checkout must happen before the Service handoff.');
-  const item=itItems().find(row=>row.id===itemId);
-  if (!item) return alert('Truck spare unit could not be found.');
-  if (!confirm('Check out '+item.equipment_type+' '+(item.unit_tag||'')+' as a truck spare for MHelpDesk #'+activeItPrep.ticket_no+'?')) return;
-  const { error }=await liveDb.rpc('it_checkout_truck_spare_unit',{p_item_id:itemId});
-  if (error) return alert(error.message);
-  activeItPrep=await getPrep(activeItPrep.id);
-  return renderItUnitStep();
-}
-async function checkoutTruckSpareBattery(spareId) {
-  if (!activeItPrep?.id || activeItPrep.status!=='draft') return alert('Spare battery checkout must happen before the Service handoff.');
-  const rows=await loadTruckSpareBatteries(activeItPrep.id);
-  const row=rows.find(x=>x.id===spareId);
-  if (!row) return alert('Spare battery batch could not be found.');
-  if (!confirm('Check out '+row.qty_prepared+' × '+row.battery_type+' for MHelpDesk #'+activeItPrep.ticket_no+'?')) return;
-  const { error }=await liveDb.rpc('it_checkout_truck_spare_battery',{p_spare_id:spareId});
-  if (error) return alert(error.message);
-  return renderItUnitStep();
-}
-
 async function releaseItPrepUnitByUnit() {
   if (!activeItPrep) return showITHome();
   const items = itItems();
@@ -6931,12 +6801,6 @@ document.addEventListener('click', async e => {
     const next=result.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itFinalView=next.finalView;
     return renderItUnitStep();
   }
-  if (e.target.closest('[data-wl-add-truck-spare-unit]')) { e.preventDefault(); e.stopPropagation(); return addTruckSpareUnitFromSummary(); }
-  const checkoutSpareUnit=e.target.closest('[data-wl-checkout-truck-spare-unit]');
-  if (checkoutSpareUnit) { e.preventDefault(); e.stopPropagation(); return checkoutTruckSpareUnit(checkoutSpareUnit.dataset.wlCheckoutTruckSpareUnit); }
-  const checkoutSpareBattery=e.target.closest('[data-wl-checkout-truck-spare-battery]');
-  if (checkoutSpareBattery) { e.preventDefault(); e.stopPropagation(); return checkoutTruckSpareBattery(checkoutSpareBattery.dataset.wlCheckoutTruckSpareBattery); }
-  if (e.target.closest('[data-wl-save-truck-spare-batteries]')) { e.preventDefault(); e.stopPropagation(); return saveTruckSpareBatteriesFromSummary(); }
   if (e.target.closest('[data-wl-send-it]')) { e.preventDefault(); e.stopPropagation(); await releaseItPrepUnitByUnit(); return; }
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
