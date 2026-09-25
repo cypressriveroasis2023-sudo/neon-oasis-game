@@ -1,5 +1,6 @@
 // IT Prep wizard navigation state.
 // Keeps unit/question/phase transitions deterministic while the existing renderer remains unchanged.
+let releaseHandoffSubmitting=false;
 function nextAfterCheck(state,stepCount){
   const next={...state};
   if(next.questionIndex<stepCount-1)next.questionIndex++;else next.phase='photo';
@@ -222,6 +223,8 @@ async function releaseHandoff(prep,items=[],evidence=[],deps={}){
     else notify(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
     return {...state,completed:false,blocked:true};
   }
+  if(releaseHandoffSubmitting)return {...state,completed:false,blocked:true,submitting:true};
+  releaseHandoffSubmitting=true;
   const doc=deps.document||document;
   const button=doc.querySelector?.('[data-wl-send-it]')||null;
   const msg=doc.getElementById?.('wlSendItMsg')||null;
@@ -240,6 +243,7 @@ async function releaseHandoff(prep,items=[],evidence=[],deps={}){
     if(msg)msg.innerHTML=`<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message||'Please try again.')}</div></div>`;
     return {...state,completed:false,error};
   }finally{
+    releaseHandoffSubmitting=false;
     doc.body?.classList.remove('busy');
   }
 }
