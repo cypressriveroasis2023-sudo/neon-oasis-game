@@ -1,4 +1,4 @@
-import './it-prep-wizard-v1.js?v=1';
+import './it-prep-wizard-v1.js?v=2';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -7024,95 +7024,18 @@ document.addEventListener('click', async e => {
     if (!matches) alert(`Retake the photo so the unit tag for ${itItemIdentity(currentItItem(), itUnitIndex + 1)} is clearly visible and matches the equipment.`);
     return renderItUnitStep();
   }
-  const itAnswer = e.target.closest('[data-wl-it-answer]');
-  if (itAnswer && itUnitPhase === 'checks') {
-    const item = currentItItem();
-    const step = itUnitStepsData(item, itUnitIndex + 1)[itQuestionIndex];
-    if (!step || step.kind !== 'bool') return;
-    const value = itAnswer.dataset.wlItAnswer === 'yes';
-    item[step.field] = value;
-    itDraftAnswers.set(itAnswerKey(item, step.field), value);
-    itAnswered.add(itAnswerKey(item, step.field));
-    const answerButtons = itAnswer.closest('.wl-options')?.querySelectorAll('button') || [];
-    answerButtons.forEach(button => button.disabled = true);
-    const saved = await persistCurrentItItem();
-    if (!saved) { answerButtons.forEach(button => button.disabled = false); return; }
-    if (value) { const steps=itUnitStepsData(currentItItem(),itUnitIndex+1),next=window.TechCheckITPrepWizard.nextAfterCheck({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase},steps.length); itQuestionIndex=next.questionIndex; itUnitPhase=next.phase; }
-    return renderItUnitStep();
-  }
-  if (e.target.closest('[data-wl-it-next]')) {
-    const items = itItems();
-    const totalUnits = activeItPrep?.expected_unit_count || itExpectedUnits || items.length;
-    if (itUnitPhase === 'type') {
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'purpose') {
-      if (!itPurposeChoice) return alert('Choose BACKUP, SWAP, or DELIVERY first.');
-      if (!itPurposeAllowedForCurrentJob(itTypeChoice,itPurposeChoice)) return alert('That purpose is not available for this equipment type and job.');
-      if (itTypeChoice === 'Recon 2') { itUnitPhase = 'recon'; return renderItUnitStep(); }
-      if (!await configureCurrentItItem()) return;
-      itQuestionIndex = 0;
-      itUnitPhase = 'checks';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'recon') {
-      const value = Math.max(1, Number(document.getElementById('wlReconRequired')?.value || 0));
-      if (value < 1) return alert('Enter how many cameras are going on this Recon II.');
-      itReconRequired = value;
-      if (!await configureCurrentItItem()) return;
-      itQuestionIndex = 0;
-      itUnitPhase = 'checks';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'checks') {
-      const item = currentItItem();
-      const steps = itUnitStepsData(item, itUnitIndex + 1);
-      const step = steps[itQuestionIndex];
-      let needsSave = false;
-      if (step.kind === 'tag') {
-        const value = document.getElementById('wlItUnitValue')?.value.trim() || '';
-        if (!value && !step.optional) return alert('Enter the exact unit tag first.');
-        item.unit_tag = value; needsSave = true;
-      } else if (step.kind === 'number') {
-        const value = Number(document.getElementById('wlItUnitValue')?.value || 0);
-        const min=Number(step.min ?? (step.field==='battery_count' ? item.required_battery_count : 1) ?? 1);
-        if (value < min) return alert(`This check requires at least ${min}.`);
-        item[step.field] = value; needsSave = true;
-      } else if (!itBoolAnswered(item, step.field)) {
-        return alert('Choose YES or NO first.');
-      }
-      if (needsSave && !await persistCurrentItItem()) return;
-      if (itQuestionIndex < steps.length - 1) itQuestionIndex++;
-      else itUnitPhase = 'photo';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'photo') {
-      const ev = await evidenceRows(activeItPrep.id, 'it');
-      const item = currentItItem();
-      const identity = itItemIdentity(item, itUnitIndex + 1);
-      if (!unitEvidence(ev, itUnitIndex + 1, 'photo').length) return alert(`Take and save a photo of ${identity} before continuing.`);
-      if (!itPhotoTagReady(item)) return alert(`Confirm that the photo clearly shows unit tag ${item.unit_tag} and matches ${identity} before continuing.`);
-      itUnitPhase = 'signature';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'signature') {
-      const ev = await evidenceRows(activeItPrep.id, 'it');
-      if (!unitSignature(ev, itUnitIndex + 1)) return alert(`Sign Unit ${itUnitIndex + 1} before continuing.`);
-      itUnitPhase = 'review';
-      return renderItUnitStep();
-    }
-    if (itUnitPhase === 'review') {
-      const ev = await evidenceRows(activeItPrep.id, 'it');
-      const issues = itUnitIssues(currentItItem(), ev, itUnitIndex + 1);
-      if (issues.length) {
-        itUnitPhase = issues[0].phase;
-        itQuestionIndex = issues[0].index || 0;
-        return renderItUnitStep();
-      }
-      const next=window.TechCheckITPrepWizard.nextAfterReview({unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},totalUnits);
-      itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itReconRequired=next.reconRequired;itFinalView=next.finalView;
-      return renderItUnitStep();
-    }
+  const itQuestionResult=await window.TechCheckITPrepWizard.handleQuestionClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},{
+    currentItem:currentItItem,items:itItems,steps:itUnitStepsData,persist:persistCurrentItItem,
+    recordAnswer:(item,field,value)=>{itDraftAnswers.set(itAnswerKey(item,field),value);itAnswered.add(itAnswerKey(item,field));},
+    totalUnits:items=>activeItPrep?.expected_unit_count||itExpectedUnits||items.length,
+    purposeAllowed:itPurposeAllowedForCurrentJob,configure:configureCurrentItItem,setReconRequired:value=>{itReconRequired=value;},
+    boolAnswered:itBoolAnswered,evidence:()=>evidenceRows(activeItPrep.id,'it'),identity:itItemIdentity,
+    unitEvidence,photoTagReady:itPhotoTagReady,unitSignature,issues:itUnitIssues
+  });
+  if(itQuestionResult.handled){
+    const next=itQuestionResult.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itTypeChoice=next.typeChoice;itPurposeChoice=next.purposeChoice;itReconRequired=next.reconRequired;itFinalView=next.finalView;
+    if(itQuestionResult.render)return renderItUnitStep();
+    return;
   }
   const issueLink = e.target.closest('[data-wl-issue-unit]');
   if (issueLink) {
