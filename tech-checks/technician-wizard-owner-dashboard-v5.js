@@ -1,3 +1,4 @@
+import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
@@ -4403,7 +4404,7 @@ function itItemIdentity(item, unitNo) {
 function isHeliosDeploy(item){
   return window.TechCheckRules?.isHeliosDeploy ? window.TechCheckRules.isHeliosDeploy(item) : (item?.equipment_type==='Helios' && ['DELIVERY','SWAP','BACKUP'].includes(item?.purpose));
 }
-function itUnitStepsData(item, unitNo) {
+function legacyItUnitStepsData(item, unitNo) {
   if (window.TechCheckRules?.itChecklist) return window.TechCheckRules.itChecklist(item, unitNo);
   const support = isSupport(item.equipment_type);
   const identity = itItemIdentity(item, unitNo);
@@ -4496,6 +4497,9 @@ function itUnitStepsData(item, unitNo) {
   steps.push({ kind: 'bool', field: 'functions_ok', label: `Were all functions on ${identity} tested and working?` });
   steps.push({ kind: 'bool', field: 'safe_ok', label: `Is ${identity} ready for field use?` });
   return steps;
+}
+function itUnitStepsData(item, unitNo) {
+  return window.TechCheckITPrepRules.checklist(item,unitNo,{fallbackChecklist:legacyItUnitStepsData});
 }
 function itUnitReady(item) {
   if (window.TechCheckRules?.itReady) return window.TechCheckRules.itReady(item);
