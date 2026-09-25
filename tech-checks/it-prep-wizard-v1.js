@@ -165,4 +165,22 @@ function initialState(prep,items=[],evidence=[],deps={}){
   return state;
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState});
+
+function finalReadiness(prep,items=[],evidence=[],spareBatteries=[],deps={}){
+  const totalUnits=prep?.expected_unit_count||deps.expectedUnits||items.length;
+  const issues=deps.issues||(()=>[]);
+  const partsTotal=deps.partsTotal||(()=>0);
+  const itemReady=items.length===totalUnits&&items.every((item,index)=>issues(item,evidence,index+1).length===0);
+  const spareUnits=items.filter(row=>row?.purpose==='BACKUP');
+  const spareUnitsCheckedOut=spareUnits.every(row=>Boolean(row?.spare_it_checked_out_at));
+  const spareBatteriesReady=(spareBatteries||[]).every(row=>Boolean(row?.ready_ok));
+  const spareBatteriesCheckedOut=(spareBatteries||[]).every(row=>Boolean(row?.it_checked_out_at));
+  const partsOnly=totalUnits===0&&items.length===0&&partsTotal(prep)>0;
+  const globalItPhotos=(evidence||[]).filter(row=>row?.kind==='photo'&&!row?.prep_item_id);
+  const globalItSignature=[...(evidence||[])].reverse().find(row=>row?.kind==='signature'&&!row?.prep_item_id);
+  const partsOnlyProofReady=!partsOnly||(globalItPhotos.length>=1&&Boolean(globalItSignature));
+  const ready=itemReady&&spareUnitsCheckedOut&&spareBatteriesReady&&spareBatteriesCheckedOut&&partsOnlyProofReady;
+  return {totalUnits,itemReady,spareUnitsCheckedOut,spareBatteriesReady,spareBatteriesCheckedOut,partsOnly,partsOnlyProofReady,ready};
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness});
