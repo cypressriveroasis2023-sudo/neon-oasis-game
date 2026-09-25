@@ -1,6 +1,6 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=3';
-import './handoff-evidence-shared-v1.js?v=4';
+import './handoff-evidence-shared-v1.js?v=5';
 import './it-prep-wizard-v1.js?v=13';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=9';
