@@ -244,4 +244,21 @@ async function releaseHandoff(prep,items=[],evidence=[],deps={}){
   }
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff});
+
+function answerKey(item,field){return `${item?.id||''}:${field}`;}
+function boolValue(item,field,draftAnswers){
+  const key=answerKey(item,field);
+  return draftAnswers?.has?.(key)?draftAnswers.get(key):item?.[field];
+}
+function boolAnswered(item,field,draftAnswers,answered){
+  const key=answerKey(item,field);
+  return Boolean(draftAnswers?.has?.(key)||item?.[field]===true||answered?.has?.(key));
+}
+function recordAnswer(item,field,value,draftAnswers,answered){
+  const key=answerKey(item,field);
+  draftAnswers?.set?.(key,value);
+  answered?.add?.(key);
+  return key;
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff,answerKey,boolValue,boolAnswered,recordAnswer});
