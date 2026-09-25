@@ -47,7 +47,18 @@ async function upload(prepId,stage,kind,file,name,itemId=null){
   const {error:recordError}=itemId
     ? await ctx.db.rpc('record_unit_handoff_evidence',{p_prep_id:prepId,p_item_id:itemId,p_stage:stage,p_kind:kind,p_storage_path:path,p_original_name:name||null})
     : await ctx.db.rpc('record_handoff_evidence',{p_prep_id:prepId,p_stage:stage,p_kind:kind,p_storage_path:path,p_original_name:name||null});
-  if(recordError)throw recordError;
+  if(recordError){
+    // The RPC may have committed even if the phone lost the response.
+    // Verify the exact storage path before deleting the uploaded file or retrying.
+    const {data:recorded,error:verifyError}=await ctx.db.from('handoff_evidence')
+      .select('id')
+      .eq('storage_path',path)
+      .maybeSingle();
+    if(recorded?.id)return path;
+    if(!verifyError)await ctx.db.storage.from(EVIDENCE_BUCKET).remove([path]).catch(()=>null);
+    if(verifyError)throw new Error('Connection was interrupted while saving evidence. Tech Check could not safely verify the result. Reconnect and retry this same step; the database will keep only the current evidence for the item.');
+    throw recordError;
+  }
   return path;
 }
 
