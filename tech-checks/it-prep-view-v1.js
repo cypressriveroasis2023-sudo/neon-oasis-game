@@ -88,4 +88,33 @@ function reviewPhaseHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml)
   return `${reviewHtml||''}${ready?'':(issuesHtml||'')}${ready?'':`<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready?'':'disabled'}>${unitNo<totalUnits?`Next: Unit ${unitNo+1} →`:'Next: Ticket Summary →'}</button></div>`;
 }
 
-window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml});
+
+function partsOnlyFinalHtml(prep,ready,photoHtml,signatureHtml,deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??'')),parts=partsSummaryHtml(prep,{esc,partsRows:deps.partsRows||(()=>[])});
+  return progress('PARTS-ONLY IT HANDOFF',ready?'READY — HAND OFF PARTS':'Verify the loose parts',1,1)+
+    `<div class='wl-review'><b>MHelpDesk #${esc(prep?.ticket_no||'')}</b><div>${esc(prep?.site||'')}</div><div class='small'>No whole unit or stand is leaving the shop on this ticket.</div></div>`+
+    parts+
+    `<div class='wl-question top10'><div class='qnum'>PARTS-ONLY HANDOFF</div><div class='qtext'>VERIFY THE EXACT PARTS AND QUANTITIES</div><div class='small'>Photograph the actual parts IT is giving Service, then sign the ticket-level IT handoff.</div></div>`+
+    (photoHtml||'')+
+    (signatureHtml||'')+
+    `<div id='wlSendItMsg'></div>`+
+    (ready?`<div class='ok top10'><b>✓ PARTS HANDOFF READY</b><div>Service will verify these same parts, photo evidence, and quantities before accepting the handoff.</div></div>`:`<div class='wl-stop top10'><b>PHOTO + IT SIGNATURE REQUIRED</b><div>Save one clear parts photo and the IT final sign-off before handing this ticket to Service.</div></div>`)+
+    `<button class='wl-big wl-green top10' style='font-size:18px;min-height:58px' data-wl-send-it ${ready?'':'disabled'}>HAND OFF PARTS TO SERVICE →</button>
+    <div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><button class='wl-next' data-wl-it='history'>Status & History →</button></div>`;
+}
+function finalTicketHtml(prep,items,spareBatteries,state={},deps={}){
+  const progress=deps.progress||(()=>''),esc=deps.esc||((x)=>String(x??'')),ready=Boolean(state.ready);
+  const spareUnitsCheckedOut=Boolean(state.spareUnitsCheckedOut),spareBatteriesReady=Boolean(state.spareBatteriesReady),spareBatteriesCheckedOut=Boolean(state.spareBatteriesCheckedOut);
+  return progress('Ticket Summary',ready?'Ready to hand off':'Finish this ticket',1,1)+
+    finalLockHtml()+
+    ticketSummaryHtml(prep,items||[],{esc})+
+    partsSummaryHtml(prep,{esc,partsRows:deps.partsRows||(()=>[])})+
+    spareSummaryHtml(items||[],spareBatteries||[],{esc})+
+    (!spareUnitsCheckedOut?`<div class='wl-stop top10'><b>SPARE NOT CHECKED OUT</b><div>Finish the truck spare checkout.</div></div>`:'')+
+    ((!spareBatteriesReady||!spareBatteriesCheckedOut)?`<div class='wl-stop top10'><b>SPARE BATTERY NOT READY</b><div>Finish the spare battery checkout.</div></div>`:'')+
+    `<div id='wlSendItMsg'></div>`+
+    `<button class='wl-big wl-red wl-primary-handoff top10' data-wl-send-it ${ready?'':'disabled'}>HAND OFF TO SERVICE →</button>
+    <div class='wl-nav wl-simple-final-nav'><button class='wl-prev' data-wl-final-last-unit>← Back</button><span></span></div>`;
+}
+
+window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml,partsOnlyFinalHtml,finalTicketHtml});
