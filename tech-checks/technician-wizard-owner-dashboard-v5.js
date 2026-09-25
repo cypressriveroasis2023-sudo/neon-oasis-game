@@ -57,6 +57,7 @@ let heliosFieldAnswerSubmitting = false;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
 let inspectionSubmitting = false;
+let serviceTruckInventorySubmitting = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [], submissionId:null, pendingUploadPaths:[] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
@@ -4404,6 +4405,7 @@ async function showServiceTruckInventoryCheck(){
   }
 }
 async function submitServiceTruckInventoryCheck(){
+  if(serviceTruckInventorySubmitting)return;
   const unitConfirmations={};
   document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
     unitConfirmations[el.dataset.wlTruckUnitConfirm]={unit_tag:el.dataset.unitTag||'',confirmed:Boolean(el.checked)};
@@ -4416,24 +4418,67 @@ async function submitServiceTruckInventoryCheck(){
   const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
   const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
   if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))return alert('Enter the actual battery quantities physically on the truck.');
+  const reconQty=Math.max(0,Math.floor(recon)),agmQty=Math.max(0,Math.floor(agm)),litimeQty=Math.max(0,Math.floor(litime));
+  const attemptStartedAt=Date.now();
+  const submitButton=document.querySelector('[data-wl-submit-truck-inventory]');
+  serviceTruckInventorySubmitting=true;
+  if(submitButton){submitButton.disabled=true;submitButton.textContent='VERIFYING TRUCK…';}
   document.body.classList.add('busy');
-  try{
-    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
-      p_unit_confirmations:unitConfirmations,
-      p_sim_confirmations:simConfirmations,
-      p_recon_battery_qty:Math.max(0,Math.floor(recon)),
-      p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
-      p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
-    });
-    if(error)throw error;
+  const finishResult=async data=>{
     if(data?.inventory_ready){
       rememberTechCompletion('service','', 'TRUCK INVENTORY READY');
       return showSvcHome();
     }
     alert('TRUCK NOT READY TO LEAVE SHOP\n\nMissing items were sent to the IT restock queue. Accept the prepared replacements/restock, then physically recheck the truck.');
     return showServiceTruckInventoryCheck();
-  }catch(error){alert(error?.message||'Could not save the truck inventory check.');}
-  finally{document.body.classList.remove('busy');}
+  };
+  try{
+    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
+      p_unit_confirmations:unitConfirmations,
+      p_sim_confirmations:simConfirmations,
+      p_recon_battery_qty:reconQty,
+      p_agm_12v_110ah_qty:agmQty,
+      p_litime_12v_100ah_qty:litimeQty
+    });
+    if(error)throw error;
+    return await finishResult(data);
+  }catch(error){
+    let confirmed=false;
+    try{
+      const {data:rows,error:verifyError}=await liveDb.from('service_truck_inventory_checks')
+        .select('unit_confirmations,sim_confirmations,recon_battery_qty,agm_12v_110ah_qty,litime_12v_100ah_qty,submitted_at')
+        .gte('submitted_at',new Date(attemptStartedAt-60000).toISOString())
+        .order('submitted_at',{ascending:false})
+        .limit(3);
+      const sameUnit=(actual,expected)=>Object.keys(expected||{}).every(key=>
+        String(actual?.[key]?.unit_tag||'')===String(expected?.[key]?.unit_tag||'')
+        && Boolean(actual?.[key]?.confirmed)===Boolean(expected?.[key]?.confirmed)
+      )&&Object.keys(actual||{}).length===Object.keys(expected||{}).length;
+      const sameSim=(actual,expected)=>Object.keys(expected||{}).every(key=>
+        String(actual?.[key]?.sim_number||'')===String(expected?.[key]?.sim_number||'')
+        && Boolean(actual?.[key]?.confirmed)===Boolean(expected?.[key]?.confirmed)
+      )&&Object.keys(actual||{}).length===Object.keys(expected||{}).length;
+      if(!verifyError)confirmed=(rows||[]).some(row=>
+        Number(row?.recon_battery_qty)===reconQty
+        && Number(row?.agm_12v_110ah_qty)===agmQty
+        && Number(row?.litime_12v_100ah_qty)===litimeQty
+        && sameUnit(row?.unit_confirmations,unitConfirmations)
+        && sameSim(row?.sim_confirmations,simConfirmations)
+      );
+    }catch{}
+    if(confirmed){
+      const readiness=await loadMyServiceTruckReadiness().catch(()=>null);
+      if(readiness)return await finishResult(readiness);
+      return alert('The truck inventory check was saved, but Tech Check could not reload readiness. Return to Service Home and refresh before starting a new job.');
+    }
+    return alert(error?.message==='Failed to fetch'
+      ? 'Connection lost. Tech Check could not confirm that this truck inventory check saved. Reconnect and verify the truck again before starting a new job.'
+      : (error?.message||'Could not save the truck inventory check.'));
+  }finally{
+    serviceTruckInventorySubmitting=false;
+    document.body.classList.remove('busy');
+    if(document.contains(submitButton)){submitButton.disabled=false;submitButton.textContent='I PHYSICALLY VERIFIED MY TRUCK →';}
+  }
 }
 async function acceptServiceTruckRestock(id){
   document.body.classList.add('busy');
