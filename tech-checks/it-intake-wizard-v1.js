@@ -82,4 +82,28 @@ async function handleClick(event,deps={}){
   return false;
 }
 
-window.TechCheckITIntake=Object.freeze({labels,getState,setState,reset,start,reviewFlags,render,handleClick});
+async function rows(){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  const {data,error}=await ctx.db.from('unit_returns').select('*').order('returned_at',{ascending:false});if(error)throw error;return data||[];
+}
+async function counts(){
+  const all=await rows(),waitingRows=all.filter(r=>r.status==='waiting_it');
+  return {waiting:waitingRows.length,inventory:all.filter(r=>r.status==='pending_mhelp_inventory').length,replacement:all.filter(r=>r.status==='needs_replacement').length,completed:all.filter(r=>r.status==='completed').length,nextWaiting:waitingRows[waitingRows.length-1]||null};
+}
+async function showHome(deps={}){
+  const view=deps.view?.();if(!view)return;let card=document.getElementById('wlItIntake');
+  if(!card){card=document.createElement('div');card.id='wlItIntake';card.className='card wl-home';view.append(card);}
+  const c=await counts();card.className='card wl-home';
+  card.innerHTML=`<div class='wl-mode-pills'><button class='wl-mode-card' data-wl-mode='deployment'><span class='wl-mode-title'>Deployment</span><span class='wl-mode-sub'>Prepare & hand off equipment</span></button><button class='on wl-mode-card' data-wl-mode='intake'><span class='wl-mode-title'>Intake & Returns</span><span class='wl-mode-sub'>Process returned units</span><span class='wl-mode-badge'>${c.waiting+c.inventory}</span></button></div><div class='wl-title'>What do you need to do?</div><div class='wl-sub'>Process returned Service units the same way as Deployment: one unit and one step at a time.</div><div class='wl-menu'><button class='${c.waiting?'wl-red':'wl-gray'}' data-wl-intake-view='waiting'>▶ Start / Continue Returned Unit <span class='wl-count'>${c.waiting}</span></button><button class='${c.inventory?'wl-red':'wl-gray'}' data-wl-intake-view='inventory'>▣ Pending MHelpDesk Inventory <span class='wl-count'>${c.inventory}</span></button><button class='wl-gray' data-wl-intake-view='history'>☰ Status & History <span class='wl-count'>${c.completed}</span></button></div>`;
+  deps.hideChildren?.(view,[card]);deps.resetPosition?.();
+}
+async function showList(kind='waiting',deps={}){
+  const all=await rows(),filtered=kind==='waiting'?all.filter(r=>r.status==='waiting_it'):kind==='inventory'?[]:all.filter(r=>r.status==='completed'),view=deps.view?.();if(!view)return;
+  let card=document.getElementById('wlIntakeList');if(!card){card=document.createElement('div');card.id='wlIntakeList';card.className='card';view.append(card);}
+  const title=kind==='waiting'?'Choose a returned unit to check':kind==='inventory'?'Owner/Manager handles MHelpDesk inventory':'Completed returned-unit history',kicker=kind==='waiting'?'Returned / Waiting for IT':kind==='inventory'?'Sent to Owner / Manager':'Intake Status & History';
+  const items=await Promise.all(filtered.map(async r=>`<div class='wl-ticket'><b>${esc(r.unit_tag||(r.equipment_type==='110V Stand'?'No tag':'Unit'))} · ${esc(r.equipment_type||'Unit')}</b><div><b>MHelpDesk #${esc(r.ticket_no)}</b></div><div class='small'>Returned by ${esc(r.service_tech_name)} · ${new Date(r.returned_at).toLocaleString()}</div>${r.return_notes?`<div class='small top8'>Service notes: ${esc(r.return_notes)}</div>`:''}<div class='wl-return-gallery'>${await deps.photoHtml(r.return_photo_paths)}${kind!=='waiting'?await deps.photoHtml(r.intake_photo_paths):''}</div>${kind==='waiting'?`<button class='wl-big wl-blue top10' data-wl-intake-start='${r.id}'>Start / Continue This Unit →</button>`:`<div class='ok top10'>✓ Completed · ${esc(r.it_tech_name||'IT')}</div>`}</div>`));
+  card.innerHTML=`${deps.progress(kicker,title,1,1)}<button class='wl-back' data-wl-mode='intake'>← Intake / Returns Home</button>${kind==='inventory'?`<div class='ok'><b>✓ IT sends completed intake to the Owner/Manager.</b><div>You do not add units back to MHelpDesk inventory here. The Owner/Manager completes that final step from the Owner dashboard.</div></div>`:items.join('')||`<div class='ok'><b>${kind==='history'?'No completed intake yet.':'Nothing waiting here.'}</b></div>`}`;
+  deps.hideChildren?.(view,[card]);deps.resetPosition?.();
+}
+
+window.TechCheckITIntake=Object.freeze({labels,getState,setState,reset,start,reviewFlags,render,handleClick,rows,counts,showHome,showList});
