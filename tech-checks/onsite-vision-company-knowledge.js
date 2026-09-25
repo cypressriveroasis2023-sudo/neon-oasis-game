@@ -72,39 +72,35 @@
       "network_rules": [
         {
           "component": "Camera 1",
-          "ports": [
-            81,
-            554,
-            1400
-          ],
-          "where": "device and router"
+          "ports": [81,554,1400],
+          "device_ports": [81,554],
+          "router_forwarding": [1400,1443,1454],
+          "target_ip": "192.168.10.14",
+          "where": "device ports plus exact router forwarding"
         },
         {
           "component": "Camera 2",
-          "ports": [
-            81,
-            554,
-            1500
-          ],
-          "where": "device and router"
+          "ports": [81,554,1500],
+          "device_ports": [81,554],
+          "router_forwarding": [1500,1543,1554],
+          "target_ip": "192.168.10.15",
+          "where": "device ports plus exact router forwarding"
         },
         {
           "component": "PTZ",
-          "ports": [
-            81,
-            554,
-            1600
-          ],
-          "where": "device and router"
+          "ports": [81,554,1600],
+          "device_ports": [81,554],
+          "router_forwarding": [1600,1643,1654],
+          "target_ip": "192.168.10.16",
+          "where": "device ports plus exact router forwarding"
         },
         {
           "component": "IP Speaker",
-          "ports": [
-            81,
-            554,
-            1700
-          ],
-          "where": "device and router"
+          "ports": [81,554,1700],
+          "device_ports": [81,554],
+          "router_forwarding": [1700,1743,1754],
+          "target_ip": "192.168.10.17",
+          "where": "device ports plus exact router forwarding"
         }
       ],
       "it_checks": [
@@ -948,10 +944,10 @@
     }
     if(data.equipment.Helios&&shared.heliosPorts){
       data.equipment.Helios.network_rules=[
-        {component:'Camera 1',ports:[...shared.heliosPorts.camera1],where:'device and router'},
-        {component:'Camera 2',ports:[...shared.heliosPorts.camera2],where:'device and router'},
-        {component:'PTZ',ports:[...shared.heliosPorts.ptz],where:'device and router'},
-        {component:'IP Speaker',ports:[...shared.heliosPorts.speaker],where:'device and router'}
+        {component:'Camera 1',ports:[...shared.heliosPorts.camera1],device_ports:[81,554],router_forwarding:[1400,1443,1454],target_ip:'192.168.10.14',where:'device ports plus exact router forwarding'},
+        {component:'Camera 2',ports:[...shared.heliosPorts.camera2],device_ports:[81,554],router_forwarding:[1500,1543,1554],target_ip:'192.168.10.15',where:'device ports plus exact router forwarding'},
+        {component:'PTZ',ports:[...shared.heliosPorts.ptz],device_ports:[81,554],router_forwarding:[1600,1643,1654],target_ip:'192.168.10.16',where:'device ports plus exact router forwarding'},
+        {component:'IP Speaker',ports:[...shared.heliosPorts.speaker],device_ports:[81,554],router_forwarding:[1700,1743,1754],target_ip:'192.168.10.17',where:'device ports plus exact router forwarding'}
       ];
     }
     data.shared_helios_field_install=shared.heliosFieldChecklist?[...shared.heliosFieldChecklist]:[];
