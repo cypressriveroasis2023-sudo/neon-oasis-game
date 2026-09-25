@@ -130,4 +130,19 @@ async function confirmPhotoTag(itemId,matches){
   return true;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag});
+
+async function saveTagScan(itemId,scan={}){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!itemId)throw new Error('IT prep item is not available.');
+  const {error}=await ctx.db.rpc('record_it_unit_ai_tag_scan',{
+    p_item_id:itemId,
+    p_status:scan.status,
+    p_detected:scan.detected||null,
+    p_confidence:scan.confidence==null?null:Number(scan.confidence),
+    p_engine:scan.engine||'tesseract.js-7.0.0'
+  });
+  if(error)throw error;
+  return true;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag,saveTagScan});
