@@ -272,12 +272,25 @@ async function configureCurrent({prep=null,unitIndex=0,typeChoice='',purposeChoi
     await deps.configureBase?.({
       itemId:item?.id||null,
       prepId:prep?.id||null,
+      itemOrder:unitIndex+1,
       equipmentType:typeChoice,
       purpose:purposeChoice,
       requiredBatteryCount:1
     });
     let refreshed=await deps.reload?.(prep?.id);
-    const configured=sortedItems(refreshed)[unitIndex]||null;
+    let configured=sortedItems(refreshed)[unitIndex]||null;
+    if(configured&&(configured.equipment_type!==typeChoice||configured.purpose!==purposeChoice)){
+      await deps.configureBase?.({
+        itemId:configured.id,
+        prepId:prep?.id||null,
+        itemOrder:unitIndex+1,
+        equipmentType:typeChoice,
+        purpose:purposeChoice,
+        requiredBatteryCount:1
+      });
+      refreshed=await deps.reload?.(prep?.id);
+      configured=sortedItems(refreshed)[unitIndex]||null;
+    }
     if(configured){
       const initialized=await deps.initializeConfigured?.({
         itemId:configured.id,
