@@ -2,7 +2,7 @@ import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
-import './it-prep-shared-v1.js?v=7';
+import './it-prep-shared-v1.js?v=8';
 import './truck-spares-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
 import './intake-shared-v1.js?v=1';
@@ -6647,8 +6647,7 @@ document.addEventListener('click', async e => {
   if(confirmSwapSite){
     const label=confirmSwapSite.dataset.wlSwapSiteLabel||'replacement unit',site=confirmSwapSite.dataset.wlSwapSite||'customer site';
     if(!confirm('Confirm IT registered '+label+' to '+site+'?\n\nThis records the site-registration step in Tech Check.'))return;
-    const {error}=await liveDb.rpc('it_confirm_swap_site_registration_v1',{p_item_id:confirmSwapSite.dataset.wlConfirmSwapSite});
-    if(error)return alert(error.message);
+    try{await window.TechCheckITPrep.confirmSwapSiteRegistration(confirmSwapSite.dataset.wlConfirmSwapSite);}catch(error){return alert(error?.message||'Could not confirm site registration.');}
     rememberTechCompletion('it','', 'SITE REGISTRATION COMPLETE');
     return showITHome();
   }
