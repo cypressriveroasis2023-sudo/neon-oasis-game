@@ -208,4 +208,40 @@ function releaseReadiness(prep,items=[],evidence=[],deps={}){
   return {expected,partsOnly,itemReady,partsPhotoReady,partsSignatureReady,ready};
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness});
+
+async function releaseHandoff(prep,items=[],evidence=[],deps={}){
+  const state=releaseReadiness(prep,items,evidence,{
+    expectedUnits:deps.expectedUnits,
+    issues:deps.issues,
+    partsTotal:deps.partsTotal
+  });
+  const {expected,partsOnly,ready}=state;
+  const notify=deps.alert||window.alert;
+  if(!ready){
+    if(partsOnly)notify('Take one clear photo of the loose parts and save the IT final signature before handing them to Service.');
+    else notify(`Complete all ${expected} equipment items with checks, a photo showing the matching tag, and an IT signature before handing off to Service.`);
+    return {...state,completed:false,blocked:true};
+  }
+  const doc=deps.document||document;
+  const button=doc.querySelector?.('[data-wl-send-it]')||null;
+  const msg=doc.getElementById?.('wlSendItMsg')||null;
+  if(button){button.disabled=true;button.textContent='Creating Service handoff…';}
+  if(msg)msg.innerHTML="<div class='warn top10'><b>Creating Service handoff…</b></div>";
+  doc.body?.classList.add('busy');
+  try{
+    const ticketNo=prep?.ticket_no||'';
+    await deps.verifyItems?.(items);
+    await deps.releasePrep?.(prep?.id);
+    await deps.refresh?.();
+    return {...state,completed:true,ticketNo};
+  }catch(error){
+    if(button){button.disabled=false;button.textContent=partsOnly?'Hand Off Parts to Service →':'Hand Off to Service Tech →';}
+    const esc=deps.escape||((value)=>String(value??''));
+    if(msg)msg.innerHTML=`<div class='bad top10'><b>Could not create the Service handoff.</b><div>${esc(error?.message||'Please try again.')}</div></div>`;
+    return {...state,completed:false,error};
+  }finally{
+    doc.body?.classList.remove('busy');
+  }
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues,initialState,finalReadiness,typePhaseDecision,releaseReadiness,releaseHandoff});
