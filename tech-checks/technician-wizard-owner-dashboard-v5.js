@@ -1,4 +1,5 @@
 import './it-prep-view-v1.js?v=6';
+import './handoff-evidence-view-v1.js?v=1';
 import './it-prep-wizard-v1.js?v=9';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=4';
@@ -4249,85 +4250,10 @@ async function proofHtml(prepId, stage, editable) {
   const title = stage === 'it' ? 'IT Handoff Proof' : 'Service Receipt Proof';
   return `<div class='wl-proof ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}'><b>${title}</b><div class='wl-note'>${stage === 'it' ? 'Photograph exactly what is leaving the shop.' : 'Photograph exactly what you received from IT.'}</div>${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Handoff photo'>`).join('')}</div>` : `<div class='warn top8'>No photos saved yet.</div>`}${editable ? `<input class='wl-file top8' type='file' accept='image/*' capture='environment' multiple><button class='mini full top8' data-wl-upload='${stage}'>Save Photo(s)</button>` : ''}${sig ? `<div class='wl-saved'><b>✓ Signature saved</b><div class='small'>${esc(sig.created_by_name || '')} · ${new Date(sig.created_at).toLocaleString()}</div>${sig.url ? `<img src='${esc(sig.url)}' alt='Saved signature'>` : ''}</div>${editable ? `<button class='mini full top8' data-wl-replace='${stage}'>Replace Signature</button>` : ''}` : editable ? `<div class='wl-sign top8'><b>Sign with your finger</b><canvas></canvas><div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div></div>` : `<div class='warn top8'>No signature saved yet.</div>`}</div>`;
 }
-async function photoOnlyHtml(prepId, stage, unitNo = null, expectedCount = null) {
-  const rows = await evidenceRows(prepId, stage);
-  const prefix = unitNo ? `unit-${unitNo}-` : '';
-  const photos = rows.filter(r => r.kind === 'photo' && (!unitNo || String(r.original_name || '').startsWith(prefix)));
-  const required = unitNo ? 1 : Math.max(1, Number(expectedCount || 1));
-  const item = stage === 'it' && unitNo ? itItems()[unitNo - 1] || null : null;
-  const identity = item ? itItemIdentity(item, unitNo) : `Unit ${unitNo}`;
-  const tag = String(item?.unit_tag || '').trim();
-  const complete = photos.length === required;
-  const aiScan = stage === 'it' && unitNo && photos.length && shouldScanUnitTag(item?.equipment_type) ? itemTagScan(item) : null;
-  const aiMismatch = aiScan?.status === 'mismatch';
-
-  const shortInstruction = unitNo
-    ? (stage === 'it' && tag ? `Take 1 clear photo. Make sure tag ${tag} is visible.` : `Take 1 clear photo of ${identity}.`)
-    : stage === 'service'
-      ? `Take ${required} clear receipt photo${required===1?'':'s'}.`
-      : 'Take a clear photo of what is leaving the shop.';
-
-  let picker='';
-  if(stage==='service'){
-    picker=`<div class='wl-photo-step'>
-      <div class='wl-photo-step-num'>STEP 1</div>
-      <div class='wl-photo-step-title'>Choose Photo</div>
-      <div class='small'>${esc(shortInstruction)}</div>
-      <div class='wl-solar-photo-actions'>
-        <label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>
-        <label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-file wl-solar-file-hidden' type='file' accept='image/*' multiple></label>
-      </div>
-      <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
-    </div>
-    <div class='wl-photo-step'>
-      <div class='wl-photo-step-num'>STEP 2</div>
-      <div class='wl-photo-step-title'>Save Photo</div>
-      <div class='small'>Save the photo before moving on.</div>
-      <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
-    </div>`;
-  }else{
-    const captureAttr=" capture='environment'";
-    picker=`<div class='wl-photo-step'>
-      <div class='wl-photo-step-num'>STEP 1</div>
-      <div class='wl-photo-step-title'>Choose Photo</div>
-      <div class='small'>${esc(shortInstruction)}</div>
-      <label class='wl-photo-picker'>
-        <input class='wl-file' type='file' accept='image/*'${captureAttr} ${unitNo ? '' : 'multiple'}>
-        <span>${complete?'Choose a New Photo':'Choose Photo'}</span>
-      </label>
-      <div class='wl-photo-selected' data-wl-photo-selected>${complete ? 'Photo already saved.' : 'No photo selected yet.'}</div>
-    </div>
-    <div class='wl-photo-step'>
-      <div class='wl-photo-step-num'>STEP 2</div>
-      <div class='wl-photo-step-title'>Save Photo</div>
-      <div class='small'>Save the photo before moving on.</div>
-      <button class='wl-photo-save' data-wl-upload='${stage}' disabled>${complete ? 'Save New Photo' : 'Save Photo'}</button>
-    </div>`;
-  }
-
-  let tagConfirm='';
-  if (stage === 'it' && unitNo && photos.length && tag) {
-    if (aiMismatch) {
-      tagConfirm=`<div class='wl-stop top10'><b>WRONG TAG</b><div>This photo does not match tag ${esc(tag)}. Choose a new photo.</div></div>`;
-    } else if (!item?.photo_tag_match_ok) {
-      tagConfirm=`<div class='wl-photo-step wl-photo-confirm'>
-        <div class='wl-photo-step-num'>STEP 3</div>
-        <div class='wl-photo-step-title'>Check the Tag</div>
-        <div class='small'>Can you clearly see tag ${esc(tag)}?</div>
-        <div class='wl-options'><button class='fail' data-wl-photo-tag='no'>RETAKE</button><button class='pass' data-wl-photo-tag='yes'>YES</button></div>
-      </div>`;
-    } else {
-      tagConfirm=`<div class='ok top10'><b>✓ Tag ${esc(tag)} confirmed</b></div>`;
-    }
-  }
-
-  return `<div class='wl-proof wl-photo-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='photo' data-unit='${unitNo || ''}' data-expected='${required}'>
-    <div class='wl-photo-title'>${stage === 'it' && unitNo ? esc(identity) : unitNo ? `Unit ${unitNo}` : 'Photo'}</div>
-    <div class='wl-photo-status ${complete?'done':''}'>${complete ? '✓ Photo saved' : 'No photo saved yet'}</div>
-    ${photos.length ? `<div class='wl-gallery'>${photos.map(p => `<img src='${esc(p.url)}' alt='Saved photo'>`).join('')}</div>` : ''}
-    ${picker}
-    ${tagConfirm}
-  </div>`;
+async function photoOnlyHtml(prepId,stage,unitNo=null,expectedCount=null){
+  return window.TechCheckEvidenceView.photoOnlyHtml(prepId,stage,unitNo,expectedCount,{
+    evidenceRows,esc,itItems,itemIdentity:itItemIdentity,shouldScanUnitTag,itemTagScan
+  });
 }
 function signatureStamp(name,at){
   if(!at) return `Signed by ${esc(name || 'Technician')}`;
@@ -4336,24 +4262,8 @@ function signatureStamp(name,at){
   const time=d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
   return `Signed by ${esc(name || 'Technician')} · ${esc(date)} · ${esc(time)}`;
 }
-async function signatureOnlyHtml(prepId, stage, unitNo = null) {
-  const rows = await evidenceRows(prepId, stage);
-  const signatureName = unitNo ? `unit-${unitNo}-signature.png` : null;
-  const sig = [...rows].reverse().find(r => r.kind === 'signature' && (!unitNo || r.original_name === signatureName));
-  if (sig) {
-    return `<div class='wl-proof wl-sign-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'>
-      <div class='wl-photo-title'>Signature</div>
-      <div class='ok'><b>✓ Signature saved</b><div class='small'>${signatureStamp(sig.created_by_name || (stage === 'it' ? 'IT Technician' : 'Service Tech'),sig.created_at)}</div></div>
-      <button class='mini full top10' data-wl-replace='${stage}'>Sign Again</button>
-    </div>`;
-  }
-  return `<div class='wl-proof wl-sign-simple ${stage === 'service' ? 'service' : ''}' data-proof='${prepId}' data-stage='${stage}' data-mode='signature' data-unit='${unitNo || ''}'>
-    <div class='wl-photo-title'>Sign Here</div>
-    <div class='small'>Sign inside the box with your finger.</div>
-    <div class='wl-sign top10'><canvas></canvas>
-      <div class='wl-nav'><button class='wl-prev' data-wl-clear>Clear</button><button class='wl-next' data-wl-save-sign='${stage}'>Save Signature</button></div>
-    </div>
-  </div>`;
+async function signatureOnlyHtml(prepId,stage,unitNo=null){
+  return window.TechCheckEvidenceView.signatureOnlyHtml(prepId,stage,unitNo,{evidenceRows,signatureStamp});
 }
 function itSummaryHtml(forms, evidence) {
   const photos = evidence.filter(r => r.kind === 'photo');
