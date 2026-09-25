@@ -164,4 +164,13 @@ async function createPrepShell({ticket='',site='',requestedUnits=0,manifest=[],p
   return data;
 }
 
-window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag,saveTagScan,createPrepShell});
+
+async function confirmSwapSiteRegistration(itemId){
+  const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
+  if(!itemId)throw new Error('IT prep item is not available.');
+  const {error}=await ctx.db.rpc('it_confirm_swap_site_registration_v1',{p_item_id:itemId});
+  if(error)throw error;
+  return true;
+}
+
+window.TechCheckITPrep=Object.freeze({saveItem,isHeliosDeploy,configureBase,initializeConfigured,verifyItemsForRelease,releasePrep,confirmPhotoTag,saveTagScan,createPrepShell,confirmSwapSiteRegistration});
