@@ -1,7 +1,7 @@
 import './it-prep-view-v1.js?v=6';
 import './handoff-evidence-view-v1.js?v=2';
 import './handoff-evidence-shared-v1.js?v=2';
-import './it-prep-wizard-v1.js?v=10';
+import './it-prep-wizard-v1.js?v=11';
 import './it-prep-rules-v1.js?v=3';
 import './it-prep-shared-v1.js?v=8';
 import './truck-spares-shared-v1.js?v=1';
@@ -4123,7 +4123,7 @@ async function signatureOnlyHtml(prepId,stage,unitNo=null){
 }
 const CAMERA_UNIT_TYPES = window.TechCheckRules?.deviceTypes || ['Sniper','Ranger','Helios','Solar Spotter','Spotter','Recon 2'];
 const STAND_POLE_TYPES = window.TechCheckRules?.standTypes || ['Solar Stand','110V Stand','Pole'];
-function itItems() { return [...(activeItPrep?.prep_items || [])].sort((a, b) => a.item_order - b.item_order); }
+function itItems(){return window.TechCheckITPrepWizard.sortedItems(activeItPrep);}
 function currentItItem() { return itItems()[itUnitIndex] || null; }
 function itPurposeOptionsForCurrentJob(type){
   const workType=String(activeItPrep?.work_type||pendingAssignmentWorkType||'service').toLowerCase();
@@ -4140,39 +4140,35 @@ function itUnitStepsData(item,unitNo){return window.TechCheckITPrepRules.checkli
 function itBoolValue(item,field){return window.TechCheckITPrepWizard.boolValue(item,field,itDraftAnswers);}
 function itBoolAnswered(item,field){return window.TechCheckITPrepWizard.boolAnswered(item,field,itDraftAnswers,itAnswered);}
 function itPhotoTagReady(item){return window.TechCheckITPrepWizard.photoTagReady(item);}
-async function configureCurrentItItem() {
-  const item=currentItItem();
-  if(!itTypeChoice||!itPurposeChoice)return false;
-  try{
-    await window.TechCheckITPrep.configureBase({
-      itemId:item?.id||null,
-      prepId:activeItPrep?.id||null,
-      equipmentType:itTypeChoice,
-      purpose:itPurposeChoice,
-      requiredBatteryCount:1
-    });
-    activeItPrep=await getPrep(activeItPrep.id);
-    const configured=currentItItem();
-    if(configured){
-      const initialized=await window.TechCheckITPrep.initializeConfigured({
-        itemId:configured.id,
-        equipmentType:itTypeChoice,
-        purpose:itPurposeChoice,
-        reconRequired:itReconRequired
-      });
-      if(initialized)activeItPrep=await getPrep(activeItPrep.id);
-    }
-    return true;
-  }catch(error){
-    alert(error?.message||'Could not configure this IT prep item.');
+async function configureCurrentItItem(){
+  const result=await window.TechCheckITPrepWizard.configureCurrent({
+    prep:activeItPrep,
+    unitIndex:itUnitIndex,
+    typeChoice:itTypeChoice,
+    purposeChoice:itPurposeChoice,
+    reconRequired:itReconRequired
+  },{
+    configureBase:args=>window.TechCheckITPrep.configureBase(args),
+    initializeConfigured:args=>window.TechCheckITPrep.initializeConfigured(args),
+    reload:getPrep
+  });
+  if(!result?.ok){
+    if(result?.error)alert(result.error?.message||'Could not configure this IT prep item.');
     return false;
   }
+  activeItPrep=result.prep;
+  return true;
 }
-async function persistCurrentItItem() {
-  const item=currentItItem();if(!item)return false;
-  try{await window.TechCheckITPrep.saveItem(item);}
-  catch(error){alert(error.message);return false;}
-  activeItPrep=await getPrep(activeItPrep.id);
+async function persistCurrentItItem(){
+  const result=await window.TechCheckITPrepWizard.persistCurrent({prep:activeItPrep,unitIndex:itUnitIndex},{
+    saveItem:item=>window.TechCheckITPrep.saveItem(item),
+    reload:getPrep
+  });
+  if(!result?.ok){
+    if(result?.error)alert(result.error?.message||'Could not save this IT prep item.');
+    return false;
+  }
+  activeItPrep=result.prep;
   return true;
 }
 
