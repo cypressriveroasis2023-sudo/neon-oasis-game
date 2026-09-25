@@ -102,4 +102,13 @@ function blobFromCanvas(canvas){
   return new Promise(resolve=>canvas.toBlob(resolve,'image/png',.92));
 }
 
-window.TechCheckEvidence=Object.freeze({rows,optimizePhoto,upload,wireCanvas,blobFromCanvas});
+
+function unitRows(rows,unitNo,kind){
+  const prefix=`unit-${unitNo}-`;
+  return (rows||[]).filter(row=>row?.kind===kind&&String(row?.original_name||'').startsWith(prefix));
+}
+function unitSignature(rows,unitNo){
+  return [...(rows||[])].reverse().find(row=>row?.kind==='signature'&&row?.original_name===`unit-${unitNo}-signature.png`)||null;
+}
+
+window.TechCheckEvidence=Object.freeze({rows,optimizePhoto,upload,wireCanvas,blobFromCanvas,unitRows,unitSignature});
