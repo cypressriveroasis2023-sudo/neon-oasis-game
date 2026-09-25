@@ -36,13 +36,21 @@ async function optimizePhoto(file){
   }
 }
 
+async function evidenceContentHash(file){
+  if(!globalThis.crypto?.subtle)throw new Error('Secure evidence hashing is unavailable on this device. Reload Tech Check over HTTPS and try again.');
+  const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+
 async function upload(prepId,stage,kind,file,name,itemId=null){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   const {data:{session}}=await ctx.db.auth.getSession();
   if(!session?.user?.id)throw new Error('Please sign in again.');
-  const ext=kind==='signature'?'png':((name||'photo.jpg').split('.').pop()||'jpg').toLowerCase();
-  const path=`${session.user.id}/${prepId}/${stage}/${itemId||'ticket'}/${kind}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const {error:uploadError}=await ctx.db.storage.from(EVIDENCE_BUCKET).upload(path,file,{contentType:file.type||(kind==='signature'?'image/png':'image/jpeg')});
+  const contentType=file.type||(kind==='signature'?'image/png':'image/jpeg');
+  const ext=kind==='signature'?'png':contentType==='image/png'?'png':contentType==='image/webp'?'webp':'jpg';
+  const hash=await evidenceContentHash(file);
+  const path=`${session.user.id}/${prepId}/${stage}/${itemId||'ticket'}/${kind}-${hash}.${ext}`;
+  const {error:uploadError}=await ctx.db.storage.from(EVIDENCE_BUCKET).upload(path,file,{contentType,upsert:true});
   if(uploadError)throw uploadError;
   const {error:recordError}=itemId
     ? await ctx.db.rpc('record_unit_handoff_evidence',{p_prep_id:prepId,p_item_id:itemId,p_stage:stage,p_kind:kind,p_storage_path:path,p_original_name:name||null})
