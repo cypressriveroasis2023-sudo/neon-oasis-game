@@ -5450,19 +5450,36 @@ async function saveServiceSolarChecklist() {
   });
   document.body.classList.remove('busy'); if(error)return alert(error.message); return renderSvcPrep();
 }
+async function serviceEvidenceContentHash(file){
+  if(!globalThis.crypto?.subtle)throw new Error('Secure evidence hashing is unavailable on this device. Reload Tech Check over HTTPS and try again.');
+  const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
 async function uploadServiceSolarEvidence(prepId,category,kind,file) {
   const { data:{ session } }=await liveDb.auth.getSession();
   if (!session?.user?.id) throw new Error('Please sign in again.');
   const prepared=kind==='photo' ? await optimizeEvidencePhoto(file) : file;
   const ext=kind==='signature' ? 'png' : ((prepared.name || 'photo.jpg').split('.').pop() || 'jpg').toLowerCase();
-  const path=`${session.user.id}/${prepId}/service-solar/${category}/${kind}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const { error:up }=await liveDb.storage.from(EVIDENCE_BUCKET).upload(path,prepared,{contentType:prepared.type || (kind==='signature'?'image/png':'image/jpeg')});
+  const hash=await serviceEvidenceContentHash(prepared);
+  const path=`${session.user.id}/${prepId}/service-solar/${category}/${kind}-${hash}.${ext}`;
+  const contentType=prepared.type || (kind==='signature'?'image/png':'image/jpeg');
+  const { error:up }=await liveDb.storage.from(EVIDENCE_BUCKET).upload(path,prepared,{contentType,upsert:true});
   if (up) throw up;
   const original=kind==='signature' ? `${category}-signature.png` : `${category}-photo-${prepared.name || 'photo.jpg'}`;
   const { error:rec }=await liveDb.rpc('record_service_solar_evidence',{
     p_prep_id:prepId,p_category:category,p_kind:kind,p_storage_path:path,p_original_name:original
   });
-  if (rec) throw rec;
+  if(rec){
+    const {data:recorded,error:verifyError}=await liveDb.from('service_solar_evidence')
+      .select('id')
+      .eq('storage_path',path)
+      .maybeSingle();
+    if(recorded?.id)return path;
+    if(!verifyError)await liveDb.storage.from(EVIDENCE_BUCKET).remove([path]).catch(()=>null);
+    if(verifyError)throw new Error('Connection was interrupted while saving Solar / Helios evidence. Tech Check could not safely verify the result. Reconnect and retry this same proof; the same photo will not be counted twice.');
+    throw rec;
+  }
+  return path;
 }
 function svcQuestions(form) {
   const out = [];
