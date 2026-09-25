@@ -83,7 +83,7 @@ function wireCanvas(canvas){
   ctx.scale(dpr,dpr);
   ctx.lineWidth=2.5;
   ctx.lineCap='round';
-  ctx.strokeStyle='#0b1720';
+  ctx.strokeStyle=getComputedStyle(canvas).backgroundColor==='rgb(255, 255, 255)'?'#0b1720':'#ffffff';
   let draw=false;
   const blockTouch=e=>{e.preventDefault();e.stopPropagation();};
   canvas.addEventListener('touchstart',blockTouch,{passive:false});
