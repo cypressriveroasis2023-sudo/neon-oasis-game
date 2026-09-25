@@ -1,3 +1,4 @@
+import './intake-shared-v1.js?v=1';
 import './notifications-v1.js?v=1';
 const LIVE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const LIVE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -59,20 +60,9 @@ const intakeLabels = window.TechCheckRules?.itIntakeChecklist || ['Is the return
 let intakeWizard = { row: null, step: 0, answers: Array(intakeLabels.length).fill(null), notes: '', photo: null, meta: {} };
 let ownerReturnRows = new Map();
 let serviceReturnRows = new Map();
-const INTAKE_META_RE = /(?:^|\n)\[\[INTAKE_META:([A-Za-z0-9+/=]+)\]\]/;
-function readIntakeRecord(raw) {
-  const text = String(raw || '');
-  const match = text.match(INTAKE_META_RE);
-  let meta = {};
-  if (match?.[1]) { try { meta = JSON.parse(atob(match[1])); } catch { meta = {}; } }
-  return { notes: text.replace(INTAKE_META_RE, '').trim(), meta };
-}
-function writeIntakeRecord(notes, meta) {
-  const payload = btoa(JSON.stringify(meta || {}));
-  return `${String(notes || '').trim()}${String(notes || '').trim() ? '\n' : ''}[[INTAKE_META:${payload}]]`;
-}
-function techInitials(name) { return String(name || 'IT').trim().split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 4).toUpperCase() || 'IT'; }
-function intakeDocumentation(row, tech, at = new Date()) { return { simCanceledDate: at.toLocaleDateString(), ticket: String(row?.ticket_no || ''), unit: String(row?.unit_tag || ''), techInitials: techInitials(tech?.name), techName: String(tech?.name || 'IT Technician') }; }
+const readIntakeRecord = (...args) => window.TechCheckIntake.readRecord(...args);
+const writeIntakeRecord = (...args) => window.TechCheckIntake.writeRecord(...args);
+const intakeDocumentation = (...args) => window.TechCheckIntake.documentation(...args);
 
 function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' })[c]);
