@@ -1,3 +1,4 @@
+import './notifications-v1.js?v=1';
 const LIVE_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const LIVE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const liveDb = window.TechCheckDB || supabase.createClient(LIVE_URL, LIVE_KEY);
@@ -1322,54 +1323,9 @@ let helpWalkthroughStep = 0;
 let helpWalkthroughMode = 'help';
 let walkthroughCheckedUserId = null;
 let walkthroughDismissedSession = false;
-const TECHCHECK_VAPID_PUBLIC_KEY = 'BAvDfBdTqTbyOxAOYDQ25EfMKregOkdUmOkVW_BlHEQ4CP--otdlOCrDobnj7eVUg-5YMcjVM8sfLHg_qNr2fq0';
-
-function vapidKeyBytes(value) {
-  const padding = '='.repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
-}
-async function pushAlertState() {
-  const supported = 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
-  if (!supported) return { supported:false, permission:'unsupported', subscribed:false, ready:false };
-  const permission = Notification.permission;
-  let subscribed = false;
-  if (permission === 'granted') {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      subscribed = Boolean(await reg.pushManager.getSubscription());
-    } catch {}
-  }
-  return { supported:true, permission, subscribed, ready:permission === 'granted' && subscribed };
-}
+const pushAlertState = (...args) => window.TechCheckNotifications.pushAlertState(...args);
+const registerPhonePush = (...args) => window.TechCheckNotifications.registerPhonePush(...args);
 function phoneAlertBanner() { return ''; }
-async function registerPhonePush() {
-  const tech = await currentTechIdentity();
-  const reg = await navigator.serviceWorker.ready;
-  let subscription = await reg.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: vapidKeyBytes(TECHCHECK_VAPID_PUBLIC_KEY),
-    });
-  }
-  const json = subscription.toJSON();
-  const p256dh = json.keys?.p256dh || '';
-  const auth = json.keys?.auth || '';
-  if (!p256dh || !auth) throw new Error('This device did not return a valid push subscription.');
-  const { error } = await liveDb.from('push_subscriptions').upsert({
-    user_id: tech.id,
-    endpoint: subscription.endpoint,
-    p256dh,
-    auth,
-    user_agent: navigator.userAgent,
-    enabled: true,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'endpoint' });
-  if (error) throw error;
-  return subscription;
-}
 
 function currentRoleKey() {
   const role = roleText();
