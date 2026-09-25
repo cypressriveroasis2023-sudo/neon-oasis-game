@@ -1,4 +1,4 @@
-import './it-prep-view-v1.js?v=3';
+import './it-prep-view-v1.js?v=4';
 import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
@@ -4590,7 +4590,6 @@ async function persistCurrentItItem() {
   return true;
 }
 
-function itCheckStepHtml(item,step,index,total,unitNo){return window.TechCheckITPrepView.stepHtml(item,step,index,total,unitNo,{esc,boolAnswered:itBoolAnswered,boolValue:itBoolValue});}
 function itUnitIssues(item, evidence, unitNo) {
   const steps = itUnitStepsData(item, unitNo);
   const issues = [];
@@ -4790,11 +4789,7 @@ async function releaseItPrepUnitByUnit() {
     document.body.classList.remove('busy');
   }
 }
-function itWizardCard() {
-  let wizard = document.getElementById('wlItWizardOnly');
-  if (!wizard) { wizard = document.createElement('div'); wizard.id = 'wlItWizardOnly'; wizard.className = 'card'; viewIT().append(wizard); }
-  return wizard;
-}
+function itWizardCard(){return window.TechCheckITPrepView.wizardCard(viewIT());}
 async function showItPrep(prepId) {
   activeItPrep = await getPrep(prepId);
   if (!activeItPrep) return;
@@ -4915,25 +4910,16 @@ async function renderItUnitStep() {
       itUnitPhase='purpose';
       return renderItUnitStep();
     }
-    wizard.innerHTML = progress(`Item ${unitNo} of ${totalUnits}`, 'Equipment type missing', 1, 1) +
-      `<div class='wl-stop'><b>OWNER ACTION NEEDED</b><div>This ticket does not say what equipment IT should prepare. Go back and have the Owner correct the assignment.</div></div><div class='wl-nav'><button class='wl-prev' data-wl-home='it'>← IT Home</button><span></span></div>`;
+    wizard.innerHTML = window.TechCheckITPrepView.typeMissingHtml(unitNo,totalUnits,{progress,esc});
   } else if (itUnitPhase === 'purpose') {
     const options=itPurposeOptionsForCurrentJob(itTypeChoice);
     const serviceJob=String(activeItPrep?.work_type||'').toLowerCase()==='service';
-    const question=serviceJob?'IS THIS UNIT REPLACING A UNIT ALREADY AT THE SITE?':'Confirm this unit purpose';
-    const note=serviceJob
-      ? (itTypeChoice==='110V Stand'?'110V Stand is swap-only. If it is not replacing a site stand, the Owner assignment needs to be corrected.':'YES uses the SWAP return path. NO treats the unit as Service support / backup equipment.')
-      : 'Tech Check selected the purpose from the Owner job type.';
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, serviceJob?'One simple purpose question':'Confirm unit purpose', 1, 1) +
-      `<div class='wl-question'><div class='qtext'>${esc(question)}</div><div class='wl-options'>${options.map(row => `<button class='${itPurposeChoice === row.value ? 'pass on' : 'pass'}' data-wl-unit-purpose='${row.value}'>${esc(row.label)}</button>`).join('')}</div><div class='wl-note'>${esc(note)}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    wizard.innerHTML = window.TechCheckITPrepView.purposeHtml(unitNo,totalUnits,itTypeChoice,itPurposeChoice,options,serviceJob,{progress,esc});
   } else if (itUnitPhase === 'recon') {
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, 'Recon II camera count', 1, 1) + `<div class='wl-question'><div class='qtext'>How many cameras are going on this Recon II for this deployment?</div><input id='wlReconRequired' type='number' inputmode='numeric' min='1' value='${Math.max(1, Number(itReconRequired || 1))}'></div><div class='wl-note top8'>Battery quantity is entered separately during the unit check after the Recon II is programmed and ready.</div><div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>Next →</button></div>`;
+    wizard.innerHTML = window.TechCheckITPrepView.reconHtml(unitNo,totalUnits,itReconRequired,{progress});
   } else if (itUnitPhase === 'checks') {
     const steps = itUnitStepsData(item, unitNo);
-    const step = steps[itQuestionIndex];
-    const stepCount=Math.max(1,steps.length);
-    const equipmentName=item?.equipment_type||'Equipment';
-    wizard.innerHTML = progress(`Unit ${unitNo} of ${totalUnits}`, `${equipmentName} · Step ${itQuestionIndex + 1} of ${stepCount}`, itQuestionIndex + 1, stepCount) + itCheckStepHtml(item, step, itQuestionIndex, steps.length, unitNo) + (step?.kind==='bool'?`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><span></span></div>`:`<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next>${itQuestionIndex === steps.length - 1 ? 'Next: Photo →' : 'Next →'}</button></div>`);
+    wizard.innerHTML = window.TechCheckITPrepView.checksHtml(item,unitNo,totalUnits,itQuestionIndex,steps,{progress,esc,boolAnswered:itBoolAnswered,boolValue:itBoolValue});
   } else if (itUnitPhase === 'photo') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const photoReady = unitEvidence(ev, unitNo, 'photo').length === 1 && itPhotoTagReady(item);
@@ -4942,7 +4928,8 @@ async function renderItUnitStep() {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const issues = itUnitIssues(item, ev, unitNo);
     const ready = issues.length === 0;
-    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, ready ? `${identity} is ready` : `Finish ${identity}`, 3, 3) + itUnitReviewHtml(item, ev, unitNo) + (ready ? '' : itIssueLinksHtml(item, ev, unitNo)) + `${ready ? '' : `<div class='wl-stop'><b>ONE MORE THING</b><div>Finish the item shown above.</div><button class='wl-big wl-red top10' data-wl-fix-issues>Fix It →</button></div>`}<div class='wl-nav'><button class='wl-prev' data-wl-it-prev>Back</button><button class='wl-next' data-wl-it-next ${ready ? '' : 'disabled'}>${unitNo < totalUnits ? `Next: Unit ${unitNo + 1} →` : 'Next: Ticket Summary →'}</button></div>`;
+    wizard.innerHTML = progress(`${identity} · Unit ${unitNo} of ${totalUnits}`, ready ? `${identity} is ready` : `Finish ${identity}`, 3, 3) +
+      window.TechCheckITPrepView.reviewPhaseHtml(identity,unitNo,totalUnits,ready,itUnitReviewHtml(item,ev,unitNo),ready?'':itIssueLinksHtml(item,ev,unitNo));
   } else if (itUnitPhase === 'signature') {
     const ev = await evidenceRows(activeItPrep.id, 'it');
     const sig = unitSignature(ev, unitNo);
