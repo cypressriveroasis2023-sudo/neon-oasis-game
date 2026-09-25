@@ -45,12 +45,13 @@ async function saveItem(item){
   return true;
 }
 
-async function configureBase({itemId=null,prepId=null,equipmentType='',purpose='',requiredBatteryCount=1}={}){
+async function configureBase({itemId=null,prepId=null,itemOrder=null,equipmentType='',purpose='',requiredBatteryCount=1}={}){
   const ctx=window.TechCheckContext;if(!ctx?.db)throw new Error('Tech Check application context is not ready.');
   if(!equipmentType||!purpose)throw new Error('Equipment type and purpose are required.');
+  if(!itemId&&(!Number.isInteger(Number(itemOrder))||Number(itemOrder)<1))throw new Error('Equipment unit position is required.');
   const result=itemId
     ? await ctx.db.rpc('configure_it_prep_item',{p_item_id:itemId,p_equipment_type:equipmentType,p_purpose:purpose,p_required_battery_count:requiredBatteryCount})
-    : await ctx.db.rpc('add_it_prep_item',{p_prep_id:prepId,p_equipment_type:equipmentType,p_purpose:purpose,p_recon_battery_count:requiredBatteryCount});
+    : await ctx.db.rpc('add_it_prep_item_v2',{p_prep_id:prepId,p_item_order:Number(itemOrder),p_equipment_type:equipmentType,p_purpose:purpose,p_recon_battery_count:requiredBatteryCount});
   if(result.error)throw result.error;
   return result.data;
 }
