@@ -5374,7 +5374,7 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total,reviewMode=false
       "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='"+esc(task.category)+"' data-wl-solar-multi='"+(allowsMultiple?"1":"0")+"'>"+
         "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" saved":"PHOTO REQUIRED")+"</div>"+
         "<div class='wl-solar-photo-actions'>"+
-          "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'"+multiple+"></label>"+
+          "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>"+
           "<label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*'"+multiple+"></label>"+
         "</div>"+
         (allowsMultiple?"<div class='wl-solar-multi-note'>You can add multiple photos before saving.</div>":"")+
