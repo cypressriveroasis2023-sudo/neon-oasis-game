@@ -1,6 +1,6 @@
 // IT Prep presentation helpers.
 // Pure markup only: no database writes and no workflow transitions.
-function stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml(item,step,index,total,unitNo,deps={}){
+function stepHtml(item,step,index,total,unitNo,deps={}){
   const esc=deps.esc||((v)=>String(v??''));const boolAnswered=deps.boolAnswered||(()=>false),boolValue=deps.boolValue||(()=>false);
   if(step.kind==='tag'){
     const type=String(item?.equipment_type||'unit'),example=type==='Helios'?'Example: 007.':'Enter the tag exactly as printed on the equipment.';
@@ -37,4 +37,20 @@ function spareSummaryHtml(items,rows,deps={}){
 }
 function finalLockHtml(){return `<div class='wl-it-final-lock'><b>✓ TICKET CONTENTS LOCKED</b><span>At handoff, IT can only review or correct a unit check. Equipment, parts, and spares cannot be added from this screen.</span></div>`;}
 
-window.TechCheckITPrepView=Object.freeze({stepHtml});
+function issueLinksHtml(item,evidence,unitNo,deps={}){
+  const esc=deps.esc||((x)=>String(x??'')),issues=deps.issues?deps.issues(item,evidence||[],unitNo):[];
+  if(!issues.length)return '';
+  return `<div class='wl-stop'><b>${issues.length} issue${issues.length===1?'':'s'} need attention.</b><div>Tap an issue to go directly back to it.</div><div class='wl-issue-list'>${issues.map((issue,index)=>`<button class='wl-issue-link' data-wl-issue-unit='${unitNo-1}' data-wl-issue-phase='${issue.phase}' data-wl-issue-index='${issue.index}'><b>Issue ${index+1}: ${esc(issue.label)}</b><span>Go to this issue →</span></button>`).join('')}</div></div>`;
+}
+function unitReviewHtml(item,evidence,unitNo,deps={}){
+  const esc=deps.esc||((x)=>String(x??'')),unitEvidence=deps.unitEvidence||(()=>[]),stepsData=deps.stepsData||(()=>[]),boolValue=deps.boolValue||(()=>false),itemIdentity=deps.itemIdentity||((_,n)=>`Unit ${n}`),unitSignature=deps.unitSignature||(()=>null);
+  const photos=unitEvidence(evidence||[],unitNo,'photo'),steps=stepsData(item,unitNo).filter(s=>s.kind==='bool'),passed=steps.filter(s=>boolValue(item,s.field)===true).length,identity=itemIdentity(item,unitNo),sig=unitSignature(evidence||[],unitNo);
+  return `<div class='wl-simple-complete'>
+    <div class='wl-simple-complete-title'>${esc(identity)} is ready</div>
+    <div>✓ ${passed} checks complete</div>
+    <div>✓ ${photos.length?'Photo saved':'Photo needed'}</div>
+    <div>✓ ${sig?'Signed by '+esc(sig.created_by_name||'IT Technician'):'Signature needed'}</div>
+  </div>`;
+}
+
+window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml});
