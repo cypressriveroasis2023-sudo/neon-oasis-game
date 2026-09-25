@@ -777,6 +777,10 @@ function show(which) {
   window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
+  // Signing out is an explicit end to any Owner Test impersonation on this device.
+  // Normal page refresh still restores an intentionally active Owner Test session.
+  try{localStorage.removeItem(OWNER_TEST_SESSION_KEY);}catch{}
+  document.body.classList.remove('owner-test-role-preview','owner-test-role-it','owner-test-role-service');
   await db.auth.signOut();
   showAuth();
 }
