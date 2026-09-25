@@ -1,4 +1,4 @@
-import './it-prep-wizard-v1.js?v=2';
+import './it-prep-wizard-v1.js?v=3';
 import './it-prep-rules-v1.js?v=1';
 import './it-prep-shared-v1.js?v=1';
 import './it-intake-wizard-v1.js?v=1';
@@ -7012,18 +7012,6 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-wl-it-back]')) return showPendingList();
   const purpose = e.target.closest('[data-wl-unit-purpose]');
   if (purpose) { itPurposeChoice = purpose.dataset.wlUnitPurpose; return renderItUnitStep(); }
-  const photoTag = e.target.closest('[data-wl-photo-tag]');
-  if (photoTag && itUnitPhase === 'photo') {
-    const item = currentItItem();
-    if (!item) return;
-    const matches = photoTag.dataset.wlPhotoTag === 'yes';
-    if (matches && item.ai_tag_scan_status==='mismatch') return alert(`AI read a different tag than ${item.unit_tag}. Retake a clear tag photo before approving this unit.`);
-    const { error } = await liveDb.rpc('confirm_it_unit_photo_tag', { p_item_id: item.id, p_matches: matches });
-    if (error) return alert(error.message);
-    activeItPrep = await getPrep(activeItPrep.id);
-    if (!matches) alert(`Retake the photo so the unit tag for ${itItemIdentity(currentItItem(), itUnitIndex + 1)} is clearly visible and matches the equipment.`);
-    return renderItUnitStep();
-  }
   const itQuestionResult=await window.TechCheckITPrepWizard.handleQuestionClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,typeChoice:itTypeChoice,purposeChoice:itPurposeChoice,reconRequired:itReconRequired,finalView:itFinalView},{
     currentItem:currentItItem,items:itItems,steps:itUnitStepsData,persist:persistCurrentItItem,
     recordAnswer:(item,field,value)=>{itDraftAnswers.set(itAnswerKey(item,field),value);itAnswered.add(itAnswerKey(item,field));},
@@ -7037,40 +7025,16 @@ document.addEventListener('click', async e => {
     if(itQuestionResult.render)return renderItUnitStep();
     return;
   }
-  const issueLink = e.target.closest('[data-wl-issue-unit]');
-  if (issueLink) {
-    if (!activeItPrep) return;
-    itUnitIndex = Number(issueLink.dataset.wlIssueUnit || 0);
-    itUnitPhase = issueLink.dataset.wlIssuePhase || 'checks';
-    itQuestionIndex = Number(issueLink.dataset.wlIssueIndex || 0);
-    return renderItUnitStep();
-  }
-  if (e.target.closest('[data-wl-fix-issues]')) {
-    if (!activeItPrep) return;
-    const item = itItems()[itUnitIndex];
-    const ev = await evidenceRows(activeItPrep.id, 'it');
-    const firstIssue = itUnitIssues(item, ev, itUnitIndex + 1)[0];
-    if (!firstIssue) return renderItUnitStep();
-    itUnitPhase = firstIssue.phase;
-    itQuestionIndex = firstIssue.index || 0;
-    return renderItUnitStep();
-  }
-  const finalView=e.target.closest('[data-wl-final-view]');
-  if (finalView && itUnitPhase==='final') {
-    itFinalView=finalView.dataset.wlFinalView || 'summary';
-    return renderItUnitStep();
-  }
-  const finalUnit=e.target.closest('[data-wl-final-unit]');
-  if (finalUnit && itUnitPhase==='final') {
-    itFinalView='summary';
-    itUnitIndex=Math.max(0,Number(finalUnit.dataset.wlFinalUnit||0));
-    itUnitPhase='review';
-    return renderItUnitStep();
-  }
-  if (e.target.closest('[data-wl-final-last-unit]') && itUnitPhase==='final') {
-    const next=window.TechCheckITPrepWizard.finalLastUnit({unitIndex:itUnitIndex,phase:itUnitPhase,finalView:itFinalView},itItems());
-    itFinalView=next.finalView;itUnitIndex=next.unitIndex;itUnitPhase=next.phase;
-    return renderItUnitStep();
+  const itReviewResult=await window.TechCheckITPrepWizard.handleReviewClick(e,{unitIndex:itUnitIndex,questionIndex:itQuestionIndex,phase:itUnitPhase,finalView:itFinalView},{
+    currentItem:currentItItem,items:itItems,hasPrep:()=>Boolean(activeItPrep),identity:itItemIdentity,
+    confirmPhotoTag:async(itemId,matches)=>{const {error}=await liveDb.rpc('confirm_it_unit_photo_tag',{p_item_id:itemId,p_matches:matches});return error||null;},
+    reload:async()=>{activeItPrep=await getPrep(activeItPrep.id);},
+    evidence:()=>evidenceRows(activeItPrep.id,'it'),issues:itUnitIssues
+  });
+  if(itReviewResult.handled){
+    const next=itReviewResult.state;itUnitIndex=next.unitIndex;itQuestionIndex=next.questionIndex;itUnitPhase=next.phase;itFinalView=next.finalView;
+    if(itReviewResult.render)return renderItUnitStep();
+    return;
   }
 
   if (e.target.closest('[data-wl-it-prev]')) {
