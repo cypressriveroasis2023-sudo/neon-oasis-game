@@ -101,4 +101,28 @@ async function handleReviewClick(event,state,deps={}){
   return {handled:false,state:next};
 }
 
-window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick});
+
+function photoTagReady(item){
+  if(item?.equipment_type==='110V Stand'&&!String(item?.unit_tag||'').trim())return true;
+  return item?.photo_tag_match_ok===true;
+}
+function unitIssues(item,evidence,unitNo,deps={}){
+  const steps=(deps.steps?deps.steps(item,unitNo):[])||[],issues=[];
+  const boolValue=deps.boolValue||((row,field)=>row?.[field]);
+  steps.forEach((step,index)=>{
+    const failed=step.kind==='number'
+      ? Number(item?.[step.field]||0)<Number(step.min??(step.field==='battery_count'?item?.required_battery_count:1)??1)
+      : step.kind==='tag'
+        ? (!step.optional&&!String(item?.[step.field]||'').trim())
+        : boolValue(item,step.field)!==true;
+    if(failed)issues.push({phase:'checks',index,label:step.label});
+  });
+  const unitEvidence=deps.unitEvidence||(()=>[]);
+  if(!unitEvidence(evidence||[],unitNo,'photo').length)issues.push({phase:'photo',index:0,label:'Required equipment photo is missing.'});
+  else if(!(deps.photoTagReady||photoTagReady)(item))issues.push({phase:'photo',index:0,label:`Confirm the photo clearly shows and matches unit tag ${item?.unit_tag||''}.`});
+  const unitSignature=deps.unitSignature||(()=>null);
+  if(!unitSignature(evidence||[],unitNo))issues.push({phase:'signature',index:0,label:'IT technician signature is missing.'});
+  return issues;
+}
+
+window.TechCheckITPrepWizard=Object.freeze({nextAfterCheck,nextAfterReview,previous,finalLastUnit,handleQuestionClick,handleReviewClick,photoTagReady,unitIssues});
