@@ -14,14 +14,6 @@ function stepHtml(item,step,index,total,unitNo,deps={}){
   const answered=boolAnswered(item,step.field),value=boolValue(item,step.field),yes=answered&&value===true,no=answered&&value!==true;
   return `<div class='wl-question wl-it-auto-bool'><div class='qnum'>UNIT ${unitNo} · STEP ${index+1} OF ${total}</div><div class='qtext'>${esc(step.label)}</div><div class='wl-options'><button class='pass ${yes?'on':''}' data-wl-it-answer='yes'>YES</button><button class='fail ${no?'on':''}' data-wl-it-answer='no'>NO</button></div>${no?`<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. This equipment cannot move forward while this answer is NO.</div></div>`:''}</div>`;
 }
-function equipmentReviewHtml(item,ev,unitNo,deps={}){
-  const esc=deps.esc||((x)=>String(x??'')),type=String(item?.equipment_type||deps.typeChoice||'Equipment'),issues=item?deps.issues(item,ev||[],unitNo):[],flags=[],low=type.toLowerCase();
-  if(low.includes('helios'))flags.push('Helios focus: cameras → modem → antenna → camera/modem programming → ports/configuration; verify 3 × 1TB SD cards.');
-  if(low.includes('solar spotter'))flags.push('Solar Spotter IT check does not include battery checkout. The Solar Stand and its battery setup are verified on the Service side (4 × AGM 12V 110Ah or 1 × 12V 350Ah per stand).');
-  if(low.includes('ranger'))flags.push('Ranger: verify MPPT update, MPPT operation, and charging. Service should receive 1 solar panel per Ranger.');
-  if(low.includes('helios'))flags.push('Verify Camera 1: 81/554/1400 · Camera 2: 81/554/1500 · PTZ: 81/554/1600 · IP Speaker: 81/554/1700.');
-  return `<div class='wl-ai-panel wl-ai-equipment'><div class='wl-ai-head'>${deps.title('Equipment Check')}<b>${issues.length?'VERIFY '+issues.length+' ITEM'+(issues.length===1?'':'S'):'ON TRACK'}</b></div><div class='wl-ai-line'><b>${esc(type)}</b> · Item ${unitNo}</div>${flags.length?`<div class='wl-ai-line'>${flags.map(x=>'• '+esc(x)).join('<br>')}</div>`:''}${issues.length?`<div class='wl-ai-warn'>${issues.slice(0,5).map(x=>'⚠ '+esc(x.label||x.message||x.phase||'Required check incomplete')).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ No required-item conflicts detected at this point.</div>`}<div class='small top8'>AI Assist does not answer checks or approve equipment for the technician.</div></div>`;
-}
 function ticketSummaryHtml(prep,items,deps={}){
   const esc=deps.esc||((x)=>String(x??'')),units=items.map((item,index)=>({item,index})).filter(r=>r.item.purpose!=='BACKUP').map(({item,index})=>`<div class='wl-simple-unit'><div><b>${esc(item.equipment_type)} ${esc(item.unit_tag||'')}</b><span>Unit ${index+1} · ${esc(item.purpose)}</span></div><div class='wl-simple-unit-ok'>✓ READY</div><button class='mini' data-wl-final-unit='${index}'>Review / Adjust Unit</button></div>`).join('');
   return `<div class='wl-simple-ticket'><div class='wl-simple-ticket-number'>MHelpDesk #${esc(prep.ticket_no)}</div><div class='small'>${esc(prep.site||'')}</div></div><div class='wl-simple-units'>${units||"<div class='small'>No equipment prepared yet.</div>"}</div>`;
@@ -131,4 +123,4 @@ function reviewScreenHtml(identity,unitNo,totalUnits,ready,reviewHtml,issuesHtml
   return progress(`${identity} · Unit ${unitNo} of ${totalUnits}`,ready?`${identity} is ready`:`Finish ${identity}`,3,3)+body;
 }
 
-window.TechCheckITPrepView=Object.freeze({stepHtml,equipmentReviewHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml,partsOnlyFinalHtml,finalTicketHtml,photoPhaseHtml,signaturePhaseHtml,reviewScreenHtml});
+window.TechCheckITPrepView=Object.freeze({stepHtml,ticketSummaryHtml,partsSummaryHtml,spareSummaryHtml,finalLockHtml,issueLinksHtml,unitReviewHtml,wizardCard,typeMissingHtml,purposeHtml,reconHtml,checksHtml,reviewPhaseHtml,partsOnlyFinalHtml,finalTicketHtml,photoPhaseHtml,signaturePhaseHtml,reviewScreenHtml});
