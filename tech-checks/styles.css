@@ -9531,3 +9531,42 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     color:#b8c5ce!important;-webkit-text-fill-color:#b8c5ce!important;
   }
 }
+
+
+/* Owner dashboard dark mode v12 — exact rendered element types */
+@media (prefers-color-scheme: dark) {
+  #view-owner[data-owner-route="today"] section.ownerHomeWelcome h1#ownerTodayGreeting{
+    color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeStatus button{
+    appearance:none!important;-webkit-appearance:none!important;
+    background:#10232d!important;background-image:none!important;
+    color:#ffffff!important;border:1px solid #31505e!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeStatus button.alert{
+    background:#10232d!important;background-image:none!important;
+    border:1px solid #31505e!important;border-left:4px solid #ef3038!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeStatus button b{
+    color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeStatus button span{
+    color:#b8c5ce!important;-webkit-text-fill-color:#b8c5ce!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeNext{
+    background:#10232d!important;background-color:#10232d!important;background-image:none!important;
+    color:#ffffff!important;border:1px solid #31505e!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeNext header div h2{
+    color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeNext>p{
+    color:#b8c5ce!important;-webkit-text-fill-color:#b8c5ce!important;
+  }
+  #view-owner[data-owner-route="today"] section.ownerHomeNext header button{
+    appearance:none!important;-webkit-appearance:none!important;
+    background:#172d38!important;background-image:none!important;
+    color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;
+    border-color:#42616f!important;
+  }
+}
