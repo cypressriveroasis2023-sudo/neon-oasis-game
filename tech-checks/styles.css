@@ -9783,3 +9783,32 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
   body #view-owner td.selected *,
   body #view-owner [data-selected="true"] * {color:inherit!important;}
 }
+
+/* Owner mobile light mode: use the selectors rendered by Assign Job and Calendar. */
+@media (max-width:900px) and (prefers-color-scheme:light) {
+  body #view-owner #ownerAppPage #ownerJobAssignments .owner-simple-step,
+  body #view-owner #ownerAppPage #ownerJobAssignments .owner-simple-review {
+    background:#fff!important;color:#171b1f!important;border-color:#d1d9de!important;
+  }
+  body #view-owner #ownerJobAssignments .owner-simple-step-head b,
+  body #view-owner #ownerJobAssignments .owner-simple-review h3 {color:#171b1f!important}
+  body #view-owner #ownerJobAssignments .owner-simple-step-head span:not(.owner-simple-step-icon),
+  body #view-owner #ownerJobAssignments .owner-simple-review p {color:#52616b!important}
+  body #view-owner #ownerJobAssignments .owner-assign-command-grid label,
+  body #view-owner #ownerJobAssignments .wl-requirement-heading,
+  body #view-owner #ownerJobAssignments .qtext {color:#171b1f!important}
+  body #view-owner #ownerJobAssignments .owner-auto-flow-card {background:#0b1a22!important}
+  body #view-owner #ownerJobAssignments .owner-auto-flow-card b,
+  body #view-owner #ownerJobAssignments .owner-auto-flow-card small {color:#fff!important}
+  body #view-owner #ownerJobAssignments .owner-assign-review-card .owner-simple-review>div,
+  body #view-owner #ownerJobAssignments .owner-assign-review-card .owner-simple-review li {
+    background:#f4f6f7!important;color:#24323b!important;border-color:#d1d9de!important;
+  }
+  body #view-owner #ownerAppPage .ownerCalDay.selected,
+  body #view-owner #ownerAppPage .ownerCalDay.today.selected {
+    background:#fff0f0!important;color:#171b1f!important;box-shadow:inset 0 0 0 2px #c9141d!important;
+  }
+  body #view-owner #ownerAppPage .ownerCalDay.selected .ownerCalDate b {background:transparent!important;color:#171b1f!important}
+  body #view-owner #ownerAppPage .ownerCalDay.selected .ownerCalDate span {background:#24323b!important;color:#fff!important}
+  body #view-owner #ownerAppPage .ownerCalDay.selected .ownerCalDate em {color:#fff!important}
+}
