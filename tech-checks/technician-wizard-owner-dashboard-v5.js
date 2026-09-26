@@ -5755,14 +5755,14 @@ function serviceAIEquipmentReview(ctx,check,evidence){
   if(ctx?.need_solar&&!check?.completed_at)flags.push('Solar / Helios Service checklist is not completed yet.');
   return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'>${onsiteVisionTitle('Service Equipment Check')}<b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${esc(check?.battery_description || batteryPlan.description)}</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'} + LiTime 12V 110Ah battery setup</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
 }
-function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired}){
+function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,itPhotos,hasParts,solarRequired}){
   const holds=[];
   if(!allChecksOk) holds.push('One or more Service equipment checks are NO or incomplete.');
-  if(!proofReady) holds.push('Service evidence is incomplete: '+servicePhotos+' of '+requiredPhotos+' receipt photos plus final signature are required.');
+  if(!proofReady) holds.push('Handoff evidence is incomplete: IT handoff photo proof and the Service receipt signature are required.');
   if(hasParts&&!partsReady) holds.push('Listed parts have not been physically verified.');
   if(solarRequired&&!solarReady) holds.push('Solar / Helios pre-trip requirements or evidence are incomplete.');
   const ready=holds.length===0;
-  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Service Handoff Check')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Handoff record ready.</b><br>IT-to-Service handoff evidence, Service checks, parts, signatures, and required solar pre-trip checks are complete in the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>This confirms the handoff record only. The Helios is not deployed until Service completes the field-install steps at the site.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Service Handoff Check')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Handoff record ready.</b><br>IT handoff photo/signature evidence, Service receipt signature, Service checks, parts, and required solar pre-trip checks are complete in the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>This confirms the handoff record only. The Helios is not deployed until Service completes the field-install steps at the site.</div></div>`;
 }
 function allSwapItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(row=>row.purpose==='SWAP').sort((a,b)=>a.item_order-b.item_order);
@@ -6095,7 +6095,7 @@ async function renderSvcPrep() {
   let solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null; const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[]; const solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
   const swapState=await swapWorkflowState(activeSvcPrep);
   const allSwaps=swapState.swaps,nonHeliosSwaps=allSwaps.filter(i=>i.equipment_type!=='Helios'),heliosHandoff=heliosHandoffItems(activeSvcPrep),heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep);
-  const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),signStep=proofStep+1,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
   const unitQuestionCounts=forms.map(form=>svcQuestions(form).length);
   const unitQuestionTotal=unitQuestionCounts.reduce((sum,n)=>sum+n,0);
   const solarTaskTotal=solarRequired
@@ -6132,10 +6132,7 @@ async function renderSvcPrep() {
     const overallStep=solarOffset+((solarIndex<0?solarTasks.length:solarIndex)+1);
     wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',Math.min(combinedCheckTotal,Math.max(1,overallStep)),combinedCheckTotal)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence,solarOffset,combinedCheckTotal,Number.isInteger(svcSolarCursor)?svcSolarCursor:null)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
-    wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
-  }else if(svcUnitIndex===photoStep){
-    const itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length;
-    wizard.innerHTML=progress('Service Photos',`Take ${requiredPhotos} matching receipt photo${requiredPhotos===1?'':'s'}`,1,1)+await photoOnlyHtml(activeSvcPrep.id,'service',null,requiredPhotos)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
+    wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos and signature`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Sign Receipt →</button></div>`;
   }else if(svcUnitIndex===signStep){
     wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${nonHeliosSwaps.length?'Swap Result →':rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(nonHeliosSwaps.length&&svcUnitIndex===swapStep){
@@ -6148,8 +6145,8 @@ async function renderSvcPrep() {
     wizard.innerHTML=progress('Ranger Field Check','Verify Victron Bluetooth status at the site',1,1)+rangerFieldHtml(activeSvcPrep)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${rangerFieldReady(activeSvcPrep)?'':'disabled'}>Review →</button></div>`;
   }else{
     if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);wireSvcSolarPhotoInputs(wizard);resetWizardPosition();return;}
-    const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
-    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
+    const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),itPhotos=itEv.filter(x=>x.kind==='photo').length;
+    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=itPhotos>0&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
     const heliosNeedsAcceptance=heliosHandoff.length>0&&!solarCheck?.handoff_accepted_at;
     const nonHeliosInstalled=nonHeliosSwaps.filter(i=>i.swap_outcome==='installed');
     const nonHeliosByType=nonHeliosInstalled.reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{});
@@ -6158,7 +6155,7 @@ async function renderSvcPrep() {
       && !Object.entries(nonHeliosByType).some(([type,needed])=>swapState.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
     const swapReady=heliosNeedsAcceptance ? nonHeliosReady : swapState.ready;
     const ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
-    const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
+    const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,itPhotos,hasParts,solarRequired});
     const heliosNotice=heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`<div class='warn top10'><b>HELIOS HANDOFF FIRST</b><div>Accept the IT → Service handoff. At the site, Service will answer whether the SWAP replacement was actually installed.</div></div>`:'';
     const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each installed Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
     const pendingHeliosFieldDecision=heliosNeedsAcceptance&&allSwaps.some(i=>i.equipment_type==='Helios'&&!i.swap_outcome);
@@ -6168,7 +6165,7 @@ async function renderSvcPrep() {
         ? `<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`
         : `<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`
     ):'';
-    wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 IT handoff photos reviewed: ${itPhotos}</div><div class='small'>✓ Service receipt signature required.</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
   wireSvcSolarPhotoInputs(wizard);
   resetWizardPosition();
@@ -6578,8 +6575,7 @@ document.addEventListener('click', async e => {
       const partStep = forms.length;
       const solarStep = forms.length + (hasParts ? 1 : 0);
       const proofStep = solarStep + (solarRequired ? 1 : 0);
-      const photoStep = proofStep + 1;
-      const signStep = proofStep + 2;
+      const signStep = proofStep + 1;
       const swapStep = signStep + 1;
       const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
       const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
@@ -6591,7 +6587,6 @@ document.addEventListener('click', async e => {
         const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
         if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
       }
-      if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
       if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
       if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
         const state=await swapWorkflowState(activeSvcPrep);
@@ -6614,7 +6609,7 @@ document.addEventListener('click', async e => {
     const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
     const partStep = forms.length;
     const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
-    const solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1;
+    const solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),signStep=proofStep+1,swapStep=signStep+1;
     if (svcUnitIndex < forms.length) {
       if (svcQuestionIndex > 0) { svcQuestionIndex--; return renderSvcPrep(); }
       if (svcUnitIndex > 0) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
