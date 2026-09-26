@@ -9570,3 +9570,89 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     border-color:#42616f!important;
   }
 }
+
+
+/* Owner dashboard dark mode v13 — mobile Safari hard override */
+@media (prefers-color-scheme: dark) {
+  body #view-owner .ownerHomeWelcome h1,
+  body #view-owner #ownerTodayGreeting {
+    color:#f7fafc!important;
+    -webkit-text-fill-color:#f7fafc!important;
+    opacity:1!important;
+  }
+
+  body #view-owner .ownerHomeStatus,
+  body #view-owner .ownerHomeStatus button,
+  body #view-owner .ownerHomeStatus button:first-child,
+  body #view-owner .ownerHomeStatus button:nth-child(2),
+  body #view-owner .ownerHomeStatus button:nth-child(3),
+  body #view-owner .ownerHomeStatus button.alert {
+    background:#10232d!important;
+    background-color:#10232d!important;
+    background-image:none!important;
+  }
+  body #view-owner .ownerHomeStatus button {
+    color:#f7fafc!important;
+    border:1px solid #35515e!important;
+    box-shadow:none!important;
+  }
+  body #view-owner .ownerHomeStatus button.alert {
+    border-left:5px solid #ef3038!important;
+  }
+  body #view-owner .ownerHomeStatus button b {
+    color:#f7fafc!important;
+    -webkit-text-fill-color:#f7fafc!important;
+    opacity:1!important;
+  }
+  body #view-owner .ownerHomeStatus button span {
+    color:#b8c6cf!important;
+    -webkit-text-fill-color:#b8c6cf!important;
+    opacity:1!important;
+  }
+
+  body #view-owner .ownerHomeNext,
+  body #view-owner section.ownerHomeNext,
+  body #view-owner .ownerHomeNext header,
+  body #view-owner .ownerHomeNextProgress {
+    background:#10232d!important;
+    background-color:#10232d!important;
+    background-image:none!important;
+  }
+  body #view-owner .ownerHomeNext {
+    border:1px solid #35515e!important;
+    box-shadow:none!important;
+  }
+  body #view-owner .ownerHomeNext h2 {
+    color:#f7fafc!important;
+    -webkit-text-fill-color:#f7fafc!important;
+    opacity:1!important;
+  }
+  body #view-owner .ownerHomeNext>p {
+    color:#b8c6cf!important;
+    -webkit-text-fill-color:#b8c6cf!important;
+  }
+  body #view-owner .ownerHomeNext header button {
+    background:#172d38!important;
+    background-color:#172d38!important;
+    background-image:none!important;
+    color:#f7fafc!important;
+    -webkit-text-fill-color:#f7fafc!important;
+    border:1px solid #42616f!important;
+  }
+  body #view-owner .ownerHomeNextProgress span {
+    background:#172d38!important;
+    color:#dce6ec!important;
+    -webkit-text-fill-color:#dce6ec!important;
+  }
+
+  body #view-owner .ownerAppBottomNav {
+    background:#081820!important;
+    background-color:#081820!important;
+    background-image:none!important;
+    border-color:#35515e!important;
+  }
+  body #view-owner .ownerAppBottomNav button {
+    color:#c4d0d7!important;
+    -webkit-text-fill-color:#c4d0d7!important;
+  }
+}
