@@ -9311,3 +9311,31 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     }
   }
 }
+
+
+/* Compact Owner home v6 */
+.ownerHomeSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.ownerHomeSummary button{min-height:118px;text-align:left;padding:18px;border-radius:20px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.ownerHomeSummary button b{font-size:36px;line-height:1}
+.ownerHomeSummary button span{font-weight:900;letter-spacing:.08em;font-size:13px}
+.ownerHomeSummary button small{font-weight:700;opacity:.72}
+.ownerHomeSeeAll{width:100%;margin-top:12px}
+@media(max-width:900px){
+  .ownerTodayHeroCompact .ownerTodayClockCard{display:none!important}
+  .ownerTodayHeroCompact{display:block!important}
+  .ownerTodayHeroCompact .ownerTodayWelcome{min-height:auto!important;padding:24px!important}
+  .ownerTodayHeroCompact .ownerTodayWelcome h1{font-size:clamp(34px,10vw,52px)!important}
+  .ownerHomeSummary{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 16px}
+  .ownerHomeSummary button{min-height:104px;padding:13px 11px;border-radius:16px}
+  .ownerHomeSummary button b{font-size:32px}
+  .ownerHomeSummary button span{font-size:11px;letter-spacing:.05em}
+  .ownerHomeSummary button small{font-size:10px;line-height:1.25}
+  .ownerHomeJobs .ownerTodayMiniStats{display:none!important}
+}
+@media(prefers-color-scheme:light){
+  #view-owner .ownerHomeSummary button{background:#fff!important;color:#181b1e!important;border:1px solid #d7dde2!important;box-shadow:0 3px 10px rgba(15,23,32,.04)!important}
+  #view-owner .ownerHomeSummary button b,#view-owner .ownerHomeSummary button span{color:#181b1e!important}
+  #view-owner .ownerHomeSummary button small{color:#6b7780!important}
+  #view-owner .ownerHomeSummary button.alert{background:#fff5f5!important;border-color:#e9b6b9!important;border-left:4px solid #c9151c!important}
+  #view-owner .ownerHomeSeeAll{background:#f7f8f9!important;color:#222!important;border:1px solid #d4dbe0!important}
+}
