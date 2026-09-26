@@ -5729,18 +5729,25 @@ async function resumeServicePrepAtSavedProgress() {
   const proofStep=solarStep+(solarRequired?1:0);
   const signStep=proofStep+1;
 
-  // Service equipment verification is saved on prep_items. Once the saved
-  // record says a unit was verified, never replay its checkout questions.
-  let firstIncomplete=-1;
-  for(let i=0;i<forms.length;i++){
-    const itemId=String(forms[i].querySelector("input[id^='exact_']")?.id||'').replace(/^exact_/,'');
-    const item=(activeSvcPrep.prep_items||[]).find(row=>String(row.id)===itemId);
-    if(!item?.service_verified_at){firstIncomplete=i;break;}
-  }
-  if(firstIncomplete>=0){
-    svcUnitIndex=firstIncomplete;
-    svcQuestionIndex=0;
-    return renderSvcPrep();
+  // Any completed downstream Service evidence proves the earlier checkout
+  // questions were already passed in the old flow. Never send a technician
+  // backward to Steps 1–3 just because that older flow did not stamp
+  // service_verified_at until final Helios handoff acceptance.
+  const downstreamProgress=Boolean(solarCheck?.completed_at)
+    || ev.some(row=>row.kind==='signature')
+    || Boolean(activeSvcPrep.service_parts_confirmed);
+  if(!downstreamProgress){
+    let firstIncomplete=-1;
+    for(let i=0;i<forms.length;i++){
+      const itemId=String(forms[i].querySelector("input[id^='exact_']")?.id||'').replace(/^exact_/,'');
+      const item=(activeSvcPrep.prep_items||[]).find(row=>String(row.id)===itemId);
+      if(!item?.service_verified_at){firstIncomplete=i;break;}
+    }
+    if(firstIncomplete>=0){
+      svcUnitIndex=firstIncomplete;
+      svcQuestionIndex=0;
+      return renderSvcPrep();
+    }
   }
   if(hasParts&&!activeSvcPrep.service_parts_confirmed){
     svcUnitIndex=partStep;svcQuestionIndex=0;return renderSvcPrep();
