@@ -9288,11 +9288,39 @@ function techLiveIndicator(){
 }
 function techRepositionLiveIndicator(){
   const el=techLiveIndicator();
-  const ownerWeather=document.querySelector('#view-owner:not(.hidden) #ownerTodayWeatherHost .ownerWeatherNow')
-    || document.querySelector('#view-owner:not(.hidden) #ownerTodayWeatherHost');
-  const target=ownerWeather||document.body;
+  const ownerVisible=Boolean(document.querySelector('#view-owner:not(.hidden)'));
+  const mount=ownerVisible ? document.getElementById('ownerWeatherLiveMount') : null;
+  const weatherHost=ownerVisible ? document.getElementById('ownerTodayWeatherHost') : null;
+  const target=mount||weatherHost||document.body;
   if(el.parentElement!==target) target.append(el);
-  el.classList.toggle('in-owner-weather',Boolean(ownerWeather));
+  el.classList.toggle('in-owner-weather',Boolean(mount||weatherHost));
+  if(mount||weatherHost){
+    Object.assign(el.style,{
+      position:'static',
+      inset:'auto',
+      top:'auto',
+      right:'auto',
+      bottom:'auto',
+      left:'auto',
+      margin:'0',
+      width:'max-content',
+      maxWidth:'100%',
+      transform:'none',
+      zIndex:'8'
+    });
+  }else{
+    Object.assign(el.style,{
+      position:'fixed',
+      top:'calc(env(safe-area-inset-top, 0px) + 62px)',
+      right:'12px',
+      bottom:'auto',
+      left:'auto',
+      margin:'0',
+      width:'auto',
+      transform:'none',
+      zIndex:'9997'
+    });
+  }
   const appVisible=!document.getElementById('appView')?.classList.contains('hidden');
   el.classList.toggle('hidden',!appVisible);
   el.classList.remove('live','reconnecting','offline');
