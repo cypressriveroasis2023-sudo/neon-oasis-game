@@ -9812,3 +9812,23 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
   body #view-owner #ownerAppPage .ownerCalDay.selected .ownerCalDate span {background:#24323b!important;color:#fff!important}
   body #view-owner #ownerAppPage .ownerCalDay.selected .ownerCalDate em {color:#fff!important}
 }
+
+/* Owner calendar editor: match its inputs to the light inspector and show native controls. */
+@media (max-width:900px) and (prefers-color-scheme:light) {
+  body #view-owner #ownerAppPage .ownerCalInspector input,
+  body #view-owner #ownerAppPage .ownerCalInspector select,
+  body #view-owner #ownerAppPage .ownerCalInspector textarea {
+    background:#fff!important;color:#171b1f!important;border:1px solid #9daeb9!important;
+    color-scheme:light!important;-webkit-text-fill-color:#171b1f!important;
+  }
+  body #view-owner #ownerAppPage .ownerCalInspector input::placeholder,
+  body #view-owner #ownerAppPage .ownerCalInspector textarea::placeholder {
+    color:#4f606b!important;opacity:1!important;
+  }
+  body #view-owner #ownerAppPage .ownerCalInspectorSection>small,
+  body #view-owner #ownerAppPage .ownerCalInspectorHead small {
+    color:#465c68!important;font-size:11px!important;letter-spacing:.08em!important;
+  }
+  body #view-owner #ownerAppPage .ownerCalInspectorSection>b {color:#171b1f!important}
+  body #view-owner #ownerAppPage .ownerCalInspectorSection>p {color:#52616b!important}
+}
