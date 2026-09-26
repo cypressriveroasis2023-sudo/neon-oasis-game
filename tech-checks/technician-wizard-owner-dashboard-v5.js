@@ -5094,6 +5094,11 @@ async function matchSvcTicket() {
   svcUnitIndex = 0;
   svcQuestionIndex = 0;
   svcSolarCursor = null;
+  const savedServiceProgress=(activeSvcPrep.prep_items||[]).some(item=>Boolean(item.service_verified_at))
+    || Boolean(activeSvcPrep.service_parts_confirmed)
+    || Boolean((await loadServiceSolarCheck(activeSvcPrep.id))?.completed_at)
+    || (await evidenceRows(activeSvcPrep.id,'service')).some(row=>row.kind==='signature');
+  if(savedServiceProgress)return resumeServicePrepAtSavedProgress();
   showSvcTicketConfirmation();
 }
 async function showSvcTicketConfirmation() {
@@ -5708,6 +5713,51 @@ function svcQuestionHtml(q, index, total, displayStep=index+1, displayTotal=tota
   const no = answered && !q.input.checked;
   return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${displayStep} OF ${displayTotal}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
 }
+async function resumeServicePrepAtSavedProgress() {
+  if (!activeSvcPrep?.id) return renderSvcPrep();
+  const card=findSvcCard(activeSvcPrep.ticket_no);
+  if (!card) return renderSvcPrep();
+  const forms=svcForms(card);
+  const hasParts=ticketPartsTotal(activeSvcPrep)>0;
+  const solarCtx=await serviceSolarContextData(activeSvcPrep.id);
+  const solarRequired=Boolean(solarCtx?.need_solar);
+  const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null;
+  const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[];
+  const ev=await evidenceRows(activeSvcPrep.id,'service');
+  const partStep=forms.length;
+  const solarStep=forms.length+(hasParts?1:0);
+  const proofStep=solarStep+(solarRequired?1:0);
+  const signStep=proofStep+1;
+
+  // Service equipment verification is saved on prep_items. Once the saved
+  // record says a unit was verified, never replay its checkout questions.
+  let firstIncomplete=-1;
+  for(let i=0;i<forms.length;i++){
+    const itemId=String(forms[i].querySelector("input[id^='exact_']")?.id||'').replace(/^exact_/,'');
+    const item=(activeSvcPrep.prep_items||[]).find(row=>String(row.id)===itemId);
+    if(!item?.service_verified_at){firstIncomplete=i;break;}
+  }
+  if(firstIncomplete>=0){
+    svcUnitIndex=firstIncomplete;
+    svcQuestionIndex=0;
+    return renderSvcPrep();
+  }
+  if(hasParts&&!activeSvcPrep.service_parts_confirmed){
+    svcUnitIndex=partStep;svcQuestionIndex=0;return renderSvcPrep();
+  }
+  if(solarRequired&&!serviceSolarReady(solarCtx,solarCheck,solarEvidence)){
+    svcUnitIndex=solarStep;svcQuestionIndex=0;svcSolarCursor=null;return renderSvcPrep();
+  }
+  if(!ev.some(row=>row.kind==='signature')){
+    // IT proof is read-only context; resume at the receipt signature rather
+    // than forcing the technician to walk backward through completed checks.
+    svcUnitIndex=signStep;svcQuestionIndex=0;return renderSvcPrep();
+  }
+  svcUnitIndex=signStep+1;
+  svcQuestionIndex=0;
+  return renderSvcPrep();
+}
+
 function svcWizardCard() {
   let wizard = document.getElementById('wlSvcWizardOnly');
   if (!wizard) { wizard = document.createElement('div'); wizard.id = 'wlSvcWizardOnly'; wizard.className = 'card'; viewSvc().append(wizard); }
