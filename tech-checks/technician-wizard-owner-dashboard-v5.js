@@ -5094,11 +5094,6 @@ async function matchSvcTicket() {
   svcUnitIndex = 0;
   svcQuestionIndex = 0;
   svcSolarCursor = null;
-  const savedServiceProgress=(activeSvcPrep.prep_items||[]).some(item=>Boolean(item.service_verified_at))
-    || Boolean(activeSvcPrep.service_parts_confirmed)
-    || Boolean((await loadServiceSolarCheck(activeSvcPrep.id))?.completed_at)
-    || (await evidenceRows(activeSvcPrep.id,'service')).some(row=>row.kind==='signature');
-  if(savedServiceProgress)return resumeServicePrepAtSavedProgress();
   showSvcTicketConfirmation();
 }
 async function showSvcTicketConfirmation() {
@@ -5713,58 +5708,6 @@ function svcQuestionHtml(q, index, total, displayStep=index+1, displayTotal=tota
   const no = answered && !q.input.checked;
   return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${displayStep} OF ${displayTotal}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
 }
-async function resumeServicePrepAtSavedProgress() {
-  if (!activeSvcPrep?.id) return renderSvcPrep();
-  const card=findSvcCard(activeSvcPrep.ticket_no);
-  if (!card) return renderSvcPrep();
-  const forms=svcForms(card);
-  const hasParts=ticketPartsTotal(activeSvcPrep)>0;
-  const solarCtx=await serviceSolarContextData(activeSvcPrep.id);
-  const solarRequired=Boolean(solarCtx?.need_solar);
-  const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null;
-  const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[];
-  const ev=await evidenceRows(activeSvcPrep.id,'service');
-  const partStep=forms.length;
-  const solarStep=forms.length+(hasParts?1:0);
-  const proofStep=solarStep+(solarRequired?1:0);
-  const signStep=proofStep+1;
-
-  // Any completed downstream Service evidence proves the earlier checkout
-  // questions were already passed in the old flow. Never send a technician
-  // backward to Steps 1–3 just because that older flow did not stamp
-  // service_verified_at until final Helios handoff acceptance.
-  const downstreamProgress=Boolean(solarCheck?.completed_at)
-    || ev.some(row=>row.kind==='signature')
-    || Boolean(activeSvcPrep.service_parts_confirmed);
-  if(!downstreamProgress){
-    let firstIncomplete=-1;
-    for(let i=0;i<forms.length;i++){
-      const itemId=String(forms[i].querySelector("input[id^='exact_']")?.id||'').replace(/^exact_/,'');
-      const item=(activeSvcPrep.prep_items||[]).find(row=>String(row.id)===itemId);
-      if(!item?.service_verified_at){firstIncomplete=i;break;}
-    }
-    if(firstIncomplete>=0){
-      svcUnitIndex=firstIncomplete;
-      svcQuestionIndex=0;
-      return renderSvcPrep();
-    }
-  }
-  if(hasParts&&!activeSvcPrep.service_parts_confirmed){
-    svcUnitIndex=partStep;svcQuestionIndex=0;return renderSvcPrep();
-  }
-  if(solarRequired&&!serviceSolarReady(solarCtx,solarCheck,solarEvidence)){
-    svcUnitIndex=solarStep;svcQuestionIndex=0;svcSolarCursor=null;return renderSvcPrep();
-  }
-  if(!ev.some(row=>row.kind==='signature')){
-    // IT proof is read-only context; resume at the receipt signature rather
-    // than forcing the technician to walk backward through completed checks.
-    svcUnitIndex=signStep;svcQuestionIndex=0;return renderSvcPrep();
-  }
-  svcUnitIndex=signStep+1;
-  svcQuestionIndex=0;
-  return renderSvcPrep();
-}
-
 function svcWizardCard() {
   let wizard = document.getElementById('wlSvcWizardOnly');
   if (!wizard) { wizard = document.createElement('div'); wizard.id = 'wlSvcWizardOnly'; wizard.className = 'card'; viewSvc().append(wizard); }
@@ -5976,15 +5919,15 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
   let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
   index=Math.max(0,Math.min(total,index));
-  const header="<div class='wl-helios-field-head wl-helios-field-head-min'><div class='wl-progress'><div style='width:"+Math.round(((Math.min(total,index+1))/Math.max(1,total))*100)+"%'></div></div></div>";
-  const context=oldBlock;
+  const header=heliosFieldProgress('HELIOS FIELD INSTALL',unitLabel+' · Complete one step at a time',Math.min(total,index+1),total);
+  const context="<div class='wl-field-context'><b>"+esc(unitLabel)+" · MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Follow each site step in order. Tap YES only after it is physically complete. Tap NO to stop and correct it before continuing.</span></div>"+newUnits+oldBlock;
 
   if(index<rules.length){
     const rule=rules[index];
     const yes=check?.[rule.key]===true;
     return header+context+
-      "<div class='wl-question wl-helios-field-step wl-helios-field-simple'>"+
-        "<div class='qnum'>"+esc(unitLabel)+" · STEP "+(index+1)+" OF "+total+"</div>"+
+      "<div class='wl-question wl-helios-field-step'>"+
+        "<div class='qnum'>STEP "+(index+1)+" OF "+total+"</div>"+
         "<div class='qtext'>"+esc(rule.label)+"</div>"+
         "<div class='wl-options'><button class='fail' data-wl-helios-field-answer='no' data-field='"+esc(rule.key)+"'>NO</button><button class='pass "+(yes?"on":"")+"' data-wl-helios-field-answer='yes' data-field='"+esc(rule.key)+"'>YES</button></div>"+
         "<div class='wl-helios-field-message'></div>"+
