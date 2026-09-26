@@ -9943,3 +9943,21 @@ body #view-owner #ownerAppPage .ownerHomeTeamActivity .ownerHomeHandoffLink{widt
  body #view-owner #ownerAppPage #ownerGlobalSearchInput::placeholder{color:#52616b!important;opacity:1!important}
  body #view-owner #ownerAppPage .ownerCmdBoardMeta>button{background:#f4f6f7!important;color:#24323b!important;border-color:#c3cdd4!important}
 }
+
+/* Wait for session restoration before presenting the login form. */
+#sessionLoading{min-height:70dvh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px;text-align:center;color:#f3f7fa}
+#sessionLoading strong{font-size:26px}
+#sessionLoading span{color:#b9c9d2}
+#sessionLoading button{padding:12px 22px;border-radius:12px;border:1px solid #c9141d;background:#b9151d;color:#fff;font-weight:700}
+body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a){background:#29151a!important;border-color:#9e3942!important;color:#fff!important}
+body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a) b{color:#fff!important}
+body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a) span{color:#d4bec2!important}
+@media(prefers-color-scheme:light){
+ #sessionLoading{color:#171b1f}#sessionLoading span{color:#52616b}
+ body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a){background:#fff2f3!important;border-color:#d58b91!important;color:#171b1f!important}
+ body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a) b{color:#991b1b!important}
+ body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a) span{color:#633b40!important}
+}
+@media(max-width:900px){
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is(button,a)::before{color:inherit!important}
+}
