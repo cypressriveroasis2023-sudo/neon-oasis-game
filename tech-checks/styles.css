@@ -9417,3 +9417,38 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
   #view-owner .ownerAppWorkspace{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
   #view-owner .ownerAppPage{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
 }
+
+
+/* Owner mobile centering + live badge placement v9 */
+@media(max-width:600px){
+  /* Center the actual dashboard information instead of pinning it to the left. */
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome{text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome>span,
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome h1,
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome p{margin-left:auto!important;margin-right:auto!important;text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeWeather .ownerWeatherCurrent{text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeWeather .ownerWeatherCurrent>span{justify-content:center!important;text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeWeather .ownerWeatherCurrent div{justify-content:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button{text-align:center!important;align-items:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNext{text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNext header{align-items:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNext header>div{flex:1;text-align:center!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNextProgress{justify-content:center!important}
+
+  /* Connection LIVE badge: left side beside the weather/dashboard zone, never over Camera Health. */
+  body:has(#view-owner:not(.hidden)) #connectionBanner.online{
+    left:18px!important;
+    right:auto!important;
+    top:calc(env(safe-area-inset-top) + 92px)!important;
+    bottom:auto!important;
+    width:auto!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:7px 11px!important;
+    border-radius:999px!important;
+    font-size:10px!important;
+    font-weight:950!important;
+    letter-spacing:.12em!important;
+    box-shadow:0 5px 16px rgba(0,0,0,.16)!important;
+  }
+}
