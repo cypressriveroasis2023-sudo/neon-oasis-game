@@ -9498,3 +9498,36 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     border-top-color:#42616f!important;
   }
 }
+
+
+/* Owner dark dashboard hard override v11 — keep at EOF */
+@media (prefers-color-scheme: dark) {
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome h1,
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome h1 *{color:#f7fafc!important;-webkit-text-fill-color:#f7fafc!important}
+
+  #view-owner[data-owner-route="today"] .ownerHomeStatus>button,
+  #view-owner[data-owner-route="today"] .ownerHomeStatus>button.alert{
+    background:#10232d!important;background-color:#10232d!important;
+    border-color:#31505e!important;color:#f7fafc!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeStatus>button.alert{border-left-color:#ef3038!important}
+  #view-owner[data-owner-route="today"] .ownerHomeStatus>button b{
+    color:#f7fafc!important;-webkit-text-fill-color:#f7fafc!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeStatus>button span{
+    color:#aebec8!important;-webkit-text-fill-color:#aebec8!important;
+  }
+
+  #view-owner[data-owner-route="today"] section.ownerHomeNext,
+  #view-owner[data-owner-route="today"] .ownerHomeNext{
+    background:#10232d!important;background-color:#10232d!important;
+    border-color:#31505e!important;color:#f7fafc!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeNext h2,
+  #view-owner[data-owner-route="today"] .ownerHomeNext h2 *{
+    color:#f7fafc!important;-webkit-text-fill-color:#f7fafc!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeNext p{
+    color:#b8c5ce!important;-webkit-text-fill-color:#b8c5ce!important;
+  }
+}
