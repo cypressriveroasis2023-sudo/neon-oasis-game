@@ -9855,3 +9855,45 @@ body #view-owner #ownerAppPage .ownerHomeTeamActivity .ownerHomeHandoffLink{widt
  body #view-owner #ownerAppPage .ownerHomeTeamRow{border-color:#d1d9de}
  body #view-owner #ownerAppPage .ownerHomeTeamActivity button{background:#f4f6f7!important;color:#24323b!important;border-color:#c3cdd4!important}
 }
+
+/* Team board light palette: explicit foregrounds on every status surface. */
+@media(prefers-color-scheme:light){
+ body #view-owner #ownerAppPage .ownerCmdTechHead{background:#f4f6f7!important;border-color:#d1d9de!important}
+ body #view-owner #ownerAppPage .ownerCmdTechHead h2{color:#171b1f!important}
+ body #view-owner #ownerAppPage .ownerCmdTechHead>div>span,
+ body #view-owner #ownerAppPage .ownerCmdSummary>div>span{color:#52616b!important}
+ body #view-owner #ownerAppPage .ownerCmdAvatar,
+ body #view-owner #ownerAppPage .ownerCmdITSection>header>strong{background:#e9eef1!important;color:#24323b!important;border-color:#a9bac5!important}
+ body #view-owner #ownerAppPage .ownerTechControlButton{background:#b9151d!important;color:#fff!important;border-color:#b9151d!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.bad,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.bad,
+ body #view-owner #ownerAppPage .ownerCmdStockRow.bad,
+ body #view-owner #ownerAppPage .ownerCmdMissingBanner,
+ body #view-owner #ownerAppPage .ownerCmdRestock{background:#fff1f1!important;color:#991b1b!important;border-color:#d99393!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.bad>b,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.bad>b,
+ body #view-owner #ownerAppPage .ownerCmdStockRow.bad>b,
+ body #view-owner #ownerAppPage .ownerCmdMissingBanner b,
+ body #view-owner #ownerAppPage .ownerCmdRestock b{color:#991b1b!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.bad>span,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.bad>span,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.bad>small,
+ body #view-owner #ownerAppPage .ownerCmdStockRow.bad>span,
+ body #view-owner #ownerAppPage .ownerCmdMissingBanner span,
+ body #view-owner #ownerAppPage .ownerCmdRestock span{color:#743737!important}
+ body #view-owner #ownerAppPage .ownerCmdTechHead>strong.danger{background:#fff1f1!important;color:#991b1b!important;border-color:#d99393!important}
+ body #view-owner #ownerAppPage .ownerCmdTechHead>strong.ready{background:#eaf7ee!important;color:#17633b!important;border-color:#8abc9b!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.bad>b i,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.bad>i,
+ body #view-owner #ownerAppPage .ownerCmdStockRow.bad>i{background:#b9151d!important;color:#fff!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.good>b i,
+ body #view-owner #ownerAppPage .ownerCmdUnitRow.good>i,
+ body #view-owner #ownerAppPage .ownerCmdStockRow.good>i{background:#17633b!important;color:#fff!important}
+ body #view-owner #ownerAppPage .ownerCmdReadyRow.na>b i{background:#e9eef1!important;color:#24323b!important}
+ body #view-owner #ownerAppPage .ownerCmdJobMeta span,
+ body #view-owner #ownerAppPage .ownerCmdJob>header strong{background:#e9eef1!important;color:#24323b!important}
+ body #view-owner #ownerAppPage .ownerCmdFlowStep>i{background:#e9eef1!important;color:#24323b!important;border-color:#657b89!important}
+ body #view-owner #ownerAppPage .ownerCmdFlowStep.complete>i{background:#17633b!important;color:#fff!important;border-color:#17633b!important}
+ body #view-owner #ownerAppPage .ownerCmdFlowStep.working>i{background:#17668c!important;color:#fff!important;border-color:#17668c!important}
+ body #view-owner #ownerAppPage .ownerCmdFlowStep small{color:#52616b!important}
+}
