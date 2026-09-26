@@ -8204,3 +8204,374 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     display:none!important;
   }
 }
+
+
+/* System-synced Owner light theme v1 - 2026-09-26 */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --owner-system-red:#d20b12;
+    --owner-system-black:#111315;
+    --owner-system-ink:#17191c;
+    --owner-system-muted:#65717b;
+    --owner-system-bg:#f3f4f5;
+    --owner-system-panel:#ffffff;
+    --owner-system-soft:#f8f9fa;
+    --owner-system-line:#d8dde2;
+  }
+
+  body:has(#view-owner:not(.hidden)),
+  #view-owner,
+  #view-owner .ownerAppWorkspace,
+  #view-owner .ownerAppPage {
+    background:var(--owner-system-bg)!important;
+    color:var(--owner-system-ink)!important;
+  }
+
+  /* Desktop sidebar */
+  #view-owner .ownerAppSidebar {
+    background:#fff!important;
+    border-color:#d5d9dd!important;
+    box-shadow:6px 0 22px rgba(0,0,0,.04)!important;
+  }
+  #view-owner .ownerAppBrand {border-color:#e1e4e7!important}
+  #view-owner .ownerAppBrand b {color:#111!important}
+  #view-owner .ownerAppBrand small {color:#6d7379!important}
+  #view-owner .ownerAppSidebar nav button,
+  #view-owner .ownerAppSidebar nav a,
+  #view-owner .ownerAppSidebarUtility a,
+  #view-owner .ownerAppSidebarUtility button {
+    color:#25282b!important;
+  }
+  #view-owner .ownerAppSidebar nav button:hover,
+  #view-owner .ownerAppSidebar nav a:hover {
+    background:#f3f4f5!important;
+    color:#111!important;
+  }
+  #view-owner .ownerAppSidebar nav button.active,
+  #view-owner .ownerAppSidebar nav a.active {
+    background:#fff0f1!important;
+    border-color:var(--owner-system-red)!important;
+    color:var(--owner-system-red)!important;
+  }
+  #view-owner .ownerAppSidebarUtility {border-color:#e0e3e6!important}
+  #view-owner .ownerVisionLauncher {
+    background:#fff6f6!important;
+    border-color:#efc8ca!important;
+    color:#111!important;
+  }
+  #view-owner .ownerVisionLauncher b {color:#111!important}
+  #view-owner .ownerVisionLauncher small {color:#6b737b!important}
+  #view-owner .ownerVisionLauncher em {color:var(--owner-system-red)!important}
+
+  /* Page headings */
+  #view-owner .ownerAppPageHeader {border-color:#d9dde1!important}
+  #view-owner .ownerAppPageHeader>span {color:var(--owner-system-red)!important}
+  #view-owner .ownerAppPageHeader h1 {color:#111!important}
+  #view-owner .ownerAppPageHeader p {color:#66717b!important}
+  #view-owner .ownerAppGroup>h2 {color:#17191c!important}
+  #view-owner .ownerAppGroup>h2 span {
+    background:#f0f1f2!important;
+    color:#626b73!important;
+  }
+
+  /* Owner Quick Find */
+  #view-owner .ownerGlobalSearchBar {
+    background:#fff!important;
+    border-color:#d7dce0!important;
+    box-shadow:0 8px 24px rgba(0,0,0,.05)!important;
+  }
+  #view-owner .ownerGlobalSearchTop small {color:var(--owner-system-red)!important}
+  #view-owner .ownerGlobalSearchTop b {color:#111!important}
+  #view-owner .ownerGlobalSearchTop>button {
+    background:#f5f6f7!important;
+    border-color:#d3d8dc!important;
+    color:#16181a!important;
+  }
+  #view-owner .ownerGlobalSearchInputWrap input {
+    background:#fff!important;
+    border-color:#cfd5da!important;
+    color:#111!important;
+  }
+  #view-owner .ownerGlobalSearchInputWrap input::placeholder {color:#7d858d!important}
+  #view-owner .ownerGlobalSearchInputWrap button {
+    background:var(--owner-system-red)!important;
+    border-color:var(--owner-system-red)!important;
+    color:#fff!important;
+  }
+  #view-owner .ownerGlobalSearchResults {
+    background:#fff!important;
+    border-color:#d6dbe0!important;
+    box-shadow:0 18px 45px rgba(0,0,0,.18)!important;
+  }
+  #view-owner .ownerGlobalSearchGroup>span {color:#6c747b!important}
+  #view-owner .ownerGlobalSearchGroup button,
+  #view-owner .ownerGlobalCameraResult {
+    background:#fafafa!important;
+    border-color:#d9dde1!important;
+    color:#111!important;
+  }
+  #view-owner .ownerGlobalSearchGroup b,
+  #view-owner .ownerGlobalCameraResult b {color:#111!important}
+  #view-owner .ownerGlobalSearchGroup small,
+  #view-owner .ownerGlobalCameraResult small {color:#66717b!important}
+  #view-owner .ownerGlobalCameraResult {
+    background:#fff5f5!important;
+    border-color:#e5bfc1!important;
+  }
+
+  /* Dashboard hero, clock and weather */
+  #view-owner .ownerTodayWelcome,
+  #view-owner .ownerTodayClockCard,
+  #view-owner .ownerTodayPanel,
+  #view-owner .ownerWeatherNow,
+  #view-owner .ownerWeatherWeek,
+  #view-owner .ownerWeatherLoading,
+  #view-owner .ownerWeatherError {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    box-shadow:0 8px 24px rgba(0,0,0,.05)!important;
+  }
+  #view-owner .ownerTodayWelcome *,
+  #view-owner .ownerTodayClockCard *,
+  #view-owner .ownerTodayPanel *,
+  #view-owner .ownerTodayWeatherHost * {
+    color:#17191c!important;
+  }
+  #view-owner .ownerTodayWelcome>span,
+  #view-owner .ownerTodayPanel>header span {
+    color:var(--owner-system-red)!important;
+  }
+  #view-owner .ownerTodayWelcome h1,
+  #view-owner .ownerTodayClock,
+  #view-owner .ownerTodayPanel>header h2,
+  #view-owner .ownerWeatherCurrent>div>b,
+  #view-owner .ownerWeatherCurrent>div>strong,
+  #view-owner .ownerWeatherToday>b,
+  #view-owner .ownerWeatherDay>b {
+    color:#111!important;
+    text-shadow:none!important;
+  }
+  #view-owner .ownerTodayWelcome p,
+  #view-owner .ownerTodayClockCard>span,
+  #view-owner .ownerWeatherCurrent>span,
+  #view-owner .ownerWeatherToday>span,
+  #view-owner .ownerWeatherCurrent>small,
+  #view-owner .ownerWeatherToday>small,
+  #view-owner .ownerWeatherDay>span,
+  #view-owner .ownerWeatherDay>small {
+    color:#69737c!important;
+  }
+  #view-owner .ownerWeatherIcon {
+    background:#f0f2f3!important;
+    color:#111!important;
+  }
+  #view-owner .ownerWeatherToday {border-color:#e0e3e6!important}
+  #view-owner .ownerWeatherDay {
+    background:#fff!important;
+    border-color:#e0e3e6!important;
+  }
+  #view-owner .ownerWeatherDay>em {color:#1269a8!important}
+  #view-owner .ownerTodayPanel>header button {
+    background:#f3f4f5!important;
+    border-color:#cfd5da!important;
+    color:#111!important;
+  }
+  #view-owner .ownerTodayReadyCard,
+  #view-owner .ownerTodayMiniStats>div {
+    background:#fafafa!important;
+    border-color:#d8dde2!important;
+  }
+  #view-owner .ownerTodayReadyCard>div:first-child b,
+  #view-owner .ownerTodayMiniStats b {color:#111!important}
+  #view-owner .ownerTodayReadyCard.ready>div:first-child span {color:#137c2d!important}
+  #view-owner .ownerTodayReadyCard.notReady>div:first-child span {color:#b51e16!important}
+  #view-owner .ownerTodayReadyChecks i.good {
+    background:#e8f7ec!important;
+    border-color:#46a65d!important;
+    color:#15652a!important;
+  }
+  #view-owner .ownerTodayReadyChecks i.bad {
+    background:#fff0ef!important;
+    border-color:#e05d56!important;
+    color:#a91c15!important;
+  }
+
+  /* General Owner cards and rows */
+  #view-owner .ownerAppEmpty,
+  #view-owner .ownerAppJobRow,
+  #view-owner .ownerAppUnitRow,
+  #view-owner .ownerAppHandoffRow,
+  #view-owner .ownerAppTeamRow,
+  #view-owner .ownerAppAccountCreate,
+  #view-owner .ownerTodaySummary>div,
+  #view-owner .ownerPageStats span {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerAppEmpty b,
+  #view-owner .ownerAppJobRow b,
+  #view-owner .ownerAppUnitRow b,
+  #view-owner .ownerAppHandoffRow b,
+  #view-owner .ownerAppTeamRow b,
+  #view-owner .ownerTodaySummary b,
+  #view-owner .ownerPageStats b {color:#111!important}
+  #view-owner .ownerAppEmpty span,
+  #view-owner .ownerAppJobRow span,
+  #view-owner .ownerAppUnitRow span,
+  #view-owner .ownerAppHandoffRow span,
+  #view-owner .ownerAppTeamRow span,
+  #view-owner .ownerTodaySummary span,
+  #view-owner .ownerPageStats span {color:#68727a!important}
+  #view-owner .ownerAppTeamRow:hover {background:#f7f8f9!important}
+  #view-owner .ownerAppSearch input,
+  #view-owner .ownerAppHistoryControls input,
+  #view-owner .ownerAppHistoryControls select,
+  #view-owner .ownerAppAccountCreate input,
+  #view-owner .ownerAppAccountCreate select {
+    background:#fff!important;
+    border-color:#ccd2d7!important;
+    color:#111!important;
+  }
+  #view-owner .ownerAppActivityRow {border-color:#dde1e4!important}
+  #view-owner .ownerAppActivityRow b {color:#111!important}
+  #view-owner .ownerAppActivityRow span,
+  #view-owner .ownerAppActivityRow p {color:#68727a!important}
+
+  /* Team / command cards */
+  #view-owner .ownerCmdTechCard,
+  #view-owner .ownerCmdITCard,
+  #view-owner .ownerCmdSummary,
+  #view-owner .ownerCmdBoardMeta,
+  #view-owner .ownerCmdITSection {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerCmdTechCard * ,
+  #view-owner .ownerCmdITCard * {
+    color:#17191c!important;
+  }
+  #view-owner .ownerCmdTechCard small,
+  #view-owner .ownerCmdTechCard span,
+  #view-owner .ownerCmdITCard small,
+  #view-owner .ownerCmdITCard span {color:#69737c!important}
+  #view-owner .ownerCmdTechHead>strong.ready {
+    background:#e7f6eb!important;
+    border-color:#55a769!important;
+    color:#17622b!important;
+  }
+  #view-owner .ownerCmdTechHead>strong.danger {
+    background:#fff0ef!important;
+    border-color:#e05b54!important;
+    color:#a91f18!important;
+  }
+  #view-owner .ownerCmdReadyRow.good>b,
+  #view-owner .ownerCmdStockRow.good>b {color:#176c2e!important}
+  #view-owner .ownerCmdReadyRow.bad>b,
+  #view-owner .ownerCmdUnitRow.bad>b,
+  #view-owner .ownerCmdStockRow.bad>b,
+  #view-owner .ownerCmdMissingBanner b,
+  #view-owner .ownerCmdRestock b {color:#a91f18!important}
+
+  /* Calendar */
+  #view-owner .ownerCalBoard,
+  #view-owner .ownerCalAgenda,
+  #view-owner .ownerCalInspector,
+  #view-owner .ownerCalDayView,
+  #view-owner .ownerCalControlBar,
+  #view-owner .ownerCalStats>div,
+  #view-owner .ownerCalDay,
+  #view-owner .ownerCalYear button {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerCalBoard *,
+  #view-owner .ownerCalAgenda *,
+  #view-owner .ownerCalInspector *,
+  #view-owner .ownerCalDayView *,
+  #view-owner .ownerCalDay *,
+  #view-owner .ownerCalYear button * {color:#17191c!important}
+  #view-owner .ownerCalBoard span,
+  #view-owner .ownerCalAgenda span,
+  #view-owner .ownerCalInspector span,
+  #view-owner .ownerCalDayView span,
+  #view-owner .ownerCalDay span,
+  #view-owner .ownerCalYear button small {color:#68727a!important}
+  #view-owner .ownerCalDay:hover,
+  #view-owner .ownerCalYear button:hover {background:#f6f7f8!important}
+  #view-owner .ownerCalDay.today,
+  #view-owner .ownerCalDay.selected {
+    background:#fff5f5!important;
+    border-color:var(--owner-system-red)!important;
+  }
+  #view-owner .ownerCalEvent {
+    background:#f6f7f8!important;
+    border-color:#d8dde2!important;
+  }
+
+  /* More page */
+  #view-owner .ownerMoreSummary>div,
+  #view-owner .ownerMoreGrid button,
+  #view-owner .ownerMoreGrid a {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerMoreSummary b,
+  #view-owner .ownerMoreGrid b {color:#111!important}
+  #view-owner .ownerMoreSummary span,
+  #view-owner .ownerMoreGrid span {color:#68727a!important}
+  #view-owner .ownerMoreGrid>button:first-child,
+  #view-owner .ownerMoreGrid>button:nth-child(2) {
+    background:#fff5f5!important;
+    border-color:#e4b7ba!important;
+  }
+  #view-owner .ownerMoreDanger button {
+    background:#fff!important;
+    border-color:#d20b12!important;
+    color:#b70b11!important;
+  }
+
+  /* Test center */
+  #view-owner .ownerTestCreate,
+  #view-owner .ownerTestWarning {
+    background:#fff!important;
+    border-color:#e1c0c2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerTestWarning b {color:#b80f15!important}
+  #view-owner .ownerTestWarning span {color:#68727a!important}
+  #view-owner .ownerTestForm label {color:#4f5961!important}
+  #view-owner .ownerTestForm input,
+  #view-owner .ownerTestForm select {
+    background:#fff!important;
+    border-color:#ccd2d7!important;
+    color:#111!important;
+  }
+
+  /* Mobile bottom navigation — follows iPhone light mode */
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+  }
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="today"],
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="calendar"],
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="assign"],
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="attention"],
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav a[href*="camera-health"],
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav [data-owner-route="more"] {
+    color:#25282b!important;
+    background:transparent!important;
+  }
+  html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav .active {
+    color:var(--owner-system-red)!important;
+    background:#fff0f1!important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: dark; }
+}
