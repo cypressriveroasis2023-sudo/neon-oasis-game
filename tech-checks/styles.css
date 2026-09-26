@@ -9897,3 +9897,49 @@ body #view-owner #ownerAppPage .ownerHomeTeamActivity .ownerHomeHandoffLink{widt
  body #view-owner #ownerAppPage .ownerCmdFlowStep.working>i{background:#17668c!important;color:#fff!important;border-color:#17668c!important}
  body #view-owner #ownerAppPage .ownerCmdFlowStep small{color:#52616b!important}
 }
+
+/* Compact mobile navigation, with matching icons and safe-area spacing. */
+@media(max-width:900px){
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav{height:calc(68px + env(safe-area-inset-bottom))!important;min-height:0!important;box-sizing:border-box!important;padding:5px 6px calc(5px + env(safe-area-inset-bottom))!important;border-radius:16px 16px 0 0!important;box-shadow:0 -3px 14px rgba(0,0,0,.10)!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav{height:58px!important;gap:2px!important;align-items:stretch!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is([data-owner-route="today"],[data-owner-route="calendar"],[data-owner-route="assign"],[data-owner-route="attention"],a[href*="camera-health"],[data-owner-route="more"]){display:flex!important;flex-direction:column!important;gap:4px!important;height:58px!important;min-height:44px!important;padding:5px 1px!important;font-size:9px!important;font-weight:700!important;line-height:1.1!important;letter-spacing:0!important;text-decoration:none!important;border-radius:10px!important;box-shadow:none!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is([data-owner-route="today"],[data-owner-route="calendar"],[data-owner-route="assign"],[data-owner-route="attention"],a[href*="camera-health"],[data-owner-route="more"])::before{content:""!important;display:block!important;flex:0 0 21px!important;width:21px!important;height:21px!important;margin:0!important;border:0!important;border-radius:0!important;background:currentColor!important;mask:var(--owner-nav-icon) center/contain no-repeat!important;-webkit-mask:var(--owner-nav-icon) center/contain no-repeat!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>button.active{background:#263c49!important;color:#fff!important;box-shadow:none!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is([data-owner-route="today"],[data-owner-route="calendar"],[data-owner-route="assign"],[data-owner-route="attention"],a[href*="camera-health"],[data-owner-route="more"]):focus-visible{outline:2px solid #c9141d!important;outline-offset:-2px!important}
+}
+@media(max-width:900px) and (prefers-color-scheme:light){
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav{background:#fff!important;border-color:#d1d9de!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is([data-owner-route="today"],[data-owner-route="calendar"],[data-owner-route="assign"],[data-owner-route="attention"],a[href*="camera-health"],[data-owner-route="more"]){color:#52616b!important;background:transparent!important}
+ body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>button.active{background:#fff0f1!important;color:#b9151d!important}
+}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>[data-owner-route="today"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m3%2010%209-7%209%207v10a1%201%200%200%201-1%201h-5v-7H9v7H4a1%201%200%200%201-1-1z%22%2F%3E%3C%2Fsvg%3E")}}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>[data-owner-route="calendar"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%2216%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M16%203v4M8%203v4M3%2011h18%22%2F%3E%3C%2Fsvg%3E")}}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>[data-owner-route="assign"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%225%22%2F%3E%3Cpath%20d%3D%22M12%207v10M7%2012h10%22%2F%3E%3C%2Fsvg%3E")}}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>[data-owner-route="attention"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%203%2010%2018H2zM12%209v5M12%2017v1%22%2F%3E%3C%2Fsvg%3E")}}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>a[href*="camera-health"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2215%22%20height%3D%2213%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22m17%2010%205-3v11l-5-3%22%2F%3E%3C%2Fsvg%3E")}}
+@media(max-width:900px){body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>[data-owner-route="more"]{--owner-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%225%22%20cy%3D%2212%22%20r%3D%221%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221%22%2F%3E%3Ccircle%20cx%3D%2219%22%20cy%3D%2212%22%20r%3D%221%22%2F%3E%3C%2Fsvg%3E")}}
+
+/* The control overlay is attached to body, outside #view-owner. */
+@media(prefers-color-scheme:light){
+ body #ownerSimpleControlOverlay{background:rgba(20,30,38,.38)!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlPanel,
+ body #ownerSimpleControlOverlay .ownerSimpleControlPanel>header{background:#fff!important;color:#171b1f!important;border-color:#ccd6dc!important}
+ body #ownerSimpleControlOverlay h2,
+ body #ownerSimpleControlOverlay b{color:#171b1f!important}
+ body #ownerSimpleControlOverlay p,
+ body #ownerSimpleControlOverlay span{color:#52616b!important}
+ body #ownerSimpleControlOverlay header small{color:#b9151d!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlStatus>div,
+ body #ownerSimpleControlOverlay .ownerTechControlJobs>button,
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>button,
+ body #ownerSimpleControlOverlay .ownerSimpleControlFooter>button,
+ body #ownerSimpleControlOverlay header>button{background:#f4f6f7!important;color:#171b1f!important;border-color:#c3cdd4!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>.primary{background:#b9151d!important;border-color:#b9151d!important;color:#fff!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>.primary b,
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>.primary span{color:#fff!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>.warnAction{background:#fff6df!important;border-color:#c5a04c!important}
+ body #ownerSimpleControlOverlay .ownerSimpleControlGrid>.closeAction{background:#eaf7ee!important;border-color:#8abc9b!important}
+ body #view-owner #ownerAppPage #ownerGlobalSearchInput{background:#fff!important;color:#171b1f!important;border-color:#9daeb9!important;color-scheme:light!important}
+ body #view-owner #ownerAppPage #ownerGlobalSearchInput::placeholder{color:#52616b!important;opacity:1!important}
+ body #view-owner #ownerAppPage .ownerCmdBoardMeta>button{background:#f4f6f7!important;color:#24323b!important;border-color:#c3cdd4!important}
+}
