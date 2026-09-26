@@ -9339,3 +9339,46 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
   #view-owner .ownerHomeSummary button.alert{background:#fff5f5!important;border-color:#e9b6b9!important;border-left:4px solid #c9151c!important}
   #view-owner .ownerHomeSeeAll{background:#f7f8f9!important;color:#222!important;border:1px solid #d4dbe0!important}
 }
+
+
+/* Owner home visual cleanup v7 */
+.ownerHomeWelcome{background:transparent!important;border:0!important;box-shadow:none!important;padding:12px 6px 8px!important;margin:0!important}
+.ownerHomeWelcome>span{display:block;font-size:12px;font-weight:900;letter-spacing:.16em;color:#c9151c;margin-bottom:7px}
+.ownerHomeWelcome h1{margin:0;font-size:clamp(34px,8vw,54px);line-height:1.02;letter-spacing:-.035em;color:#171a1d}
+.ownerHomeWelcome p{margin:8px 0 0;color:#68747d;font-weight:750;font-size:15px}
+.ownerHomeStatus{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.ownerHomeStatus button{background:#fff!important;color:#171a1d!important;border:1px solid #d7dde2!important;border-radius:17px!important;box-shadow:none!important;min-height:86px!important;padding:15px 12px!important;text-align:left!important}
+.ownerHomeStatus button b{display:block;font-size:30px;line-height:1;margin-bottom:8px;color:#171a1d!important}
+.ownerHomeStatus button span{display:block;font-size:10px;font-weight:900;letter-spacing:.06em;color:#68747d!important}
+.ownerHomeStatus button.alert{border-left:4px solid #c9151c!important;background:#fff!important}
+.ownerHomeNext{background:#fff;border:1px solid #d7dde2;border-radius:20px;padding:19px 20px;margin:14px 0 20px}
+.ownerHomeNext header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.ownerHomeNext header>div>span{display:block;color:#c9151c;font-size:11px;font-weight:900;letter-spacing:.15em;margin-bottom:5px}
+.ownerHomeNext h2{margin:0;font-size:24px;line-height:1.1;color:#171a1d}
+.ownerHomeNext header button{white-space:nowrap;border:1px solid #d7dde2;background:#f7f8f9;color:#26333b;border-radius:12px;padding:10px 12px;font-weight:850}
+.ownerHomeNext p{color:#6c7780;font-weight:700;margin:9px 0 0}
+.ownerHomeNextProgress{display:flex;gap:8px;margin-top:12px}
+.ownerHomeNextProgress span{font-size:11px;font-weight:850;background:#f1f4f6;border-radius:999px;padding:7px 10px;color:#42515b}
+.ownerHomeWeather{margin:12px 0!important}
+.ownerHomeWeather .ownerWeatherNow{border-radius:20px!important;box-shadow:none!important}
+.ownerHomeWeather .ownerWeatherWeek{display:none!important}
+.ownerHomeWeather .ownerWeatherNow{padding:18px!important}
+.ownerHomeWeather .ownerWeatherIcon{width:58px!important;height:58px!important;font-size:34px!important}
+.ownerHomeWeather .ownerWeatherCurrent>span{font-size:10px!important}
+.ownerHomeWeather .ownerWeatherCurrent div b{font-size:38px!important}
+.ownerHomeWeather .ownerWeatherCurrent em{display:none!important}
+.ownerHomeWeather .ownerWeatherToday{padding-left:14px!important}
+@media(max-width:600px){
+  .ownerHomeWelcome{padding:8px 4px 4px!important}
+  .ownerHomeWelcome h1{font-size:39px!important}
+  .ownerHomeWelcome p{font-size:14px!important}
+  .ownerHomeStatus{gap:7px;margin:10px 0}
+  .ownerHomeStatus button{min-height:78px!important;padding:12px 9px!important;border-radius:14px!important}
+  .ownerHomeStatus button b{font-size:28px;margin-bottom:6px}
+  .ownerHomeStatus button span{font-size:9px}
+  .ownerHomeNext{padding:16px;margin-top:10px}
+  .ownerHomeNext h2{font-size:20px}
+  .ownerHomeNext header button{font-size:12px;padding:9px}
+  .ownerHomeWeather .ownerWeatherNow{display:grid!important;grid-template-columns:auto 1fr!important;gap:12px!important}
+  .ownerHomeWeather .ownerWeatherToday{grid-column:1/-1!important;border-left:0!important;border-top:1px solid #e3e7ea!important;padding:10px 0 0!important;margin-top:2px!important;display:flex!important;align-items:center!important;justify-content:space-between!important}
+}
