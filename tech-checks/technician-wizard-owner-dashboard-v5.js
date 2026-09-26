@@ -5976,15 +5976,15 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
   let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
   index=Math.max(0,Math.min(total,index));
-  const header=heliosFieldProgress('HELIOS FIELD INSTALL',unitLabel+' · Complete one step at a time',Math.min(total,index+1),total);
-  const context="<div class='wl-field-context'><b>"+esc(unitLabel)+" · MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Follow each site step in order. Tap YES only after it is physically complete. Tap NO to stop and correct it before continuing.</span></div>"+newUnits+oldBlock;
+  const header="";
+  const context=oldBlock;
 
   if(index<rules.length){
     const rule=rules[index];
     const yes=check?.[rule.key]===true;
     return header+context+
-      "<div class='wl-question wl-helios-field-step'>"+
-        "<div class='qnum'>STEP "+(index+1)+" OF "+total+"</div>"+
+      "<div class='wl-question wl-helios-field-step wl-helios-field-simple'>"+
+        "<div class='qnum'>"+esc(unitLabel)+" · STEP "+(index+1)+" OF "+total+"</div>"+
         "<div class='qtext'>"+esc(rule.label)+"</div>"+
         "<div class='wl-options'><button class='fail' data-wl-helios-field-answer='no' data-field='"+esc(rule.key)+"'>NO</button><button class='pass "+(yes?"on":"")+"' data-wl-helios-field-answer='yes' data-field='"+esc(rule.key)+"'>YES</button></div>"+
         "<div class='wl-helios-field-message'></div>"+
