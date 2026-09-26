@@ -9452,3 +9452,49 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     box-shadow:0 5px 16px rgba(0,0,0,.16)!important;
   }
 }
+
+
+/* Owner dark-mode dashboard correction v10 */
+@media (prefers-color-scheme: dark) {
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome h1{color:#fff!important}
+  #view-owner[data-owner-route="today"] .ownerHomeWelcome p{color:#b8c5ce!important}
+
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button,
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button.alert{
+    background:#10232d!important;
+    color:#f7fafc!important;
+    border:1px solid #31505e!important;
+    box-shadow:none!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button.alert{
+    border-left:4px solid #ef3038!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button b{color:#fff!important}
+  #view-owner[data-owner-route="today"] .ownerHomeStatus button span{color:#aebec8!important}
+
+  #view-owner[data-owner-route="today"] .ownerHomeNext{
+    background:#10232d!important;
+    color:#f7fafc!important;
+    border:1px solid #31505e!important;
+    box-shadow:none!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeNext h2{color:#fff!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNext p{color:#b8c5ce!important}
+  #view-owner[data-owner-route="today"] .ownerHomeNext header button{
+    background:#172d38!important;
+    color:#f5f8fa!important;
+    border-color:#42616f!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeNextProgress span{
+    background:#1b3440!important;
+    color:#dce6eb!important;
+  }
+
+  #view-owner[data-owner-route="today"] .ownerHomeWeather .ownerWeatherNow{
+    background:#10232d!important;
+    border-color:#31505e!important;
+  }
+  #view-owner[data-owner-route="today"] .ownerHomeWeather .ownerWeatherToday{
+    border-top-color:#42616f!important;
+  }
+}
