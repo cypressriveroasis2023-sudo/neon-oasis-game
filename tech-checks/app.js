@@ -111,7 +111,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-logo-live-20260926v')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-header-live-20260926w')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -2717,7 +2717,7 @@ function ownerRenderWeather(){
   const gps=data._gps||{};
   const accuracy=Number(gps.accuracy||0);
   const locationLine=(gps.cached?'LAST GPS LOCATION':'CURRENT GPS LOCATION')+(accuracy?' · ±'+Math.round(accuracy)+' m':'');
-  host.innerHTML='<section class="ownerWeatherNow '+meta.kind+'"><div class="ownerWeatherIcon">'+meta.icon+'</div><div class="ownerWeatherCurrent"><span>LOCAL WEATHER · GPS</span><div><b>'+Math.round(Number(current.temperature_2m||0))+'°</b><strong>'+esc(meta.label)+'</strong></div><small>Feels '+Math.round(Number(current.apparent_temperature||0))+'° · Wind '+Math.round(Number(current.wind_speed_10m||0))+' mph</small><em>'+esc(locationLine)+'</em></div><div class="ownerWeatherToday"><span>TODAY</span><b>'+todayMeta.icon+' '+high+'° / '+low+'°</b><small>'+rain+'% chance of rain</small></div></section>'+ownerWeatherForecastHtml(data);
+  host.innerHTML='<section class="ownerWeatherNow '+meta.kind+'"><div id="ownerWeatherLiveMount" class="ownerWeatherLiveMount" aria-label="Realtime connection status"></div><div class="ownerWeatherIcon">'+meta.icon+'</div><div class="ownerWeatherCurrent"><span>LOCAL WEATHER · GPS</span><div><b>'+Math.round(Number(current.temperature_2m||0))+'°</b><strong>'+esc(meta.label)+'</strong></div><small>Feels '+Math.round(Number(current.apparent_temperature||0))+'° · Wind '+Math.round(Number(current.wind_speed_10m||0))+' mph</small><em>'+esc(locationLine)+'</em></div><div class="ownerWeatherToday"><span>TODAY</span><b>'+todayMeta.icon+' '+high+'° / '+low+'°</b><small>'+rain+'% chance of rain</small></div></section>'+ownerWeatherForecastHtml(data);
   window.techRepositionLiveIndicator?.();
 }
 function ownerTodayGreeting(){
@@ -2792,7 +2792,7 @@ function ownerAppToday(){
   const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
   const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
   const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
-  return '<section class="ownerHomeWelcome"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=1" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
     +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
     +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>'+ownerHomeTeamActivityHtml(jobs,today);
@@ -3193,6 +3193,8 @@ async function ownerAppRender(){
   const host=document.getElementById('ownerRouteView');
   if(!page||!host)return;
   const version=++ownerAppRenderVersion, route=ownerAppRoute;
+  const ownerView=document.getElementById('view-owner');
+  if(ownerView) ownerView.dataset.ownerRoute=route;
   let html='';
   if(route==='today')html=ownerAppToday();
   else if(route==='calendar')html=ownerAppCalendar();
