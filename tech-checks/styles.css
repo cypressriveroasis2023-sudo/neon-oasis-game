@@ -8962,3 +8962,242 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     }
   }
 }
+
+
+/* Owner light visual audit v4 - screenshot-driven cleanup */
+@media (prefers-color-scheme: light) {
+  /* Light mode is intentionally white / soft gray / black / Cameras Onsite red.
+     Status meaning may use restrained green/amber, but large dark color blocks are removed. */
+  #view-owner {
+    --light-bg:#f4f5f6;
+    --light-card:#fff;
+    --light-soft:#f7f8f9;
+    --light-line:#d6dde2;
+    --light-ink:#15181b;
+    --light-muted:#687681;
+    --light-red:#d71920;
+  }
+
+  /* Dashboard KPI tiles from screenshot: remove navy/maroon/green/purple/brown fills. */
+  #view-owner .ownerCommandKpis button,
+  #view-owner .ownerCommandKpis button.alert,
+  #view-owner .ownerCommandKpis button.field,
+  #view-owner .ownerCommandKpis button.intake,
+  #view-owner .ownerCommandKpis button.review,
+  #view-owner .ownerCommandQuickGrid button,
+  #view-owner .ownerCommandQuickGrid a {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border:1px solid var(--light-line)!important;
+    box-shadow:0 3px 10px rgba(15,23,32,.05)!important;
+  }
+  #view-owner .ownerCommandKpis button b,
+  #view-owner .ownerCommandKpis button strong,
+  #view-owner .ownerCommandQuickGrid b,
+  #view-owner .ownerCommandQuickGrid strong {color:var(--light-ink)!important}
+  #view-owner .ownerCommandKpis button span,
+  #view-owner .ownerCommandQuickGrid span {color:var(--light-muted)!important}
+  #view-owner .ownerCommandKpis button.alert {border-left:5px solid var(--light-red)!important}
+  #view-owner .ownerCommandKpis button.field {border-left:5px solid #258a55!important}
+  #view-owner .ownerCommandKpis button.intake {border-left:5px solid #6e5aa7!important}
+  #view-owner .ownerCommandKpis button.review {border-left:5px solid #b27a22!important}
+
+  /* Today's job rows: light readable cards, status conveyed by badges/edge only. */
+  #view-owner .ownerTodayJob,
+  #view-owner .ownerCmdJob,
+  #view-owner .ownerCalAgendaJob,
+  #view-owner .ownerCalDayJob {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerTodayJob *,
+  #view-owner .ownerCmdJob *,
+  #view-owner .ownerCalAgendaJob *,
+  #view-owner .ownerCalDayJob * {color:inherit}
+  #view-owner .ownerTodayJob b,
+  #view-owner .ownerTodayJob strong,
+  #view-owner .ownerCmdJob b,
+  #view-owner .ownerCmdJob strong,
+  #view-owner .ownerCalAgendaJob b,
+  #view-owner .ownerCalAgendaJob strong,
+  #view-owner .ownerCalDayJob b,
+  #view-owner .ownerCalDayJob strong {color:var(--light-ink)!important}
+  #view-owner .ownerTodayJob span,
+  #view-owner .ownerTodayJob small,
+  #view-owner .ownerCmdJob span,
+  #view-owner .ownerCmdJob small,
+  #view-owner .ownerCalAgendaJob span,
+  #view-owner .ownerCalAgendaJob small,
+  #view-owner .ownerCalDayJob span,
+  #view-owner .ownerCalDayJob small {color:var(--light-muted)!important}
+  #view-owner .ownerTodayJob.working,
+  #view-owner .ownerCmdJob.working {border-left:5px solid #258a55!important}
+  #view-owner .ownerTodayJob.complete,
+  #view-owner .ownerCmdJob.complete {border-left:5px solid #59656d!important}
+
+  /* Quick Actions: only Assign Job is a filled primary action. */
+  #view-owner .ownerCommandQuickGrid button,
+  #view-owner .ownerCommandQuickGrid a {
+    min-height:86px!important;
+  }
+  #view-owner .ownerCommandQuickGrid button:first-child,
+  #view-owner .ownerCommandQuickGrid a:first-child {
+    background:var(--light-red)!important;
+    border-color:var(--light-red)!important;
+    color:#fff!important;
+  }
+  #view-owner .ownerCommandQuickGrid button:first-child *,
+  #view-owner .ownerCommandQuickGrid a:first-child * {color:#fff!important}
+
+  /* Service readiness buttons in screenshot. */
+  #view-owner .ownerCmdInventoryEditBtn,
+  #view-owner .ownerTodayPanel>header button,
+  #view-owner .ownerCalControlBar button,
+  #view-owner .ownerCalToolbar button {
+    background:#fff!important;
+    color:#22272b!important;
+    border-color:#cbd3d9!important;
+  }
+
+  /* Calendar: every cell and selected-day panel must actually be light. */
+  #view-owner .ownerCalMonth,
+  #view-owner .ownerCalWeek,
+  #view-owner .ownerCalBoard,
+  #view-owner .ownerCalAgenda,
+  #view-owner .ownerCalInspector,
+  #view-owner .ownerCalDayView,
+  #view-owner .ownerCalControlBar,
+  #view-owner .ownerCalDay,
+  #view-owner .ownerCalDay.muted,
+  #view-owner .ownerCalYear button,
+  #view-owner .ownerCalAgendaHead,
+  #view-owner .ownerCalInspectorHead,
+  #view-owner .ownerCalDayView>header {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerCalDay.muted {background:#f1f3f4!important}
+  #view-owner .ownerCalDay.muted *,
+  #view-owner .ownerCalDay.muted b,
+  #view-owner .ownerCalDay.muted span {color:#929ba2!important}
+  #view-owner .ownerCalDay.today,
+  #view-owner .ownerCalDay.selected {
+    background:#fff3f3!important;
+    box-shadow:inset 0 0 0 2px var(--light-red)!important;
+  }
+  #view-owner .ownerCalWeekdays {
+    background:#f5f6f7!important;
+    color:#5f6b74!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerCalWeekdays * {color:#5f6b74!important}
+  #view-owner .ownerCalEvent,
+  #view-owner .ownerCalEvent.service,
+  #view-owner .ownerCalEvent.waiting,
+  #view-owner .ownerCalEvent.working {
+    background:#f6f7f8!important;
+    color:var(--light-ink)!important;
+    border-color:#cbd3d9!important;
+  }
+  #view-owner .ownerCalEvent.working {border-left:4px solid #258a55!important}
+  #view-owner .ownerCalAgendaJob.selected {background:#fff3f3!important;border-color:var(--light-red)!important}
+
+  /* Selected Day + ticket editor from screenshot. */
+  #view-owner .ownerCalAgendaHead,
+  #view-owner .ownerCalInspectorHead,
+  #view-owner .ownerSimpleControlPanel>header,
+  #view-owner .ownerSimpleControlStatus>div,
+  #view-owner .ownerSimpleControlPanel {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerSimpleControlPanel input,
+  #view-owner .ownerSimpleControlPanel textarea,
+  #view-owner .ownerSimpleControlPanel select {
+    background:#fff!important;
+    color:#111!important;
+    border:1px solid #cbd3d9!important;
+  }
+  #view-owner .ownerSimpleControlPanel textarea {min-height:110px}
+  #view-owner .ownerSimpleControlPanel label,
+  #view-owner .ownerSimpleControlPanel b,
+  #view-owner .ownerSimpleControlPanel strong {color:var(--light-ink)!important}
+
+  /* Search / live surfaces: readable instead of black-on-dark. */
+  #view-owner .ownerGlobalSearchBar,
+  #view-owner .ownerGlobalSearchResults,
+  #view-owner .ownerGlobalSearchGroup button,
+  #view-owner .ownerGlobalCameraResult {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerGlobalSearchTop b,
+  #view-owner .ownerGlobalSearchGroup b,
+  #view-owner .ownerGlobalCameraResult b {color:var(--light-ink)!important}
+  #view-owner .ownerGlobalSearchGroup small,
+  #view-owner .ownerGlobalCameraResult small,
+  #view-owner .ownerGlobalSearchGroup>span {color:var(--light-muted)!important}
+  #view-owner .ownerGlobalSearchInputWrap input {
+    background:#fff!important;
+    color:#111!important;
+    border-color:#c8d0d6!important;
+  }
+
+  /* Owner control secondary fields/buttons: white, with red reserved for action. */
+  #view-owner .ownerSimpleControlGrid button:not(.closeAction):not(.reopenAction),
+  #view-owner .ownerSimpleControlFooter button:not(.closeAction):not(.reopenAction),
+  #view-owner .ownerTechControlJobs button {
+    background:#fff!important;
+    color:#202428!important;
+    border-color:#cbd3d9!important;
+  }
+  #view-owner .ownerSimpleControlGrid .closeAction,
+  #view-owner .ownerSimpleControlGrid .reopenAction,
+  #view-owner .ownerSimpleControlFooter .closeAction,
+  #view-owner .ownerSimpleControlFooter .reopenAction {
+    background:var(--light-red)!important;
+    color:#fff!important;
+    border-color:var(--light-red)!important;
+  }
+
+  /* Make text contrast safe wherever a legacy dark block survived. */
+  #view-owner .ownerTodayPanel,
+  #view-owner .ownerTodayReadyCard,
+  #view-owner .ownerTodayMiniStats>div,
+  #view-owner .ownerCmdTechCard,
+  #view-owner .ownerCmdITCard,
+  #view-owner .ownerCmdSummary>div,
+  #view-owner .ownerCalStats>div {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border-color:var(--light-line)!important;
+  }
+  #view-owner .ownerTodayPanel h1,
+  #view-owner .ownerTodayPanel h2,
+  #view-owner .ownerTodayPanel h3,
+  #view-owner .ownerTodayPanel b,
+  #view-owner .ownerTodayPanel strong,
+  #view-owner .ownerTodayReadyCard b,
+  #view-owner .ownerTodayMiniStats b,
+  #view-owner .ownerCmdTechCard b,
+  #view-owner .ownerCmdITCard b,
+  #view-owner .ownerCmdSummary b,
+  #view-owner .ownerCalStats b {color:var(--light-ink)!important}
+
+  /* Preserve primary red buttons after broad button rules. */
+  #view-owner button.primary,
+  #view-owner .btn,
+  #view-owner .ownerReviewControlButton,
+  #view-owner .ownerGlobalSearchInputWrap button,
+  #view-owner #ownerAppPage button.active,
+  #view-owner #ownerAppPage button.selected,
+  #view-owner #ownerAppPage button[aria-pressed="true"] {
+    background:var(--light-red)!important;
+    color:#fff!important;
+    border-color:var(--light-red)!important;
+  }
+}
