@@ -8710,3 +8710,255 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     }
   }
 }
+
+
+/* Owner light mode full override v3 - 2026-09-26 */
+@media (prefers-color-scheme: light) {
+  html:has(#view-owner:not(.hidden)),
+  body:has(#view-owner:not(.hidden)),
+  #view-owner:not(.hidden),
+  #view-owner .ownerWorkspaceContent,
+  #view-owner .ownerWorkspaceContent.active,
+  #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected,
+  #view-owner .ownerWorkspaceContent.active>.ownerDashSection.ownerWorkspaceSelected>.ownerDashBody,
+  #view-owner .ownerWorkspaceContent .ownerDashBody {
+    background:#f4f5f6!important;
+    color:#17191c!important;
+  }
+  #view-owner {
+    --oa-bg:#f4f5f6;
+    --oa-panel:#fff;
+    --oa-panel2:#f8f9fa;
+    --oa-line:#d7dce0;
+    --oa-text:#17191c;
+    --oa-muted:#68727a;
+    --oa-red:#d71920;
+    --oa-blue:#d71920!important;
+  }
+  #view-owner .ownerWorkspaceRail {
+    background:#fff!important;
+    border-color:#d7dce0!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerWorkspaceRail button {
+    color:#303438!important;
+    background:transparent!important;
+  }
+  #view-owner .ownerWorkspaceRail button:hover {background:#f2f3f4!important}
+  #view-owner .ownerWorkspaceRail button.ownerNavActive {
+    background:#fff1f2!important;
+    color:#c81017!important;
+    border-left-color:#d71920!important;
+  }
+
+  #view-owner .ownerWorkspaceContent .card,
+  #view-owner .ownerWorkspaceContent .item,
+  #view-owner .ownerWorkspaceContent .ownerFold,
+  #view-owner .ownerWorkspaceContent .ok,
+  #view-owner .ownerWorkspaceContent .warn,
+  #view-owner .ownerWorkspaceContent .err,
+  #view-owner .ownerWorkspaceContent .ownerCommandCard,
+  #view-owner .ownerWorkspaceContent details,
+  #view-owner .ownerWorkspaceContent table,
+  #view-owner .ownerWorkspaceContent thead,
+  #view-owner .ownerWorkspaceContent tbody,
+  #view-owner .ownerWorkspaceContent tr,
+  #view-owner .ownerWorkspaceContent td,
+  #view-owner .ownerWorkspaceContent th {
+    background:#fff!important;
+    color:#17191c!important;
+    border-color:#d7dce0!important;
+  }
+  #view-owner .ownerWorkspaceContent .warn,
+  #view-owner .ownerWorkspaceContent .err {border-left-color:#d71920!important}
+  #view-owner .ownerWorkspaceContent .ok {border-left-color:#239348!important}
+
+  #view-owner .ownerWorkspaceContent label,
+  #view-owner .ownerWorkspaceContent h1,
+  #view-owner .ownerWorkspaceContent h2,
+  #view-owner .ownerWorkspaceContent h3,
+  #view-owner .ownerWorkspaceContent h4,
+  #view-owner .ownerWorkspaceContent b,
+  #view-owner .ownerWorkspaceContent strong {
+    color:#17191c!important;
+  }
+  #view-owner .ownerWorkspaceContent .small,
+  #view-owner .ownerWorkspaceContent small,
+  #view-owner .ownerWorkspaceContent p {color:#68727a!important}
+
+  #view-owner .ownerWorkspaceContent button:not(.danger):not(.primary),
+  #view-owner .ownerWorkspaceContent .btn:not(.danger) {
+    background:#fff!important;
+    color:#202326!important;
+    border-color:#cfd5da!important;
+    box-shadow:none!important;
+  }
+  #view-owner .ownerWorkspaceContent button:hover {
+    background:#f3f4f5!important;
+    color:#111!important;
+    filter:none!important;
+  }
+  #view-owner .ownerWorkspaceContent input,
+  #view-owner .ownerWorkspaceContent textarea,
+  #view-owner .ownerWorkspaceContent select {
+    background:#fff!important;
+    color:#111!important;
+    border-color:#c9d0d6!important;
+  }
+
+  /* Assign Job: reverse the old dark-theme completion rules. */
+  #view-owner #ownerJobAssignments,
+  #view-owner #ownerAppPage {color:#17191c!important}
+  #view-owner #ownerJobAssignments .ok,
+  #view-owner #ownerJobAssignments .warn,
+  #view-owner #ownerJobAssignments .item,
+  #view-owner #ownerJobAssignments .owner-simple-step,
+  #view-owner #ownerJobAssignments .ownerWorkflowFirst,
+  #view-owner #ownerJobAssignments .wl-equipment-number-block,
+  #view-owner #ownerJobAssignments .wl-unit-area,
+  #view-owner #ownerJobAssignments .wl-stand-area,
+  #view-owner #ownerJobAssignments [class*="equipment"],
+  #view-owner #ownerJobAssignments [class*="Equipment"],
+  #view-owner #ownerJobAssignments [class*="parts"],
+  #view-owner #ownerJobAssignments [class*="Parts"],
+  #view-owner #ownerJobAssignments [class*="area"],
+  #view-owner #ownerJobAssignments [class*="Area"],
+  #view-owner #ownerJobAssignments [class*="unit"],
+  #view-owner #ownerJobAssignments [class*="Unit"],
+  #view-owner #ownerJobAssignments [class*="stand"],
+  #view-owner #ownerJobAssignments [class*="Stand"],
+  #view-owner #ownerJobAssignments table,
+  #view-owner #ownerJobAssignments tbody,
+  #view-owner #ownerJobAssignments tr,
+  #view-owner #ownerJobAssignments td,
+  #view-owner #ownerJobAssignments th {
+    background:#fff!important;
+    color:#17191c!important;
+    border-color:#d7dce0!important;
+  }
+  #view-owner #ownerJobAssignments label,
+  #view-owner #ownerJobAssignments legend,
+  #view-owner #ownerJobAssignments h1,
+  #view-owner #ownerJobAssignments h2,
+  #view-owner #ownerJobAssignments h3,
+  #view-owner #ownerJobAssignments h4,
+  #view-owner #ownerJobAssignments strong,
+  #view-owner #ownerJobAssignments b {color:#17191c!important}
+  #view-owner #ownerJobAssignments p,
+  #view-owner #ownerJobAssignments small,
+  #view-owner #ownerJobAssignments .small,
+  #view-owner #ownerJobAssignments .muted,
+  #view-owner #ownerJobAssignments .help,
+  #view-owner #ownerJobAssignments [class*="hint"],
+  #view-owner #ownerJobAssignments [class*="Hint"] {color:#68727a!important}
+  #view-owner #ownerJobAssignments input,
+  #view-owner #ownerJobAssignments textarea,
+  #view-owner #ownerJobAssignments select {
+    background:#fff!important;
+    color:#111!important;
+    border-color:#c9d0d6!important;
+  }
+  #view-owner #ownerJobAssignments input::placeholder,
+  #view-owner #ownerJobAssignments textarea::placeholder {color:#7b858d!important}
+  #view-owner #ownerJobAssignments button:not(.danger):not(.btn):not(.active):not(.selected):not([aria-pressed="true"]),
+  #view-owner #ownerJobAssignments [role="button"] {
+    background:#fff!important;
+    color:#202326!important;
+    border-color:#cfd5da!important;
+  }
+  #view-owner #ownerJobAssignments .ownerPartsChips span,
+  #view-owner #ownerJobAssignments .wl-parts-chips span,
+  #view-owner #ownerJobAssignments .wl-tech-pill {
+    background:#f2f3f4!important;
+    color:#34383c!important;
+    border-color:#d2d7dc!important;
+  }
+  #view-owner #ownerJobAssignments .ownerReviewStep,
+  #view-owner #ownerJobAssignments .ownerReviewStep * {color:#17191c!important}
+  #view-owner #ownerJobAssignments .ownerReviewStep.pending,
+  #view-owner #ownerJobAssignments .ownerReviewStep.missing {
+    background:#fff7f7!important;
+    border-color:#e4b6b9!important;
+  }
+
+  /* Dynamic Owner pages that were explicitly dark. */
+  #view-owner #ownerAppPage .ownerAppAccountCreate,
+  #view-owner #ownerAppPage .ownerAppAccountRow,
+  #view-owner #ownerAppPage .ownerAppJobRow,
+  #view-owner #ownerAppPage .ownerAppUnitRow,
+  #view-owner #ownerAppPage .ownerAppHandoffRow,
+  #view-owner #ownerAppPage .ownerAppTeamRow,
+  #view-owner #ownerAppPage .ownerCompanyHistoryEvent,
+  #view-owner #ownerAppPage .ownerReviewRow,
+  #view-owner #ownerAppPage .ownerReviewStep,
+  #view-owner #ownerPersistentAccounts .usercard,
+  #view-owner #ownerPersistentAccounts .teamMemberCard,
+  #view-owner #ownerPersistentAccounts .teamMemberBody,
+  #view-owner #ownerPersistentAccounts .accountSecurityFold,
+  #view-owner #ownerPersistentAccounts .teamEmailBox,
+  #view-owner #ownerPersistentAccounts .accountSecurityBody {
+    background:#fff!important;
+    color:#17191c!important;
+    border-color:#d7dce0!important;
+  }
+  #view-owner #ownerAppPage .ownerReviewStep.complete {background:#f1faf3!important}
+  #view-owner #ownerAppPage .ownerReviewStep.pending {background:#fff9ec!important}
+  #view-owner #ownerAppPage .ownerReviewStep.missing,
+  #view-owner #ownerAppPage .ownerReviewRow.correction {background:#fff3f3!important}
+  #view-owner #ownerAppPage .ownerCompanyHistoryHead {background:#f6f7f8!important;color:#17191c!important;border-color:#d7dce0!important}
+
+  /* Test Center / More / simple controls */
+  #view-owner .ownerTestWorkflowRow,
+  #view-owner .ownerTestCleanup,
+  #view-owner .ownerSimpleControlPanel,
+  #view-owner .ownerSimpleControlStatus>div,
+  #view-owner .ownerTechControlJobs button {
+    background:#fff!important;
+    color:#17191c!important;
+    border-color:#d7dce0!important;
+  }
+  #view-owner .ownerTestWorkflowRow>header b {color:#17191c!important}
+  #view-owner .ownerTestWorkflowRow>header span,
+  #view-owner .ownerTestWorkflowRow p,
+  #view-owner .ownerTestCleanup span {color:#68727a!important}
+  #view-owner .ownerTestWorkflowActions button,
+  #view-owner .ownerTestBannerActions button,
+  #view-owner .ownerSimpleControlGrid button,
+  #view-owner .ownerSimpleControlFooter button {
+    background:#fff!important;
+    color:#202326!important;
+    border-color:#cfd5da!important;
+  }
+
+  /* Keep intentional red actions/statuses red. */
+  #view-owner #ownerAppPage .btn,
+  #view-owner #ownerAppPage button.primary,
+  #view-owner #ownerAppPage button.active,
+  #view-owner #ownerAppPage button.selected,
+  #view-owner #ownerAppPage button[aria-pressed="true"],
+  #view-owner #ownerJobAssignments button[aria-pressed="true"],
+  #view-owner #ownerJobAssignments button.selected,
+  #view-owner #ownerJobAssignments .selected button,
+  #view-owner #ownerJobAssignments .active button,
+  #view-owner .ownerTestWorkflowActions button.primary,
+  #view-owner .ownerTestCreateButton {
+    background:#d71920!important;
+    border-color:#d71920!important;
+    color:#fff!important;
+  }
+
+  /* Mobile shell: no charcoal/navy left behind. */
+  @media(max-width:900px) {
+    body:has(#view-owner:not(.hidden)),
+    #view-owner:not(.hidden),
+    #view-owner .ownerWorkspaceMain,
+    #view-owner .ownerWorkspaceContent,
+    #view-owner .ownerWorkspaceContent.active {background:#f4f5f6!important}
+    #view-owner .ownerAppSidebar,
+    #view-owner .ownerWorkspaceRail,
+    #view-owner .ownerAppSidebar nav {
+      background:#fff!important;
+      border-color:#d7dce0!important;
+    }
+  }
+}
