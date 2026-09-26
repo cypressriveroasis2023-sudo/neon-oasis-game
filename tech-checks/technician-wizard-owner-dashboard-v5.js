@@ -50,104 +50,15 @@ let activeSvcPrep = null;
 let activeSvcAssignment = null;
 let svcUnitIndex = 0;
 let svcQuestionIndex = 0;
-let serviceQuestionAdvancing = false;
 let svcSolarCursor = null;
 let svcHeliosFieldCursor = null;
 let heliosFieldAnswerSubmitting = false;
 let inspection = { step: 0, truck: Array(8).fill(null), takingTrailer: null, trailer: Array(7).fill(null) };
 let inspectionRecovered = false;
-let inspectionSubmitting = false;
-let serviceTruckInventorySubmitting = false;
-let serviceTruckUsageSubmitting = false;
 let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:false, photo: null, tagScan: null, conditionPhotos: [], damagePhotos: [], knownUnits: [], submissionId:null, pendingUploadPaths:[] };
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
 let serviceCloseSubmitting = false;
-const svcSolarPendingFilesByKey = new Map();
-
-function svcSolarPendingKey(panel) {
-  const prepId=String(activeSvcPrep?.id||'');
-  const category=String(panel?.dataset?.solarCategory||'');
-  return prepId&&category ? prepId+'|'+category : '';
-}
-function svcSolarPendingFiles(panel) {
-  const key=svcSolarPendingKey(panel);
-  return key ? (svcSolarPendingFilesByKey.get(key)||[]) : [];
-}
-function renderSvcSolarPendingFiles(panel,files) {
-  if(!panel)return;
-  files=Array.isArray(files)?files:[];
-  const multi=panel.dataset.wlSolarMulti==='1';
-  const selected=panel.querySelector('[data-wl-solar-selected]');
-  const preview=panel.querySelector('[data-wl-solar-preview]');
-  const save=panel.querySelector('[data-wl-solar-upload]');
-  const clear=panel.querySelector('[data-wl-solar-clear-photos]');
-  for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
-  panel._wlSolarObjectUrls=[];
-  if(!files.length){
-    if(selected)selected.textContent='No photo selected yet.';
-    if(preview){preview.innerHTML='';preview.classList.add('hidden');}
-    if(save){save.disabled=true;save.textContent=multi?'SAVE PHOTOS →':'SAVE PHOTO →';}
-    clear?.classList.add('hidden');
-    return;
-  }
-  if(selected)selected.textContent=files.length===1?'✓ 1 photo selected':'✓ '+files.length+' photos selected';
-  if(preview){
-    const shown=files.slice(0,4);
-    const urls=shown.map(file=>URL.createObjectURL(file));
-    panel._wlSolarObjectUrls=urls;
-    preview.classList.remove('hidden');
-    preview.innerHTML="<div class='wl-solar-preview-grid'>"+urls.map((url,i)=>"<img src='"+url+"' alt='Selected photo "+(i+1)+"'>").join('')+"</div><div><b>READY TO SAVE</b><span>"+esc(files.length===1?(files[0].name||'Photo ready'):(files.length+' photos selected'))+"</span></div>";
-  }
-  if(save){save.disabled=false;save.textContent=files.length>1?'SAVE '+files.length+' PHOTOS →':'SAVE PHOTO →';}
-  clear?.classList.remove('hidden');
-}
-function handleSvcSolarFileChange(input) {
-  const panel=input?.closest?.('.wl-solar-proof');
-  if(!panel)return;
-  const key=svcSolarPendingKey(panel);
-  if(!key)return;
-  const multi=panel.dataset.wlSolarMulti==='1';
-  const incoming=[...(input.files||[])];
-  if(!incoming.length)return;
-  let files;
-  if(!multi){
-    files=incoming.slice(0,1);
-  }else{
-    files=[...svcSolarPendingFiles(panel)];
-    for(const file of incoming){
-      const fingerprint=[file.name,file.size,file.lastModified].join('|');
-      if(!files.some(existingFile=>[existingFile.name,existingFile.size,existingFile.lastModified].join('|')===fingerprint))files.push(file);
-    }
-  }
-  svcSolarPendingFilesByKey.set(key,files);
-  try{input.value='';}catch{}
-  renderSvcSolarPendingFiles(panel,files);
-
-  // If realtime refreshed the wizard while iOS Camera/Photos was open, this
-  // input may now be detached. The direct listener still owns the selected
-  // File objects, so repaint the live wizard from the durable pending map.
-  if(!panel.isConnected){
-    Promise.resolve(renderSvcPrep()).catch(error=>console.warn('Could not restore selected Service photo after picker return',error));
-  }
-}
-function wireSvcSolarPhotoInputs(root=document) {
-  const inputs=[...(root?.querySelectorAll?.('.wl-solar-file')||[])];
-  for(const input of inputs){
-    if(input.dataset.wlSolarDirectBound!=='1'){
-      input.dataset.wlSolarDirectBound='1';
-      input.addEventListener('change',event=>{
-        event.stopPropagation();
-        handleSvcSolarFileChange(input);
-      });
-    }
-  }
-  const panels=new Set(inputs.map(input=>input.closest('.wl-solar-proof')).filter(Boolean));
-  for(const panel of panels){
-    const pending=svcSolarPendingFiles(panel);
-    if(pending.length)renderSvcSolarPendingFiles(panel,pending);
-  }
-}
 const FIELD_DRAFT_TTL = 24 * 60 * 60 * 1000;
 async function deviceDraftKey(kind) { const tech=await currentTechIdentity().catch(()=>null); return tech?.id ? `cos-tech-field-draft-v1:${tech.id}:${kind}` : ''; }
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
@@ -216,7 +127,7 @@ function injectStyles() {
     .wl-head{border:1px solid #d8dde2;background:#fff;border-radius:12px;padding:14px;margin-bottom:14px}.wl-head .kicker{font-size:11px;font-weight:950;text-transform:uppercase;color:#d20b12;letter-spacing:.4px}.wl-head h2{margin:4px 0!important;font-size:23px}.wl-progress{height:7px;background:#e1e4e7;border-radius:999px;overflow:hidden;margin-top:9px}.wl-progress span{display:block;height:100%;background:#d20b12}
     .wl-nav{display:grid;grid-template-columns:1fr 1.7fr;gap:9px;margin-top:14px}.wl-nav button{min-height:54px;border:0;border-radius:13px;font-size:16px;font-weight:950}.wl-prev{background:#fff;color:#3d4349;border:1px solid #d8dde2!important}.wl-next{background:#d20b12;color:#fff}.wl-finish{background:#20ad59!important;color:#fff!important}
     .wl-ticket{border:2px solid #dce4ea;border-radius:15px;padding:14px;margin-bottom:10px;background:#fff}.wl-ticket b{font-size:18px}.wl-ticket button{margin-top:10px}.wl-question{border:1px solid #d8dde2;background:#fff;border-radius:12px;padding:17px}.wl-question .qnum{font-size:12px;font-weight:950;color:#d20b12;text-transform:uppercase}.wl-question .qtext{font-size:21px;font-weight:900;margin:9px 0 15px}.wl-options{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wl-options button{min-height:66px;border:2px solid #d4dce3;border-radius:14px;background:#fff;font-size:18px;font-weight:950}.wl-options .pass.on{background:#e8f7ef;border-color:#52a777;color:#17653f}.wl-options .fail.on{background:#ffebe9;border-color:#dc6c63;color:#a5231b}
-    .wl-proof{border:1px solid #d8dde2;background:#f8f9fa;border-radius:12px;padding:13px;margin-top:12px}.wl-proof.service{border-color:#b8ddc9;background:#f7fcf9}.wl-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}.wl-gallery img{width:100%;height:120px;object-fit:cover;border-radius:9px;background:#fff;border:1px solid #d9e2e8}.wl-photo-preview{margin-top:10px}.wl-photo-preview:empty{display:none}.wl-photo-preview .wl-solar-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.wl-photo-preview .wl-solar-preview-grid img{display:block;width:100%;height:120px;object-fit:cover;border-radius:9px;background:#fff;border:1px solid #d9e2e8}.wl-sign canvas{width:100%;height:135px;border:2px dashed #a9b9c6;border-radius:10px;background:#fff;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.wl-saved{background:#eaf8f0;border:1px solid #a8d5bb;border-radius:10px;padding:9px;margin-top:8px}.wl-saved img{width:100%;max-height:100px;object-fit:contain;background:#fff;border-radius:8px;margin-top:5px}.wl-note{font-size:12px;color:#62717d}.wl-review{border:2px solid #a7d3b8;background:#effaf3;border-radius:13px;padding:12px;margin:10px 0}.wl-stop{background:#ffebe9;border:2px solid #eeaaa3;border-radius:13px;padding:12px;color:#9e2119;margin-top:12px}.wl-stop a{display:block;background:#b82418;color:#fff!important;text-decoration:none;text-align:center;padding:13px;border-radius:10px;font-weight:950;margin-top:8px}.wl-history details{border:2px solid #dce3e8;border-radius:12px;margin:8px 0;overflow:hidden}.wl-history summary{padding:13px;background:#f0f3f6;font-weight:950}.wl-history .body{padding:11px}.wl-status-pending{border-color:#e25a52!important}.wl-status-pending summary{background:#ffe7e5!important;color:#9f2119}.wl-status-waiting{border-color:#dfa94b!important}.wl-status-waiting summary{background:#fff1c9!important;color:#7c5200}.wl-status-complete{border-color:#43aa69!important}.wl-status-complete summary{background:#dff6e7!important;color:#126536}
+    .wl-proof{border:1px solid #d8dde2;background:#f8f9fa;border-radius:12px;padding:13px;margin-top:12px}.wl-proof.service{border-color:#b8ddc9;background:#f7fcf9}.wl-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}.wl-gallery img{width:100%;height:120px;object-fit:cover;border-radius:9px;background:#fff;border:1px solid #d9e2e8}.wl-sign canvas{width:100%;height:135px;border:2px dashed #a9b9c6;border-radius:10px;background:#fff;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.wl-saved{background:#eaf8f0;border:1px solid #a8d5bb;border-radius:10px;padding:9px;margin-top:8px}.wl-saved img{width:100%;max-height:100px;object-fit:contain;background:#fff;border-radius:8px;margin-top:5px}.wl-note{font-size:12px;color:#62717d}.wl-review{border:2px solid #a7d3b8;background:#effaf3;border-radius:13px;padding:12px;margin:10px 0}.wl-stop{background:#ffebe9;border:2px solid #eeaaa3;border-radius:13px;padding:12px;color:#9e2119;margin-top:12px}.wl-stop a{display:block;background:#b82418;color:#fff!important;text-decoration:none;text-align:center;padding:13px;border-radius:10px;font-weight:950;margin-top:8px}.wl-history details{border:2px solid #dce3e8;border-radius:12px;margin:8px 0;overflow:hidden}.wl-history summary{padding:13px;background:#f0f3f6;font-weight:950}.wl-history .body{padding:11px}.wl-status-pending{border-color:#e25a52!important}.wl-status-pending summary{background:#ffe7e5!important;color:#9f2119}.wl-status-waiting{border-color:#dfa94b!important}.wl-status-waiting summary{background:#fff1c9!important;color:#7c5200}.wl-status-complete{border-color:#43aa69!important}.wl-status-complete summary{background:#dff6e7!important;color:#126536}
     .wl-home .wl-title{color:#111417!important}.wl-home .wl-sub{color:#666b70!important}
     .wl-menu button,.wl-big{border-radius:12px!important;box-shadow:0 4px 14px rgba(0,0,0,.08)!important}
     .wl-blue{background:linear-gradient(180deg,#e5141b,#c90910)!important;color:#fff!important;border:1px solid #b6080e!important}.wl-red{background:linear-gradient(180deg,#e5141b,#c90910)!important;color:#fff!important}.wl-gray{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important}.wl-amber{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important;border-left:4px solid #7b8b9b!important}.wl-green{background:#fff!important;color:#172231!important;border:1px solid #dbe3ea!important;border-left:4px solid #2a7bc7!important}
@@ -2510,9 +2421,7 @@ async function startAssignedJob(id,{serviceTicketVerified=false}={}) {
   if (!gate.ready) return alert(gate.label + '\n\n' + gate.detail);
 
   if (assignment.assigned_role==='service' && !serviceTicketVerified) {
-    const tech=await currentTechIdentity().catch(()=>null);
-    const alreadyMine=assignment.status==='started'&&tech?.id&&assignment.assignee_user_id===tech.id;
-    if(!alreadyMine)return showServiceJobLookup();
+    return showServiceJobLookup();
   }
 
   if (!assignment.assignee_user_id && assignment.assignment_scope === 'department') {
@@ -2883,7 +2792,8 @@ function serviceNextActionHtml(state){
     if(a)return `<div class='wl-day-next-card urgent'><span>CONTINUE WHERE YOU STOPPED</span><b>${esc(state.recovery.title)}</b><small>${esc(state.recovery.step||'Continue this field job.')}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>RESUME JOB</button></div>`;
   }
   if(state.nextReady){
-    return `<div class='wl-day-next-card'><span>NEXT JOB</span><b>ENTER MHELPDESK TICKET NUMBER</b><small>Open MHelpDesk, enter the ticket assigned to you, and Tech Check will verify the assignment and handoff before showing the job.</small><button class='wl-service-start' data-wl-service-open-job>ENTER TICKET NUMBER</button></div>`;
+    const a=state.nextReady.assignment;
+    return `<div class='wl-day-next-card'><span>NEXT JOB</span><b>MHELPDESK #${esc(a.ticket_no)}</b><small>${esc(a.site||'No site listed')} · ${esc(String(a.work_type||'service').toUpperCase())} · ${esc(techAssignmentScheduleText(a))}</small><button class='wl-service-start' data-wl-service-take-job='${esc(a.id)}'>OPEN NEXT JOB</button></div>`;
   }
   if(state.nextBlocked){
     const a=state.nextBlocked.assignment,gate=state.nextBlocked.gate;
@@ -4492,7 +4402,6 @@ async function showServiceTruckInventoryCheck(){
   }
 }
 async function submitServiceTruckInventoryCheck(){
-  if(serviceTruckInventorySubmitting)return;
   const unitConfirmations={};
   document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
     unitConfirmations[el.dataset.wlTruckUnitConfirm]={unit_tag:el.dataset.unitTag||'',confirmed:Boolean(el.checked)};
@@ -4505,67 +4414,24 @@ async function submitServiceTruckInventoryCheck(){
   const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
   const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
   if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))return alert('Enter the actual battery quantities physically on the truck.');
-  const reconQty=Math.max(0,Math.floor(recon)),agmQty=Math.max(0,Math.floor(agm)),litimeQty=Math.max(0,Math.floor(litime));
-  const attemptStartedAt=Date.now();
-  const submitButton=document.querySelector('[data-wl-submit-truck-inventory]');
-  serviceTruckInventorySubmitting=true;
-  if(submitButton){submitButton.disabled=true;submitButton.textContent='VERIFYING TRUCK…';}
   document.body.classList.add('busy');
-  const finishResult=async data=>{
+  try{
+    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
+      p_unit_confirmations:unitConfirmations,
+      p_sim_confirmations:simConfirmations,
+      p_recon_battery_qty:Math.max(0,Math.floor(recon)),
+      p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
+      p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
+    });
+    if(error)throw error;
     if(data?.inventory_ready){
       rememberTechCompletion('service','', 'TRUCK INVENTORY READY');
       return showSvcHome();
     }
     alert('TRUCK NOT READY TO LEAVE SHOP\n\nMissing items were sent to the IT restock queue. Accept the prepared replacements/restock, then physically recheck the truck.');
     return showServiceTruckInventoryCheck();
-  };
-  try{
-    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
-      p_unit_confirmations:unitConfirmations,
-      p_sim_confirmations:simConfirmations,
-      p_recon_battery_qty:reconQty,
-      p_agm_12v_110ah_qty:agmQty,
-      p_litime_12v_100ah_qty:litimeQty
-    });
-    if(error)throw error;
-    return await finishResult(data);
-  }catch(error){
-    let confirmed=false;
-    try{
-      const {data:rows,error:verifyError}=await liveDb.from('service_truck_inventory_checks')
-        .select('unit_confirmations,sim_confirmations,recon_battery_qty,agm_12v_110ah_qty,litime_12v_100ah_qty,submitted_at')
-        .gte('submitted_at',new Date(attemptStartedAt-60000).toISOString())
-        .order('submitted_at',{ascending:false})
-        .limit(3);
-      const sameUnit=(actual,expected)=>Object.keys(expected||{}).every(key=>
-        String(actual?.[key]?.unit_tag||'')===String(expected?.[key]?.unit_tag||'')
-        && Boolean(actual?.[key]?.confirmed)===Boolean(expected?.[key]?.confirmed)
-      )&&Object.keys(actual||{}).length===Object.keys(expected||{}).length;
-      const sameSim=(actual,expected)=>Object.keys(expected||{}).every(key=>
-        String(actual?.[key]?.sim_number||'')===String(expected?.[key]?.sim_number||'')
-        && Boolean(actual?.[key]?.confirmed)===Boolean(expected?.[key]?.confirmed)
-      )&&Object.keys(actual||{}).length===Object.keys(expected||{}).length;
-      if(!verifyError)confirmed=(rows||[]).some(row=>
-        Number(row?.recon_battery_qty)===reconQty
-        && Number(row?.agm_12v_110ah_qty)===agmQty
-        && Number(row?.litime_12v_100ah_qty)===litimeQty
-        && sameUnit(row?.unit_confirmations,unitConfirmations)
-        && sameSim(row?.sim_confirmations,simConfirmations)
-      );
-    }catch{}
-    if(confirmed){
-      const readiness=await loadMyServiceTruckReadiness().catch(()=>null);
-      if(readiness)return await finishResult(readiness);
-      return alert('The truck inventory check was saved, but Tech Check could not reload readiness. Return to Service Home and refresh before starting a new job.');
-    }
-    return alert(error?.message==='Failed to fetch'
-      ? 'Connection lost. Tech Check could not confirm that this truck inventory check saved. Reconnect and verify the truck again before starting a new job.'
-      : (error?.message||'Could not save the truck inventory check.'));
-  }finally{
-    serviceTruckInventorySubmitting=false;
-    document.body.classList.remove('busy');
-    if(document.contains(submitButton)){submitButton.disabled=false;submitButton.textContent='I PHYSICALLY VERIFIED MY TRUCK →';}
-  }
+  }catch(error){alert(error?.message||'Could not save the truck inventory check.');}
+  finally{document.body.classList.remove('busy');}
 }
 async function acceptServiceTruckRestock(id){
   document.body.classList.add('busy');
@@ -4648,52 +4514,17 @@ async function recordServiceTruckSimUsed(){
   finally{document.body.classList.remove('busy');}
 }
 async function recordServiceTruckStockUsed(){
-  if(serviceTruckUsageSubmitting)return;
   const ticket=document.getElementById('wlTruckUseStockTicket')?.value||'';
   const type=document.getElementById('wlTruckUseStockType')?.value||'';
   const qty=Math.max(1,Math.floor(Number(document.getElementById('wlTruckUseStockQty')?.value||0)));
-  const fieldByType={'Recon Battery':'recon_battery_qty','AGM 12V 110Ah':'agm_12v_110ah_qty','LiTime 12V 100Ah':'litime_12v_100ah_qty'};
-  const field=fieldByType[type];
-  if(!ticket||!field)return alert('Choose the active MHelpDesk job and the truck battery stock you used.');
-  let before;
-  try{
-    const readiness=await loadMyServiceTruckReadiness();
-    before=Number(readiness?.stock?.[field]);
-  }catch(error){
-    return alert(error?.message||'Could not verify current truck stock. Refresh before recording battery usage.');
-  }
-  if(!Number.isFinite(before))return alert('Could not verify the current truck battery quantity. Refresh before continuing.');
-  if(before<qty)return alert('You cannot use more '+type+' than Tech Check currently records on the truck.');
-  const button=document.querySelector('[data-wl-service-record-truck-stock-used]');
-  serviceTruckUsageSubmitting=true;
-  if(button){button.disabled=true;button.textContent='RECORDING USAGE…';}
   document.body.classList.add('busy');
-  const finish=async()=>{
-    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
-    return showSvcHome();
-  };
   try{
     const {error}=await liveDb.rpc('service_use_truck_stock_v1',{p_ticket_no:ticket,p_item_type:type,p_qty:qty});
     if(error)throw error;
-    return await finish();
-  }catch(error){
-    let after=NaN;
-    try{
-      const readiness=await loadMyServiceTruckReadiness();
-      after=Number(readiness?.stock?.[field]);
-    }catch{}
-    if(Number.isFinite(after)&&after===before-qty)return await finish();
-    if(Number.isFinite(after)&&after!==before){
-      return alert('Truck stock changed while Tech Check was saving this usage. The app will not subtract anything again. Return to Service Home, refresh the live truck inventory, and verify the physical quantity before recording another usage.');
-    }
-    return alert(error?.message==='Failed to fetch'
-      ? 'Connection was interrupted and Tech Check could not confirm whether the battery usage saved. Do not tap again until the live truck inventory can be reloaded.'
-      : (error?.message||'Could not record truck stock used.'));
-  }finally{
-    serviceTruckUsageSubmitting=false;
-    document.body.classList.remove('busy');
-    if(document.contains(button)){button.disabled=false;button.textContent='RECORD STOCK USED →';}
-  }
+    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
+    return showSvcHome();
+  }catch(error){alert(error?.message||'Could not record truck stock used.');}
+  finally{document.body.classList.remove('busy');}
 }
 
 async function loadITServiceTruckInventory(){
@@ -5094,11 +4925,6 @@ async function matchSvcTicket() {
   svcUnitIndex = 0;
   svcQuestionIndex = 0;
   svcSolarCursor = null;
-  const savedServiceProgress=(activeSvcPrep.prep_items||[]).some(item=>Boolean(item.service_verified_at))
-    || Boolean(activeSvcPrep.service_parts_confirmed)
-    || Boolean((await loadServiceSolarCheck(activeSvcPrep.id))?.completed_at)
-    || (await evidenceRows(activeSvcPrep.id,'service')).some(row=>row.kind==='signature');
-  if(savedServiceProgress)return resumeServicePrepAtSavedProgress();
   showSvcTicketConfirmation();
 }
 async function showSvcTicketConfirmation() {
@@ -5466,7 +5292,7 @@ function serviceSolarSingleProofHtml(task,evidence,stepNo,total,reviewMode=false
       "<div class='wl-solar-proof wl-solar-photo-card top10' data-solar-category='"+esc(task.category)+"' data-wl-solar-multi='"+(allowsMultiple?"1":"0")+"'>"+
         "<div class='wl-solar-proof-status'>"+(count?"✓ "+count+" saved":"PHOTO REQUIRED")+"</div>"+
         "<div class='wl-solar-photo-actions'>"+
-          "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'></label>"+
+          "<label class='wl-solar-photo-choice'><span>📷</span><b>TAKE PHOTO</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*' capture='environment'"+multiple+"></label>"+
           "<label class='wl-solar-photo-choice'><span>▣</span><b>PHOTO LIBRARY</b><input class='wl-solar-file wl-solar-file-hidden' type='file' accept='image/*'"+multiple+"></label>"+
         "</div>"+
         (allowsMultiple?"<div class='wl-solar-multi-note'>You can add multiple photos before saving.</div>":"")+
@@ -5713,58 +5539,6 @@ function svcQuestionHtml(q, index, total, displayStep=index+1, displayTotal=tota
   const no = answered && !q.input.checked;
   return `<div class='wl-question wl-service-auto-bool'><div class='qnum'>STEP ${displayStep} OF ${displayTotal}</div><div class='qtext'>${esc(q.label)}</div><div class='wl-options'><button class='fail ${no ? 'on' : ''}' data-wl-svc-answer='no'>NO</button><button class='pass ${yes ? 'on' : ''}' data-wl-svc-answer='yes'>YES</button></div>${no ? `<div class='wl-stop'><b>STOP — FIX THIS FIRST.</b><div>When the problem is corrected, tap YES. You cannot continue with this job while this answer is NO.</div></div>` : ''}</div>`;
 }
-async function resumeServicePrepAtSavedProgress() {
-  if (!activeSvcPrep?.id) return renderSvcPrep();
-  const card=findSvcCard(activeSvcPrep.ticket_no);
-  if (!card) return renderSvcPrep();
-  const forms=svcForms(card);
-  const hasParts=ticketPartsTotal(activeSvcPrep)>0;
-  const solarCtx=await serviceSolarContextData(activeSvcPrep.id);
-  const solarRequired=Boolean(solarCtx?.need_solar);
-  const solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null;
-  const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[];
-  const ev=await evidenceRows(activeSvcPrep.id,'service');
-  const partStep=forms.length;
-  const solarStep=forms.length+(hasParts?1:0);
-  const proofStep=solarStep+(solarRequired?1:0);
-  const signStep=proofStep+1;
-
-  // Any completed downstream Service evidence proves the earlier checkout
-  // questions were already passed in the old flow. Never send a technician
-  // backward to Steps 1–3 just because that older flow did not stamp
-  // service_verified_at until final Helios handoff acceptance.
-  const downstreamProgress=Boolean(solarCheck?.completed_at)
-    || ev.some(row=>row.kind==='signature')
-    || Boolean(activeSvcPrep.service_parts_confirmed);
-  if(!downstreamProgress){
-    let firstIncomplete=-1;
-    for(let i=0;i<forms.length;i++){
-      const itemId=String(forms[i].querySelector("input[id^='exact_']")?.id||'').replace(/^exact_/,'');
-      const item=(activeSvcPrep.prep_items||[]).find(row=>String(row.id)===itemId);
-      if(!item?.service_verified_at){firstIncomplete=i;break;}
-    }
-    if(firstIncomplete>=0){
-      svcUnitIndex=firstIncomplete;
-      svcQuestionIndex=0;
-      return renderSvcPrep();
-    }
-  }
-  if(hasParts&&!activeSvcPrep.service_parts_confirmed){
-    svcUnitIndex=partStep;svcQuestionIndex=0;return renderSvcPrep();
-  }
-  if(solarRequired&&!serviceSolarReady(solarCtx,solarCheck,solarEvidence)){
-    svcUnitIndex=solarStep;svcQuestionIndex=0;svcSolarCursor=null;return renderSvcPrep();
-  }
-  if(!ev.some(row=>row.kind==='signature')){
-    // IT proof is read-only context; resume at the receipt signature rather
-    // than forcing the technician to walk backward through completed checks.
-    svcUnitIndex=signStep;svcQuestionIndex=0;return renderSvcPrep();
-  }
-  svcUnitIndex=signStep+1;
-  svcQuestionIndex=0;
-  return renderSvcPrep();
-}
-
 function svcWizardCard() {
   let wizard = document.getElementById('wlSvcWizardOnly');
   if (!wizard) { wizard = document.createElement('div'); wizard.id = 'wlSvcWizardOnly'; wizard.className = 'card'; viewSvc().append(wizard); }
@@ -5812,14 +5586,14 @@ function serviceAIEquipmentReview(ctx,check,evidence){
   if(ctx?.need_solar&&!check?.completed_at)flags.push('Solar / Helios Service checklist is not completed yet.');
   return `<div class='wl-ai-panel wl-ai-service-equipment'><div class='wl-ai-head'>${onsiteVisionTitle('Service Equipment Check')}<b>${flags.length?'PROOF NEEDED':'ON TRACK'}</b></div>${spotters?`<div class='wl-ai-line'><b>Solar Spotter:</b> ${spotters} unit${spotters===1?'':'s'} → ${spotters} Solar Stand${spotters===1?'':'s'} → ${esc(check?.battery_description || batteryPlan.description)}</div>`:''}${rangers?`<div class='wl-ai-line'><b>Ranger:</b> ${rangers} unit${rangers===1?'':'s'} → ${rangers} solar panel${rangers===1?'':'s'} + LiTime 12V 110Ah battery setup</div>`:''}${flags.length?`<div class='wl-ai-warn'>${flags.map(v=>'⚠ '+esc(v)).join('<br>')}</div>`:`<div class='wl-ai-good'>✓ Required Service equipment evidence is present.</div>`}<div class='small top8'>AI checks stored evidence only. Service Tech must physically verify the equipment and readings.</div></div>`;
 }
-function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,itPhotos,hasParts,solarRequired}){
+function finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired}){
   const holds=[];
   if(!allChecksOk) holds.push('One or more Service equipment checks are NO or incomplete.');
-  if(!proofReady) holds.push('Handoff evidence is incomplete: IT handoff photo proof and the Service receipt signature are required.');
+  if(!proofReady) holds.push('Service evidence is incomplete: '+servicePhotos+' of '+requiredPhotos+' receipt photos plus final signature are required.');
   if(hasParts&&!partsReady) holds.push('Listed parts have not been physically verified.');
   if(solarRequired&&!solarReady) holds.push('Solar / Helios pre-trip requirements or evidence are incomplete.');
   const ready=holds.length===0;
-  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Service Handoff Check')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Handoff record ready.</b><br>IT handoff photo/signature evidence, Service receipt signature, Service checks, parts, and required solar pre-trip checks are complete in the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>This confirms the handoff record only. The Helios is not deployed until Service completes the field-install steps at the site.</div></div>`;
+  return `<div class='wl-ai-panel wl-ai-final ${ready?'wl-ai-ready':'wl-ai-hold'}'><div class='wl-ai-head'>${onsiteVisionTitle('Service Handoff Check')}<b>${ready?'AI READY':'HOLD — '+holds.length+' ISSUE'+(holds.length===1?'':'S')}</b></div>${ready?`<div class='wl-ai-good'><b>✓ Handoff record ready.</b><br>IT-to-Service handoff evidence, Service checks, parts, signatures, and required solar pre-trip checks are complete in the stored record.</div>`:`<div class='wl-ai-warn'>${holds.map(v=>'⛔ '+esc(v)).join('<br>')}</div>`}<div class='small top8'>This confirms the handoff record only. The Helios is not deployed until Service completes the field-install steps at the site.</div></div>`;
 }
 function allSwapItems(prep=activeSvcPrep){
   return [...(prep?.prep_items||[])].filter(row=>row.purpose==='SWAP').sort((a,b)=>a.item_order-b.item_order);
@@ -5976,15 +5750,15 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
   let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
   index=Math.max(0,Math.min(total,index));
-  const header="";
-  const context=oldBlock;
+  const header=heliosFieldProgress('HELIOS FIELD INSTALL',unitLabel+' · Complete one step at a time',Math.min(total,index+1),total);
+  const context="<div class='wl-field-context'><b>"+esc(unitLabel)+" · MHelpDesk #"+esc(prep.ticket_no)+"</b><span>Follow each site step in order. Tap YES only after it is physically complete. Tap NO to stop and correct it before continuing.</span></div>"+newUnits+oldBlock;
 
   if(index<rules.length){
     const rule=rules[index];
     const yes=check?.[rule.key]===true;
     return header+context+
-      "<div class='wl-question wl-helios-field-step wl-helios-field-simple'>"+
-        "<div class='qnum'>"+esc(unitLabel)+" · STEP "+(index+1)+" OF "+total+"</div>"+
+      "<div class='wl-question wl-helios-field-step'>"+
+        "<div class='qnum'>STEP "+(index+1)+" OF "+total+"</div>"+
         "<div class='qtext'>"+esc(rule.label)+"</div>"+
         "<div class='wl-options'><button class='fail' data-wl-helios-field-answer='no' data-field='"+esc(rule.key)+"'>NO</button><button class='pass "+(yes?"on":"")+"' data-wl-helios-field-answer='yes' data-field='"+esc(rule.key)+"'>YES</button></div>"+
         "<div class='wl-helios-field-message'></div>"+
@@ -6152,7 +5926,7 @@ async function renderSvcPrep() {
   let solarCheck=solarRequired?await loadServiceSolarCheck(activeSvcPrep.id):null; const solarEvidence=solarRequired?await serviceSolarEvidenceRows(activeSvcPrep.id):[]; const solarReady=serviceSolarReady(solarCtx,solarCheck,solarEvidence);
   const swapState=await swapWorkflowState(activeSvcPrep);
   const allSwaps=swapState.swaps,nonHeliosSwaps=allSwaps.filter(i=>i.equipment_type!=='Helios'),heliosHandoff=heliosHandoffItems(activeSvcPrep),heliosField=heliosFieldItems(activeSvcPrep),rangerField=rangerFieldItems(activeSvcPrep);
-  const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),signStep=proofStep+1,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
+  const partStep=forms.length,solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1,rangerStep=swapStep+(nonHeliosSwaps.length?1:0),preparedBy=activeSvcPrep.released_by_name||'IT Technician';
   const unitQuestionCounts=forms.map(form=>svcQuestions(form).length);
   const unitQuestionTotal=unitQuestionCounts.reduce((sum,n)=>sum+n,0);
   const solarTaskTotal=solarRequired
@@ -6170,7 +5944,7 @@ async function renderSvcPrep() {
       wizard.innerHTML=swapResultHtml(activeSvcPrep,swapState,{heliosOnly:true});
       resetWizardPosition();return;
     }
-    if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);wireSvcSolarPhotoInputs(wizard);resetWizardPosition();return;}
+    if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
   }
   if(svcUnitIndex<forms.length){
     const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Next Check →':solarRequired?'Next Check →':'Compare IT Photos →';
@@ -6189,7 +5963,10 @@ async function renderSvcPrep() {
     const overallStep=solarOffset+((solarIndex<0?solarTasks.length:solarIndex)+1);
     wizard.innerHTML=progress(combinedCheckTitle,'One step at a time',Math.min(combinedCheckTotal,Math.max(1,overallStep)),combinedCheckTotal)+serviceSolarOneStepHtml(solarCtx,solarCheck,solarEvidence,solarOffset,combinedCheckTotal,Number.isInteger(svcSolarCursor)?svcSolarCursor:null)+serviceRestartButtonHtml();wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(svcUnitIndex===proofStep){
-    wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos and signature`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Sign Receipt →</button></div>`;
+    wizard.innerHTML=progress('Compare',`Look at IT Tech ${preparedBy}’s handoff photos`,1,1)+await proofHtml(activeSvcPrep.id,'it',false)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>My Photos →</button></div>`;
+  }else if(svcUnitIndex===photoStep){
+    const itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length;
+    wizard.innerHTML=progress('Service Photos',`Take ${requiredPhotos} matching receipt photo${requiredPhotos===1?'':'s'}`,1,1)+await photoOnlyHtml(activeSvcPrep.id,'service',null,requiredPhotos)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>Signature →</button></div>`;
   }else if(svcUnitIndex===signStep){
     wizard.innerHTML=progress('Service Signature',`Sign that you received and verified the handoff from IT Tech ${preparedBy}`,1,1)+await signatureOnlyHtml(activeSvcPrep.id,'service')+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next>${nonHeliosSwaps.length?'Swap Result →':rangerField.length?'Ranger Field Check →':'Review →'}</button></div>`;wizard.querySelectorAll('canvas').forEach(wireCanvas);
   }else if(nonHeliosSwaps.length&&svcUnitIndex===swapStep){
@@ -6201,9 +5978,9 @@ async function renderSvcPrep() {
   }else if(rangerField.length&&svcUnitIndex===rangerStep){
     wizard.innerHTML=progress('Ranger Field Check','Verify Victron Bluetooth status at the site',1,1)+rangerFieldHtml(activeSvcPrep)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${rangerFieldReady(activeSvcPrep)?'':'disabled'}>Review →</button></div>`;
   }else{
-    if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);wireSvcSolarPhotoInputs(wizard);resetWizardPosition();return;}
-    const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),itPhotos=itEv.filter(x=>x.kind==='photo').length;
-    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=itPhotos>0&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
+    if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+    const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
+    const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
     const heliosNeedsAcceptance=heliosHandoff.length>0&&!solarCheck?.handoff_accepted_at;
     const nonHeliosInstalled=nonHeliosSwaps.filter(i=>i.swap_outcome==='installed');
     const nonHeliosByType=nonHeliosInstalled.reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{});
@@ -6212,7 +5989,7 @@ async function renderSvcPrep() {
       && !Object.entries(nonHeliosByType).some(([type,needed])=>swapState.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
     const swapReady=heliosNeedsAcceptance ? nonHeliosReady : swapState.ready;
     const ready=proofReady&&allChecksOk&&partsReady&&solarReady&&rangerReady&&swapReady;
-    const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,itPhotos,hasParts,solarRequired});
+    const aiFinal=finalHandoffAIReview({proofReady,allChecksOk,partsReady,solarReady,servicePhotos,requiredPhotos,hasParts,solarRequired});
     const heliosNotice=heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`<div class='warn top10'><b>HELIOS HANDOFF FIRST</b><div>Accept the IT → Service handoff. At the site, Service will answer whether the SWAP replacement was actually installed.</div></div>`:'';
     const rangerNotice=rangerField.length?(rangerReady?`<div class='ok top10'><b>✓ Ranger field Victron verification complete.</b></div>`:`<div class='wl-stop top10'><b>Ranger field verification is incomplete.</b><div>At the site, confirm each installed Ranger is up to date in the Victron Bluetooth app before closing this Tech Check.</div></div>`):'';
     const pendingHeliosFieldDecision=heliosNeedsAcceptance&&allSwaps.some(i=>i.equipment_type==='Helios'&&!i.swap_outcome);
@@ -6222,9 +5999,8 @@ async function renderSvcPrep() {
         ? `<div class='ok top10'><b>✓ SWAP outcome and required return path recorded.</b><div>${swapState.pendingSiteRegistration.length?'IT site registration is queued and ready for IT.':'No unresolved Service SWAP return remains.'}</div></div>`
         : `<div class='wl-stop top10'><b>SWAP RESULT REQUIRED</b><div>Finish the YES / NO replacement-unit decision and any required IT Intake return before this Tech Check can close.</div></div>`
     ):'';
-    wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 IT handoff photos reviewed: ${itPhotos}</div><div class='small'>✓ Service receipt signature required.</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
+    wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
-  wireSvcSolarPhotoInputs(wizard);
   resetWizardPosition();
 }
 function inspectionQuestion() {
@@ -6306,7 +6082,6 @@ async function startInspection() {
   inspectionQuestion();
 }
 async function submitInspection() {
-  if(inspectionSubmitting)return;
   if (inspection.truck.some(v => v !== true)) return alert('Every truck question must be YES before continuing.');
   if (inspection.takingTrailer === true && inspection.trailer.some(v => v !== true)) return alert('Every trailer question must be YES before continuing.');
   if (!navigator.onLine) {
@@ -6317,17 +6092,7 @@ async function submitInspection() {
   const trailer = {}; inspection.trailer.forEach((v, i) => trailer[`trailer_${i + 1}`] = v);
   const text = document.getElementById('sessionClosed')?.textContent || '';
   const tickets = [...text.matchAll(/MHelpDesk Ticket\s*#([^·\s]+)/gi)].map(m => m[1]);
-  const attemptStartedAt=Date.now();
-  const submitButton=document.querySelector('[data-wl-submit-inspection]');
-  inspectionSubmitting=true;
-  if(submitButton){submitButton.disabled=true;submitButton.textContent='SUBMITTING…';}
   document.body.classList.add('busy');
-  const finishSubmittedInspection=async()=>{
-    await clearDeviceDraft('inspection');
-    inspectionRecovered=false;
-    rememberTechCompletion('service','', 'TRUCK / TRAILER INSPECTION COMPLETE');
-    return showServiceTruckInventoryCheck();
-  };
   try {
     const { error } = await liveDb.rpc('submit_morning_check', {
       p_mhelp_reviewed:true,
@@ -6337,42 +6102,17 @@ async function submitInspection() {
       p_closed_ticket_nos:tickets
     });
     if (error) throw error;
-    return await finishSubmittedInspection();
+    await clearDeviceDraft('inspection');
+    inspectionRecovered=false;
+    rememberTechCompletion('service','', 'TRUCK / TRAILER INSPECTION COMPLETE');
+    return showServiceTruckInventoryCheck();
   } catch(error) {
-    let confirmed=false;
-    try{
-      const {data,error:verifyError}=await liveDb.from('morning_checks')
-        .select('id,submitted_at,mhelp_reviewed,truck_checks,taking_trailer,trailer_checks,closed_ticket_nos')
-        .gte('submitted_at',new Date(attemptStartedAt-60000).toISOString())
-        .order('submitted_at',{ascending:false})
-        .limit(5);
-      if(!verifyError){
-        const sameChecks=(actual,expected,prefix,count)=>{
-          for(let i=1;i<=count;i++)if(Boolean(actual?.[`${prefix}_${i}`])!==Boolean(expected?.[`${prefix}_${i}`]))return false;
-          return true;
-        };
-        const sameTickets=(actual,expected)=>{
-          const a=[...(actual||[])].map(String).sort(),b=[...(expected||[])].map(String).sort();
-          return a.length===b.length&&a.every((value,index)=>value===b[index]);
-        };
-        confirmed=(data||[]).some(row=>
-          row?.mhelp_reviewed===true
-          && Boolean(row?.taking_trailer)===Boolean(inspection.takingTrailer===true)
-          && sameChecks(row?.truck_checks,truck,'truck',8)
-          && (!inspection.takingTrailer || sameChecks(row?.trailer_checks,trailer,'trailer',7))
-          && sameTickets(row?.closed_ticket_nos,tickets)
-        );
-      }
-    }catch{}
-    if(confirmed)return await finishSubmittedInspection();
     await saveInspectionDraft();
     alert(error?.message === 'Failed to fetch'
-      ? 'Connection lost. Your inspection is saved on this device and Tech Check could not confirm a submitted record. Reconnect and try again.'
+      ? 'Connection lost. Your inspection is saved on this device and was not submitted.'
       : (error?.message || 'Could not submit the inspection.'));
   } finally {
-    inspectionSubmitting=false;
     document.body.classList.remove('busy');
-    if(document.contains(submitButton)){submitButton.disabled=false;submitButton.textContent='CONTINUE TO REQUIRED TRUCK INVENTORY →';}
   }
 }
 async function showInspectionHistory() {
@@ -6391,7 +6131,48 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', async e => {
   if (e.target.matches?.('.wl-solar-file')) {
-    handleSvcSolarFileChange(e.target);
+    const panel=e.target.closest('.wl-solar-proof');
+    if(!panel)return;
+    const multi=panel.dataset.wlSolarMulti==='1';
+    const incoming=[...(e.target.files||[])];
+    if(!multi){
+      panel.querySelectorAll('.wl-solar-file').forEach(input=>{if(input!==e.target)input.value='';});
+      panel._wlSolarPendingFiles=incoming;
+    }else{
+      const existing=Array.isArray(panel._wlSolarPendingFiles)?panel._wlSolarPendingFiles:[];
+      const merged=[...existing];
+      for(const file of incoming){
+        const key=[file.name,file.size,file.lastModified].join('|');
+        if(!merged.some(x=>[x.name,x.size,x.lastModified].join('|')===key))merged.push(file);
+      }
+      panel._wlSolarPendingFiles=merged;
+      e.target.value='';
+    }
+    const files=panel._wlSolarPendingFiles||[];
+    const selected=panel.querySelector('[data-wl-solar-selected]');
+    const preview=panel.querySelector('[data-wl-solar-preview]');
+    const save=panel.querySelector('[data-wl-solar-upload]');
+    const clear=panel.querySelector('[data-wl-solar-clear-photos]');
+    for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
+    panel._wlSolarObjectUrls=[];
+    if(!files.length){
+      if(selected)selected.textContent='No photo selected yet.';
+      preview?.classList.add('hidden');
+      if(preview)preview.innerHTML='';
+      if(save){save.disabled=true;save.textContent=multi?'SAVE PHOTOS →':'SAVE PHOTO →';}
+      clear?.classList.add('hidden');
+      return;
+    }
+    if(selected)selected.textContent=files.length===1?'✓ 1 photo selected':'✓ '+files.length+' photos selected';
+    if(preview){
+      const shown=files.slice(0,4);
+      const urls=shown.map(file=>URL.createObjectURL(file));
+      panel._wlSolarObjectUrls=urls;
+      preview.classList.remove('hidden');
+      preview.innerHTML="<div class='wl-solar-preview-grid'>"+urls.map((url,i)=>"<img src='"+url+"' alt='Selected photo "+(i+1)+"'>").join('')+"</div><div><b>READY TO SAVE</b><span>"+esc(files.length===1?files[0].name:(files.length+' photos selected'))+"</span></div>";
+    }
+    if(save){save.disabled=false;save.textContent=files.length>1?'SAVE '+files.length+' PHOTOS →':'SAVE PHOTO →';}
+    clear?.classList.remove('hidden');
     return;
   }
   if (e.target.id === 'wlReturnPhoto') {
@@ -6586,8 +6367,7 @@ document.addEventListener('click', async e => {
   const takeServiceJob=e.target.closest('[data-wl-service-take-job]');
   if(takeServiceJob){
     const fromTicketLookup=Boolean(takeServiceJob.closest('#wlSvcLookup')&&document.getElementById('wlServiceJobSearch'));
-    if(!fromTicketLookup)return startAssignedJob(takeServiceJob.dataset.wlServiceTakeJob);
-    const enteredTicket=String(document.getElementById('wlServiceJobSearch')?.value||'').trim().replace(/^#\s*/,'');
+    const enteredTicket=fromTicketLookup ? String(document.getElementById('wlServiceJobSearch')?.value||'').trim().replace(/^#\s*/,'') : '';
     return serviceTakeVerifiedJob(takeServiceJob.dataset.wlServiceTakeJob,enteredTicket);
   }
   if (e.target.closest('[data-wl-match]')) return matchSvcTicket();
@@ -6596,69 +6376,52 @@ document.addEventListener('click', async e => {
   if (svcTicket) { if (svcTicket.dataset.wlSvcTicket === 'wrong') { activeSvcPrep = null; return showReceiveLookup(); } return renderSvcPrep(); }
   const svcAnswer = e.target.closest('[data-wl-svc-answer]');
   if (svcAnswer) {
-    if(serviceQuestionAdvancing)return;
-    serviceQuestionAdvancing=true;
-    const answerButtons=[...(svcAnswer.closest('.wl-options')?.querySelectorAll('button')||[])];
-    answerButtons.forEach(button=>button.disabled=true);
-    try{
-      const card = findSvcCard(activeSvcPrep.ticket_no);
-      const q = svcQuestions(svcForms(card)[svcUnitIndex])[svcQuestionIndex];
-      if (!q || q.kind !== 'bool') return;
-      const yes = svcAnswer.dataset.wlSvcAnswer === 'yes';
-      q.input.checked = yes;
-      q.input.dataset.wlAnswered = '1';
-      if(q.heliosBattery){
-        if(!await saveServiceSolarProgressField('helios_battery_box_charging_ok',yes?'true':'false'))return;
-        if(!await saveServiceSolarProgressField('batteries_charged_ok',yes?'true':'false'))return;
-      }
-      if (yes) return await advanceSvcVerification();
-      return await renderSvcPrep();
-    }finally{
-      serviceQuestionAdvancing=false;
-      answerButtons.forEach(button=>{if(document.contains(button))button.disabled=false;});
+    const card = findSvcCard(activeSvcPrep.ticket_no);
+    const q = svcQuestions(svcForms(card)[svcUnitIndex])[svcQuestionIndex];
+    if (!q || q.kind !== 'bool') return;
+    const yes = svcAnswer.dataset.wlSvcAnswer === 'yes';
+    q.input.checked = yes;
+    q.input.dataset.wlAnswered = '1';
+    if(q.heliosBattery){
+      if(!await saveServiceSolarProgressField('helios_battery_box_charging_ok',yes?'true':'false'))return;
+      if(!await saveServiceSolarProgressField('batteries_charged_ok',yes?'true':'false'))return;
     }
+    if (yes) return advanceSvcVerification();
+    return renderSvcPrep();
   }
-  const svcNext=e.target.closest('[data-wl-svc-next]');
-  if (svcNext) {
-    if(serviceQuestionAdvancing)return;
-    serviceQuestionAdvancing=true;
-    svcNext.disabled=true;
-    try{
-      const card = findSvcCard(activeSvcPrep.ticket_no);
-      const forms = svcForms(card);
-      const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
-      const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
-      const solarRequired = Boolean(solarCtx?.need_solar);
-      const partStep = forms.length;
-      const solarStep = forms.length + (hasParts ? 1 : 0);
-      const proofStep = solarStep + (solarRequired ? 1 : 0);
-      const signStep = proofStep + 1;
-      const swapStep = signStep + 1;
-      const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
-      const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
-      const rangerField = rangerFieldItems(activeSvcPrep);
-      if (svcUnitIndex < forms.length) return await advanceSvcVerification();
-      if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
-      if (solarRequired && svcUnitIndex === solarStep) {
-        const check=await loadServiceSolarCheck(activeSvcPrep.id);
-        const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
-        if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
-      }
-      if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
-      if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
-        const state=await swapWorkflowState(activeSvcPrep);
-        const unresolved=nonHeliosSwaps.some(i=>!i.swap_outcome)
-          || nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id))
-          || Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>state.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
-        if(unresolved)return alert('Finish the SWAP YES / NO decision and required IT Intake return before continuing.');
-      }
-      if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
-      svcUnitIndex++;
-      return await renderSvcPrep();
-    }finally{
-      serviceQuestionAdvancing=false;
-      if(document.contains(svcNext))svcNext.disabled=false;
+  if (e.target.closest('[data-wl-svc-next]')) {
+    const card = findSvcCard(activeSvcPrep.ticket_no);
+    const forms = svcForms(card);
+    const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
+    const solarCtx = await serviceSolarContextData(activeSvcPrep.id);
+    const solarRequired = Boolean(solarCtx?.need_solar);
+    const partStep = forms.length;
+    const solarStep = forms.length + (hasParts ? 1 : 0);
+    const proofStep = solarStep + (solarRequired ? 1 : 0);
+    const photoStep = proofStep + 1;
+    const signStep = proofStep + 2;
+    const swapStep = signStep + 1;
+    const nonHeliosSwaps = allSwapItems(activeSvcPrep).filter(i=>i.equipment_type!=='Helios');
+    const rangerStep = swapStep + (nonHeliosSwaps.length ? 1 : 0);
+    const rangerField = rangerFieldItems(activeSvcPrep);
+    if (svcUnitIndex < forms.length) return advanceSvcVerification();
+    if (hasParts && svcUnitIndex === partStep && !activeSvcPrep.service_parts_confirmed) return alert('Physically verify the listed parts from IT before continuing.');
+    if (solarRequired && svcUnitIndex === solarStep) {
+      const check=await loadServiceSolarCheck(activeSvcPrep.id);
+      const evidence=await serviceSolarEvidenceRows(activeSvcPrep.id);
+      if (!serviceSolarReady(solarCtx,check,evidence)) return alert('Finish the Solar / Helios checklist, required photos, and signatures before continuing.');
     }
+    if (svcUnitIndex === photoStep) { const serviceEv = await evidenceRows(activeSvcPrep.id, 'service'); const itEv = await evidenceRows(activeSvcPrep.id, 'it'); const requiredPhotos = itEv.filter(x => x.kind === 'photo').length || forms.length; const servicePhotos = serviceEv.filter(x => x.kind === 'photo').length; if (servicePhotos !== requiredPhotos) return alert(`Service needs exactly ${requiredPhotos} receipt photo${requiredPhotos === 1 ? '' : 's'} to match IT. You currently have ${servicePhotos}.`); }
+    if (svcUnitIndex === signStep) { const ev = await evidenceRows(activeSvcPrep.id, 'service'); if (!ev.some(x => x.kind === 'signature')) return alert('Save the Service signature before continuing.'); }
+    if (nonHeliosSwaps.length && svcUnitIndex === swapStep) {
+      const state=await swapWorkflowState(activeSvcPrep);
+      const unresolved=nonHeliosSwaps.some(i=>!i.swap_outcome)
+        || nonHeliosSwaps.some(i=>i.swap_outcome==='returned_unused'&&state.unusedMissing.some(m=>m.id===i.id))
+        || Object.entries(nonHeliosSwaps.filter(i=>i.swap_outcome==='installed').reduce((m,i)=>(m[i.equipment_type]=(m[i.equipment_type]||0)+1,m),{})).some(([type,needed])=>state.oldReturns.filter(r=>r.equipment_type===type).length<Number(needed));
+      if(unresolved)return alert('Finish the SWAP YES / NO decision and required IT Intake return before continuing.');
+    }
+    if (rangerField.length && svcUnitIndex === rangerStep && !rangerFieldReady(activeSvcPrep)) return alert('Complete the Ranger Victron Bluetooth field verification before continuing.');
+    svcUnitIndex++; return renderSvcPrep();
   }
   if (e.target.closest('[data-wl-svc-prev]')) {
     const card = findSvcCard(activeSvcPrep.ticket_no);
@@ -6666,7 +6429,7 @@ document.addEventListener('click', async e => {
     const hasParts = ticketPartsTotal(activeSvcPrep) > 0;
     const partStep = forms.length;
     const solarCtx=await serviceSolarContextData(activeSvcPrep.id),solarRequired=Boolean(solarCtx?.need_solar);
-    const solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),signStep=proofStep+1,swapStep=signStep+1;
+    const solarStep=forms.length+(hasParts?1:0),proofStep=solarStep+(solarRequired?1:0),photoStep=proofStep+1,signStep=proofStep+2,swapStep=signStep+1;
     if (svcUnitIndex < forms.length) {
       if (svcQuestionIndex > 0) { svcQuestionIndex--; return renderSvcPrep(); }
       if (svcUnitIndex > 0) { svcUnitIndex--; svcQuestionIndex = Math.max(0, svcQuestions(forms[svcUnitIndex]).length - 1); return renderSvcPrep(); }
@@ -6832,8 +6595,6 @@ document.addEventListener('click', async e => {
   if(solarClearPhotos){
     const panel=solarClearPhotos.closest('.wl-solar-proof');
     if(!panel)return;
-    const pendingKey=svcSolarPendingKey(panel);
-    if(pendingKey)svcSolarPendingFilesByKey.delete(pendingKey);
     panel._wlSolarPendingFiles=[];
     for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
     panel._wlSolarObjectUrls=[];
@@ -6852,19 +6613,14 @@ document.addEventListener('click', async e => {
   if (solarUpload) {
     const panel=solarUpload.closest('.wl-solar-proof');
     const category=panel?.dataset.solarCategory;
-    const pendingKey=svcSolarPendingKey(panel);
-    const rememberedFiles=pendingKey ? (svcSolarPendingFilesByKey.get(pendingKey)||[]) : [];
-    const files=rememberedFiles.length
-      ? [...rememberedFiles]
-      : (Array.isArray(panel?._wlSolarPendingFiles)&&panel._wlSolarPendingFiles.length)
-        ? [...panel._wlSolarPendingFiles]
-        : [...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
+    const files=(Array.isArray(panel?._wlSolarPendingFiles)&&panel._wlSolarPendingFiles.length)
+      ? [...panel._wlSolarPendingFiles]
+      : [...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
     if (!category || !files.length) return alert('Take or select at least one photo first.');
     solarUpload.disabled=true;
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
     try {
       for (const file of files) await uploadServiceSolarEvidence(activeSvcPrep.id,category,'photo',file);
-      if(pendingKey)svcSolarPendingFilesByKey.delete(pendingKey);
       if(category==='helios_install' && Number.isInteger(svcHeliosFieldCursor))svcHeliosFieldCursor++;
       else if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
@@ -9426,14 +9182,9 @@ document.addEventListener('change', e => {
     }
     const count=e.target.files?.length||0;
     const status=panel?.querySelector('[data-wl-photo-selected]');
-    if(status) status.textContent=count ? (count===1?'✓ PHOTO READY TO SAVE':('✓ '+count+' PHOTOS READY TO SAVE')) : 'No photo selected yet.';
-    const preview=panel?.querySelector('[data-wl-photo-preview]');
-    if(preview){
-      const files=[...(e.target.files||[])];
-      preview.innerHTML=files.length ? "<div class='wl-solar-preview-grid'>"+files.map((file,index)=>"<img src='"+URL.createObjectURL(file)+"' alt='Selected photo "+(index+1)+"'>").join('')+"</div>" : '';
-    }
+    if(status) status.textContent=count ? (count===1?'1 photo selected':count+' photos selected') : 'No photo selected yet.';
     const save=panel?.querySelector('[data-wl-upload]');
-    if(save){save.disabled=!count;save.textContent=count?(count===1?'SAVE PHOTO →':('SAVE '+count+' PHOTOS →')):'Save Photo';}
+    if(save) save.disabled=!count;
   }
 
   if (e.target?.id === 'ownerAssignDate') e.target.dataset.ownerConfirmed='1';
