@@ -2763,6 +2763,17 @@ function ownerTodayJobsHtml(){
     +'</section>';
 }
 
+function ownerHomeTeamActivityHtml(jobs,today){
+  const rows=['it','service'].map(role=>{
+    const work=jobs.filter(a=>a.assigned_role===role&&a.status==='started');
+    const queued=jobs.filter(a=>a.assigned_role===role&&a.status==='assigned'&&String(a.scheduled_for||'')===today);
+    const names=[...new Set(work.map(a=>a.assignee_name||a.assigned_to_name).filter(Boolean))];
+    const detail=work.length?(names.length?names.join(', '):'Department work in progress'):(queued.length?'Assignments waiting to start':'No work in progress');
+    return '<div class="ownerHomeTeamRow"><div><b>'+ (role==='it'?'IT':'Service')+'</b><p>'+esc(detail)+'</p></div><div class="ownerHomeTeamCounts"><strong>'+work.length+' working</strong><span>'+queued.length+' queued today</span></div></div>';
+  }).join('');
+  return '<section class="ownerHomeTeamActivity" aria-label="Team activity"><header><h2>Team Activity</h2><button type="button" onclick="ownerAppNavigate(\'team\')">Team →</button></header>'+rows+'<button class="ownerHomeHandoffLink" type="button" onclick="ownerAppNavigate(\'handoffs\')">View handoffs &amp; returns →</button></section>';
+}
+
 function ownerAppToday(){
   const greeting=ownerTodayGreeting()+', '+ownerTodayName();
   const today=localDateKey(new Date());
@@ -2780,7 +2791,7 @@ function ownerAppToday(){
   return '<section class="ownerHomeWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
     +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
-    +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>';
+    +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>'+ownerHomeTeamActivityHtml(jobs,today);
 }
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
