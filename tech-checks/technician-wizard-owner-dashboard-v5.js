@@ -9286,16 +9286,26 @@ function techLiveIndicator(){
   }
   return el;
 }
-function setTechLiveStatus(state='reconnecting'){
-  techWorkflowRealtimeState=state;
+function techRepositionLiveIndicator(){
   const el=techLiveIndicator();
+  const ownerWeather=document.querySelector('#view-owner:not(.hidden) #ownerTodayWeatherHost .ownerWeatherNow')
+    || document.querySelector('#view-owner:not(.hidden) #ownerTodayWeatherHost');
+  const target=ownerWeather||document.body;
+  if(el.parentElement!==target) target.append(el);
+  el.classList.toggle('in-owner-weather',Boolean(ownerWeather));
   const appVisible=!document.getElementById('appView')?.classList.contains('hidden');
   el.classList.toggle('hidden',!appVisible);
   el.classList.remove('live','reconnecting','offline');
-  const normalized=state==='live'?'live':state==='offline'?'offline':'reconnecting';
+  const normalized=techWorkflowRealtimeState==='live'?'live':techWorkflowRealtimeState==='offline'?'offline':'reconnecting';
   el.classList.add(normalized);
   const label=normalized==='live'?'LIVE':normalized==='offline'?'OFFLINE':'RECONNECTING';
   const span=el.querySelector('span'); if(span)span.textContent=label;
+  return el;
+}
+window.techRepositionLiveIndicator=techRepositionLiveIndicator;
+function setTechLiveStatus(state='reconnecting'){
+  techWorkflowRealtimeState=state==='live'?'live':state==='offline'?'offline':'reconnecting';
+  techRepositionLiveIndicator();
 }
 function techElementVisible(el){
   if(!el)return false;
