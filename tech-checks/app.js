@@ -516,6 +516,8 @@ async function init() {
   } catch (error) {
     console.warn('Tech Check session restore failed', error);
     showAuth();
+  } finally {
+    document.getElementById('sessionLoading')?.remove();
   }
 }
 function showAuth() {
