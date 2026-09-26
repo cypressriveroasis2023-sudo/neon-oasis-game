@@ -3193,7 +3193,7 @@ async function ownerAppRender(){
   else if(route==='testcenter')html=ownerAppTestCenter();
   else if(route==='assign')html=await ownerAppAssign();
   if(version!==ownerAppRenderVersion||route!==ownerAppRoute)return;
-  host.innerHTML=ownerGlobalSearchBarHtml()+html;
+  host.innerHTML=(route==='today'?'':ownerGlobalSearchBarHtml())+html;
   ownerSetPersistentSurface(route);
   const ownerWs=document.querySelector('#view-owner .ownerAppWorkspace');
   if(ownerWs){
