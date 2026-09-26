@@ -2769,17 +2769,18 @@ function ownerAppToday(){
   const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
   const todayJobs=jobs.filter(a=>String(a.scheduled_for||'')===today);
   const working=todayJobs.filter(a=>a.status==='started').length;
-  const open=todayJobs.filter(a=>a.status!=='completed').length;
   const complete=todayJobs.filter(a=>a.status==='completed').length;
   const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
   const review=(state.ownerReviewQueue||[]).filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed').length;
   const overdue=jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today).length;
   const attention=overdue+returns.filter(r=>r.status==='needs_replacement'||r.status==='pending_mhelp_inventory').length+review;
-  const topJobs=todayJobs.slice(0,3);
-  const jobRows=topJobs.length?topJobs.map(ownerAppJobRow).join(''):ownerAppEmpty('NO TECH CHECK JOBS SCHEDULED TODAY');
-  return '<section class="ownerTodayHero ownerTodayHeroCompact"><div class="ownerTodayWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>Here’s what needs your attention today.</p></div><div class="ownerTodayClockCard"><div id="ownerTodayClock" class="ownerTodayClock">--:--:--</div><span id="ownerTodayDate"></span></div></section>'
-    +'<section class="ownerHomeSummary"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>TODAY</span><small>'+open+' open · '+working+' working · '+complete+' complete</small></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span><small>'+(attention?'Tap to review owner actions':'Nothing urgent right now')+'</small></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span><small>'+(review?'Ready for closeout':'Nothing waiting')+'</small></button></section>'
-    +'<section class="ownerTodayPanel ownerHomeJobs"><header><div><span>TODAY’S OPERATIONS</span><h2>'+todayJobs.length+' Scheduled Job'+(todayJobs.length===1?'':'s')+'</h2></div><button class="mini" type="button" onclick="ownerAppNavigate(\'calendar\')">View Calendar →</button></header><div class="ownerTodayJobsList">'+jobRows+'</div>'+(todayJobs.length>3?'<button class="ownerHomeSeeAll" type="button" onclick="ownerAppNavigate(\'calendar\')">See all '+todayJobs.length+' jobs →</button>':'')+'</section>';
+  const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
+  const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
+  const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
+  return '<section class="ownerHomeWelcome"><span>CAMERAS ONSITE · OWNER</span><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+    +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
+    +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
+    +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>';
 }
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
