@@ -9201,3 +9201,113 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
     border-color:var(--light-red)!important;
   }
 }
+
+
+/* Owner light refinement v5 - simplify mobile dashboard */
+@media (prefers-color-scheme: light) {
+  /* Mobile already has persistent navigation: remove the duplicate Quick Actions menu. */
+  @media (max-width:900px) {
+    #view-owner .ownerCommandCenter .ownerCommandSection:has(.ownerCommandQuickGrid),
+    #view-owner .ownerCommandCenter section:has(.ownerCommandQuickGrid),
+    #view-owner .ownerCommandQuickGrid {
+      display:none!important;
+    }
+  }
+
+  /* Softer light palette: black is text, red is accent/action — not competing blocks. */
+  #view-owner {
+    --light-red:#c9151c;
+    --light-red-soft:#fff2f3;
+    --light-ink:#181b1e;
+    --light-muted:#66727c;
+    --light-line:#d8dee3;
+  }
+
+  /* Secondary navigation/action buttons should not look like dark-mode leftovers. */
+  #view-owner .ownerTodayPanel>header button,
+  #view-owner .ownerCmdInventoryEditBtn,
+  #view-owner .ownerCommandCenter a:not(.primary),
+  #view-owner .ownerCommandCenter button:not(.primary):not(.danger):not(.ownerReviewControlButton),
+  #view-owner .ownerCalControlBar button:not(.active),
+  #view-owner .ownerCalToolbar button:not(.active) {
+    background:#f6f7f8!important;
+    color:#22272b!important;
+    border:1px solid #d3d9de!important;
+    box-shadow:none!important;
+  }
+
+  /* Dashboard links: quiet outline treatment instead of black/navy blocks. */
+  #view-owner .ownerTodayPanel>header button,
+  #view-owner .ownerCmdInventoryEditBtn {
+    background:#fff!important;
+    color:#2c3338!important;
+    border-color:#cbd3d9!important;
+  }
+
+  /* Search field was the strongest black block in the light dashboard. */
+  #view-owner .ownerGlobalSearchInputWrap,
+  #view-owner .ownerGlobalSearchInputWrap input {
+    background:#f6f7f8!important;
+    color:#171a1d!important;
+    border-color:#cfd6db!important;
+  }
+  #view-owner .ownerGlobalSearchInputWrap input::placeholder {color:#78838c!important}
+  #view-owner .ownerGlobalSearchInputWrap button {
+    background:var(--light-red)!important;
+    color:#fff!important;
+    border-color:var(--light-red)!important;
+  }
+
+  /* Camera Health header control becomes a quiet utility, not a competing block. */
+  #view-owner .ownerCameraHealth,
+  #view-owner .ownerCameraHealthCard,
+  #view-owner [class*="HealthCard"],
+  #view-owner [class*="healthCard"] {
+    background:#f7f8f9!important;
+    color:#252a2e!important;
+    border-color:#d4dbe0!important;
+  }
+
+  /* KPI cards: neutral white with a thin status accent only. */
+  #view-owner .ownerCommandKpis button,
+  #view-owner .ownerCommandKpis button.alert,
+  #view-owner .ownerCommandKpis button.field,
+  #view-owner .ownerCommandKpis button.intake,
+  #view-owner .ownerCommandKpis button.review {
+    background:#fff!important;
+    color:var(--light-ink)!important;
+    border:1px solid var(--light-line)!important;
+    border-left-width:4px!important;
+  }
+
+  /* Owner Control is an action, but red outline reads cleaner than a red brick. */
+  #view-owner .ownerReviewControlButton {
+    background:#fff!important;
+    color:var(--light-red)!important;
+    border:2px solid var(--light-red)!important;
+    box-shadow:none!important;
+  }
+
+  /* Calendar active states: red is a small selected-state cue. */
+  #view-owner .ownerCalControlBar button.active,
+  #view-owner .ownerCalToolbar button.active,
+  #view-owner #ownerAppPage button.active,
+  #view-owner #ownerAppPage button.selected,
+  #view-owner #ownerAppPage button[aria-pressed="true"] {
+    background:var(--light-red-soft)!important;
+    color:var(--light-red)!important;
+    border-color:#e8aeb2!important;
+    box-shadow:none!important;
+  }
+
+  /* Bottom navigation is the primary mobile navigation. Keep it visually calm. */
+  @media (max-width:900px) {
+    #view-owner .ownerAppSidebar nav button.active,
+    #view-owner .ownerAppSidebar nav a.active,
+    html body:has(#view-owner:not(.hidden)) #view-owner .ownerAppSidebar nav .active {
+      background:var(--light-red-soft)!important;
+      color:var(--light-red)!important;
+      border-color:#e5b1b4!important;
+    }
+  }
+}
