@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-emergency-known-good-20260926ah';
+const CACHE_NAME = 'tech-check-helios-steps-only-20260926af';
 const APP_SHELL = './';
 const VISION_SHELL = './onsite-vision.html';
 
@@ -10,8 +10,8 @@ self.addEventListener('install', event => {
     await Promise.allSettled([
       cache.add(new Request(VISION_SHELL, { cache:'reload' })),
       cache.add(new Request('./tech-check-rules.js?v=helios-field-clarity-20260924q', { cache:'reload' })),
-      cache.add(new Request('./app.js?v=emergency-known-good-20260926ah', { cache:'reload' })),
-      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=emergency-known-good-20260926ah', { cache:'reload' })),
+      cache.add(new Request('./app.js?v=helios-steps-only-20260926af', { cache:'reload' })),
+      cache.add(new Request('./technician-wizard-owner-dashboard-v5.js?v=helios-steps-only-20260926af', { cache:'reload' })),
       cache.add(new Request('./team-email-settings.js?v=email-settings-v4', { cache:'reload' })),
       cache.add(new Request('./styles.css?v=owner-test-persona-20260923bg', { cache:'reload' })),
       cache.add(new Request('./onsite-vision.css?v=vision-workspace-v33', { cache:'reload' })),
