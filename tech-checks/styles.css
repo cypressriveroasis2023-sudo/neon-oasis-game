@@ -9832,3 +9832,26 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
   body #view-owner #ownerAppPage .ownerCalInspectorSection>b {color:#171b1f!important}
   body #view-owner #ownerAppPage .ownerCalInspectorSection>p {color:#52616b!important}
 }
+
+/* Owner dashboard: department activity below Next Up. */
+body #view-owner #ownerAppPage .ownerHomeTeamActivity{margin:12px 0 20px;padding:16px;background:#10232d;color:#f7fafc;border:1px solid #36505f;border-radius:18px}
+body #view-owner #ownerAppPage .ownerHomeTeamActivity header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+body #view-owner #ownerAppPage .ownerHomeTeamActivity h2{margin:0;font-size:18px;color:#f7fafc!important}
+body #view-owner #ownerAppPage .ownerHomeTeamActivity button{background:#182f3c!important;color:#f7fafc!important;border:1px solid #627986!important;border-radius:10px;min-height:44px;padding:8px 12px;font-size:14px;font-weight:800}
+body #view-owner #ownerAppPage .ownerHomeTeamRow{display:flex;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid #36505f}
+body #view-owner #ownerAppPage .ownerHomeTeamRow b{color:#f7fafc!important;font-size:16px}
+body #view-owner #ownerAppPage .ownerHomeTeamRow p{margin:5px 0 0;color:#bdced7!important;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+body #view-owner #ownerAppPage .ownerHomeTeamCounts{flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:5px;font-size:13px}
+body #view-owner #ownerAppPage .ownerHomeTeamCounts strong{color:#f7fafc!important}
+body #view-owner #ownerAppPage .ownerHomeTeamCounts span{color:#bdced7!important}
+body #view-owner #ownerAppPage .ownerHomeTeamActivity .ownerHomeHandoffLink{width:100%;margin-top:14px}
+@media(prefers-color-scheme:light){
+ body #view-owner #ownerAppPage .ownerHomeTeamActivity{background:#fff;color:#171b1f;border-color:#d1d9de}
+ body #view-owner #ownerAppPage .ownerHomeTeamActivity h2,
+ body #view-owner #ownerAppPage .ownerHomeTeamRow b,
+ body #view-owner #ownerAppPage .ownerHomeTeamCounts strong{color:#171b1f!important}
+ body #view-owner #ownerAppPage .ownerHomeTeamRow p,
+ body #view-owner #ownerAppPage .ownerHomeTeamCounts span{color:#52616b!important}
+ body #view-owner #ownerAppPage .ownerHomeTeamRow{border-color:#d1d9de}
+ body #view-owner #ownerAppPage .ownerHomeTeamActivity button{background:#f4f6f7!important;color:#24323b!important;border-color:#c3cdd4!important}
+}
