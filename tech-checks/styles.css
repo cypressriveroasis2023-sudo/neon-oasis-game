@@ -10052,3 +10052,58 @@ body #view-owner #ownerAppPage .ownerWeatherLiveMount .wl-tech-live-status{
     padding:5px 8px!important;
   }
 }
+
+
+/* Owner header live date + time v18 */
+body #view-owner #ownerAppPage .ownerHomeBrandRow{
+  width:100%!important;
+}
+body #view-owner #ownerAppPage .ownerHomeBrandRow>span{
+  flex:1 1 auto!important;
+  min-width:0!important;
+}
+body #view-owner #ownerAppPage .ownerHomeDateTime{
+  margin-left:auto!important;
+  flex:0 0 auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
+  gap:2px!important;
+  min-width:72px!important;
+  text-align:right!important;
+  line-height:1.05!important;
+}
+body #view-owner #ownerAppPage .ownerHomeDateTime span{
+  display:block!important;
+  color:#91a6b2!important;
+  font-size:9px!important;
+  font-weight:850!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+  white-space:nowrap!important;
+}
+body #view-owner #ownerAppPage .ownerHomeDateTime b{
+  display:block!important;
+  color:#f7fafc!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  letter-spacing:-.01em!important;
+  white-space:nowrap!important;
+}
+@media(prefers-color-scheme:light){
+  body #view-owner #ownerAppPage .ownerHomeDateTime span{color:#60717b!important}
+  body #view-owner #ownerAppPage .ownerHomeDateTime b{color:#171b1f!important}
+}
+@media(max-width:600px){
+  body #view-owner #ownerAppPage .ownerHomeDateTime{
+    min-width:66px!important;
+  }
+  body #view-owner #ownerAppPage .ownerHomeDateTime span{
+    font-size:8px!important;
+    letter-spacing:.06em!important;
+  }
+  body #view-owner #ownerAppPage .ownerHomeDateTime b{
+    font-size:14px!important;
+  }
+}
