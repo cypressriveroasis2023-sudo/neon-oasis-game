@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-menu-20260926t" />
+    <link rel="stylesheet" href="./styles.css?v=owner-startup-20260926u" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -173,7 +173,9 @@
 </head>
   <body>
     <div id="app">
-      <div id="authView" class="wrap auth">
+      <div id="sessionLoading" role="status" aria-live="polite"><strong>Tech Check</strong><span>Opening Tech Check…</span><button id="sessionLoadingRetry" type="button" hidden onclick="location.reload()">Try again</button></div>
+      <script>setTimeout(function(){var panel=document.getElementById('sessionLoading');if(panel){panel.querySelector('span').textContent='Taking longer than expected. Check your connection and try again.';document.getElementById('sessionLoadingRetry').hidden=false;}},15000);</script>
+      <div id="authView" class="wrap auth hidden">
         <div class="hero">
           <div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div>
         </div>
@@ -511,7 +513,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-field-clarity-20260924q"></script>
-    <script type="module" src="./app.js?v=owner-menu-20260926t"></script>
+    <script type="module" src="./app.js?v=owner-startup-20260926u"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -522,7 +524,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-menu-20260926t');
+            const registration = await navigator.serviceWorker.register('./sw.js?v=owner-startup-20260926u');
             registration.update().catch(() => {});
           } catch (error) {
             console.warn('Tech Check service worker unavailable', error);
