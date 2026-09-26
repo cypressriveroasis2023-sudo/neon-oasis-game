@@ -9962,68 +9962,92 @@ body #view-owner #ownerAppPage .ownerMoreGrid>:is(button,a) span{color:#d4bec2!i
  body:has(#view-owner:not(.hidden)) #view-owner #ownerPrimaryNav nav>:is(button,a)::before{color:inherit!important}
 }
 
-
-/* Owner dashboard logo + weather LIVE placement v16 */
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome{
-  position:relative!important;
-  display:grid!important;
-  grid-template-columns:54px minmax(0,1fr)!important;
-  grid-template-rows:auto auto auto!important;
-  column-gap:13px!important;
-  align-items:start!important;
-  text-align:left!important;
-}
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeLogo{
-  grid-column:1!important;
-  grid-row:1 / 4!important;
-  width:54px!important;
-  height:54px!important;
-  margin:1px 0 0!important;
+/* Owner header logo + weather realtime placement v17 */
+body #view-owner #ownerAppPage .ownerHomeWelcome{
   display:block!important;
+  position:relative!important;
+  text-align:left!important;
+  padding:8px 2px 4px!important;
+}
+body #view-owner #ownerAppPage .ownerHomeBrandRow{
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:46px!important;
+  margin:0 0 8px!important;
+}
+body #view-owner #ownerAppPage .ownerHomeBrandRow .ownerHomeLogo{
+  display:block!important;
+  flex:0 0 46px!important;
+  width:46px!important;
+  height:46px!important;
   object-fit:cover!important;
-  border-radius:14px!important;
+  border-radius:12px!important;
   box-shadow:0 5px 16px rgba(0,0,0,.18)!important;
 }
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome>span,
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome>h1,
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome>p{
-  grid-column:2!important;
+body #view-owner #ownerAppPage .ownerHomeBrandRow>span{
+  display:block!important;
+  margin:0!important;
+  color:#ef3038!important;
+  font-size:10px!important;
+  font-weight:900!important;
+  letter-spacing:.14em!important;
+  text-align:left!important;
+}
+body #view-owner #ownerAppPage .ownerHomeWelcome h1#ownerTodayGreeting,
+body #view-owner #ownerAppPage .ownerHomeWelcome>p{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
   margin-left:0!important;
   margin-right:0!important;
   text-align:left!important;
 }
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWeather .ownerWeatherNow{
+body #view-owner #ownerAppPage .ownerHomeWelcome h1#ownerTodayGreeting{
+  white-space:normal!important;
+  overflow:visible!important;
+}
+body #view-owner #ownerAppPage .ownerHomeWeather .ownerWeatherNow{
   position:relative!important;
 }
-body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWeather .wl-tech-live-status.in-owner-weather{
+body #view-owner #ownerAppPage .ownerWeatherLiveMount{
   position:absolute!important;
-  z-index:8!important;
   top:12px!important;
   right:12px!important;
-  left:auto!important;
-  bottom:auto!important;
-  width:auto!important;
-  margin:0!important;
+  z-index:8!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  min-height:28px!important;
   pointer-events:none!important;
 }
+body #view-owner #ownerAppPage .ownerWeatherLiveMount .wl-tech-live-status{
+  position:static!important;
+  inset:auto!important;
+  margin:0!important;
+  transform:none!important;
+}
 @media(max-width:600px){
-  body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome{
-    grid-template-columns:46px minmax(0,1fr)!important;
-    column-gap:10px!important;
-    padding:8px 2px 4px!important;
+  body #view-owner #ownerAppPage .ownerHomeBrandRow{
+    min-height:42px!important;
+    margin-bottom:7px!important;
   }
-  body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeLogo{
-    width:46px!important;
-    height:46px!important;
-    border-radius:12px!important;
+  body #view-owner #ownerAppPage .ownerHomeBrandRow .ownerHomeLogo{
+    width:42px!important;
+    height:42px!important;
+    flex-basis:42px!important;
+    border-radius:11px!important;
   }
-  body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWelcome h1#ownerTodayGreeting{
-    font-size:clamp(28px,7.25vw,32px)!important;
-    white-space:nowrap!important;
+  body #view-owner #ownerAppPage .ownerHomeWelcome h1#ownerTodayGreeting{
+    font-size:34px!important;
+    line-height:1.02!important;
+    letter-spacing:-.03em!important;
   }
-  body #view-owner[data-owner-route="today"] #ownerAppPage .ownerHomeWeather .wl-tech-live-status.in-owner-weather{
+  body #view-owner #ownerAppPage .ownerWeatherLiveMount{
     top:10px!important;
     right:10px!important;
+  }
+  body #view-owner #ownerAppPage .ownerWeatherLiveMount .wl-tech-live-status{
     font-size:9px!important;
     padding:5px 8px!important;
   }
