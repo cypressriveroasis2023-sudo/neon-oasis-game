@@ -5976,7 +5976,7 @@ function serviceHeliosFieldInstallHtml(prep,check,evidence,returns){
   const naturalIndex=heliosFieldTaskIndex(check,evidence,units);
   let index=Number.isInteger(svcHeliosFieldCursor)?svcHeliosFieldCursor:naturalIndex;
   index=Math.max(0,Math.min(total,index));
-  const header="";
+  const header="<div class='wl-helios-field-head wl-helios-field-head-min'><div class='wl-progress'><div style='width:"+Math.round(((Math.min(total,index+1))/Math.max(1,total))*100)+"%'></div></div></div>";
   const context=oldBlock;
 
   if(index<rules.length){
