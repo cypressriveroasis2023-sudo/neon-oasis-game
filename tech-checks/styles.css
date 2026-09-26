@@ -8575,3 +8575,138 @@ body.owner-test-role-preview .ownerTestBannerActions button.primary{
 @media (prefers-color-scheme: dark) {
   :root { color-scheme: dark; }
 }
+
+
+/* System-synced Owner light theme completeness v2 - 2026-09-26 */
+@media (prefers-color-scheme: light) {
+  /* Catch legacy dark surfaces still visible in Owner mode. */
+  #view-owner .card,
+  #view-owner .panel,
+  #view-owner .statCard,
+  #view-owner .summaryCard,
+  #view-owner details,
+  #view-owner section,
+  #view-owner article {
+    border-color:#d8dde2;
+  }
+
+  #view-owner .ownerAppWorkspace,
+  #view-owner .ownerAppWorkspace main,
+  #view-owner .ownerAppContent,
+  #view-owner .ownerAppPage,
+  #view-owner .ownerTodayPage {
+    background:#f3f4f5!important;
+  }
+
+  #view-owner .ownerAppWorkspace input:not([type="checkbox"]):not([type="radio"]),
+  #view-owner .ownerAppWorkspace select,
+  #view-owner .ownerAppWorkspace textarea {
+    background:#fff!important;
+    border-color:#cbd2d8!important;
+    color:#111!important;
+  }
+  #view-owner .ownerAppWorkspace input::placeholder,
+  #view-owner .ownerAppWorkspace textarea::placeholder {color:#7a838b!important}
+
+  #view-owner .ownerDashSection,
+  #view-owner .ownerInnerSection,
+  #view-owner .ownerInnerBody,
+  #view-owner .ownerTeamIntro,
+  #view-owner .ownerEquipmentIntro,
+  #view-owner .teamMemberCard,
+  #view-owner .teamMemberBody,
+  #view-owner .accountSecurityFold,
+  #view-owner .equipmentHistoryFold,
+  #view-owner .accountSecurityBody,
+  #view-owner .equipmentHistoryFold>div,
+  #view-owner .archivedTeamCard,
+  #view-owner .ownerEquipmentCard,
+  #view-owner .ownerUnitCard,
+  #view-owner .ownerAttentionItem,
+  #view-owner .ownerHandoffCard,
+  #view-owner .ownerHistoryCard,
+  #view-owner .ownerActivityCard {
+    background:#fff!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+
+  #view-owner .ownerDashSummary,
+  #view-owner .ownerInnerSection>summary,
+  #view-owner .teamMemberCard>summary {
+    background:#f7f8f9!important;
+    border-color:#d8dde2!important;
+    color:#17191c!important;
+  }
+  #view-owner .ownerDashSummary>div>b,
+  #view-owner .ownerInnerSection>summary,
+  #view-owner .teamMemberIdentity b,
+  #view-owner .ownerTeamIntro>b,
+  #view-owner .ownerEquipmentIntro>b,
+  #view-owner .ownerTeamStats b,
+  #view-owner .ownerEquipmentStats b {
+    color:#111!important;
+  }
+  #view-owner .ownerDashSummary>div>span,
+  #view-owner .teamMemberIdentity span,
+  #view-owner .ownerTeamStats span,
+  #view-owner .ownerEquipmentStats span,
+  #view-owner .accountSecurityFold>summary,
+  #view-owner .equipmentHistoryFold>summary {
+    color:#66717b!important;
+  }
+  #view-owner .ownerTeamStats span,
+  #view-owner .ownerEquipmentStats span,
+  #view-owner .ownerTeamIntro,
+  #view-owner .ownerEquipmentIntro,
+  #view-owner .accountSecurityFold,
+  #view-owner .equipmentHistoryFold,
+  #view-owner .archivedTeamCard {
+    background:#f8f9fa!important;
+  }
+
+  /* Health/status header and miscellaneous command controls. */
+  #view-owner button:not(.danger):not(.primary):not(.ownerReviewControlButton):not(.ownerGlobalSearchInputWrap button),
+  #view-owner .mini {
+    border-color:#cfd5da;
+  }
+  #view-owner .ownerCameraHealth,
+  #view-owner .ownerCameraHealthCard,
+  #view-owner [class*="HealthCard"],
+  #view-owner [class*="healthCard"] {
+    background:#fff!important;
+    border-color:#cfd5da!important;
+    color:#17191c!important;
+  }
+
+  /* Keep brand/action red intentional, never washed out. */
+  #view-owner .primary,
+  #view-owner button.primary,
+  #view-owner .danger,
+  #view-owner button.danger,
+  #view-owner .ownerReviewControlButton {
+    color:#fff!important;
+  }
+
+  /* Bottom dock / mobile navigation must be genuinely light. */
+  @media (max-width:900px) {
+    #view-owner .ownerAppSidebar {
+      background:#fff!important;
+      border-top-color:#d5dadd!important;
+      box-shadow:0 -8px 24px rgba(0,0,0,.08)!important;
+    }
+    #view-owner .ownerAppSidebar nav {
+      background:#fff!important;
+    }
+    #view-owner .ownerAppSidebar nav button,
+    #view-owner .ownerAppSidebar nav a {
+      color:#34383c!important;
+    }
+    #view-owner .ownerAppSidebar nav button.active,
+    #view-owner .ownerAppSidebar nav a.active {
+      background:#fff4f4!important;
+      border-color:#d20b12!important;
+      color:#c70c12!important;
+    }
+  }
+}
