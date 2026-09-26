@@ -111,7 +111,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-header-live-20260926w')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-datetime-20260926x')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -2734,8 +2734,8 @@ function ownerTodayClockTick(){
   const greeting=document.getElementById('ownerTodayGreeting');
   if(!clock)return;
   const now=new Date();
-  clock.textContent=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true}).replace(/\s?(AM|PM)$/,' $1');
-  if(date)date.textContent=now.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  clock.textContent=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?(AM|PM)$/,' $1');
+  if(date)date.textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   if(greeting)greeting.textContent=ownerTodayGreeting()+', '+ownerTodayName();
 }
 function ownerStartTodayLive(){
@@ -2792,7 +2792,7 @@ function ownerAppToday(){
   const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
   const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
   const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
-  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
     +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
     +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>'+ownerHomeTeamActivityHtml(jobs,today);
