@@ -63,6 +63,91 @@ let serviceReturn = { step: 0, ticket: '', unit: '', type: '', notes: '', noTag:
 let serviceReturnRecovered = false;
 let serviceReturnSubmitting = false;
 let serviceCloseSubmitting = false;
+const svcSolarPendingFilesByKey = new Map();
+
+function svcSolarPendingKey(panel) {
+  const prepId=String(activeSvcPrep?.id||'');
+  const category=String(panel?.dataset?.solarCategory||'');
+  return prepId&&category ? prepId+'|'+category : '';
+}
+function svcSolarPendingFiles(panel) {
+  const key=svcSolarPendingKey(panel);
+  return key ? (svcSolarPendingFilesByKey.get(key)||[]) : [];
+}
+function renderSvcSolarPendingFiles(panel,files) {
+  if(!panel)return;
+  files=Array.isArray(files)?files:[];
+  const multi=panel.dataset.wlSolarMulti==='1';
+  const selected=panel.querySelector('[data-wl-solar-selected]');
+  const preview=panel.querySelector('[data-wl-solar-preview]');
+  const save=panel.querySelector('[data-wl-solar-upload]');
+  const clear=panel.querySelector('[data-wl-solar-clear-photos]');
+  for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
+  panel._wlSolarObjectUrls=[];
+  if(!files.length){
+    if(selected)selected.textContent='No photo selected yet.';
+    if(preview){preview.innerHTML='';preview.classList.add('hidden');}
+    if(save){save.disabled=true;save.textContent=multi?'SAVE PHOTOS →':'SAVE PHOTO →';}
+    clear?.classList.add('hidden');
+    return;
+  }
+  if(selected)selected.textContent=files.length===1?'✓ 1 photo selected':'✓ '+files.length+' photos selected';
+  if(preview){
+    const shown=files.slice(0,4);
+    const urls=shown.map(file=>URL.createObjectURL(file));
+    panel._wlSolarObjectUrls=urls;
+    preview.classList.remove('hidden');
+    preview.innerHTML="<div class='wl-solar-preview-grid'>"+urls.map((url,i)=>"<img src='"+url+"' alt='Selected photo "+(i+1)+"'>").join('')+"</div><div><b>READY TO SAVE</b><span>"+esc(files.length===1?(files[0].name||'Photo ready'):(files.length+' photos selected'))+"</span></div>";
+  }
+  if(save){save.disabled=false;save.textContent=files.length>1?'SAVE '+files.length+' PHOTOS →':'SAVE PHOTO →';}
+  clear?.classList.remove('hidden');
+}
+function handleSvcSolarFileChange(input) {
+  const panel=input?.closest?.('.wl-solar-proof');
+  if(!panel)return;
+  const key=svcSolarPendingKey(panel);
+  if(!key)return;
+  const multi=panel.dataset.wlSolarMulti==='1';
+  const incoming=[...(input.files||[])];
+  if(!incoming.length)return;
+  let files;
+  if(!multi){
+    files=incoming.slice(0,1);
+  }else{
+    files=[...svcSolarPendingFiles(panel)];
+    for(const file of incoming){
+      const fingerprint=[file.name,file.size,file.lastModified].join('|');
+      if(!files.some(existingFile=>[existingFile.name,existingFile.size,existingFile.lastModified].join('|')===fingerprint))files.push(file);
+    }
+  }
+  svcSolarPendingFilesByKey.set(key,files);
+  try{input.value='';}catch{}
+  renderSvcSolarPendingFiles(panel,files);
+
+  // If realtime refreshed the wizard while iOS Camera/Photos was open, this
+  // input may now be detached. The direct listener still owns the selected
+  // File objects, so repaint the live wizard from the durable pending map.
+  if(!panel.isConnected){
+    Promise.resolve(renderSvcPrep()).catch(error=>console.warn('Could not restore selected Service photo after picker return',error));
+  }
+}
+function wireSvcSolarPhotoInputs(root=document) {
+  const inputs=[...(root?.querySelectorAll?.('.wl-solar-file')||[])];
+  for(const input of inputs){
+    if(input.dataset.wlSolarDirectBound!=='1'){
+      input.dataset.wlSolarDirectBound='1';
+      input.addEventListener('change',event=>{
+        event.stopPropagation();
+        handleSvcSolarFileChange(input);
+      });
+    }
+  }
+  const panels=new Set(inputs.map(input=>input.closest('.wl-solar-proof')).filter(Boolean));
+  for(const panel of panels){
+    const pending=svcSolarPendingFiles(panel);
+    if(pending.length)renderSvcSolarPendingFiles(panel,pending);
+  }
+}
 const FIELD_DRAFT_TTL = 24 * 60 * 60 * 1000;
 async function deviceDraftKey(kind) { const tech=await currentTechIdentity().catch(()=>null); return tech?.id ? `cos-tech-field-draft-v1:${tech.id}:${kind}` : ''; }
 async function saveDeviceDraft(kind, payload) { const key = await deviceDraftKey(kind); if (!key) return; try { localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() })); } catch {} }
@@ -6028,7 +6113,7 @@ async function renderSvcPrep() {
       wizard.innerHTML=swapResultHtml(activeSvcPrep,swapState,{heliosOnly:true});
       resetWizardPosition();return;
     }
-    if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+    if(heliosField.length){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);wireSvcSolarPhotoInputs(wizard);resetWizardPosition();return;}
   }
   if(svcUnitIndex<forms.length){
     const questions=svcQuestions(forms[svcUnitIndex]),q=questions[svcQuestionIndex],afterLast=hasParts?'Next Check →':solarRequired?'Next Check →':'Compare IT Photos →';
@@ -6062,7 +6147,7 @@ async function renderSvcPrep() {
   }else if(rangerField.length&&svcUnitIndex===rangerStep){
     wizard.innerHTML=progress('Ranger Field Check','Verify Victron Bluetooth status at the site',1,1)+rangerFieldHtml(activeSvcPrep)+`<div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><button class='wl-next' data-wl-svc-next ${rangerFieldReady(activeSvcPrep)?'':'disabled'}>Review →</button></div>`;
   }else{
-    if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);resetWizardPosition();return;}
+    if(heliosField.length&&solarCheck?.handoff_accepted_at){const swapReturns=await loadHeliosSwapReturns(activeSvcPrep.ticket_no);wizard.innerHTML=serviceHeliosFieldInstallHtml(activeSvcPrep,solarCheck,solarEvidence,swapReturns);wizard.querySelectorAll('canvas').forEach(wireCanvas);wireSvcSolarPhotoInputs(wizard);resetWizardPosition();return;}
     const ev=await evidenceRows(activeSvcPrep.id,'service'),itEv=await evidenceRows(activeSvcPrep.id,'it'),requiredPhotos=itEv.filter(x=>x.kind==='photo').length||forms.length,servicePhotos=ev.filter(x=>x.kind==='photo').length;
     const allChecksOk=forms.every(form=>svcQuestions(form).every(q=>q.kind==='number'?q.input.value!=='':q.input.checked)),partsReady=!hasParts||Boolean(activeSvcPrep.service_parts_confirmed),proofReady=servicePhotos===requiredPhotos&&ev.some(x=>x.kind==='signature'),rangerReady=rangerFieldReady(activeSvcPrep);
     const heliosNeedsAcceptance=heliosHandoff.length>0&&!solarCheck?.handoff_accepted_at;
@@ -6085,6 +6170,7 @@ async function renderSvcPrep() {
     ):'';
     wizard.innerHTML=progress(heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'SERVICE HANDOFF':'FINAL STEP',heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'Accept the Helios from IT before field installation':'Complete field work and close Tech Check',1,1)+aiFinal+`<div class='wl-review'><b>MHelpDesk #${esc(activeSvcPrep.ticket_no)}</b><div class='small'><b>Received from:</b> IT Tech ${esc(preparedBy)}</div><div class='small'>📷 Service receipt photos: ${servicePhotos} of ${requiredPhotos}</div>${partsReady?(hasParts?`<div class='small'>✓ Listed parts verified.</div>`:''):`<div class='wl-stop'><b>Parts are not verified.</b></div>`}${solarRequired?(solarReady?`<div class='small'>✓ Solar / Helios pre-trip complete.</div>`:`<div class='wl-stop'><b>Solar / Helios pre-trip incomplete.</b></div>`):''}${allChecksOk?`<div class='small'>✓ Every Service equipment verification answer is YES.</div>`:`<div class='wl-stop'><b>One or more Service checks are incomplete.</b></div>`}</div>${heliosNotice}${rangerNotice}${swapNotice}<button class='wl-big wl-red' ${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?'data-wl-accept-helios':'data-wl-close-svc'} ${ready?'':'disabled'}>${heliosHandoff.length&&!solarCheck?.handoff_accepted_at?`Accept Helios from IT Tech ${esc(preparedBy)} & Start Field Install →`:`Complete Tech Check →`}</button><div class='wl-nav'><button class='wl-prev' data-wl-svc-prev>Back</button><span></span></div>`;
   }
+  wireSvcSolarPhotoInputs(wizard);
   resetWizardPosition();
 }
 function inspectionQuestion() {
@@ -6251,48 +6337,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', async e => {
   if (e.target.matches?.('.wl-solar-file')) {
-    const panel=e.target.closest('.wl-solar-proof');
-    if(!panel)return;
-    const multi=panel.dataset.wlSolarMulti==='1';
-    const incoming=[...(e.target.files||[])];
-    if(!multi){
-      panel.querySelectorAll('.wl-solar-file').forEach(input=>{if(input!==e.target)input.value='';});
-      panel._wlSolarPendingFiles=incoming;
-    }else{
-      const existing=Array.isArray(panel._wlSolarPendingFiles)?panel._wlSolarPendingFiles:[];
-      const merged=[...existing];
-      for(const file of incoming){
-        const key=[file.name,file.size,file.lastModified].join('|');
-        if(!merged.some(x=>[x.name,x.size,x.lastModified].join('|')===key))merged.push(file);
-      }
-      panel._wlSolarPendingFiles=merged;
-      e.target.value='';
-    }
-    const files=panel._wlSolarPendingFiles||[];
-    const selected=panel.querySelector('[data-wl-solar-selected]');
-    const preview=panel.querySelector('[data-wl-solar-preview]');
-    const save=panel.querySelector('[data-wl-solar-upload]');
-    const clear=panel.querySelector('[data-wl-solar-clear-photos]');
-    for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
-    panel._wlSolarObjectUrls=[];
-    if(!files.length){
-      if(selected)selected.textContent='No photo selected yet.';
-      preview?.classList.add('hidden');
-      if(preview)preview.innerHTML='';
-      if(save){save.disabled=true;save.textContent=multi?'SAVE PHOTOS →':'SAVE PHOTO →';}
-      clear?.classList.add('hidden');
-      return;
-    }
-    if(selected)selected.textContent=files.length===1?'✓ 1 photo selected':'✓ '+files.length+' photos selected';
-    if(preview){
-      const shown=files.slice(0,4);
-      const urls=shown.map(file=>URL.createObjectURL(file));
-      panel._wlSolarObjectUrls=urls;
-      preview.classList.remove('hidden');
-      preview.innerHTML="<div class='wl-solar-preview-grid'>"+urls.map((url,i)=>"<img src='"+url+"' alt='Selected photo "+(i+1)+"'>").join('')+"</div><div><b>READY TO SAVE</b><span>"+esc(files.length===1?files[0].name:(files.length+' photos selected'))+"</span></div>";
-    }
-    if(save){save.disabled=false;save.textContent=files.length>1?'SAVE '+files.length+' PHOTOS →':'SAVE PHOTO →';}
-    clear?.classList.remove('hidden');
+    handleSvcSolarFileChange(e.target);
     return;
   }
   if (e.target.id === 'wlReturnPhoto') {
@@ -6735,6 +6780,8 @@ document.addEventListener('click', async e => {
   if(solarClearPhotos){
     const panel=solarClearPhotos.closest('.wl-solar-proof');
     if(!panel)return;
+    const pendingKey=svcSolarPendingKey(panel);
+    if(pendingKey)svcSolarPendingFilesByKey.delete(pendingKey);
     panel._wlSolarPendingFiles=[];
     for(const url of (panel._wlSolarObjectUrls||[])){try{URL.revokeObjectURL(url);}catch{}}
     panel._wlSolarObjectUrls=[];
@@ -6753,14 +6800,19 @@ document.addEventListener('click', async e => {
   if (solarUpload) {
     const panel=solarUpload.closest('.wl-solar-proof');
     const category=panel?.dataset.solarCategory;
-    const files=(Array.isArray(panel?._wlSolarPendingFiles)&&panel._wlSolarPendingFiles.length)
-      ? [...panel._wlSolarPendingFiles]
-      : [...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
+    const pendingKey=svcSolarPendingKey(panel);
+    const rememberedFiles=pendingKey ? (svcSolarPendingFilesByKey.get(pendingKey)||[]) : [];
+    const files=rememberedFiles.length
+      ? [...rememberedFiles]
+      : (Array.isArray(panel?._wlSolarPendingFiles)&&panel._wlSolarPendingFiles.length)
+        ? [...panel._wlSolarPendingFiles]
+        : [...(panel?.querySelectorAll('.wl-solar-file') || [])].flatMap(input=>[...(input.files||[])]);
     if (!category || !files.length) return alert('Take or select at least one photo first.');
     solarUpload.disabled=true;
     solarUpload.textContent=files.length>1 ? `Saving ${files.length} photos…` : 'Saving photo…';
     try {
       for (const file of files) await uploadServiceSolarEvidence(activeSvcPrep.id,category,'photo',file);
+      if(pendingKey)svcSolarPendingFilesByKey.delete(pendingKey);
       if(category==='helios_install' && Number.isInteger(svcHeliosFieldCursor))svcHeliosFieldCursor++;
       else if(Number.isInteger(svcSolarCursor))svcSolarCursor++;
       return renderSvcPrep();
