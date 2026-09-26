@@ -98,38 +98,20 @@ let refreshInFlight = null;
 let refreshQueued = false;
 let deferredModulesPromise = null;
 let realtimeStarted = false;
-let refreshDeferredWhileHidden = false;
 function scheduleRefreshData() {
   // Realtime can emit several related row changes for one technician action.
   // Coalesce that burst into one shared refresh instead of reloading the entire
   // role snapshot repeatedly within a few hundred milliseconds.
-  //
-  // iOS hides this page while Camera / Photo Library owns the screen. Do not
-  // repaint the technician wizard during that interval or the file input that
-  // launched the picker can be detached before its change event is delivered.
   clearTimeout(liveRefreshTimer);
-  liveRefreshTimer = setTimeout(() => {
-    if (document.visibilityState !== 'visible') {
-      refreshDeferredWhileHidden = true;
-      return;
-    }
-    refreshDeferredWhileHidden = false;
-    refreshData();
-  }, 900);
+  liveRefreshTimer = setTimeout(() => refreshData(), 900);
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && refreshDeferredWhileHidden) {
-    refreshDeferredWhileHidden = false;
-    scheduleRefreshData();
-  }
-});
 function scheduleIdle(task, timeout=700) {
   if ('requestIdleCallback' in window) return requestIdleCallback(task, { timeout });
   return setTimeout(task, Math.min(timeout, 260));
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=helios-steps-only-20260926af')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=reliability-shared-evidence-20260925ab')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -795,10 +777,6 @@ function show(which) {
   window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
-  // Signing out is an explicit end to any Owner Test impersonation on this device.
-  // Normal page refresh still restores an intentionally active Owner Test session.
-  try{localStorage.removeItem(OWNER_TEST_SESSION_KEY);}catch{}
-  document.body.classList.remove('owner-test-role-preview','owner-test-role-it','owner-test-role-service');
   await db.auth.signOut();
   showAuth();
 }
