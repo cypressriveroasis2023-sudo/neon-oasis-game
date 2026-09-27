@@ -97,22 +97,18 @@
   }
 
   function getRequiredFields(workflow,equipmentManifest){
-    const type=normalizeWorkType(workflow);
-    const wf=getWorkflowDefinition(type);
-    const base=(wf?.required_create_fields||[
-      'ticket_no','site','scheduled_for','scheduled_time','equipment_manifest',
-      'equipment_numbers','job_description','parts','assignment','notes'
-    ]).slice();
-
-    // Work type is always required in conversational drafts until known.
-    const fields=['work_type',...base];
-
-    // Service-only work can explicitly answer "no shop equipment".
-    // Other job types require an equipment definition/manifest.
-    if(type==='service' && Array.isArray(equipmentManifest) && equipmentManifest.length===0){
-      // Keep the equipment question until the user explicitly answers it.
-    }
-    return [...new Set(fields)];
+    // Owner creates only the job facts they actually know.
+    // Unit / stand numbers, technical prep, parts, and implementation detail belong
+    // to the technician workflow after the job exists.
+    return [
+      'work_type',
+      'ticket_no',
+      'site',
+      'scheduled_for',
+      'scheduled_time',
+      'equipment_manifest',
+      'assignment'
+    ];
   }
 
   function isAnswered(field,d){
@@ -151,12 +147,8 @@
       site:{key,prompt:'What customer or site is listed on the MHelpDesk ticket?'},
       scheduled_for:{key,prompt:'What date should this work be scheduled for?'},
       scheduled_time:{key,prompt:'What time should it be scheduled for? If there is no exact time, choose “No specific time.”',choices:['No specific time']},
-      equipment_manifest:{key,prompt:type==='service'?'Does this Service job need any equipment from the shop?':'What equipment is required, and how many?'},
-      equipment_numbers:{key,prompt:'Do you have the specific unit / stand numbers from MHelpDesk? Type them, or choose “No numbers yet.”',choices:['No numbers yet']},
-      job_description:{key,prompt:'What should the technician actually do on this work order?'},
-      parts:{key,prompt:'Are any extra parts or supplies required — solar panels, replacement batteries, cameras, SIM cards, or micro SD cards?',choices:['No additional parts']},
-      assignment:{key,prompt:'Who should this work be assigned to? Choose a technician or leave each step in its department queue.',choices:['Use department queues']},
-      notes:{key,prompt:'Any additional owner notes for the technicians?',choices:['No additional notes']}
+      equipment_manifest:{key,prompt:'What equipment is this job for, and how many units?'},
+      assignment:{key,prompt:'Which technician is handling this job? The rest of the department routing is automatic.'}
     };
     const q=questions[key]||{key:'',prompt:''};
 
