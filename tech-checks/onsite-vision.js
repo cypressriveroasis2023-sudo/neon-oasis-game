@@ -794,7 +794,7 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome vision-welcome-minimal"><button type="button" class="vision-orb" data-vision-voice aria-label="Talk to OnSite Vision"><span class="vision-orb-glow"></span><img src="./techcheck-eye-192.png?v=2" alt=""><span class="vision-orb-mic">🎙</span></button><div class="vision-rotating-prompt" aria-live="polite"><span id="visionPromptSuggestion">Ask Vision anything about Tech Check</span></div><div class="vision-orb-hint">Tap Vision to talk</div></div>';
+  return '<div class="vision-welcome vision-welcome-minimal"><button type="button" class="vision-orb" data-vision-voice aria-label="Talk to OnSite Vision"><span class="vision-orb-glow"></span><img src="./techcheck-eye-192.png?v=2" alt=""></button><div class="vision-rotating-prompt" aria-live="polite"><span id="visionPromptSuggestion">Ask Vision anything about Tech Check</span></div><div class="vision-orb-hint">Tap Vision to talk</div></div>';
 }
 const VISION_PROMPT_SUGGESTIONS=[
   'Ask Vision anything about Tech Check',
@@ -820,8 +820,8 @@ function message(m){
   return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
 }
 function renderThread(){
-  const h=$('visionThread');if(!h)return;const c=chat();
-  h.innerHTML=!c||!c.messages.length?welcome():c.messages.map(message).join('');if(!c||!c.messages.length)startVisionPromptSuggestions();else clearInterval(visionPromptSuggestionTimer);setTimeout(()=>bottom(false),0);
+  const h=$('visionThread');if(!h)return;const c=chat();const empty=!c||!c.messages.length;
+  h.innerHTML=empty?welcome():c.messages.map(message).join('');document.body.classList.toggle('vision-empty-chat',empty);if(empty)startVisionPromptSuggestions();else clearInterval(visionPromptSuggestionTimer);setTimeout(()=>bottom(false),0);
 }
 function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
 function bottom(smooth=true){
