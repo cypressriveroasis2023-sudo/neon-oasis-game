@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v5",
-  "description": "Owner-style natural-language regression bank for OnSite Vision. Includes terse speech, omitted command verbs, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
+  "version": "onsite-vision-language-evals-v6",
+  "description": "Owner-style natural-language regression bank for OnSite Vision. Adds conversational correction, draft editing, repeated-job references, terse speech, omitted command verbs, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
     "workload_followup",
@@ -719,6 +719,106 @@
       "intent": "schedule",
       "tool": "get_job_context",
       "action": "schedule"
+    },
+    {
+      "id": "mem01",
+      "utterance": "make that Teddy",
+      "context": [
+        "Vision is editing a delivery draft and an IT technician assignment was just discussed"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "mem02",
+      "utterance": "no I meant Service",
+      "context": [
+        "Vision just asked who should be assigned to the current job"
+      ],
+      "intent": "assign",
+      "tool": "none",
+      "action": "assign"
+    },
+    {
+      "id": "mem03",
+      "utterance": "no I meant a Service job",
+      "context": [
+        "Vision is building a new Delivery draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem04",
+      "utterance": "move that to Friday",
+      "context": [
+        "Vision is building a new job draft for Thursday"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "mem05",
+      "utterance": "make it 3 pm",
+      "context": [
+        "Vision is building a new job draft at 10 AM"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "mem06",
+      "utterance": "add another Helios",
+      "context": [
+        "Vision is building a new job draft with 2 Helios units"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem07",
+      "utterance": "remove one Helios",
+      "context": [
+        "Vision is building a new job draft with 3 Helios units"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem08",
+      "utterance": "do the same thing for the next ticket",
+      "context": [
+        "Vision just created a Tech Check delivery"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem09",
+      "utterance": "same setup ticket 22999",
+      "context": [
+        "Vision just created a Tech Check service job"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem10",
+      "utterance": "change the site to North Yard",
+      "context": [
+        "Vision is building a new job draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
     }
   ]
 }
