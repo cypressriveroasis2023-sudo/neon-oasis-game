@@ -183,9 +183,12 @@ function visionInterpretationHints(text){
   }catch{}
   if(!intent&&parts.length)intent='parts_update';
   if(!intent&&/\b(cancel|remove|delete)\b/.test(lower)&&ticket)intent='cancel_or_update';
+  const questionLead=/^\s*(what|which|who|how|why|where|when|show|list|does|do|is|are|can|could|should|any)\b/i.test(raw);
+  if(!intent&&!state.currentTicket&&!questionLead&&(workType||equipment.length)&&(date||time||techs.length||site))intent='create_job';
   if(!intent&&/\b(who|what|when|where|why|how|show|list|does|do|is|are|can|could|should)\b/.test(lower))intent='question';
 
-  const role=/\bservice\b/.test(lower)?'service':/\b(?:it|eye\s*tee)\b/.test(lower)?'it':'';
+  const explicitIt=/\bIT\b/.test(raw)||/\beye\s*tee\b/i.test(raw)||/\bit\s+(?:tech|technician|department|team|queue)\b/i.test(raw);
+  const role=/\bservice\b/.test(lower)?'service':explicitIt?'it':'';
   const reference=/\b(it|that|this|him|her|them|that one|this one|same one|same tech|same job)\b/.test(lower);
   const draft=chat()?.draft?normalizeDraftState({...chat().draft}):null;
   let draftMissing='';
@@ -1057,14 +1060,16 @@ function findTech(text,role=''){
   return pool.find(t=>{const first=String(t.full_name||'').trim().split(/\s+/)[0].toLowerCase();return first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(s);})||null;
 }
 function assignIntent(text){
-  const s=String(text||'').toLowerCase();
+  const raw=String(text||''),s=raw.toLowerCase();
   if(!/\b(assign|task|send|put|give|ask|have|let|move|hand|stick)\b/.test(s)||!/\b(job|ticket|this|that|it|service|tech|technician|to|on|handle|take)\b/.test(s))return null;
-  const service=/\bservice\b/.test(s),it=/\bit\b/.test(s),tech=findTech(text,service?'service':it?'it':'');
+  const service=/\bservice\b/.test(s);
+  const itDept=/\bIT\b/.test(raw)||/\beye\s*tee\b/i.test(raw)||/\bit\s+(?:tech|technician|department|team|queue)\b/i.test(raw);
+  const tech=findTech(raw,service?'service':itDept?'it':'');
   if(tech)return{kind:'assign-tech',role:tech.role,tech};
   if(service&&/\b(?:a|any|which)?\s*service\s+(?:tech|technician)\b/.test(s))return{kind:'choose-tech',role:'service'};
-  if(it&&/\b(?:a|any|which)?\s*it\s+(?:tech|technician)\b/.test(s))return{kind:'choose-tech',role:'it'};
+  if(itDept&&/\b(?:a|any|which)?\s*(?:it|eye\s*tee)\s+(?:tech|technician)\b/i.test(raw))return{kind:'choose-tech',role:'it'};
   if(service)return{kind:'assign-queue',role:'service'};
-  if(it)return{kind:'assign-queue',role:'it'};
+  if(itDept)return{kind:'assign-queue',role:'it'};
   return null;
 }
 function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||t)&&/\b(move|change|set|make|schedule|reschedule|put)\b/i.test(text)?{kind:'schedule',date:d,time:t}:null;}
@@ -1466,7 +1471,15 @@ function draftApplyInput(d,text,initial=false){
   const raw=String(text||'').trim(),expected=draftMissingKey(d),type=draftWorkType(raw);
   if(type){d.work_type=type;d.role=draftDefaultRole(type);}
   const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
-  if(explicitTicket||bareTicket)d.ticket_no=explicitTicket||bareTicket;
+  let embeddedTicket='';
+  if(!explicitTicket&&!bareTicket&&initial){
+    const values=[...raw.matchAll(/\b(\d{4,7})\b/g)].map(m=>m[1]).filter(v=>{
+      const n=Number(v),year=new Date().getFullYear();
+      return !(n>=year-1&&n<=year+2);
+    });
+    if(values.length===1)embeddedTicket=values[0];
+  }
+  if(explicitTicket||bareTicket||embeddedTicket)d.ticket_no=explicitTicket||bareTicket||embeddedTicket;
   const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i);
   if(siteMatch)d.site=String(siteMatch[1]||'').trim();
   if(!siteMatch&&(initial||expected==='site')){
@@ -1510,7 +1523,11 @@ function draftApplyInput(d,text,initial=false){
   if(expected==='parts'&&/\b(yes|correct|confirmed|that'?s all|those are all)\b/i.test(raw)&&Object.keys(d.parts||{}).length)d.parts_answered=true;
   if((expected==='parts'&&/\b(no additional parts|no other replacement items|no parts|none|skip)\b/i.test(raw))||/\b(no parts|no extra parts|no additional parts|no other replacement items)\b/i.test(raw)){d.parts=d.parts||{};d.parts_answered=true;}
   const techs=draftMatchedTechs(raw);
-  if(techs.length){d.assignees=d.assignees||{};techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});if(expected==='assignment'||/\b(assign|task|send|give|put)\b/i.test(raw))d.assignment_answered=true;}
+  if(techs.length){
+    d.assignees=d.assignees||{};
+    techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});
+    if(expected==='assignment'||/\b(assign|task|send|give|put|have|let|with)\b/i.test(raw)||(initial&&Boolean(d.work_type)))d.assignment_answered=true;
+  }
   const queueAssignment=/\b(department queues?|leave (?:it|them|both|each).*queue|unassigned|no preference|doesn'?t matter|any (?:it|service)?\s*(?:tech|technician)|anyone (?:in|from) (?:it|service)|anybody (?:in|from) (?:it|service)|whoever(?:'s| is)? (?:available|open|free)|first available (?:it|service)?\s*(?:tech|technician))\b/i.test(raw);
   if((expected==='assignment'&&queueAssignment)||(queueAssignment&&/\b(assign|assignment|tech|technician|queue|whoever|anyone|anybody|available|preference)\b/i.test(raw))){d.assignees=d.assignees||{};d.assignment_answered=true;}
   const notesMatch=raw.match(/\bnotes?\s*(?:are|is|:|=)\s*([^;\n]+)/i);
@@ -2164,6 +2181,14 @@ async function answer(text){
   // the Owner just typed.
   const hint=unitHint(raw);let ticket=ticketFrom(raw)||ticketByUnit(hint);
   if(!ticket){
+    const hints=visionInterpretationHints(raw);
+    const structuredOps=hints.likely_intent==='create_job'||hints.likely_intent==='assign'||hints.likely_intent==='schedule'
+      ||((hints.equipment||[]).length>0&&Boolean(hints.date||hints.time||(hints.matched_technicians||[]).length||hints.site));
+    if(structuredOps){
+      const agentReply=await serverAgentAnswer(raw);
+      if(agentReply)return agentReply;
+    }
+
     const personReply=await personLookupHtml(raw);
     if(personReply)return personReply;
 
