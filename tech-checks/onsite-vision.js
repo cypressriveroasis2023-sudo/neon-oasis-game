@@ -322,6 +322,36 @@ function renderKnowledgeList(){
       +'<p>'+esc(entry.content||'')+'</p><span class="vision-knowledge-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</span></button>';
   }).join('');
 }
+async function runConversationEvalPreview(){
+  if(!VISION_PREVIEW)return;
+  const button=$('visionConversationEval');
+  if(button)button.disabled=true;
+  addMessage('assistant','', '<div class="vision-direct"><b>Running preview conversation QA…</b>Testing multi-turn follow-ups, corrections, workload context, voice-like shorthand, and production-main grounding against the isolated preview AI.</div>');
+  renderThread();bottom();
+  try{
+    const result=await db.functions.invoke('onsite-vision-conversation-eval-preview',{body:{limit:10}});
+    if(result.error||!result.data?.ok)throw new Error(result.data?.error||result.error?.message||'Conversation QA failed.');
+    const data=result.data,rows=Array.isArray(data.results)?data.results:[];
+    const failed=rows.filter(x=>x.pass!==true);
+    const failureHtml=failed.slice(0,8).map(c=>{
+      const bad=(Array.isArray(c.turns)?c.turns:[]).filter(t=>t.pass!==true).slice(0,3);
+      return '<div class="vision-eval-row"><b>'+esc(c.id||c.title||'Conversation')+'</b>'
+        +bad.map(t=>'<span>'+esc(t.message||'')+'<small>'+esc((t.reasons||[]).join(' · ')||t.error||'Mismatch')+'</small></span>').join('')
+        +'</div>';
+    }).join('');
+    addMessage('assistant','',
+      '<div class="vision-answer-title">Preview conversation QA: '+esc(String(data.passed_turns||0))+' / '+esc(String(data.total_turns||0))+' turns passed · '+esc(String(data.pass_rate||0))+'%</div>'
+      +'<div class="vision-direct '+(Number(data.failed_turns||0)===0?'good':'warn')+'"><b>'+esc(String(data.passed_conversations||0))+' / '+esc(String(data.conversations||0))+' conversations passed end-to-end</b>Agent: '+esc(data.agent||'preview')+' · Suite '+esc(data.suite_version||'')+' · READ ONLY</div>'
+      +(failureHtml?'<div class="vision-context-block"><h3>Conversation mismatches</h3>'+failureHtml+'</div>':'<div class="vision-system-note">No multi-turn conversation mismatches were found in this run.</div>')
+    );
+  }catch(error){
+    addMessage('assistant','', '<div class="vision-direct warn"><b>Preview conversation QA could not finish.</b>'+esc(error?.message||'Please try again.')+'</div>');
+  }finally{
+    if(button)button.disabled=false;
+    renderThread();bottom();
+  }
+}
+
 async function runLanguageEval(){
   const button=$('visionLanguageEval'),status=$('visionLanguageEvalStatus');
   if(!db||!status)return;
@@ -2860,6 +2890,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#visionTeachButton')){await openKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeClose')){closeKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeNew')){resetKnowledgeForm();return;}
+  if(e.target.closest('#visionConversationEval')){await runConversationEvalPreview();return;}
   if(e.target.closest('#visionLanguageEval')){await runLanguageEval();return;}
   if(e.target.closest('#visionKnowledgeSaveDraft')){
     try{await saveKnowledgeEntry('draft');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not save draft.';}}return;
