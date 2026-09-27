@@ -2702,6 +2702,23 @@ async function executiveBriefingHtml(){
   try{if(layer?.getOwnerReviewQueue)reviews=await layer.getOwnerReviewQueue({limit:60});}catch{}
   try{if(layer?.getDamageHolds){const result=await layer.getDamageHolds({scope:'active',unit_reference:'',ticket_no:''},{force:true,limit:100});holds=Array.isArray(result?.rows)?result.rows:[];}}catch{}
   const reviewCount=reviews.length,holdCount=holds.length,attention=reviewCount+holdCount;
+  const readiness=[];
+  if(layer?.getJobContext){
+    for(const ticket of tomorrowWork.tickets.slice(0,12)){
+      try{
+        const context=await layer.getJobContext(ticket,{force:true});
+        const engine=visionWorkflowEngine(),wc=liveEngineContext(context);
+        const blockers=engine?.getWorkflowBlockers?engine.getWorkflowBlockers(wc):[];
+        const next=engine?.getWorkflowNextStep?engine.getWorkflowNextStep(wc):null;
+        readiness.push({ticket,context,blockers:Array.isArray(blockers)?blockers:[],next:next?.next||''});
+      }catch(error){readiness.push({ticket,context:null,blockers:[{message:'Live readiness could not be verified.'}],next:''});}
+    }
+  }
+  const blocked=readiness.filter(r=>r.blockers.length),ready=readiness.filter(r=>!r.blockers.length);
+  const readinessHtml=tomorrowWork.total
+    ?'<div class="vision-context-block"><h3>TOMORROW READINESS</h3><div class="vision-context-grid"><div><span>NO KNOWN BLOCKER</span><b>'+ready.length+'</b></div><div><span>BLOCKED / NEEDS WORK</span><b>'+blocked.length+'</b></div><div><span>NOT CHECKED</span><b>'+Math.max(0,tomorrowWork.total-readiness.length)+'</b></div></div></div>'
+      +(blocked.length?blocked.slice(0,6).map(r=>'<div class="vision-direct warn"><b>#'+esc(r.ticket)+' NEEDS WORK</b>'+esc(r.blockers.map(b=>b.message||b.code||'Workflow blocker').join(' · '))+(r.next?'<div>Next: '+esc(r.next)+'</div>':'')+'</div>').join(''):'<div class="vision-direct good"><b>NO KNOWN WORKFLOW BLOCKERS</b>The tomorrow jobs Vision checked do not currently show a Tech Check workflow blocker.</div>')
+    :'';
   const headline=attention?attention+' owner item'+(attention===1?'':'s')+' need attention':'No Owner Review or damaged-equipment holds are currently showing';
   return '<div class="vision-answer-title">Your operations briefing</div>'
     +'<div class="vision-direct '+(attention?'warn':'good')+'"><b>'+esc(headline)+'</b>'+(reviewCount?esc(reviewCount+' waiting for Owner Review. '):'')+(holdCount?esc(holdCount+' equipment hold'+(holdCount===1?'':'s')+'.'):'')+'</div>'
@@ -2709,7 +2726,8 @@ async function executiveBriefingHtml(){
     +(todayWork.tickets.length?todayWork.tickets.slice(0,4).map(ticket=>jobCard(ticket)).join(''):'<div class="vision-system-note">No Tech Check jobs are scheduled today.</div>')
     +'<div class="vision-context-block"><h3>TOMORROW</h3><div class="vision-context-grid"><div><span>SCHEDULED</span><b>'+tomorrowWork.total+'</b></div><div><span>OWNER REVIEW</span><b>'+reviewCount+'</b></div><div><span>EQUIPMENT HOLDS</span><b>'+holdCount+'</b></div></div></div>'
     +(tomorrowWork.tickets.length?tomorrowWork.tickets.slice(0,4).map(ticket=>jobCard(ticket)).join(''):'<div class="vision-system-note">No Tech Check jobs are scheduled tomorrow.</div>')
-    +'<div class="vision-answer-copy">This briefing uses Tech Check data available to Vision. MHelpDesk remains a separate system.</div>';
+    +readinessHtml
+    +'<div class="vision-answer-copy">Readiness means Vision found no known Tech Check workflow blocker in the live records it checked. It does not invent missing MHelpDesk information or assume unrecorded prep is complete. MHelpDesk remains a separate system.</div>';
 }
 
 async function answer(text){
