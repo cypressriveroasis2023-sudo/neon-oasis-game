@@ -1,5 +1,5 @@
 {
-  "version": "onsite-vision-language-evals-v11",
+  "version": "onsite-vision-language-evals-v12",
   "description": "Owner-style natural-language regression bank for OnSite Vision. Adds real-ticket and unit conversational focus, return references, conversational corrections, repeated-job references, terse speech, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
@@ -990,6 +990,37 @@
         "pending_clock": "03:00",
         "equipment": "1 Helios"
       }
+    },
+    {
+      "id": "owner01",
+      "utterance": "Create a delivery ticket for Josh tomorrow. He's going to ABC Pest Pool and Lawn. The ticket number is 22252. It'll be tomorrow from 3 PM to 7 PM. It'll be too Helios units and one solar spotter.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "ticket_no": "22252",
+        "site": "ABC Pest Pool and Lawn",
+        "technician_name": "Josh Mireles",
+        "scheduled_time": "15:00",
+        "schedule_end_time": "19:00",
+        "equipment": "2 Helios + 1 Solar Spotter",
+        "requested_unit_count": 3
+      }
+    },
+    {
+      "id": "owner02",
+      "utterance": "Create a delivery for Teddy at North Yard ticket 33333 tomorrow at 10 AM with one Ranger.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_owner_questions": [
+        "none for unit numbers",
+        "none for stand numbers",
+        "none for parts",
+        "none for notes",
+        "none for job description"
+      ]
     }
   ]
 }
