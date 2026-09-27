@@ -211,6 +211,7 @@ function visionInterpretationHints(text){
     has_context_reference:reference,
     draft_missing_field:draftMissing,
     current_subject:cleanMemory(chat()?.memory)?.current_subject||'',
+    remembered_unit_references:cleanMemory(chat()?.memory)?.unit_references||[],
     has_last_job_template:Boolean(lastJobTemplate()),
     current_draft:Boolean(chat()?.draft)
   };
@@ -738,6 +739,30 @@ async function liveContext(ticket,force=false){
   if(!layer?.getJobContext)return null;
   return await layer.getJobContext(String(ticket||''),{force});
 }
+function contextUnitReferences(context){
+  const out=[];
+  const push=(type,tag)=>{
+    const t=String(type||'').trim(),u=String(tag||'').trim();
+    if(!t&&!u)return;
+    const label=[t,u?('#'+u):''].filter(Boolean).join(' ').trim();
+    if(label)out.push(label);
+  };
+  for(const row of Array.isArray(context?.items)?context.items:[])push(row.equipment_type,row.unit_tag);
+  for(const row of Array.isArray(context?.unit_registry)?context.unit_registry:[])push(row.equipment_type,row.unit_tag);
+  for(const row of Array.isArray(context?.returns)?context.returns:[])push(row.equipment_type,row.unit_tag);
+  return [...new Set(out)].slice(-16);
+}
+function rememberLiveContext(context,subject='ticket'){
+  if(!context?.found)return;
+  const s=context.summary||{};
+  mergeWorkingMemory({
+    active_ticket:String(context.ticket_no||''),
+    site:String(s.site||context.prep?.site||''),
+    work_type:String(s.effective_work_type||context.prep?.work_type||''),
+    current_subject:String(subject||'ticket'),
+    unit_references:contextUnitReferences(context)
+  });
+}
 function liveEngineContext(context){
   const layer=visionLiveData();
   return layer?.forWorkflowEngine?layer.forWorkflowEngine(context):context;
@@ -792,6 +817,37 @@ function liveEquipmentHtml(context){
     return '<div class="vision-direct good"><b>'+esc(i.equipment_type||'Equipment')+' '+esc(i.unit_tag?('#'+i.unit_tag):'')+'</b>'+esc('Purpose: '+String(i.purpose||'—')+' · Lifecycle: '+String(u?.lifecycle_status||'not recorded').replaceAll('_',' '))+'</div>';
   }).join('')+liveJobCard(context);
 }
+function liveReturnsHtml(context){
+  const returns=Array.isArray(context?.returns)?context.returns:[];
+  const swapItems=(Array.isArray(context?.items)?context.items:[]).filter(i=>String(i.purpose||'').toUpperCase()==='SWAP');
+  if(!returns.length){
+    if(swapItems.length){
+      return '<div class="vision-answer-title">No replaced-unit return is recorded yet.</div>'
+        +'<div class="vision-direct warn"><b>VERIFIED DATABASE FACT</b>The live ticket does not currently show a Service Return / IT Intake record for the replaced field unit.</div>'
+        +'<div class="vision-system-note"><b>COMPANY RULE</b>A SWAP keeps NEW UNIT OUT and OLD UNIT RETURNING as separate obligations. The replaced field unit must be recorded through Service Return → IT Intake before close.</div>'
+        +liveJobCard(context);
+    }
+    return '<div class="vision-answer-title">No equipment return is recorded on this job.</div>'
+      +'<div class="vision-direct warn"><b>VERIFIED DATABASE FACT</b>The live Tech Check context does not currently contain a return record for this ticket.</div>'
+      +liveJobCard(context);
+  }
+  const rows=returns.map(r=>{
+    const label=[r.equipment_type||'Equipment',r.unit_tag?('#'+r.unit_tag):''].filter(Boolean).join(' ');
+    const status=String(r.status||'recorded').replaceAll('_',' ').toUpperCase();
+    const details=[
+      r.service_tech_name?('Service: '+r.service_tech_name):'',
+      r.returned_at?('Returned '+historyDate(r.returned_at)):'',
+      r.it_tech_name?('IT: '+r.it_tech_name):'',
+      r.it_received_at?('IT received '+historyDate(r.it_received_at)):''
+    ].filter(Boolean).join(' · ');
+    return '<div class="vision-context-block"><h3>'+esc(label)+'</h3><div class="vision-context-grid">'
+      +'<div><span>RETURN STATUS</span><b>'+esc(status)+'</b></div>'
+      +'<div><span>RETURN NOTES</span><b>'+esc(r.return_notes||'—')+'</b></div>'
+      +'</div>'+(details?'<div class="vision-system-note">'+esc(details)+'</div>':'')+'</div>';
+  }).join('');
+  return '<div class="vision-answer-title">'+returns.length+' equipment return'+(returns.length===1?' is':'s are')+' recorded</div>'+rows+liveJobCard(context);
+}
+
 function liveEvidenceHtml(context){
   const handoff=Array.isArray(context?.handoff_evidence)?context.handoff_evidence:[],solar=Array.isArray(context?.service_solar_evidence)?context.service_solar_evidence:[],returns=Array.isArray(context?.returns)?context.returns:[];
   const returnCount=returns.reduce((n,r)=>n+(r.return_photo_paths?.length||0)+(r.intake_photo_paths?.length||0),0);
@@ -807,6 +863,7 @@ function liveEvidenceHtml(context){
 async function refreshLiveOrderPanel(ticket){
   const context=await liveContext(ticket,false);
   if(String(state.currentTicket||'')!==String(ticket)||!context?.found)return;
+  rememberLiveContext(context,'ticket');
   const t=$('visionOrderTitle'),h=$('visionOrderBody');if(!t||!h)return;
   const engine=visionWorkflowEngine(),wc=liveEngineContext(context),step=engine?.getWorkflowNextStep?.(wc),blockers=engine?.getWorkflowBlockers?.(wc)||[];
   const s=context.summary||{},assignments=(context.assignments||[]).filter(a=>!['completed','cancelled'].includes(a.status));
@@ -874,6 +931,8 @@ function ticketFrom(text){
   const raw=String(text||'');
   const direct=raw.match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i)||raw.match(/#(\d{3,})\b/);
   if(direct?.[1])return direct[1];
+  const openDirect=raw.match(/\b(?:open|pull\s+up|load|go\s+to|look\s+at|check|show\s+me)\s+(?:mhelpdesk\s*)?(?:ticket\s*)?#?\s*(\d{3,})\b/i);
+  if(openDirect?.[1])return openDirect[1];
   // Natural speech often puts the number first: "22712 job ticket".
   const reverse=raw.match(/\b(\d{3,})\b(?=[^.\n]{0,28}\b(?:job|ticket|service\s+order|work\s+order)\b)/i);
   if(reverse?.[1])return reverse[1];
@@ -2390,7 +2449,7 @@ async function answer(text){
     if(agentReply)return agentReply;
   }
 
-  if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining)\b/i.test(raw))ticket=state.currentTicket;
+  if(!ticket&&state.currentTicket&&/\b(this|that|it|job|ticket|order|who|next|assign|task|send|move|change|set|make|finish|remaining|unit|equipment|gear|return|returning|coming\s+back|old\s+unit|failed\s+unit|replacement\s+unit|that\s+one|same\s+one)\b/i.test(raw))ticket=state.currentTicket;
   const d=dateFrom(raw);
   if(d&&/\b(job|jobs|schedule|scheduled|what do i have|show me)\b/i.test(raw)&&!/\b(move|change|set|make|reschedule)\b/i.test(raw))return dateJobs(d);
   if(/\b(active jobs?|open jobs?|show me my active jobs?|current jobs?)\b/i.test(lower)){
@@ -2404,7 +2463,10 @@ async function answer(text){
   if(ticket){
     const context=await liveContext(ticket,true);
     if(!context?.found&&!group(ticket).length&&!prep(ticket))return ticketAnswer(ticket);
-    state.currentTicket=ticket;ensureChat().ticket=ticket;mergeWorkingMemory({active_ticket:ticket,current_subject:'ticket'});saveChats();renderOrder();
+    state.currentTicket=ticket;ensureChat().ticket=ticket;
+    if(context?.found)rememberLiveContext(context,'ticket');
+    else mergeWorkingMemory({active_ticket:ticket,current_subject:'ticket'});
+    saveChats();renderOrder();
     const a=assignIntent(raw);
     if(a){
       if(a.kind==='choose-tech')return '<div class="vision-answer-title">I can prepare that change.</div>'+actionCard(a,ticket)+(context?.found?liveJobCard(context):jobCard(ticket));
@@ -2421,6 +2483,7 @@ async function answer(text){
     if(/\b(what happens next|what next|next steps?|still needs|remaining|finish it|what needs to be done|what should happen next)\b/i.test(raw))return context?.found?liveNextHtml(context):'<div class="vision-answer-title">What still needs to happen</div><div class="vision-direct"><b>MHelpDesk #'+esc(ticket)+'</b>'+esc(next(ticket))+'</div>'+jobCard(ticket);
     if(/\b(show|list|what).*(equipment|unit|units|gear)|\bwhat equipment\b/i.test(raw))return context?.found?liveEquipmentHtml(context):jobCard(ticket);
     if(/\b(show|list|see|what).*(photo|photos|picture|pictures|evidence|signature|signatures)\b/i.test(raw))return context?.found?liveEvidenceHtml(context):'<div class="vision-answer-title">No evidence context is available.</div>';
+    if(/\b(return|returning|coming\s+back|came\s+back|old\s+unit|failed\s+unit|unit\s+back|service\s+return|it\s+intake)\b/i.test(raw))return context?.found?liveReturnsHtml(context):'<div class="vision-answer-title">No return context is available.</div>';
     const ticketAgentReply=await serverAgentAnswer(raw);
     if(ticketAgentReply)return ticketAgentReply;
     return context?.found?'<div class="vision-answer-title">MHelpDesk #'+esc(ticket)+'</div><div class="vision-answer-copy">Here is the current Tech Check context from the live database.</div>'+liveJobCard(context):ticketAnswer(ticket,'Here is the live Tech Check side of this service order.');
