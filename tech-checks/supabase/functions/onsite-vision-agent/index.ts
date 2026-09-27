@@ -22,6 +22,7 @@ const clean = (value: unknown) => String(value ?? '').trim()
 const lower = (value: unknown) => clean(value).toLowerCase()
 
 const SOURCE_REPO = 'cypressriveroasis2023-sudo/neon-oasis-game'
+const SOURCE_BRANCH = 'main'
 const SOURCE_FILES = [
   'tech-checks/onsite-vision.js',
   'tech-checks/onsite-vision-live-data.js',
@@ -536,10 +537,14 @@ const outputSchema = {
         technician_name: { type: 'string' },
         date: { type: 'string' },
         time: { type: 'string' },
+        site: { type: 'string' },
+        equipment_summary: { type: 'string' },
+        job_description: { type: 'string' },
+        notes: { type: 'string' },
         summary: { type: 'string' },
         requires_confirmation: { type: 'boolean' },
       },
-      required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'summary', 'requires_confirmation'],
+      required: ['type', 'ticket_no', 'work_type', 'role', 'technician_name', 'date', 'time', 'site', 'equipment_summary', 'job_description', 'notes', 'summary', 'requires_confirmation'],
       additionalProperties: false,
     },
     action_plan: {
@@ -655,7 +660,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v31',
+        agent_version: 'onsite-vision-agent-v32',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -669,6 +674,9 @@ Deno.serve(async (req) => {
         owner_correction_learning_enabled: true,
         operations_orchestration_enabled: true,
         multi_action_planning_enabled: true,
+        natural_language_hints_enabled: true,
+        production_source_repository: SOURCE_REPO,
+        production_source_branch: SOURCE_BRANCH,
       })
     }
 
@@ -679,6 +687,9 @@ Deno.serve(async (req) => {
     const activeTicket = clean(body.active_ticket)
     const workingMemory = body.working_memory && typeof body.working_memory === 'object' && !Array.isArray(body.working_memory)
       ? stripNulls(body.working_memory)
+      : {}
+    const interpretationHints = body.interpretation_hints && typeof body.interpretation_hints === 'object' && !Array.isArray(body.interpretation_hints)
+      ? stripNulls(body.interpretation_hints)
       : {}
     const history = Array.isArray(body.history)
       ? body.history.slice(-10)
@@ -825,7 +836,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v31',
+            agent_version: 'onsite-vision-agent-v32',
           }
         } as Json
       }
@@ -1250,7 +1261,7 @@ Deno.serve(async (req) => {
         for(const path of requested){
           if(matches.length>=18)break
           try{
-            const url='https://raw.githubusercontent.com/'+SOURCE_REPO+'/main/'+path+'?vision='+Date.now()
+            const url='https://raw.githubusercontent.com/'+SOURCE_REPO+'/'+SOURCE_BRANCH+'/'+path+'?vision='+Date.now()
             const response=await fetch(url,{headers:{'Cache-Control':'no-cache'}})
             if(!response.ok)continue
             const source=(await response.text()).slice(0,450000)
@@ -1272,7 +1283,7 @@ Deno.serve(async (req) => {
         return {
           query:queryText,
           file_hint:fileHint,
-          branch:'main',
+          branch:SOURCE_BRANCH,
           repository:SOURCE_REPO,
           matches,
           note:'Read-only source search of the current GitHub main branch. A match proves source text, not that a workflow database row currently has that state.'
@@ -1312,6 +1323,8 @@ Deno.serve(async (req) => {
       'Current local date for Cameras On Site (America/Chicago): ' + currentDate + '.',
       activeTicket ? 'Current conversation ticket context: MHelpDesk #' + activeTicket + '.' : 'There is no current ticket context.',
       'Conversation working memory (context, not company truth): ' + JSON.stringify(workingMemory).slice(0, 7000),
+      'Client interpretation hints from the live Tech Check UI (helpful language clues, not authoritative facts): ' + JSON.stringify(interpretationHints).slice(0, 7000),
+      'Production application source of truth: GitHub ' + SOURCE_REPO + ' branch ' + SOURCE_BRANCH + '.',
       '',
       'GROUNDING RULES:',
       '- For current job, assignment, schedule, equipment, return, evidence, handoff, blocker, or completion facts, call a live database tool before answering.',
@@ -1339,6 +1352,7 @@ Deno.serve(async (req) => {
       '- Historical raw work_type can be stale. Prefer summary.effective_work_type from live job context.',
       '- MHelpDesk is separate from Tech Check; never claim you changed MHelpDesk.',
       '- For source-code/programming questions, call search_app_source. Treat exact matched implementation as VERIFIED SOURCE CODE FACT. Source code tells you implementation; live database tools tell you current operational state.',
+      '- search_app_source reads the current GitHub main branch, which is the production application contract. When company knowledge and production main disagree, report the mismatch rather than silently teaching Vision the branch-only behavior.',
       '',
       'OPERATIONS ORCHESTRATION:',
       '- For broad Owner requests such as "what needs attention today", "give me the rundown", "what is behind", "who has room", "who can take this", "what do I need to deal with", "how are operations looking", or a daily/morning operations brief, call get_operations_snapshot FIRST for the relevant date.',
@@ -1364,12 +1378,17 @@ Deno.serve(async (req) => {
       '',
       'PLAIN TALK / DICTATION:',
       '- Treat the Owner’s message like normal spoken conversation, not command syntax. Understand slang, shorthand, missing punctuation, speech-to-text wording, and reasonable typos when the intended meaning is clear.',
+      '- Use interpretation_hints as parsing assistance for likely intent, ticket, work type, site, date/time, equipment, parts, and uniquely matched technician names. These hints come from the same signed-in Tech Check client but are NOT a substitute for live database verification.',
+      '- The Owner may omit command verbs. Phrases like "Teddy delivery tomorrow at 10", "Josh on 22825", "22712 tomorrow at 3", or "two Helios for ABC Friday morning" should be understood from context. If there is no active ticket and the phrase clearly describes a new Delivery/Pickup/Swap/Service, treat it as create_job and let the guided draft ask only for missing fields.',
+      '- When an utterance supplies several job details at once, preserve every supplied detail. Do not ask again for work type, ticket, site, date, time, equipment, or technician if it was already clearly supplied and does not conflict with live data.',
+      '- For create_job, copy clearly supplied site into proposed_action.site, equipment wording into proposed_action.equipment_summary, the requested field work into proposed_action.job_description when explicit, and one-off owner notes into proposed_action.notes. Never invent these fields.',
+      '- If a terse phrase could reasonably mean either a new job or a change to the active ticket, use the active ticket plus recent conversation to resolve it; if still ambiguous, ask one short clarification instead of guessing.',
       '- Infer workload questions from normal speech. Examples: "what’s IT got today?", "what does Josh have?", "is Service busy tomorrow?", "how many jobs today?", "how many total jobs do I have today?", and "how many jobs are scheduled today?". Use get_workload. A fresh broad question resets the named-technician subject unless the Owner explicitly refers back with language such as "him", "her", "that tech", "same tech", or a terse continuation such as "and tomorrow?".',
       '- For workload answers, scheduled_ticket_count means all non-cancelled Tech Check tickets scheduled for that day; also tell the Owner how many remain and how many are completed when useful.',
       '- Resolve a partial technician name only when it uniquely matches one active IT or Service technician. If more than one matches, ask one short natural clarification instead of guessing.',
       '- Understand assignment phrasing such as "put Josh on this", "have Josh handle it", "give this to IT", or "let Mike take that one" as assignment intent.',
       '- Understand creation phrasing such as "make me a delivery", "throw in a pickup tomorrow", "start a swap", or "I need a service call" as create_job intent even if the words job or ticket are omitted.',
-      '- For create_job, fill proposed_action.work_type, date, time, and technician_name whenever the Owner already supplied or clearly implied them. The client’s guided draft will ask only for required details that are still missing, including MHelpDesk number, site, equipment, unit numbers, work description, parts, assignment, and notes.',
+      '- For create_job, fill proposed_action.work_type, ticket_no, site, date, time, technician_name, equipment_summary, job_description, and notes whenever the Owner already supplied or clearly implied them. Leave unknown fields empty. The client’s guided draft will ask only for required details that are still missing, including MHelpDesk number, site, equipment, unit numbers, work description, parts, assignment, and notes.',
       '- For questions about how Tech Check is programmed or why its workflow behaves a certain way, use live database facts, get_company_knowledge, workflow rules, and system health. Clearly distinguish code/company rules from live job data. If source-level implementation detail is not available through these tools, say that detail is not exposed here instead of inventing it.',
       '- Keep conversational context across follow-ups such as "him", "her", "that one", "this job", "move it to tomorrow", and "give it to Service" when the prior messages make the referent clear.',
       '',
@@ -1496,6 +1515,10 @@ Deno.serve(async (req) => {
           technician_name: '',
           date: '',
           time: '',
+          site: '',
+          equipment_summary: '',
+          job_description: '',
+          notes: '',
           summary: '',
           requires_confirmation: false,
         },
@@ -1523,7 +1546,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v31',
+      agent_version: 'onsite-vision-agent-v32',
       model,
       tool_trace: toolTrace,
       ...parsed,
