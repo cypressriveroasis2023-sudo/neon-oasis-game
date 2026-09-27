@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v4",
-  "description": "Owner-style language regression bank for OnSite Vision, including voice-style apostrophe-free date phrases, operations orchestration, and audited multi-action planning. No case may execute a write.",
+  "version": "onsite-vision-language-evals-v12",
+  "description": "Owner-style natural-language regression bank for OnSite Vision. Adds real-ticket and unit conversational focus, return references, conversational corrections, repeated-job references, terse speech, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
     "workload_followup",
@@ -636,6 +636,391 @@
       "intent": "workload",
       "tool": "get_workload",
       "action": "none"
+    },
+    {
+      "id": "c09",
+      "utterance": "Teddy delivery tomorrow at 10",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c10",
+      "utterance": "need a delivery for ABC tomorrow at ten with Teddy",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c11",
+      "utterance": "two Helios for ABC Friday morning Teddy",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c12",
+      "utterance": "pickup 22991 for North Yard tomorrow 8am Josh",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "a07",
+      "utterance": "Josh on 22825",
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "s04",
+      "utterance": "22712 tomorrow 3 pm",
+      "intent": "schedule",
+      "tool": "get_job_context",
+      "action": "schedule"
+    },
+    {
+      "id": "v10",
+      "utterance": "teddy delivry tomoro at ten",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "v11",
+      "utterance": "put abel on dat 22825 one",
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "p05",
+      "utterance": "what does production main say controls the service handoff",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "ctx01",
+      "utterance": "make that Teddy",
+      "context": [
+        "Vision is asking who should be assigned in a new job draft"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "ctx02",
+      "utterance": "same one tomorrow at 9",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "get_job_context",
+      "action": "schedule"
+    },
+    {
+      "id": "mem01",
+      "utterance": "make that Teddy",
+      "context": [
+        "Vision is editing a delivery draft and an IT technician assignment was just discussed"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "mem02",
+      "utterance": "no I meant Service",
+      "context": [
+        "Vision just asked who should be assigned to the current job"
+      ],
+      "intent": "assign",
+      "tool": "none",
+      "action": "assign"
+    },
+    {
+      "id": "mem03",
+      "utterance": "no I meant a Service job",
+      "context": [
+        "Vision is building a new Delivery draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem04",
+      "utterance": "move that to Friday",
+      "context": [
+        "Vision is building a new job draft for Thursday"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "mem05",
+      "utterance": "make it 3 pm",
+      "context": [
+        "Vision is building a new job draft at 10 AM"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "mem06",
+      "utterance": "add another Helios",
+      "context": [
+        "Vision is building a new job draft with 2 Helios units"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem07",
+      "utterance": "remove one Helios",
+      "context": [
+        "Vision is building a new job draft with 3 Helios units"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem08",
+      "utterance": "do the same thing for the next ticket",
+      "context": [
+        "Vision just created a Tech Check delivery"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem09",
+      "utterance": "same setup ticket 22999",
+      "context": [
+        "Vision just created a Tech Check service job"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "mem10",
+      "utterance": "change the site to North Yard",
+      "context": [
+        "Vision is building a new job draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "ref01",
+      "utterance": "open 22825",
+      "intent": "ticket_next",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref02",
+      "utterance": "pull up 22825",
+      "intent": "ticket_next",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref03",
+      "utterance": "give that one to Josh",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "ref04",
+      "utterance": "move it to tomorrow",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "ref05",
+      "utterance": "what about the unit coming back",
+      "context": [
+        "Vision has a SWAP ticket open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref06",
+      "utterance": "did the old unit make it back yet",
+      "context": [
+        "Vision has a SWAP ticket open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref07",
+      "utterance": "what happened to the failed unit",
+      "context": [
+        "Vision has an offline case ticket open"
+      ],
+      "intent": "offline",
+      "tool": "get_offline_escalations",
+      "action": "none"
+    },
+    {
+      "id": "ref08",
+      "utterance": "show me the return on that one",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref09",
+      "utterance": "what about that unit",
+      "context": [
+        "Vision just discussed Helios 12 on ticket 22825"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref10",
+      "utterance": "and who has it now",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "ticket_assignment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "shot01",
+      "utterance": "Ticket number is 11111",
+      "context": [
+        "Vision is asking for the MHelpDesk ticket number in a draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "shot02",
+      "utterance": "Pick a number is 11111",
+      "context": [
+        "Voice transcription occurred while Vision is asking for the MHelpDesk ticket number"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "shot03",
+      "utterance": "Customer name is ABC tech technician is Josh date is tomorrow at 3 PM. We're gonna do a delivery of one unit Helios.",
+      "context": [
+        "Vision has an existing Service draft and is asking for its MHelpDesk ticket number"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "shot04",
+      "utterance": "Please create a service ticket for Josh for ABC Pest, Pool and Lawn ticket number 11111 from 8 to 5 tomorrow morning. It's a delivery of a Helias unit only one.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "ticket_no": "11111",
+        "site": "ABC Pest, Pool and Lawn",
+        "technician_name": "Josh Mireles",
+        "scheduled_time": "08:00",
+        "schedule_end_time": "17:00",
+        "equipment": "1 Helios"
+      }
+    },
+    {
+      "id": "shot05",
+      "utterance": "Create a ticket for a delivery for tomorrow at 3 o'clock for Helios's unit for Josh AT ABC Pest Pool, Lawn",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "site": "ABC Pest Pool, Lawn",
+        "technician_name": "Josh Mireles",
+        "pending_clock": "03:00",
+        "equipment": "1 Helios",
+        "ticket_no": "missing"
+      }
+    },
+    {
+      "id": "shot06",
+      "utterance": "Create a delivery ticket for Josh ABC pest, Pool and Lawn at 3 o'clock tomorrow for one Helias unit ticket number 11111",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "ticket_no": "11111",
+        "site": "ABC pest, Pool and Lawn",
+        "technician_name": "Josh Mireles",
+        "date": "tomorrow",
+        "pending_clock": "03:00",
+        "equipment": "1 Helios"
+      }
+    },
+    {
+      "id": "owner01",
+      "utterance": "Create a delivery ticket for Josh tomorrow. He's going to ABC Pest Pool and Lawn. The ticket number is 22252. It'll be tomorrow from 3 PM to 7 PM. It'll be too Helios units and one solar spotter.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "ticket_no": "22252",
+        "site": "ABC Pest Pool and Lawn",
+        "technician_name": "Josh Mireles",
+        "scheduled_time": "15:00",
+        "schedule_end_time": "19:00",
+        "equipment": "2 Helios + 1 Solar Spotter",
+        "requested_unit_count": 3
+      }
+    },
+    {
+      "id": "owner02",
+      "utterance": "Create a delivery for Teddy at North Yard ticket 33333 tomorrow at 10 AM with one Ranger.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_owner_questions": [
+        "none for unit numbers",
+        "none for stand numbers",
+        "none for parts",
+        "none for notes",
+        "none for job description"
+      ]
     }
   ]
 }

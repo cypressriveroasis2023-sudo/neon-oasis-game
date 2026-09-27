@@ -4,23 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#0b1118">
-  <title>CAMERAS ONSITE OnSite Vision</title>
-  <link rel="icon" href="./vision-ai.webp?v=3">
-  <link rel="apple-touch-icon" href="./vision-ai.webp?v=3">
+  <meta name="onsite-vision-mode" content="preview">
+  <meta name="onsite-vision-agent-function" content="onsite-vision-agent-preview">
+  <title>CAMERAS ONSITE OnSite Vision · Preview</title>
+  <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
+  <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
   <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v35">
 </head>
-<body>
+<body class="vision-preview-mode">
+  <div class="vision-preview-banner"><b>BRANCH PREVIEW</b><span>feature/onsite-vision · READ ONLY</span></div>
   <div id="visionLoading" class="vision-loading">
-    <img src="./vision-ai.webp?v=3" alt="">
+    <img src="./techcheck-eye-192.png?v=1" alt="">
     <b>OnSite Vision</b>
-    <span>Opening your Tech Check workspace…</span>
+    <span>Opening the OnSite Vision branch preview…</span>
   </div>
   <div id="visionApp" class="vision-app hidden">
     <aside id="visionSidebar" class="vision-sidebar">
       <div class="vision-brand">
-        <span class="vision-logo"><img src="./vision-ai.webp?v=3" alt=""></span>
+        <span class="vision-logo"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
         <span><small>CAMERAS ONSITE</small><b>OnSite Vision</b></span>
       </div>
       <button id="visionNewChat" class="vision-new-chat" type="button"><span>＋</span> New chat</button>
@@ -38,13 +41,15 @@
       <header class="vision-topbar">
         <button id="visionMenuButton" class="vision-icon-button vision-mobile-only" type="button" aria-label="Open conversations">☰</button>
         <div class="vision-top-title">
-          <span class="vision-logo small"><img src="./vision-ai.webp?v=3" alt=""></span>
-          <div><small>CAMERAS ONSITE · ONSITE VISION</small><b id="visionConversationTitle">New conversation</b></div>
+          <span class="vision-logo small"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
+          <div><small>CAMERAS ONSITE · ONSITE VISION · PREVIEW</small><b id="visionConversationTitle">New conversation</b></div>
         </div>
         <div class="vision-top-actions">
+          <button id="visionConversationEval" class="vision-icon-button vision-preview-qa" type="button">Conversation QA</button>
           <span id="visionLiveStatus" class="vision-live-status">LIVE</span>
           <button id="visionHeaderNewButton" class="vision-icon-button vision-mobile-only vision-new-header" type="button" aria-label="Start new chat">＋</button>
-          <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>\n          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
+          <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>
+          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
           <button id="visionRefreshButton" class="vision-icon-button" type="button" aria-label="Refresh data">↻</button>
         </div>
       </header>
@@ -183,7 +188,7 @@
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-workspace-v69" defer></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v64" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=153', { scope: './', updateViaCache: 'none' }).catch(console.warn));

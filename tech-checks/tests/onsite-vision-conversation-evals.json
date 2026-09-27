@@ -1,0 +1,244 @@
+{
+  "version": "onsite-vision-conversation-evals-v2",
+  "description": "Multi-turn, read-only regression conversations for the OnSite Vision feature preview. These scenarios verify conversational carryover, natural corrections, workload follow-ups, repeat-job language, and production-main grounding. Follow-up draft edits may surface as create/assign/schedule proposals, but no test is allowed to execute a write.",
+  "conversations": [
+    {
+      "id": "conv01_create_correction",
+      "title": "Create job then correct technician and time",
+      "turns": [
+        {
+          "message": "Teddy delivery tomorrow at 10",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "make that Victor",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        },
+        {
+          "message": "actually make it 3 pm",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv02_create_equipment",
+      "title": "Create job then add equipment conversationally",
+      "turns": [
+        {
+          "message": "need a delivery for North Yard tomorrow with Teddy",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "add two Helios",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        },
+        {
+          "message": "and another Ranger",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv03_workload_followup",
+      "title": "Department workload then named technician follow-up",
+      "turns": [
+        {
+          "message": "How many jobs does IT have today?",
+          "expect": {
+            "tool": "get_workload",
+            "action_type": "none"
+          }
+        },
+        {
+          "message": "what about Teddy?",
+          "expect": {
+            "tool": "get_workload",
+            "action_type": "none"
+          }
+        },
+        {
+          "message": "and tomorrow?",
+          "expect": {
+            "tool": "get_workload",
+            "action_type": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv04_service_workload",
+      "title": "Service workload follow-up",
+      "turns": [
+        {
+          "message": "What does Service have today?",
+          "expect": {
+            "tool": "get_workload",
+            "action_type": "none"
+          }
+        },
+        {
+          "message": "what about Josh tomorrow?",
+          "expect": {
+            "tool": "get_workload",
+            "action_type": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv05_repeat_job_language",
+      "title": "Repeat prior job language remains creation intent",
+      "turns": [
+        {
+          "message": "Create a pickup for South Yard tomorrow",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "same setup for the next ticket",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv06_assignment_reference",
+      "title": "Assignment reference uses active conversational subject",
+      "turns": [
+        {
+          "message": "I need a service job tomorrow",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "give that to Josh",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv07_work_type_correction",
+      "title": "Correct work type naturally",
+      "turns": [
+        {
+          "message": "make a delivery tomorrow for West Gate",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "no I meant a Service job",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv08_source_grounding",
+      "title": "Programming question uses production main",
+      "turns": [
+        {
+          "message": "What file controls OnSite Vision workflow rules?",
+          "expect": {
+            "tool": "search_app_source",
+            "action_type": "none"
+          }
+        },
+        {
+          "message": "and what does production main say about swap returns?",
+          "expect": {
+            "tool": "search_app_source",
+            "action_type": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv09_ops_followup",
+      "title": "Broad operations context",
+      "turns": [
+        {
+          "message": "Give me the operations rundown for today",
+          "expect": {
+            "tool": "get_operations_snapshot",
+            "action_type": "none"
+          }
+        },
+        {
+          "message": "what needs my attention most?",
+          "expect": {
+            "action_type": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conv10_voice_like",
+      "title": "Voice-like shorthand and typo recovery",
+      "turns": [
+        {
+          "message": "teddy delivry tomoro at ten",
+          "expect": {
+            "action_type": "create_job"
+          }
+        },
+        {
+          "message": "make dat victor instead",
+          "expect": {
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

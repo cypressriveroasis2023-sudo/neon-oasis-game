@@ -217,6 +217,7 @@ window.addEventListener('techcheck:owner-ai-alerts', event => {
   if(state.profile?.role==='owner'){
     renderOwnerAttention();
     renderOwnerCommandCenter();
+    refreshOwnerVisionPresence();
   }
 });
 function normalizeUsername(v) {
@@ -2778,6 +2779,73 @@ function ownerHomeTeamActivityHtml(jobs,today){
   return '<section class="ownerHomeTeamActivity" aria-label="Team activity"><header><h2>Team Activity</h2><button type="button" onclick="ownerAppNavigate(\'team\')">Team →</button></header>'+rows+'<button class="ownerHomeHandoffLink" type="button" onclick="ownerAppNavigate(\'handoffs\')">View handoffs &amp; returns →</button></section>';
 }
 
+function ownerVisionAttentionSummary(){
+  const alerts=(state.ownerAIAlerts||[]).filter(a=>!a.resolved_at);
+  const reviews=(state.ownerReviewQueue||[]).filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed');
+  const returns=(state.ownerReturns||[]).filter(r=>r.status==='needs_replacement'||r.status==='pending_mhelp_inventory');
+  const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
+  const today=localDateKey(new Date());
+  const overdueTickets=new Set(jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today).map(a=>String(a.ticket_no||a.id||'')));
+  const unique=new Set();
+  alerts.forEach(a=>unique.add('alert:'+(a.id||a.ticket_no||a.code||JSON.stringify(a))));
+  reviews.forEach(r=>unique.add('review:'+(r.ticket_no||r.id||'')));
+  returns.forEach(r=>unique.add('return:'+(r.id||r.ticket_no||r.unit_tag||'')));
+  overdueTickets.forEach(t=>unique.add('overdue:'+t));
+  return{count:unique.size,alerts:alerts.length,reviews:reviews.length,returns:returns.length,overdue:overdueTickets.size};
+}
+function ownerVisionAttentionCount(){return ownerVisionAttentionSummary().count;}
+function ownerVisionAttentionText(summary){
+  const count=Number(summary?.count||0);
+  if(!count)return'Vision is ready';
+  const parts=[];
+  if(summary.reviews)parts.push(summary.reviews+' Owner Review');
+  if(summary.returns)parts.push(summary.returns+' equipment hold'+(summary.returns===1?'':'s'));
+  if(summary.overdue)parts.push(summary.overdue+' overdue job'+(summary.overdue===1?'':'s'));
+  if(summary.alerts)parts.push(summary.alerts+' Vision alert'+(summary.alerts===1?'':'s'));
+  return count+' need attention'+(parts.length?' · '+parts.slice(0,2).join(' · '):'');
+}
+function refreshOwnerVisionPresence(){
+  const summary=ownerVisionAttentionSummary(),count=summary.count;
+  document.querySelectorAll('.ownerVisionPresence').forEach(node=>{
+    const label=node.querySelector('.ownerVisionPresenceCopy>span');
+    const side=node.querySelector('.ownerVisionPresenceBadge,.ownerVisionPresenceGo');
+    node.dataset.visionState=count?'needs_attention':'idle';
+    const text=ownerVisionAttentionText(summary);
+    if(label)label.textContent=text;
+    node.setAttribute('aria-label','Open OnSite Vision. '+text);
+    node.dataset.attentionCount=String(count);
+    node.dataset.attentionBreakdown=JSON.stringify(summary);
+    if(side){
+      side.className=count?'ownerVisionPresenceBadge':'ownerVisionPresenceGo';
+      side.textContent=count?String(count):'OPEN →';
+    }
+  });
+}
+function ownerVisionPresenceHtml(){
+  const count=ownerVisionAttentionCount();
+  const status=ownerVisionAttentionText(ownerVisionAttentionSummary());
+  const stateName=count?'needs_attention':'idle';
+  return '<button type="button" class="ownerVisionPresence" data-vision-state="'+stateName+'" onclick="ownerJump(\'vision\')" aria-label="Open OnSite Vision. '+esc(status)+'">'
+    +'<span class="ownerVisionPresenceEye" aria-hidden="true"><span class="ownerVisionPresenceHalo"></span><img src="./vision-ai.webp?v=1" alt=""></span>'
+    +'<span class="ownerVisionPresenceCopy"><small>ONSITE VISION</small><b>Ask Vision</b><span>'+esc(status)+'</span></span>'
+    +(count?'<strong class="ownerVisionPresenceBadge">'+count+'</strong>':'<strong class="ownerVisionPresenceGo">OPEN →</strong>')
+    +'</button>';
+}
+function ownerSetVisionPresenceState(next='idle',detail=''){
+  const allowed=new Set(['idle','listening','thinking','working','needs_attention','ready','error']);
+  const value=allowed.has(next)?next:'idle';
+  document.querySelectorAll('.ownerVisionPresence').forEach(node=>{
+    node.dataset.visionState=value;
+    const label=node.querySelector('.ownerVisionPresenceCopy>span');
+    if(label)label.textContent=detail||({idle:'Vision is ready',listening:'Listening…',thinking:'Thinking…',working:'Checking Tech Check…',needs_attention:'Vision needs your attention',ready:'Ready',error:'Vision needs attention'}[value]||'Vision is ready');
+  });
+}
+window.ownerSetVisionPresenceState=ownerSetVisionPresenceState;
+window.addEventListener('onsite-vision-state',event=>{
+  const detail=event?.detail||{};
+  ownerSetVisionPresenceState(detail.state||'idle',detail.detail||'');
+});
+
 function ownerAppToday(){
   const greeting=ownerTodayGreeting()+', '+ownerTodayName();
   const today=localDateKey(new Date());
@@ -2792,7 +2860,8 @@ function ownerAppToday(){
   const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
   const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
   const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
-  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./vision-ai.webp?v=1" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+    +ownerVisionPresenceHtml()
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
     +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
     +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>'+ownerHomeTeamActivityHtml(jobs,today);
@@ -3396,6 +3465,7 @@ function renderOwnerCommandCenter() {
   });
 }
 function renderOwner() {
+  setTimeout(refreshOwnerVisionPresence,0);
   if (state.profile?.role !== 'owner') return;
   const activePreps = state.preps.filter(p => p.status !== 'closed');
   const completedPreps = state.preps.filter(p => p.status === 'closed').slice().reverse();
