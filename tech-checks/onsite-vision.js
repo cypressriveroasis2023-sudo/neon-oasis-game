@@ -2659,9 +2659,38 @@ async function ownerReviewQueueHtml(raw){
     +rows.slice(0,12).map(card).join('');
 }
 
+async function visionExecutiveBriefingHtml(){
+  const today=dayKey(new Date()),tomorrowDate=new Date();tomorrowDate.setDate(tomorrowDate.getDate()+1);
+  const tomorrow=dayKey(tomorrowDate);
+  const layer=visionLiveData();
+  setVisionRuntimeState('working','Building your morning briefing…');
+  const [todayHtml,tomorrowHtml,reviewHtml,damageHtml]=await Promise.all([
+    workloadHtml({date:today,scope:'all',role:'',tech:null}),
+    workloadHtml({date:tomorrow,scope:'all',role:'',tech:null}),
+    ownerReviewQueueHtml('owner review queue'),
+    damageHoldHtml('needs replacement damage holds')
+  ]);
+  let readinessHtml='';
+  if(layer?.getDepartureReadiness){
+    try{readinessHtml=await departureReadinessHtml('truck departure readiness');}catch(error){console.warn('Vision briefing readiness',error);}
+  }
+  const summary='<div class="vision-answer-title">Your morning operations briefing</div>'
+    +'<div class="vision-answer-copy">Here is the current Tech Check picture. I am separating live records from company rules and I will not fill in anything Tech Check has not recorded. MHelpDesk remains separate.</div>';
+  return summary
+    +'<div class="vision-brief-section"><h3>TODAY</h3>'+todayHtml+'</div>'
+    +'<div class="vision-brief-section"><h3>TOMORROW</h3>'+tomorrowHtml+'</div>'
+    +'<div class="vision-brief-section"><h3>OWNER DECISIONS</h3>'+reviewHtml+'</div>'
+    +'<div class="vision-brief-section"><h3>EQUIPMENT HOLDS</h3>'+damageHtml+'</div>'
+    +(readinessHtml?'<div class="vision-brief-section"><h3>DEPARTURE READINESS</h3>'+readinessHtml+'</div>':'');
+}
+function explicitExecutiveBriefingIntent(raw){
+  return /\b(?:give|show|run|tell)\s+(?:me\s+)?(?:my|the)?\s*(?:morning|daily|today(?:'s)?|operations?|ops)?\s*brief(?:ing)?\b|\bwhat\s+do\s+i\s+need\s+to\s+know\s+today\b/i.test(String(raw||''));
+}
+
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   const current=chat();
+  if(explicitExecutiveBriefingIntent(raw))return await visionExecutiveBriefingHtml();
   if(current?.draft){
     const sideQuestion=/\?$|^(what|how|why|which|does|do|is|are|can|could|should|where|when)\b/i.test(raw);
     if(sideQuestion){
