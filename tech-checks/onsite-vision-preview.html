@@ -42,6 +42,7 @@
           <div><small>CAMERAS ONSITE · ONSITE VISION · PREVIEW</small><b id="visionConversationTitle">New conversation</b></div>
         </div>
         <div class="vision-top-actions">
+          <button id="visionConversationEval" class="vision-icon-button vision-preview-qa" type="button">Conversation QA</button>
           <span id="visionLiveStatus" class="vision-live-status">LIVE</span>
           <button id="visionHeaderNewButton" class="vision-icon-button vision-mobile-only vision-new-header" type="button" aria-label="Start new chat">＋</button>
           <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>\n          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
@@ -183,7 +184,7 @@
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-workspace-v62" defer></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v63" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=153', { scope: './', updateViaCache: 'none' }).catch(console.warn));
