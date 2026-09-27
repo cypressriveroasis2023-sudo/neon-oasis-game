@@ -3251,6 +3251,17 @@ function bindOwnerAppRouter(){
   const app=document.getElementById('ownerApp');if(!app||app.dataset.bound==='1')return;
   app.dataset.bound='1';
   app.addEventListener('click',e=>{
+    // Page links must leave the dashboard in installed iPhone apps as well.
+    const link=e.target.closest('a[href]');
+    if(link && !e.defaultPrevented && e.button===0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey){
+      const destination=new URL(link.href,document.baseURI);
+      if(destination.origin===location.origin && /\/(camera-health|onsite-vision)\.html$/.test(destination.pathname)){
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.assign(destination.href);
+        return;
+      }
+    }
     const b=e.target.closest('[data-owner-route]');
     if(!b)return;
     e.preventDefault();
