@@ -21,7 +21,7 @@ self.addEventListener('install', event => {
       cache.add(new Request('./onsite-vision-actions.js?v=action-layer-v1', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-persistence.js?v=persistence-v2', { cache:'reload' })),
       cache.add(new Request('./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1', { cache:'reload' })),
-      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v59', { cache:'reload' }))
+      cache.add(new Request('./onsite-vision.js?v=vision-workspace-v60', { cache:'reload' }))
     ]);
     await self.skipWaiting();
   })());
