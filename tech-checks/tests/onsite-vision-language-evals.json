@@ -1,5 +1,5 @@
 {
-  "version": "onsite-vision-language-evals-v8",
+  "version": "onsite-vision-language-evals-v9",
   "description": "Owner-style natural-language regression bank for OnSite Vision. Adds real-ticket and unit conversational focus, return references, conversational corrections, repeated-job references, terse speech, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
@@ -943,6 +943,22 @@
       "intent": "create_job",
       "tool": "none",
       "action": "create_job"
+    },
+    {
+      "id": "shot04",
+      "utterance": "Please create a service ticket for Josh for ABC Pest, Pool and Lawn ticket number 11111 from 8 to 5 tomorrow morning. It's a delivery of a Helias unit only one.",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job",
+      "expected_entities": {
+        "work_type": "delivery",
+        "ticket_no": "11111",
+        "site": "ABC Pest, Pool and Lawn",
+        "technician_name": "Josh Mireles",
+        "scheduled_time": "08:00",
+        "schedule_end_time": "17:00",
+        "equipment": "1 Helios"
+      }
     }
   ]
 }
