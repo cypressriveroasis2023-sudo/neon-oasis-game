@@ -217,6 +217,7 @@ window.addEventListener('techcheck:owner-ai-alerts', event => {
   if(state.profile?.role==='owner'){
     renderOwnerAttention();
     renderOwnerCommandCenter();
+    refreshOwnerVisionPresence();
   }
 });
 function normalizeUsername(v) {
@@ -2778,14 +2779,35 @@ function ownerHomeTeamActivityHtml(jobs,today){
   return '<section class="ownerHomeTeamActivity" aria-label="Team activity"><header><h2>Team Activity</h2><button type="button" onclick="ownerAppNavigate(\'team\')">Team →</button></header>'+rows+'<button class="ownerHomeHandoffLink" type="button" onclick="ownerAppNavigate(\'handoffs\')">View handoffs &amp; returns →</button></section>';
 }
 
-function ownerVisionAttentionCount(){
+function ownerVisionAttentionSummary(){
   const alerts=(state.ownerAIAlerts||[]).filter(a=>!a.resolved_at);
   const reviews=(state.ownerReviewQueue||[]).filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed');
   const returns=(state.ownerReturns||[]).filter(r=>r.status==='needs_replacement'||r.status==='pending_mhelp_inventory');
   const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
   const today=localDateKey(new Date());
-  const overdue=jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today);
-  return alerts.length+reviews.length+returns.length+overdue.length;
+  const overdueTickets=new Set(jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today).map(a=>String(a.ticket_no||a.id||'')));
+  const unique=new Set();
+  alerts.forEach(a=>unique.add('alert:'+(a.id||a.ticket_no||a.code||JSON.stringify(a))));
+  reviews.forEach(r=>unique.add('review:'+(r.ticket_no||r.id||'')));
+  returns.forEach(r=>unique.add('return:'+(r.id||r.ticket_no||r.unit_tag||'')));
+  overdueTickets.forEach(t=>unique.add('overdue:'+t));
+  return{count:unique.size,alerts:alerts.length,reviews:reviews.length,returns:returns.length,overdue:overdueTickets.size};
+}
+function ownerVisionAttentionCount(){return ownerVisionAttentionSummary().count;}
+function refreshOwnerVisionPresence(){
+  const summary=ownerVisionAttentionSummary(),count=summary.count;
+  document.querySelectorAll('.ownerVisionPresence').forEach(node=>{
+    const label=node.querySelector('.ownerVisionPresenceCopy>span');
+    const side=node.querySelector('.ownerVisionPresenceBadge,.ownerVisionPresenceGo');
+    node.dataset.visionState=count?'needs_attention':'idle';
+    const text=count?(count+' item'+(count===1?'':'s')+' need'+(count===1?'s':'')+' your attention'):'Vision is ready';
+    if(label)label.textContent=text;
+    node.setAttribute('aria-label','Open OnSite Vision. '+text);
+    if(side){
+      side.className=count?'ownerVisionPresenceBadge':'ownerVisionPresenceGo';
+      side.textContent=count?String(count):'OPEN →';
+    }
+  });
 }
 function ownerVisionPresenceHtml(){
   const count=ownerVisionAttentionCount();
@@ -2807,6 +2829,10 @@ function ownerSetVisionPresenceState(next='idle',detail=''){
   });
 }
 window.ownerSetVisionPresenceState=ownerSetVisionPresenceState;
+window.addEventListener('onsite-vision-state',event=>{
+  const detail=event?.detail||{};
+  ownerSetVisionPresenceState(detail.state||'idle',detail.detail||'');
+});
 
 function ownerAppToday(){
   const greeting=ownerTodayGreeting()+', '+ownerTodayName();
@@ -3427,6 +3453,7 @@ function renderOwnerCommandCenter() {
   });
 }
 function renderOwner() {
+  setTimeout(refreshOwnerVisionPresence,0);
   if (state.profile?.role !== 'owner') return;
   const activePreps = state.preps.filter(p => p.status !== 'closed');
   const completedPreps = state.preps.filter(p => p.status === 'closed').slice().reverse();
