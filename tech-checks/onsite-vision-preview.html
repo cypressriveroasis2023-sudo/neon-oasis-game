@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1118">\n  <meta name="onsite-vision-mode" content="preview">\n  <meta name="onsite-vision-agent-function" content="onsite-vision-agent-preview">
+  <title>CAMERAS ONSITE OnSite Vision · Preview</title>
+  <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
+  <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v35">
+</head>
+<body class="vision-preview-mode">\n  <div class="vision-preview-banner"><b>BRANCH PREVIEW</b><span>feature/onsite-vision · READ ONLY</span></div>
+  <div id="visionLoading" class="vision-loading">
+    <img src="./techcheck-eye-192.png?v=1" alt="">
+    <b>OnSite Vision</b>
+    <span>Opening the OnSite Vision branch preview…</span>
+  </div>
+  <div id="visionApp" class="vision-app hidden">
+    <aside id="visionSidebar" class="vision-sidebar">
+      <div class="vision-brand">
+        <span class="vision-logo"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
+        <span><small>CAMERAS ONSITE</small><b>OnSite Vision</b></span>
+      </div>
+      <button id="visionNewChat" class="vision-new-chat" type="button"><span>＋</span> New chat</button>
+      <div class="vision-side-section">
+        <div class="vision-side-label">Recent conversations</div>
+        <div id="visionHistory" class="vision-history"></div>
+      </div>
+      <div class="vision-side-footer">
+        <button id="visionTeachButton" class="vision-teach-button" type="button"><span>✦</span> Teach Vision</button>
+        <a href="./" class="vision-back-link">← Back to Tech Check</a>
+        <div id="visionOwnerName" class="vision-owner-name"></div>
+      </div>
+    </aside>
+    <main class="vision-main">
+      <header class="vision-topbar">
+        <button id="visionMenuButton" class="vision-icon-button vision-mobile-only" type="button" aria-label="Open conversations">☰</button>
+        <div class="vision-top-title">
+          <span class="vision-logo small"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
+          <div><small>CAMERAS ONSITE · ONSITE VISION · PREVIEW</small><b id="visionConversationTitle">New conversation</b></div>
+        </div>
+        <div class="vision-top-actions">
+          <span id="visionLiveStatus" class="vision-live-status">LIVE</span>
+          <button id="visionHeaderNewButton" class="vision-icon-button vision-mobile-only vision-new-header" type="button" aria-label="Start new chat">＋</button>
+          <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>\n          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
+          <button id="visionRefreshButton" class="vision-icon-button" type="button" aria-label="Refresh data">↻</button>
+        </div>
+      </header>
+      <section id="visionThread" class="vision-thread"></section>
+      <footer class="vision-composer-wrap">
+        <div class="vision-composer">
+          <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision" aria-pressed="false">🎙</button>
+          <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision…" enterkeyhint="send"></textarea>
+          <button id="visionSendButton" class="vision-send" type="button" aria-label="Send">➜</button>
+        </div>
+        <div id="visionVoiceStatus" class="vision-voice-status hidden" aria-live="polite"></div>
+        <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
+      </footer>
+    </main>
+    <aside id="visionOrderPanel" class="vision-order-panel">
+      <div class="vision-order-head">
+        <div><small>SERVICE ORDER</small><b id="visionOrderTitle">No job selected</b></div>
+        <button id="visionOrderClose" class="vision-mobile-only vision-icon-button" type="button">Close</button>
+      </div>
+      <div id="visionOrderBody" class="vision-order-body"></div>
+    </aside>
+    <div id="visionShade" class="vision-shade"></div>
+  </div>
+
+  <div id="visionKnowledgeModal" class="vision-knowledge-modal hidden" aria-hidden="true">
+    <div class="vision-knowledge-shell" role="dialog" aria-modal="true" aria-labelledby="visionKnowledgeTitle">
+      <div class="vision-knowledge-head">
+        <div>
+          <small>COMPANY KNOWLEDGE</small>
+          <b id="visionKnowledgeTitle">Teach OnSite Vision</b>
+          <span>Approved entries become Cameras On Site company knowledge. Drafts are never used as company truth.</span>
+        </div>
+        <button id="visionKnowledgeClose" class="vision-icon-button" type="button">Close</button>
+      </div>
+      <div class="vision-knowledge-layout">
+        <section class="vision-knowledge-editor">
+          <div class="vision-knowledge-editor-head">
+            <div><small>KNOWLEDGE ENTRY</small><b id="visionKnowledgeEditorTitle">New knowledge</b></div>
+            <button id="visionKnowledgeNew" type="button">New</button>
+          </div>
+          <input id="visionKnowledgeEntryId" type="hidden">
+          <label>Title
+            <input id="visionKnowledgeEntryTitle" type="text" placeholder="Example: Helios PTZ port configuration">
+          </label>
+          <div class="vision-knowledge-row">
+            <label>Domain
+              <select id="visionKnowledgeDomain">
+                <option value="technical">Technical</option>
+                <option value="product">Product</option>
+                <option value="workflow">Workflow</option>
+                <option value="sop">SOP</option>
+                <option value="troubleshooting">Troubleshooting</option>
+                <option value="configuration">Configuration</option>
+                <option value="safety">Safety</option>
+                <option value="operations">Operations</option>
+              </select>
+            </label>
+            <label>Equipment
+              <input id="visionKnowledgeEquipment" type="text" list="visionEquipmentOptions" placeholder="Helios, Ranger…">
+              <datalist id="visionEquipmentOptions">
+                <option value="Helios"><option value="Solar Spotter"><option value="Ranger"><option value="Sniper">
+                <option value="Spotter"><option value="Recon 2"><option value="Solar Stand">
+                <option value="110V Stand"><option value="Pole">
+              </datalist>
+            </label>
+          </div>
+          <div class="vision-knowledge-row">
+            <label>Workflow
+              <select id="visionKnowledgeWorkflow">
+                <option value="">Any / not specific</option>
+                <option value="delivery">Delivery</option>
+                <option value="pickup">Pickup</option>
+                <option value="swap">Swap</option>
+                <option value="service">Service</option>
+                <option value="return">Return</option>
+                <option value="intake">IT Intake</option>
+                <option value="handoff">IT → Service Handoff</option>
+              </select>
+            </label>
+            <label>Topic
+              <input id="visionKnowledgeTopic" type="text" placeholder="Ports, batteries, Cerbo, return photos…">
+            </label>
+          </div>
+          <label>What Vision should know
+            <textarea id="visionKnowledgeContent" rows="8" placeholder="Write the Cameras On Site rule, technical specification, troubleshooting procedure, or SOP exactly as the team should follow it."></textarea>
+          </label>
+          <div class="vision-knowledge-row">
+            <label>Source
+              <select id="visionKnowledgeSourceKind">
+                <option value="owner">Owner instruction</option>
+                <option value="sop">Company SOP</option>
+                <option value="database_rule">Database rule</option>
+                <option value="code_baseline">Existing Tech Check rule</option>
+                <option value="vendor">Vendor documentation</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Source reference
+              <input id="visionKnowledgeSourceRef" type="text" placeholder="Optional document, ticket, manual, note…">
+            </label>
+          </div>
+          <label>Tags
+            <input id="visionKnowledgeTags" type="text" placeholder="Comma separated: PTZ, ports, router">
+          </label>
+          <div id="visionKnowledgeSaveStatus" class="vision-system-note hidden"></div>
+          <div class="vision-knowledge-actions">
+            <button id="visionKnowledgeSaveDraft" type="button">Save draft</button>
+            <button id="visionKnowledgeApprove" class="primary" type="button">Approve & publish</button>
+            <button id="visionKnowledgeRetire" type="button" class="danger hidden">Retire</button>
+          </div>
+        </section>
+        <aside class="vision-knowledge-list-pane">
+          <div class="vision-knowledge-list-head">
+            <div><small>VISION KNOWLEDGE</small><b>Saved entries</b></div>
+            <select id="visionKnowledgeFilter">
+              <option value="">All</option>
+              <option value="approved">Approved</option>
+              <option value="draft">Drafts</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+          <button id="visionLanguageEval" class="vision-language-eval-button" type="button">Run language QA</button>
+          <div id="visionLanguageEvalStatus" class="vision-language-eval-status hidden"></div>
+          <div id="visionKnowledgeList" class="vision-knowledge-list">
+            <div class="vision-system-note">Loading knowledge…</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./tech-check-rules.js?v=rules-v10" defer></script>
+  <script src="./onsite-vision-company-knowledge.js?v=company-knowledge-v18" defer></script>
+  <script src="./onsite-vision-workflow-engine.js?v=workflow-engine-v6b" defer></script>
+  <script src="./onsite-vision-live-data.js?v=live-data-v7" defer></script>
+  <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
+  <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
+  <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
+  <script src="./onsite-vision.js?v=vision-workspace-v62" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=153', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+    }
+  </script>
+</body>
+</html>
