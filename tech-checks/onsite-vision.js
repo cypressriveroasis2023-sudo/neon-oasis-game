@@ -2766,17 +2766,30 @@ async function answer(text){
 async function send(raw=null){
   const input=$('visionPrompt'),text=String(raw??input?.value??'').trim();if(!text)return;if(input){input.value='';grow(input);}
   titleFrom(text);addMessage('user',text);renderThread();$('visionThread').insertAdjacentHTML('beforeend',typing());bottom();
-  try{const html=await answer(text);$('visionTyping')?.remove();addMessage('assistant','',html);renderThread();renderOrder();}
-  catch(error){$('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}
+  setVisionRuntimeState('thinking','Thinking…');
+  try{
+    const html=await answer(text);
+    setVisionRuntimeState('working','Checking Tech Check…');
+    $('visionTyping')?.remove();addMessage('assistant','',html);renderThread();renderOrder();
+    setVisionRuntimeState('ready','Ready');
+    setTimeout(()=>setVisionRuntimeState('idle','Vision is ready'),900);
+  }
+  catch(error){
+    $('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();
+    setVisionRuntimeState('error','Vision needs attention');
+  }
 }
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;
+  setVisionRuntimeState('working','Checking Tech Check…');
   if(VISION_PREVIEW){
     state.pending.delete(actionId);
     addMessage('assistant','',
       '<div class="vision-direct good"><b>Preview interpretation confirmed — no live change was made.</b>This branch preview is read-only. Vision reached the confirmation boundary successfully, but Tech Check production data was not changed.</div>'
     );
     renderThread();renderOrder();
+    setVisionRuntimeState('ready','Ready');
+    setTimeout(()=>setVisionRuntimeState('idle','Vision is ready'),900);
     return;
   }
 
@@ -2987,6 +3000,12 @@ function openOrderDrawer(){
 function toggleOrderDrawer(){
   if($('visionApp')?.classList.contains('order-open')) closeDrawers(); else openOrderDrawer();
 }
+function setVisionRuntimeState(next='idle',detail=''){
+  const allowed=new Set(['idle','listening','thinking','working','needs_attention','ready','error']);
+  const value=allowed.has(next)?next:'idle';
+  document.documentElement.dataset.visionState=value;
+  window.dispatchEvent(new CustomEvent('onsite-vision-state',{detail:{state:value,detail:String(detail||'')}}));
+}
 function setVoiceStatus(text='',kind=''){
   const node=$('visionVoiceStatus'),button=$('visionVoiceButton');
   if(node){node.textContent=String(text||'');node.className='vision-voice-status'+(kind?' '+kind:'')+(text?'':' hidden');}
@@ -2996,6 +3015,10 @@ function setVoiceStatus(text='',kind=''){
     button.setAttribute('aria-pressed',kind==='recording'?'true':'false');
     button.textContent=kind==='recording'?'■':'🎙';
   }
+  if(kind==='recording')setVisionRuntimeState('listening',text||'Listening…');
+  else if(kind==='busy')setVisionRuntimeState('working',text||'Checking Tech Check…');
+  else if(kind==='heard')setVisionRuntimeState('thinking',text||'Thinking…');
+  else if(!text)setVisionRuntimeState('idle','Vision is ready');
   syncVisualViewport();
 }
 function stopVoiceTracks(){
