@@ -1069,6 +1069,17 @@ function timeWindowFrom(text){
   if(!m[6]&&!/afternoon|evening|tonight/i.test(daypart)&&eh<=sh&&eh<12)end=String(eh+12).padStart(2,'0')+end.slice(2);
   return{start,end};
 }
+function ambiguousClockFrom(text){
+  const s=String(text||''),m=s.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*o[’']?clock\b/i);
+  if(!m)return'';
+  const h=Number(m[1]||0),min=Number(m[2]||0);
+  if(h<1||h>12||min>59)return'';
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+function ambiguousClockLabel(value){
+  const m=String(value||'').match(/^(\d{2}):(\d{2})/);if(!m)return String(value||'');
+  return String(Number(m[1])||12)+':'+m[2];
+}
 function timeFrom(text){
   const range=timeWindowFrom(text);if(range?.start)return range.start;
   const s=String(text||''),m=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i)||s.match(/\b(?:at|to|for)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i);if(!m)return '';
@@ -1314,10 +1325,11 @@ function draftEquipmentParse(text){
       const a=reEsc(alias);
       const before=source.match(new RegExp('\\b(\\d+)\\s*(?:x|×)?\\s*(?:units?\\s+)?'+a+'\\b','i'));
       const after=source.match(new RegExp('\\b'+a+'\\s*(?:x|×)\\s*(\\d+)\\b','i'));
-      const one=source.match(new RegExp('\\b(?:a|an)\\s+'+a+'\\b','i'));
+      const one=source.match(new RegExp("\\b(?:a|an|1)\\s+(?:unit\\s+)?"+a+"(?:['’]s)?(?:\\s+unit)?\\b","i"));
+      const possessiveUnit=source.match(new RegExp("\\b"+a+"(?:['’]s)?\\s+unit\\b","i"));
       if(before){qty=Number(before[1]);mentioned=true;break;}
       if(after){qty=Number(after[1]);mentioned=true;break;}
-      if(one){qty=1;mentioned=true;break;}
+      if(one||possessiveUnit){qty=1;mentioned=true;break;}
       if(new RegExp('\\b'+a+'\\b','i').test(source))mentioned=true;
     }
     if(qty&&qty>0)rows.push({category:def.category,label:def.label,qty});
@@ -1561,6 +1573,7 @@ function draftTemplateFrom(d={}){
     scheduled_for:x.scheduled_for,
     scheduled_time:x.scheduled_time,
     schedule_end_time:x.schedule_end_time,
+    pending_clock:x.pending_clock,
     time_answered:x.time_answered===true,
     equipment_manifest:JSON.parse(JSON.stringify(x.equipment_manifest||[])),
     equipment_answered:x.equipment_answered===true,
@@ -1588,6 +1601,7 @@ function draftFromTemplate(template={}){
     scheduled_for:String(t.scheduled_for||''),
     scheduled_time:String(t.scheduled_time||''),
     schedule_end_time:String(t.schedule_end_time||''),
+    pending_clock:String(t.pending_clock||''),
     time_answered:t.time_answered===true||Boolean(t.scheduled_time),
     equipment_manifest:JSON.parse(JSON.stringify(Array.isArray(t.equipment_manifest)?t.equipment_manifest:[])),
     equipment_answered:t.equipment_answered===true||Boolean(t.equipment_manifest?.length),
@@ -1744,6 +1758,7 @@ function normalizeDraftState(d={}){
   d.scheduled_for=String(d.scheduled_for||'');
   d.scheduled_time=String(d.scheduled_time||'');
   d.schedule_end_time=String(d.schedule_end_time||'');
+  d.pending_clock=String(d.pending_clock||'');
   d.unit_numbers=String(d.unit_numbers||'');
   d.stand_numbers=String(d.stand_numbers||'');
   d.job_description=String(d.job_description||'');
@@ -1806,6 +1821,7 @@ function draftMissingKey(d){
   return'';
 }
 function draftQuestion(key,d){
+  if(key==='scheduled_time'&&d?.pending_clock)return'You said '+ambiguousClockLabel(d.pending_clock)+' o’clock. Is that AM or PM?';
   const engine=visionWorkflowEngine();
   if(engine?.getNextBestQuestion){
     const q=engine.getNextBestQuestion(d||{});
@@ -1825,7 +1841,7 @@ function draftQuestion(key,d){
   return'';
 }
 function draftSummaryHtml(d){
-  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+clockLabel(d.scheduled_time)+(d.schedule_end_time?'–'+clockLabel(d.schedule_end_time):''):' · no exact time'):' · time not answered')):'—';
+  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+clockLabel(d.scheduled_time)+(d.schedule_end_time?'–'+clockLabel(d.schedule_end_time):''):' · no exact time'):(d.pending_clock?' · '+ambiguousClockLabel(d.pending_clock)+' o’clock · AM/PM needed':' · time not answered'))):'—';
   return '<div class="vision-draft-card"><div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
     +'<div class="vision-draft-grid"><div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div><div><span>Site</span><b>'+esc(d.site||'—')+'</b></div><div><span>Schedule</span><b>'+esc(when)+'</b></div><div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div><div><span>Assignment</span><b>'+esc(draftAssignmentText(d))+'</b></div><div><span>Parts</span><b>'+esc(draftPartsText(d))+'</b></div></div>'
     +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
@@ -1845,6 +1861,11 @@ function draftSiteFrom(text){
       if(/^(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate))continue;
       return candidate;
     }
+  }
+  const trailingAt=raw.match(/\bat\s+([A-Za-z][A-Za-z0-9 &'.,_-]{2,100})\s*$/i);
+  if(trailingAt?.[1]){
+    const candidate=String(trailingAt[1]).trim().replace(/[,.]+$/,'').trim();
+    if(candidate&&!draftMatchedTechs(candidate).length&&!draftWorkType(candidate))return candidate;
   }
   return'';
 }
@@ -1874,18 +1895,22 @@ function draftApplyInput(d,text,initial=false,options={}){
   if(explicitTicket||bareTicket||promptedTicket||embeddedTicket)d.ticket_no=explicitTicket||bareTicket||promptedTicket||embeddedTicket;
   const siteValue=draftSiteFrom(raw),siteMatch=siteValue?{1:siteValue}:null;
   if(siteValue)d.site=siteValue;
-  if(!siteMatch&&(initial||expected==='site')){
-    const loose=raw.match(/\bfor\s+([A-Za-z0-9][A-Za-z0-9 &'._-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d|around\s+\d|with\s+|using\s+|ticket\b|mhelp|unit\b|helios\b|ranger\b|sniper\b|spotter\b|recon\b)|$)/i);
-    const candidate=String(loose?.[1]||'').trim();
-    const isDate=/^(today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate);
-    const techNames=draftMatchedTechs(candidate);
-    if(candidate&&!isDate&&!techNames.length)d.site=candidate;
+  if(!siteMatch&&expected==='site'){
+    const candidate=raw.replace(/^[,.;\s]+|[,.;\s]+$/g,'').trim();
+    if(candidate)d.site=candidate;
   }
   const when=dateFrom(raw);if(when)d.scheduled_for=when;
-  const window=timeWindowFrom(raw),clock=timeFrom(raw);
-  if(window){d.scheduled_time=window.start;d.schedule_end_time=window.end;d.time_answered=true;}
-  else if(clock){d.scheduled_time=clock;d.schedule_end_time='';d.time_answered=true;}
+  const window=timeWindowFrom(raw),clock=timeFrom(raw),ambiguousClock=ambiguousClockFrom(raw);
+  if(window){d.scheduled_time=window.start;d.schedule_end_time=window.end;d.pending_clock='';d.time_answered=true;}
+  else if(clock){d.scheduled_time=clock;d.schedule_end_time='';d.pending_clock='';d.time_answered=true;}
+  else if(ambiguousClock){d.pending_clock=ambiguousClock;d.scheduled_time='';d.schedule_end_time='';d.time_answered=false;}
   if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
+  if(expected==='scheduled_time'&&d.pending_clock&&/^\s*(?:a\.?m\.?|p\.?m\.?)\s*$/i.test(raw)){
+    const mer=raw.toLowerCase().replace(/\./g,'');
+    d.scheduled_time=normalizeSpokenClock(Number(d.pending_clock.slice(0,2)),Number(d.pending_clock.slice(3,5)),mer);
+    d.pending_clock='';
+    d.time_answered=true;
+  }
   const equipment=draftEquipmentParse(raw);
   if(!options.skipEquipment&&equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
   if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;d.equipment_numbers_answered=true;}
@@ -1964,7 +1989,7 @@ function draftResponseHtml(d,started=false,transition=null){
 }
 function startDraft(text,seed={}){
   state.currentTicket='';
-  const d={draft_version:5,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',schedule_end_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
+  const d={draft_version:6,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',schedule_end_time:'',pending_clock:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
   draftApplyInput(d,text,true);
   const s=seed&&typeof seed==='object'?seed:{};
   if(s.work_type){d.work_type=draftWorkType(s.work_type)||String(s.work_type);d.role=draftDefaultRole(d.work_type);}
