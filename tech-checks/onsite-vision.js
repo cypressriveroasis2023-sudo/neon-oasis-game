@@ -7,7 +7,7 @@ const VISION_PREVIEW=VISION_MODE==='preview';
 const VISION_AGENT_FUNCTION=(document.querySelector('meta[name="onsite-vision-agent-function"]')?.content||'onsite-vision-agent').trim()||'onsite-vision-agent';
 let conversationSyncTimer=null;
 let persistenceReady=false;
-let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false;
+let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false,voiceSilenceWatch=null,voiceAudioContext=null;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -2647,7 +2647,7 @@ async function departureReadinessHtml(raw){
 
 function operationsOverviewIntent(raw){
   const text=normalizeSpokenDateText(raw);
-  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+(?:know|deal\s+with)|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief(?:ing)?|daily\s+brief(?:ing)?|today(?:'s)?\s+(?:ops\s+)?brief(?:ing)?|give\s+me\s+(?:my|the)\s+(?:morning|daily|today(?:'s)?)\s+brief(?:ing)?|is\s+everything\s+ready\s+for\s+tomorrow|run\s+the\s+company)\b/i.test(text);
+  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+(?:know|deal\s+with)|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief(?:ing)?|daily\s+brief(?:ing)?|today(?:'s)?\s+(?:ops\s+)?brief(?:ing)?|give\s+me\s+(?:my|the)\s+(?:morning|daily|today(?:'s)?)\s+brief(?:ing)?|tell\s+me\s+(?:about\s+)?my\s+day|what(?:'s|\s+is)\s+my\s+day(?:\s+look(?:ing)?\s+like)?|what\s+does\s+my\s+day\s+look\s+like|what\s+do\s+i\s+have\s+(?:today|for\s+today)|tell\s+me\s+(?:about\s+)?today|what(?:'s|\s+is)\s+(?:going\s+on|happening)\s+today|walk\s+me\s+through\s+(?:my\s+)?day|is\s+everything\s+ready\s+for\s+tomorrow|run\s+the\s+company)\b/i.test(text);
 }
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
@@ -3118,6 +3118,8 @@ function setVoiceStatus(text='',kind=''){
 }
 function stopVoiceTracks(){
   clearTimeout(voiceStopTimer);voiceStopTimer=null;
+  clearInterval(voiceSilenceWatch);voiceSilenceWatch=null;
+  try{voiceAudioContext?.close?.();}catch{} voiceAudioContext=null;
   try{voiceStream?.getTracks?.().forEach(track=>track.stop());}catch{}
   voiceStream=null;
 }
@@ -3159,10 +3161,6 @@ async function transcribeVoiceBlob(blob,mimeType){
 }
 async function voice(){
   if(voiceBusy)return;
-  if(VISION_PREVIEW&&(window.SpeechRecognition||window.webkitSpeechRecognition)){
-    browserVoiceFallback();
-    return;
-  }
   if(voiceRecorder?.state==='recording'){
     voiceBusy=true;
     setVoiceStatus('Finishing…','busy');
@@ -3200,7 +3198,28 @@ async function voice(){
     };
     voiceRecorder.start(250);
     voiceBusy=false;
-    setVoiceStatus('Listening… tap the microphone again when you are done.','recording');
+    setVoiceStatus('Listening…','recording');
+    try{
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(AudioCtx){
+        voiceAudioContext=new AudioCtx();
+        const source=voiceAudioContext.createMediaStreamSource(voiceStream);
+        const analyser=voiceAudioContext.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.25;source.connect(analyser);
+        const samples=new Uint8Array(analyser.fftSize);
+        let speechSeen=false,silentSince=0;
+        voiceSilenceWatch=setInterval(()=>{
+          if(voiceRecorder?.state!=='recording')return;
+          analyser.getByteTimeDomainData(samples);
+          let sum=0;for(let i=0;i<samples.length;i++){const v=(samples[i]-128)/128;sum+=v*v;}
+          const rms=Math.sqrt(sum/samples.length),t=Date.now();
+          if(rms>.022){speechSeen=true;silentSince=0;}
+          else if(speechSeen){
+            if(!silentSince)silentSince=t;
+            if(t-silentSince>1100){voiceBusy=true;setVoiceStatus('Understanding…','busy');try{voiceRecorder.stop();}catch{}}
+          }
+        },100);
+      }
+    }catch(error){console.warn('Vision silence detection',error);}
     voiceStopTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording'){voiceBusy=true;setVoiceStatus('Finishing…','busy');voiceRecorder.stop();}},45000);
   }catch(error){
     voiceBusy=false;stopVoiceTracks();voiceRecorder=null;setVoiceStatus('');
