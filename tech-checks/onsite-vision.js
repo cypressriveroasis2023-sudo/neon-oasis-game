@@ -687,18 +687,24 @@ async function loadData(){
 function showPreviewLogin(message=''){
   const host=$('visionLoading');if(!host)return;
   host.classList.remove('hidden');
-  host.innerHTML='<div class="vision-preview-login"><img src="./techcheck-eye-192.png?v=1" alt=""><small>CAMERAS ONSITE · BRANCH PREVIEW</small><b>Sign in to OnSite Vision</b><span>Use your Tech Check Owner/Admin login. This preview is read-only.</span>'
-    +'<form id="visionPreviewLoginForm"><label>Email<input id="visionPreviewEmail" type="email" autocomplete="username" required></label><label>Password<input id="visionPreviewPassword" type="password" autocomplete="current-password" required></label>'
+  host.innerHTML='<div class="vision-preview-login"><img src="./techcheck-eye-192.png?v=1" alt=""><small>CAMERAS ONSITE · BRANCH PREVIEW</small><b>Sign in to OnSite Vision</b><span>Use the same Tech Check username and password you use in the main app. Your work email also works here.</span>'
+    +'<form id="visionPreviewLoginForm"><label>Username or work email<input id="visionPreviewEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label><label>Password<input id="visionPreviewPassword" type="password" autocomplete="current-password" required></label>'
     +'<button type="submit">Sign in to preview</button><div id="visionPreviewLoginStatus" class="vision-preview-login-status">'+esc(message)+'</div></form></div>';
   $('visionPreviewLoginForm')?.addEventListener('submit',async e=>{
     e.preventDefault();
-    const email=String($('visionPreviewEmail')?.value||'').trim();
+    const login=String($('visionPreviewEmail')?.value||'').trim().toLowerCase();
+    const username=(login.includes('@')?login.split('@')[0]:login).trim();
     const password=String($('visionPreviewPassword')?.value||'');
     const status=$('visionPreviewLoginStatus');
+    if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)){
+      if(status)status.textContent='Enter your Tech Check username or work email.';
+      return;
+    }
     if(status)status.textContent='Signing in…';
+    const email=username+'@cameras-on-site.invalid';
     const result=await db.auth.signInWithPassword({email,password});
     if(result.error){
-      if(status)status.textContent=result.error.message||'Sign-in failed.';
+      if(status)status.textContent='Username or password is incorrect.';
       return;
     }
     location.reload();
