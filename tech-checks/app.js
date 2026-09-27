@@ -2826,7 +2826,7 @@ function ownerVisionPresenceHtml(){
   const status=ownerVisionAttentionText(ownerVisionAttentionSummary());
   const stateName=count?'needs_attention':'idle';
   return '<button type="button" class="ownerVisionPresence" data-vision-state="'+stateName+'" onclick="ownerJump(\'vision\')" aria-label="Open OnSite Vision. '+esc(status)+'">'
-    +'<span class="ownerVisionPresenceEye" aria-hidden="true"><span class="ownerVisionPresenceHalo"></span><img src="./techcheck-eye-192.png?v=2" alt=""></span>'
+    +'<span class="ownerVisionPresenceEye" aria-hidden="true"><span class="ownerVisionPresenceHalo"></span><img src="./vision-ai.webp?v=1" alt=""></span>'
     +'<span class="ownerVisionPresenceCopy"><small>ONSITE VISION</small><b>Ask Vision</b><span>'+esc(status)+'</span></span>'
     +(count?'<strong class="ownerVisionPresenceBadge">'+count+'</strong>':'<strong class="ownerVisionPresenceGo">OPEN →</strong>')
     +'</button>';
@@ -2860,7 +2860,7 @@ function ownerAppToday(){
   const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
   const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
   const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
-  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
+  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./vision-ai.webp?v=1" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
     +ownerVisionPresenceHtml()
     +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
     +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
