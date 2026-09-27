@@ -660,7 +660,7 @@ Deno.serve(async (req) => {
     if (body.mode === 'status') {
       return json({
         ok: true,
-        agent_version: 'onsite-vision-agent-v32',
+        agent_version: 'onsite-vision-agent-v33',
         model,
         model_configured: Boolean(apiKey),
         knowledge_version: KNOWLEDGE?.version || 'unknown',
@@ -836,7 +836,7 @@ Deno.serve(async (req) => {
             knowledge: knowledgeCoverage(),
             shared_rules_version: (globalThis as any).TechCheckRules?.version || 'unknown',
             workflow_engine_version: ENGINE?.version || 'unknown',
-            agent_version: 'onsite-vision-agent-v32',
+            agent_version: 'onsite-vision-agent-v33',
           }
         } as Json
       }
@@ -1419,6 +1419,10 @@ Deno.serve(async (req) => {
       '',
       'CONVERSATION:',
       '- Understand natural references such as it, that job, this ticket, the unit, and follow-ups using the supplied active ticket and history.',
+      '- If active_ticket is present and the Owner says "that one", "this one", "the unit", "the unit coming back", "the old unit", "the failed unit", or "what about the return", treat the active ticket as the default job context unless the current message names a different ticket/unit.',
+      '- interpretation_hints.remembered_unit_references are conversational focus only. For any current unit status or return claim, verify through get_job_context, find_job_by_unit, get_offline_escalations, or get_damage_holds before answering.',
+      '- If the Owner says "open 22825", "pull up 22825", "look at 22825", or equivalent, use that number as the ticket reference and call get_job_context even if it is not in a prior conversation message.',
+      '- For a SWAP follow-up about "the unit coming back", distinguish the replacement unit going out from the old/failed field unit returning. Never merge those into one unit record.',
       '- If find_people returns multiple profile records for the same name, describe the records clearly and do not guess which account the owner means. Distinguish active, inactive, and archived status.',
       '- Be concise but operationally thorough. State the immediate next step when it helps.',
       '- Do not expose internal UUIDs unless the user explicitly asks for them.',
@@ -1549,7 +1553,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      agent_version: 'onsite-vision-agent-v32',
+      agent_version: 'onsite-vision-agent-v33',
       model,
       tool_trace: toolTrace,
       ...parsed,
