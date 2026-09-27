@@ -210,7 +210,9 @@ function visionInterpretationHints(text){
     parts,
     has_context_reference:reference,
     draft_missing_field:draftMissing,
-    current_subject:cleanMemory(chat()?.memory)?.current_subject||''
+    current_subject:cleanMemory(chat()?.memory)?.current_subject||'',
+    has_last_job_template:Boolean(lastJobTemplate()),
+    current_draft:Boolean(chat()?.draft)
   };
 }
 
@@ -1368,6 +1370,183 @@ function draftAssignmentText(d){
   return out.join(' · ')||'—';
 }
 function visionWorkflowEngine(){return window.OnSiteVisionWorkflowEngine||null;}
+function draftTemplateFrom(d={}){
+  const x=normalizeDraftState({...d});
+  return {
+    template_version:1,
+    work_type:x.work_type,
+    role:x.role,
+    scheduled_for:x.scheduled_for,
+    scheduled_time:x.scheduled_time,
+    time_answered:x.time_answered===true,
+    equipment_manifest:JSON.parse(JSON.stringify(x.equipment_manifest||[])),
+    equipment_answered:x.equipment_answered===true,
+    job_description:x.job_description,
+    parts:JSON.parse(JSON.stringify(x.parts||{})),
+    parts_answered:x.parts_answered===true,
+    assignees:{...(x.assignees||{})},
+    assignment_answered:x.assignment_answered===true,
+    notes:x.notes,
+    notes_answered:x.notes_answered===true
+  };
+}
+function lastJobTemplate(){
+  const value=cleanMemory(chat()?.memory)?.last_job_template;
+  return value&&typeof value==='object'&&!Array.isArray(value)?value:null;
+}
+function draftFromTemplate(template={}){
+  const t=template&&typeof template==='object'?template:{};
+  return normalizeDraftState({
+    draft_version:4,
+    work_type:String(t.work_type||''),
+    role:String(t.role||''),
+    ticket_no:'',
+    site:'',
+    scheduled_for:String(t.scheduled_for||''),
+    scheduled_time:String(t.scheduled_time||''),
+    time_answered:t.time_answered===true||Boolean(t.scheduled_time),
+    equipment_manifest:JSON.parse(JSON.stringify(Array.isArray(t.equipment_manifest)?t.equipment_manifest:[])),
+    equipment_answered:t.equipment_answered===true||Boolean(t.equipment_manifest?.length),
+    equipment_numbers_answered:false,
+    unit_numbers:'',
+    stand_numbers:'',
+    job_description:String(t.job_description||''),
+    parts:JSON.parse(JSON.stringify(t.parts&&typeof t.parts==='object'?t.parts:{})),
+    parts_answered:t.parts_answered===true,
+    assignees:{...(t.assignees||{})},
+    assignment_answered:t.assignment_answered===true,
+    notes:String(t.notes||''),
+    notes_answered:t.notes_answered===true,
+    last_answered_key:'',
+    last_answered_at:''
+  });
+}
+function draftEquipmentEdit(d,text){
+  const raw=numberWords(String(text||'')).trim();
+  const defs=[
+    ['Solar Spotter',/solar\s+spotters?/i],
+    ['Recon 2',/recon\s+(?:2|ii|two)/i],
+    ['Helios',/helios?|helio/i],
+    ['Ranger',/rangers?/i],
+    ['Sniper',/snipers?/i],
+    ['Spotter',/(?<!solar\s)spotters?/i],
+    ['Solar Stand',/solar\s+stands?/i],
+    ['110V Stand',/(?:110\s*v|110\s*volt)\s+stands?/i],
+    ['Pole',/poles?/i]
+  ];
+  const def=defs.find(([,re])=>re.test(raw));
+  if(!def)return false;
+  const label=def[0],re=def[1];
+  const normalized=raw.toLowerCase();
+  const qtyMatch=normalized.match(/\b(\d+)\b/);
+  const qty=qtyMatch?Math.max(0,Number(qtyMatch[1])):1;
+  const rows=d.equipment_manifest||[];
+  const existing=rows.find(x=>String(x.label||'').toLowerCase()===label.toLowerCase());
+  const add=/\b(add|another|more|plus|also|include|need one more|need \d+ more)\b/i.test(raw);
+  const remove=/\b(remove|delete|take out|take off|drop|minus|less)\b/i.test(raw);
+  const set=/\b(make (?:it|that)|change (?:it|that)?\s*to|set (?:it|that)?\s*to)\b/i.test(raw);
+  if(!add&&!remove&&!set)return false;
+  if(set){
+    if(existing)existing.qty=qty;
+    else if(qty>0)rows.push({category:/Stand|Pole/.test(label)?'stand':'device',label,qty});
+  }else if(add){
+    if(existing)existing.qty=Number(existing.qty||0)+qty;
+    else rows.push({category:/Stand|Pole/.test(label)?'stand':'device',label,qty});
+  }else if(remove&&existing){
+    existing.qty=Math.max(0,Number(existing.qty||0)-qty);
+  }
+  d.equipment_manifest=rows.filter(x=>Number(x.qty||0)>0);
+  d.equipment_answered=true;
+  return true;
+}
+function applyDraftConversationEdit(d,text){
+  const raw=String(text||'').trim(),lower=raw.toLowerCase(),expected=draftMissingKey(d);
+  let changed=false,label='';
+
+  // Correct a workflow type only when the Owner clearly says this is a correction.
+  const correctedType=draftWorkType(raw);
+  if(correctedType&&/\b(no|actually|instead|i meant|meant|change|switch|make it|make that)\b/i.test(raw)
+      && expected!=='assignment'){
+    d.work_type=correctedType;
+    d.role=draftDefaultRole(correctedType);
+    d.assignees={};
+    d.assignment_answered=false;
+    changed=true;label='workflow';
+  }
+
+  const techs=draftMatchedTechs(raw);
+  if(techs.length&&(
+      expected==='assignment'
+      || /\b(make|change|switch|instead|meant|put|assign|give|have|let|with)\b/i.test(raw)
+      || /\b(that|it)\s+(?:to\s+)?[A-Za-z]/i.test(raw)
+    )){
+    d.assignees=d.assignees||{};
+    for(const t of techs){
+      if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;
+    }
+    d.assignment_answered=true;
+    changed=true;label=label||'assignment';
+  }
+
+  // At the assignment question, bare "Service" / "IT" means the department queue,
+  // not a different work-order type.
+  if(expected==='assignment'){
+    const serviceQueue=/^(?:no,?\s*)?(?:service|service queue|service department|give it to service)$/i.test(raw)
+      || /\b(?:use|put|give|leave|send).*(?:service)\s*(?:queue|department)?\b/i.test(raw);
+    const itQueue=/^(?:no,?\s*)?(?:IT|eye\s*tee|IT queue|IT department|give it to IT)$/i.test(raw)
+      || /\b(?:use|put|give|leave|send).*\b(?:IT|eye\s*tee)\b\s*(?:queue|department)?/i.test(raw);
+    if(serviceQueue||itQueue){
+      const role=serviceQueue?'service':'it';
+      d.assignees=d.assignees||{};
+      delete d.assignees[role];
+      d.assignment_answered=true;
+      changed=true;label='assignment';
+    }
+  }
+
+  if(dateFrom(raw)&&/\b(no|actually|instead|meant|change|move|make|switch|rather|that|it)\b/i.test(raw)){
+    d.scheduled_for=dateFrom(raw);
+    changed=true;label=label||'date';
+  }
+  if(timeFrom(raw)&&/\b(no|actually|instead|meant|change|move|make|switch|rather|that|it|at)\b/i.test(raw)){
+    d.scheduled_time=timeFrom(raw);
+    d.time_answered=true;
+    changed=true;label=label||'time';
+  }
+  if(draftEquipmentEdit(d,raw)){
+    changed=true;label=label||'equipment';
+  }
+
+  const explicitSite=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)|\b(?:change|make|switch)\s+(?:the\s+)?(?:site|customer)\s+(?:to|as)\b/i);
+  if(explicitSite){
+    const m=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i)
+      || raw.match(/\b(?:change|make|switch)\s+(?:the\s+)?(?:site|customer)\s+(?:to|as)\s+([^,.;\n]+)/i);
+    if(m?.[1]){d.site=String(m[1]).trim();changed=true;label=label||'site';}
+  }
+
+  if(changed){
+    d.last_answered_key=label||d.last_answered_key||'edit';
+    d.last_answered_at=now();
+  }
+  return changed;
+}
+function startSameJobDraft(text){
+  const template=lastJobTemplate();
+  if(!template)return'';
+  state.currentTicket='';
+  const d=draftFromTemplate(template);
+  draftApplyInput(d,text,true);
+  const current=ensureChat();
+  current.ticket='';
+  current.draft=d;
+  const memory=cleanMemory(current.memory);
+  current.memory={...memory,current_subject:'draft:repeat'};
+  saveChats();renderOrder();
+  return '<div class="vision-answer-title">I copied the last Tech Check setup.</div>'
+    +'<div class="vision-answer-copy">I kept the workflow, schedule, equipment, work description, parts and assignment. I cleared the ticket, customer/site and unit numbers so I do not carry the wrong job-specific information forward.</div>'
+    +draftResponseHtml(d,false);
+}
+
 function normalizeDraftState(d={}){
   if(!d||typeof d!=='object')d={};
   if(!Array.isArray(d.equipment_manifest))d.equipment_manifest=[];
@@ -1468,7 +1647,9 @@ function draftSummaryHtml(d){
 }
 function draftApplyInput(d,text,initial=false){
   d=normalizeDraftState(d||{});
-  const raw=String(text||'').trim(),expected=draftMissingKey(d),type=draftWorkType(raw);
+  const raw=String(text||'').trim(),expected=draftMissingKey(d);
+  const assignmentRoleOnly=expected==='assignment'&&/^(?:no,?\s*)?(?:service|service queue|service department|IT|eye\s*tee|IT queue|IT department)$/i.test(raw);
+  const type=assignmentRoleOnly?'':draftWorkType(raw);
   if(type){d.work_type=type;d.role=draftDefaultRole(type);}
   const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
   let embeddedTicket='';
@@ -1599,7 +1780,8 @@ async function continueDraft(text){
     return '<div class="vision-answer-title">Draft cancelled.</div><div class="vision-answer-copy">No Tech Check job was created.</div>';
   }
   const before=draftMissingKey(d);
-  draftApplyInput(d,text,false);
+  const edited=applyDraftConversationEdit(d,text);
+  if(!edited)draftApplyInput(d,text,false);
   const after=draftMissingKey(d);
   const advanced=Boolean(before&&after!==before);
   if(advanced){
@@ -1634,7 +1816,14 @@ async function createDraftJob(d){
     if(response.data){ids.push(response.data);if(d.scheduled_time){const timeUpdate=await db.from('job_assignments').update({scheduled_time:d.scheduled_time,updated_at:now()}).eq('id',response.data);if(timeUpdate.error)throw timeUpdate.error;}}
   }
   for(const assignmentId of ids){try{await db.functions.invoke('send-techcheck-push',{body:{assignment_id:assignmentId}});}catch{}}
-  await loadData();state.currentTicket=String(d.ticket_no);const current=ensureChat();current.ticket=state.currentTicket;current.draft=null;saveChats();renderOrder();
+  await loadData();
+  state.currentTicket=String(d.ticket_no);
+  const current=ensureChat();
+  current.ticket=state.currentTicket;
+  current.draft=null;
+  const memory=cleanMemory(current.memory);
+  current.memory={...memory,active_ticket:state.currentTicket,current_subject:'ticket',last_job_template:draftTemplateFrom(d)};
+  saveChats();renderOrder();
   return '<div class="vision-direct good"><b>Tech Check job created.</b>MHelpDesk #'+esc(d.ticket_no)+' is now set up as a '+esc(String(d.work_type).toUpperCase())+' workflow. '+esc(draftFlowLabel(d))+' is in place.</div>'+jobCard(d.ticket_no);
 }
 function actionCard(a,ticket){
@@ -2155,6 +2344,10 @@ async function answer(text){
       if(side)return side;
     }
     return await continueDraft(raw);
+  }
+  if(/\b(?:same thing|same setup|same job|copy that|copy the last one|do that again|another one like that)\b/i.test(raw)){
+    const repeated=startSameJobDraft(raw);
+    if(repeated)return repeated;
   }
   if(isCreateRequest(raw))return startDraft(raw);
 
