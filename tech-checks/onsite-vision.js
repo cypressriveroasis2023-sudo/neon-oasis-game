@@ -1273,7 +1273,7 @@ function draftEquipmentParse(text){
     let qty=null,mentioned=false;
     for(const alias of def.aliases){
       const a=reEsc(alias);
-      const before=source.match(new RegExp('\\b(\\d+)\\s*(?:x|×)?\\s*'+a+'\\b','i'));
+      const before=source.match(new RegExp('\\b(\\d+)\\s*(?:x|×)?\\s*(?:units?\\s+)?'+a+'\\b','i'));
       const after=source.match(new RegExp('\\b'+a+'\\s*(?:x|×)\\s*(\\d+)\\b','i'));
       const one=source.match(new RegExp('\\b(?:a|an)\\s+'+a+'\\b','i'));
       if(before){qty=Number(before[1]);mentioned=true;break;}
@@ -1889,10 +1889,11 @@ function draftResponseHtml(d,started=false,transition=null){
       ?'I started the work order. I’ll ask you one thing at a time.'
       :advanced
         ?'Got it. Here is the next question.'
-        :'I still need this answer before I can move on.';
-    // The full draft summary belongs at the start and final review. Appending it
-    // after every answer duplicated the same draft card in the conversation.
-    return '<div class="vision-answer-title">'+title+'</div>'+(started?draftSummaryHtml(d):'')
+        :transition?.captured
+          ?'I saved those details. I still need this answer.'
+          :'I still need this answer before I can move on.';
+    const showSummary=started||transition?.captured===true;
+    return '<div class="vision-answer-title">'+title+'</div>'+(showSummary?draftSummaryHtml(d):'')
       +'<div class="vision-draft-question"><small>QUESTION '+step+' OF '+keys.length+'</small><b>'+esc(draftQuestion(missing,d))+'</b>'+draftChoiceHtml(missing,d)+'</div>'
       +'<div class="vision-system-note">Answer below or tap one of the choices. Vision remembers the answers already in this draft.</div>';
   }
@@ -1933,11 +1934,22 @@ async function continueDraft(text){
     return '<div class="vision-answer-title">Draft cancelled.</div><div class="vision-answer-copy">No Tech Check job was created.</div>';
   }
   const before=draftMissingKey(d);
+  const beforeState=JSON.stringify({
+    work_type:d.work_type,ticket_no:d.ticket_no,site:d.site,scheduled_for:d.scheduled_for,
+    scheduled_time:d.scheduled_time,equipment_manifest:d.equipment_manifest,assignees:d.assignees,
+    job_description:d.job_description,parts:d.parts,notes:d.notes
+  });
   const edited=applyDraftConversationEdit(d,text);
   const equipmentEditCommand=/\b(add|another|more|plus|remove|delete|take\s+out|take\s+off|drop|minus|less|set|change)\b[\s\S]{0,45}\b(helios?|rangers?|snipers?|solar\s+spotters?|spotters?|recon|stands?|poles?)\b/i.test(String(text||''));
   draftApplyInput(d,text,false,{skipEquipment:edited&&equipmentEditCommand});
   const after=draftMissingKey(d);
+  const afterState=JSON.stringify({
+    work_type:d.work_type,ticket_no:d.ticket_no,site:d.site,scheduled_for:d.scheduled_for,
+    scheduled_time:d.scheduled_time,equipment_manifest:d.equipment_manifest,assignees:d.assignees,
+    job_description:d.job_description,parts:d.parts,notes:d.notes
+  });
   const advanced=Boolean(before&&after!==before);
+  const captured=beforeState!==afterState&&!advanced;
   if(advanced){
     d.last_answered_key=before;
     d.last_answered_at=now();
@@ -1951,7 +1963,7 @@ async function continueDraft(text){
     clearTimeout(conversationSyncTimer);
     try{await visionPersistence()?.save?.(current);}catch(error){console.warn('Vision draft answer cloud sync',error);queueConversationSync();}
   }
-  return draftResponseHtml(d,false,{before,after,advanced});
+  return draftResponseHtml(d,false,{before,after,advanced,captured});
 }
 async function createDraftJob(d){
   const engine=visionWorkflowEngine();
