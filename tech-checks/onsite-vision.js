@@ -1465,8 +1465,9 @@ function applyDraftConversationEdit(d,text){
 
   // Correct a workflow type only when the Owner clearly says this is a correction.
   const correctedType=draftWorkType(raw);
+  const explicitWorkTypeCorrection=/\b(?:job|work\s*order|service\s*call|delivery|pickup|swap)\b/i.test(raw);
   if(correctedType&&/\b(no|actually|instead|i meant|meant|change|switch|make it|make that)\b/i.test(raw)
-      && expected!=='assignment'){
+      && (expected!=='assignment'||explicitWorkTypeCorrection)){
     d.work_type=correctedType;
     d.role=draftDefaultRole(correctedType);
     d.assignees={};
@@ -1491,9 +1492,9 @@ function applyDraftConversationEdit(d,text){
   // At the assignment question, bare "Service" / "IT" means the department queue,
   // not a different work-order type.
   if(expected==='assignment'){
-    const serviceQueue=/^(?:no,?\s*)?(?:service|service queue|service department|give it to service)$/i.test(raw)
+    const serviceQueue=/^(?:no,?\s*)?(?:(?:i\s+)?meant\s+)?(?:service|service queue|service department|give it to service)$/i.test(raw)
       || /\b(?:use|put|give|leave|send).*(?:service)\s*(?:queue|department)?\b/i.test(raw);
-    const itQueue=/^(?:no,?\s*)?(?:IT|eye\s*tee|IT queue|IT department|give it to IT)$/i.test(raw)
+    const itQueue=/^(?:no,?\s*)?(?:(?:i\s+)?meant\s+)?(?:IT|eye\s*tee|IT queue|IT department|give it to IT)$/i.test(raw)
       || /\b(?:use|put|give|leave|send).*\b(?:IT|eye\s*tee)\b\s*(?:queue|department)?/i.test(raw);
     if(serviceQueue||itQueue){
       const role=serviceQueue?'service':'it';
