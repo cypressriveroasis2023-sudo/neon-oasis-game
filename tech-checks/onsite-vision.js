@@ -2628,7 +2628,7 @@ async function departureReadinessHtml(raw){
 
 function operationsOverviewIntent(raw){
   const text=normalizeSpokenDateText(raw);
-  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+deal\s+with|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief|daily\s+brief|today\s+brief|run\s+the\s+company)\b/i.test(text);
+  return /\b(operations?|ops|rundown|what\s+needs\s+(?:my\s+)?attention|needs\s+attention|what(?:'s|\s+is)\s+behind|who\s+(?:can\s+take|has\s+room)|what\s+do\s+i\s+need\s+to\s+(?:know|deal\s+with)|how\s+are\s+(?:we|operations)\s+looking|morning\s+brief(?:ing)?|daily\s+brief(?:ing)?|today(?:'s)?\s+(?:ops\s+)?brief(?:ing)?|give\s+me\s+(?:my|the)\s+(?:morning|daily|today(?:'s)?)\s+brief(?:ing)?|is\s+everything\s+ready\s+for\s+tomorrow|run\s+the\s+company)\b/i.test(text);
 }
 function ownerReviewIntent(raw){
   return /\b(ready\s+for\s+owner\s+review|owner\s+review\s+queue|what\s+do\s+i\s+need\s+to\s+review|jobs?\s+(?:ready|waiting)\s+for\s+(?:my|owner)\s+review)\b/i.test(String(raw||''));
@@ -2682,8 +2682,16 @@ async function answer(text){
   if(isCreateRequest(raw))return startDraft(raw);
 
   if(operationsOverviewIntent(raw)){
+    setVisionRuntimeState('working','Building your operations briefing…');
     const operationsReply=await serverAgentAnswer(raw);
     if(operationsReply)return operationsReply;
+    const todayIntent={date:dayKey(new Date()),scope:'all',role:'',tech:null};
+    const schedule=await workloadHtml(todayIntent);
+    const review=await ownerReviewQueueHtml('owner review queue');
+    const damage=await damageHoldHtml('needs replacement damage holds');
+    return '<div class="vision-answer-title">Your Tech Check operations briefing</div>'
+      +'<div class="vision-answer-copy">I checked the live Tech Check schedule and Owner-facing queues available to Vision. MHelpDesk remains separate.</div>'
+      +schedule+review+damage;
   }
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
