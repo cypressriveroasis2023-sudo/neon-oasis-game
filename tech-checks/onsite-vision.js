@@ -1049,9 +1049,35 @@ function dateFrom(text){
   if(m){const d=new Date(base),n=(days[m[1]]-d.getDay()+7)%7||7;d.setDate(d.getDate()+n);return dayKey(d);}
   const iso=s.match(/\b(20\d{2}-\d{2}-\d{2})\b/);return iso?.[1]||'';
 }
+function normalizeSpokenClock(hour,minute=0,meridian='',daypart=''){
+  let h=Number(hour||0),min=Number(minute||0),mer=String(meridian||'').toLowerCase().replace(/\./g,'');
+  if(mer==='pm'&&h<12)h+=12;
+  if(mer==='am'&&h===12)h=0;
+  if(!mer&&/afternoon|evening|tonight/i.test(daypart)&&h<12)h+=12;
+  if(h>23||min>59)return'';
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+function timeWindowFrom(text){
+  const s=String(text||'');
+  const m=s.match(/\bfrom\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*(?:to|until|through|-)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b/i);
+  if(!m)return null;
+  const daypart=(s.match(/\b(morning|afternoon|evening|tonight)\b/i)||[])[1]||'';
+  let start=normalizeSpokenClock(m[1],m[2]||0,m[3]||'',daypart);
+  let end=normalizeSpokenClock(m[4],m[5]||0,m[6]||'',daypart);
+  if(!start||!end)return null;
+  const sh=Number(start.slice(0,2)),eh=Number(end.slice(0,2));
+  if(!m[6]&&!/afternoon|evening|tonight/i.test(daypart)&&eh<=sh&&eh<12)end=String(eh+12).padStart(2,'0')+end.slice(2);
+  return{start,end};
+}
 function timeFrom(text){
+  const range=timeWindowFrom(text);if(range?.start)return range.start;
   const s=String(text||''),m=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i)||s.match(/\b(?:at|to|for)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i);if(!m)return '';
-  let h=Number(m[1]||0),min=Number(m[2]||0),mer=String(m[3]||'').toLowerCase().replace(/\./g,'');if(mer==='pm'&&h<12)h+=12;if(mer==='am'&&h===12)h=0;return h>23||min>59?'':String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+  return normalizeSpokenClock(m[1],m[2]||0,m[3]||'');
+}
+function clockLabel(value){
+  const m=String(value||'').match(/^(\d{2}):(\d{2})/);if(!m)return String(value||'');
+  let h=Number(m[1]),min=m[2],mer=h>=12?'PM':'AM';h=h%12||12;
+  return h+':'+min+' '+mer;
 }
 function dateLabel(k){const d=new Date(k+'T12:00:00');return Number.isNaN(d.getTime())?k:d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});}
 function dateJobs(k){
@@ -1196,8 +1222,21 @@ async function workloadHtml(intent){
     :'<div class="vision-answer-title">'+esc(subject)+' has 0 Tech Check jobs '+esc(when)+'.</div>';
 }
 function findTech(text,role=''){
-  const s=String(text||'').toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role),exact=pool.find(t=>[t.full_name,t.username].filter(Boolean).some(v=>s.includes(String(v).toLowerCase())));if(exact)return exact;
-  return pool.find(t=>{const first=String(t.full_name||'').trim().split(/\s+/)[0].toLowerCase();return first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(s);})||null;
+  const raw=String(text||''),s=raw.toLowerCase(),pool=state.techs.filter(t=>!role||t.role===role);
+  const full=pool.find(t=>{const name=String(t.full_name||'').trim().toLowerCase();return name.length>2&&s.includes(name);});
+  if(full)return full;
+  const first=pool.find(t=>{
+    const name=String(t.full_name||'').trim(),token=name.split(/\s+/)[0]||'';
+    return token.length>2&&!/^test$/i.test(token)&&new RegExp('\\b'+reEsc(token)+'\\b','i').test(raw);
+  });
+  if(first)return first;
+  const generic=new Set(['service','ittech']);
+  return pool.find(t=>{
+    const user=String(t.username||'').trim().toLowerCase();
+    if(user.length<=2)return false;
+    if(generic.has(user))return new RegExp('(?:@|username\\s+)'+reEsc(user)+'\\b','i').test(raw);
+    return new RegExp('\\b'+reEsc(user)+'\\b','i').test(raw);
+  })||null;
 }
 function assignIntent(text){
   const raw=String(text||''),s=raw.toLowerCase();
@@ -1257,7 +1296,7 @@ function draftEquipmentParse(text){
   const defs=[
     {category:'device',label:'Solar Spotter',aliases:['solar spotter','solar spotters']},
     {category:'device',label:'Recon 2',aliases:['recon 2','recon ii','recon two']},
-    {category:'device',label:'Helios',aliases:['helios','helio']},
+    {category:'device',label:'Helios',aliases:['helios','helio','helias','helius']},
     {category:'device',label:'Ranger',aliases:['ranger','rangers']},
     {category:'device',label:'Sniper',aliases:['sniper','snipers']},
     {category:'device',label:'Spotter',aliases:['spotter','spotters']},
@@ -1489,10 +1528,15 @@ function draftPartsText(d){
   return rows.join(', ')||'None';
 }
 function draftMatchedTechs(text){
-  const lower=String(text||'').toLowerCase(),hits=[];
+  const raw=String(text||''),lower=raw.toLowerCase(),hits=[],seen=new Set(),generic=new Set(['service','ittech']);
   for(const tech of state.techs){
-    const full=String(tech.full_name||'').trim(),user=String(tech.username||'').trim(),first=full.split(/\s+/)[0]||'';
-    if((full.length>2&&lower.includes(full.toLowerCase()))||(user.length>2&&new RegExp('\\b'+reEsc(user)+'\\b','i').test(lower))||(first.length>2&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(lower)))hits.push(tech);
+    const full=String(tech.full_name||'').trim(),user=String(tech.username||'').trim().toLowerCase(),first=full.split(/\s+/)[0]||'';
+    const fullHit=full.length>2&&lower.includes(full.toLowerCase());
+    const firstHit=first.length>2&&!/^test$/i.test(first)&&new RegExp('\\b'+reEsc(first)+'\\b','i').test(raw);
+    const userHit=user.length>2&&(generic.has(user)
+      ?new RegExp('(?:@|username\\s+)'+reEsc(user)+'\\b','i').test(raw)
+      :new RegExp('\\b'+reEsc(user)+'\\b','i').test(raw));
+    if((fullHit||firstHit||userHit)&&!seen.has(tech.user_id)){seen.add(tech.user_id);hits.push(tech);}
   }
   return hits;
 }
@@ -1516,6 +1560,7 @@ function draftTemplateFrom(d={}){
     role:x.role,
     scheduled_for:x.scheduled_for,
     scheduled_time:x.scheduled_time,
+    schedule_end_time:x.schedule_end_time,
     time_answered:x.time_answered===true,
     equipment_manifest:JSON.parse(JSON.stringify(x.equipment_manifest||[])),
     equipment_answered:x.equipment_answered===true,
@@ -1542,6 +1587,7 @@ function draftFromTemplate(template={}){
     site:'',
     scheduled_for:String(t.scheduled_for||''),
     scheduled_time:String(t.scheduled_time||''),
+    schedule_end_time:String(t.schedule_end_time||''),
     time_answered:t.time_answered===true||Boolean(t.scheduled_time),
     equipment_manifest:JSON.parse(JSON.stringify(Array.isArray(t.equipment_manifest)?t.equipment_manifest:[])),
     equipment_answered:t.equipment_answered===true||Boolean(t.equipment_manifest?.length),
@@ -1564,7 +1610,7 @@ function draftEquipmentEdit(d,text){
   const defs=[
     ['Solar Spotter',/solar\s+spotters?/i],
     ['Recon 2',/recon\s+(?:2|ii|two)/i],
-    ['Helios',/helios?|helio/i],
+    ['Helios',/helios?|helio|helias|helius/i],
     ['Ranger',/rangers?/i],
     ['Sniper',/snipers?/i],
     ['Spotter',/(?<!solar\s)spotters?/i],
@@ -1697,6 +1743,7 @@ function normalizeDraftState(d={}){
   d.site=String(d.site||'');
   d.scheduled_for=String(d.scheduled_for||'');
   d.scheduled_time=String(d.scheduled_time||'');
+  d.schedule_end_time=String(d.schedule_end_time||'');
   d.unit_numbers=String(d.unit_numbers||'');
   d.stand_numbers=String(d.stand_numbers||'');
   d.job_description=String(d.job_description||'');
@@ -1778,7 +1825,7 @@ function draftQuestion(key,d){
   return'';
 }
 function draftSummaryHtml(d){
-  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+d.scheduled_time:' · no exact time'):' · time not answered')):'—';
+  const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+clockLabel(d.scheduled_time)+(d.schedule_end_time?'–'+clockLabel(d.schedule_end_time):''):' · no exact time'):' · time not answered')):'—';
   return '<div class="vision-draft-card"><div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
     +'<div class="vision-draft-grid"><div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div><div><span>Site</span><b>'+esc(d.site||'—')+'</b></div><div><span>Schedule</span><b>'+esc(when)+'</b></div><div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div><div><span>Assignment</span><b>'+esc(draftAssignmentText(d))+'</b></div><div><span>Parts</span><b>'+esc(draftPartsText(d))+'</b></div></div>'
     +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
@@ -1786,8 +1833,19 @@ function draftSummaryHtml(d){
 }
 function draftSiteFrom(text){
   const raw=String(text||'').trim();
-  const m=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'._-]{0,80}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:helios|ranger|sniper|spotter|recon))|[,.;\n]|$)/i);
-  return String(m?.[1]||'').trim();
+  const explicit=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'.,_-]{0,100}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:helios|helias|ranger|sniper|spotter|recon))|[;\n]|$)/i);
+  if(explicit?.[1])return String(explicit[1]).trim().replace(/[,.]+$/,'').trim();
+  const ticketPos=raw.search(/\b(?:ticket|mhelpdesk|mhelp)\b/i);
+  if(ticketPos>0){
+    const prefix=raw.slice(0,ticketPos),segments=prefix.split(/\bfor\b/i).slice(1).map(x=>x.trim()).filter(Boolean);
+    for(let i=segments.length-1;i>=0;i--){
+      const candidate=segments[i].replace(/^[,.;\s]+|[,.;\s]+$/g,'').trim();
+      if(!candidate||draftMatchedTechs(candidate).length||draftWorkType(candidate))continue;
+      if(/^(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate))continue;
+      return candidate;
+    }
+  }
+  return'';
 }
 function draftApplyInput(d,text,initial=false,options={}){
   d=normalizeDraftState(d||{});
@@ -1823,7 +1881,9 @@ function draftApplyInput(d,text,initial=false,options={}){
     if(candidate&&!isDate&&!techNames.length)d.site=candidate;
   }
   const when=dateFrom(raw);if(when)d.scheduled_for=when;
-  const clock=timeFrom(raw);if(clock){d.scheduled_time=clock;d.time_answered=true;}
+  const window=timeWindowFrom(raw),clock=timeFrom(raw);
+  if(window){d.scheduled_time=window.start;d.schedule_end_time=window.end;d.time_answered=true;}
+  else if(clock){d.scheduled_time=clock;d.schedule_end_time='';d.time_answered=true;}
   if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
   const equipment=draftEquipmentParse(raw);
   if(!options.skipEquipment&&equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
@@ -1903,7 +1963,7 @@ function draftResponseHtml(d,started=false,transition=null){
 }
 function startDraft(text,seed={}){
   state.currentTicket='';
-  const d={draft_version:3,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
+  const d={draft_version:5,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',schedule_end_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
   draftApplyInput(d,text,true);
   const s=seed&&typeof seed==='object'?seed:{};
   if(s.work_type){d.work_type=draftWorkType(s.work_type)||String(s.work_type);d.role=draftDefaultRole(d.work_type);}
@@ -1977,7 +2037,7 @@ async function createDraftJob(d){
   const roles=d.role==='it_service'?['it','service']:d.role==='service_it'?['service','it']:d.role?[d.role]:[d.work_type==='service'?'service':'it'],ids=[],parts=d.parts||{};
   for(const role of roles){
     const assignee=d.assignees?.[role]||null;
-    const response=await db.rpc('owner_assign_job_v8',{p_ticket_no:String(d.ticket_no),p_site:d.site,p_assigned_role:role,p_assignee_user_id:assignee,p_requested_unit_count:draftDeviceTotal(d),p_unit_summary:[d.unit_numbers?'Unit #s: '+d.unit_numbers:'',d.stand_numbers?'Stand / Solar Stand #s: '+d.stand_numbers:''].filter(Boolean).join(' | '),p_job_description:d.job_description,p_notes:d.notes||'',p_solar_panel_qty:Number(parts.solar_panel_qty||0),p_battery_replacement_qty:Number(parts.battery_replacement_qty||0),p_camera_replacement_qty:Number(parts.camera_replacement_qty||0),p_sim_replacement_qty:Number(parts.sim_replacement_qty||0),p_micro_sd_qty:Number(parts.micro_sd_qty||0),p_equipment_manifest:d.equipment_manifest,p_requires_it_handoff:d.work_type==='pickup'?false:((d.role==='it_service'&&role==='service')||(d.role==='service_it'&&role==='it')),p_scheduled_for:d.scheduled_for,p_work_type:d.work_type});
+    const response=await db.rpc('owner_assign_job_v8',{p_ticket_no:String(d.ticket_no),p_site:d.site,p_assigned_role:role,p_assignee_user_id:assignee,p_requested_unit_count:draftDeviceTotal(d),p_unit_summary:[d.unit_numbers?'Unit #s: '+d.unit_numbers:'',d.stand_numbers?'Stand / Solar Stand #s: '+d.stand_numbers:''].filter(Boolean).join(' | '),p_job_description:d.job_description,p_notes:[d.notes||'',d.schedule_end_time?('Requested schedule window: '+clockLabel(d.scheduled_time)+'–'+clockLabel(d.schedule_end_time)):''].filter(Boolean).join(' | '),p_solar_panel_qty:Number(parts.solar_panel_qty||0),p_battery_replacement_qty:Number(parts.battery_replacement_qty||0),p_camera_replacement_qty:Number(parts.camera_replacement_qty||0),p_sim_replacement_qty:Number(parts.sim_replacement_qty||0),p_micro_sd_qty:Number(parts.micro_sd_qty||0),p_equipment_manifest:d.equipment_manifest,p_requires_it_handoff:d.work_type==='pickup'?false:((d.role==='it_service'&&role==='service')||(d.role==='service_it'&&role==='it')),p_scheduled_for:d.scheduled_for,p_work_type:d.work_type});
     if(response.error)throw response.error;
     if(response.data){ids.push(response.data);if(d.scheduled_time){const timeUpdate=await db.from('job_assignments').update({scheduled_time:d.scheduled_time,updated_at:now()}).eq('id',response.data);if(timeUpdate.error)throw timeUpdate.error;}}
   }
