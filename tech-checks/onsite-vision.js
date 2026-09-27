@@ -1835,7 +1835,8 @@ function draftSiteFrom(text){
   const raw=String(text||'').trim();
   const explicit=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'.,_-]{0,100}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:helios|helias|ranger|sniper|spotter|recon))|[;\n]|$)/i);
   if(explicit?.[1])return String(explicit[1]).trim().replace(/[,.]+$/,'').trim();
-  const ticketPos=raw.search(/\b(?:ticket|mhelpdesk|mhelp)\b/i);
+  const numberedRefs=[...raw.matchAll(/\b(?:ticket|mhelpdesk|mhelp)(?:\s+(?:number|no\.?))?\s*(?:is\s*)?[:#=-]?\s*\d{3,}\b/gi)];
+  const ticketPos=numberedRefs.length?numberedRefs[numberedRefs.length-1].index:raw.search(/\b(?:ticket|mhelpdesk|mhelp)\b/i);
   if(ticketPos>0){
     const prefix=raw.slice(0,ticketPos),segments=prefix.split(/\bfor\b/i).slice(1).map(x=>x.trim()).filter(Boolean);
     for(let i=segments.length-1;i>=0;i--){
