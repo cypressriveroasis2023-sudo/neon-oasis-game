@@ -794,7 +794,7 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask for a full operations rundown, what needs your attention, who has room, what IT or a technician has today, create work, assign it, or ask how Tech Check is programmed. Vision keeps the operating context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="Give me the operations rundown for today. What is behind, what needs my attention, and who has room?">Today\'s ops brief</button><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
+  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask for a full operations rundown, what needs your attention, who has room, what IT or a technician has today, create work, assign it, or ask how Tech Check is programmed. Vision keeps the operating context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="Vision, give me my morning briefing.">Morning briefing</button><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -2687,6 +2687,31 @@ function explicitExecutiveBriefingIntent(raw){
   return /\b(?:give|show|run|tell)\s+(?:me\s+)?(?:my|the)?\s*(?:morning|daily|today(?:'s)?|operations?|ops)?\s*brief(?:ing)?\b|\bwhat\s+do\s+i\s+need\s+to\s+know\s+today\b/i.test(String(raw||''));
 }
 
+async function executiveBriefingHtml(){
+  setVisionRuntimeState('working','Building your operations briefing…');
+  const today=dayKey(new Date()),d=new Date();d.setDate(d.getDate()+1);const tomorrow=dayKey(d),layer=visionLiveData();
+  const getSummary=async(date)=>{
+    if(layer?.getWorkload){const live=await layer.getWorkload({date,role:'',tech_id:'',tech_name:''},{force:true});const tickets=Array.isArray(live?.tickets)?live.tickets:[];return{tickets,total:tickets.length,completed:Number(live?.completed||0),remaining:Number(live?.remaining??tickets.length)};}
+    const rows=state.jobs.filter(j=>j.status!=='cancelled'&&String(j.scheduled_for||'')===String(date)),grouped=new Map();
+    rows.forEach(r=>{const t=String(r.ticket_no||'');if(t){if(!grouped.has(t))grouped.set(t,[]);grouped.get(t).push(r);}});
+    const tickets=[...grouped.keys()],completed=tickets.filter(t=>(grouped.get(t)||[]).every(r=>String(r.status||'').toLowerCase()==='completed')).length;
+    return{tickets,total:tickets.length,completed,remaining:Math.max(0,tickets.length-completed)};
+  };
+  const [todayWork,tomorrowWork]=await Promise.all([getSummary(today),getSummary(tomorrow)]);
+  let reviews=[],holds=[];
+  try{if(layer?.getOwnerReviewQueue)reviews=await layer.getOwnerReviewQueue({limit:60});}catch{}
+  try{if(layer?.getDamageHolds){const result=await layer.getDamageHolds({scope:'active',unit_reference:'',ticket_no:''},{force:true,limit:100});holds=Array.isArray(result?.rows)?result.rows:[];}}catch{}
+  const reviewCount=reviews.length,holdCount=holds.length,attention=reviewCount+holdCount;
+  const headline=attention?attention+' owner item'+(attention===1?'':'s')+' need attention':'No Owner Review or damaged-equipment holds are currently showing';
+  return '<div class="vision-answer-title">Your operations briefing</div>'
+    +'<div class="vision-direct '+(attention?'warn':'good')+'"><b>'+esc(headline)+'</b>'+(reviewCount?esc(reviewCount+' waiting for Owner Review. '):'')+(holdCount?esc(holdCount+' equipment hold'+(holdCount===1?'':'s')+'.'):'')+'</div>'
+    +'<div class="vision-context-block"><h3>TODAY</h3><div class="vision-context-grid"><div><span>SCHEDULED</span><b>'+todayWork.total+'</b></div><div><span>REMAINING</span><b>'+todayWork.remaining+'</b></div><div><span>COMPLETED</span><b>'+todayWork.completed+'</b></div></div></div>'
+    +(todayWork.tickets.length?todayWork.tickets.slice(0,4).map(ticket=>jobCard(ticket)).join(''):'<div class="vision-system-note">No Tech Check jobs are scheduled today.</div>')
+    +'<div class="vision-context-block"><h3>TOMORROW</h3><div class="vision-context-grid"><div><span>SCHEDULED</span><b>'+tomorrowWork.total+'</b></div><div><span>OWNER REVIEW</span><b>'+reviewCount+'</b></div><div><span>EQUIPMENT HOLDS</span><b>'+holdCount+'</b></div></div></div>'
+    +(tomorrowWork.tickets.length?tomorrowWork.tickets.slice(0,4).map(ticket=>jobCard(ticket)).join(''):'<div class="vision-system-note">No Tech Check jobs are scheduled tomorrow.</div>')
+    +'<div class="vision-answer-copy">This briefing uses Tech Check data available to Vision. MHelpDesk remains a separate system.</div>';
+}
+
 async function answer(text){
   const raw=String(text||'').trim(),lower=raw.toLowerCase();
   const current=chat();
@@ -2711,16 +2736,12 @@ async function answer(text){
   if(isCreateRequest(raw))return startDraft(raw);
 
   if(operationsOverviewIntent(raw)){
-    setVisionRuntimeState('working','Building your operations briefing…');
+    const explicitBrief=/\b(?:morning|daily|today(?:'s)?)\s+(?:ops\s+)?brief(?:ing)?\b|\bwhat\s+do\s+i\s+need\s+to\s+know\s+today\b|\bis\s+everything\s+ready\s+for\s+tomorrow\b/i.test(raw);
+    if(explicitBrief)return await executiveBriefingHtml();
+    setVisionRuntimeState('working','Checking Tech Check…');
     const operationsReply=await serverAgentAnswer(raw);
     if(operationsReply)return operationsReply;
-    const todayIntent={date:dayKey(new Date()),scope:'all',role:'',tech:null};
-    const schedule=await workloadHtml(todayIntent);
-    const review=await ownerReviewQueueHtml('owner review queue');
-    const damage=await damageHoldHtml('needs replacement damage holds');
-    return '<div class="vision-answer-title">Your Tech Check operations briefing</div>'
-      +'<div class="vision-answer-copy">I checked the live Tech Check schedule and Owner-facing queues available to Vision. MHelpDesk remains separate.</div>'
-      +schedule+review+damage;
+    return await executiveBriefingHtml();
   }
 
   if(systemHealthIntent(raw))return await systemHealthHtml();
