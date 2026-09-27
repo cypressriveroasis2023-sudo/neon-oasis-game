@@ -794,7 +794,26 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask for a full operations rundown, what needs your attention, who has room, what IT or a technician has today, create work, assign it, or ask how Tech Check is programmed. Vision keeps the operating context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="Vision, give me my morning briefing.">Morning briefing</button><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
+  return '<div class="vision-welcome vision-welcome-minimal"><button type="button" class="vision-orb" data-vision-voice aria-label="Talk to OnSite Vision"><span class="vision-orb-glow"></span><img src="./techcheck-eye-192.png?v=2" alt=""><span class="vision-orb-mic">🎙</span></button><div class="vision-rotating-prompt" aria-live="polite"><span id="visionPromptSuggestion">Ask Vision anything about Tech Check</span></div><div class="vision-orb-hint">Tap Vision to talk</div></div>';
+}
+const VISION_PROMPT_SUGGESTIONS=[
+  'Ask Vision anything about Tech Check',
+  '“Give me my morning briefing”',
+  '“What needs my attention?”',
+  '“How many jobs does IT have today?”',
+  '“Create a delivery for Josh tomorrow”',
+  '“Is everything ready for tomorrow?”',
+  '“Show me my active jobs”'
+];
+let visionPromptSuggestionTimer=null,visionPromptSuggestionIndex=0;
+function startVisionPromptSuggestions(){
+  clearInterval(visionPromptSuggestionTimer);
+  const node=$('visionPromptSuggestion');if(!node)return;
+  visionPromptSuggestionTimer=setInterval(()=>{
+    if(!$('visionPromptSuggestion')){clearInterval(visionPromptSuggestionTimer);return;}
+    node.classList.add('fade-out');
+    setTimeout(()=>{const live=$('visionPromptSuggestion');if(!live)return;visionPromptSuggestionIndex=(visionPromptSuggestionIndex+1)%VISION_PROMPT_SUGGESTIONS.length;live.textContent=VISION_PROMPT_SUGGESTIONS[visionPromptSuggestionIndex];live.classList.remove('fade-out');},650);
+  },4200);
 }
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
@@ -802,7 +821,7 @@ function message(m){
 }
 function renderThread(){
   const h=$('visionThread');if(!h)return;const c=chat();
-  h.innerHTML=!c||!c.messages.length?welcome():c.messages.map(message).join('');setTimeout(()=>bottom(false),0);
+  h.innerHTML=!c||!c.messages.length?welcome():c.messages.map(message).join('');if(!c||!c.messages.length)startVisionPromptSuggestions();else clearInterval(visionPromptSuggestionTimer);setTimeout(()=>bottom(false),0);
 }
 function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
 function bottom(smooth=true){
@@ -3195,6 +3214,7 @@ async function voice(){
 }
 document.addEventListener('click',async e=>{
   const c=e.target.closest('[data-chat-id]');if(c)return openChat(c.dataset.chatId);
+  const voiceOrb=e.target.closest('[data-vision-voice]');if(voiceOrb)return voice();
   const p=e.target.closest('[data-vision-prompt],[data-order-prompt]');if(p)return send(p.dataset.visionPrompt||p.dataset.orderPrompt);
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){
