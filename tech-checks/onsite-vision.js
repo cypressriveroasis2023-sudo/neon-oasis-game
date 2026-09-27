@@ -1783,7 +1783,13 @@ function draftStepKeys(d={}){
 function draftChoiceHtml(key,d){
   if(key==='work_type')return '<div class="vision-draft-choices">'+['Delivery','Pickup','Swap','Service'].map(v=>'<button type="button" data-vision-prompt="'+v+'">'+v+'</button>').join('')+'</div>';
   if(key==='scheduled_for')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="Today">Today</button><button type="button" data-vision-prompt="Tomorrow">Tomorrow</button><button type="button" data-vision-prompt="Monday">Monday</button><button type="button" data-vision-prompt="Tuesday">Tuesday</button></div>';
-  if(key==='scheduled_time')return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="8 AM">8 AM</button><button type="button" data-vision-prompt="9 AM">9 AM</button><button type="button" data-vision-prompt="No specific time">No specific time</button></div>';
+  if(key==='scheduled_time'){
+    if(d?.pending_clock){
+      const base=ambiguousClockLabel(d.pending_clock).replace(/:00$/,'');
+      return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="'+esc(base+' AM')+'">'+esc(base+' AM')+'</button><button type="button" data-vision-prompt="'+esc(base+' PM')+'">'+esc(base+' PM')+'</button><button type="button" data-vision-prompt="No specific time">No specific time</button></div>';
+    }
+    return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="8 AM">8 AM</button><button type="button" data-vision-prompt="9 AM">9 AM</button><button type="button" data-vision-prompt="No specific time">No specific time</button></div>';
+  }
   if(key==='equipment_manifest'){
     const noEq=d.work_type==='service'?'<button type="button" data-vision-prompt="No equipment">No equipment</button>':'';
     return '<div class="vision-draft-choices"><button type="button" data-vision-prompt="1 Helios">1 Helios</button><button type="button" data-vision-prompt="1 Solar Spotter">1 Solar Spotter</button><button type="button" data-vision-prompt="1 Ranger">1 Ranger</button><button type="button" data-vision-prompt="1 Sniper">1 Sniper</button>'+noEq+'</div>';
@@ -1849,24 +1855,63 @@ function draftSummaryHtml(d){
 }
 function draftSiteFrom(text){
   const raw=String(text||'').trim();
-  const explicit=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'.,_-]{0,100}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:helios|helias|ranger|sniper|spotter|recon))|[;\n]|$)/i);
-  if(explicit?.[1])return String(explicit[1]).trim().replace(/[,.]+$/,'').trim();
+  const cleanCandidate=value=>String(value||'').trim().replace(/^[,.;\s]+|[,.;\s]+$/g,'').trim();
+  const validCandidate=value=>{
+    const candidate=cleanCandidate(value);
+    if(!candidate||candidate.length<2)return'';
+    if(draftMatchedTechs(candidate).length)return'';
+    if(draftWorkType(candidate))return'';
+    if(/^(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate))return'';
+    if(/^(?:a|an|one|two|three|four|five|\d+)\s+(?:unit\s+)?(?:helios?|helias|helius|rangers?|snipers?|solar\s+spotters?|spotters?|recon(?:\s*2)?)\s*(?:unit)?$/i.test(candidate))return'';
+    if(/^(?:helios?|helias|helius|rangers?|snipers?|solar\s+spotters?|spotters?|recon(?:\s*2)?)(?:['’]s)?\s+unit$/i.test(candidate))return'';
+    return candidate;
+  };
+
+  const explicit=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'.,_-]{0,120}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:units?\s+)?(?:helios|helias|helius|ranger|sniper|spotter|recon))|[;\n]|$)/i);
+  const explicitSite=validCandidate(explicit?.[1]);
+  if(explicitSite)return explicitSite;
+
+  // Natural owner speech often puts the customer immediately after the named tech:
+  // "for Josh ABC Pest, Pool and Lawn at 3 o'clock..."
+  const matched=draftMatchedTechs(raw);
+  for(const tech of matched){
+    const variants=[tech.full_name,String(tech.full_name||'').trim().split(/\s+/)[0],tech.username]
+      .map(v=>String(v||'').trim()).filter(v=>v.length>2).sort((a,b)=>b.length-a.length);
+    for(const name of variants){
+      const re=new RegExp('\\b'+reEsc(name)+'\\b','i');
+      const hit=re.exec(raw);
+      if(!hit)continue;
+      let tail=raw.slice(hit.index+hit[0].length).replace(/^\s*(?:for\s+)?/i,'');
+      const stop=tail.search(/\s+(?=(?:at\s+\d|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|ticket\b|mhelp|from\s+\d|for\s+(?:(?:a|an|one|two|three|four|five|\d+)\s+)?(?:unit\s+)?(?:helios|helias|helius|ranger|sniper|spotter|recon)\b))/i);
+      if(stop>=0)tail=tail.slice(0,stop);
+      const candidate=validCandidate(tail);
+      if(candidate)return candidate;
+    }
+  }
+
+  // Safe "for SITE tomorrow/at 3/with Josh/ticket..." pattern.
+  const forMatches=[...raw.matchAll(/\bfor\s+([A-Za-z][A-Za-z0-9 &'.,_-]{1,120}?)(?=\s+(?:today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|from\s+\d|with\s+[A-Za-z]|ticket\b|mhelp)|$)/gi)];
+  for(let i=forMatches.length-1;i>=0;i--){
+    const candidate=validCandidate(forMatches[i][1]);
+    if(candidate)return candidate;
+  }
+
+  // If a numbered ticket appears later, inspect the last "for ..." segment before it.
   const numberedRefs=[...raw.matchAll(/\b(?:ticket|mhelpdesk|mhelp)(?:\s+(?:number|no\.?))?\s*(?:is\s*)?[:#=-]?\s*\d{3,}\b/gi)];
-  const ticketPos=numberedRefs.length?numberedRefs[numberedRefs.length-1].index:raw.search(/\b(?:ticket|mhelpdesk|mhelp)\b/i);
+  const ticketPos=numberedRefs.length?numberedRefs[numberedRefs.length-1].index:-1;
   if(ticketPos>0){
     const prefix=raw.slice(0,ticketPos),segments=prefix.split(/\bfor\b/i).slice(1).map(x=>x.trim()).filter(Boolean);
     for(let i=segments.length-1;i>=0;i--){
-      const candidate=segments[i].replace(/^[,.;\s]+|[,.;\s]+$/g,'').trim();
-      if(!candidate||draftMatchedTechs(candidate).length||draftWorkType(candidate))continue;
-      if(/^(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate))continue;
-      return candidate;
+      const candidate=validCandidate(segments[i]);
+      if(candidate)return candidate;
     }
   }
-  const trailingAt=raw.match(/\bat\s+([A-Za-z][A-Za-z0-9 &'.,_-]{2,100})\s*$/i);
-  if(trailingAt?.[1]){
-    const candidate=String(trailingAt[1]).trim().replace(/[,.]+$/,'').trim();
-    if(candidate&&!draftMatchedTechs(candidate).length&&!draftWorkType(candidate))return candidate;
-  }
+
+  // "Josh at ABC Pest" or "delivery at ABC Pest" when the site is at the end.
+  const trailingAt=raw.match(/\bat\s+([A-Za-z][A-Za-z0-9 &'.,_-]{2,120})\s*$/i);
+  const atSite=validCandidate(trailingAt?.[1]);
+  if(atSite)return atSite;
+
   return'';
 }
 function draftApplyInput(d,text,initial=false,options={}){
