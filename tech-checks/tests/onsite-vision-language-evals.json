@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v4",
-  "description": "Owner-style language regression bank for OnSite Vision, including voice-style apostrophe-free date phrases, operations orchestration, and audited multi-action planning. No case may execute a write.",
+  "version": "onsite-vision-language-evals-v5",
+  "description": "Owner-style natural-language regression bank for OnSite Vision. Includes terse speech, omitted command verbs, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
     "workload_followup",
@@ -636,6 +636,89 @@
       "intent": "workload",
       "tool": "get_workload",
       "action": "none"
+    },
+    {
+      "id": "c09",
+      "utterance": "Teddy delivery tomorrow at 10",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c10",
+      "utterance": "need a delivery for ABC tomorrow at ten with Teddy",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c11",
+      "utterance": "two Helios for ABC Friday morning Teddy",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "c12",
+      "utterance": "pickup 22991 for North Yard tomorrow 8am Josh",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "a07",
+      "utterance": "Josh on 22825",
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "s04",
+      "utterance": "22712 tomorrow 3 pm",
+      "intent": "schedule",
+      "tool": "get_job_context",
+      "action": "schedule"
+    },
+    {
+      "id": "v10",
+      "utterance": "teddy delivry tomoro at ten",
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "v11",
+      "utterance": "put abel on dat 22825 one",
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "p05",
+      "utterance": "what does production main say controls the service handoff",
+      "intent": "source_code",
+      "tool": "search_app_source",
+      "action": "none"
+    },
+    {
+      "id": "ctx01",
+      "utterance": "make that Teddy",
+      "context": [
+        "Vision is asking who should be assigned in a new job draft"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "ctx02",
+      "utterance": "same one tomorrow at 9",
+      "context": [
+        "We're looking at ticket 22712"
+      ],
+      "intent": "schedule",
+      "tool": "get_job_context",
+      "action": "schedule"
     }
   ]
 }
