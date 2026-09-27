@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-conversation-evals-v1",
-  "description": "Multi-turn, read-only regression conversations for the OnSite Vision feature preview. These scenarios verify conversational carryover, natural corrections, workload follow-ups, repeat-job language, and production-main grounding. No test is allowed to execute a write.",
+  "version": "onsite-vision-conversation-evals-v2",
+  "description": "Multi-turn, read-only regression conversations for the OnSite Vision feature preview. These scenarios verify conversational carryover, natural corrections, workload follow-ups, repeat-job language, and production-main grounding. Follow-up draft edits may surface as create/assign/schedule proposals, but no test is allowed to execute a write.",
   "conversations": [
     {
       "id": "conv01_create_correction",
@@ -15,13 +15,21 @@
         {
           "message": "make that Victor",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         },
         {
           "message": "actually make it 3 pm",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
@@ -39,13 +47,21 @@
         {
           "message": "add two Helios",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         },
         {
           "message": "and another Ranger",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
@@ -110,7 +126,11 @@
         {
           "message": "same setup for the next ticket",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
@@ -128,7 +148,11 @@
         {
           "message": "give that to Josh",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
@@ -146,7 +170,11 @@
         {
           "message": "no I meant a Service job",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
@@ -203,7 +231,11 @@
         {
           "message": "make dat victor instead",
           "expect": {
-            "action_type": "create_job"
+            "action_types": [
+              "create_job",
+              "assign",
+              "schedule"
+            ]
           }
         }
       ]
