@@ -2,6 +2,9 @@
 'use strict';
 let db=null;
 const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown',knowledgeEntries:[],knowledgeEditingId:''};
+const VISION_MODE=(document.querySelector('meta[name="onsite-vision-mode"]')?.content||'production').trim().toLowerCase();
+const VISION_PREVIEW=VISION_MODE==='preview';
+const VISION_AGENT_FUNCTION=(document.querySelector('meta[name="onsite-vision-agent-function"]')?.content||'onsite-vision-agent').trim()||'onsite-vision-agent';
 let conversationSyncTimer=null;
 let persistenceReady=false;
 let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false;
@@ -133,7 +136,7 @@ function agentHistory(currentText=''){
 async function checkAgentStatus(){
   if(!db)return null;
   try{
-    const result=await db.functions.invoke('onsite-vision-agent',{body:{mode:'status'}});
+    const result=await db.functions.invoke(VISION_AGENT_FUNCTION,{body:{mode:'status'}});
     if(result.error||!result.data?.ok){
       state.agentStatus='unknown';
       if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
@@ -141,7 +144,7 @@ async function checkAgentStatus(){
     }
     state.agentStatus=result.data.model_configured?'online':'unavailable';
     if($('visionLiveStatus')){
-      $('visionLiveStatus').textContent=result.data.model_configured?'AI LIVE':'DATA LIVE';
+      $('visionLiveStatus').textContent=result.data.model_configured?(VISION_PREVIEW?'AI PREVIEW':'AI LIVE'):(VISION_PREVIEW?'DATA PREVIEW':'DATA LIVE');
       $('visionLiveStatus').title=result.data.model_configured
         ?'OnSite Vision server AI '+String(result.data.model||'')+' is connected to live Tech Check data.'
         :'Live Tech Check data is connected. The server AI model credential is not configured, so Vision is using deterministic fallback behavior.';
@@ -220,7 +223,7 @@ function visionInterpretationHints(text){
 async function callVisionAgent(text){
   if(state.agentStatus==='unavailable'||!db)return null;
   try{
-    const result=await db.functions.invoke('onsite-vision-agent',{body:{
+    const result=await db.functions.invoke(VISION_AGENT_FUNCTION,{body:{
       message:String(text||'').trim(),
       active_ticket:state.currentTicket||'',
       working_memory:cleanMemory(chat()?.memory),
@@ -380,6 +383,11 @@ async function saveKnowledgeEntry(status){
   if(note){note.classList.remove('hidden');note.textContent=status==='approved'?'Approved. Vision can now use this as company knowledge.':'Draft saved. Vision will not use it as company truth until approved.';}
 }
 async function openKnowledgeManager(){
+  if(VISION_PREVIEW){
+    addMessage('assistant','', '<div class="vision-direct warn"><b>Preview mode is read-only.</b>Teach Vision changes are disabled in this branch preview.</div>');
+    renderThread();
+    return;
+  }
   const modal=$('visionKnowledgeModal');if(!modal)return;
   modal.classList.remove('hidden');modal.setAttribute('aria-hidden','false');
   document.body.classList.add('vision-modal-open');
@@ -660,6 +668,11 @@ async function init(){
   const p=profileResult.data;
   if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){location.replace('./');return;}
   state.profile=p;$('visionOwnerName').textContent=(p.full_name||p.username||'Owner')+' - Owner/Admin';
+  if(VISION_PREVIEW){
+    document.body.classList.add('vision-preview-mode');
+    const note=document.querySelector('.vision-compose-note');
+    if(note)note.textContent='PREVIEW MODE · Live Tech Check data may be read, but operational writes and Teach Vision changes are blocked.';
+  }
   await Promise.all([hydratePersistentChats(),loadData()]);
   checkAgentStatus().catch(error=>console.warn('Vision AI status check',error));
   if(!state.chats.length)newChat();else state.chatId=state.chats[0].id;
@@ -1921,7 +1934,7 @@ function healthRows(items,key='ticket_no'){
 async function systemHealthHtml(){
   const [healthResult,agentResult]=await Promise.all([
     db.rpc('get_owner_system_health_v1'),
-    db.functions.invoke('onsite-vision-agent',{body:{mode:'status'}}).catch(()=>({data:null,error:true}))
+    db.functions.invoke(VISION_AGENT_FUNCTION,{body:{mode:'status'}}).catch(()=>({data:null,error:true}))
   ]);
   if(healthResult.error)throw healthResult.error;
   const h=healthResult.data||{};
@@ -2501,6 +2514,14 @@ async function send(raw=null){
 }
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;
+  if(VISION_PREVIEW){
+    state.pending.delete(actionId);
+    addMessage('assistant','',
+      '<div class="vision-direct good"><b>Preview interpretation confirmed — no live change was made.</b>This branch preview is read-only. Vision reached the confirmation boundary successfully, but Tech Check production data was not changed.</div>'
+    );
+    renderThread();renderOrder();
+    return;
+  }
 
   if(a.kind==='approve-knowledge'){
     const admin=visionKnowledgeAdmin();
