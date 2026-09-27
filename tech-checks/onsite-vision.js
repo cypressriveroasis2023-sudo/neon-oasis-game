@@ -1008,7 +1008,7 @@ function renderOrder(){
 }
 function ticketFrom(text){
   const raw=String(text||'');
-  const direct=raw.match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*[:#=-]?\s*(\d{3,})\b/i)||raw.match(/#(\d{3,})\b/);
+  const direct=raw.match(/\b(?:mhelpdesk|mhelp|ticket|reference|ref)\s*(?:#|number|no\.?)?\s*(?:is\s*)?[:#=-]?\s*(\d{3,})\b/i)||raw.match(/#(\d{3,})\b/);
   if(direct?.[1])return direct[1];
   const openDirect=raw.match(/\b(?:open|pull\s+up|load|go\s+to|look\s+at|check|show\s+me)\s+(?:mhelpdesk\s*)?(?:ticket\s*)?#?\s*(\d{3,})\b/i);
   if(openDirect?.[1])return openDirect[1];
@@ -1784,24 +1784,37 @@ function draftSummaryHtml(d){
     +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
     +(d.notes?'<div class="vision-draft-description"><span>Owner notes</span><b>'+esc(d.notes)+'</b></div>':'')+'</div>';
 }
-function draftApplyInput(d,text,initial=false){
+function draftSiteFrom(text){
+  const raw=String(text||'').trim();
+  const m=raw.match(/\b(?:site|customer)(?:\s+name)?\s*(?:is|to|:|=|-)\s*([A-Za-z0-9][A-Za-z0-9 &'._-]{0,80}?)(?=\s+(?:(?:tech\s+)?technician|tech\s+is|date\s*(?:is|:|=)|time\s*(?:is|:|=)|schedule(?:d)?\b|today\b|tomorrow\b|tonight\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b|at\s+\d|equipment\b|ticket\b|mhelp|we(?:'re|\s+are)\b|delivery\b|pickup\b|swap\b|service\s+job\b|\d+\s*(?:x|×)?\s*(?:helios|ranger|sniper|spotter|recon))|[,.;\n]|$)/i);
+  return String(m?.[1]||'').trim();
+}
+function draftApplyInput(d,text,initial=false,options={}){
   d=normalizeDraftState(d||{});
   const raw=String(text||'').trim(),expected=draftMissingKey(d);
-  const assignmentRoleOnly=expected==='assignment'&&/^(?:no,?\s*)?(?:service|service queue|service department|IT|eye\s*tee|IT queue|IT department)$/i.test(raw);
+  const assignmentRoleOnly=expected==='assignment'&&/^(?:no,?\s*)?(?:(?:i\s+)?meant\s+)?(?:service|service queue|service department|IT|eye\s*tee|IT queue|IT department)$/i.test(raw);
   const type=assignmentRoleOnly?'':draftWorkType(raw);
   if(type){d.work_type=type;d.role=draftDefaultRole(type);}
   const explicitTicket=ticketFrom(raw),bareTicket=!explicitTicket&&/^\s*\d{3,}\s*$/.test(raw)?raw.trim():'';
+  let promptedTicket='';
+  if(!explicitTicket&&!bareTicket&&expected==='ticket_no'){
+    const values=[...raw.matchAll(/\b(\d{3,7})\b/g)].map(m=>m[1]).filter(v=>{
+      const n=Number(v),year=new Date().getFullYear();
+      return !(n>=year-1&&n<=year+2);
+    });
+    if(values.length===1)promptedTicket=values[0];
+  }
   let embeddedTicket='';
-  if(!explicitTicket&&!bareTicket&&initial){
+  if(!explicitTicket&&!bareTicket&&!promptedTicket&&initial){
     const values=[...raw.matchAll(/\b(\d{4,7})\b/g)].map(m=>m[1]).filter(v=>{
       const n=Number(v),year=new Date().getFullYear();
       return !(n>=year-1&&n<=year+2);
     });
     if(values.length===1)embeddedTicket=values[0];
   }
-  if(explicitTicket||bareTicket||embeddedTicket)d.ticket_no=explicitTicket||bareTicket||embeddedTicket;
-  const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i);
-  if(siteMatch)d.site=String(siteMatch[1]||'').trim();
+  if(explicitTicket||bareTicket||promptedTicket||embeddedTicket)d.ticket_no=explicitTicket||bareTicket||promptedTicket||embeddedTicket;
+  const siteValue=draftSiteFrom(raw),siteMatch=siteValue?{1:siteValue}:null;
+  if(siteValue)d.site=siteValue;
   if(!siteMatch&&(initial||expected==='site')){
     const loose=raw.match(/\bfor\s+([A-Za-z0-9][A-Za-z0-9 &'._-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d|around\s+\d|with\s+|using\s+|ticket\b|mhelp|unit\b|helios\b|ranger\b|sniper\b|spotter\b|recon\b)|$)/i);
     const candidate=String(loose?.[1]||'').trim();
@@ -1813,7 +1826,7 @@ function draftApplyInput(d,text,initial=false){
   const clock=timeFrom(raw);if(clock){d.scheduled_time=clock;d.time_answered=true;}
   if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
   const equipment=draftEquipmentParse(raw);
-  if(equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
+  if(!options.skipEquipment&&equipment.some(x=>x.qty>0)){draftMergeEquipment(d,equipment);d.equipment_answered=true;}
   if(expected==='equipment_manifest'&&/\b(no equipment|none|no shop equipment)\b/i.test(raw)&&d.work_type==='service'){d.equipment_manifest=[];d.equipment_answered=true;d.equipment_numbers_answered=true;}
   const unitMatch=expected==='equipment_numbers'
     ? raw.match(/\b(?:unit|units)\s*(?:#s?|numbers?|tags?)?\s*[:=]?\s*([A-Za-z0-9-]+(?:\s*,\s*[A-Za-z0-9-]+)*)/i)
@@ -1846,14 +1859,15 @@ function draftApplyInput(d,text,initial=false){
   if(techs.length){
     d.assignees=d.assignees||{};
     techs.forEach(t=>{if(t.role==='it'||t.role==='service')d.assignees[t.role]=t.user_id;});
-    if(expected==='assignment'||/\b(assign|task|send|give|put|have|let|with)\b/i.test(raw)||(initial&&Boolean(d.work_type)))d.assignment_answered=true;
+    const explicitTech=/\b(?:(?:it|service)\s+)?(?:tech|technician)\s*(?:is|:|=)\b/i.test(raw)||/\b(?:tech\s+technician)\s*(?:is|:|=)\b/i.test(raw);
+    if(expected==='assignment'||explicitTech||/\b(assign|task|send|give|put|have|let|with)\b/i.test(raw)||(initial&&Boolean(d.work_type)))d.assignment_answered=true;
   }
   const queueAssignment=/\b(department queues?|leave (?:it|them|both|each).*queue|unassigned|no preference|doesn'?t matter|any (?:it|service)?\s*(?:tech|technician)|anyone (?:in|from) (?:it|service)|anybody (?:in|from) (?:it|service)|whoever(?:'s| is)? (?:available|open|free)|first available (?:it|service)?\s*(?:tech|technician))\b/i.test(raw);
   if((expected==='assignment'&&queueAssignment)||(queueAssignment&&/\b(assign|assignment|tech|technician|queue|whoever|anyone|anybody|available|preference)\b/i.test(raw))){d.assignees=d.assignees||{};d.assignment_answered=true;}
   const notesMatch=raw.match(/\bnotes?\s*(?:are|is|:|=)\s*([^;\n]+)/i);
   if(notesMatch){d.notes=String(notesMatch[1]||'').trim();d.notes_answered=true;}
   if((expected==='notes'&&/\b(no additional notes|no notes|none|skip)\b/i.test(raw))||/\b(no notes|no additional notes|nothing else to add)\b/i.test(raw)){d.notes='';d.notes_answered=true;}
-  const recognized=Boolean(type||explicitTicket||bareTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||unitMatch||standMatch||descMatch||Object.keys(parts).length||techs.length||notesMatch);
+  const recognized=Boolean(type||explicitTicket||bareTicket||promptedTicket||siteMatch||when||clock||equipment.some(x=>x.qty>0)||unitMatch||standMatch||descMatch||Object.keys(parts).length||techs.length||notesMatch);
   // Guided interview answers belong to the question currently being asked even
   // when the same sentence also mentions recognizable equipment or parts.
   // Example: "Swap the Ranger, solar panel and battery" must satisfy the
@@ -1920,7 +1934,8 @@ async function continueDraft(text){
   }
   const before=draftMissingKey(d);
   const edited=applyDraftConversationEdit(d,text);
-  if(!edited)draftApplyInput(d,text,false);
+  const equipmentEditCommand=/\b(add|another|more|plus|remove|delete|take\s+out|take\s+off|drop|minus|less|set|change)\b[\s\S]{0,45}\b(helios?|rangers?|snipers?|solar\s+spotters?|spotters?|recon|stands?|poles?)\b/i.test(String(text||''));
+  draftApplyInput(d,text,false,{skipEquipment:edited&&equipmentEditCommand});
   const after=draftMissingKey(d);
   const advanced=Boolean(before&&after!==before);
   if(advanced){
@@ -2837,7 +2852,11 @@ async function transcribeVoiceBlob(blob,mimeType){
   form.append('audio',new File([blob],'onsite-vision-voice.'+ext,{type:mimeType||blob.type||'audio/webm'}));
   setVoiceStatus('Understanding what you said…','busy');
   const result=await db.functions.invoke('onsite-vision-transcribe',{body:form});
-  if(result.error||!result.data?.ok)throw new Error(result.data?.error||result.error?.message||'Voice transcription failed.');
+  if(result.error||!result.data?.ok){
+    const detail=String(result.data?.error||result.error?.message||'Voice transcription failed.');
+    if(VISION_PREVIEW&&/non-2xx|not configured|503/i.test(detail))throw new Error('Server voice transcription is not configured for this preview. Use the browser microphone/dictation path instead.');
+    throw new Error(detail);
+  }
   const transcript=String(result.data.transcript||'').trim();
   if(!transcript)throw new Error('I could not hear enough speech to transcribe.');
   setVoiceStatus('Heard: “'+transcript.slice(0,110)+(transcript.length>110?'…':'')+'”','heard');
@@ -2846,6 +2865,10 @@ async function transcribeVoiceBlob(blob,mimeType){
 }
 async function voice(){
   if(voiceBusy)return;
+  if(VISION_PREVIEW&&(window.SpeechRecognition||window.webkitSpeechRecognition)){
+    browserVoiceFallback();
+    return;
+  }
   if(voiceRecorder?.state==='recording'){
     voiceBusy=true;
     setVoiceStatus('Finishing…','busy');
