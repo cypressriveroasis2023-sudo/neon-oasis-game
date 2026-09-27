@@ -684,6 +684,26 @@ async function loadData(){
   state.jobs=jobs.data||[];state.preps=preps.data||[];state.techs=techs.data||[];
   if($('visionLiveStatus'))$('visionLiveStatus').textContent='LIVE';
 }
+function showPreviewLogin(message=''){
+  const host=$('visionLoading');if(!host)return;
+  host.classList.remove('hidden');
+  host.innerHTML='<div class="vision-preview-login"><img src="./techcheck-eye-192.png?v=1" alt=""><small>CAMERAS ONSITE · BRANCH PREVIEW</small><b>Sign in to OnSite Vision</b><span>Use your Tech Check Owner/Admin login. This preview is read-only.</span>'
+    +'<form id="visionPreviewLoginForm"><label>Email<input id="visionPreviewEmail" type="email" autocomplete="username" required></label><label>Password<input id="visionPreviewPassword" type="password" autocomplete="current-password" required></label>'
+    +'<button type="submit">Sign in to preview</button><div id="visionPreviewLoginStatus" class="vision-preview-login-status">'+esc(message)+'</div></form></div>';
+  $('visionPreviewLoginForm')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=String($('visionPreviewEmail')?.value||'').trim();
+    const password=String($('visionPreviewPassword')?.value||'');
+    const status=$('visionPreviewLoginStatus');
+    if(status)status.textContent='Signing in…';
+    const result=await db.auth.signInWithPassword({email,password});
+    if(result.error){
+      if(status)status.textContent=result.error.message||'Sign-in failed.';
+      return;
+    }
+    location.reload();
+  });
+}
 async function init(){
   db=await techCheckDb();
   window.OnSiteVisionLiveData?.configure?.(db);
@@ -692,11 +712,21 @@ async function init(){
   window.OnSiteVisionKnowledgeAdmin?.configure?.(db);
   loadChats();
   const session=(await db.auth.getSession()).data.session;
-  if(!session){location.replace('./');return;}
+  if(!session){
+    if(VISION_PREVIEW){showPreviewLogin();return;}
+    location.replace('./');return;
+  }
   state.session=session;
   const profileResult=await db.from('profiles').select('*').eq('user_id',session.user.id).single();
   const p=profileResult.data;
-  if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){location.replace('./');return;}
+  if(profileResult.error||!p||p.role!=='owner'||p.active===false||p.archived_at){
+    if(VISION_PREVIEW){
+      await db.auth.signOut().catch(()=>{});
+      showPreviewLogin('Owner/Admin access is required for this preview.');
+      return;
+    }
+    location.replace('./');return;
+  }
   state.profile=p;$('visionOwnerName').textContent=(p.full_name||p.username||'Owner')+' - Owner/Admin';
   if(VISION_PREVIEW){
     document.body.classList.add('vision-preview-mode');
