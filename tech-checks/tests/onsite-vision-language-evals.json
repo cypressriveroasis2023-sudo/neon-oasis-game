@@ -1,5 +1,5 @@
 {
-  "version": "onsite-vision-language-evals-v7",
+  "version": "onsite-vision-language-evals-v8",
   "description": "Owner-style natural-language regression bank for OnSite Vision. Adds real-ticket and unit conversational focus, return references, conversational corrections, repeated-job references, terse speech, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
@@ -913,6 +913,36 @@
       "intent": "ticket_assignment",
       "tool": "get_job_context",
       "action": "none"
+    },
+    {
+      "id": "shot01",
+      "utterance": "Ticket number is 11111",
+      "context": [
+        "Vision is asking for the MHelpDesk ticket number in a draft"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "shot02",
+      "utterance": "Pick a number is 11111",
+      "context": [
+        "Voice transcription occurred while Vision is asking for the MHelpDesk ticket number"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
+    },
+    {
+      "id": "shot03",
+      "utterance": "Customer name is ABC tech technician is Josh date is tomorrow at 3 PM. We're gonna do a delivery of one unit Helios.",
+      "context": [
+        "Vision has an existing Service draft and is asking for its MHelpDesk ticket number"
+      ],
+      "intent": "create_job",
+      "tool": "none",
+      "action": "create_job"
     }
   ]
 }
