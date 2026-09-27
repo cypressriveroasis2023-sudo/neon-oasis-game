@@ -689,3 +689,11 @@ body.vision-preview-mode .vision-live-status{
   border:0;border-radius:12px;background:#ef3038;color:#fff;padding:13px 14px;font-weight:900;font-size:15px
 }
 .vision-preview-login-status{min-height:18px;color:#ffb0b4;font-size:12px;text-align:center}
+
+
+/* Vision preview mobile header cleanup */
+@media(max-width:600px){
+  body.vision-preview-mode .vision-preview-qa{display:none!important}
+  body.vision-preview-mode .vision-top-actions{gap:6px!important}
+  body.vision-preview-mode .vision-top-actions .vision-icon-button{white-space:nowrap}
+}
