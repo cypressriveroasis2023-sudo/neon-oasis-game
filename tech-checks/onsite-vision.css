@@ -658,3 +658,34 @@ body.vision-preview-mode .vision-live-status{
   body.vision-preview-mode .vision-app,
   body.vision-preview-mode .vision-loading{padding-top:26px}
 }
+
+
+/* Portable branch-preview sign in */
+.vision-preview-login{
+  width:min(420px,calc(100vw - 32px));
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  padding:28px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:22px;
+  background:#101820;
+  box-shadow:0 24px 70px rgba(0,0,0,.35);
+}
+.vision-preview-login img{width:64px;height:64px;border-radius:16px}
+.vision-preview-login small{color:#ef3038;font-weight:900;letter-spacing:.12em}
+.vision-preview-login>b{font-size:26px;color:#fff}
+.vision-preview-login>span{color:#93a7b2;text-align:center;line-height:1.45}
+.vision-preview-login form{width:100%;display:grid;gap:12px;margin-top:8px}
+.vision-preview-login label{display:grid;gap:6px;color:#c9d5db;font-size:12px;font-weight:800}
+.vision-preview-login input{
+  width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.14);border-radius:12px;
+  background:#0b1118;color:#fff;padding:13px 14px;font:inherit;font-size:16px;outline:none
+}
+.vision-preview-login input:focus{border-color:#ef3038}
+.vision-preview-login button{
+  border:0;border-radius:12px;background:#ef3038;color:#fff;padding:13px 14px;font-weight:900;font-size:15px
+}
+.vision-preview-login-status{min-height:18px;color:#ffb0b4;font-size:12px;text-align:center}
