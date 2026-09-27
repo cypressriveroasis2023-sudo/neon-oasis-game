@@ -153,6 +153,64 @@ async function checkAgentStatus(){
     return null;
   }
 }
+function visionInterpretationHints(text){
+  const raw=String(text||'').trim();
+  const lower=raw.toLowerCase();
+  let ticket='',date='',time='',workType='',site='',equipment=[],techs=[],parts=[];
+  try{ticket=ticketFrom(raw)||'';}catch{}
+  try{date=dateFrom(raw)||'';}catch{}
+  try{time=timeFrom(raw)||'';}catch{}
+  try{workType=draftWorkType(raw)||'';}catch{}
+  try{equipment=draftEquipmentParse(raw).filter(x=>Number(x.qty||0)>0).map(x=>({label:x.label,qty:Number(x.qty||0),category:x.category||''}));}catch{}
+  try{techs=draftMatchedTechs(raw).map(t=>({name:t.full_name||t.username||'',role:t.role||'',user_id:t.user_id||''}));}catch{}
+  try{parts=parseSimplePartsCommand(raw).map(x=>({key:x.key||'',value:Number(x.value||0),operation:x.operation||''}));}catch{}
+
+  const explicitSite=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i);
+  if(explicitSite)site=String(explicitSite[1]||'').trim();
+  if(!site){
+    const loose=raw.match(/\bfor\s+([A-Za-z0-9][A-Za-z0-9 &'._-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d|around\s+\d|with\s+|using\s+|ticket\b|mhelp|unit\b|helios\b|ranger\b|sniper\b|spotter\b|recon\b)|$)/i);
+    const candidate=String(loose?.[1]||'').trim();
+    const isDate=/^(today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate);
+    const isTech=techs.some(t=>String(t.name||'').toLowerCase()===candidate.toLowerCase()||String(t.name||'').toLowerCase().split(/\s+/)[0]===candidate.toLowerCase());
+    if(candidate&&!isDate&&!isTech)site=candidate;
+  }
+
+  let intent='';
+  try{
+    if(isCreateRequest(raw))intent='create_job';
+    else if(assignIntent(raw))intent='assign';
+    else if(scheduleIntent(raw))intent='schedule';
+  }catch{}
+  if(!intent&&parts.length)intent='parts_update';
+  if(!intent&&/\b(cancel|remove|delete)\b/.test(lower)&&ticket)intent='cancel_or_update';
+  if(!intent&&/\b(who|what|when|where|why|how|show|list|does|do|is|are|can|could|should)\b/.test(lower))intent='question';
+
+  const role=/\bservice\b/.test(lower)?'service':/\b(?:it|eye\s*tee)\b/.test(lower)?'it':'';
+  const reference=/\b(it|that|this|him|her|them|that one|this one|same one|same tech|same job)\b/.test(lower);
+  const draft=chat()?.draft?normalizeDraftState({...chat().draft}):null;
+  let draftMissing='';
+  try{draftMissing=draft?draftMissingKey(draft):'';}catch{}
+
+  return {
+    parser_version:'vision-interpretation-v1',
+    production_source:{repository:'cypressriveroasis2023-sudo/neon-oasis-game',branch:'main'},
+    likely_intent:intent,
+    explicit_ticket:ticket,
+    active_ticket:state.currentTicket||'',
+    work_type:workType,
+    role,
+    date,
+    time,
+    site,
+    equipment,
+    matched_technicians:techs,
+    parts,
+    has_context_reference:reference,
+    draft_missing_field:draftMissing,
+    current_subject:cleanMemory(chat()?.memory)?.current_subject||''
+  };
+}
+
 async function callVisionAgent(text){
   if(state.agentStatus==='unavailable'||!db)return null;
   try{
@@ -160,7 +218,8 @@ async function callVisionAgent(text){
       message:String(text||'').trim(),
       active_ticket:state.currentTicket||'',
       working_memory:cleanMemory(chat()?.memory),
-      history:agentHistory(text)
+      history:agentHistory(text),
+      interpretation_hints:visionInterpretationHints(text)
     }});
     if(result.error||!result.data?.ok){
       const code=result.data?.code||'';
@@ -504,10 +563,23 @@ async function serverAgentAnswer(raw){
       p.work_type||'',
       p.date?('date '+p.date):'',
       p.time?('at '+p.time):'',
+      p.site?('site '+p.site):'',
+      p.equipment_summary||'',
       p.technician_name?('assign '+p.technician_name):'',
+      p.job_description?('description: '+p.job_description):'',
       raw
     ].filter(Boolean).join(' ');
-    return startDraft(seeded);
+    return startDraft(seeded,{
+      work_type:p.work_type||'',
+      ticket_no:p.ticket_no||'',
+      site:p.site||'',
+      date:p.date||'',
+      time:p.time||'',
+      technician_name:p.technician_name||'',
+      equipment_summary:p.equipment_summary||'',
+      job_description:p.job_description||'',
+      notes:p.notes||''
+    });
   }
 
   let html='<div class="vision-agent-answer">'+esc(result.answer||'').replace(/\n/g,'<br>')+'</div>'+agentFactsHtml(result.facts||[]);
@@ -999,23 +1071,31 @@ function scheduleIntent(text){const d=dateFrom(text),t=timeFrom(text);return(d||
 
 function isCreateRequest(text){
   const s=String(text||'').toLowerCase().replace(/pick\s*-?\s*up/g,'pickup');
-  const type=/\b(delivery|deliver|deployment|deploy|pickup|swap|service)\b/.test(s);
+  const type=/\b(delivery|deliver|deployment|deploy|deelivery|delivry|pickup|swap|service)\b/.test(s);
   const object=/\b(ticket|job|work\s*order|assignment|service\s*call|call|order)\b/.test(s);
-  const action=/\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|need|want|throw\s+in)\b/.test(s);
-  const workloadQuestion=/\b(how many|what|which|show|list|does|do|has|have|got)\b[\s\S]{0,35}\b(ticket|job|work|schedule)\b/.test(s);
+  const action=/\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|need|want|throw\s+in|give|send|schedule)\b/.test(s);
+  const workloadQuestion=/\b(how many|what|which|show|list|does|do|has|have|got|any|are there|is there)\b[\s\S]{0,45}\b(ticket|job|work|schedule|delivery|pickup|swap|service)\b/.test(s);
+  const questionLead=/^\s*(what|which|who|how|why|where|when|show|list|does|do|is|are|can|could|should|any)\b/.test(s);
+  let terseCreate=false;
+  if(type&&!state.currentTicket&&!questionLead){
+    let detail=false;
+    try{detail=Boolean(dateFrom(text)||timeFrom(text)||draftMatchedTechs(text).length||draftEquipmentParse(text).some(x=>Number(x.qty||0)>0));}catch{}
+    terseCreate=detail;
+  }
   return !workloadQuestion&&(
-    /\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|throw\s+in)\b[\s\S]{0,55}\b(ticket|job|work\s*order|assignment|service\s*call|call|order)\b/.test(s)
-    || /\b(create|make|start|open|add|book|put\s+in|set\s*up|setup|throw\s+in)\s+(?:me\s+)?(?:a|an)?\s*(delivery|pickup|swap|service)(?:\s+(?:ticket|job|call|order))?\b/.test(s)
+    /\b(create|make|start|prepare|set\s*up|setup|add|open|build|book|put\s+in|write\s+up|throw\s+in|schedule)\b[\s\S]{0,55}\b(ticket|job|work\s*order|assignment|service\s*call|call|order|delivery|pickup|swap|service)\b/.test(s)
+    || /\b(create|make|start|open|add|book|put\s+in|set\s*up|setup|throw\s+in|schedule)\s+(?:me\s+)?(?:a|an)?\s*(delivery|pickup|swap|service)(?:\s+(?:ticket|job|call|order))?\b/.test(s)
     || (type&&object&&action)
-    || /\b(?:i\s+)?(?:need|want)\s+(?:to\s+)?(?:do|put\s+in|set\s+up|make|book)?\s*(?:a|an)?\s*(delivery|pickup|swap|service)\b/.test(s)
+    || /\b(?:i\s+)?(?:need|want)\s+(?:to\s+)?(?:do|put\s+in|set\s+up|make|book|schedule)?\s*(?:a|an)?\s*(delivery|pickup|swap|service)\b/.test(s)
+    || terseCreate
   );
 }
 function draftWorkType(text){
   const s=String(text||'').toLowerCase();
-  if(/\b(pickup|pick\s+up)\b/.test(s))return'pickup';
-  if(/\b(delivery|deliver|deploy)\b/.test(s))return'delivery';
-  if(/\b(swap|swapping)\b/.test(s))return'swap';
-  if(/\bservice\b/.test(s))return'service';
+  if(/\b(pickup|pick\s+up|pikup)\b/.test(s))return'pickup';
+  if(/\b(delivery|deliver|deploy|deelivery|delivry|delvery)\b/.test(s))return'delivery';
+  if(/\b(swap|swapping|swop)\b/.test(s))return'swap';
+  if(/\bservice|servce\b/.test(s))return'service';
   return'';
 }
 function draftDefaultRole(type){
@@ -1389,6 +1469,13 @@ function draftApplyInput(d,text,initial=false){
   if(explicitTicket||bareTicket)d.ticket_no=explicitTicket||bareTicket;
   const siteMatch=raw.match(/\b(?:site|customer)\s*(?:is|to|:|=|-)\s*([^,.;\n]+)/i);
   if(siteMatch)d.site=String(siteMatch[1]||'').trim();
+  if(!siteMatch&&(initial||expected==='site')){
+    const loose=raw.match(/\bfor\s+([A-Za-z0-9][A-Za-z0-9 &'._-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d|around\s+\d|with\s+|using\s+|ticket\b|mhelp|unit\b|helios\b|ranger\b|sniper\b|spotter\b|recon\b)|$)/i);
+    const candidate=String(loose?.[1]||'').trim();
+    const isDate=/^(today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(candidate);
+    const techNames=draftMatchedTechs(candidate);
+    if(candidate&&!isDate&&!techNames.length)d.site=candidate;
+  }
   const when=dateFrom(raw);if(when)d.scheduled_for=when;
   const clock=timeFrom(raw);if(clock){d.scheduled_time=clock;d.time_answered=true;}
   if(expected==='scheduled_time'&&/\b(no specific time|no time|anytime|skip|none)\b/i.test(raw)){d.scheduled_time='';d.time_answered=true;}
@@ -1462,10 +1549,23 @@ function draftResponseHtml(d,started=false,transition=null){
   return '<div class="vision-answer-title">The work order is complete and ready for review.</div>'+draftSummaryHtml(d)
     +'<div class="vision-action-card"><small>READY TO CREATE</small><b>Create this '+esc(String(d.work_type).toUpperCase())+' Tech Check job?</b><p>Vision will create the Tech Check workflow shown above. MHelpDesk remains separate.</p><div class="vision-action-buttons"><button class="vision-confirm" type="button" data-confirm-action="'+esc(actionId)+'">Create Tech Check job</button><button class="vision-cancel" type="button" data-cancel-action="'+esc(actionId)+'">Keep editing</button></div></div>';
 }
-function startDraft(text){
+function startDraft(text,seed={}){
   state.currentTicket='';
-  const d={draft_version:2,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
+  const d={draft_version:3,work_type:'',role:'',ticket_no:'',site:'',scheduled_for:'',scheduled_time:'',time_answered:false,equipment_manifest:[],equipment_answered:false,equipment_numbers_answered:false,unit_numbers:'',stand_numbers:'',job_description:'',parts:{},parts_answered:false,assignees:{},assignment_answered:false,notes:'',notes_answered:false,last_answered_key:'',last_answered_at:''};
   draftApplyInput(d,text,true);
+  const s=seed&&typeof seed==='object'?seed:{};
+  if(s.work_type){d.work_type=draftWorkType(s.work_type)||String(s.work_type);d.role=draftDefaultRole(d.work_type);}
+  if(s.ticket_no)d.ticket_no=String(s.ticket_no);
+  if(s.site)d.site=String(s.site);
+  if(s.date)d.scheduled_for=String(s.date);
+  if(s.time){d.scheduled_time=String(s.time);d.time_answered=true;}
+  if(s.equipment_summary)draftApplyInput(d,String(s.equipment_summary),true);
+  if(s.job_description)d.job_description=String(s.job_description);
+  if(s.notes){d.notes=String(s.notes);d.notes_answered=true;}
+  if(s.technician_name){
+    const tech=findTech(String(s.technician_name));
+    if(tech){d.assignees=d.assignees||{};d.assignees[tech.role]=tech.user_id;d.assignment_answered=true;}
+  }
   const current=ensureChat();current.ticket='';current.draft=d;saveChats();renderOrder();
   return draftResponseHtml(d,true);
 }
