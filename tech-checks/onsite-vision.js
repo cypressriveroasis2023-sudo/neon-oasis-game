@@ -1025,7 +1025,13 @@ function ticketFrom(text){
   }
   return'';
 }
-function numberWords(text){const m={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};return String(text||'').replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,x=>String(m[x.toLowerCase()]||x));}
+function numberWords(text){
+  const m={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+  return String(text||'')
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,x=>String(m[x.toLowerCase()]||x))
+    // Common voice-to-text homophone when a quantity is spoken before equipment.
+    .replace(/\btoo\b(?=\s+(?:units?\s+)?(?:helios?|helio|helias|helius|helium|rangers?|snipers?|solar\s+spotters?|spotters?|recon(?:\s*2)?))/gi,'2');
+}
 function unitHint(text){
   const raw=numberWords(text),defs=[['Helios',/\bhelio(?:s)?\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Ranger',/\branger\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Solar Spotter',/\bsolar\s+spotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Spotter',/\bspotter\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i],['Sniper',/\bsniper\s*(?:unit\s*)?(?:#|number|no\.?)?\s*(\d{1,4})\b/i]];
   for(const d of defs){const x=raw.match(d[1]);if(x)return{type:d[0],tag:String(Number(x[1]))};}return null;
@@ -1307,7 +1313,7 @@ function draftEquipmentParse(text){
   const defs=[
     {category:'device',label:'Solar Spotter',aliases:['solar spotter','solar spotters']},
     {category:'device',label:'Recon 2',aliases:['recon 2','recon ii','recon two']},
-    {category:'device',label:'Helios',aliases:['helios','helio','helias','helius']},
+    {category:'device',label:'Helios',aliases:['helios','helio','helias','helius','helium']},
     {category:'device',label:'Ranger',aliases:['ranger','rangers']},
     {category:'device',label:'Sniper',aliases:['sniper','snipers']},
     {category:'device',label:'Spotter',aliases:['spotter','spotters']},
@@ -1352,7 +1358,37 @@ function draftStandTotal(d){
   return (d.equipment_manifest||[]).filter(x=>x.category==='stand').reduce((n,x)=>n+Number(x.qty||0),0);
 }
 function draftEquipmentText(d){
-  return (d.equipment_manifest||[]).map(x=>x.qty+' × '+x.label).join(', ')||'—';
+  const devices=(d.equipment_manifest||[]).filter(x=>x.category==='device'&&Number(x.qty||0)>0);
+  if(!devices.length)return'—';
+  const total=devices.reduce((n,x)=>n+Number(x.qty||0),0);
+  return total+' unit'+(total===1?'':'s')+' · '+devices.map(x=>x.qty+' × '+x.label).join(', ');
+}
+function draftAutomaticRequirements(d){
+  const rows=(d.equipment_manifest||[]).filter(x=>x.category==='device'&&Number(x.qty||0)>0);
+  const out=[];
+  const qty=label=>rows.filter(x=>String(x.label||'').toLowerCase()===label.toLowerCase()).reduce((n,x)=>n+Number(x.qty||0),0);
+  const helios=qty('Helios'),solar=qty('Solar Spotter'),ranger=qty('Ranger'),spotter=qty('Spotter'),sniper=qty('Sniper');
+  if(helios)out.push(helios+' Helios battery box'+(helios===1?'':'es')+' + Helios IT/Service checklist');
+  if(solar)out.push(solar+' Solar Stand'+(solar===1?'':'s')+' + Solar Spotter battery package');
+  if(ranger)out.push(ranger+' Ranger solar panel'+(ranger===1?'':'s')+' + '+ranger+' LiTime 12V 110Ah batter'+(ranger===1?'y':'ies'));
+  if(spotter)out.push('Spotter support/power package handled by Service');
+  if(sniper)out.push((sniper*2)+' × 12V 35Ah Sniper batteries + field support package');
+  return out;
+}
+function ownerDraftJobDescription(d){
+  const devices=(d.equipment_manifest||[]).filter(x=>x.category==='device'&&Number(x.qty||0)>0);
+  if(!d.work_type||!devices.length)return'';
+  const verb=d.work_type==='delivery'?'Deliver':d.work_type==='swap'?'Swap':d.work_type==='pickup'?'Pick up':'Service';
+  return verb+' '+devices.map(x=>x.qty+' × '+x.label).join(', ')+'.';
+}
+function applyOwnerDraftDefaults(d){
+  // Owner is not expected to know unit tags, stand tags, replacement-part detail,
+  // technician implementation steps, or notes just to create the job.
+  d.equipment_numbers_answered=true;
+  d.parts_answered=true;
+  d.notes_answered=true;
+  if(!d.job_description)d.job_description=ownerDraftJobDescription(d);
+  return d;
 }
 
 
@@ -1624,7 +1660,7 @@ function draftEquipmentEdit(d,text){
   const defs=[
     ['Solar Spotter',/solar\s+spotters?/i],
     ['Recon 2',/recon\s+(?:2|ii|two)/i],
-    ['Helios',/helios?|helio|helias|helius/i],
+    ['Helios',/helios?|helio|helias|helius|helium/i],
     ['Ranger',/rangers?/i],
     ['Sniper',/snipers?/i],
     ['Spotter',/(?<!solar\s)spotters?/i],
@@ -1735,6 +1771,7 @@ function startSameJobDraft(text){
   state.currentTicket='';
   const d=draftFromTemplate(template);
   draftApplyInput(d,text,true);
+  applyOwnerDraftDefaults(d);
   const current=ensureChat();
   current.ticket='';
   current.draft=d;
@@ -1778,7 +1815,7 @@ function draftStepKeys(d={}){
     const fields=engine.getRequiredFields(d.work_type,d.equipment_manifest);
     if(Array.isArray(fields)&&fields.length)return fields;
   }
-  return ['work_type','ticket_no','site','scheduled_for','scheduled_time','equipment_manifest','equipment_numbers','job_description','parts','assignment','notes'];
+  return ['work_type','ticket_no','site','scheduled_for','scheduled_time','equipment_manifest','assignment'];
 }
 function draftChoiceHtml(key,d){
   if(key==='work_type')return '<div class="vision-draft-choices">'+['Delivery','Pickup','Swap','Service'].map(v=>'<button type="button" data-vision-prompt="'+v+'">'+v+'</button>').join('')+'</div>';
@@ -1819,11 +1856,7 @@ function draftMissingKey(d){
   const needsEquipment=d.work_type!=='service';
   if(needsEquipment&&!(d.equipment_manifest||[]).length)return'equipment_manifest';
   if(!needsEquipment&&!d.equipment_answered&&!(d.equipment_manifest||[]).length)return'equipment_manifest';
-  if(!d.equipment_numbers_answered)return'equipment_numbers';
-  if(!d.job_description)return'job_description';
-  if(!d.parts_answered)return'parts';
   if(!d.assignment_answered)return'assignment';
-  if(!d.notes_answered)return'notes';
   return'';
 }
 function draftQuestion(key,d){
@@ -1838,23 +1871,22 @@ function draftQuestion(key,d){
   if(key==='site')return'What customer or site is listed on the MHelpDesk ticket?';
   if(key==='scheduled_for')return'What date should this work be scheduled for?';
   if(key==='scheduled_time')return'What time should it be scheduled for? If there is no exact time, choose “No specific time.”';
-  if(key==='equipment_manifest')return d.work_type==='service'?'Does this Service job need any equipment from the shop?':'What equipment is required, and how many?';
-  if(key==='equipment_numbers')return'Do you have the specific unit / stand numbers from MHelpDesk? Type them, or choose “No numbers yet.”';
-  if(key==='job_description')return'What should the technician actually do on this work order?';
-  if(key==='parts')return'Any replacement / swap items? SIM Card Swap and SD / Micro SD Card Replacement are supplied by IT and handed to Service.';
-  if(key==='assignment')return'Who should this work be assigned to? Choose a technician or leave each step in its department queue.';
-  if(key==='notes')return'Any additional owner notes for the technicians?';
+  if(key==='equipment_manifest')return'What equipment is this job for, and how many units?';
+  if(key==='assignment')return'Which technician is handling this job? The IT / Service routing is automatic.';
   return'';
 }
 function draftSummaryHtml(d){
   const when=d.scheduled_for?(dateLabel(d.scheduled_for)+(d.time_answered?(d.scheduled_time?' · '+clockLabel(d.scheduled_time)+(d.schedule_end_time?'–'+clockLabel(d.schedule_end_time):''):' · no exact time'):(d.pending_clock?' · '+ambiguousClockLabel(d.pending_clock)+' o’clock · AM/PM needed':' · time not answered'))):'—';
   return '<div class="vision-draft-card"><div class="vision-draft-head"><span><small>NEW TECH CHECK DRAFT</small><b>'+esc(String(d.work_type||'New job').toUpperCase())+'</b></span><span class="vision-pill">'+esc(draftFlowLabel(d))+'</span></div>'
     +'<div class="vision-draft-grid"><div><span>MHelpDesk</span><b>'+(d.ticket_no?'#'+esc(d.ticket_no):'—')+'</b></div><div><span>Site</span><b>'+esc(d.site||'—')+'</b></div><div><span>Schedule</span><b>'+esc(when)+'</b></div><div><span>Equipment</span><b>'+esc(draftEquipmentText(d))+'</b></div><div><span>Assignment</span><b>'+esc(draftAssignmentText(d))+'</b></div><div><span>Parts</span><b>'+esc(draftPartsText(d))+'</b></div></div>'
+    +(draftAutomaticRequirements(d).length?'<div class="vision-draft-description"><span>Automatic equipment requirements</span><b>'+esc(draftAutomaticRequirements(d).join(' · '))+'</b></div>':'')
     +(d.job_description?'<div class="vision-draft-description"><span>Work to perform</span><b>'+esc(d.job_description)+'</b></div>':'')
     +(d.notes?'<div class="vision-draft-description"><span>Owner notes</span><b>'+esc(d.notes)+'</b></div>':'')+'</div>';
 }
 function draftSiteFrom(text){
   const raw=String(text||'').trim();
+  const travel=raw.match(/\b(?:going|headed|assigned|scheduled)\s+to\s+([A-Za-z][A-Za-z0-9 &'.,_-]{2,120}?)(?=\s*(?:[.;]|\b(?:the\s+)?ticket\b|\bmhelp\b|\bfrom\s+\d|\bat\s+\d|\btoday\b|\btomorrow\b|\bfor\s+(?:(?:a|an|one|two|three|four|five|\d+)\s+)?(?:unit\s+)?(?:helios|helias|helius|helium|ranger|sniper|spotter|recon)\b|$))/i);
+  if(travel?.[1])return String(travel[1]).trim().replace(/[,.]+$/,'').trim();
   const cleanCandidate=value=>String(value||'').trim().replace(/^[,.;\s]+|[,.;\s]+$/g,'').trim();
   const validCandidate=value=>{
     const candidate=cleanCandidate(value);
@@ -2008,6 +2040,7 @@ function draftApplyInput(d,text,initial=false,options={}){
     else if(expected==='job_description'&&!descMatch)d.job_description=raw;
     else if(expected==='notes'&&!notesMatch){d.notes=raw;d.notes_answered=true;}
   }
+  applyOwnerDraftDefaults(d);
   return d;
 }
 function draftResponseHtml(d,started=false,transition=null){
