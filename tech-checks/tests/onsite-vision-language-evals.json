@@ -1,6 +1,6 @@
 {
-  "version": "onsite-vision-language-evals-v6",
-  "description": "Owner-style natural-language regression bank for OnSite Vision. Adds conversational correction, draft editing, repeated-job references, terse speech, omitted command verbs, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
+  "version": "onsite-vision-language-evals-v7",
+  "description": "Owner-style natural-language regression bank for OnSite Vision. Adds real-ticket and unit conversational focus, return references, conversational corrections, repeated-job references, terse speech, voice transcription errors, production-main grounding, follow-ups, and safe audited actions. No case may execute a write.",
   "categories": [
     "workload",
     "workload_followup",
@@ -819,6 +819,100 @@
       "intent": "create_job",
       "tool": "none",
       "action": "create_job"
+    },
+    {
+      "id": "ref01",
+      "utterance": "open 22825",
+      "intent": "ticket_next",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref02",
+      "utterance": "pull up 22825",
+      "intent": "ticket_next",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref03",
+      "utterance": "give that one to Josh",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "assign",
+      "tool": "list_technicians",
+      "action": "assign"
+    },
+    {
+      "id": "ref04",
+      "utterance": "move it to tomorrow",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "schedule",
+      "tool": "none",
+      "action": "schedule"
+    },
+    {
+      "id": "ref05",
+      "utterance": "what about the unit coming back",
+      "context": [
+        "Vision has a SWAP ticket open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref06",
+      "utterance": "did the old unit make it back yet",
+      "context": [
+        "Vision has a SWAP ticket open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref07",
+      "utterance": "what happened to the failed unit",
+      "context": [
+        "Vision has an offline case ticket open"
+      ],
+      "intent": "offline",
+      "tool": "get_offline_escalations",
+      "action": "none"
+    },
+    {
+      "id": "ref08",
+      "utterance": "show me the return on that one",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref09",
+      "utterance": "what about that unit",
+      "context": [
+        "Vision just discussed Helios 12 on ticket 22825"
+      ],
+      "intent": "ticket_equipment",
+      "tool": "get_job_context",
+      "action": "none"
+    },
+    {
+      "id": "ref10",
+      "utterance": "and who has it now",
+      "context": [
+        "Vision has ticket 22825 open"
+      ],
+      "intent": "ticket_assignment",
+      "tool": "get_job_context",
+      "action": "none"
     }
   ]
 }
