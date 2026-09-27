@@ -2794,15 +2794,27 @@ function ownerVisionAttentionSummary(){
   return{count:unique.size,alerts:alerts.length,reviews:reviews.length,returns:returns.length,overdue:overdueTickets.size};
 }
 function ownerVisionAttentionCount(){return ownerVisionAttentionSummary().count;}
+function ownerVisionAttentionText(summary){
+  const count=Number(summary?.count||0);
+  if(!count)return'Vision is ready';
+  const parts=[];
+  if(summary.reviews)parts.push(summary.reviews+' Owner Review');
+  if(summary.returns)parts.push(summary.returns+' equipment hold'+(summary.returns===1?'':'s'));
+  if(summary.overdue)parts.push(summary.overdue+' overdue job'+(summary.overdue===1?'':'s'));
+  if(summary.alerts)parts.push(summary.alerts+' Vision alert'+(summary.alerts===1?'':'s'));
+  return count+' need attention'+(parts.length?' · '+parts.slice(0,2).join(' · '):'');
+}
 function refreshOwnerVisionPresence(){
   const summary=ownerVisionAttentionSummary(),count=summary.count;
   document.querySelectorAll('.ownerVisionPresence').forEach(node=>{
     const label=node.querySelector('.ownerVisionPresenceCopy>span');
     const side=node.querySelector('.ownerVisionPresenceBadge,.ownerVisionPresenceGo');
     node.dataset.visionState=count?'needs_attention':'idle';
-    const text=count?(count+' item'+(count===1?'':'s')+' need'+(count===1?'s':'')+' your attention'):'Vision is ready';
+    const text=ownerVisionAttentionText(summary);
     if(label)label.textContent=text;
     node.setAttribute('aria-label','Open OnSite Vision. '+text);
+    node.dataset.attentionCount=String(count);
+    node.dataset.attentionBreakdown=JSON.stringify(summary);
     if(side){
       side.className=count?'ownerVisionPresenceBadge':'ownerVisionPresenceGo';
       side.textContent=count?String(count):'OPEN →';
@@ -2811,7 +2823,7 @@ function refreshOwnerVisionPresence(){
 }
 function ownerVisionPresenceHtml(){
   const count=ownerVisionAttentionCount();
-  const status=count?(count+' item'+(count===1?'':'s')+' need'+(count===1?'s':'')+' your attention'):'Vision is ready';
+  const status=ownerVisionAttentionText(ownerVisionAttentionSummary());
   const stateName=count?'needs_attention':'idle';
   return '<button type="button" class="ownerVisionPresence" data-vision-state="'+stateName+'" onclick="ownerJump(\'vision\')" aria-label="Open OnSite Vision. '+esc(status)+'">'
     +'<span class="ownerVisionPresenceEye" aria-hidden="true"><span class="ownerVisionPresenceHalo"></span><img src="./techcheck-eye-192.png?v=2" alt=""></span>'
