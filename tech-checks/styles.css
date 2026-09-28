@@ -10282,47 +10282,62 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
  #view-owner .ownerAppJobRow,#view-owner .ownerAppUnitRow,#view-owner .ownerAppHandoffRow,#view-owner .ownerAppTeamRow{background:#0d242e!important;border:1px solid #314b57!important;border-radius:8px!important}
 }
 
-/* Owner dashboard: direct IT Technician dashboard geometry */
-#view-owner .ownerItDashboard{width:100%;display:block}
-#view-owner .ownerItHeaderGrid{display:grid;grid-template-columns:1.45fr .88fr 1.08fr;gap:7px;margin-bottom:7px}
-#view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{min-height:112px;border:1px solid #314956;border-radius:7px;background:#0d2029;padding:14px 16px;box-sizing:border-box}
-#view-owner .ownerItGreeting{background:linear-gradient(110deg,#7e1018,#2a151c 62%,#0d2029)}
-#view-owner .ownerItGreeting>span,#view-owner .ownerItInfoCard>span{display:block;color:#ef4b53;font-size:9px;font-weight:900;letter-spacing:.11em;margin-bottom:5px}
+/* Shared role dashboard geometry — IT is the visual authority; Owner uses the same shell. */
+#view-owner .ownerItDashboard{width:100%;max-width:none;margin:0;display:block;box-sizing:border-box}
+#view-owner .ownerItHeaderGrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(180px,.88fr) minmax(220px,1.08fr);gap:7px;margin:0 0 7px}
+#view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:112px;min-height:112px;border:1px solid #314956;border-radius:7px;background:#0d2029;padding:14px 16px;box-sizing:border-box;overflow:hidden}
+#view-owner .ownerItGreeting{background:linear-gradient(110deg,#9d101b 0%,#64121b 42%,#25171c 70%,#0d2029 100%)}
+#view-owner .ownerItGreeting>span,#view-owner .ownerItInfoCard>span{display:block;color:#ff525b;font-size:9px;font-weight:900;letter-spacing:.11em;margin-bottom:5px}
 #view-owner .ownerItGreeting h1{margin:0;color:#fff;font-size:25px;line-height:1.05}
-#view-owner .ownerItGreeting p{margin:6px 0 0;color:#c4d0d6;font-size:10px}
+#view-owner .ownerItGreeting p{margin:6px 0 0;color:#d7e0e4;font-size:10px}
 #view-owner .ownerItInfoCard>b{display:block;color:#fff;font-size:30px;line-height:1.05;margin-top:7px}
 #view-owner .ownerItInfoCard>small{display:block;color:#c2ced4;font-size:10px;margin-top:4px}
-#view-owner .ownerItWeatherCard #ownerTodayWeatherHost{min-height:0!important;margin:0!important}
-#view-owner .ownerItWeatherCard .ownerWeatherNow{min-height:0!important;padding:4px 0!important;border:0!important;background:transparent!important;box-shadow:none!important}
-#view-owner .ownerItWeatherCard .ownerWeatherIcon,#view-owner .ownerItWeatherCard .ownerWeatherToday,#view-owner .ownerItWeatherCard .ownerWeatherForecast{display:none!important}
-#view-owner .ownerItWeatherCard .ownerWeatherCurrent>span,#view-owner .ownerItWeatherCard .ownerWeatherCurrent>em{display:none!important}
-#view-owner .ownerItWeatherCard .ownerWeatherCurrent div b{font-size:27px!important}
-#view-owner .ownerItWeatherCard .ownerWeatherCurrent div strong{font-size:17px!important}
-#view-owner .ownerItKpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-bottom:7px}
-#view-owner .ownerItKpis button{min-height:72px;padding:9px 12px;text-align:left;border-radius:7px;background:#0c2029;border:1px solid #2b4652;color:#fff}
-#view-owner .ownerItKpis button b{display:block;font-size:22px;line-height:1}
-#view-owner .ownerItKpis button span{display:block;margin-top:5px;font-size:9px;font-weight:900;letter-spacing:.06em}
-#view-owner .ownerItKpis button small{display:block;margin-top:3px;font-size:9px;color:#9fb0b9}
-#view-owner .ownerItKpis .cyan{border-color:#047c9d}.ownerItKpis .red{border-color:#a72b38!important}.ownerItKpis .green{border-color:#0b8048!important}.ownerItKpis .purple{border-color:#7b2aa0!important}.ownerItKpis .amber{border-color:#9c6800!important}
-#view-owner .ownerItMainGrid{display:grid;grid-template-columns:minmax(0,2.05fr) minmax(270px,1fr);gap:6px}
-#view-owner .ownerItPanel{min-height:230px;border:1px solid #29434f;border-radius:7px;background:#0b1c25;overflow:hidden}
-#view-owner .ownerItPanel>header{min-height:44px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #243c47}
+#view-owner .ownerItWeatherCard #ownerTodayWeatherHost{min-height:0;margin:0}
+#view-owner .ownerItWeatherCard .ownerWeatherNow{min-height:0;padding:4px 0;border:0;background:transparent;box-shadow:none}
+#view-owner .ownerItWeatherCard .ownerWeatherIcon,#view-owner .ownerItWeatherCard .ownerWeatherToday,#view-owner .ownerItWeatherCard .ownerWeatherForecast{display:none}
+#view-owner .ownerItWeatherCard .ownerWeatherCurrent>span,#view-owner .ownerItWeatherCard .ownerWeatherCurrent>em{display:none}
+#view-owner .ownerItWeatherCard .ownerWeatherCurrent div{display:flex;align-items:center;gap:8px}
+#view-owner .ownerItWeatherCard .ownerWeatherCurrent div b{font-size:27px;color:#fff}
+#view-owner .ownerItWeatherCard .ownerWeatherCurrent div strong{font-size:17px;color:#fff}
+#view-owner .ownerItKpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 7px}
+#view-owner .ownerItKpis button{height:58px;min-height:58px;padding:8px 12px;text-align:left;border-radius:7px;background:#0c2029;border:1px solid #2b4652;color:#fff;appearance:none;box-sizing:border-box}
+#view-owner .ownerItKpis button b{display:block;font-size:20px;line-height:1}
+#view-owner .ownerItKpis button span{display:block;margin-top:4px;font-size:9px;font-weight:900;letter-spacing:.06em}
+#view-owner .ownerItKpis button small{display:block;margin-top:2px;font-size:8px;color:#9fb0b9}
+#view-owner .ownerItKpis .cyan{background:linear-gradient(135deg,#0d2530,#08212b);border-color:#0789ad}
+#view-owner .ownerItKpis .red{background:linear-gradient(135deg,#35131a,#1d1820);border-color:#c52b3b}
+#view-owner .ownerItKpis .green{background:linear-gradient(135deg,#0b2c22,#10231f);border-color:#079253}
+#view-owner .ownerItKpis .purple{background:linear-gradient(135deg,#251334,#181c2c);border-color:#8d35b6}
+#view-owner .ownerItKpis .amber{background:linear-gradient(135deg,#34230a,#241d12);border-color:#b67a00}
+#view-owner .ownerItMainGrid{display:grid;grid-template-columns:minmax(0,2.05fr) minmax(270px,1fr);grid-template-rows:minmax(165px,1fr) minmax(145px,1fr);gap:6px;min-height:calc(100vh - 350px)}
+#view-owner .ownerItPanel{min-height:0;height:100%;border:1px solid #29434f;border-radius:7px;background:#0b1c25;overflow:hidden;box-sizing:border-box}
+#view-owner .ownerItPanel>header{height:44px;min-height:44px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #243c47;box-sizing:border-box}
 #view-owner .ownerItPanel h2{margin:0;font-size:15px;color:#fff}
 #view-owner .ownerItPanel>header button{border:0;background:transparent;color:#c8d6dc;font-size:10px;font-weight:800}
-#view-owner .ownerItPanelBody{padding:8px}
-#view-owner .ownerItEmpty{min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff}
+#view-owner .ownerItPanelBody{padding:8px;height:calc(100% - 44px);box-sizing:border-box;overflow:auto}
+#view-owner .ownerItEmpty{height:100%;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff}
 #view-owner .ownerItEmpty span{color:#9fb0b9;font-size:10px;margin-top:4px}
 #view-owner .ownerItAttentionRows{padding:7px;display:grid;gap:5px}
 #view-owner .ownerItAttentionRows button{min-height:36px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;border:1px solid #35505d;border-radius:7px;background:#10242e;color:#fff;text-align:left}
-#view-owner .ownerItAttentionRows button b{font-size:10px}#view-owner .ownerItAttentionRows button span{font-size:9px;color:#aebdc4}
+#view-owner .ownerItAttentionRows button b{font-size:10px}
+#view-owner .ownerItAttentionRows button span{font-size:9px;color:#aebdc4}
 #view-owner .ownerItQuickGrid{padding:7px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-#view-owner .ownerItQuickGrid button{min-height:56px;padding:8px;text-align:left;border:1px solid #36515d;border-radius:6px;background:#0d222c;color:#fff}
+#view-owner .ownerItQuickGrid button{min-height:50px;padding:7px;text-align:left;border:1px solid #36515d;border-radius:6px;background:#0d222c;color:#fff}
 #view-owner .ownerItQuickGrid button.primary{background:#c91420;border-color:#ed2b35}
-#view-owner .ownerItQuickGrid b{display:block;font-size:10px}#view-owner .ownerItQuickGrid span{display:block;margin-top:3px;color:#aab9c0;font-size:8px}
+#view-owner .ownerItQuickGrid b{display:block;font-size:10px}
+#view-owner .ownerItQuickGrid span{display:block;margin-top:3px;color:#aab9c0;font-size:8px}
 #view-owner .ownerItQuickGrid .primary span{color:#fff}
+@media(min-width:901px){
+ #view-owner .ownerAppShell{width:100%;max-width:none}
+ #view-owner .ownerAppWorkspace{width:auto;max-width:none;min-width:0}
+ #view-owner .ownerAppPage{width:100%;max-width:none;box-sizing:border-box;padding:0 10px 18px}
+ #view-owner #ownerRouteView{width:100%;max-width:none;min-width:0}
+}
 @media(max-width:900px){
  #view-owner .ownerItHeaderGrid{grid-template-columns:1fr}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:auto;min-height:104px}
  #view-owner .ownerItKpis{grid-template-columns:repeat(2,minmax(0,1fr))}
- #view-owner .ownerItMainGrid{grid-template-columns:1fr}
+ #view-owner .ownerItMainGrid{grid-template-columns:1fr;grid-template-rows:auto;min-height:0}
+ #view-owner .ownerItPanel{min-height:220px;height:auto}
  #view-owner .ownerItQuickGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
