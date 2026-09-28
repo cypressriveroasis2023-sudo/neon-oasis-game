@@ -997,6 +997,7 @@ function injectStyles() {
     .wl-truck-unit-check.missing{border-color:#a93238;background:#261014}
     .wl-truck-unit-check input{width:24px!important;height:24px!important;min-height:0!important;padding:0!important}
     .wl-truck-unit-check span{display:grid;gap:2px}.wl-truck-unit-check b{font-size:16px;color:#fff}.wl-truck-unit-check small{font-size:11px;color:#aebdc5}
+    .wl-truck-self-entry span{width:100%}.wl-truck-entry-input{width:100%!important;min-height:44px!important;margin-top:7px!important;padding:10px 12px!important;border:1px solid #4a6571!important;border-radius:9px!important;background:#02090d!important;color:#fff!important;font-size:16px!important;font-weight:850!important}
     .wl-truck-stock-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
     .wl-truck-stock-grid label{padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;color:#fff}.wl-truck-stock-grid label>span{display:block;min-height:42px;font-size:12px;font-weight:850}.wl-truck-stock-grid input{text-align:center!important}
     .wl-truck-restock-list{margin-top:16px}.wl-truck-restock-row{margin:8px 0;padding:12px;border:1px solid #713238;border-radius:12px;background:#241014;color:#fff}.wl-truck-restock-row.ready{border-color:#3f6a55;background:#0d2117}.wl-truck-restock-row>div{display:grid;gap:3px}.wl-truck-restock-row span{font-size:12px;color:#b9c7ce}.wl-truck-restock-row em{display:block;margin-top:6px;font-style:normal;font-size:10px;font-weight:1000;letter-spacing:.08em;color:#ff6369}
@@ -4368,16 +4369,11 @@ async function showServiceTruckInventoryCheck(){
     const sims=(r.sims||[]).slice().sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0));
     const unitRows=units.map(u=>{
       const ready=u.status==='assigned'&&u.unit_tag;
-      return `<label class='wl-truck-unit-check ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'':'disabled'}><span><b>${esc(u.equipment_type)}</b><small>${ready?'Unit '+esc(u.unit_tag):u.status==='used_restock_due'?'USED — IT RESTOCK REQUIRED':'NO UNIT ASSIGNED — IT REQUIRED'}</small></span></label>`;
+      return `<div class='wl-truck-unit-check wl-truck-self-entry ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'':'disabled'}><span><b>${esc(u.equipment_type)}</b><small>ENTER THE UNIT NUMBER ON YOUR TRUCK</small><input class='wl-truck-entry-input' type='text' autocomplete='off' autocapitalize='characters' placeholder='Unit number' value='${esc(u.unit_tag||'')}' data-wl-truck-unit-entry='${esc(u.equipment_type)}'></span></div>`;
     }).join('');
     const simRows=sims.map(s=>{
       const ready=s.status==='assigned'&&s.sim_number;
-      const detail=ready
-        ? 'SIM '+esc(s.sim_number)
-        : s.status==='used_restock_due'
-          ? 'USED'+(s.sim_number?' · '+esc(s.sim_number):'')+(s.last_used_ticket_no?' · MHelpDesk #'+esc(s.last_used_ticket_no):'')
-          : 'NO SIM ASSIGNED — IT REQUIRED';
-      return `<label class='wl-truck-unit-check wl-truck-sim-check ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'':'disabled'}><span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>${detail}</small></span></label>`;
+      return `<div class='wl-truck-unit-check wl-truck-sim-check wl-truck-self-entry ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'':'disabled'}><span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>ENTER THE EXACT SIM CARD NUMBER</small><input class='wl-truck-entry-input' type='text' inputmode='numeric' autocomplete='off' placeholder='SIM card number' value='${esc(s.sim_number||'')}' data-wl-truck-sim-entry='${Number(s.slot_no||0)}'></span></div>`;
     }).join('');
     card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
       ${progress('MANDATORY TRUCK INVENTORY','Required before leaving the shop',1,1)}
@@ -4401,7 +4397,39 @@ async function showServiceTruckInventoryCheck(){
     card.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not load permanent truck inventory.');
   }
 }
+async function saveMyServiceTruckIdentifiers(){
+  const units={};
+  document.querySelectorAll('[data-wl-truck-unit-entry]').forEach(el=>{units[el.dataset.wlTruckUnitEntry]=String(el.value||'').trim();});
+  const sims={};
+  document.querySelectorAll('[data-wl-truck-sim-entry]').forEach(el=>{sims[String(el.dataset.wlTruckSimEntry||'')]=String(el.value||'').trim();});
+  const {data,error}=await liveDb.rpc('service_save_my_truck_inventory_v1',{p_units:units,p_sims:sims});
+  if(error)throw error;
+  return data||{};
+}
 async function submitServiceTruckInventoryCheck(){
+  document.body.classList.add('busy');
+  try{
+    await saveMyServiceTruckIdentifiers();
+  }catch(error){
+    document.body.classList.remove('busy');
+    return alert(error?.message||'Could not save your truck equipment and SIM numbers.');
+  }
+  document.body.classList.remove('busy');
+  const refreshed=await loadMyServiceTruckReadiness();
+  const unitByType=Object.fromEntries((refreshed.units||[]).map(u=>[u.equipment_type,u]));
+  const simBySlot=Object.fromEntries((refreshed.sims||[]).map(s=>[String(s.slot_no),s]));
+  document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
+    const u=unitByType[el.dataset.wlTruckUnitConfirm];
+    el.dataset.unitTag=u?.unit_tag||'';
+    el.disabled=!(u?.status==='assigned'&&u?.unit_tag);
+    if(!el.disabled)el.checked=true;
+  });
+  document.querySelectorAll('[data-wl-truck-sim-confirm]').forEach(el=>{
+    const s=simBySlot[String(el.dataset.wlTruckSimConfirm||'')];
+    el.dataset.simNumber=s?.sim_number||'';
+    el.disabled=!(s?.status==='assigned'&&s?.sim_number);
+    if(!el.disabled)el.checked=true;
+  });
   const unitConfirmations={};
   document.querySelectorAll('[data-wl-truck-unit-confirm]').forEach(el=>{
     unitConfirmations[el.dataset.wlTruckUnitConfirm]={unit_tag:el.dataset.unitTag||'',confirmed:Boolean(el.checked)};
