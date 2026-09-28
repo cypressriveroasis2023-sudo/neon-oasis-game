@@ -4856,20 +4856,39 @@ async function showSvcHome() {
     home.className='card wl-home wl-service-simple-home';
     viewSvc().prepend(home);
   }
-  home.innerHTML=techDashboardLoadingHtml('Checking your next Service action…');
-  hideChildren(viewSvc(),[home]);
-  resetWizardPosition();
 
   const ownerViewingService=roleText().includes('Owner/Admin');
   const techName=document.getElementById('whoName')?.textContent?.trim() || (ownerViewingService?'Service Technician':'Technician');
   const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
+  const pill=(label,action,status,done=false)=>`<button class='wl-service-action-pill ${done?'complete':''}' ${action}><span>${label}<small>${status}</small></span><b aria-hidden='true'>${done?'✓':'→'}</b></button>`;
+  const alreadyShowingHome=Boolean(home.querySelector('.wl-service-simple-shell'));
+
+  // Show the real Service home immediately. Never replace it with a full-screen
+  // loading card during login, refresh, reconnect, or a background data refresh.
+  if(!alreadyShowingHome){
+    home.innerHTML=`<div class='wl-service-simple-shell'>
+      <div class='wl-service-simple-kicker'>SERVICE TECH</div>
+      <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
+      <div class='wl-service-action-list'>
+        ${pill('Enter Ticket Number','data-wl-service-open-job','Open or continue your job')}
+        ${pill('Truck Inspection',"data-wl-svc='inspect'",'Checking today…')}
+        ${pill('Trailer Inspection','data-wl-service-trailer-inspection','Checking today…')}
+        ${pill('Truck Inventory','data-wl-service-truck-inventory','Checking today…')}
+        ${pill('Return Equipment to IT','data-wl-service-return','Return equipment for intake or a swap')}
+      </div>
+      <div class='wl-service-help'>Complete daily inspections and verify truck inventory before starting a job.</div>
+    </div>`;
+  }
+
+  hideChildren(viewSvc(),[home]);
+  if(!alreadyShowingHome) resetWizardPosition();
 
   try{
     const [readiness, morning]=await Promise.all([loadMyServiceTruckReadiness(), latestServiceInspectionToday()]);
     const flash=takeTechCompletion('service');
     const truckDone=Boolean(readiness.inspection_ready);
     const trailerStatus=truckDone&&morning ? (morning.taking_trailer?'Completed Today':'No Trailer Today') : 'Needs Completion';
-    const pill=(label,action,status,done=false)=>`<button class='wl-service-action-pill ${done?'complete':''}' ${action}><span>${label}<small>${status}</small></span><b aria-hidden='true'>${done?'✓':'→'}</b></button>`;
+
     home.innerHTML=`<div class='wl-service-simple-shell'>
       <div class='wl-service-simple-kicker'>SERVICE TECH</div>
       <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
@@ -4884,11 +4903,16 @@ async function showSvcHome() {
       <div class='wl-service-help'>Complete daily inspections and verify truck inventory before starting a job.</div>
     </div>`;
   }catch(error){
-    home.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not verify your Service work.');
+    // Keep the Service page visible if a background refresh hiccups. A tech
+    // should never be kicked into a loading/error flash just because live data
+    // took too long for one request.
+    const help=home.querySelector('.wl-service-help');
+    if(help) help.textContent='Service page is ready. Live status will refresh automatically.';
+    console.warn('Service home status refresh failed.',error);
   }
 
   hideChildren(viewSvc(),[home]);
-  resetWizardPosition();
+  if(!alreadyShowingHome) resetWizardPosition();
 }
 function showServiceJobLookup() {
   let card=document.getElementById('wlSvcLookup');
