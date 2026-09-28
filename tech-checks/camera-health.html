@@ -1014,10 +1014,14 @@ if($('reconSummary')){
   btn.disabled=true;const oldText=btn.textContent;btn.textContent='Checking field…';
   const before=new Map(devices.map(d=>[d.id,effectiveHealth(d)]));
   try{
-    const field=devices.filter(d=>resolvedDeviceIP(d)&&!isShop(d)),batchSize=12;
+    const field=devices.filter(d=>resolvedDeviceIP(d)&&!isShop(d)),batchSize=36,timeoutMs=12000;
+    const runCheck=d=>Promise.race([
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}),
+      new Promise(resolve=>setTimeout(()=>resolve({error:new Error('Health check timed out')}),timeoutMs))
+    ]);
     for(let i=0;i<field.length;i+=batchSize){
       btn.textContent='Checking '+Math.min(i+batchSize,field.length)+' / '+field.length+'…';
-      await Promise.allSettled(field.slice(i,i+batchSize).map(d=>db.functions.invoke('camera-health-check',{body:{device_id:d.id}})));
+      await Promise.allSettled(field.slice(i,i+batchSize).map(runCheck));
     }
     btn.textContent='Syncing Reconeyez…';
     try{await invokeRecon({action:'sync'})}catch(e){console.warn('Reconeyez refresh skipped:',e?.message||e)}
@@ -1032,7 +1036,7 @@ if($('reconSummary')){
       await new Promise(r=>setTimeout(r,1500));
       for(let i=0;i<suspects.length;i+=batchSize){
         btn.textContent='Verifying '+Math.min(i+batchSize,suspects.length)+' / '+suspects.length+'…';
-        await Promise.allSettled(suspects.slice(i,i+batchSize).map(d=>db.functions.invoke('camera-health-check',{body:{device_id:d.id}})));
+        await Promise.allSettled(suspects.slice(i,i+batchSize).map(runCheck));
       }
       await load();
       const stillBad=suspects.filter(d=>['offline','verifying','degraded'].includes(String(effectiveHealth(devices.find(x=>x.id===d.id)||d)).toLowerCase()));
