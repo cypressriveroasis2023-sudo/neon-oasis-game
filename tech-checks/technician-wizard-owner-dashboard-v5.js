@@ -4685,6 +4685,14 @@ async function showITServiceTruckManager(serviceTechId){
 }
 window.showITServiceTruckInventory=showITServiceTruckInventory;
 window.showITServiceTruckManager=showITServiceTruckManager;
+// Owner dashboard truck cards use their own attribute. Route them into the
+// same official inventory editor used by IT instead of leaving the button inert.
+document.addEventListener('click',e=>{
+  const btn=e.target.closest?.('[data-wl-owner-adjust-truck]');
+  if(!btn)return;
+  e.preventDefault();e.stopPropagation();
+  showITServiceTruckManager(btn.dataset.wlOwnerAdjustTruck);
+},true);
 async function refreshITTruckManager(serviceTechId){
   window.__wlItTruckInventoryRows=await loadITServiceTruckInventory();
   return showITServiceTruckManager(serviceTechId);
@@ -6496,6 +6504,7 @@ document.addEventListener('click', async e => {
   const editManaged=e.target.closest('[data-wl-it-edit-managed-ticket]'); if(editManaged)return showITManagedTicketEditor(editManaged.dataset.wlItEditManagedTicket);
   const ticketHistory=e.target.closest('[data-wl-it-ticket-history]'); if(ticketHistory)return showITTicketHistory(ticketHistory.dataset.wlItTicketHistory);
   const transferTicket=e.target.closest('[data-wl-it-transfer-ticket]'); if(transferTicket)return itTransferManagedTicket(transferTicket.dataset.wlItTransferTicket);
+  const ownerAdjustTruck=e.target.closest('[data-wl-owner-adjust-truck]'); if(ownerAdjustTruck)return showITServiceTruckManager(ownerAdjustTruck.dataset.wlOwnerAdjustTruck);
   if (e.target.closest('[data-wl-it-truck-inventory]')) return showITServiceTruckInventory();
   const manageTruck=e.target.closest('[data-wl-it-manage-truck]'); if(manageTruck)return showITServiceTruckManager(manageTruck.dataset.wlItManageTruck);
   const loadUnit=e.target.closest('[data-wl-it-load-unit]'); if(loadUnit)return itLoadTruckUnit(loadUnit.dataset.serviceTech,loadUnit.dataset.wlItLoadUnit);
