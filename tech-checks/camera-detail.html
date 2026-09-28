@@ -131,7 +131,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
         <div class="kv">
           <div>Camera type</div><div id="cameraGroup">—</div>
           <div>Unit</div><div id="unitKey">—</div>
-          <div>Site / organization</div><div id="organization">—</div>
+          <div>Site / organization</div><div><span id="organization">—</span><button id="editSiteBtn" class="action hidden" style="margin-left:10px;padding:5px 9px">Edit site</button></div>
           <div>Public IP</div><div id="publicIp">—</div>
           <div>Device model</div><div id="model">—</div>
           <div>Serial</div><div id="serial">—</div>
@@ -142,6 +142,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
           <div>First failed</div><div id="firstFailed">—</div>
           <div>Last recovered</div><div id="lastRecovered">—</div>
         </div>
+        <div id="siteEditWrap" class="setupbox hidden" style="margin-top:12px"><strong>Site / customer name</strong><div class="small">Owner and IT can set the site manually. This is saved to every camera component on this unit. Avigilon site data can replace it automatically when an Avigilon sync is connected.</div><input id="siteNameInput" autocomplete="off" placeholder="Example: AT&T Magnum"><button class="action" id="saveSiteBtn">Save site to this unit</button></div>
         <div class="actions" id="interfaceActions"></div>
       </div>
 
@@ -214,6 +215,7 @@ function respondingInterfaceSummary(){
 }
 function coreHeliosInterfacesOnline(){
   if(String(device?.monitoring_profile||'').toLowerCase()!=='helios')return false;
+  const siteCanEdit=['owner','it'].includes(String(profile?.role||'').toLowerCase()),siteBtn=$('editSiteBtn');if(siteBtn){siteBtn.classList.toggle('hidden',!siteCanEdit);siteBtn.onclick=()=>{const w=$('siteEditWrap');w.classList.toggle('hidden');$('siteNameInput').value=device.organization||'';if(!w.classList.contains('hidden'))$('siteNameInput').focus()}};
   const ps=current?.port_status||{};
   return ['1400','1500','1600','1700'].every(p=>ps[p]?.online===true);
 }
@@ -268,7 +270,7 @@ function render(){
   }else{
     shopBtn.classList.add('hidden');
   }
-  const ipSetup=$('ipSetupWrap'),ownerCanEdit=String(profile?.role||'')==='owner';
+  const ipSetup=$('ipSetupWrap'),ownerCanEdit=['owner','it'].includes(String(profile?.role||'').toLowerCase());
   if(ownerCanEdit&&!isRecon){
     ipSetup.classList.remove('hidden');
     $('ipSetupInput').value=cleanIP(device.public_ip)||effectiveIp||'';
@@ -381,6 +383,12 @@ async function saveUnitRouter(){
     b.textContent='Router saved ✓';
   }catch(e){console.error(e);alert('Could not save router: '+(e?.message||e));b.disabled=false;b.textContent='Save router to this unit'}
 }
+async function saveUnitSite(){
+  if(!device||!['owner','it'].includes(String(profile?.role||'').toLowerCase()))return;
+  const site=String($('siteNameInput').value||'').trim();if(!site){alert('Enter the site or customer name.');return}
+  const b=$('saveSiteBtn');b.disabled=true;b.textContent='Saving site…';
+  try{let q=db.from('camera_devices').update({organization:site,updated_at:new Date().toISOString()});if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);const {error}=await q;if(error)throw error;await load();b.textContent='Saved ✓';$('siteEditWrap').classList.add('hidden')}catch(e){console.error(e);alert('Could not save site: '+(e?.message||e));b.disabled=false;b.textContent='Save site to this unit'}
+}
 async function saveUnitPublicIP(){
   if(!device||String(profile?.role||'')!=='owner')return;
   const ip=String($('ipSetupInput').value||'').trim();
@@ -431,6 +439,7 @@ async function boot(){
 }
 $('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
 $('verifyBtn').onclick=verifyNow;
+$('saveSiteBtn').onclick=saveUnitSite;
 $('saveIpBtn').onclick=saveUnitPublicIP;
 $('saveRouterBtn').onclick=saveUnitRouter;
 $('moveShopBtn').onclick=moveUnitToShop;
