@@ -996,9 +996,11 @@ function injectStyles() {
     .wl-truck-unit-check{min-height:104px;padding:14px;border:1px solid #38505b;border-radius:14px;background:#0b1920;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start;color:#fff;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease}
     .wl-truck-unit-check.missing{border-color:#9f343a;background:#251115}
     .wl-truck-unit-check.complete{border-color:#2f9c69;background:#0d241b;box-shadow:inset 0 0 0 1px rgba(69,210,139,.12)}
-    .wl-truck-status-check{appearance:none;-webkit-appearance:none;width:30px!important;height:30px!important;min-height:30px!important;margin:2px 0 0!important;padding:0!important;border:2px solid #52636c!important;border-radius:9px!important;background:#02080b!important;display:grid;place-items:center;pointer-events:none}
-    .wl-truck-status-check:checked{border-color:#43d58c!important;background:#183c2b!important}
-    .wl-truck-status-check:checked:after{content:'✓';font-size:19px;line-height:1;color:#71e9aa;font-weight:1000}
+    .wl-truck-status-icon{width:34px;height:34px;margin:1px 0 0;border:2px solid #536872;border-radius:10px;background:#02080b;display:grid;place-items:center;box-sizing:border-box;flex:0 0 auto}
+    .wl-truck-status-icon:after{content:''}
+    .wl-truck-unit-check.complete .wl-truck-status-icon{border-color:#42cf87;background:#143625}
+    .wl-truck-unit-check.complete .wl-truck-status-icon:after{content:'✓';font-size:21px;line-height:1;color:#72e8aa;font-weight:1000}
+    .wl-truck-confirm-data{display:none!important}
     .wl-truck-unit-check span{display:grid;gap:4px;min-width:0}.wl-truck-unit-check b{font-size:18px;color:#fff}.wl-truck-unit-check small{font-size:11px;color:#b9c7ce;letter-spacing:.04em}
     .wl-truck-unit-check.complete small{color:#9cd8ba}
     .wl-truck-self-entry span{width:100%}
@@ -4378,7 +4380,8 @@ async function showServiceTruckInventoryCheck(){
     const unitRows=units.map(u=>{
       const ready=u.status==='assigned'&&u.unit_tag;
       return `<div class='wl-truck-unit-check wl-truck-self-entry ${ready?'complete':'missing'}' data-wl-truck-entry-card>
-        <input class='wl-truck-status-check' type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'checked':''} tabindex='-1' aria-hidden='true'>
+        <div class='wl-truck-status-icon' aria-hidden='true'></div>
+        <input class='wl-truck-confirm-data' type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'checked':''}>
         <span><b>${esc(u.equipment_type)}</b><small>${ready?'UNIT NUMBER ENTERED':'ENTER THE UNIT NUMBER ON YOUR TRUCK'}</small>
         <input class='wl-truck-entry-input' type='text' autocomplete='off' autocapitalize='characters' spellcheck='false' placeholder='Example: 214' value='${esc(u.unit_tag||'')}' data-wl-truck-unit-entry='${esc(u.equipment_type)}'></span>
       </div>`;
@@ -4386,7 +4389,8 @@ async function showServiceTruckInventoryCheck(){
     const simRows=sims.map(s=>{
       const ready=s.status==='assigned'&&s.sim_number;
       return `<div class='wl-truck-unit-check wl-truck-sim-check wl-truck-self-entry ${ready?'complete':'missing'}' data-wl-truck-entry-card>
-        <input class='wl-truck-status-check' type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'checked':''} tabindex='-1' aria-hidden='true'>
+        <div class='wl-truck-status-icon' aria-hidden='true'></div>
+        <input class='wl-truck-confirm-data' type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'checked':''}>
         <span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>${ready?'SIM NUMBER ENTERED':'ENTER THE EXACT SIM CARD NUMBER'}</small>
         <input class='wl-truck-entry-input' type='text' inputmode='numeric' autocomplete='off' spellcheck='false' placeholder='Enter SIM card number' value='${esc(s.sim_number||'')}' data-wl-truck-sim-entry='${Number(s.slot_no||0)}'></span>
       </div>`;
@@ -4398,14 +4402,15 @@ async function showServiceTruckInventoryCheck(){
       <div class='wl-truck-unit-grid'>${unitRows}</div>
       <div class='wl-truck-section-title'>SIM CARDS · 3 REQUIRED · VERIFY THE EXACT SIM NUMBER</div>
       <div class='wl-truck-unit-grid wl-truck-sim-grid'>${simRows}</div>
-      <button class='wl-big wl-blue top10' data-wl-save-truck-identifiers>SAVE EQUIPMENT & SIM NUMBERS →</button>
-      <div class='small top8'>Each completed entry turns green. You can come back and edit these numbers at any time.</div>
+      <div class='small top8'>Each completed equipment or SIM entry turns green.</div>
       <div class='wl-truck-section-title'>BATTERY STOCK · COUNT WHAT IS PHYSICALLY ON THE TRUCK</div>
       <div class='wl-truck-stock-grid'>
         <label><span>Recon batteries <b>25 required</b></span><input id='wlTruckReconQty' type='number' inputmode='numeric' min='0' value='${Number(stock.recon_battery_qty||0)}'></label>
         <label><span>AGM 12V 110Ah <b>4 required</b></span><input id='wlTruckAgmQty' type='number' inputmode='numeric' min='0' value='${Number(stock.agm_12v_110ah_qty||0)}'></label>
         <label><span>LiTime 12V 100Ah <b>2 required</b></span><input id='wlTruckLiTimeQty' type='number' inputmode='numeric' min='0' value='${Number(stock.litime_12v_100ah_qty||0)}'></label>
       </div>
+      <button class='wl-service-start top10' data-wl-save-truck-inventory>SAVE ALL TRUCK INVENTORY →</button>
+      <div class='small top8' data-wl-truck-save-status>Save stores all 4 unit numbers, all 3 SIM numbers, and all battery counts.</div>
       ${serviceTruckRestockRowsHtml(r)}
       <button class='wl-service-start top10' data-wl-submit-truck-inventory>I PHYSICALLY VERIFIED MY TRUCK →</button>
       <button class='wl-big wl-gray top8' data-wl-service-truck-refresh>REFRESH FROM IT</button><button class='wl-big wl-gray top8' data-wl-service-truck-usage>RECORD USED EQUIPMENT / SUPPLIES</button><button class='wl-big wl-gray top8' data-wl-service-resolve-spares>RESOLVE BACKUP EQUIPMENT</button>
@@ -4415,22 +4420,32 @@ async function showServiceTruckInventoryCheck(){
     card.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not load permanent truck inventory.');
   }
 }
-async function saveMyServiceTruckIdentifiers(){
+async function saveMyServiceTruckInventoryDraft(){
   const units={};
   document.querySelectorAll('[data-wl-truck-unit-entry]').forEach(el=>{units[el.dataset.wlTruckUnitEntry]=String(el.value||'').trim();});
   const sims={};
   document.querySelectorAll('[data-wl-truck-sim-entry]').forEach(el=>{sims[String(el.dataset.wlTruckSimEntry||'')]=String(el.value||'').trim();});
-  const {data,error}=await liveDb.rpc('service_save_my_truck_inventory_v1',{p_units:units,p_sims:sims});
+  const recon=Number(document.getElementById('wlTruckReconQty')?.value);
+  const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
+  const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
+  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))throw new Error('Enter valid battery quantities before saving.');
+  const {data,error}=await liveDb.rpc('service_save_my_truck_inventory_v2',{
+    p_units:units,
+    p_sims:sims,
+    p_recon_battery_qty:Math.max(0,Math.floor(recon)),
+    p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
+    p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
+  });
   if(error)throw error;
   return data||{};
 }
 async function submitServiceTruckInventoryCheck(){
   document.body.classList.add('busy');
   try{
-    await saveMyServiceTruckIdentifiers();
+    await saveMyServiceTruckInventoryDraft();
   }catch(error){
     document.body.classList.remove('busy');
-    return alert(error?.message||'Could not save your truck equipment and SIM numbers.');
+    return alert(error?.message||'Could not save your truck inventory.');
   }
   document.body.classList.remove('busy');
   const refreshed=await loadMyServiceTruckReadiness();
@@ -6269,7 +6284,7 @@ document.addEventListener('input', e=>{
   const field=e.target.closest?.('[data-wl-truck-unit-entry],[data-wl-truck-sim-entry]');
   if(!field)return;
   const card=field.closest('[data-wl-truck-entry-card]');
-  const status=card?.querySelector('.wl-truck-status-check');
+  const status=card?.querySelector('.wl-truck-confirm-data');
   const label=card?.querySelector('small');
   const complete=String(field.value||'').trim().length>0;
   card?.classList.toggle('complete',complete);
@@ -6281,13 +6296,21 @@ document.addEventListener('input', e=>{
   if(label)label.textContent=complete?(field.dataset.wlTruckUnitEntry!==undefined?'UNIT NUMBER ENTERED':'SIM NUMBER ENTERED'):(field.dataset.wlTruckUnitEntry!==undefined?'ENTER THE UNIT NUMBER ON YOUR TRUCK':'ENTER THE EXACT SIM CARD NUMBER');
 });
 document.addEventListener('click', async e => {
-  if(e.target.closest('[data-wl-save-truck-identifiers]')){
+  const truckSaveButton=e.target.closest('[data-wl-save-truck-inventory]');
+  if(truckSaveButton){
     document.body.classList.add('busy');
+    const original=truckSaveButton.textContent;
     try{
-      await saveMyServiceTruckIdentifiers();
-      await showServiceTruckInventoryCheck();
-    }catch(error){alert(error?.message||'Could not save the truck equipment and SIM numbers.');}
-    finally{document.body.classList.remove('busy');}
+      truckSaveButton.textContent='SAVING…';
+      await saveMyServiceTruckInventoryDraft();
+      truckSaveButton.textContent='SAVED ✓';
+      const note=document.querySelector('[data-wl-truck-save-status]');
+      if(note)note.textContent='Saved: equipment numbers, SIM numbers, and battery counts.';
+      setTimeout(()=>{if(document.body.contains(truckSaveButton))truckSaveButton.textContent=original;},1800);
+    }catch(error){
+      truckSaveButton.textContent=original;
+      alert(error?.message||'Could not save your truck inventory.');
+    }finally{document.body.classList.remove('busy');}
     return;
   }
   const dashboardRetry=e.target.closest('[data-wl-dashboard-retry]');
