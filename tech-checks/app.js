@@ -2644,7 +2644,35 @@ async function ownerSaveAllTruckInventory(id){
  [1,2,3].forEach(slot=>sims[String(slot)]=document.getElementById('ownerTruckSim_'+id+'_'+slot)?.value.trim()||'');
  [['Recon Battery',0],['AGM 12V 110Ah',1],['LiTime 12V 100Ah',2]].forEach(([type,i])=>stock[type]=Math.max(0,Math.floor(Number(document.getElementById('ownerTruckStock_'+id+'_'+i)?.value||0))));
  if(!confirm('Save ALL truck inventory for this technician? Service will be required to verify the truck again.'))return;
- setBusy(true);try{const {error}=await db.rpc('owner_save_service_truck_inventory_batch_v1',{p_service_tech_id:id,p_payload:{units,sims,stock}});if(error)throw error;await refreshData();alert('Truck inventory saved. Service must re-verify before leaving the shop.');}catch(error){alert('Could not save truck inventory: '+(error?.message||'unknown error'));}finally{setBusy(false);}
+ const saveButton=document.querySelector('[data-owner-save-all="'+CSS.escape(String(id))+'"]');
+ if(saveButton){saveButton.disabled=true;saveButton.textContent='SAVING…';}
+ setBusy(true);
+ try{
+   const {error}=await db.rpc('owner_save_service_truck_inventory_batch_v1',{p_service_tech_id:id,p_payload:{units,sims,stock}});
+   if(error)throw error;
+   // Keep the Owner on the exact technician being edited. A full refresh used to
+   // rebuild Team and visually jump to the first/test technician.
+   const fresh=await ownerFetchTruckInventory(id);
+   const host=document.getElementById('ownerTruckEditor_'+id);
+   if(host&&fresh){
+     host.innerHTML=ownerTruckEditorHtml(fresh,id);
+     host.dataset.open='true';
+     host.style.display='block';
+     host.scrollIntoView({behavior:'smooth',block:'nearest'});
+   }
+   // Update the backing board in place so later renders use the saved values.
+   const rows=state.ownerTechCommandBoard?.service_techs;
+   if(Array.isArray(rows)&&fresh){
+     const index=rows.findIndex(t=>String(t.service_tech_id||t.user_id||t.tech_id)===String(id));
+     if(index>=0)rows[index]={...rows[index],...fresh};
+   }
+   alert('Truck inventory saved. Service must re-verify before leaving the shop.');
+ }catch(error){alert('Could not save truck inventory: '+(error?.message||'unknown error'));}
+ finally{
+   setBusy(false);
+   const current=document.querySelector('[data-owner-save-all="'+CSS.escape(String(id))+'"]');
+   if(current){current.disabled=false;current.textContent='SAVE ALL TRUCK INVENTORY';}
+ }
 }
 document.addEventListener('click',function(e){const edit=e.target.closest?.('[data-owner-truck-edit]');if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}const save=e.target.closest?.('[data-owner-save-all]');if(save){e.preventDefault();e.stopPropagation();return ownerSaveAllTruckInventory(save.dataset.ownerSaveAll);}},true);
 
