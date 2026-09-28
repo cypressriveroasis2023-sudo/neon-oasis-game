@@ -111,7 +111,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=account-controls-20260928b')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=owner-reset-visible-20260928c')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -3008,7 +3008,7 @@ function ownerOpenTechControl(userId){
    +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
   overlay.classList.add('open');
 }
-async function ownerOpenAccount(userId){
+async function ownerOpenAccount(userId, focusPassword=false){
   if(state.profile?.role!=='owner')return;
   ownerCloseSimpleControl();
   await ownerAppNavigate('accounts');
@@ -3016,6 +3016,7 @@ async function ownerOpenAccount(userId){
   if(!card)return alert('This account is not in the active or disabled list. Check Former / Deleted Accounts.');
   card.open=true;
   card.scrollIntoView({behavior:'smooth',block:'start'});
+  if(focusPassword){const field=$('reset_'+userId);field?.focus({preventScroll:true});field?.scrollIntoView({behavior:'smooth',block:'center'});}
 }
 async function ownerTechAssignJob(){ownerCloseSimpleControl();await ownerAppNavigate('assign');}
 async function ownerTechHistory(userId){
@@ -3151,6 +3152,7 @@ function ownerAppMore(){
     +'<button type="button" data-owner-route="activity"><b>ACTIVITY</b><span>See the chronological Tech Check company log.</span></button>'
     +'<button class="ownerMoreTestButton" type="button" data-owner-route="testcenter"><b>OWNER TEST CENTER</b><span>Create disposable TEST tickets and run the IT → Service workflow yourself.</span></button>'
     +'<button type="button" data-owner-route="accounts"><b>TECHNICIAN ACCOUNTS</b><span>Create, disable, restore and manage logins.</span></button>'
+    +'<button type="button" onclick="ownerOpenDataReset()"><b>RESET TECH CHECK DATA</b><span>Open the Owner data-reset controls.</span></button>'
     +'<a href="./onsite-vision.html"><b>ONSITE VISION</b><span>Open the AI command center.</span></a>'
     +'<a href="./camera-health.html"><b>CAMERA HEALTH</b><span>Open live camera monitoring and troubleshooting.</span></a>'
     +'<button type="button" onclick="refreshData()"><b>REFRESH APP</b><span>Reload live Tech Check data now.</span></button>'
@@ -3158,7 +3160,7 @@ function ownerAppMore(){
     +'<section class="ownerMoreDanger"><button type="button" onclick="logout()">SIGN OUT</button></section>';
 }
 function ownerAppAccounts(){
-  renderPasswordResetRequests();renderUsers();
+  ensureStartFreshCard();renderPasswordResetRequests();renderUsers();
   return ownerAppHeader('ACCESS','Technician Accounts','Create logins, change usernames, disable/reactivate access, and review disabled or former accounts.')
     +'<section class="ownerAppAccountCreate"><h2>Create Technician</h2><div class="grid4"><div><label>Full Name</label><input id="ownerAppNewTechName"></div><div><label>Username</label><input id="ownerAppNewTechUsername" autocapitalize="none" spellcheck="false"></div><div><label>Role</label><select id="ownerAppNewTechRole"><option value="service">Service Tech</option><option value="it">IT Technician</option></select></div><div><label>Temporary Password</label><input id="ownerAppNewTechPassword" type="password"></div></div><button class="btn" onclick="ownerAppCreateTech()">Create Technician Login</button></section>';
 }
@@ -3507,7 +3509,7 @@ function teamMemberCard(p) {
   const email = p.notification_email || '';
   const emailStatus = email ? '<span class="pill green">EMAIL SET</span>' : '<span class="pill amber">NO EMAIL</span>';
   const ownerCopy = p.role === 'owner' ? '<label class="emailPref"><input id="emailOwner_' + p.user_id + '" type="checkbox" ' + (p.email_owner_copies ? 'checked' : '') + '><span>Owner copy emails</span></label>' : '';
-  return '<details data-account-user="' + esc(p.user_id) + '" class="teamMemberCard role-' + teamRoleClass(p.role) + ' ' + (p.active?'':'disabledAccount') + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody">'
+  return '<details data-account-user="' + esc(p.user_id) + '" class="teamMemberCard role-' + teamRoleClass(p.role) + ' ' + (p.active?'':'disabledAccount') + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div><div class="ownerAccountActions"><button type="button" onclick="event.preventDefault();event.stopPropagation();ownerOpenAccount(\'' + p.user_id + '\')">ACCOUNT DETAILS</button><button type="button" onclick="event.preventDefault();event.stopPropagation();ownerOpenAccount(\'' + p.user_id + '\',true)">RESET PASSWORD</button></div></summary><div class="teamMemberBody">'
     +(!p.active?'<div class="warn accountDisabledNotice"><b>DISABLED ACCOUNT</b><div class="small">This person cannot sign in until Access is changed back to Active and saved.</div></div>':'')
     +'<button class="mini full top8" onclick="ownerOpenTechControl(\'' + p.user_id + '\')">VIEW WORK, EQUIPMENT &amp; HISTORY</button>'
     +'<div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div>'
@@ -3647,16 +3649,24 @@ async function resetUserPassword(id) {
 }
 
 function ensureStartFreshCard() {
-  if ($('ownerResetCard')) return;
+  const host=$('ownerPersistentAccounts');
+  if(!host)return;
+  const existing=$('ownerResetCard');
+  if(existing){if(existing.parentElement!==host)host.appendChild(existing);return;}
   const card = document.createElement('details');
   card.id = 'ownerResetCard';
   card.className = 'card ownerDashSection ownerMaintenanceCard';
   card.innerHTML =
     '<summary class="ownerDashSummary"><div><b>Reset Tech Check Data</b><span>Start production with a clean job and operational history</span></div><span class="ownerDashBadge neutral">⚙</span></summary>' +
     '<div class="ownerDashBody"><div class="warn"><b>OWNER ONLY · DESTRUCTIVE</b><div class="small"><b>Deletes:</b> operational/test history handled by the protected Tech Check reset routine, including prep/check history, checkout verification history, Owner reports, morning checks, and operational unit-status tracking.</div><div class="small top8"><b>Keeps:</b> Tech Check programming, technician and Owner accounts, usernames, roles, passwords, and account configuration.</div><div class="small top8">Use this only when you are ready to discard testing/history and begin clean production use.</div></div><button class="btn danger" onclick="startFresh()">RESET TECH CHECK DATA</button></div>';
-  const accountsCard = $('ownerAccountsCard');
-  if (accountsCard) accountsCard.after(card);
-  else $('view-owner')?.appendChild(card);
+  host.appendChild(card);
+}
+async function ownerOpenDataReset(){
+  if(state.profile?.role!=='owner')return;
+  await ownerAppNavigate('accounts');
+  ensureStartFreshCard();
+  const card=$('ownerResetCard');
+  if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}
 }
 async function startFresh() {
   if (state.profile?.role !== 'owner') return;
@@ -3785,6 +3795,7 @@ Object.assign(window, {
   setInventoryAssetStatus,
   saveOwnerPrepParts,
   startFresh,
+  ownerOpenDataReset,
 });
 
 renderDraftNeeds();

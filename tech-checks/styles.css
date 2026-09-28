@@ -10127,3 +10127,10 @@ html[data-theme="light"] #view-svc .wl-service-action-pill small,body.light #vie
   #view-svc .wl-service-action-pill.complete{border-color:#287958!important}
   #view-svc .wl-service-action-pill.complete small{color:#236445!important}
 }
+
+/* Keep Owner account actions visible when account details are collapsed. */
+#view-owner #ownerPersistentAccounts .teamMemberCard>summary{flex-wrap:wrap!important}
+#view-owner .ownerAccountActions{display:flex;flex-wrap:wrap;gap:10px;flex-basis:100%;width:100%;margin-top:12px}
+#view-owner .ownerAccountActions button{flex:1;min-width:140px;min-height:48px;border:1px solid #6e8492!important;border-radius:12px;background:#16354a!important;color:#fff!important;padding:12px;font-weight:800;font-size:13px}
+#view-owner #ownerPersistentAccounts #ownerResetCard{display:block!important;visibility:visible!important;pointer-events:auto!important;margin:24px 0}
+#view-owner #ownerPersistentAccounts #ownerResetCard .ownerDashBody{padding:18px}
