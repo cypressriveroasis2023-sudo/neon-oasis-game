@@ -2849,23 +2849,60 @@ function ownerHomeTeamActivityHtml(jobs,today){
 }
 
 function ownerAppToday(){
-  const greeting=ownerTodayGreeting()+', '+ownerTodayName();
+  const greeting=ownerTodayGreeting()+', '+ownerTodayName()+'!';
   const today=localDateKey(new Date());
   const jobs=(state.ownerAssignments||[]).filter(a=>a.status!=='cancelled');
   const todayJobs=jobs.filter(a=>String(a.scheduled_for||'')===today);
+  const active=jobs.filter(a=>!['completed','cancelled'].includes(a.status)).length;
   const working=todayJobs.filter(a=>a.status==='started').length;
   const complete=todayJobs.filter(a=>a.status==='completed').length;
   const returns=(state.ownerReturns||[]).filter(r=>r.status!=='completed');
   const review=(state.ownerReviewQueue||[]).filter(r=>r.ready_for_owner_review===true&&r.review_status!=='closed').length;
   const overdue=jobs.filter(a=>a.status!=='completed'&&a.scheduled_for&&String(a.scheduled_for)<today).length;
   const attention=overdue+returns.filter(r=>r.status==='needs_replacement'||r.status==='pending_mhelp_inventory').length+review;
-  const next=todayJobs.find(a=>a.status!=='completed')||todayJobs[0]||null;
-  const nextTitle=next?(next.site||next.job_description||('MHelpDesk #'+(next.ticket_no||''))):'No more jobs scheduled today';
-  const nextMeta=next?('MHelpDesk #'+esc(next.ticket_no||'—')+' · '+esc(String(next.status||'assigned').replaceAll('_',' ').toUpperCase())):'Your schedule is clear.';
-  return '<section class="ownerHomeWelcome"><div class="ownerHomeBrandRow"><img class="ownerHomeLogo" src="./techcheck-eye-192.png?v=2" alt="Tech Check"><span>CAMERAS ONSITE · OWNER</span><div class="ownerHomeDateTime" aria-label="Current date and time"><span id="ownerTodayDate"></span><b id="ownerTodayClock"></b></div></div><h1 id="ownerTodayGreeting">'+esc(greeting)+'</h1><p>'+todayJobs.length+' job'+(todayJobs.length===1?'':'s')+' today'+(attention?' · '+attention+' need'+(attention===1?'s':'')+' attention':' · No urgent owner actions')+'</p></section>'
-    +'<div id="ownerTodayWeatherHost" class="ownerTodayWeatherHost ownerHomeWeather">'+(state.ownerWeatherData?'':'<div class="ownerWeatherLoading">Loading local weather…</div>')+'</div>'
-    +'<section class="ownerHomeStatus"><button onclick="ownerAppNavigate(\'calendar\')"><b>'+todayJobs.length+'</b><span>JOBS TODAY</span></button><button class="'+(attention?'alert':'')+'" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span></button><button onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span></button></section>'
-    +'<section class="ownerHomeNext"><header><div><span>NEXT UP</span><h2>'+esc(nextTitle)+'</h2></div><button type="button" onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><p>'+nextMeta+'</p>'+(next?'<div class="ownerHomeNextProgress"><span>'+working+' working</span><span>'+complete+' complete today</span></div>':'')+'</section>'+ownerHomeTeamActivityHtml(jobs,today);
+  const handoffs=(state.preps||[]).filter(p=>p.status==='released').length;
+  const team=Array.isArray(state.ownerTechCommandBoard?.service_techs)?state.ownerTechCommandBoard.service_techs:[];
+  const restock=team.filter(t=>!t.truck_ready).length;
+  const recent=jobs.slice().sort((a,b)=>String(b.updated_at||b.created_at||'').localeCompare(String(a.updated_at||a.created_at||''))).slice(0,6);
+  const schedule=todayJobs.filter(a=>a.status!=='completed');
+  const scheduleHtml=schedule.length?schedule.map(ownerAppJobRow).join(''):'<div class="ownerItEmpty"><b>No jobs scheduled for today.</b><span>Company schedule is clear.</span></div>';
+  const recentHtml=recent.length?recent.map(ownerAppJobRow).join(''):'<div class="ownerItEmpty"><b>No recent company activity yet.</b><span>New jobs and technician activity will appear here.</span></div>';
+  const needRow=(label,count,route)=>'<button type="button" onclick="ownerAppNavigate(\''+route+'\')"><b>'+label+'</b><span>'+count+' →</span></button>';
+  return '<div class="ownerItDashboard">'
+   +'<section class="ownerItHeaderGrid">'
+    +'<article class="ownerItGreeting"><span>CAMERAS ONSITE · OWNER OPERATIONS</span><h1>'+esc(greeting)+'</h1><p>Here’s what is happening across the company today.</p></article>'
+    +'<article class="ownerItInfoCard"><span>LOCAL TIME</span><b id="ownerTodayClock"></b><small id="ownerTodayDate"></small></article>'
+    +'<article class="ownerItInfoCard ownerItWeatherCard"><span>LOCAL WEATHER</span><div id="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<b>Loading…</b>')+'</div></article>'
+   +'</section>'
+   +'<section class="ownerItKpis">'
+    +'<button class="cyan" onclick="ownerAppNavigate(\'calendar\')"><b>'+active+'</b><span>ACTIVE JOBS</span><small>Company-wide →</small></button>'
+    +'<button class="red" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span><small>View details →</small></button>'
+    +'<button class="green" onclick="ownerAppNavigate(\'team\')"><b>'+working+'</b><span>IN SERVICE · FIELD</span><small>View team →</small></button>'
+    +'<button class="purple" onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span><small>Review queue →</small></button>'
+    +'<button class="amber" onclick="ownerAppNavigate(\'handoffs\')"><b>'+handoffs+'</b><span>HANDOFFS / PREP</span><small>View handoffs →</small></button>'
+   +'</section>'
+   +'<section class="ownerItMainGrid">'
+    +'<article class="ownerItPanel ownerItSchedule"><header><h2>Today’s Schedule · All Technicians</h2><button onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><div class="ownerItPanelBody">'+scheduleHtml+'</div></article>'
+    +'<article class="ownerItPanel ownerItAttention"><header><h2>Needs Attention</h2></header><div class="ownerItAttentionRows">'
+      +needRow('Overdue Jobs',overdue,'attention')+needRow('Owner Review',review,'review')+needRow('Open Handoffs / Returns',returns.length,'handoffs')+needRow('Truck / Restock Attention',restock,'team')+needRow('Jobs Completed Today',complete,'history')
+     +'</div></article>'
+    +'<article class="ownerItPanel ownerItRecent"><header><h2>Recent Activity · Company</h2><button onclick="ownerAppNavigate(\'activity\')">Activity →</button></header><div class="ownerItPanelBody">'+recentHtml+'</div></article>'
+    +'<article class="ownerItPanel ownerItQuick"><header><h2>Quick Actions</h2></header><div class="ownerItQuickGrid">'
+      +'<button class="primary" onclick="ownerAppNavigate(\'assign\')"><b>+ Assign Job</b><span>Create / assign work</span></button>'
+      +'<button onclick="ownerAppNavigate(\'team\')"><b>Team</b><span>All technicians</span></button>'
+      +'<button onclick="ownerAppNavigate(\'calendar\')"><b>Calendar</b><span>Company schedule</span></button>'
+      +'<button onclick="ownerAppNavigate(\'attention\')"><b>Needs Attention</b><span>Operational follow-up</span></button>'
+      +'<button onclick="ownerAppNavigate(\'review\')"><b>Owner Review</b><span>Approve completed work</span></button>'
+      +'<button onclick="ownerOpenTruckInventoryManager()"><b>Truck Inventory</b><span>Service truck stock</span></button>'
+      +'<button onclick="ownerAppNavigate(\'units\')"><b>Units</b><span>Equipment registry</span></button>'
+      +'<button onclick="ownerAppNavigate(\'handoffs\')"><b>Handoffs</b><span>IT / Service flow</span></button>'
+      +'<button onclick="ownerAppNavigate(\'accounts\')"><b>Tech Accounts</b><span>Access & passwords</span></button>'
+      +'<button onclick="location.href=\'./camera-health.html?v=owner-dashboard\'"><b>Camera Health</b><span>Monitor cameras</span></button>'
+      +'<button onclick="location.href=\'./onsite-vision.html\'"><b>Vision</b><span>AI command center</span></button>'
+      +'<button onclick="ownerAppNavigate(\'more\')"><b>More</b><span>All Owner controls</span></button>'
+     +'</div></article>'
+   +'</section>'
+  +'</div>';
 }
 function ownerAppAttention(){
   return ownerAppHeader('OWNER ACTION','Needs Attention','Only real items that require your action right now.')+'<div id="ownerAttention" class="ownerAppAttentionHost"><div class="small">Loading items that need attention…</div></div>';
