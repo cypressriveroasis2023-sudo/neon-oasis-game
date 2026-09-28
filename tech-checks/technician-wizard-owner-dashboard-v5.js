@@ -1008,6 +1008,17 @@ function injectStyles() {
     .wl-truck-unit-check .wl-truck-entry-input:focus{outline:none!important;border-color:#7fa0ae!important;box-shadow:0 0 0 3px rgba(127,160,174,.14)!important}
     .wl-truck-unit-check.complete .wl-truck-entry-input{border-color:#3ebc7c!important;background:#071711!important}
     .wl-truck-unit-check .wl-truck-entry-input::placeholder{color:#667983!important;font-weight:700!important}
+    .wl-no-tag-choice{background:#173247!important;color:#fff!important;border:2px solid #58788c!important;border-left:2px solid #58788c!important;box-shadow:none!important;text-align:left!important}
+    .wl-no-tag-choice b{display:block;color:#fff!important;font-size:18px!important;line-height:1.15}
+    .wl-no-tag-choice span{display:block;margin-top:6px;color:#d5e2e9!important;font-size:13px!important;line-height:1.35!important;font-weight:750!important}
+    .wl-no-tag-choice:active{background:#20445f!important}
+    .wl-return-simple-hint{margin:8px 0 12px;color:#aebdc5;font-size:12px;font-weight:750}
+    .wl-return-manual-grid{display:grid;gap:10px;margin-top:10px}
+    .wl-return-manual-grid label{font-size:11px;font-weight:1000;letter-spacing:.08em;color:#aebdc5}
+    .wl-return-optional{margin-top:12px;border:1px solid #314953;border-radius:12px;background:#09151b;overflow:hidden}
+    .wl-return-optional>summary{padding:14px 16px;cursor:pointer;color:#dce7ec;font-weight:900;list-style:none}
+    .wl-return-optional>summary::-webkit-details-marker{display:none}
+    .wl-return-optional>div{padding:0 14px 14px}
     .wl-truck-stock-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
     .wl-truck-stock-grid label{padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;color:#fff}.wl-truck-stock-grid label>span{display:block;min-height:42px;font-size:12px;font-weight:850}.wl-truck-stock-grid input{text-align:center!important}
     .wl-truck-restock-list{margin-top:16px}.wl-truck-restock-row{margin:8px 0;padding:12px;border:1px solid #713238;border-radius:12px;background:#241014;color:#fff}.wl-truck-restock-row.ready{border-color:#3f6a55;background:#0d2117}.wl-truck-restock-row>div{display:grid;gap:3px}.wl-truck-restock-row span{font-size:12px;color:#b9c7ce}.wl-truck-restock-row em{display:block;margin-top:6px;font-style:normal;font-size:10px;font-weight:1000;letter-spacing:.08em;color:#ff6369}
@@ -1664,8 +1675,8 @@ function helpStepGuide(role, step){
       steps:[
         'Tap Return Unit to IT Intake / Shop.',
         'Enter the current MHelpDesk reference.',
-        'For normal equipment, choose or enter the exact unit tag. For a tagless 110V Stand, tap 110V STAND — NO TAG.',
-        'Take / upload the required return photo. Tagged equipment keeps the normal tag verification rules.',
+        'Choose a remembered unit, enter the unit tag and type, or tap 110V STAND — NO TAG.',
+        'Take the one required return photo, review, and send it.',
         'A 110V Stand goes directly from Service back to Shop Inventory after pickup; IT Intake is not required.',
         'All other returned field equipment continues through normal IT Intake.'
       ],
@@ -6344,7 +6355,7 @@ document.addEventListener('click', async e => {
   const nextSvcReturn = e.target.closest('[data-wl-next-svc-return]'); if (nextSvcReturn) return showServiceReturnPreset(nextSvcReturn.dataset.ticket,nextSvcReturn.dataset.unit,nextSvcReturn.dataset.type);
   if (e.target.closest('[data-wl-service-return]')) return showServiceReturn();
   if (e.target.closest('[data-wl-return-next]')) return serviceReturnNext();
-  if (e.target.closest('[data-wl-return-no-tag-110v]')) { serviceReturn.unit=''; serviceReturn.type='110V Stand'; serviceReturn.noTag=true; serviceReturn.photo=null; serviceReturn.tagScan=null; serviceReturn.step=3; saveServiceReturnDraft(); return renderServiceReturn(); }
+  if (e.target.closest('[data-wl-return-no-tag-110v]')) { serviceReturn.unit=''; serviceReturn.type='110V Stand'; serviceReturn.noTag=true; serviceReturn.photo=null; serviceReturn.tagScan=null; serviceReturn.step=2; saveServiceReturnDraft(); return renderServiceReturn(); }
   const returnUnit = e.target.closest('[data-wl-return-unit]');
   if (returnUnit) {
     const nextUnit=returnUnit.dataset.wlReturnUnit || '';
@@ -6353,7 +6364,7 @@ document.addEventListener('click', async e => {
     serviceReturn.unit=nextUnit;
     serviceReturn.type=nextType;
     serviceReturn.noTag=false;
-    if (serviceReturn.step === 1) serviceReturn.step = 2;
+    if (serviceReturn.step === 1 && serviceReturn.type) serviceReturn.step = 2;
     saveServiceReturnDraft();
     return renderServiceReturn();
   }
@@ -6992,11 +7003,11 @@ document.addEventListener('click', async e => {
 });
 async function showServiceReturn() {
   const saved=await loadDeviceDraft('service-return');
-  if (saved?.ticket) { serviceReturn={ step:Math.min(Number(saved.step||0),3), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[], offlineEscalationId:saved.offlineEscalationId||null, submissionId:saved.submissionId||null, pendingUploadPaths:Array.isArray(saved.pendingUploadPaths)?saved.pendingUploadPaths:[] }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
+  if (saved?.ticket) { serviceReturn={ step:(Number(saved.step||0)>=2?2:Math.max(0,Number(saved.step||0))), ticket:String(saved.ticket||''), unit:String(saved.unit||''), type:String(saved.type||''), notes:String(saved.notes||''), noTag:Boolean(saved.noTag), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[], offlineEscalationId:saved.offlineEscalationId||null, submissionId:saved.submissionId||null, pendingUploadPaths:Array.isArray(saved.pendingUploadPaths)?saved.pendingUploadPaths:[] }; if (serviceReturn.ticket && serviceReturn.step>=1) serviceReturn.knownUnits=await rememberedUnitsForTicket(serviceReturn.ticket); serviceReturnRecovered=true; }
   else { serviceReturn={ step:0, ticket:'', unit:'', type:'', notes:'', noTag:false, photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; serviceReturnRecovered=false; }
   return renderServiceReturn();
 }
-async function showServiceReturnPreset(ticket, unit, type) { const saved=await loadDeviceDraft('service-return'); if(saved?.ticket) return showServiceReturn(); serviceReturn={ step:3, ticket:String(ticket||''), unit:String(unit||''), type:String(type||''), notes:'', noTag:String(type||'')==='110V Stand'&&!String(unit||'').trim(), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; serviceReturnRecovered=false; await saveServiceReturnDraft(); return renderServiceReturn(); }
+async function showServiceReturnPreset(ticket, unit, type) { const saved=await loadDeviceDraft('service-return'); if(saved?.ticket) return showServiceReturn(); serviceReturn={ step:2, ticket:String(ticket||''), unit:String(unit||''), type:String(type||''), notes:'', noTag:String(type||'')==='110V Stand'&&!String(unit||'').trim(), photo:null, tagScan:null, conditionPhotos:[], damagePhotos:[], knownUnits:[] }; serviceReturnRecovered=false; await saveServiceReturnDraft(); return renderServiceReturn(); }
 async function prepareReturnPreviewPhotos(files) {
   const prepared = [];
   for (const file of files) prepared.push(await optimizeEvidencePhoto(file));
@@ -7043,35 +7054,135 @@ function serviceReturnLabel(){ return isTagless110VReturn() ? '110V Stand · No 
 function renderServiceReturn() {
   const card = serviceReturnCard();
   const step = serviceReturn.step;
-  if (step === 0) card.innerHTML = `<button class='wl-back' data-wl-svc='returns'>VIEW MY RETURNS / IT STATUS</button>${progress('Return Unit · Step 1 of 5', 'Enter the MHelpDesk ticket number', 1, 5)}<div class='wl-question'><div class='qtext'>What MHelpDesk ticket is this unit coming back from?</div><input id='wlReturnTicket' inputmode='numeric' value='${esc(serviceReturn.ticket)}' placeholder='Ticket #'></div><div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`;
-  else if (step === 1) { const remembered = serviceReturn.knownUnits || []; const choices = remembered.map(item => `<button class='wl-unit-choice ${norm(serviceReturn.unit) === norm(item.unit_tag) ? 'on' : ''}' data-wl-return-unit='${esc(item.unit_tag)}' data-wl-return-type='${esc(item.equipment_type || '')}'><b>${esc(item.unit_tag)}</b><span>${esc(item.equipment_type || 'Known unit')} · remembered from MHelpDesk #${esc(serviceReturn.ticket)}</span></button>`).join(''); card.innerHTML = `${progress('Return Unit · Step 2 of 5', 'Choose the equipment coming back', 2, 5)}<div class='wl-question'><div class='qtext'>Which unit is coming back from MHelpDesk #${esc(serviceReturn.ticket)}?</div>${choices ? `<div class='wl-note'>These tagged units are already remembered from this ticket. Tap the unit coming back.</div><div class='wl-unit-choices'>${choices}</div><div class='wl-divider'>OR</div>` : ''}<button class='wl-big wl-gray' data-wl-return-no-tag-110v><b>110V STAND — NO TAG</b><span class='small'>Use this when the stand has no physical tag. Service will return it directly to Shop.</span></button><div class='wl-divider'>OR ENTER A UNIT TAG</div><input id='wlReturnUnit' value='${esc(serviceReturn.unit)}' placeholder='Exact unit tag'></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`; }
-  else if (step === 2) { const options = [...CAMERA_UNIT_TYPES, ...STAND_POLE_TYPES].map(type => `<option value='${esc(type)}' ${serviceReturn.type === type ? 'selected' : ''}>${esc(type)}</option>`).join(''); card.innerHTML = `${progress('Return Unit · Step 3 of 5', 'Choose the equipment type', 3, 5)}<div class='wl-question'><div class='qtext'>What type of unit is ${esc(serviceReturn.unit)}?</div><select id='wlReturnType'><option value=''>Choose type…</option>${options}<option value='Other' ${serviceReturn.type === 'Other' ? 'selected' : ''}>Other</option></select></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Photo →</button></div>`; }
-  else if (step === 3) {
+
+  if (step === 0) {
+    card.innerHTML = `<button class='wl-back' data-wl-svc='returns'>VIEW MY RETURNS / IT STATUS</button>
+      ${progress('Return Equipment · Step 1 of 4', 'Enter the MHelpDesk ticket number', 1, 4)}
+      <div class='wl-question'>
+        <div class='qtext'>MHelpDesk ticket number</div>
+        <input id='wlReturnTicket' inputmode='numeric' value='${esc(serviceReturn.ticket)}' placeholder='Ticket #'>
+      </div>
+      <div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`;
+  }
+
+  else if (step === 1) {
+    const remembered = serviceReturn.knownUnits || [];
+    const choices = remembered.map(item => `<button class='wl-unit-choice ${norm(serviceReturn.unit) === norm(item.unit_tag) ? 'on' : ''}' data-wl-return-unit='${esc(item.unit_tag)}' data-wl-return-type='${esc(item.equipment_type || '')}'><b>${esc(item.unit_tag)}</b><span>${esc(item.equipment_type || 'Known unit')}</span></button>`).join('');
+    const options = [...CAMERA_UNIT_TYPES, ...STAND_POLE_TYPES].map(type => `<option value='${esc(type)}' ${serviceReturn.type === type ? 'selected' : ''}>${esc(type)}</option>`).join('');
+
+    card.innerHTML = `${progress('Return Equipment · Step 2 of 4', 'Choose or enter the equipment', 2, 4)}
+      <div class='wl-question'>
+        <div class='qtext'>What equipment is coming back?</div>
+        ${choices ? `<div class='wl-return-simple-hint'>Tap a remembered unit and Tech Check will go straight to the photo.</div><div class='wl-unit-choices'>${choices}</div><div class='wl-divider'>OR</div>` : ''}
+        <button class='wl-big wl-no-tag-choice' data-wl-return-no-tag-110v><b>110V STAND — NO TAG</b><span>Use this only when the stand has no physical unit tag.</span></button>
+        <div class='wl-divider'>OR ENTER IT MANUALLY</div>
+        <div class='wl-return-manual-grid'>
+          <label>UNIT TAG / NUMBER</label>
+          <input id='wlReturnUnit' value='${esc(serviceReturn.unit)}' placeholder='Exact unit tag'>
+          <label>EQUIPMENT TYPE</label>
+          <select id='wlReturnType'><option value=''>Choose type…</option>${options}<option value='Other' ${serviceReturn.type === 'Other' ? 'selected' : ''}>Other</option></select>
+        </div>
+      </div>
+      <div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Photo →</button></div>`;
+  }
+
+  else if (step === 2) {
     const scan=serviceReturn.tagScan;
     const scanHtml=scan?.status==='scanning'
       ? `<div class='warn top8'><b>AI scanning tag…</b><div class='small'>Checking this photo against ${esc(serviceReturn.unit)}.</div></div>`
       : (scan ? tagScanStatusHtml(scan,serviceReturn.unit) : '');
-    card.innerHTML = isTagless110VReturn() ? `${progress('Return 110V Stand · Step 4 of 5', 'Photograph the stand', 4, 5)}<div class='wl-question'><div class='qtext'>Take a clear photo of the 110V Stand before bringing it back to Shop.</div><div class='wl-note'>This stand has no physical tag. The stand photo is the return proof; no tag scan or tag match is required.</div><label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE STAND PHOTO</label><input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'><div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected 110V Stand photo'><div class='ok top8'><b>✓ No tag on this stand</b></div>` : ''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Review →</button></div>` : `${progress('Return Unit · Step 4 of 5', `Photograph unit tag ${serviceReturn.unit}`, 4, 5)}<div class='wl-question'><div class='qtext'>Take a clear photo of the UNIT TAG showing ${esc(serviceReturn.unit)}.</div><div class='wl-stop'><b>Required photo proof</b><div>The tag number <b>${esc(serviceReturn.unit)}</b> must be readable in the picture. For solar equipment, the app also scans the photo and compares it to the expected tag.</div></div><label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE UNIT TAG PHOTO</label><input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'><div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected unit tag photo'>${scanHtml}<div class='small top8'>Expected tag: <b>${esc(serviceReturn.unit)}</b></div>` : ''}</div></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next ${scan?.status==='scanning'?'disabled':''}>Next: Review →</button></div>`;
+
+    card.innerHTML = isTagless110VReturn()
+      ? `${progress('Return Equipment · Step 3 of 4', 'Take one return photo', 3, 4)}
+          <div class='wl-question'>
+            <div class='qtext'>Take a clear photo of the 110V Stand.</div>
+            <label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE PHOTO</label>
+            <input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'>
+            <div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected 110V Stand photo'><div class='ok top8'><b>✓ Photo ready</b></div>` : ''}</div>
+          </div>
+          <div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Review →</button></div>`
+      : `${progress('Return Equipment · Step 3 of 4', 'Take one unit-tag photo', 3, 4)}
+          <div class='wl-question'>
+            <div class='qtext'>Take a clear photo showing unit tag ${esc(serviceReturn.unit)}.</div>
+            <label class='wl-photo-button' for='wlReturnPhoto'>📷 TAKE / CHOOSE UNIT TAG PHOTO</label>
+            <input id='wlReturnPhoto' class='wl-photo-input' type='file' accept='image/*' capture='environment'>
+            <div id='wlReturnPhotoPreview' class='wl-return-preview ${serviceReturn.photo ? '' : 'hidden'}'>${serviceReturn.photo ? `<img src='${URL.createObjectURL(serviceReturn.photo)}' alt='Selected unit tag photo'>${scanHtml}<div class='small top8'>Expected tag: <b>${esc(serviceReturn.unit)}</b></div>` : ''}</div>
+          </div>
+          <div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next ${scan?.status==='scanning'?'disabled':''}>Review →</button></div>`;
   }
-  else { const conditionPreview = (serviceReturn.conditionPhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Site condition photo'>`).join(''); const damagePreview = (serviceReturn.damagePhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Damage photo'>`).join(''); const direct110=is110VStandReturn(); card.innerHTML = `${progress(direct110?'Return 110V Stand · Step 5 of 5':'Return Unit · Step 5 of 5', direct110?'Return this stand directly to Shop':'Document how the unit looked at the site', 5, 5)}<div class='wl-review'><b>${esc(serviceReturnLabel())} · ${esc(serviceReturn.type)}</b><div><b>MHelpDesk #${esc(serviceReturn.ticket)}</b></div><div>📷 ${direct110?'Stand photo ready':'Unit tag photo ready'}</div>${!direct110 && serviceReturn.tagScan && serviceReturn.tagScan.status!=='scanning' ? tagScanStatusHtml(serviceReturn.tagScan,serviceReturn.unit) : ''}<div class='small top8'>${direct110?'Put the 110V Stand on the trailer, bring it back to the shop, and add it directly back to Shop Inventory. IT Intake is not required.':'Add photos showing the camera/unit as it looked at the site. If there is damage, add close-up damage photos and describe it below. IT Intake will see all of this before checking the unit.'}</div></div><div class='wl-question top10'><div class='qtext'>Site condition photos</div><div class='wl-note'>Take pictures showing the overall camera/unit condition before it leaves the site. Add as many as needed to verify it still looks good.</div><label class='wl-photo-button' for='wlReturnConditionPhotos'>📷 ADD SITE CONDITION PHOTOS</label><input id='wlReturnConditionPhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${conditionPreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${conditionPreview}</div><div class='ok'>✓ ${(serviceReturn.conditionPhotos || []).length} site condition photo${(serviceReturn.conditionPhotos || []).length === 1 ? '' : 's'} selected</div></div></div><div class='wl-question top10'><div class='qtext'>Damage photos, if damage is found</div><div class='wl-note'>Take close-up pictures of scratches, broken parts, dents, missing pieces, camera damage, or anything else IT needs to inspect.</div><label class='wl-photo-button wl-damage-photo' for='wlReturnDamagePhotos'>⚠️ ADD DAMAGE PHOTOS</label><input id='wlReturnDamagePhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple><div class='wl-return-preview ${damagePreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${damagePreview}</div><div class='warn'>⚠ ${(serviceReturn.damagePhotos || []).length} damage photo${(serviceReturn.damagePhotos || []).length === 1 ? '' : 's'} selected — describe the damage below.</div></div></div><label>Return notes / damage noticed</label><textarea id='wlReturnNotes' rows='5' placeholder='Describe damage, missing parts, site condition, reason for return, or other notes'>${esc(serviceReturn.notes)}</textarea><div class='ok top10'><b>✓ SERVICE RETURN READY</b><div>${direct110?'This 110V Stand will be marked Back in Shop directly by Service.':'All photos and these notes will follow unit '+esc(serviceReturn.unit)+' into IT Intake.'}</div></div><button class='wl-big wl-red top10' data-wl-return-submit>${direct110?'RETURN 110V STAND TO SHOP →':'SEND THIS UNIT TO IT INTAKE →'}</button><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><span></span></div>`; }
-  if (serviceReturnRecovered && !card.querySelector('.wl-draft-recovered')) card.insertAdjacentHTML('afterbegin', `<div class='warn wl-draft-recovered'><b>Recovered unsent Service Return from this device.</b><div class='small'>Ticket, unit, equipment type, and notes were restored. Photos are never treated as saved until they upload successfully, so reselect/retake the required photo if Safari reloaded.</div></div>`);
+
+  else {
+    const conditionPreview = (serviceReturn.conditionPhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Site condition photo'>`).join('');
+    const damagePreview = (serviceReturn.damagePhotos || []).map(file => `<img src='${URL.createObjectURL(file)}' alt='Damage photo'>`).join('');
+    const direct110=is110VStandReturn();
+
+    card.innerHTML = `${progress('Return Equipment · Step 4 of 4', 'Review and send', 4, 4)}
+      <div class='wl-review'>
+        <b>${esc(serviceReturnLabel())}</b>
+        <div>MHelpDesk #${esc(serviceReturn.ticket)}</div>
+        <div>${esc(serviceReturn.type)}</div>
+        <div>📷 Return photo ready</div>
+        ${!direct110 && serviceReturn.tagScan && serviceReturn.tagScan.status!=='scanning' ? tagScanStatusHtml(serviceReturn.tagScan,serviceReturn.unit) : ''}
+      </div>
+
+      <label class='top10'>Return notes / damage noticed <span class='small'>(optional unless damaged)</span></label>
+      <textarea id='wlReturnNotes' rows='4' placeholder='Anything IT needs to know?'>${esc(serviceReturn.notes)}</textarea>
+
+      <details class='wl-return-optional'>
+        <summary>Optional: add condition or damage photos</summary>
+        <div>
+          <div class='wl-question top8'>
+            <div class='qtext'>Site condition photos</div>
+            <label class='wl-photo-button' for='wlReturnConditionPhotos'>📷 ADD CONDITION PHOTOS</label>
+            <input id='wlReturnConditionPhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple>
+            <div class='wl-return-preview ${conditionPreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${conditionPreview}</div></div>
+          </div>
+          <div class='wl-question top8'>
+            <div class='qtext'>Damage photos</div>
+            <label class='wl-photo-button wl-damage-photo' for='wlReturnDamagePhotos'>⚠️ ADD DAMAGE PHOTOS</label>
+            <input id='wlReturnDamagePhotos' class='wl-photo-input' type='file' accept='image/*' capture='environment' multiple>
+            <div class='wl-return-preview ${damagePreview ? '' : 'hidden'}'><div class='wl-return-gallery'>${damagePreview}</div></div>
+          </div>
+        </div>
+      </details>
+
+      <button class='wl-big wl-red top10' data-wl-return-submit>${direct110?'RETURN 110V STAND TO SHOP →':'SEND TO IT INTAKE →'}</button>
+      <div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><span></span></div>`;
+  }
+
+  if (serviceReturnRecovered && !card.querySelector('.wl-draft-recovered')) {
+    card.insertAdjacentHTML('afterbegin', `<div class='warn wl-draft-recovered'><b>Recovered unsent Service Return from this device.</b><div class='small'>Ticket, unit, equipment type, and notes were restored. Retake the photo if Safari reloaded.</div></div>`);
+  }
   hideChildren(viewSvc(), [card]);
   resetWizardPosition();
 }
 async function serviceReturnNext() {
-  if (serviceReturn.step === 0) { const value = document.getElementById('wlReturnTicket')?.value.trim() || ''; if (!value) return alert('Enter the MHelpDesk ticket number first.'); serviceReturn.ticket = value; serviceReturn.knownUnits = await rememberedUnitsForTicket(value); }
-  else if (serviceReturn.step === 1) { const value = document.getElementById('wlReturnUnit')?.value.trim() || serviceReturn.unit || ''; if (!value) return alert('Choose a remembered unit, tap 110V STAND — NO TAG, or enter the exact unit tag / unit number first.'); serviceReturn.noTag=false; serviceReturn.unit = value; const known = (serviceReturn.knownUnits || []).find(item => norm(item.unit_tag) === norm(value)); if (known?.equipment_type) serviceReturn.type = known.equipment_type; }
-  else if (serviceReturn.step === 2) { const value = document.getElementById('wlReturnType')?.value || ''; if (!value) return alert('Choose the equipment type first.'); serviceReturn.type = value; serviceReturn.noTag=false; }
-  else if (serviceReturn.step === 3) {
+  if (serviceReturn.step === 0) {
+    const value = document.getElementById('wlReturnTicket')?.value.trim() || '';
+    if (!value) return alert('Enter the MHelpDesk ticket number first.');
+    serviceReturn.ticket = value;
+    serviceReturn.knownUnits = await rememberedUnitsForTicket(value);
+  }
+  else if (serviceReturn.step === 1) {
+    const value = document.getElementById('wlReturnUnit')?.value.trim() || serviceReturn.unit || '';
+    if (!value) return alert('Choose a remembered unit, tap 110V STAND — NO TAG, or enter the exact unit tag.');
+    serviceReturn.noTag=false;
+    serviceReturn.unit=value;
+    const known=(serviceReturn.knownUnits||[]).find(item=>norm(item.unit_tag)===norm(value));
+    const type=known?.equipment_type || document.getElementById('wlReturnType')?.value || serviceReturn.type || '';
+    if(!type) return alert('Choose the equipment type.');
+    serviceReturn.type=type;
+  }
+  else if (serviceReturn.step === 2) {
     const file=document.getElementById('wlReturnPhoto')?.files?.[0];
-    if (!file && !serviceReturn.photo) return alert(isTagless110VReturn() ? 'Take or choose a clear photo of the 110V Stand first.' : `Take or choose a clear photo of the unit tag showing ${serviceReturn.unit} first.`);
-    if (isTagless110VReturn()) { serviceReturn.tagScan=null; }
-    else if (serviceReturn.tagScan?.status==='scanning') return alert('Wait for the AI tag scan to finish.');
+    if (!file && !serviceReturn.photo) return alert(isTagless110VReturn() ? 'Take or choose a clear photo of the 110V Stand first.' : `Take or choose a clear photo of unit tag ${serviceReturn.unit} first.`);
+    if (isTagless110VReturn()) serviceReturn.tagScan=null;
+    else if (serviceReturn.tagScan?.status==='scanning') return alert('Wait for the tag scan to finish.');
     if (!isTagless110VReturn() && serviceReturn.tagScan?.status==='mismatch') return alert(`The photo scan read ${serviceReturn.tagScan.detected||'a different tag'}, not ${serviceReturn.unit}. Retake the tag photo before continuing.`);
-    if (!isTagless110VReturn() && serviceReturn.tagScan?.status==='unreadable' && !confirm(`AI could not read unit tag ${serviceReturn.unit}. Can you clearly read and visually verify ${serviceReturn.unit} in this photo?`)) return;
+    if (!isTagless110VReturn() && serviceReturn.tagScan?.status==='unreadable' && !confirm(`Can you clearly read and visually verify ${serviceReturn.unit} in this photo?`)) return;
     if (!isTagless110VReturn() && !serviceReturn.tagScan && !confirm(`Can you clearly read unit tag ${serviceReturn.unit} in this photo?`)) return;
   }
-  serviceReturn.step = Math.min(4, serviceReturn.step + 1);
+  serviceReturn.step = Math.min(3, serviceReturn.step + 1);
   await saveServiceReturnDraft();
   return renderServiceReturn();
 }
