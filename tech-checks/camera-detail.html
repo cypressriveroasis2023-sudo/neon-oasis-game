@@ -56,6 +56,15 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   .event{grid-template-columns:minmax(0,1fr);gap:3px;padding:10px 0}.eventstatus{font-size:13px}
 }
 @media(max-width:380px){.back,.action{font-size:14px}.title{font-size:36px}.value{font-size:22px}}
+
+/* 2026-09-28 field-readable camera detail hierarchy */
+.health-overview{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:transparent;border:0;padding:0;overflow:visible}
+.health-overview .card{border-width:2px;min-height:112px}.health-overview .card.good{border-color:#246b43;background:#0b1812}.health-overview .card.bad{border-color:#7d2931;background:#1a0d11}.health-overview .card.warn{border-color:#7b6124;background:#181407}.health-overview .card.info{border-color:#28516c;background:#091722}
+.section-card{border-color:#294052!important;background:linear-gradient(180deg,#0e1923,#0a121a)!important}.section-card>.label{font-size:14px;color:#d7e5ef;letter-spacing:.09em;padding-bottom:10px;border-bottom:1px solid #263a4c;margin-bottom:12px}
+.kv{grid-template-columns:200px minmax(0,1fr);gap:0!important;border:1px solid #213442;border-radius:12px;overflow:hidden}.kv>div{padding:10px 12px;border-bottom:1px solid #1e303d}.kv>div:nth-last-child(-n+2){border-bottom:0}.kv>div:nth-child(odd){background:#0a141d;color:#91a6b7}.kv>div:nth-child(even){background:#0d1923;color:#f1f6fa}
+.ports{gap:7px}.port{border-radius:8px!important;padding:8px 10px!important}.port:not(.off):not(.pending){border-color:#246b43!important;background:#0b1c14!important;color:#8ef0b2}.port.off{border-color:#5a3034!important;background:#170e11!important;color:#df9298!important}.port.pending{border-color:#66531f!important;background:#171407!important;color:#e9cf78!important}
+.routeritem{border-width:2px}.routerstatus.online{color:var(--green)}.routerstatus.offline{color:var(--red)}.routerstatus.stale,.routerstatus.unknown{color:var(--yellow)}
+@media(max-width:760px){.health-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.kv{grid-template-columns:1fr}.kv>div:nth-child(odd){border-bottom:0;padding-bottom:3px}.kv>div:nth-child(even){padding-top:3px}.kv>div:nth-last-child(-n+2){border-bottom:1px solid #1e303d}}
 </style>
 </head>
 <body>
@@ -94,28 +103,30 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
     </div>
 
     <section class="grid">
-      <div class="card">
-        <div class="label">Last successful ping</div>
+      <div class="health-overview">
+      <div class="card info">
+        <div class="label">Last successful live check</div>
         <div class="value" id="lastPing">—</div>
         <div class="small" id="lastPingAgo"></div>
       </div>
-      <div class="card">
+      <div class="card info">
         <div class="label">Last verification attempt</div>
         <div class="value" id="lastChecked">—</div>
         <div class="small" id="lastCheckedAgo"></div>
       </div>
-      <div class="card">
+      <div class="card good">
         <div class="label">Current source status</div>
         <div class="value" id="sourceStatus">—</div>
         <div class="small" id="sourceDetail"></div>
       </div>
-      <div class="card">
+      <div class="card bad">
         <div class="label">Failure evidence</div>
         <div class="value" id="failureCount">0</div>
         <div class="small" id="failureDetail"></div>
       </div>
+      </div>
 
-      <div class="card full">
+      <div class="card full section-card">
         <div class="label">Camera details</div>
         <div class="kv">
           <div>Camera type</div><div id="cameraGroup">—</div>
@@ -134,14 +145,14 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
         <div class="actions" id="interfaceActions"></div>
       </div>
 
-      <div class="card full">
-        <div class="label">Configured interfaces / ports</div>
+      <div class="card full section-card">
+        <div class="label">Camera services / ports</div>
         <div id="ports" class="ports"></div>
         <div class="small" id="portEmpty" style="margin-top:10px"></div>
       </div>
 
-      <div class="card full">
-        <div class="label">Unit network / router</div>
+      <div class="card full section-card">
+        <div class="label">Router / network</div>
         <div id="routerInfo"></div>
         <div id="routerSetupWrap" class="setupbox hidden">
           <strong>Link / update router</strong>
@@ -154,7 +165,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
         </div>
       </div>
 
-      <div class="card full">
+      <div class="card full section-card">
         <div class="label">Verification history</div>
         <div class="history" id="history"></div>
       </div>
