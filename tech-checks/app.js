@@ -2637,7 +2637,31 @@ function ownerTruckEditorHtml(tech,id){
  +'<div class="ownerTruckSaveBar"><span>Review all unit numbers, SIM numbers, and counts before saving.</span><button type="button" data-owner-save-all="'+esc(id)+'">SAVE ALL TRUCK INVENTORY</button></div>';
 }
 async function ownerFetchTruckInventory(id){const {data,error}=await db.rpc('owner_service_truck_inventory_v1');if(error)throw error;const rows=Array.isArray(data)?data:[];return rows.find(x=>String(x.service_tech_id||x.user_id)===String(id))||null;}
-async function ownerToggleTruckInventoryEditor(id){const host=document.getElementById('ownerTruckEditor_'+id);if(!host)return alert('Truck editor container was not found.');if(host.dataset.open==='true'){host.dataset.open='false';host.style.display='none';host.innerHTML='';return;}host.dataset.open='loading';host.style.display='block';host.innerHTML='<div class="ownerTruckEditorHead"><b>LOADING CURRENT TRUCK INVENTORY…</b></div>';try{const tech=await ownerFetchTruckInventory(id);if(!tech)throw new Error('No truck inventory record exists for this technician.');host.innerHTML=ownerTruckEditorHtml(tech,id);host.dataset.open='true';host.style.display='block';requestAnimationFrame(()=>host.scrollIntoView({behavior:'smooth',block:'center'}));}catch(error){host.dataset.open='false';host.style.display='none';host.innerHTML='';alert('Truck inventory editor could not open: '+(error?.message||'unknown error'));}}
+function ownerCloseTruckInventoryEditor(){
+ const modal=document.getElementById('ownerTruckInventoryModal');
+ if(modal)modal.remove();
+ document.body.classList.remove('ownerTruckInventoryEditing');
+}
+async function ownerToggleTruckInventoryEditor(id){
+ const existing=document.getElementById('ownerTruckInventoryModal');
+ if(existing){const same=existing.dataset.techId===String(id);ownerCloseTruckInventoryEditor();if(same)return;}
+ const modal=document.createElement('div');
+ modal.id='ownerTruckInventoryModal';modal.className='ownerTruckInventoryModal';modal.dataset.techId=String(id);
+ modal.innerHTML='<div class="ownerTruckInventoryBackdrop"></div><section class="ownerTruckInventoryWorkspace" role="dialog" aria-modal="true" aria-label="Edit truck inventory"><div class="ownerTruckEditorHead"><div><b>OWNER · TRUCK INVENTORY</b><span>Loading current truck inventory…</span></div><button class="mini" type="button" data-owner-truck-close>✕ CLOSE</button></div></section>';
+ document.body.appendChild(modal);document.body.classList.add('ownerTruckInventoryEditing');
+ const workspace=modal.querySelector('.ownerTruckInventoryWorkspace');
+ try{
+   const tech=await ownerFetchTruckInventory(id);
+   if(!tech)throw new Error('No truck inventory record exists for this technician.');
+   workspace.innerHTML=ownerTruckEditorHtml(tech,id);
+   const close=workspace.querySelector('[data-owner-truck-edit]');
+   if(close){close.removeAttribute('data-owner-truck-edit');close.setAttribute('data-owner-truck-close','');close.textContent='✕ CLOSE';}
+   requestAnimationFrame(()=>workspace.querySelector('input')?.focus());
+ }catch(error){
+   ownerCloseTruckInventoryEditor();
+   alert('Truck inventory editor could not open: '+(error?.message||'unknown error'));
+ }
+}
 async function ownerSaveAllTruckInventory(id){
  const types=['Sniper','Ranger','Spotter','Solar Spotter'],units={},sims={},stock={};
  types.forEach(type=>units[type]=document.getElementById('ownerTruckUnit_'+id+'_'+type.replaceAll(' ','_'))?.value.trim()||'');
@@ -2653,12 +2677,12 @@ async function ownerSaveAllTruckInventory(id){
    // Keep the Owner on the exact technician being edited. A full refresh used to
    // rebuild Team and visually jump to the first/test technician.
    const fresh=await ownerFetchTruckInventory(id);
-   const host=document.getElementById('ownerTruckEditor_'+id);
+   const modal=document.getElementById('ownerTruckInventoryModal');
+   const host=modal?.querySelector('.ownerTruckInventoryWorkspace');
    if(host&&fresh){
      host.innerHTML=ownerTruckEditorHtml(fresh,id);
-     host.dataset.open='true';
-     host.style.display='block';
-     host.scrollIntoView({behavior:'smooth',block:'nearest'});
+     const close=host.querySelector('[data-owner-truck-edit]');
+     if(close){close.removeAttribute('data-owner-truck-edit');close.setAttribute('data-owner-truck-close','');close.textContent='✕ CLOSE';}
    }
    // Update the backing board in place so later renders use the saved values.
    const rows=state.ownerTechCommandBoard?.service_techs;
@@ -2674,7 +2698,7 @@ async function ownerSaveAllTruckInventory(id){
    if(current){current.disabled=false;current.textContent='SAVE ALL TRUCK INVENTORY';}
  }
 }
-document.addEventListener('click',function(e){const edit=e.target.closest?.('[data-owner-truck-edit]');if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}const save=e.target.closest?.('[data-owner-save-all]');if(save){e.preventDefault();e.stopPropagation();return ownerSaveAllTruckInventory(save.dataset.ownerSaveAll);}},true);
+document.addEventListener('click',function(e){const close=e.target.closest?.('[data-owner-truck-close]');if(close){e.preventDefault();e.stopPropagation();return ownerCloseTruckInventoryEditor();}const edit=e.target.closest?.('[data-owner-truck-edit]');if(edit){e.preventDefault();e.stopPropagation();return ownerToggleTruckInventoryEditor(edit.dataset.ownerTruckEdit);}const save=e.target.closest?.('[data-owner-save-all]');if(save){e.preventDefault();e.stopPropagation();return ownerSaveAllTruckInventory(save.dataset.ownerSaveAll);}},true);
 
 function ownerBoardITSupportHtml(itTechs){
   const techs=Array.isArray(itTechs)?itTechs:[];
