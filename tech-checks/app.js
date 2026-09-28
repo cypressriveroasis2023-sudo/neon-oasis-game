@@ -193,21 +193,39 @@ function setBusy(on) {
   document.body.classList.toggle('busy', on);
 }
 let connectionHideTimer = null;
+let connectionWasOffline = !navigator.onLine;
 function updateConnectionStatus() {
   const online = navigator.onLine;
   document.body.classList.toggle('offlineMode', !online);
   const banner = $('connectionBanner');
   const sync = $('syncStatus');
   clearTimeout(connectionHideTimer);
-  if (sync && !online) sync.textContent = 'Offline — unsent field drafts stay on this device';
+
+  if (!online) {
+    connectionWasOffline = true;
+    if (sync) sync.textContent = 'Offline — unsent field drafts stay on this device';
+    if (!banner) return;
+    banner.classList.remove('hidden','online','offline');
+    banner.classList.add('offline');
+    banner.innerHTML = '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
+    return;
+  }
+
+  // iPhone/Safari can fire a harmless "online" event while the app is opening.
+  // Do not flash a reconnect banner or force a second refresh unless this app
+  // actually observed an offline state first.
+  if (!connectionWasOffline) {
+    if (banner) banner.classList.add('hidden');
+    return;
+  }
+
+  connectionWasOffline = false;
   if (!banner) return;
   banner.classList.remove('hidden','online','offline');
-  banner.classList.add(online ? 'online' : 'offline');
-  banner.innerHTML = online ? '<b>Back online.</b> Refreshing shared Tech Check data…' : '<b>No connection.</b> Keep working on unsent Service Return or inspection forms. The app will not mark anything submitted until the server confirms it.';
-  if (online) {
-    if (state.session) scheduleRefreshData();
-    connectionHideTimer = setTimeout(() => banner.classList.add('hidden'), 3200);
-  }
+  banner.classList.add('online');
+  banner.innerHTML = '<b>Back online.</b> Refreshing shared Tech Check data…';
+  if (state.session) scheduleRefreshData();
+  connectionHideTimer = setTimeout(() => banner.classList.add('hidden'), 2200);
 }
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
