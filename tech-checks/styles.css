@@ -10260,26 +10260,61 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
 
 /* Owner IT-shell structural pass */
 @media(min-width:901px){
- #view-owner .ownerAppShell{grid-template-columns:220px minmax(0,1fr)!important}
- #view-owner .ownerAppSidebar{padding:16px 12px!important}
- #view-owner .ownerAppBrand{min-height:70px!important;display:flex!important;align-items:center!important;gap:10px!important}
- #view-owner .ownerAppBrand img{width:36px!important;height:36px!important}
- #view-owner .ownerAppSidebar nav{display:flex!important;flex-direction:column!important;gap:6px!important}
- #view-owner .ownerAppSidebar nav>*{min-height:43px!important;padding:10px 13px!important;border-radius:9px!important}
- #view-owner .ownerItStyleWorkspace{padding:0 18px 40px!important;background:#06131b!important}
- #view-owner .ownerItTopbar{min-height:78px;margin:0 -18px 14px;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#0b202a;border-bottom:1px solid #2a4652;box-sizing:border-box}
- #view-owner .ownerItTopbar>div:first-child{display:flex;flex-direction:column;gap:3px}
- #view-owner .ownerItTopbar b{font-size:21px;color:#fff}
- #view-owner .ownerItEyebrow{font-size:9px;font-weight:900;letter-spacing:.15em;color:#f02b35}
- #view-owner .ownerItTopActions{display:flex;gap:8px}
- #view-owner .ownerItTopActions button{min-height:38px;padding:8px 14px;border:1px solid #385461;border-radius:8px;background:#102934;color:#fff;font-weight:800}
- #view-owner .ownerWorkspaceTools{padding:0 0 12px!important;justify-content:flex-start!important}
- #view-owner .ownerWorkspaceTools a{min-height:43px!important;padding:9px 15px!important;border-radius:9px!important}
- #view-owner .ownerAppPage{padding:0 0 60px!important}
- #view-owner .ownerAppPageHeader{padding:14px 16px!important;margin:0 0 10px!important;border:1px solid #29434f!important;border-radius:10px!important;background:#0b2029!important}
- #view-owner .ownerAppPageHeader h1{font-size:21px!important}
- #view-owner .ownerAppGroup,#view-owner .ownerTodayPanel,#view-owner .ownerAppAccountCreate{background:#0b2029!important;border:1px solid #29434f!important;border-radius:10px!important;box-shadow:none!important}
- #view-owner .ownerAppJobRow,#view-owner .ownerAppUnitRow,#view-owner .ownerAppHandoffRow,#view-owner .ownerAppTeamRow{background:#0d242e!important;border:1px solid #314b57!important;border-radius:8px!important}
+ #view-owner .ownerAppShell{width:100%;max-width:none}
+ #view-owner .ownerAppWorkspace{width:auto;max-width:none;min-width:0}
+ #view-owner .ownerAppPage{width:100%;max-width:none;box-sizing:border-box;padding:0 clamp(8px,.65vw,16px) 18px}
+ #view-owner #ownerRouteView{width:100%;max-width:none;min-width:0}
+}
+/* Desktop density follows the available desktop viewport instead of one fixed desktop size. */
+@media(min-width:901px) and (max-width:1199px){
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.38fr) minmax(165px,.82fr) minmax(205px,1fr)}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:104px;min-height:104px;padding:12px 14px}
+ #view-owner .ownerItGreeting h1{font-size:23px}
+ #view-owner .ownerItInfoCard>b{font-size:27px}
+ #view-owner .ownerItKpis button{height:56px;min-height:56px;padding:7px 10px}
+ #view-owner .ownerItKpis button b{font-size:19px}
+ #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2fr) minmax(245px,.95fr);min-height:calc(100vh - 328px)}
+ #view-owner .ownerItPanel h2{font-size:14px}
+ #view-owner .ownerItQuickGrid button{min-height:47px}
+}
+@media(min-width:1200px) and (max-width:1599px){
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.45fr) minmax(185px,.88fr) minmax(225px,1.08fr)}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:112px;min-height:112px}
+ #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.05fr) minmax(270px,1fr);min-height:calc(100vh - 340px)}
+}
+@media(min-width:1600px) and (max-width:2199px){
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.48fr) minmax(225px,.86fr) minmax(285px,1.08fr);gap:8px;margin-bottom:8px}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:122px;min-height:122px;padding:16px 18px}
+ #view-owner .ownerItGreeting h1{font-size:28px}
+ #view-owner .ownerItGreeting p,#view-owner .ownerItInfoCard>small{font-size:11px}
+ #view-owner .ownerItInfoCard>b{font-size:33px}
+ #view-owner .ownerItKpis{gap:6px;margin-bottom:8px}
+ #view-owner .ownerItKpis button{height:64px;min-height:64px;padding:9px 13px}
+ #view-owner .ownerItKpis button b{font-size:23px}
+ #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.08fr) minmax(315px,1fr);gap:7px;min-height:calc(100vh - 360px)}
+ #view-owner .ownerItPanel h2{font-size:16px}
+ #view-owner .ownerItQuickGrid button{min-height:52px}
+}
+@media(min-width:2200px){
+ #view-owner .ownerAppPage{padding-left:18px;padding-right:18px}
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.5fr) minmax(270px,.85fr) minmax(340px,1.08fr);gap:10px;margin-bottom:10px}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{height:136px;min-height:136px;padding:18px 22px}
+ #view-owner .ownerItGreeting>span,#view-owner .ownerItInfoCard>span{font-size:10px}
+ #view-owner .ownerItGreeting h1{font-size:32px}
+ #view-owner .ownerItGreeting p,#view-owner .ownerItInfoCard>small{font-size:12px}
+ #view-owner .ownerItInfoCard>b{font-size:38px}
+ #view-owner .ownerItKpis{gap:8px;margin-bottom:10px}
+ #view-owner .ownerItKpis button{height:72px;min-height:72px;padding:10px 15px}
+ #view-owner .ownerItKpis button b{font-size:26px}
+ #view-owner .ownerItKpis button span{font-size:10px}
+ #view-owner .ownerItKpis button small{font-size:9px}
+ #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.1fr) minmax(360px,1fr);gap:8px;min-height:calc(100vh - 395px)}
+ #view-owner .ownerItPanel>header{height:48px;min-height:48px;padding:11px 14px}
+ #view-owner .ownerItPanel h2{font-size:17px}
+ #view-owner .ownerItQuickGrid{gap:6px}
+ #view-owner .ownerItQuickGrid button{min-height:58px;padding:9px}
+ #view-owner .ownerItQuickGrid b{font-size:11px}
+ #view-owner .ownerItQuickGrid span{font-size:9px}
 }
 
 /* Shared role dashboard geometry — IT is the visual authority; Owner uses the same shell. */
