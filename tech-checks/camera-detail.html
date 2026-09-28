@@ -322,8 +322,21 @@ async function verifyNow(){
       if(error)throw new Error(await edgeErrorMessage(error));
       if(pass<3)await new Promise(r=>setTimeout(r,900))
     }
-    b.textContent='Refreshing…';await load();b.textContent=effectiveHealth(device,current)==='online'?'✓ Online':'Checked';
-  }catch(e){console.error(e);b.textContent='Verification failed';$('issueNotice').textContent='Verification failed: '+String(e?.message||e);$('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden')}
+    b.textContent='Refreshing…';await load();
+    const verifiedStatus=effectiveHealth(device,current);
+    b.textContent=verifiedStatus==='online'?'✓ Online':verifiedStatus==='offline'?'✕ Offline':'Checked';
+    if(verifiedStatus==='offline'){
+      $('statusPill').textContent='OFFLINE';
+      $('statusPill').className='pill offline';
+    }
+  }catch(e){
+    console.error(e);b.textContent='Verification failed';
+    // A failed manual Verify is a failed current health check: never leave a stale green ONLINE pill visible.
+    $('statusPill').textContent='OFFLINE';$('statusPill').className='pill offline';
+    $('statusSource').textContent=cameraGroup(device)+' · Verification failed / no response';
+    $('issueNotice').textContent='OFFLINE — verification failed: '+String(e?.message||e);
+    $('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden')
+  }
   finally{setTimeout(()=>{b.disabled=false;b.textContent=cameraGroup(device)==='Reconeyez'?'Refresh Reconeyez':'Verify now'},2200)}
 }
 async function saveUnitRouter(){
