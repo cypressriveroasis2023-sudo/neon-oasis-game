@@ -993,11 +993,19 @@ function injectStyles() {
     .wl-truck-required-banner span,.wl-it-restock-banner span{font-size:12px;color:#b8c7ce;font-weight:750}
     .wl-truck-section-title{margin:18px 0 8px;color:#ff4b52;font-size:12px;font-weight:1000;letter-spacing:.12em}
     .wl-truck-unit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-    .wl-truck-unit-check{min-height:72px;padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;display:flex;gap:10px;align-items:center;color:#fff}
-    .wl-truck-unit-check.missing{border-color:#a93238;background:#261014}
-    .wl-truck-unit-check input{width:24px!important;height:24px!important;min-height:0!important;padding:0!important}
-    .wl-truck-unit-check span{display:grid;gap:2px}.wl-truck-unit-check b{font-size:16px;color:#fff}.wl-truck-unit-check small{font-size:11px;color:#aebdc5}
-    .wl-truck-self-entry span{width:100%}.wl-truck-entry-input{width:100%!important;min-height:44px!important;margin-top:7px!important;padding:10px 12px!important;border:1px solid #4a6571!important;border-radius:9px!important;background:#02090d!important;color:#fff!important;font-size:16px!important;font-weight:850!important}
+    .wl-truck-unit-check{min-height:104px;padding:14px;border:1px solid #38505b;border-radius:14px;background:#0b1920;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start;color:#fff;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease}
+    .wl-truck-unit-check.missing{border-color:#9f343a;background:#251115}
+    .wl-truck-unit-check.complete{border-color:#2f9c69;background:#0d241b;box-shadow:inset 0 0 0 1px rgba(69,210,139,.12)}
+    .wl-truck-status-check{appearance:none;-webkit-appearance:none;width:30px!important;height:30px!important;min-height:30px!important;margin:2px 0 0!important;padding:0!important;border:2px solid #52636c!important;border-radius:9px!important;background:#02080b!important;display:grid;place-items:center;pointer-events:none}
+    .wl-truck-status-check:checked{border-color:#43d58c!important;background:#183c2b!important}
+    .wl-truck-status-check:checked:after{content:'✓';font-size:19px;line-height:1;color:#71e9aa;font-weight:1000}
+    .wl-truck-unit-check span{display:grid;gap:4px;min-width:0}.wl-truck-unit-check b{font-size:18px;color:#fff}.wl-truck-unit-check small{font-size:11px;color:#b9c7ce;letter-spacing:.04em}
+    .wl-truck-unit-check.complete small{color:#9cd8ba}
+    .wl-truck-self-entry span{width:100%}
+    .wl-truck-unit-check .wl-truck-entry-input{display:block;width:100%!important;height:auto!important;min-height:50px!important;margin:8px 0 0!important;padding:12px 14px!important;border:1px solid #526a75!important;border-radius:10px!important;background:#02090d!important;color:#fff!important;font-size:18px!important;font-weight:900!important;letter-spacing:.02em!important;box-sizing:border-box!important}
+    .wl-truck-unit-check .wl-truck-entry-input:focus{outline:none!important;border-color:#7fa0ae!important;box-shadow:0 0 0 3px rgba(127,160,174,.14)!important}
+    .wl-truck-unit-check.complete .wl-truck-entry-input{border-color:#3ebc7c!important;background:#071711!important}
+    .wl-truck-unit-check .wl-truck-entry-input::placeholder{color:#667983!important;font-weight:700!important}
     .wl-truck-stock-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
     .wl-truck-stock-grid label{padding:11px;border:1px solid #38505b;border-radius:12px;background:#0b1920;color:#fff}.wl-truck-stock-grid label>span{display:block;min-height:42px;font-size:12px;font-weight:850}.wl-truck-stock-grid input{text-align:center!important}
     .wl-truck-restock-list{margin-top:16px}.wl-truck-restock-row{margin:8px 0;padding:12px;border:1px solid #713238;border-radius:12px;background:#241014;color:#fff}.wl-truck-restock-row.ready{border-color:#3f6a55;background:#0d2117}.wl-truck-restock-row>div{display:grid;gap:3px}.wl-truck-restock-row span{font-size:12px;color:#b9c7ce}.wl-truck-restock-row em{display:block;margin-top:6px;font-style:normal;font-size:10px;font-weight:1000;letter-spacing:.08em;color:#ff6369}
@@ -4369,11 +4377,19 @@ async function showServiceTruckInventoryCheck(){
     const sims=(r.sims||[]).slice().sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0));
     const unitRows=units.map(u=>{
       const ready=u.status==='assigned'&&u.unit_tag;
-      return `<div class='wl-truck-unit-check wl-truck-self-entry ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'':'disabled'}><span><b>${esc(u.equipment_type)}</b><small>ENTER THE UNIT NUMBER ON YOUR TRUCK</small><input class='wl-truck-entry-input' type='text' autocomplete='off' autocapitalize='characters' placeholder='Unit number' value='${esc(u.unit_tag||'')}' data-wl-truck-unit-entry='${esc(u.equipment_type)}'></span></div>`;
+      return `<div class='wl-truck-unit-check wl-truck-self-entry ${ready?'complete':'missing'}' data-wl-truck-entry-card>
+        <input class='wl-truck-status-check' type='checkbox' data-wl-truck-unit-confirm='${esc(u.equipment_type)}' data-unit-tag='${esc(u.unit_tag||'')}' ${ready?'checked':''} tabindex='-1' aria-hidden='true'>
+        <span><b>${esc(u.equipment_type)}</b><small>${ready?'UNIT NUMBER ENTERED':'ENTER THE UNIT NUMBER ON YOUR TRUCK'}</small>
+        <input class='wl-truck-entry-input' type='text' autocomplete='off' autocapitalize='characters' spellcheck='false' placeholder='Example: 214' value='${esc(u.unit_tag||'')}' data-wl-truck-unit-entry='${esc(u.equipment_type)}'></span>
+      </div>`;
     }).join('');
     const simRows=sims.map(s=>{
       const ready=s.status==='assigned'&&s.sim_number;
-      return `<div class='wl-truck-unit-check wl-truck-sim-check wl-truck-self-entry ${ready?'':'missing'}'><input type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'':'disabled'}><span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>ENTER THE EXACT SIM CARD NUMBER</small><input class='wl-truck-entry-input' type='text' inputmode='numeric' autocomplete='off' placeholder='SIM card number' value='${esc(s.sim_number||'')}' data-wl-truck-sim-entry='${Number(s.slot_no||0)}'></span></div>`;
+      return `<div class='wl-truck-unit-check wl-truck-sim-check wl-truck-self-entry ${ready?'complete':'missing'}' data-wl-truck-entry-card>
+        <input class='wl-truck-status-check' type='checkbox' data-wl-truck-sim-confirm='${Number(s.slot_no||0)}' data-sim-number='${esc(s.sim_number||'')}' ${ready?'checked':''} tabindex='-1' aria-hidden='true'>
+        <span><b>SIM SLOT ${Number(s.slot_no||0)}</b><small>${ready?'SIM NUMBER ENTERED':'ENTER THE EXACT SIM CARD NUMBER'}</small>
+        <input class='wl-truck-entry-input' type='text' inputmode='numeric' autocomplete='off' spellcheck='false' placeholder='Enter SIM card number' value='${esc(s.sim_number||'')}' data-wl-truck-sim-entry='${Number(s.slot_no||0)}'></span>
+      </div>`;
     }).join('');
     card.innerHTML=`<button class='wl-back' data-wl-home='svc'>← SERVICE HOME</button>
       ${progress('MANDATORY TRUCK INVENTORY','Required before leaving the shop',1,1)}
@@ -4382,6 +4398,8 @@ async function showServiceTruckInventoryCheck(){
       <div class='wl-truck-unit-grid'>${unitRows}</div>
       <div class='wl-truck-section-title'>SIM CARDS · 3 REQUIRED · VERIFY THE EXACT SIM NUMBER</div>
       <div class='wl-truck-unit-grid wl-truck-sim-grid'>${simRows}</div>
+      <button class='wl-big wl-blue top10' data-wl-save-truck-identifiers>SAVE EQUIPMENT & SIM NUMBERS →</button>
+      <div class='small top8'>Each completed entry turns green. You can come back and edit these numbers at any time.</div>
       <div class='wl-truck-section-title'>BATTERY STOCK · COUNT WHAT IS PHYSICALLY ON THE TRUCK</div>
       <div class='wl-truck-stock-grid'>
         <label><span>Recon batteries <b>25 required</b></span><input id='wlTruckReconQty' type='number' inputmode='numeric' min='0' value='${Number(stock.recon_battery_qty||0)}'></label>
@@ -6247,7 +6265,31 @@ document.addEventListener('change', async e => {
     return renderITIntakeWizard();
   }
 });
+document.addEventListener('input', e=>{
+  const field=e.target.closest?.('[data-wl-truck-unit-entry],[data-wl-truck-sim-entry]');
+  if(!field)return;
+  const card=field.closest('[data-wl-truck-entry-card]');
+  const status=card?.querySelector('.wl-truck-status-check');
+  const label=card?.querySelector('small');
+  const complete=String(field.value||'').trim().length>0;
+  card?.classList.toggle('complete',complete);
+  card?.classList.toggle('missing',!complete);
+  if(status){status.checked=complete;status.disabled=false;
+    if(field.dataset.wlTruckUnitEntry!==undefined)status.dataset.unitTag=String(field.value||'').trim();
+    if(field.dataset.wlTruckSimEntry!==undefined)status.dataset.simNumber=String(field.value||'').trim();
+  }
+  if(label)label.textContent=complete?(field.dataset.wlTruckUnitEntry!==undefined?'UNIT NUMBER ENTERED':'SIM NUMBER ENTERED'):(field.dataset.wlTruckUnitEntry!==undefined?'ENTER THE UNIT NUMBER ON YOUR TRUCK':'ENTER THE EXACT SIM CARD NUMBER');
+});
 document.addEventListener('click', async e => {
+  if(e.target.closest('[data-wl-save-truck-identifiers]')){
+    document.body.classList.add('busy');
+    try{
+      await saveMyServiceTruckIdentifiers();
+      await showServiceTruckInventoryCheck();
+    }catch(error){alert(error?.message||'Could not save the truck equipment and SIM numbers.');}
+    finally{document.body.classList.remove('busy');}
+    return;
+  }
   const dashboardRetry=e.target.closest('[data-wl-dashboard-retry]');
   if(dashboardRetry){
     if(dashboardRetry.dataset.wlDashboardRetry==='it')return showITHome();
