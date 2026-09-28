@@ -5,56 +5,53 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#0b1118">
   <title>CAMERAS ONSITE OnSite Vision</title>
-  <link rel="icon" href="./techcheck-eye-favicon-32.png?v=1">
-  <link rel="apple-touch-icon" href="./techcheck-eye-192.png?v=1">
+  <link rel="icon" type="image/jpeg" href="./resources/vision-ai.jpg?v=3">
+  <link rel="apple-touch-icon" href="./resources/vision-ai.jpg?v=3">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
-  <link rel="stylesheet" href="./onsite-vision.css?v=vision-workspace-v35">
+  <link rel="stylesheet" href="./onsite-vision.css?v=vision-integrated-20260927">
 </head>
 <body>
   <div id="visionLoading" class="vision-loading">
-    <img src="./techcheck-eye-192.png?v=1" alt="">
-    <b>OnSite Vision</b>
-    <span>Opening your Tech Check workspace…</span>
+    <div class="vision-splash">
+      <div class="vision-orb vision-orb-v36 vision-splash-eye" aria-hidden="true">
+        <span class="vision-orb-glow"></span>
+        <span class="vision-scan-ring"></span>
+        <span class="vision-eye-stage"><img src="./resources/vision-ai.jpg?v=3" alt=""></span>
+      </div>
+      <div class="vision-brand-lockup">
+        <span class="vision-brand-word" aria-label="Vision"><span>V</span><span>I</span><span>S</span><span>I</span><span class="vision-brand-o">O</span><span>N</span></span>
+        <small>CAMERAS ONSITE</small>
+      </div>
+      <p class="vision-splash-status" role="status">Opening your workspace…</p>
+    </div>
   </div>
   <div id="visionApp" class="vision-app hidden">
     <aside id="visionSidebar" class="vision-sidebar">
-      <div class="vision-brand">
-        <span class="vision-logo"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
-        <span><small>CAMERAS ONSITE</small><b>OnSite Vision</b></span>
-      </div>
-      <button id="visionNewChat" class="vision-new-chat" type="button"><span>＋</span> New chat</button>
-      <div class="vision-side-section">
-        <div class="vision-side-label">Recent conversations</div>
-        <div id="visionHistory" class="vision-history"></div>
-      </div>
+      <div class="vision-brand vision-brand-v36"><div class="vision-brand-lockup"><span class="vision-brand-word" aria-label="Vision"><span>V</span><span>I</span><span>S</span><span>I</span><span class="vision-brand-o">O</span><span>N</span></span><small>CAMERAS ONSITE</small></div></div>
+      <nav class="vision-nav-v36" aria-label="Vision navigation"><button id="visionNewChat" class="active" type="button"><span>◯</span> Chat</button><a href="./"><span>▣</span> Tech Check</a><button type="button" data-vision-prompt="Give me my morning briefing"><span>◷</span> Daily Briefing</button><button type="button" data-vision-prompt="What needs my attention?"><span>!</span> Needs Attention</button><a href="./camera-health.html"><span>◎</span> Camera Health</a><button id="visionTeachNav" type="button"><span>✦</span> Teach <span class="vision-inline-brand">Visi<span class="vision-brand-o">o</span>n</span></button></nav>
+      <div class="vision-side-section"><div class="vision-side-label">Recent</div><div id="visionHistory" class="vision-history"></div></div>
       <div class="vision-side-footer">
-        <button id="visionTeachButton" class="vision-teach-button" type="button"><span>✦</span> Teach Vision</button>
+        <button id="visionTeachButton" class="vision-teach-button" type="button"><span>✦</span> Teach <span class="vision-inline-brand">Visi<span class="vision-brand-o">o</span>n</span></button>
         <a href="./" class="vision-back-link">← Back to Tech Check</a>
         <div id="visionOwnerName" class="vision-owner-name"></div>
       </div>
     </aside>
     <main class="vision-main">
       <header class="vision-topbar">
-        <button id="visionMenuButton" class="vision-icon-button vision-mobile-only" type="button" aria-label="Open conversations">☰</button>
-        <div class="vision-top-title">
-          <span class="vision-logo small"><img src="./techcheck-eye-192.png?v=1" alt=""></span>
-          <div><small>CAMERAS ONSITE · ONSITE VISION</small><b id="visionConversationTitle">New conversation</b></div>
-        </div>
+        <button id="visionMenuButton" class="vision-icon-button vision-mobile-only vision-menu-v37" type="button" aria-label="Open Vision menu"><span></span><span></span></button>
+        <div class="vision-top-title vision-title-v36"><div class="vision-brand-lockup"><span class="vision-brand-word" aria-label="Vision"><span>V</span><span>I</span><span>S</span><span>I</span><span class="vision-brand-o">O</span><span>N</span></span><small>CAMERAS ONSITE</small></div><b id="visionConversationTitle" class="vision-title-hidden">New conversation</b></div>
         <div class="vision-top-actions">
           <span id="visionLiveStatus" class="vision-live-status">LIVE</span>
           <button id="visionHeaderNewButton" class="vision-icon-button vision-mobile-only vision-new-header" type="button" aria-label="Start new chat">＋</button>
-          <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>\n          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
+          <a href="./camera-health.html" class="vision-icon-button" style="text-decoration:none;display:inline-flex;align-items:center">Camera Health</a>
+          <button id="visionOrderButton" class="vision-icon-button" type="button">Service Order</button>
           <button id="visionRefreshButton" class="vision-icon-button" type="button" aria-label="Refresh data">↻</button>
         </div>
       </header>
       <section id="visionThread" class="vision-thread"></section>
       <footer class="vision-composer-wrap">
-        <div class="vision-composer">
-          <button id="visionVoiceButton" class="vision-compose-icon" type="button" aria-label="Speak to Vision" aria-pressed="false">🎙</button>
-          <textarea id="visionPrompt" rows="1" placeholder="Ask OnSite Vision…" enterkeyhint="send"></textarea>
-          <button id="visionSendButton" class="vision-send" type="button" aria-label="Send">➜</button>
-        </div>
+        <div class="vision-composer vision-composer-v36"><button id="visionAddButton" class="vision-add-v36" type="button" aria-label="New conversation">＋</button><textarea id="visionPrompt" rows="1" placeholder="Ask Vision…" enterkeyhint="send"></textarea><button id="visionKeyboardButton" class="vision-keyboard-v36" type="button" aria-label="Type to Vision">⌨</button><button id="visionVoiceButton" class="vision-voice-orb-v36" type="button" aria-label="Speak to Vision" aria-pressed="false"><span></span></button><button id="visionSendButton" class="vision-send vision-send-v36" type="button" aria-label="Send">➜</button></div>
         <div id="visionVoiceStatus" class="vision-voice-status hidden" aria-live="polite"></div>
         <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
       </footer>
@@ -74,8 +71,8 @@
       <div class="vision-knowledge-head">
         <div>
           <small>COMPANY KNOWLEDGE</small>
-          <b id="visionKnowledgeTitle">Teach OnSite Vision</b>
-          <span>Approved entries become Cameras On Site company knowledge. Drafts are never used as company truth.</span>
+          <b id="visionKnowledgeTitle">Teach OnSite <span class="vision-inline-brand">Visi<span class="vision-brand-o">o</span>n</span></b>
+          <span>Approved entries become Cameras Onsite company knowledge. Drafts are never used as company truth.</span>
         </div>
         <button id="visionKnowledgeClose" class="vision-icon-button" type="button">Close</button>
       </div>
@@ -129,7 +126,7 @@
             </label>
           </div>
           <label>What Vision should know
-            <textarea id="visionKnowledgeContent" rows="8" placeholder="Write the Cameras On Site rule, technical specification, troubleshooting procedure, or SOP exactly as the team should follow it."></textarea>
+            <textarea id="visionKnowledgeContent" rows="8" placeholder="Write the Cameras Onsite rule, technical specification, troubleshooting procedure, or SOP exactly as the team should follow it."></textarea>
           </label>
           <div class="vision-knowledge-row">
             <label>Source
@@ -158,7 +155,7 @@
         </section>
         <aside class="vision-knowledge-list-pane">
           <div class="vision-knowledge-list-head">
-            <div><small>VISION KNOWLEDGE</small><b>Saved entries</b></div>
+            <div><small><span class="vision-inline-brand">Visi<span class="vision-brand-o">o</span>n</span> KNOWLEDGE</small><b>Saved entries</b></div>
             <select id="visionKnowledgeFilter">
               <option value="">All</option>
               <option value="approved">Approved</option>
@@ -183,10 +180,10 @@
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-workspace-v58" defer></script>
+  <script src="./onsite-vision.js?v=vision-integrated-20260927" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=153', { scope: './', updateViaCache: 'none' }).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=vision-integrated-20260927', { scope: './', updateViaCache: 'none' }).catch(console.warn));
     }
   </script>
 </body>

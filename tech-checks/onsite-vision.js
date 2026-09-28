@@ -4,7 +4,8 @@ let db=null;
 const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'',chats:[],chatId:'',pending:new Map(),loaded:false,agentStatus:'unknown',knowledgeEntries:[],knowledgeEditingId:''};
 let conversationSyncTimer=null;
 let persistenceReady=false;
-let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false;
+let visionVoiceInteraction=false;
+let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false,voiceSilenceWatch=null,voiceAudioContext=null;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -99,7 +100,7 @@ async function newChat(){
     try{await visionPersistence()?.save?.(previous);}
     catch(error){console.warn('Vision previous conversation save',error);}
   }
-  state.currentTicket='';
+  state.currentTicket='';visionVoiceInteraction=false;document.body.classList.remove('vision-voice-session');
   const c={id:id(),title:'New conversation',createdAt:now(),updatedAt:now(),ticket:'',memory:{},messages:[]};
   state.chats.unshift(c);state.chats=state.chats.slice(0,20);state.chatId=c.id;
   saveChats();renderHistory();renderThread();renderOrder();closeDrawers();
@@ -637,20 +638,54 @@ function sanitizeAssistantHtml(value){
 }
 
 function welcome(){
-  return '<div class="vision-welcome"><div class="vision-welcome-mark"><img src="./techcheck-eye-192.png?v=1" alt=""></div><div class="vision-kicker">ONSITE VISION</div><h1>Your Tech Check AI workspace.</h1><p>Talk normally. Ask for a full operations rundown, what needs your attention, who has room, what IT or a technician has today, create work, assign it, or ask how Tech Check is programmed. Vision keeps the operating context while you keep talking.</p><div class="vision-quick-grid"><button type="button" data-vision-prompt="Give me the operations rundown for today. What is behind, what needs my attention, and who has room?">Today\'s ops brief</button><button type="button" data-vision-prompt="How many jobs does IT have today?">IT today</button><button type="button" data-vision-prompt="What needs attention right now?">Needs attention</button><button type="button" data-vision-prompt="Show me my active jobs">Active jobs</button><button type="button" data-vision-prompt="Is the system healthy?">System health</button></div></div>';
+  return '<div class="vision-welcome vision-welcome-minimal vision-welcome-v36"><button type="button" class="vision-orb vision-orb-v36" data-vision-voice aria-label="Talk to OnSite Vision"><span class="vision-behind-word" aria-hidden="true">VISI<span class="vision-brand-o">O</span>N</span><span class="vision-orb-glow"></span><span class="vision-scan-ring"></span><span class="vision-eye-stage"><img src="./resources/vision-ai.jpg?v=2" alt="OnSite Vision AI"></span></button><div class="vision-mode-label" aria-live="polite"></div><div class="vision-rotating-prompt" aria-live="polite"><span id="visionPromptSuggestion">Ask Vision anything about Tech Check</span></div></div>';
 }
+const VISION_PROMPT_SUGGESTIONS=['Ask Vision anything about Tech Check','“Give me my morning briefing”','“What needs my attention?”','“How many jobs does IT have today?”','“Create a delivery for Josh tomorrow”','“Is everything ready for tomorrow?”','“Show me my active jobs”'];
+let visionPromptSuggestionTimer=null,visionPromptSuggestionIndex=0;
+function startVisionPromptSuggestions(){clearInterval(visionPromptSuggestionTimer);if(!$('visionPromptSuggestion'))return;visionPromptSuggestionTimer=setInterval(()=>{const live=$('visionPromptSuggestion');if(!live){clearInterval(visionPromptSuggestionTimer);return;}live.classList.add('fade-out');setTimeout(()=>{const current=$('visionPromptSuggestion');if(!current)return;visionPromptSuggestionIndex=(visionPromptSuggestionIndex+1)%VISION_PROMPT_SUGGESTIONS.length;current.textContent=VISION_PROMPT_SUGGESTIONS[visionPromptSuggestionIndex];current.classList.remove('fade-out');},650);},4200);}
 function message(m){
   if(m.role==='user')return '<div class="vision-turn user"><div class="vision-bubble">'+esc(m.text)+'</div></div>';
-  return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
+  return '<div class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./resources/vision-ai.jpg" alt=""> ONSITE <span class="vision-inline-brand">VISI<span class="vision-brand-o">O</span>N</span></div>'+(m.html?sanitizeAssistantHtml(m.html):esc(m.text))+'</div></div>';
 }
 function renderThread(){
-  const h=$('visionThread');if(!h)return;const c=chat();
-  h.innerHTML=!c||!c.messages.length?welcome():c.messages.map(message).join('');setTimeout(()=>bottom(false),0);
+  const h=$('visionThread');if(!h)return;const c=chat();const empty=!c||!c.messages.length;
+  document.body.classList.toggle('vision-empty-chat',empty);
+  document.body.classList.toggle('vision-voice-session',visionVoiceInteraction);
+  const latestMessage=c?.messages[c.messages.length-1];
+  const summary=latestMessage?.role==='assistant'&&String(latestMessage.html||'').includes('vision-draft-card');
+  document.body.classList.toggle('vision-summary-mode',Boolean(summary));
+  if(summary){
+    $('visionPrompt')?.blur();
+    h.innerHTML='<div class="vision-results">'+message(latestMessage)+'</div>'+welcome();
+  }else if(empty){
+    h.innerHTML=welcome();
+  }else if(visionVoiceInteraction){
+    let assistantIndex=-1;for(let i=c.messages.length-1;i>=0;i--){if(c.messages[i].role==='assistant'){assistantIndex=i;break;}}
+    let userIndex=-1;if(assistantIndex>=0){for(let i=assistantIndex-1;i>=0;i--){if(c.messages[i].role==='user'){userIndex=i;break;}}}
+    const pair=[userIndex>=0?c.messages[userIndex]:null,assistantIndex>=0?c.messages[assistantIndex]:null].filter(Boolean);
+    const latest=c.messages[c.messages.length-1];
+    if(latest?.role==='user'&&latest!==pair[0])pair.push(latest);
+    h.innerHTML='<div class="vision-results">'+pair.map(message).join('')+'</div>'+welcome();
+  }else{
+    h.innerHTML='<div class="vision-results">'+c.messages.map(message).join('')+'</div>'+welcome();
+  }
+  if(empty)startVisionPromptSuggestions();else clearInterval(visionPromptSuggestionTimer);
+  setTimeout(()=>bottom(false),0);
 }
-function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./techcheck-eye-favicon-32.png?v=1" alt=""> ONSITE VISION</div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
+function typing(){return '<div id="visionTyping" class="vision-turn assistant"><div class="vision-bubble"><div class="vision-assistant-head"><img src="./resources/vision-ai.jpg" alt=""> ONSITE <span class="vision-inline-brand">VISI<span class="vision-brand-o">O</span>N</span></div><div class="vision-typing"><span>Thinking through Tech Check</span><span class="vision-dots"><i></i><i></i><i></i></span></div></div></div>';}
 function bottom(smooth=true){
-  const h=$('visionThread');if(!h)return;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>h.scrollTo({top:h.scrollHeight,behavior:smooth?'smooth':'auto'})));
+  const thread=$('visionThread');if(!thread)return;
+  const h=thread.querySelector('.vision-results')||thread;
+  if(document.body.classList.contains('vision-empty-chat')){thread.scrollTop=0;return;}
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const latest=chat()?.messages?.slice(-1)[0];
+    const responses=h.querySelectorAll('.vision-turn.assistant');
+    const response=responses[responses.length-1];
+    const top=latest?.role==='assistant'&&response
+      ?Math.max(0,response.getBoundingClientRect().top-h.getBoundingClientRect().top+h.scrollTop)
+      :h.scrollHeight;
+    h.scrollTo({top:document.body.classList.contains('vision-summary-mode')?0:top,behavior:smooth?'smooth':'auto'});
+  }));
 }
 function prep(ticket){return state.preps.find(p=>String(p.ticket_no||'')===String(ticket))||null;}
 function group(ticket){return state.jobs.filter(j=>String(j.ticket_no||'')===String(ticket));}
@@ -2111,11 +2146,25 @@ async function answer(text){
   if(/\b(helios).*(steps|workflow|process)|\b(steps|workflow|process).*(helios)\b/i.test(raw))return '<div class="vision-answer-title">Helios delivery workflow</div><div class="vision-direct"><b>Owner -> IT -> Service -> Field -> Owner Final</b>IT prepares Helios and creates the Service handoff. Service performs yard PV/Victron/charging checks and transport prep, then field installation and final proof. Owner completes final verification.</div>';
   return '<div class="vision-answer-title">I can work through the Tech Check record with you.</div><div class="vision-answer-copy">You can ask me to create a new Delivery, Pickup, Swap, or Service job, or work with an existing ticket or unit.</div>';
 }
-async function send(raw=null){
+async function send(raw=null,source='text'){
+  if(source==='voice'){visionVoiceInteraction=true;document.body.classList.add('vision-voice-session');}
   const input=$('visionPrompt'),text=String(raw??input?.value??'').trim();if(!text)return;if(input){input.value='';grow(input);}
-  titleFrom(text);addMessage('user',text);renderThread();$('visionThread').insertAdjacentHTML('beforeend',typing());bottom();
-  try{const html=await answer(text);$('visionTyping')?.remove();addMessage('assistant','',html);renderThread();renderOrder();}
-  catch(error){$('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}
+  titleFrom(text);addMessage('user',text);renderThread();if(source!=='voice')($('visionThread').querySelector('.vision-results')||$('visionThread')).insertAdjacentHTML('beforeend',typing());bottom();
+  setVisionRuntimeState('thinking','Thinking…');
+  try{
+    const html=await answer(text);
+    setVisionRuntimeState('working','Checking Tech Check…');
+    $('visionTyping')?.remove();
+    addMessage('assistant','',html);
+    renderThread();renderOrder();
+    const voiceStatus=$('visionVoiceStatus');if(source==='voice'&&voiceStatus){voiceStatus.textContent='';voiceStatus.className='vision-voice-status hidden';}
+    setVisionRuntimeState('ready','Ready');
+    setTimeout(()=>{setVisionRuntimeState('idle','Vision is ready');if(source==='voice'&&visionWakeArmed)setTimeout(startVisionWakeListener,350);},900);
+  }catch(error){
+    $('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();
+    const voiceStatus=$('visionVoiceStatus');if(source==='voice'&&voiceStatus){voiceStatus.textContent='';voiceStatus.className='vision-voice-status hidden';}
+    setVisionRuntimeState('error','Vision needs attention');if(source==='voice'&&visionWakeArmed)setTimeout(startVisionWakeListener,1200);
+  }
 }
 async function execute(actionId){
   const a=state.pending.get(actionId);if(!a)return;
@@ -2293,6 +2342,8 @@ function grow(el){if(!el)return;el.style.height='auto';el.style.height=Math.min(
 function syncVisualViewport(){
   const vv=window.visualViewport;
   const root=document.documentElement;
+  root.style.setProperty('--vision-visual-height',Math.round(vv?.height||window.innerHeight)+'px');
+  root.style.setProperty('--vision-visual-top',Math.round(vv?.offsetTop||0)+'px');
   const composer=document.querySelector('.vision-composer-wrap');
   root.style.setProperty('--vision-composer-space',Math.ceil(composer?.getBoundingClientRect().height||92)+'px');
   if(!vv){root.style.setProperty('--vision-visual-bottom','0px');return;}
@@ -2327,6 +2378,7 @@ function openOrderDrawer(){
 function toggleOrderDrawer(){
   if($('visionApp')?.classList.contains('order-open')) closeDrawers(); else openOrderDrawer();
 }
+function setVisionRuntimeState(next='idle',detail=''){const allowed=new Set(['idle','listening','thinking','working','needs_attention','ready','error']);const value=allowed.has(next)?next:'idle';document.documentElement.dataset.visionState=value;window.dispatchEvent(new CustomEvent('onsite-vision-state',{detail:{state:value,detail:String(detail||'')}}));}
 function setVoiceStatus(text='',kind=''){
   const node=$('visionVoiceStatus'),button=$('visionVoiceButton');
   if(node){node.textContent=String(text||'');node.className='vision-voice-status'+(kind?' '+kind:'')+(text?'':' hidden');}
@@ -2334,32 +2386,88 @@ function setVoiceStatus(text='',kind=''){
     button.classList.toggle('recording',kind==='recording');
     button.classList.toggle('busy',kind==='busy');
     button.setAttribute('aria-pressed',kind==='recording'?'true':'false');
-    button.textContent=kind==='recording'?'■':'🎙';
+    button.setAttribute('aria-label',kind==='recording'?'Stop listening':'Speak to Vision');
   }
+  if(kind==='recording')setVisionRuntimeState('listening',text||'Listening…');
+  else if(kind==='busy')setVisionRuntimeState('working',text||'Checking Tech Check…');
+  else if(kind==='heard')setVisionRuntimeState('thinking',text||'Thinking…');
+  else if(!text)setVisionRuntimeState('idle','Vision is ready');
   syncVisualViewport();
 }
 function stopVoiceTracks(){
   clearTimeout(voiceStopTimer);voiceStopTimer=null;
+  clearInterval(voiceSilenceWatch);voiceSilenceWatch=null;
+  try{voiceAudioContext?.close?.();}catch{} voiceAudioContext=null;
   try{voiceStream?.getTracks?.().forEach(track=>track.stop());}catch{}
   voiceStream=null;
 }
+function visionHaptic(){
+  try{if(typeof navigator.vibrate==='function')navigator.vibrate(18);}catch{}
+}
+let visionWakeRecognition=null,visionWakeRestartTimer=null,visionWakeArmed=false,visionDirectRecognitionActive=false,visionDirectRecognition=null;
+function startVisionWakeListener(){
+  // Tap-to-talk only: no automatic microphone restarts or browser chimes.
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&visionWakeArmed)setTimeout(startVisionWakeListener,700);else{try{visionWakeRecognition?.stop?.();}catch{}visionWakeRecognition=null;}});
+// Voice capture starts only when the user taps a voice control.
 function browserVoiceFallback(){
+  if(visionWakeRecognition){
+    const wake=visionWakeRecognition;visionWakeRecognition=null;
+    try{wake.onend=null;wake.onerror=null;wake.abort?.();}catch{try{wake.stop?.();}catch{}}
+    setTimeout(browserVoiceFallback,300);return;
+  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){
     setVoiceStatus('');
-    addMessage('assistant','', '<div class="vision-system-note">Voice recording is not available on this device. You can still use the iPhone keyboard microphone.</div>');
+    addMessage('assistant','', '<div class="vision-system-note">Voice listening is not available in this browser. You can still use the keyboard microphone.</div>');
     renderThread();return;
   }
   try{
-    const r=new SR();r.lang='en-US';r.interimResults=false;r.maxAlternatives=1;
-    setVoiceStatus('Listening with device dictation…','recording');
-    r.onresult=e=>{const text=String(e.results?.[0]?.[0]?.transcript||'').trim();setVoiceStatus('');if(text)send(text);};
-    r.onerror=()=>setVoiceStatus('');
-    r.onend=()=>{if($('visionVoiceStatus')?.classList.contains('recording'))setVoiceStatus('');};
+    visionDirectRecognitionActive=true;
+    const r=new SR();
+    visionDirectRecognition=r;
+    r.onstart=()=>visionHaptic();
+    let finalText='',interimText='',heardSpeech=false,submitted=false,silenceTimer=null;
+    const finish=()=>{clearTimeout(silenceTimer);silenceTimer=null;try{r.stop();}catch{}};
+    const armSilence=()=>{clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,1050);};
+    r.lang='en-US';r.interimResults=true;r.continuous=true;r.maxAlternatives=1;
+    setVoiceStatus('Listening…','recording');
+    r.onspeechstart=()=>{heardSpeech=true;clearTimeout(silenceTimer);setVoiceStatus('Listening…','recording');};
+    r.onresult=e=>{
+      interimText='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const part=String(e.results[i]?.[0]?.transcript||'').trim();
+        if(!part)continue;
+        heardSpeech=true;
+        if(e.results[i].isFinal)finalText+=(finalText?' ':'')+part; else interimText+=(interimText?' ':'')+part;
+      }
+      const live=(finalText||interimText).trim();
+      if(live)setVoiceStatus('Listening… '+live.slice(-72),'recording');
+      if(heardSpeech)armSilence();
+    };
+    r.onspeechend=()=>{if(heardSpeech)armSilence();};
+    r.onerror=e=>{clearTimeout(silenceTimer);if(!['no-speech','aborted'].includes(String(e.error||'')))console.warn('Vision speech recognition',e);};
+    r.onend=()=>{
+      visionDirectRecognition=null;
+      visionHaptic();
+      visionDirectRecognitionActive=false;
+      clearTimeout(silenceTimer);
+      const text=(finalText||interimText).trim();
+      setVoiceStatus('');
+      if(text&&!submitted){
+        submitted=true;setVoiceStatus('Understanding…','heard');
+        Promise.resolve(send(text,'voice')).finally(()=>{if(visionWakeArmed)setTimeout(startVisionWakeListener,1000);});
+      }else if(!heardSpeech){
+        setVisionRuntimeState('idle','Vision is ready');
+        if(visionWakeArmed)setTimeout(startVisionWakeListener,900);
+      }
+    };
     r.start();
   }catch(error){
+    visionDirectRecognitionActive=false;
     setVoiceStatus('');
     console.warn('Vision browser voice fallback',error);
+    if(visionWakeArmed)setTimeout(startVisionWakeListener,900);
   }
 }
 async function transcribeVoiceBlob(blob,mimeType){
@@ -2373,10 +2481,20 @@ async function transcribeVoiceBlob(blob,mimeType){
   if(!transcript)throw new Error('I could not hear enough speech to transcribe.');
   setVoiceStatus('Heard: “'+transcript.slice(0,110)+(transcript.length>110?'…':'')+'”','heard');
   setTimeout(()=>setVoiceStatus(''),1800);
-  await send(transcript);
+  await send(transcript,'voice');
 }
 async function voice(){
+  if(visionDirectRecognitionActive){
+    try{visionDirectRecognition?.stop();}catch{}
+    return;
+  }
+  visionVoiceInteraction=true;document.body.classList.add('vision-voice-session');
   if(voiceBusy)return;
+  if(window.SpeechRecognition||window.webkitSpeechRecognition){
+    visionWakeArmed=false;
+    browserVoiceFallback();
+    return;
+  }
   if(voiceRecorder?.state==='recording'){
     voiceBusy=true;
     setVoiceStatus('Finishing…','busy');
@@ -2400,6 +2518,7 @@ async function voice(){
       stopVoiceTracks();voiceRecorder=null;voiceBusy=false;setVoiceStatus('');
     };
     voiceRecorder.onstop=async()=>{
+      visionHaptic();
       voiceBusy=true;
       const blob=new Blob(voiceChunks,{type:actualType});
       voiceChunks=[];stopVoiceTracks();voiceRecorder=null;
@@ -2413,8 +2532,30 @@ async function voice(){
       }finally{voiceBusy=false;}
     };
     voiceRecorder.start(250);
+    visionHaptic();
     voiceBusy=false;
-    setVoiceStatus('Listening… tap the microphone again when you are done.','recording');
+    setVoiceStatus('Listening…','recording');
+    try{
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(AudioCtx){
+        voiceAudioContext=new AudioCtx();
+        const source=voiceAudioContext.createMediaStreamSource(voiceStream);
+        const analyser=voiceAudioContext.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=.25;source.connect(analyser);
+        const samples=new Uint8Array(analyser.fftSize);
+        let speechSeen=false,silentSince=0;
+        voiceSilenceWatch=setInterval(()=>{
+          if(voiceRecorder?.state!=='recording')return;
+          analyser.getByteTimeDomainData(samples);
+          let sum=0;for(let i=0;i<samples.length;i++){const v=(samples[i]-128)/128;sum+=v*v;}
+          const rms=Math.sqrt(sum/samples.length),t=Date.now();
+          if(rms>.022){speechSeen=true;silentSince=0;}
+          else if(speechSeen){
+            if(!silentSince)silentSince=t;
+            if(t-silentSince>1100){voiceBusy=true;setVoiceStatus('Understanding…','busy');try{voiceRecorder.stop();}catch{}}
+          }
+        },100);
+      }
+    }catch(error){console.warn('Vision silence detection',error);}
     voiceStopTimer=setTimeout(()=>{if(voiceRecorder?.state==='recording'){voiceBusy=true;setVoiceStatus('Finishing…','busy');voiceRecorder.stop();}},45000);
   }catch(error){
     voiceBusy=false;stopVoiceTracks();voiceRecorder=null;setVoiceStatus('');
@@ -2428,6 +2569,7 @@ async function voice(){
 }
 document.addEventListener('click',async e=>{
   const c=e.target.closest('[data-chat-id]');if(c)return openChat(c.dataset.chatId);
+  const voiceOrb=e.target.closest('[data-vision-voice]');if(voiceOrb)return voice();
   const p=e.target.closest('[data-vision-prompt],[data-order-prompt]');if(p)return send(p.dataset.visionPrompt||p.dataset.orderPrompt);
   const confirm=e.target.closest('[data-confirm-action]');if(confirm){confirm.disabled=true;confirm.textContent='Saving...';try{await execute(confirm.dataset.confirmAction);}catch(error){addMessage('assistant','', '<div class="vision-direct warn"><b>That change was not saved.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();}return;}
   const cancel=e.target.closest('[data-cancel-action]');if(cancel){
@@ -2454,7 +2596,7 @@ document.addEventListener('click',async e=>{
     if(entry)fillKnowledgeForm(entry);
     return;
   }
-  if(e.target.closest('#visionTeachButton')){await openKnowledgeManager();return;}
+  if(e.target.closest('#visionTeachButton')||e.target.closest('#visionTeachNav')){await openKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeClose')){closeKnowledgeManager();return;}
   if(e.target.closest('#visionKnowledgeNew')){resetKnowledgeForm();return;}
   if(e.target.closest('#visionLanguageEval')){await runLanguageEval();return;}
@@ -2467,7 +2609,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#visionKnowledgeRetire')){
     try{await saveKnowledgeEntry('retired');}catch(error){const n=$('visionKnowledgeSaveStatus');if(n){n.classList.remove('hidden');n.textContent=error?.message||'Could not retire knowledge.';}}return;
   }
-  if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton'))return newChat();if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){closeDrawers();$('visionApp').classList.add('sidebar-open');return;}if(e.target.closest('#visionOrderButton'))return toggleOrderDrawer();if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
+  if(e.target.closest('#visionNewChat')||e.target.closest('#visionHeaderNewButton')||e.target.closest('#visionAddButton'))return newChat();if(e.target.closest('#visionKeyboardButton')){$('visionPrompt')?.focus();return;}if(e.target.closest('#visionSendButton'))return send();if(e.target.closest('#visionMenuButton')){closeDrawers();$('visionApp').classList.add('sidebar-open');return;}if(e.target.closest('#visionOrderButton'))return toggleOrderDrawer();if(e.target.closest('#visionOrderClose')||e.target.closest('#visionShade'))return closeDrawers();
   if(e.target.closest('#visionRefreshButton')){try{visionLiveData()?.invalidateAll?.();state.agentStatus='unknown';await loadData();await checkAgentStatus();renderOrder();}catch(error){console.warn(error);}return;}
   if(e.target.closest('#visionVoiceButton'))return voice();
 });
