@@ -10257,3 +10257,27 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
  #view-owner .ownerWeatherWeek{border-radius:0 0 10px 10px!important}
  #view-owner .ownerWeatherDay{min-height:88px!important;padding:7px 5px!important}
 }
+
+/* Owner IT-shell structural pass */
+@media(min-width:901px){
+ #view-owner .ownerAppShell{grid-template-columns:220px minmax(0,1fr)!important}
+ #view-owner .ownerAppSidebar{padding:16px 12px!important}
+ #view-owner .ownerAppBrand{min-height:70px!important;display:flex!important;align-items:center!important;gap:10px!important}
+ #view-owner .ownerAppBrand img{width:36px!important;height:36px!important}
+ #view-owner .ownerAppSidebar nav{display:flex!important;flex-direction:column!important;gap:6px!important}
+ #view-owner .ownerAppSidebar nav>*{min-height:43px!important;padding:10px 13px!important;border-radius:9px!important}
+ #view-owner .ownerItStyleWorkspace{padding:0 18px 40px!important;background:#06131b!important}
+ #view-owner .ownerItTopbar{min-height:78px;margin:0 -18px 14px;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#0b202a;border-bottom:1px solid #2a4652;box-sizing:border-box}
+ #view-owner .ownerItTopbar>div:first-child{display:flex;flex-direction:column;gap:3px}
+ #view-owner .ownerItTopbar b{font-size:21px;color:#fff}
+ #view-owner .ownerItEyebrow{font-size:9px;font-weight:900;letter-spacing:.15em;color:#f02b35}
+ #view-owner .ownerItTopActions{display:flex;gap:8px}
+ #view-owner .ownerItTopActions button{min-height:38px;padding:8px 14px;border:1px solid #385461;border-radius:8px;background:#102934;color:#fff;font-weight:800}
+ #view-owner .ownerWorkspaceTools{padding:0 0 12px!important;justify-content:flex-start!important}
+ #view-owner .ownerWorkspaceTools a{min-height:43px!important;padding:9px 15px!important;border-radius:9px!important}
+ #view-owner .ownerAppPage{padding:0 0 60px!important}
+ #view-owner .ownerAppPageHeader{padding:14px 16px!important;margin:0 0 10px!important;border:1px solid #29434f!important;border-radius:10px!important;background:#0b2029!important}
+ #view-owner .ownerAppPageHeader h1{font-size:21px!important}
+ #view-owner .ownerAppGroup,#view-owner .ownerTodayPanel,#view-owner .ownerAppAccountCreate{background:#0b2029!important;border:1px solid #29434f!important;border-radius:10px!important;box-shadow:none!important}
+ #view-owner .ownerAppJobRow,#view-owner .ownerAppUnitRow,#view-owner .ownerAppHandoffRow,#view-owner .ownerAppTeamRow{background:#0d242e!important;border:1px solid #314b57!important;border-radius:8px!important}
+}
