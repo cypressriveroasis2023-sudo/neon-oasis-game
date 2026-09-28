@@ -275,6 +275,45 @@
   #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.25fr) minmax(360px,.9fr)!important}
 }
 </style>
+<!-- OWNER DESKTOP FILL LAYOUT 20260928 -->
+<style id="owner-desktop-fill-layout-20260928">
+@media (min-width:901px){
+ #view-owner .ownerAppWorkspace{min-height:calc(100vh - 0px)!important}
+ #view-owner .ownerAppPage{padding-top:10px!important;padding-bottom:18px!important}
+ #view-owner #ownerRouteView{min-height:calc(100vh - 145px)!important}
+ #view-owner .ownerItDashboard{min-height:calc(100vh - 145px)!important;display:grid!important;grid-template-rows:auto auto minmax(0,1fr)!important;align-content:stretch!important}
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.45fr) minmax(0,.72fr) minmax(0,.92fr)!important}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{min-height:132px!important}
+ #view-owner .ownerItKpis{width:100%!important}
+ #view-owner .ownerItKpis button{min-height:82px!important}
+ #view-owner .ownerItMainGrid{height:100%!important;min-height:0!important;grid-template-columns:minmax(0,2fr) minmax(320px,.9fr)!important;grid-template-rows:minmax(255px,1.15fr) minmax(210px,.85fr)!important;align-items:stretch!important}
+ #view-owner .ownerItPanel{min-height:0!important;height:100%!important}
+ #view-owner .ownerItSchedule{grid-column:1;grid-row:1}
+ #view-owner .ownerItAttention{grid-column:2;grid-row:1}
+ #view-owner .ownerItRecent{grid-column:1;grid-row:2}
+ #view-owner .ownerItQuick{grid-column:2;grid-row:2}
+ #view-owner .ownerItPanelBody{height:calc(100% - 45px)!important;box-sizing:border-box!important;overflow:auto!important}
+ #view-owner .ownerItEmpty{height:100%!important;min-height:0!important}
+ #view-owner .ownerItAttentionRows{height:calc(100% - 45px)!important;box-sizing:border-box!important;grid-template-rows:repeat(5,minmax(42px,1fr))!important}
+ #view-owner .ownerItAttentionRows button{height:100%!important}
+ #view-owner .ownerItQuickGrid{height:calc(100% - 45px)!important;box-sizing:border-box!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:repeat(4,minmax(48px,1fr))!important}
+ #view-owner .ownerItQuickGrid button{height:100%!important;min-height:0!important}
+}
+@media (min-width:1400px){
+ #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(0,1.6fr) minmax(250px,.7fr) minmax(320px,1fr)!important}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{min-height:145px!important}
+ #view-owner .ownerItKpis button{min-height:94px!important}
+ #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.15fr) minmax(360px,.85fr)!important}
+}
+@media (min-width:1900px){
+ #view-owner .ownerAppPage{padding-left:36px!important;padding-right:36px!important}
+ #view-owner .ownerItHeaderGrid{gap:14px!important;margin-bottom:14px!important}
+ #view-owner .ownerItKpis{gap:12px!important;margin-bottom:14px!important}
+ #view-owner .ownerItMainGrid{gap:12px!important}
+ #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{min-height:158px!important}
+ #view-owner .ownerItKpis button{min-height:104px!important}
+}
+</style>
 </head>
   <body>
     <div id="app">
