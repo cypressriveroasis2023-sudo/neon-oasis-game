@@ -3505,7 +3505,7 @@ function teamMemberCard(p) {
     +'<div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div>'
     +'<div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Account</button></div></div>'
     +'<div class="teamEmailBox"><div><label>Notification Email</label><input id="notifyEmail_' + p.user_id + '" type="email" autocapitalize="none" spellcheck="false" placeholder="name@camerasonsite.com" value="' + esc(email) + '"></div><div class="emailPrefs"><label class="emailPref"><input id="emailJobs_' + p.user_id + '" type="checkbox" ' + (p.email_job_assignments !== false ? 'checked' : '') + '><span>New job assignment emails</span></label><label class="emailPref"><input id="emailHandoffs_' + p.user_id + '" type="checkbox" ' + (p.email_handoff_updates !== false ? 'checked' : '') + '><span>Equipment / handoff emails</span></label>' + ownerCopy + '</div><div class="small">Email delivery will start after the outgoing email service is connected.</div></div>'
-    +'<details class="accountSecurityFold"><summary>Account Security</summary><div class="accountSecurityBody"><div class="small">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>Set Temporary Password</label><input id="reset_' + p.user_id + '" type="password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">Set Temporary Password</button></div></div></div></details>'
+    +'<details class="accountSecurityFold" open><summary>Account Security · Password</summary><div class="accountSecurityBody"><div class="small"><b>Owner control:</b> Set a temporary password for this account. Tech Check never reveals the technician’s private password. The technician must replace this temporary password with a private password at next sign in.</div><div class="small top8">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>New Temporary Password</label><input id="reset_' + p.user_id + '" type="password" autocomplete="new-password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">RESET USER PASSWORD</button></div></div></div></details>'
     +(self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>')
     +'</div></details>';
 }
@@ -3604,10 +3604,10 @@ async function resetUserPassword(id) {
   const { data, error } = await db.functions.invoke('admin-user-management', {
     body: { action: 'reset_password', user_id: id, password },
   });
-  if (error || data?.error) return alert(error?.message || data.error);
+  if (error || data?.error) return alert('Password reset failed: ' + (data?.error || error?.message || 'Unknown error'));
   $('reset_' + id).value = '';
   await refreshData();
-  alert('Temporary password set. The technician must create a private password at the next sign in.');
+  alert('Temporary password set successfully. The technician can sign in with it once, then Tech Check will require a new private password.');
 }
 function ensureStartFreshCard() {
   if ($('ownerResetCard')) return;
@@ -3615,8 +3615,8 @@ function ensureStartFreshCard() {
   card.id = 'ownerResetCard';
   card.className = 'card ownerDashSection ownerMaintenanceCard';
   card.innerHTML =
-    '<summary class="ownerDashSummary"><div><b>Maintenance</b><span>Clear test / operational data only when needed</span></div><span class="ownerDashBadge neutral">⚙</span></summary>' +
-    '<div class="ownerDashBody"><div class="warn"><b>Owner only.</b><div class="small">Clears all equipment prep records, equipment checkout verifications, Owner reports, morning checks, and the operational unit-status registry. Technician accounts, usernames, roles, and passwords are kept.</div></div><button class="btn danger" onclick="startFresh()">Start Fresh — Clear Operational Data</button></div>';
+    '<summary class="ownerDashSummary"><div><b>Reset Tech Check Data</b><span>Start production with a clean job and operational history</span></div><span class="ownerDashBadge neutral">⚙</span></summary>' +
+    '<div class="ownerDashBody"><div class="warn"><b>OWNER ONLY · DESTRUCTIVE</b><div class="small"><b>Deletes:</b> operational/test history handled by the protected Tech Check reset routine, including prep/check history, checkout verification history, Owner reports, morning checks, and operational unit-status tracking.</div><div class="small top8"><b>Keeps:</b> Tech Check programming, technician and Owner accounts, usernames, roles, passwords, and account configuration.</div><div class="small top8">Use this only when you are ready to discard testing/history and begin clean production use.</div></div><button class="btn danger" onclick="startFresh()">RESET TECH CHECK DATA</button></div>';
   const accountsCard = $('ownerAccountsCard');
   if (accountsCard) accountsCard.after(card);
   else $('view-owner')?.appendChild(card);
@@ -3624,9 +3624,9 @@ function ensureStartFreshCard() {
 async function startFresh() {
   if (state.profile?.role !== 'owner') return;
   const answer = prompt(
-    'This clears ALL equipment prep, equipment verification history, Owner reports, and morning checks. Technician accounts and passwords will be kept. Type RESET to continue.'
+    'RESET TECH CHECK DATA?\n\nThis permanently clears the operational/test data handled by the protected Tech Check reset routine. Technician and Owner accounts are kept.\n\nType RESET TECH CHECK to continue.'
   );
-  if (answer !== 'RESET') return;
+  if (answer !== 'RESET TECH CHECK') return;
   setBusy(true);
   const { error } = await db.rpc('owner_start_fresh');
   setBusy(false);
@@ -3635,7 +3635,7 @@ async function startFresh() {
   state.sessionClosed = [];
   await refreshData();
   alert(
-    'Started fresh. Operational/test data was cleared. Technician accounts were kept.'
+    'Tech Check operational/test data was reset. Technician and Owner accounts were kept.'
   );
 }
 
