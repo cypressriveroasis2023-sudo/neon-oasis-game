@@ -215,7 +215,6 @@ function respondingInterfaceSummary(){
 }
 function coreHeliosInterfacesOnline(){
   if(String(device?.monitoring_profile||'').toLowerCase()!=='helios')return false;
-  const siteCanEdit=['owner','it'].includes(String(profile?.role||'').toLowerCase()),siteBtn=$('editSiteBtn');if(siteBtn){siteBtn.classList.toggle('hidden',!siteCanEdit);siteBtn.onclick=()=>{const w=$('siteEditWrap');w.classList.toggle('hidden');$('siteNameInput').value=device.organization||'';if(!w.classList.contains('hidden'))$('siteNameInput').focus()}};
   const ps=current?.port_status||{};
   return ['1400','1500','1600','1700'].every(p=>ps[p]?.online===true);
 }
@@ -271,6 +270,8 @@ function render(){
     shopBtn.classList.add('hidden');
   }
   const ipSetup=$('ipSetupWrap'),ownerCanEdit=['owner','it'].includes(String(profile?.role||'').toLowerCase());
+  const siteBtn=$('editSiteBtn');if(siteBtn){siteBtn.classList.toggle('hidden',!ownerCanEdit);siteBtn.onclick=()=>{const w=$('siteEditWrap');w.classList.toggle('hidden');$('siteNameInput').value=device.organization||'';if(!w.classList.contains('hidden'))$('siteNameInput').focus()}};
+
   if(ownerCanEdit&&!isRecon){
     ipSetup.classList.remove('hidden');
     $('ipSetupInput').value=cleanIP(device.public_ip)||effectiveIp||'';
