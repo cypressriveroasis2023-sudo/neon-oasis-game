@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-datetime-large-20260926y" />
+    <link rel="stylesheet" href="./styles.css?v=service-simple-20260928" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -526,7 +526,7 @@
       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     </div>
     <script src="./tech-check-rules.js?v=helios-field-clarity-20260924q"></script>
-    <script type="module" src="./app.js?v=owner-tools-20260927"></script>
+    <script type="module" src="./app.js?v=service-simple-20260928"></script>
     <script>
       if ('serviceWorker' in navigator) {
         let techCheckReloadedForWorker = false;
@@ -537,7 +537,7 @@
         });
         window.addEventListener('load', async () => {
           try {
-            const registration = await navigator.serviceWorker.register('./sw.js?v=vision-integrated-20260927');
+            const registration = await navigator.serviceWorker.register('./sw.js?v=service-simple-20260928');
             registration.update().catch(() => {});
           } catch (error) {
             console.warn('Tech Check service worker unavailable', error);

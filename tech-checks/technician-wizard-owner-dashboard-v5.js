@@ -4394,7 +4394,7 @@ async function showServiceTruckInventoryCheck(){
       </div>
       ${serviceTruckRestockRowsHtml(r)}
       <button class='wl-service-start top10' data-wl-submit-truck-inventory>I PHYSICALLY VERIFIED MY TRUCK →</button>
-      <button class='wl-big wl-gray top8' data-wl-service-truck-refresh>REFRESH FROM IT</button>
+      <button class='wl-big wl-gray top8' data-wl-service-truck-refresh>REFRESH FROM IT</button><button class='wl-big wl-gray top8' data-wl-service-truck-usage>RECORD USED EQUIPMENT / SUPPLIES</button><button class='wl-big wl-gray top8' data-wl-service-resolve-spares>RESOLVE BACKUP EQUIPMENT</button>
       <div class='small top8'>New Service jobs remain blocked until the safety inspection AND this truck inventory check are both complete.</div>`;
     resetWizardPosition();
   }catch(error){
@@ -4750,6 +4750,31 @@ async function prepareITTruckBatteryRestock(id){
   finally{document.body.classList.remove('busy');}
 }
 
+async function latestServiceInspectionToday() {
+  const tech=await currentTechIdentity();
+  if(!tech?.id) throw new Error('Active Service Tech account required.');
+  const dayStart=new Date(); dayStart.setHours(0,0,0,0);
+  const {data,error}=await liveDb.from('morning_checks').select('truck_checks,taking_trailer,trailer_checks,submitted_at')
+    .eq('service_tech_id',tech.id).gte('submitted_at',dayStart.toISOString())
+    .order('submitted_at',{ascending:false}).limit(1);
+  if(error)throw error;
+  return data?.[0]||null;
+}
+async function startTrailerInspection() {
+  try {
+    const morning=await latestServiceInspectionToday();
+    const truck=truckLabels.map((_,i)=>morning?.truck_checks?.['truck_'+(i+1)]);
+    if(truck.every(v=>v===true)) {
+      inspection={step:8,truck,takingTrailer:null,trailer:Array(7).fill(null)};
+      inspectionRecovered=false;
+      await saveInspectionDraft();
+      return inspectionQuestion();
+    }
+    await startInspection();
+    if(inspection.truck.every(v=>v===true)){inspection.step=8;inspectionQuestion();}
+    else document.getElementById('wlInspection')?.insertAdjacentHTML('afterbegin',"<div class='warn'>Complete your truck inspection first, then continue to the trailer questions.</div>");
+  }catch(error){alert(error?.message||'Could not load today’s inspection.');}
+}
 async function showSvcHome() {
   if (!isSvc() || !viewSvc()) return;
   let home=document.getElementById('wlSvcHome');
@@ -4768,27 +4793,23 @@ async function showSvcHome() {
   const firstName=String(techName||'Technician').trim().split(/\s+/)[0] || 'Technician';
 
   try{
-    const state=await techDashboardTimeout(serviceDayState(),null);
+    const [readiness, morning]=await Promise.all([loadMyServiceTruckReadiness(), latestServiceInspectionToday()]);
     const flash=takeTechCompletion('service');
+    const truckDone=Boolean(readiness.inspection_ready);
+    const trailerStatus=truckDone&&morning ? (morning.taking_trailer?'Completed Today':'No Trailer Today') : 'Needs Completion';
+    const pill=(label,action,status,done=false)=>`<button class='wl-service-action-pill ${done?'complete':''}' ${action}><span>${label}<small>${status}</small></span><b aria-hidden='true'>${done?'✓':'→'}</b></button>`;
     home.innerHTML=`<div class='wl-service-simple-shell'>
       <div class='wl-service-simple-kicker'>SERVICE TECH</div>
       <h1>HELLO, ${esc(ownerViewingService?'TECHNICIAN':firstName.toUpperCase())}</h1>
       ${techCompletionBanner(flash)}
-      ${serviceNextActionHtml(state)}
-      <div class='wl-service-flowline'>TRUCK / TRAILER INSPECTION <b>→</b> REQUIRED TRUCK INVENTORY <b>→</b> NEXT JOB <b>→</b> FIELD WORK</div>
-
-      <details class='wl-service-more'>
-        <summary>OTHER ACTIONS</summary>
-        <div class='wl-service-more-grid'>
-          <button data-wl-service-open-job>ENTER MHELPDESK TICKET</button>
-          <button data-wl-service-truck-inventory>MY REQUIRED TRUCK INVENTORY</button>
-          <button data-wl-service-truck-usage>USED TRUCK UNIT / SIM / STOCK</button>
-          <button data-wl-service-return>RETURN UNIT TO IT</button>
-          <button data-wl-svc='returns'>MY RETURNED UNITS</button>
-          <button data-wl-offline-start>OFFLINE UNIT / CALL IT</button>
-          <button data-wl-svc='history'>STATUS & HISTORY</button>
-        </div>
-      </details>
+      <div class='wl-service-action-list'>
+        ${pill('Enter Ticket Number','data-wl-service-open-job','Open or continue your job')}
+        ${pill('Truck Inspection',"data-wl-svc='inspect'",truckDone?'Completed Today':'Needs Completion',truckDone)}
+        ${pill('Trailer Inspection','data-wl-service-trailer-inspection',trailerStatus,truckDone&&Boolean(morning))}
+        ${pill('Truck Inventory','data-wl-service-truck-inventory',readiness.inventory_ready?'Completed Today':'Needs Completion',Boolean(readiness.inventory_ready))}
+        ${pill('Return Equipment to IT','data-wl-service-return','Return equipment for intake or a swap')}
+      </div>
+      <div class='wl-service-help'>Complete daily inspections and verify truck inventory before starting a job.</div>
     </div>`;
   }catch(error){
     home.innerHTML=techDashboardErrorHtml('service',error?.message||'Could not verify your Service work.');
@@ -6323,6 +6344,7 @@ document.addEventListener('click', async e => {
     if(itPrepClickResult.render)return renderItUnitStep();
     return;
   }
+  if(e.target.closest('[data-wl-service-trailer-inspection]')) return startTrailerInspection();
   const svc = e.target.closest('[data-wl-svc]'); if (svc) { if (svc.dataset.wlSvc === 'receive') showReceiveLookup(); if (svc.dataset.wlSvc === 'returns') showServiceReturnHistory(); if (svc.dataset.wlSvc === 'inspect') startInspection(); if (svc.dataset.wlSvc === 'history') showInspectionHistory(); return; }
   if (e.target.closest('[data-wl-service-open-job]')) return showServiceJobLookup();
   if (e.target.closest('[data-wl-service-truck-inventory]')) return showServiceTruckInventoryCheck();
@@ -6928,7 +6950,7 @@ function serviceReturnLabel(){ return isTagless110VReturn() ? '110V Stand · No 
 function renderServiceReturn() {
   const card = serviceReturnCard();
   const step = serviceReturn.step;
-  if (step === 0) card.innerHTML = `${progress('Return Unit · Step 1 of 5', 'Enter the MHelpDesk ticket number', 1, 5)}<div class='wl-question'><div class='qtext'>What MHelpDesk ticket is this unit coming back from?</div><input id='wlReturnTicket' inputmode='numeric' value='${esc(serviceReturn.ticket)}' placeholder='Ticket #'></div><div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`;
+  if (step === 0) card.innerHTML = `<button class='wl-back' data-wl-svc='returns'>VIEW MY RETURNS / IT STATUS</button>${progress('Return Unit · Step 1 of 5', 'Enter the MHelpDesk ticket number', 1, 5)}<div class='wl-question'><div class='qtext'>What MHelpDesk ticket is this unit coming back from?</div><input id='wlReturnTicket' inputmode='numeric' value='${esc(serviceReturn.ticket)}' placeholder='Ticket #'></div><div class='wl-nav'><button class='wl-prev' data-wl-home='svc'>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`;
   else if (step === 1) { const remembered = serviceReturn.knownUnits || []; const choices = remembered.map(item => `<button class='wl-unit-choice ${norm(serviceReturn.unit) === norm(item.unit_tag) ? 'on' : ''}' data-wl-return-unit='${esc(item.unit_tag)}' data-wl-return-type='${esc(item.equipment_type || '')}'><b>${esc(item.unit_tag)}</b><span>${esc(item.equipment_type || 'Known unit')} · remembered from MHelpDesk #${esc(serviceReturn.ticket)}</span></button>`).join(''); card.innerHTML = `${progress('Return Unit · Step 2 of 5', 'Choose the equipment coming back', 2, 5)}<div class='wl-question'><div class='qtext'>Which unit is coming back from MHelpDesk #${esc(serviceReturn.ticket)}?</div>${choices ? `<div class='wl-note'>These tagged units are already remembered from this ticket. Tap the unit coming back.</div><div class='wl-unit-choices'>${choices}</div><div class='wl-divider'>OR</div>` : ''}<button class='wl-big wl-gray' data-wl-return-no-tag-110v><b>110V STAND — NO TAG</b><span class='small'>Use this when the stand has no physical tag. Service will return it directly to Shop.</span></button><div class='wl-divider'>OR ENTER A UNIT TAG</div><input id='wlReturnUnit' value='${esc(serviceReturn.unit)}' placeholder='Exact unit tag'></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next →</button></div>`; }
   else if (step === 2) { const options = [...CAMERA_UNIT_TYPES, ...STAND_POLE_TYPES].map(type => `<option value='${esc(type)}' ${serviceReturn.type === type ? 'selected' : ''}>${esc(type)}</option>`).join(''); card.innerHTML = `${progress('Return Unit · Step 3 of 5', 'Choose the equipment type', 3, 5)}<div class='wl-question'><div class='qtext'>What type of unit is ${esc(serviceReturn.unit)}?</div><select id='wlReturnType'><option value=''>Choose type…</option>${options}<option value='Other' ${serviceReturn.type === 'Other' ? 'selected' : ''}>Other</option></select></div><div class='wl-nav'><button class='wl-prev' data-wl-return-prev>Back</button><button class='wl-next' data-wl-return-next>Next: Photo →</button></div>`; }
   else if (step === 3) {

@@ -10107,3 +10107,23 @@ body #view-owner #ownerAppPage .ownerHomeDateTime b{
     font-size:21px!important;
   }
 }
+
+/* Service technician: five direct daily actions. */
+#view-svc .wl-service-action-list{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;max-width:680px;margin:24px auto 16px}
+#view-svc .wl-service-action-pill{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;width:100%!important;min-height:88px!important;margin:0!important;padding:18px 26px!important;border:2px solid #526b7e!important;border-radius:48px!important;background:#142b3b!important;color:#fff!important;text-align:left!important;line-height:1.25!important;font-size:22px!important;font-weight:850!important;box-shadow:none!important}
+#view-svc .wl-service-action-pill span{min-width:0}
+#view-svc .wl-service-action-pill small{display:block;margin-top:6px;color:#c2d2df!important;font-size:13px!important;font-weight:600!important}
+#view-svc .wl-service-action-pill.complete{border-color:#399c77!important}
+#view-svc .wl-service-action-pill.complete small{color:#95e3bc!important}
+#view-svc .wl-service-action-pill:focus-visible{outline:3px solid #ffbf47!important;outline-offset:4px}
+#view-svc .wl-service-action-pill:active{transform:scale(.99)}
+html[data-theme="light"] #view-svc .wl-service-action-pill,body.light #view-svc .wl-service-action-pill{background:#fff!important;color:#142b3b!important;border-color:#9aafbf!important}
+html[data-theme="light"] #view-svc .wl-service-action-pill small,body.light #view-svc .wl-service-action-pill small{color:#405b70!important}
+@media(max-width:420px){#view-svc .wl-service-action-pill{padding:16px 20px!important;font-size:19px!important}}
+
+@media(prefers-color-scheme:light){
+  #view-svc .wl-service-action-pill{background:#fff!important;color:#142b3b!important;border-color:#9aafbf!important}
+  #view-svc .wl-service-action-pill small{color:#405b70!important}
+  #view-svc .wl-service-action-pill.complete{border-color:#287958!important}
+  #view-svc .wl-service-action-pill.complete small{color:#236445!important}
+}
