@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="./techcheck-eye-apple-180.png?v=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="stylesheet" href="./styles.css?v=owner-it-dashboard-20260928c" />
+    <link rel="stylesheet" href="./styles.css?v=owner-responsive-20260928d" />
     <!-- iPhone Work Date hard containment v71 -->
     <style>
       #view-owner .ownerWorkflowFirst,
@@ -226,6 +226,54 @@
 #view-owner .ownerItQuickGrid span{display:block!important;margin-top:3px!important;color:#aab9c0!important;font-size:8px!important}
 #view-owner .ownerItQuickGrid .primary span{color:#fff!important}
 @media(max-width:900px){#view-owner .ownerItHeaderGrid{grid-template-columns:1fr!important}#view-owner .ownerItKpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-owner .ownerItMainGrid{grid-template-columns:1fr!important}#view-owner .ownerItQuickGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+</style>
+<!-- OWNER RESPONSIVE DESKTOP SCALE 20260928 -->
+<style id="owner-responsive-desktop-scale-20260928">
+@media (min-width:901px){
+  #view-owner .ownerAppShell{width:100%!important;max-width:none!important}
+  #view-owner .ownerAppWorkspace{width:auto!important;max-width:none!important;min-width:0!important}
+  #view-owner .ownerAppPage{width:100%!important;max-width:none!important;box-sizing:border-box!important;padding-left:clamp(12px,1.35vw,28px)!important;padding-right:clamp(12px,1.35vw,28px)!important}
+  #view-owner #ownerRouteView{width:100%!important;max-width:none!important;min-width:0!important}
+  #view-owner .ownerItDashboard{width:100%!important;max-width:none!important;margin:0!important}
+  #view-owner .ownerItHeaderGrid{grid-template-columns:minmax(320px,1.55fr) minmax(210px,.78fr) minmax(260px,1fr)!important;gap:clamp(7px,.65vw,14px)!important;margin-bottom:clamp(7px,.65vw,14px)!important}
+  #view-owner .ownerItGreeting,#view-owner .ownerItInfoCard{min-height:clamp(112px,8.5vw,154px)!important;padding:clamp(14px,1.15vw,22px) clamp(16px,1.35vw,26px)!important}
+  #view-owner .ownerItGreeting h1{font-size:clamp(25px,1.9vw,38px)!important}
+  #view-owner .ownerItGreeting p,#view-owner .ownerItInfoCard>small{font-size:clamp(10px,.72vw,14px)!important}
+  #view-owner .ownerItGreeting>span,#view-owner .ownerItInfoCard>span{font-size:clamp(9px,.62vw,12px)!important}
+  #view-owner .ownerItInfoCard>b{font-size:clamp(30px,2.25vw,44px)!important}
+  #view-owner .ownerItWeatherCard .ownerWeatherCurrent div b{font-size:clamp(27px,2vw,40px)!important}
+  #view-owner .ownerItWeatherCard .ownerWeatherCurrent div strong{font-size:clamp(17px,1.2vw,24px)!important}
+  #view-owner .ownerItKpis{gap:clamp(5px,.55vw,12px)!important;margin-bottom:clamp(7px,.65vw,14px)!important}
+  #view-owner .ownerItKpis button{min-height:clamp(72px,6vw,108px)!important;padding:clamp(9px,.8vw,16px) clamp(12px,1vw,20px)!important}
+  #view-owner .ownerItKpis button b{font-size:clamp(22px,1.65vw,34px)!important}
+  #view-owner .ownerItKpis button span{font-size:clamp(9px,.67vw,13px)!important}
+  #view-owner .ownerItKpis button small{font-size:clamp(9px,.62vw,12px)!important}
+  #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.15fr) minmax(310px,.95fr)!important;gap:clamp(6px,.65vw,14px)!important}
+  #view-owner .ownerItPanel{min-height:clamp(230px,20vw,390px)!important}
+  #view-owner .ownerItPanel>header{min-height:clamp(44px,3.5vw,64px)!important;padding:clamp(10px,.8vw,16px) clamp(12px,1vw,20px)!important}
+  #view-owner .ownerItPanel h2{font-size:clamp(15px,1.05vw,21px)!important}
+  #view-owner .ownerItPanel>header button{font-size:clamp(10px,.7vw,13px)!important}
+  #view-owner .ownerItPanelBody{padding:clamp(8px,.75vw,15px)!important}
+  #view-owner .ownerItEmpty{min-height:clamp(160px,14vw,280px)!important}
+  #view-owner .ownerItEmpty b{font-size:clamp(12px,.9vw,17px)!important}
+  #view-owner .ownerItEmpty span{font-size:clamp(10px,.68vw,13px)!important}
+  #view-owner .ownerItAttentionRows,#view-owner .ownerItQuickGrid{padding:clamp(7px,.65vw,13px)!important;gap:clamp(5px,.5vw,10px)!important}
+  #view-owner .ownerItAttentionRows button{min-height:clamp(36px,3vw,54px)!important;padding:clamp(7px,.65vw,13px) clamp(10px,.8vw,16px)!important}
+  #view-owner .ownerItAttentionRows button b{font-size:clamp(10px,.7vw,14px)!important}
+  #view-owner .ownerItAttentionRows button span{font-size:clamp(9px,.62vw,12px)!important}
+  #view-owner .ownerItQuickGrid button{min-height:clamp(56px,4.8vw,86px)!important;padding:clamp(8px,.7vw,14px)!important}
+  #view-owner .ownerItQuickGrid b{font-size:clamp(10px,.72vw,14px)!important}
+  #view-owner .ownerItQuickGrid span{font-size:clamp(8px,.58vw,11px)!important}
+}
+@media (min-width:901px) and (max-width:1180px){
+  #view-owner .ownerItHeaderGrid{grid-template-columns:1.35fr .8fr 1fr!important}
+  #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,1.75fr) minmax(270px,1fr)!important}
+  #view-owner .ownerItKpis{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+}
+@media (min-width:1700px){
+  #view-owner .ownerAppPage{padding-left:32px!important;padding-right:32px!important}
+  #view-owner .ownerItMainGrid{grid-template-columns:minmax(0,2.25fr) minmax(360px,.9fr)!important}
+}
 </style>
 </head>
   <body>
