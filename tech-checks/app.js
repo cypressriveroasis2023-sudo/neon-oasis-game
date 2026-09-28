@@ -111,7 +111,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=service-simple-20260928')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=account-controls-20260928b')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -3000,12 +3000,22 @@ function ownerOpenTechControl(userId){
    +'<div class="ownerSimpleControlStatus"><div><span>ACTIVE JOBS</span><b>'+jobs.length+'</b></div><div><span>ASSIGNED ASSETS</span><b>'+assets.length+'</b></div></div>'
    +(jobs.length?'<div class="ownerTechControlJobs">'+jobs.slice(0,8).map(j=>'<button type="button" onclick="ownerOpenTicketControlByNumber(\''+esc(j.ticket_no||'')+'\')"><b>MHelpDesk #'+esc(j.ticket_no||'—')+'</b><span>'+esc(j.site||'Site not recorded')+' · '+esc(String(j.status||'').toUpperCase())+'</span></button>').join('')+'</div>':'')
    +'<div class="ownerSimpleControlGrid">'
+   +'<button type="button" onclick="ownerOpenAccount(\''+esc(id)+'\')"><b>ACCOUNT &amp; PASSWORD</b><span>View account details and reset their password</span></button>'
    +'<button class="primary" type="button" onclick="ownerTechAssignJob(\''+esc(id)+'\')"><b>GIVE JOB</b><span>Create or assign Tech Check work</span></button>'
    +'<button type="button" onclick="ownerTechHistory(\''+esc(id)+'\')"><b>VIEW HISTORY</b><span>See this technician’s recorded activity</span></button>'
    +(role==='service'?'<button type="button" onclick="ownerTechManageTruck(\''+esc(id)+'\')"><b>MANAGE TRUCK</b><span>Adjust units, SIMs and truck stock</span></button>':'')
    +'<button type="button" onclick="ownerTechTestScreen(\''+esc(role)+'\')"><b>TEST '+esc(role==='service'?'SERVICE':'IT')+' SCREEN</b><span>Open the technician-side workflow screen</span></button>'
    +'</div><div class="ownerSimpleControlFooter"><button type="button" onclick="ownerCloseSimpleControl()">DONE</button></div></section>';
   overlay.classList.add('open');
+}
+async function ownerOpenAccount(userId){
+  if(state.profile?.role!=='owner')return;
+  ownerCloseSimpleControl();
+  await ownerAppNavigate('accounts');
+  const card=[...document.querySelectorAll('[data-account-user]')].find(el=>el.dataset.accountUser===String(userId));
+  if(!card)return alert('This account is not in the active or disabled list. Check Former / Deleted Accounts.');
+  card.open=true;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function ownerTechAssignJob(){ownerCloseSimpleControl();await ownerAppNavigate('assign');}
 async function ownerTechHistory(userId){
@@ -3497,15 +3507,16 @@ function teamMemberCard(p) {
   const email = p.notification_email || '';
   const emailStatus = email ? '<span class="pill green">EMAIL SET</span>' : '<span class="pill amber">NO EMAIL</span>';
   const ownerCopy = p.role === 'owner' ? '<label class="emailPref"><input id="emailOwner_' + p.user_id + '" type="checkbox" ' + (p.email_owner_copies ? 'checked' : '') + '><span>Owner copy emails</span></label>' : '';
-  return '<details class="teamMemberCard role-' + teamRoleClass(p.role) + ' ' + (p.active?'':'disabledAccount') + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody">'
+  return '<details data-account-user="' + esc(p.user_id) + '" class="teamMemberCard role-' + teamRoleClass(p.role) + ' ' + (p.active?'':'disabledAccount') + '"><summary><div class="teamMemberIdentity"><b>' + esc(p.full_name || p.username || 'User') + '</b><span>@' + esc(p.username || 'no-username') + '</span></div><div class="teamMemberBadges"><span class="pill roleBadge ' + teamRoleClass(p.role) + '">' + esc(roleLabel(p.role)) + '</span><span class="pill ' + (p.active ? 'green' : 'amber') + '">' + status + '</span>' + emailStatus + (self ? '<span class="pill">YOU</span>' : '') + '</div></summary><div class="teamMemberBody">'
     +(!p.active?'<div class="warn accountDisabledNotice"><b>DISABLED ACCOUNT</b><div class="small">This person cannot sign in until Access is changed back to Active and saved.</div></div>':'')
+    +'<button class="mini full top8" onclick="ownerOpenTechControl(\'' + p.user_id + '\')">VIEW WORK, EQUIPMENT &amp; HISTORY</button>'
     +'<div class="teamEditGrid"><div><label>Full Name</label><input id="name_' + p.user_id + '" value="' + esc(p.full_name || '') + '"></div>'
     +'<div><label>Username / Sign In</label><input id="username_' + p.user_id + '" autocapitalize="none" spellcheck="false" value="' + esc(p.username || '') + '"><div class="small">Changing this changes the username they use the next time they sign in.</div></div>'
     +'<div><label>Role</label><select id="role_' + p.user_id + '"><option value="service" ' + (p.role==='service'?'selected':'') + '>Service Tech</option><option value="it" ' + (p.role==='it'?'selected':'') + '>IT Technician</option><option value="owner" ' + (p.role==='owner'?'selected':'') + '>Owner/Admin</option><option value="pending" ' + (p.role==='pending'?'selected':'') + '>Pending</option></select></div>'
     +'<div><label>Access</label><select id="active_' + p.user_id + '"><option value="true" ' + (p.active?'selected':'') + '>Active</option><option value="false" ' + (!p.active?'selected':'') + '>Disabled</option></select></div>'
     +'<div class="teamSaveCell"><label>&nbsp;</label><button class="mini full" onclick="saveUserAccess(\'' + p.user_id + '\')">Save Account</button></div></div>'
     +'<div class="teamEmailBox"><div><label>Notification Email</label><input id="notifyEmail_' + p.user_id + '" type="email" autocapitalize="none" spellcheck="false" placeholder="name@camerasonsite.com" value="' + esc(email) + '"></div><div class="emailPrefs"><label class="emailPref"><input id="emailJobs_' + p.user_id + '" type="checkbox" ' + (p.email_job_assignments !== false ? 'checked' : '') + '><span>New job assignment emails</span></label><label class="emailPref"><input id="emailHandoffs_' + p.user_id + '" type="checkbox" ' + (p.email_handoff_updates !== false ? 'checked' : '') + '><span>Equipment / handoff emails</span></label>' + ownerCopy + '</div><div class="small">Email delivery will start after the outgoing email service is connected.</div></div>'
-    +'<details class="accountSecurityFold" open><summary>Account Security · Password</summary><div class="accountSecurityBody"><div class="small"><b>Owner control:</b> Set a temporary password for this account. Tech Check never reveals the technician’s private password. The technician must replace this temporary password with a private password at next sign in.</div><div class="small top8">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>New Temporary Password</label><input id="reset_' + p.user_id + '" type="password" autocomplete="new-password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">RESET USER PASSWORD</button></div></div></div></details>'
+    +'<details class="accountSecurityFold" open><summary>Account Security · Password</summary><div class="accountSecurityBody"><div class="small"><b>Owner control:</b> Set a temporary password for this account. Tech Check never reveals the technician’s private password. The technician must replace this temporary password with a private password at next sign in.</div><div class="small top8">' + (p.must_change_password ? 'Password status: TEMPORARY — private change required at next sign in' : 'Password status: Private password set') + '</div><div class="grid top8"><div><label>New Temporary Password</label><input id="reset_' + p.user_id + '" type="password" autocomplete="new-password" placeholder="8+ characters"></div><div><label>&nbsp;</label><button class="mini full" onclick="resetUserPassword(\'' + p.user_id + '\')">RESET USER PASSWORD</button></div></div><div id="resetMessage_' + p.user_id + '" role="status" aria-live="polite"></div></div></details>'
     +(self ? '<div class="small top8"><b>Your Owner/Admin account is protected.</b> You cannot archive or disable your own owner access.</div>' : '<button class="mini danger top10" onclick="archiveUser(\'' + p.user_id + '\')">Delete from Techs on File</button>')
     +'</div></details>';
 }
@@ -3520,6 +3531,10 @@ function renderTeamAccessHistory() {
 }
 function renderUsers() {
   if (state.profile?.role !== 'owner') return;
+  const accountRoot=$('ownerPersistentAccounts');
+  // Realtime updates must not erase a password or account edit in progress.
+  if(accountRoot?.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName))return;
+  const openAccounts=new Set([...document.querySelectorAll('[data-account-user][open]')].map(el=>el.dataset.accountUser));
   const activeTeam=state.profiles.filter(p => !p.archived_at && p.active);
   const inactiveTeam=state.profiles.filter(p => !p.archived_at && !p.active);
   const archived=state.profiles.filter(p => p.archived_at);
@@ -3542,6 +3557,7 @@ function renderUsers() {
   if (inactiveHost) inactiveHost.innerHTML=inactiveTeam.length ? inactiveTeam.map(teamMemberCard).join('') : '<div class="ok"><b>✓ No inactive team members.</b></div>';
   const archivedHost=$('archivedUserList');
   if (archivedHost) archivedHost.innerHTML=archived.length ? archived.map(archivedTeamCard).join('') : '<div class="ok"><b>✓ No deleted / former team members.</b></div>';
+  document.querySelectorAll('[data-account-user]').forEach(el=>{el.open=openAccounts.has(el.dataset.accountUser);});
   renderTeamAccessHistory();
 }
 async function archiveUser(id) {
@@ -3597,18 +3613,39 @@ async function saveUserAccess(id) {
   await refreshData();
   alert(usernameChanged ? 'Account updated. New sign-in username: @' + username : 'Team member and email settings updated.');
 }
+const pendingPasswordResets=new Set();
 async function resetUserPassword(id) {
-  const password = $('reset_' + id).value;
-  if (password.length < 8)
-    return alert('Password must be at least 8 characters.');
-  const { data, error } = await db.functions.invoke('admin-user-management', {
-    body: { action: 'reset_password', user_id: id, password },
-  });
-  if (error || data?.error) return alert('Password reset failed: ' + (data?.error || error?.message || 'Unknown error'));
-  $('reset_' + id).value = '';
-  await refreshData();
-  alert('Temporary password set successfully. The technician can sign in with it once, then Tech Check will require a new private password.');
+  if(state.profile?.role!=='owner'||pendingPasswordResets.has(id))return;
+  const input=$('reset_'+id), statusId='resetMessage_'+id;
+  const feedback=(text,type)=>msg(statusId,text,type);
+  const password=input?.value||'';
+  if(password.length<8)return feedback('Enter a temporary password of at least 8 characters.','bad');
+  pendingPasswordResets.add(id);
+  feedback('Setting temporary password…','');
+  let succeeded=false;
+  try {
+    const {data:sessionData,error:sessionError}=await db.auth.getSession();
+    if(sessionError||!sessionData?.session)throw new Error('Your Owner session expired. Sign out and sign in again.');
+    const {data,error}=await db.functions.invoke('admin-user-management',{
+      body:{action:'reset_password',user_id:id,password}
+    });
+    if(error||data?.error){
+      let detail=data?.error||error?.message||'Unknown error';
+      try{const body=await error?.context?.json();detail=body?.error||body?.message||detail;}catch{}
+      throw new Error(typeof detail==='string'?detail:JSON.stringify(detail));
+    }
+    succeeded=true;
+    input.value='';
+    feedback('Temporary password set. This technician must choose a private password at their next sign-in.','ok');
+  }catch(error){
+    feedback('Password reset failed: '+(error?.message||'Could not reach the account service.'),'bad');
+  }finally{pendingPasswordResets.delete(id);}
+  if(succeeded){
+    try{await refreshData();feedback('Temporary password set. This technician must choose a private password at their next sign-in.','ok');}
+    catch{feedback('Password was reset, but account details could not refresh. Reload to view the updated status.','ok');}
+  }
 }
+
 function ensureStartFreshCard() {
   if ($('ownerResetCard')) return;
   const card = document.createElement('details');
@@ -3679,6 +3716,7 @@ Object.assign(window, {
   archiveUser,
   restoreUser,
   resetUserPassword,
+  ownerOpenAccount,
   ownerReviewPasswordReset,
   ownerCompanyHistoryKindChanged,
   ownerCompanyHistorySearch,
