@@ -1011,43 +1011,30 @@ if($('reconSummary')){
   $('reconSummary').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAllReconCameras()}};
 }async function refreshFieldHealth(){
   const btn=$('refresh');if(btn.disabled)return;
-  btn.disabled=true;const oldText=btn.textContent;btn.textContent='Checking field…';
-  const before=new Map(devices.map(d=>[d.id,effectiveHealth(d)]));
+  btn.disabled=true;const oldText=btn.textContent;
   try{
-    const field=devices.filter(d=>resolvedDeviceIP(d)&&!isShop(d)),batchSize=36,timeoutMs=12000;
-    const runCheck=d=>Promise.race([
-      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}),
-      new Promise(resolve=>setTimeout(()=>resolve({error:new Error('Health check timed out')}),timeoutMs))
-    ]);
-    for(let i=0;i<field.length;i+=batchSize){
-      btn.textContent='Checking '+Math.min(i+batchSize,field.length)+' / '+field.length+'…';
-      await Promise.allSettled(field.slice(i,i+batchSize).map(runCheck));
-    }
+    /* Provider-first refresh: one Vigilant sync replaces hundreds of duplicate per-camera network calls. */
+    btn.textContent='Syncing Vigilant…';
+    try{
+      const v=await Promise.race([
+        db.functions.invoke('vigilant-sync',{body:{action:'sync'}}),
+        new Promise(resolve=>setTimeout(()=>resolve({error:new Error('Vigilant sync timed out')}),20000))
+      ]);
+      if(v?.error)console.warn('Vigilant sync:',v.error);
+    }catch(e){console.warn('Vigilant refresh skipped:',e?.message||e)}
     btn.textContent='Syncing Reconeyez…';
-    try{await invokeRecon({action:'sync'})}catch(e){console.warn('Reconeyez refresh skipped:',e?.message||e)}
+    try{await Promise.race([invokeRecon({action:'sync'}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Reconeyez sync timed out')),20000))])}catch(e){console.warn('Reconeyez refresh skipped:',e?.message||e)}
+    btn.textContent='Loading health…';
     await load();
     await loadReconStatus();
-    const suspects=field.filter(d=>before.get(d.id)==='online'&&['offline','verifying','degraded'].includes(String(effectiveHealth(devices.find(x=>x.id===d.id)||d)).toLowerCase()));
-    const massThreshold=Math.max(5,Math.ceil(field.length*.03));
-    if(suspects.length>=massThreshold){
-      const banner=$('healthDropBanner');
-      if(banner){banner.style.display='block';banner.style.borderColor='#c89524';banner.innerHTML='<b class="yellow">⚠ Fleet change detected · verifying '+suspects.length+' devices again</b><div class="small" style="margin-top:5px">Camera Health will not trust a sudden mass drop from one scan. A second pass is running before treating these as outages.</div>'}
-      btn.textContent='Verifying '+suspects.length+' changes…';
-      await new Promise(r=>setTimeout(r,1500));
-      for(let i=0;i<suspects.length;i+=batchSize){
-        btn.textContent='Verifying '+Math.min(i+batchSize,suspects.length)+' / '+suspects.length+'…';
-        await Promise.allSettled(suspects.slice(i,i+batchSize).map(runCheck));
-      }
-      await load();
-      const stillBad=suspects.filter(d=>['offline','verifying','degraded'].includes(String(effectiveHealth(devices.find(x=>x.id===d.id)||d)).toLowerCase()));
-      if(banner&&stillBad.length){banner.style.display='block';banner.style.borderColor='#c89524';banner.innerHTML='<b class="yellow">Verification complete · '+stillBad.length+' device'+(stillBad.length===1?'':'s')+' still need attention</b><div class="small" style="margin-top:5px">The sudden fleet change was automatically rechecked. Only repeated/confirmed failures can become OFFLINE.</div><button id="viewVerifiedIssues" style="margin-top:9px">Review verified issues →</button>';setTimeout(()=>{const b=$('viewVerifiedIssues');if(b)b.onclick=()=>{$('filter').value='Degraded';unitPage=1;render();$('unitCards').scrollIntoView({behavior:'smooth',block:'start'})}},0)}
-    }
-    btn.textContent='✓ Verified '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
-    setTimeout(()=>{if(!btn.disabled)btn.textContent=oldText},2500);
-  }catch(e){console.error('Full Camera Health refresh failed',e);btn.textContent='Refresh failed';}
-  finally{btn.disabled=false}
+    btn.textContent='✓ Updated '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  }catch(e){
+    console.error('Camera Health refresh failed',e);btn.textContent='Refresh failed';
+  }finally{
+    btn.disabled=false;
+    setTimeout(()=>{if(btn.textContent.startsWith('✓'))btn.textContent=oldText},2500);
+  }
 }
-
 async function reconErrorMessage(error){try{const ctx=error?.context;if(ctx&&typeof ctx.clone==='function'){const body=await ctx.clone().json().catch(()=>null);if(body?.error)return String(body.error)}}catch{}return String(error?.message||error||'Reconeyez request failed')}
 async function invokeRecon(body){const {data,error}=await db.functions.invoke('reconeyez-connect',{body});if(error)throw new Error(await reconErrorMessage(error));if(data?.error)throw new Error(data.error);return data||{}}
 async function loadReconStatus(){const box=$('reconConnectStatus'),sync=$('reconSync'),live=$('reconLiveStatus');if(!box)return;try{const s=await invokeRecon({action:'status'});box.innerHTML=s.configured?'<span class="green"><b>CONNECTED</b></span> · '+esc(s.server||'na.reconeyez.com')+(s.last_sync_at?' · Last inventory sync '+esc(new Date(s.last_sync_at).toLocaleString()):' · Ready to sync'):'<span class="yellow"><b>NOT CONNECTED YET</b></span> · Enter your existing Reconeyez login once below.';if(sync)sync.disabled=!s.configured;if($('reconConnect'))$('reconConnect').textContent=s.configured?'Update Login & Sync':'Connect & Sync Reconeyez';if(live){if(s.last_webhook_received_at)live.innerHTML='<span class="green"><b>LIVE EVENTS RECEIVING</b></span> · Last event '+esc(new Date(s.last_webhook_received_at).toLocaleString())+(s.live_event_type?' · '+esc(s.live_event_type):'');else if(s.receiver_tested_at)live.innerHTML='<span class="green"><b>RECEIVER READY</b></span> · Tested '+esc(new Date(s.receiver_tested_at).toLocaleString())+' · Waiting for Reconeyez to begin forwarding live events.';else live.innerHTML='<span class="yellow"><b>LIVE FEED NOT TESTED YET</b></span> · Test the receiver, then send the setup request to Reconeyez.'}}catch(e){box.textContent='Reconeyez connection status unavailable: '+(e?.message||e);if(live)live.textContent='Live receiver status unavailable.';if(sync)sync.disabled=true}}
