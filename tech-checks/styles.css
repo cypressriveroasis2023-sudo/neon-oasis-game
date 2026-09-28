@@ -10157,3 +10157,54 @@ html[data-theme="light"] #view-svc .wl-service-action-pill small,body.light #vie
     gap:12px!important;
   }
 }
+
+
+/* Owner truck inventory workspace — stable outside live board refresh */
+body.ownerTruckInventoryEditing{overflow:hidden!important}
+.ownerTruckInventoryModal{position:fixed;inset:0;z-index:30000;display:grid;place-items:center;padding:28px}
+.ownerTruckInventoryBackdrop{position:absolute;inset:0;background:rgba(1,7,11,.82);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.ownerTruckInventoryWorkspace{
+ position:relative;z-index:1;width:min(900px,94vw);max-height:90vh;overflow:auto;
+ padding:24px;border:1px solid #e31821;border-radius:18px;
+ background:#07151e;box-shadow:0 28px 80px rgba(0,0,0,.65),0 0 0 1px rgba(227,24,33,.16)
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditorHead{
+ position:sticky;top:-24px;z-index:8;margin:-24px -24px 18px;padding:20px 24px 16px;
+ background:rgba(7,21,30,.97);border-bottom:1px solid #29424f;backdrop-filter:blur(10px)
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditorHead b{font-size:18px;color:#fff}
+.ownerTruckInventoryWorkspace .ownerTruckEditorHead span{font-size:11px;color:#b7c5cc}
+.ownerTruckInventoryWorkspace .ownerTruckEditorHead button{min-height:38px;padding:0 15px}
+.ownerTruckInventoryWorkspace .ownerTruckEditorLabel{
+ margin:22px 0 10px;padding-bottom:8px;border-bottom:1px solid #334b57;
+ color:#ff5961;font-size:11px;letter-spacing:.11em
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow{
+ grid-template-columns:minmax(190px,.8fr) minmax(280px,1.3fr)!important;
+ gap:18px;padding:12px 4px;border-top:0
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow>div b{font-size:13px}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow>div span{font-size:10px}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow input{
+ height:46px!important;padding:9px 12px!important;border-radius:9px!important;
+ background:#0d222c!important;border:1px solid #496471!important;font-size:15px!important
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow input:focus{
+ outline:2px solid #e31821!important;outline-offset:1px;border-color:#ff5961!important;background:#102a35!important
+}
+.ownerTruckInventoryWorkspace .ownerTruckEditRow input:not(:placeholder-shown){border-color:#2b9c62!important}
+.ownerTruckInventoryWorkspace .ownerTruckSaveBar{
+ bottom:-24px;margin:22px -24px -24px;padding:16px 24px;
+ grid-template-columns:minmax(0,1fr) auto;align-items:center;border-radius:0 0 18px 18px;
+ background:rgba(7,21,30,.98)
+}
+.ownerTruckInventoryWorkspace .ownerTruckSaveBar span{font-size:11px}
+.ownerTruckInventoryWorkspace .ownerTruckSaveBar button{min-height:48px;padding:0 22px;font-size:12px}
+@media(max-width:700px){
+ .ownerTruckInventoryModal{padding:0}
+ .ownerTruckInventoryWorkspace{width:100vw;max-height:100dvh;height:100dvh;border-radius:0;padding:18px}
+ .ownerTruckInventoryWorkspace .ownerTruckEditorHead{top:-18px;margin:-18px -18px 14px;padding:16px 18px 13px}
+ .ownerTruckInventoryWorkspace .ownerTruckEditRow{grid-template-columns:1fr!important;gap:7px;padding:11px 0}
+ .ownerTruckInventoryWorkspace .ownerTruckSaveBar{bottom:-18px;margin:18px -18px -18px;padding:13px 18px;grid-template-columns:1fr}
+ .ownerTruckInventoryWorkspace .ownerTruckSaveBar button{width:100%}
+}
