@@ -10208,3 +10208,52 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
  .ownerTruckInventoryWorkspace .ownerTruckSaveBar{bottom:-18px;margin:18px -18px -18px;padding:13px 18px;grid-template-columns:1fr}
  .ownerTruckInventoryWorkspace .ownerTruckSaveBar button{width:100%}
 }
+
+/* Owner board aligned to IT Tech visual system — 2026-09-28 */
+@media(min-width:901px){
+ body:has(#view-owner:not(.hidden)){background:#07151e!important}
+ #view-owner{background:#07151e!important}
+ #view-owner .ownerAppShell{grid-template-columns:190px minmax(0,1fr)!important;background:#07151e!important}
+ #view-owner .ownerAppSidebar{background:#081923!important;border-right:1px solid #213844!important;padding:14px 9px!important}
+ #view-owner .ownerAppBrand{padding:5px 7px 13px!important;margin-bottom:8px!important;border-bottom:1px solid #213844!important}
+ #view-owner .ownerAppBrand b{font-size:12px!important}
+ #view-owner .ownerAppBrand small{font-size:9px!important}
+ #view-owner .ownerAppSidebar nav{gap:3px!important}
+ #view-owner .ownerAppSidebar nav button,
+ #view-owner .ownerAppSidebar nav>a{min-height:36px!important;padding:8px 10px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;color:#c7d3da!important;font-size:11px!important;font-weight:800!important;text-decoration:none!important;display:flex!important;align-items:center!important}
+ #view-owner .ownerAppSidebar nav button:hover,
+ #view-owner .ownerAppSidebar nav>a:hover{background:#102630!important;border-color:#29434f!important;color:#fff!important}
+ #view-owner .ownerAppSidebar nav button.active{background:#b90f18!important;border-color:#ef2c35!important;color:#fff!important;box-shadow:0 0 18px rgba(227,24,33,.12)!important}
+ #view-owner .ownerVisionNav{color:#fff!important}
+ #view-owner .ownerAppSidebarUtility{border-top:1px solid #213844!important;padding-top:8px!important}
+ #view-owner .ownerAppWorkspace{background:#07151e!important}
+ #view-owner .ownerWorkspaceTools{justify-content:flex-start!important;padding:12px 18px 0!important}
+ #view-owner .ownerWorkspaceTools a{min-height:38px!important;border-radius:8px!important;background:#0d222c!important;border-color:#29434f!important;font-size:11px!important}
+ #view-owner .ownerAppPage{padding:18px 20px 64px!important}
+ #view-owner .ownerAppPageHeader{max-width:none!important;margin:0 0 14px!important;padding:0 0 12px!important}
+ #view-owner .ownerAppPageHeader h1{font-size:23px!important;margin:3px 0!important}
+ #view-owner .ownerAppGroup,
+ #view-owner .ownerTodayGroup,
+ #view-owner .ownerTodaySummary,
+ #view-owner .ownerAppJobRow,
+ #view-owner .ownerAppUnitRow,
+ #view-owner .ownerAppHandoffRow,
+ #view-owner .ownerAppTeamRow{max-width:none!important}
+ #view-owner .ownerAppGroup,
+ #view-owner .ownerTodayPanel,
+ #view-owner .ownerAppAccountCreate{border-radius:10px!important}
+ #view-owner .ownerTodayHero{grid-template-columns:minmax(0,1.6fr) minmax(250px,.55fr)!important;gap:10px!important;margin-bottom:10px!important}
+ #view-owner .ownerTodayWelcome,
+ #view-owner .ownerTodayClockCard{min-height:128px!important;border-radius:10px!important}
+ #view-owner .ownerTodayWelcome{padding:17px 20px!important}
+ #view-owner .ownerTodayWelcome h1{font-size:34px!important}
+ #view-owner .ownerTodayClockCard{padding:16px!important}
+ #view-owner .ownerTodayClock{font-size:38px!important}
+ #view-owner .ownerTodaySummary{gap:7px!important;margin:0 0 14px!important}
+ #view-owner .ownerTodaySummary>div{padding:10px 12px!important;border-radius:8px!important;background:#0d2029!important}
+ #view-owner .ownerTodaySummary b{font-size:19px!important}
+ #view-owner .ownerTodayPanel{padding:13px!important;margin-bottom:10px!important;background:#0b1d26!important}
+ #view-owner .ownerWeatherNow{min-height:112px!important;border-radius:10px 10px 0 0!important;padding:13px 16px!important}
+ #view-owner .ownerWeatherWeek{border-radius:0 0 10px 10px!important}
+ #view-owner .ownerWeatherDay{min-height:88px!important;padding:7px 5px!important}
+}
