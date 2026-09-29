@@ -2866,29 +2866,29 @@ function ownerAppToday(){
   const restock=team.filter(t=>!t.truck_ready).length;
   const recent=jobs.slice().sort((a,b)=>String(b.updated_at||b.created_at||'').localeCompare(String(a.updated_at||a.created_at||''))).slice(0,6);
   const schedule=todayJobs.filter(a=>a.status!=='completed');
-  const scheduleHtml=schedule.length?schedule.map(ownerAppJobRow).join(''):'<div class="ownerItEmpty"><b>No jobs scheduled for today.</b><span>Company schedule is clear.</span></div>';
-  const recentHtml=recent.length?recent.map(ownerAppJobRow).join(''):'<div class="ownerItEmpty"><b>No recent company activity yet.</b><span>New jobs and technician activity will appear here.</span></div>';
+  const scheduleHtml=schedule.length?schedule.map(ownerAppJobRow).join(''):'<div class="wl-it-empty"><b>No jobs scheduled for today.</b><span>Company schedule is clear.</span></div>';
+  const recentHtml=recent.length?recent.map(ownerAppJobRow).join(''):'<div class="wl-it-empty"><b>No recent company activity yet.</b><span>New jobs and technician activity will appear here.</span></div>';
   const needRow=(label,count,route)=>'<button type="button" onclick="ownerAppNavigate(\''+route+'\')"><b>'+label+'</b><span>'+count+' →</span></button>';
-  return '<div class="ownerItDashboard">'
-   +'<section class="ownerItHeaderGrid">'
-    +'<article class="ownerItGreeting"><span>CAMERAS ONSITE · OWNER OPERATIONS</span><h1>'+esc(greeting)+'</h1><p>Here’s what is happening across the company today.</p></article>'
-    +'<article class="ownerItInfoCard"><span>LOCAL TIME</span><b id="ownerTodayClock"></b><small id="ownerTodayDate"></small></article>'
-    +'<article class="ownerItInfoCard ownerItWeatherCard"><span>LOCAL WEATHER</span><div id="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<b>Loading…</b>')+'</div></article>'
+  return '<div class="wl-it-shared-dashboard">'
+   +'<section class="wl-it-owner-hero">'
+    +'<article class="wl-it-hero-greeting"><span>CAMERAS ONSITE · OWNER OPERATIONS</span><h1>'+esc(greeting)+'</h1><p>Here’s what is happening across the company today.</p></article>'
+    +'<article class="wl-it-clock-card"><span>LOCAL TIME</span><b id="ownerTodayClock"></b><small id="ownerTodayDate"></small></article>'
+    +'<article class="wl-it-weather-card"><span>LOCAL WEATHER</span><div id="ownerTodayWeatherHost">'+(state.ownerWeatherData?'':'<b>Loading…</b>')+'</div></article>'
    +'</section>'
-   +'<section class="ownerItKpis">'
+   +'<section class="wl-it-command-stats">'
     +'<button class="cyan" onclick="ownerAppNavigate(\'calendar\')"><b>'+active+'</b><span>ACTIVE JOBS</span><small>Company-wide →</small></button>'
     +'<button class="red" onclick="ownerAppNavigate(\'attention\')"><b>'+attention+'</b><span>NEEDS ATTENTION</span><small>View details →</small></button>'
     +'<button class="green" onclick="ownerAppNavigate(\'team\')"><b>'+working+'</b><span>IN SERVICE · FIELD</span><small>View team →</small></button>'
     +'<button class="purple" onclick="ownerAppNavigate(\'review\')"><b>'+review+'</b><span>OWNER REVIEW</span><small>Review queue →</small></button>'
     +'<button class="amber" onclick="ownerAppNavigate(\'handoffs\')"><b>'+handoffs+'</b><span>HANDOFFS / PREP</span><small>View handoffs →</small></button>'
    +'</section>'
-   +'<section class="ownerItMainGrid">'
-    +'<article class="ownerItPanel ownerItSchedule"><header><h2>Today’s Schedule · All Technicians</h2><button onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><div class="ownerItPanelBody">'+scheduleHtml+'</div></article>'
-    +'<article class="ownerItPanel ownerItAttention"><header><h2>Needs Attention</h2></header><div class="ownerItAttentionRows">'
+   +'<section class="wl-it-shared-main">'
+    +'<article class="wl-it-command-panel wl-it-shared-schedule"><header><h2>Today’s Schedule · All Technicians</h2><button onclick="ownerAppNavigate(\'calendar\')">Calendar →</button></header><div class="wl-it-dashboard-list">'+scheduleHtml+'</div></article>'
+    +'<article class="wl-it-command-panel wl-it-shared-attention"><header><h2>Needs Attention</h2></header><div class="wl-it-dashboard-list">'
       +needRow('Overdue Jobs',overdue,'attention')+needRow('Owner Review',review,'review')+needRow('Open Handoffs / Returns',returns.length,'handoffs')+needRow('Truck / Restock Attention',restock,'team')+needRow('Jobs Completed Today',complete,'history')
      +'</div></article>'
-    +'<article class="ownerItPanel ownerItRecent"><header><h2>Recent Activity · Company</h2><button onclick="ownerAppNavigate(\'activity\')">Activity →</button></header><div class="ownerItPanelBody">'+recentHtml+'</div></article>'
-    +'<article class="ownerItPanel ownerItQuick"><header><h2>Quick Actions</h2></header><div class="ownerItQuickGrid">'
+    +'<article class="wl-it-command-panel wl-it-shared-recent"><header><h2>Recent Activity · Company</h2><button onclick="ownerAppNavigate(\'activity\')">Activity →</button></header><div class="wl-it-dashboard-list">'+recentHtml+'</div></article>'
+    +'<article class="wl-it-command-panel wl-it-shared-quick"><header><h2>Quick Actions</h2></header><div class="wl-it-quick-grid">'
       +'<button class="primary" onclick="ownerAppNavigate(\'assign\')"><b>+ Assign Job</b><span>Create / assign work</span></button>'
       +'<button onclick="ownerAppNavigate(\'team\')"><b>Team</b><span>All technicians</span></button>'
       +'<button onclick="ownerAppNavigate(\'calendar\')"><b>Calendar</b><span>Company schedule</span></button>'
