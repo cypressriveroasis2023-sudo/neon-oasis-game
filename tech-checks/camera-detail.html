@@ -318,50 +318,37 @@ async function verifyNow(){
     if(cameraGroup(device)==='Reconeyez'){
       b.textContent='Refreshing Reconeyez…';
       const {data,error}=await db.functions.invoke('reconeyez-connect',{body:{action:'sync'}});
-      if(error)throw new Error(await edgeErrorMessage(error));
-      if(data?.error)throw new Error(data.error);
-      await load();
-      b.textContent='Reconeyez refreshed';
-      return;
+      if(error)throw new Error(await edgeErrorMessage(error));if(data?.error)throw new Error(data.error);
+      await load();b.textContent='Reconeyez refreshed';return;
     }
     if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
-    if(!effectivePublicIP())throw new Error('No public IP is configured for '+(device.device_name||device.unit_key)+' and no linked router public IP is available. Add a public IP before verifying.');
-    const hasProfile=String(device.monitoring_profile||'').trim()||((device.expected_ports||[]).length>0);
-    if(!hasProfile)throw new Error('No monitoring profile or port profile is configured for this device.');
-    for(let pass=1;pass<=3;pass++){
-      b.textContent='Verify '+pass+' / 3…';
-      const {error}=await db.functions.invoke('camera-health-check',{body:{device_id:device.id}});
-      if(error)throw new Error(await edgeErrorMessage(error));
-      if(pass<3)await new Promise(r=>setTimeout(r,900))
+    if(!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');
+    const profile=String(device.monitoring_profile||'').toLowerCase();
+    const vigilant=['helios','nvr','ranger','solar_spotter','spotter'].includes(profile);
+    if(vigilant){
+      b.textContent='Syncing source…';
+      await Promise.race([db.functions.invoke('vigilant-sync',{body:{device_id:device.id}}),new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),7000))]);
     }
-    b.textContent='Refreshing…';await load();
-    // Manual Verify is authoritative for what the user sees. Do not let stale
-    // source/port data repaint a failed verification green.
-    const freshCheckedAt=current?.checked_at?new Date(current.checked_at).getTime():0;
-    const freshEnough=freshCheckedAt>=(Date.now()-120000);
-    const portResults=Object.values(current?.port_status||{});
-    const anyPortOnline=portResults.some(v=>v?.online===true);
-    const explicitFailure=String(current?.overall_status||'').toLowerCase()==='offline'||current?.ip_reachable===false||(portResults.length>0&&!anyPortOnline);
-    const verifiedStatus=(!freshEnough||explicitFailure)?'offline':effectiveHealth(device,current);
-    if(verifiedStatus!=='online'){
-      $('statusPill').textContent='OFFLINE';$('statusPill').className='pill offline';
-      $('statusSource').textContent=cameraGroup(device)+' · Direct verification FAILED / no current response';
-      $('shopActionWrap').classList.add('hidden');
-      $('issueNotice').textContent='OFFLINE — the latest manual Verify did not prove a current live response.';
-      $('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden');
-      b.textContent='✕ Offline';
-    }else{
-      b.textContent='✓ Online';
-    }
+    b.textContent='Verifying now…';
+    const {error}=await Promise.race([
+      db.functions.invoke('camera-health-check',{body:{device_id:device.id,fast_verify:true,skip_provider_sync:true}}),
+      new Promise(resolve=>setTimeout(()=>resolve({error:{message:'Live verification timed out'}}),5500))
+    ]);
+    if(error)throw new Error(error.message||'Live verification failed');
+    await load();
+    const st=effectiveHealth(device,current);
+    b.textContent=st==='online'?'✓ Online':st==='offline'?'✕ Offline':st==='degraded'?'⚠ Degraded':'? Not verified';
   }catch(e){
-    console.error(e);b.textContent='Verification failed';
-    // A failed manual Verify is a failed current health check: never leave a stale green ONLINE pill visible.
-    $('statusPill').textContent='OFFLINE';$('statusPill').className='pill offline';
-    $('statusSource').textContent=cameraGroup(device)+' · Verification failed / no response';
-    $('issueNotice').textContent='OFFLINE — verification failed: '+String(e?.message||e);
-    $('issueNotice').className='notice red';$('issueNotice').classList.remove('hidden')
-  }
-  finally{setTimeout(()=>{b.disabled=false;b.textContent=cameraGroup(device)==='Reconeyez'?'Refresh Reconeyez':'Verify now'},2200)}
+    console.error(e);await load().catch(()=>{});
+    const st=effectiveHealth(device,current);
+    if(st==='stale'||st==='verifying'){
+      $('statusPill').textContent='NOT VERIFIED';$('statusPill').className='pill stale';
+      $('statusSource').textContent=cameraGroup(device)+' · Verification did not complete';
+      $('issueNotice').textContent='NOT VERIFIED — '+String(e?.message||e);
+      $('issueNotice').className='notice yellow';$('issueNotice').classList.remove('hidden');
+    }
+    b.textContent='Verification incomplete';
+  }finally{setTimeout(()=>{b.disabled=false;b.textContent=cameraGroup(device)==='Reconeyez'?'Refresh Reconeyez':'Verify now'},2200)}
 }
 async function saveUnitRouter(){
   if(!device||String(profile?.role||'')!=='owner'||!device.unit_key)return;
