@@ -984,7 +984,7 @@ if(status==='offline')reason='No current response from '+(profile==='avigilon'?'
 else if(status==='degraded'){const expected=(d.expected_ports||[]).map(String),missing=expected.filter(p=>!responding.includes(p));reason=profile==='avigilon'?(responding.length?'Avigilon ES web interface is responding':'Avigilon ES has no responding tested interface'):(missing.length?'No response on '+missing.map(p=>(d.port_labels||{})[p]||('port '+p)).join(', '):'Device is only partially responding')}
 else if(status==='online')reason=profile==='avigilon'?'Avigilon ES / Unity appliance responding':profile==='helios'?'HELIOS camera interfaces responding':profile==='solar_spotter'?'Solar Spotter camera system responding':profile==='spotter'?'Spotter camera system responding':profile==='ranger'?'Ranger public-IP interface responding':profile==='recon'?'Reconeyez status responding':'Device responding';
 return{status,reason,profile}}
-function effectiveHealth(d){const h=health[d.id]||{},source=String(d.source_status||'').trim().toLowerCase(),probe=String(h.overall_status||'').trim().toLowerCase(),group=cameraGroup(d),now=Date.now(),sourceAt=d.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0,checkAt=h.checked_at?new Date(h.checked_at).getTime():0,sourceFresh=sourceAt>0&&now-sourceAt>=0&&now-sourceAt<=10*60*1000,checkFresh=checkAt>0&&now-checkAt>=0&&now-checkAt<=10*60*1000;if(group==='Reconeyez'){if(sourceFresh&&source==='online')return 'online';if(sourceFresh&&source==='offline')return 'offline';return 'verifying'}if(group==='Vigilant'){if(sourceFresh&&source==='offline')return 'offline';if(sourceFresh&&source==='online'){if(checkFresh&&probe==='offline')return 'degraded';return 'online'}return 'verifying'}if(checkFresh&&probe==='online')return 'online';if(checkFresh&&probe==='degraded')return 'degraded';if(checkFresh&&probe==='offline')return 'offline';return 'verifying'}
+function effectiveHealth(d){const h=health[d.id]||{},source=String(d.source_status||'').trim().toLowerCase(),probe=String(h.overall_status||'').trim().toLowerCase(),group=cameraGroup(d),now=Date.now(),sourceAt=d.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0,checkAt=h.checked_at?new Date(h.checked_at).getTime():0,sourceFresh=sourceAt>0&&now-sourceAt>=0&&now-sourceAt<=10*60*1000,checkFresh=checkAt>0&&now-checkAt>=0&&now-checkAt<=15*60*1000;if(group==='Reconeyez'){if(sourceFresh&&source==='online')return 'online';if(sourceFresh&&source==='offline')return 'offline';return 'verifying'}if(group==='Vigilant'){if(sourceFresh&&source==='offline')return 'offline';if(sourceFresh&&source==='online'){if(checkFresh&&probe==='offline')return 'degraded';return 'online'}return 'verifying'}if(checkFresh&&probe==='online')return 'online';if(checkFresh&&probe==='degraded')return 'degraded';if(checkFresh&&probe==='offline')return 'offline';return 'verifying'}
 function isCountedCamera(d){return String(d?.activation_state||'').toLowerCase()!=='deactivated'}
 function isFieldCamera(d){return isCountedCamera(d)&&!isShop(d)}
 function isReconAwaitingStatus(d){return cameraGroup(d)==='Reconeyez'&&effectiveHealth(d)==='verifying'&&!String(d?.source_status||'').trim()&&!d?.source_last_seen_at}
@@ -1085,6 +1085,22 @@ function startHealthCountdown(fromMs){
   tick();healthCountdownTimer=setInterval(tick,1000);
 }
 let autoOpenCheckRunning=false;
+async function refreshSniperHealth(){
+  const targets=devices.filter(d=>isFieldCamera(d)&&cameraGroup(d)==='Sniper'&&d.monitoring_enabled!==false);
+  if(!targets.length)return {checked:0};
+  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Sniper check timed out')),ms));
+  const batchSize=10;
+  let checked=0;
+  for(let i=0;i<targets.length;i+=batchSize){
+    const batch=targets.slice(i,i+batchSize);
+    const results=await Promise.allSettled(batch.map(d=>Promise.race([
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id,fast_verify:true,skip_provider_sync:true}}).then(({error})=>{if(error)throw error;return true}),
+      timeout(5000)
+    ])));
+    checked+=results.filter(x=>x.status==='fulfilled').length;
+  }
+  return {checked,total:targets.length};
+}
 async function autoCheckOnOpen(){
   if(autoOpenCheckRunning)return;
   const lockKey='cameraHealthAutoCheckStartedAt';
@@ -1102,6 +1118,8 @@ async function autoCheckOnOpen(){
       db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
       new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
     ]);
+    if(btn)btn.textContent='Checking Avigilon Snipers…';
+    await refreshSniperHealth();
     await load({background:true});
     if(btn)btn.textContent='✓ Inventory + status refreshed';
   }catch(e){console.warn('Automatic Camera Health check-in failed',e);if(btn)btn.textContent='Auto check incomplete'}
@@ -1118,6 +1136,8 @@ async function refreshFieldHealth(){
       db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
       new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
     ]);
+    btn.textContent='Checking Avigilon Snipers…';
+    await refreshSniperHealth();
     btn.textContent='Syncing Reconeyez status…';
     await Promise.race([
       invokeRecon({action:'sync'}).catch(e=>({error:e})),
