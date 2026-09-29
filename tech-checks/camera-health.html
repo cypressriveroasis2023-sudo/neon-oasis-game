@@ -1039,26 +1039,25 @@ if($('reconSummary')){
   const btn=$('refresh');if(btn.disabled)return;
   btn.disabled=true;const oldText=btn.textContent;
   try{
-    /* Provider-first refresh: one Vigilant sync replaces hundreds of duplicate per-camera network calls. */
-    btn.textContent='Syncing Vigilant…';
-    try{
-      const v=await Promise.race([
-        db.functions.invoke('vigilant-sync',{body:{action:'sync'}}),
-        new Promise(resolve=>setTimeout(()=>resolve({error:new Error('Vigilant sync timed out')}),20000))
-      ]);
-      if(v?.error)console.warn('Vigilant sync:',v.error);
-    }catch(e){console.warn('Vigilant refresh skipped:',e?.message||e)}
-    btn.textContent='Syncing Reconeyez…';
-    try{await Promise.race([invokeRecon({action:'sync'}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Reconeyez sync timed out')),20000))])}catch(e){console.warn('Reconeyez refresh skipped:',e?.message||e)}
-    btn.textContent='Loading health…';
-    await load();
-    await loadReconStatus();
-    btn.textContent='✓ Updated '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    btn.textContent='Loading cameras…';
+    await load({background:true});
+    const targets=devices.filter(d=>cameraGroup(d)!=='Reconeyez'&&d.public_ip&&d.monitoring_enabled!==false);
+    let done=0;
+    const workers=Math.min(18,Math.max(1,targets.length));
+    let next=0;
+    const run=async()=>{while(true){const idx=next++;if(idx>=targets.length)return;const d=targets[idx];await Promise.race([
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),6500))
+    ]);done++;btn.textContent='Checking cameras '+done+' / '+targets.length+'…'}};
+    await Promise.all(Array.from({length:workers},run));
+    btn.textContent='Loading results…';
+    await load({background:true});
+    btn.textContent='✓ Checked '+targets.length+' cameras';
   }catch(e){
     console.error('Camera Health refresh failed',e);btn.textContent='Refresh failed';
   }finally{
     btn.disabled=false;
-    setTimeout(()=>{if(btn.textContent.startsWith('✓'))btn.textContent=oldText},2500);
+    setTimeout(()=>{if(btn.textContent.startsWith('✓'))btn.textContent=oldText},3000);
   }
 }
 async function reconErrorMessage(error){try{const ctx=error?.context;if(ctx&&typeof ctx.clone==='function'){const body=await ctx.clone().json().catch(()=>null);if(body?.error)return String(body.error)}}catch{}return String(error?.message||error||'Reconeyez request failed')}
