@@ -11049,3 +11049,24 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
   display:block!important;font-size:9px!important;line-height:1.2!important;
   white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
 }
+
+
+/* Shared Owner + IT dashboard geometry. Owner now consumes the IT dashboard primitives. */
+.wl-it-shared-dashboard{width:100%;max-width:none;margin:0;padding:0;box-sizing:border-box}
+.wl-it-shared-dashboard .wl-it-owner-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(220px,.8fr) minmax(280px,1fr);gap:8px;margin-bottom:8px}
+.wl-it-shared-dashboard .wl-it-hero-greeting,.wl-it-shared-dashboard .wl-it-clock-card,.wl-it-shared-dashboard .wl-it-weather-card{height:112px;min-height:112px;max-height:112px;box-sizing:border-box;overflow:hidden}
+.wl-it-shared-dashboard .wl-it-command-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:0 0 8px}
+.wl-it-shared-dashboard .wl-it-command-stats>button{min-width:0;min-height:64px;margin:0;padding:9px 11px;text-align:left;border-radius:7px;color:#fff}
+.wl-it-shared-dashboard .wl-it-command-stats>button b,.wl-it-shared-dashboard .wl-it-command-stats>button span,.wl-it-shared-dashboard .wl-it-command-stats>button small{display:block}
+.wl-it-shared-dashboard .wl-it-command-stats>button.cyan{background:linear-gradient(120deg,#0c2631,#0d1b25 72%);border:1px solid #17657b;border-top:2px solid #20c4e8}
+.wl-it-shared-dashboard .wl-it-command-stats>button.red{background:linear-gradient(120deg,#35151b,#18171e 72%);border:1px solid #7d2833;border-top:2px solid #ef4552}
+.wl-it-shared-dashboard .wl-it-command-stats>button.green{background:linear-gradient(120deg,#0c2b20,#0e1d1b 72%);border:1px solid #17623f;border-top:2px solid #31d27a}
+.wl-it-shared-dashboard .wl-it-command-stats>button.purple{background:linear-gradient(120deg,#28163a,#171724 72%);border:1px solid #643891;border-top:2px solid #a968ec}
+.wl-it-shared-dashboard .wl-it-command-stats>button.amber{background:linear-gradient(120deg,#38270d,#1e1b14 72%);border:1px solid #745419;border-top:2px solid #e8a72f}
+.wl-it-shared-main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.72fr);gap:7px}
+.wl-it-shared-main>.wl-it-command-panel{min-width:0;margin:0}
+.wl-it-shared-main>.wl-it-shared-recent{grid-column:1}.wl-it-shared-main>.wl-it-shared-quick{grid-column:2}
+.wl-it-shared-dashboard #ownerTodayWeatherHost{height:70px;max-height:70px;overflow:hidden}
+.wl-it-shared-dashboard #ownerTodayWeatherHost .ownerWeatherWeek,.wl-it-shared-dashboard #ownerTodayWeatherHost .ownerWeatherToday{display:none!important}
+@media(max-width:900px){.wl-it-shared-dashboard .wl-it-owner-hero{grid-template-columns:1fr}.wl-it-shared-dashboard .wl-it-hero-greeting,.wl-it-shared-dashboard .wl-it-clock-card,.wl-it-shared-dashboard .wl-it-weather-card{height:auto;min-height:96px;max-height:none}.wl-it-shared-dashboard .wl-it-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-shared-main{grid-template-columns:1fr}.wl-it-shared-main>.wl-it-shared-recent,.wl-it-shared-main>.wl-it-shared-quick{grid-column:auto}}
+@media(max-width:520px){.wl-it-shared-dashboard .wl-it-command-stats{grid-template-columns:1fr}}
