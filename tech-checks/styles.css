@@ -10805,3 +10805,89 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
    margin-right:0!important;
  }
 }
+
+
+/* Owner desktop top-shell parity with IT — 2026-09-29 */
+@media(min-width:901px){
+ #view-owner[data-owner-route="today"] .ownerAppWorkspace{
+   display:grid!important;
+   grid-template-rows:58px auto minmax(0,1fr)!important;
+   height:100vh!important;
+   overflow:hidden!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopbar{
+   grid-row:1!important;
+   width:100%!important;
+   height:58px!important;
+   min-height:58px!important;
+   box-sizing:border-box!important;
+   margin:0!important;
+   padding:0 12px!important;
+   display:flex!important;
+   align-items:center!important;
+   justify-content:space-between!important;
+   gap:16px!important;
+   border-bottom:1px solid #263746!important;
+   background:#081923!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopbar>div:first-child{
+   display:flex!important;
+   align-items:center!important;
+   gap:10px!important;
+   min-width:0!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopbar .ownerItEyebrow{
+   display:block!important;
+   margin:0!important;
+   font-size:10px!important;
+   line-height:1!important;
+   letter-spacing:.13em!important;
+   color:#ef4338!important;
+   white-space:nowrap!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopbar>div:first-child>b{
+   display:block!important;
+   margin:0!important;
+   font-size:15px!important;
+   line-height:1!important;
+   color:#f4f8fa!important;
+   white-space:nowrap!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopActions{
+   margin-left:auto!important;
+   display:flex!important;
+   align-items:center!important;
+   justify-content:flex-end!important;
+   gap:8px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItTopActions button{
+   width:auto!important;
+   min-width:64px!important;
+   height:34px!important;
+   min-height:34px!important;
+   margin:0!important;
+   padding:0 12px!important;
+   border-radius:8px!important;
+   font-size:11px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerWorkspaceTools{
+   grid-row:2!important;
+   width:100%!important;
+   min-height:46px!important;
+   margin:0!important;
+   padding:6px 12px!important;
+   box-sizing:border-box!important;
+   display:flex!important;
+   align-items:center!important;
+   justify-content:flex-start!important;
+   gap:8px!important;
+   background:#07151e!important;
+ }
+ #view-owner[data-owner-route="today"] #ownerAppPage{
+   grid-row:3!important;
+   height:100%!important;
+   min-height:0!important;
+   overflow:auto!important;
+   padding:8px 12px 24px!important;
+ }
+}
