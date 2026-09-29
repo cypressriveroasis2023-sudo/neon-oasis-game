@@ -638,16 +638,14 @@ async function enterApp(session) {
   setupCommandCenterMobileMenu();
   ownerTestApplyAfterLogin(profile);
 
-  // Paint the signed-in shell first. Heavy workflow code and shared-data hydration
-  // are deliberately moved off the critical startup path.
+  // Hydrate the first visible role before revealing it. This prevents the Owner
+  // shell from flashing a separate "Loading Owner workspace" screen.
   const sync = $('syncStatus');
-  if (sync) sync.textContent = 'Opening Tech Check…';
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (sync) sync.textContent = 'Loading live work…';
-    refreshData({ skipProfile:true, initial:true }).catch(error => console.warn('Initial Tech Check refresh failed', error));
-    scheduleIdle(() => loadDeferredModules(), 700);
-    scheduleIdle(() => setupRealtime(), 1200);
-  }));
+  if (sync) sync.textContent = 'Loading live work…';
+  await refreshData({ skipProfile:true, initial:true });
+  if (sync) sync.textContent = 'Live work loaded';
+  scheduleIdle(() => loadDeferredModules(), 450);
+  scheduleIdle(() => setupRealtime(), 800);
 }
 function setupCommandCenterMobileMenu(){
   const btn=document.getElementById('techMenuButton');
@@ -1068,21 +1066,18 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     if (!fieldEscalations.error) state.ownerFieldEscalations = fieldEscalations.data || [];
     if (!truckSpareBatteries.error) state.truckSpareBatteries = truckSpareBatteries.data || [];
     if (!ownerTechBoard.error) state.ownerTechCommandBoard = ownerTechBoard.data || null;
-    // Paint the Owner command board first. Heavy secondary owner surfaces are
-    // filled during idle time so mobile launch is immediately interactive.
+    // Build the Owner workspace in one DOM commit so the phone never shows a
+    // half-hydrated command board. Secondary hidden routes still reuse this data.
+    renderOwner();
+    renderOwnerUnitSearch();
+    renderOwnerEquipment();
+    renderOwnerTechOverview();
+    renderOwnerAttention();
+    renderOwnerReview();
+    renderPasswordResetRequests();
+    renderUsers();
     bindOwnerAppRouter();
     await ownerAppRender();
-    scheduleIdle(() => {
-      if (!state.session || state.profile?.role !== 'owner') return;
-      renderOwner();
-      renderOwnerUnitSearch();
-      renderOwnerEquipment();
-      renderOwnerTechOverview();
-      renderOwnerAttention();
-      renderOwnerReview();
-      renderPasswordResetRequests();
-      renderUsers();
-    }, 350);
   } else {
     const prepRows = await prepPromise;
     if (prepRows) state.preps = prepRows;
