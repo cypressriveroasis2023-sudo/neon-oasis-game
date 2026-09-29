@@ -1025,8 +1025,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     }
   }
 
-  const prepRows = await loadPrepSnapshot(initial);
-  if (prepRows) state.preps = prepRows;
+  const prepPromise = loadPrepSnapshot(initial);
 
   if (state.profile.role === 'owner') {
     const dayStart = new Date(); dayStart.setHours(0,0,0,0);
@@ -1035,7 +1034,8 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     const reportLimit = initial ? 60 : 250;
     const historyLimit = initial ? 80 : 300;
     const registryLimit = initial ? 180 : 500;
-    const [rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries, ownerTechBoard] = await appTimeout(Promise.all([
+    const [prepRows, rep, prof, resets, returns, inspections, selectedInspections, assignments, registry, assets, assetHistory, accessHistory, ownerReviewQueue, fieldEscalations, truckSpareBatteries, ownerTechBoard] = await appTimeout(Promise.all([
+      prepPromise,
       db.from('reports').select('*').order('created_at',{ascending:false}).limit(reportLimit),
       db.from('profiles').select('*').order('created_at',{ascending:true}),
       db.from('password_reset_requests').select('id,user_id,username,status,requested_at,expires_at,approved_at').in('status',['pending','approved']).order('requested_at',{ascending:false}).limit(30),
@@ -1052,6 +1052,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       db.from('truck_spare_batteries').select('*').eq('status','in_truck').order('accepted_at',{ascending:true}),
       db.rpc('owner_tech_command_board_v2',{p_date:localDateKey(new Date())})
     ]),'Owner production data');
+    if (prepRows) state.preps = prepRows;
     if (!rep.error) state.reports = rep.data || [];
     if (!prof.error) state.profiles = prof.data || [];
     if (!resets.error) state.resetRequests = resets.data || [];
@@ -1067,16 +1068,24 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
     if (!fieldEscalations.error) state.ownerFieldEscalations = fieldEscalations.data || [];
     if (!truckSpareBatteries.error) state.truckSpareBatteries = truckSpareBatteries.data || [];
     if (!ownerTechBoard.error) state.ownerTechCommandBoard = ownerTechBoard.data || null;
-    renderOwner();
-    renderOwnerUnitSearch();
-    renderOwnerEquipment();
-    renderOwnerTechOverview();
-    renderOwnerAttention();
-    renderOwnerReview();
+    // Paint the Owner command board first. Heavy secondary owner surfaces are
+    // filled during idle time so mobile launch is immediately interactive.
     bindOwnerAppRouter();
     await ownerAppRender();
-    renderPasswordResetRequests();
-    renderUsers();
+    scheduleIdle(() => {
+      if (!state.session || state.profile?.role !== 'owner') return;
+      renderOwner();
+      renderOwnerUnitSearch();
+      renderOwnerEquipment();
+      renderOwnerTechOverview();
+      renderOwnerAttention();
+      renderOwnerReview();
+      renderPasswordResetRequests();
+      renderUsers();
+    }, 350);
+  } else {
+    const prepRows = await prepPromise;
+    if (prepRows) state.preps = prepRows;
   }
 
   renderIT();
