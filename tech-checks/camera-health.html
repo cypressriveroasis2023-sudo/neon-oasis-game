@@ -1103,7 +1103,7 @@ async function autoCheckOnOpen(){
       new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
     ]);
     await load({background:true});
-    if(btn)btn.textContent='✓ Provider status refreshed';
+    if(btn)btn.textContent='✓ Inventory + status refreshed';
   }catch(e){console.warn('Automatic Camera Health check-in failed',e);if(btn)btn.textContent='Auto check incomplete'}
   finally{autoOpenCheckRunning=false;if(btn){btn.disabled=false;setTimeout(()=>{if(btn.textContent.startsWith('✓')||btn.textContent==='Auto check incomplete')btn.textContent=oldText},3000)}}
 }
@@ -1113,12 +1113,17 @@ async function refreshFieldHealth(){
   try{
     btn.textContent='Loading cameras…';
     await load({background:true});
-    btn.textContent='Syncing provider status…';
+    btn.textContent='Syncing Vigilant status…';
     await Promise.race([
       db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
       new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
     ]);
-    btn.textContent='Loading results…';
+    btn.textContent='Syncing Reconeyez status…';
+    await Promise.race([
+      invokeRecon({action:'sync'}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
+    ]);
+    btn.textContent='Loading reconciled inventory…';
     await load({background:true});
     btn.textContent='✓ Provider status refreshed';
     try{sessionStorage.setItem('cameraHealthAutoCheckStartedAt',String(Date.now()));startHealthCountdown(Date.now())}catch{}
