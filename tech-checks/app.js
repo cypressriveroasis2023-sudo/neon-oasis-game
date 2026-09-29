@@ -111,7 +111,7 @@ function scheduleIdle(task, timeout=700) {
 }
 function loadDeferredModules() {
   if (deferredModulesPromise) return deferredModulesPromise;
-  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=service-direct-20260928g')
+  deferredModulesPromise = import('./technician-wizard-owner-dashboard-v5.js?v=truck-35ah-direct-20260929a')
     .then(() => {
       if (state.profile?.role === 'owner') {
         scheduleIdle(() => import('./team-email-settings.js?v=email-settings-v4').catch(console.warn), 1200);
@@ -2601,6 +2601,7 @@ function ownerBoardServiceTechCard(tech){
         +ownerBoardStockRow('Recon Batteries',stock.recon_battery_qty,25)
         +ownerBoardStockRow('AGM 12V 110Ah',stock.agm_12v_110ah_qty,4)
         +ownerBoardStockRow('LiTime 12V 100Ah',stock.litime_12v_100ah_qty,2)
+        +ownerBoardStockRow('12V 35Ah',stock.battery_12v_35ah_qty,4)
       +'</div>'
       +(missing.length?'<div class="ownerCmdMissingBanner"><b>⚠ MISSING TRUCK STOCK</b><span>'+missing.length+' required item'+(missing.length===1?'':'s')+' missing / not verified.</span></div>':'')
       +restockSummary
@@ -2633,7 +2634,7 @@ function ownerTruckEditorHtml(tech,id){
  +'<div class="ownerTruckEditorLabel">SIM CARDS · EXACT NUMBERS</div>'
  +[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return '<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>SIM '+slot+'</b><span>'+(s.sim_number?'Current · '+esc(s.sim_number):'MISSING')+'</span></div><input id="ownerTruckSim_'+esc(id)+'_'+slot+'" value="'+esc(s.sim_number||'')+'" placeholder="Enter SIM '+slot+' number"></div>';}).join('')
  +'<div class="ownerTruckEditorLabel">BATTERY INVENTORY · ACTUAL COUNT ON TRUCK</div>'
- +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(id)+'_'+i+'" type="number" min="0" value="'+qty+'"></div>').join('')
+ +[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0)],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0)],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0)],['12V 35Ah','12V 35Ah',Number(stock.battery_12v_35ah_qty||0)]].map(([type,label,qty],i)=>'<div class="ownerTruckEditRow ownerTruckEditNoButton"><div><b>'+esc(label)+'</b><span>Current · '+qty+'</span></div><input id="ownerTruckStock_'+esc(id)+'_'+i+'" type="number" min="0" value="'+qty+'"></div>').join('')
  +'<div class="ownerTruckSaveBar"><span>Review all unit numbers, SIM numbers, and counts before saving.</span><button type="button" data-owner-save-all="'+esc(id)+'">SAVE ALL TRUCK INVENTORY</button></div>';
 }
 async function ownerFetchTruckInventory(id){const {data,error}=await db.rpc('owner_service_truck_inventory_v1');if(error)throw error;const rows=Array.isArray(data)?data:[];return rows.find(x=>String(x.service_tech_id||x.user_id)===String(id))||null;}
@@ -2666,7 +2667,7 @@ async function ownerSaveAllTruckInventory(id){
  const types=['Sniper','Ranger','Spotter','Solar Spotter'],units={},sims={},stock={};
  types.forEach(type=>units[type]=document.getElementById('ownerTruckUnit_'+id+'_'+type.replaceAll(' ','_'))?.value.trim()||'');
  [1,2,3].forEach(slot=>sims[String(slot)]=document.getElementById('ownerTruckSim_'+id+'_'+slot)?.value.trim()||'');
- [['Recon Battery',0],['AGM 12V 110Ah',1],['LiTime 12V 100Ah',2]].forEach(([type,i])=>stock[type]=Math.max(0,Math.floor(Number(document.getElementById('ownerTruckStock_'+id+'_'+i)?.value||0))));
+ [['Recon Battery',0],['AGM 12V 110Ah',1],['LiTime 12V 100Ah',2],['12V 35Ah',3]].forEach(([type,i])=>stock[type]=Math.max(0,Math.floor(Number(document.getElementById('ownerTruckStock_'+id+'_'+i)?.value||0))));
  if(!confirm('Save ALL truck inventory for this technician? Service will be required to verify the truck again.'))return;
  const saveButton=document.querySelector('[data-owner-save-all="'+CSS.escape(String(id))+'"]');
  if(saveButton){saveButton.disabled=true;saveButton.textContent='SAVING…';}
