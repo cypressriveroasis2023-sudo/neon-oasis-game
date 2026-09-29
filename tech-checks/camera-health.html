@@ -1134,7 +1134,7 @@ button,.btn,a.btn,[role="button"],.stat,.collapse-toggle,.camera-open-cta{pointe
 }
 </style>
 </head><body><div id="authGate" class="authgate"><div class="authcard"><div class="brand" style="margin-bottom:16px"><img src="./techcheck-eye-192.png?v=1" alt=""><div><small>CAMERAS ONSITE</small><b>OnSite Vision · Camera Health</b></div></div><h2>Authorized Access</h2><p>Sign in with your Tech Check Owner or IT account.</p><label>Username</label><input id="cameraLoginUsername" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username"><label>Password</label><input id="cameraLoginPassword" type="password" autocomplete="current-password" placeholder="Password"><button id="cameraLogin" class="primary">Sign In</button><div id="cameraLoginMsg" class="autherr"></div><a class="btn" style="display:block;text-align:center;margin-top:10px" href="./">Sign in through Tech Check</a><div class="small" style="margin-top:10px;text-align:center">If Tech Check is already signed in, Camera Health will open automatically.</div></div></div><div class="shell">
-<aside class="cos-sidebar"><div class="cos-wordmark">CAMERAS ONSITE <span>OnSite Vision</span></div><div class="cos-submark">SECURITY · MONITOR · MAINTAIN</div><nav class="cos-nav"><button class="active">▣ &nbsp;Camera Health</button><button class="jump-events">◉ &nbsp;Alerts</button><button class="jump-trouble">⚒ &nbsp;Troubleshooting</button><button class="jump-history">▤ &nbsp;History</button><a href="./onsite-vision.html">◉ &nbsp;OnSite Vision</a><a href="./">← &nbsp;Tech Check Dashboard</a></nav></aside><div class="cos-topline"><div class="cos-title vision-health-title"><a class="health-eye" href="./onsite-vision.html"><img src="./resources/vision-ai.jpg?v=3" alt="OnSite Vision"></a><div><h1>Camera Health</h1><div>ONSITE VISION · LIVE CAMERA OPERATIONS</div></div></div><div class="cos-search"><input id="globalSearch" placeholder="Search units, sites, IPs, or device names…"><div id="cameraSearchResults"></div></div><div class="actions"><button id="manageUnitsBtn" class="primary" style="display:none">+ Add / Remove Unit</button><button id="importToggle" class="primary" style="display:none">Import / Map</button><button id="refresh">↻ Refresh</button><a class="btn" href="./onsite-vision.html">+ Vision</a></div></div>
+<aside class="cos-sidebar"><div class="cos-wordmark">CAMERAS ONSITE <span>OnSite Vision</span></div><div class="cos-submark">SECURITY · MONITOR · MAINTAIN</div><nav class="cos-nav"><button class="active">▣ &nbsp;Camera Health</button><button class="jump-events">◉ &nbsp;Alerts</button><button class="jump-trouble">⚒ &nbsp;Troubleshooting</button><button class="jump-history">▤ &nbsp;History</button><a href="./onsite-vision.html">◉ &nbsp;OnSite Vision</a><a href="./">← &nbsp;Tech Check Dashboard</a></nav></aside><div class="cos-topline"><div class="cos-title vision-health-title"><a class="health-eye" href="./onsite-vision.html"><img src="./resources/vision-ai.jpg?v=3" alt="OnSite Vision"></a><div><h1>Camera Health</h1><div>ONSITE VISION · LIVE CAMERA OPERATIONS</div></div></div><div class="cos-search"><input id="globalSearch" placeholder="Search units, sites, IPs, or device names…"><div id="cameraSearchResults"></div></div><div class="actions"><button id="manageUnitsBtn" class="primary" style="display:none">+ Add / Remove Unit</button><button id="importToggle" class="primary" style="display:none">Import / Map</button><button id="refresh">↻ RESET / RUN NEW CHECK</button><a class="btn" href="./onsite-vision.html">+ Vision</a></div></div>
 <div id="manageUnitsPanel" class="panel import" style="display:none;padding:16px;margin-bottom:14px">
 <div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><b style="font-size:18px">OWNER UNIT INVENTORY</b><div class="small">Add real units or remove units that do not belong in Camera Health. Changes are audit logged.</div></div><button id="closeManageUnits">Close</button></div>
 <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px">
@@ -1189,7 +1189,7 @@ function applyCameraViewPreference(){
   try{v=localStorage.getItem(CAMERA_VIEW_PREF_KEY)||''}catch{}
   if($('view'))$('view').value='units';
 }
-async function enterCameraHealth(session){$('authGate').classList.add('hidden');$('cameraLoginMsg').textContent='';let pr=null;try{const r=await wait(db.from('profiles').select('*').eq('user_id',session.user.id).single(),'Profile',12000);pr=r?.data||null;if(r?.error)console.warn('Camera Health profile lookup:',r.error)}catch(e){console.warn('Camera Health profile lookup failed:',e)}profile=pr||{role:'owner',active:true,user_id:session.user.id};if(pr&&(!pr.active||pr.role==='pending')){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Your account is not active yet. Contact the Owner/Admin.';return}if(pr&&!['owner','it'].includes(String(pr.role))){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Camera Health is available only to active Owner and IT accounts.';return}if(['owner','it'].includes(String(profile.role).toLowerCase())){$('importToggle').style.display='inline-block';$('manageUnitsBtn').style.display='inline-block';}applyCameraViewPreference();await load();await loadReconStatus();startLiveUpdates()}
+async function enterCameraHealth(session){$('authGate').classList.add('hidden');$('cameraLoginMsg').textContent='';let pr=null;try{const r=await wait(db.from('profiles').select('*').eq('user_id',session.user.id).single(),'Profile',12000);pr=r?.data||null;if(r?.error)console.warn('Camera Health profile lookup:',r.error)}catch(e){console.warn('Camera Health profile lookup failed:',e)}profile=pr||{role:'owner',active:true,user_id:session.user.id};if(pr&&(!pr.active||pr.role==='pending')){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Your account is not active yet. Contact the Owner/Admin.';return}if(pr&&!['owner','it'].includes(String(pr.role))){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Camera Health is available only to active Owner and IT accounts.';return}if(['owner','it'].includes(String(profile.role).toLowerCase())){$('importToggle').style.display='inline-block';$('manageUnitsBtn').style.display='inline-block';}applyCameraViewPreference();await load();await loadReconStatus();/* Snapshot mode: opening Camera Health only reads the last saved check. */}
 function refreshRemoveUnitOptions(){const keys=[...new Set(devices.map(d=>String(d.unit_key||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));['removeUnitKey','moveUnitKey'].forEach(id=>{const el=$(id);if(el)el.innerHTML='<option value="">Choose a unit…</option>'+keys.map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')})}
 function toggleManageUnits(show){const p=$('manageUnitsPanel');if(!p)return;p.style.display=show?'block':'none';if(show)refreshRemoveUnitOptions()}
 async function addOwnerUnit(){const msg=$('unitManageMsg');msg.textContent='Adding unit…';const args={p_unit_key:$('addUnitKey').value.trim(),p_unit_type:$('addUnitType').value,p_camera_count:Number($('addUnitCount').value||0),p_public_ip:$('addUnitIp').value.trim()||null,p_organization:$('addUnitOrg').value.trim()||'root',p_reason:$('addUnitReason').value.trim()};const {error}=await db.rpc('owner_add_camera_unit_v1',args);if(error){msg.textContent='Could not add unit: '+error.message;return}msg.textContent='Unit added ✓';await load();refreshRemoveUnitOptions()}
@@ -1351,7 +1351,8 @@ if($('reconSummary')){
 
 async function refreshFieldHealth(){
   const btn=$('refresh');if(btn.disabled)return;
-  btn.disabled=true;const idleText='↻ Refresh';
+  if(!confirm('Run a NEW Camera Health check now? The saved snapshot stays unchanged until the new check completes.'))return;
+  btn.disabled=true;const idleText='↻ RESET / RUN NEW CHECK';
   try{
     btn.textContent='Checking refresh availability…';
     const {data:claim,error:claimError}=await db.rpc('claim_camera_health_refresh_v1');
@@ -1547,23 +1548,7 @@ async function liveRefresh(force=false){
   catch(e){console.warn('Camera Health live refresh',e)}
   finally{liveRefreshBusy=false}
 }
-function startLiveUpdates(){
-  if(liveRefreshTimer)return;
-  // Realtime is the primary refresh path. The slower timer is only a safety net,
-  // preventing the camera board from re-downloading every table every 15 seconds.
-  liveRefreshTimer=setInterval(()=>liveRefresh(false),120000);
-  try{
-    ['camera_devices','camera_health_current'].forEach((table,i)=>{
-      const ch=db.channel('camera-health-live-'+i).on('postgres_changes',{event:'*',schema:'public',table},()=>{
-        clearTimeout(window.__cameraHealthLiveDebounce);
-        window.__cameraHealthLiveDebounce=setTimeout(()=>liveRefresh(false),5000);
-      }).subscribe();
-      liveChannels.push(ch);
-    });
-  }catch(e){console.warn('Realtime subscription unavailable; 2-minute safety refresh remains active.',e)}
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)liveRefresh(true)});
-  window.addEventListener('pageshow',event=>{if(event.persisted&&profile)liveRefresh(true)});
-}
+function startLiveUpdates(){/* Disabled: frozen snapshot until explicit new check. */}
 window.addEventListener('resize',()=>syncMobileCameraLayout(),{passive:true});
 boot().catch(error=>{console.error(error);const el=document.getElementById('empty');if(el){el.style.display='block';el.textContent='STARTUP ERROR: '+(error?.message||error)}});
 </script></body></html>
