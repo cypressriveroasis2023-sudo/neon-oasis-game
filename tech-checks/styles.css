@@ -11012,3 +11012,40 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
    overflow-wrap:normal!important;
  }
 }
+
+
+/* Owner weather header: compact like IT; never let forecast expand the dashboard hero row. */
+#view-owner[data-owner-route="today"] .ownerItHeaderGrid{align-items:stretch!important}
+#view-owner[data-owner-route="today"] .ownerItGreeting,
+#view-owner[data-owner-route="today"] .ownerItInfoCard,
+#view-owner[data-owner-route="today"] .ownerItWeatherCard{
+  height:96px!important;min-height:96px!important;max-height:96px!important;
+  box-sizing:border-box!important;overflow:hidden!important;
+}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard{padding:12px 16px!important}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard #ownerTodayWeatherHost{
+  height:58px!important;max-height:58px!important;overflow:hidden!important;margin-top:3px!important;
+}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherNow{
+  height:58px!important;min-height:0!important;max-height:58px!important;
+  overflow:hidden!important;padding:0!important;margin:0!important;border:0!important;
+  background:transparent!important;box-shadow:none!important;
+}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherWeek,
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherToday,
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherForecast,
+#view-owner[data-owner-route="today"] .ownerItWeatherCard [class*="Week"],
+#view-owner[data-owner-route="today"] .ownerItWeatherCard [class*="Forecast"]{display:none!important}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent{
+  display:flex!important;align-items:center!important;gap:10px!important;
+  height:58px!important;min-height:0!important;overflow:hidden!important;
+}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div{min-width:0!important}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div b{
+  font-size:27px!important;line-height:1!important;white-space:nowrap!important;
+}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div span,
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div small{
+  display:block!important;font-size:9px!important;line-height:1.2!important;
+  white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+}
