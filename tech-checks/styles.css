@@ -10983,3 +10983,32 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
  }
  #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayState{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 160px!important}
 }
+
+
+/* Owner header weather readability fix — prevent temp/details clipping */
+@media(min-width:721px){
+ #view-owner[data-owner-route="today"] .ownerItHeaderGrid{
+   grid-template-columns:minmax(360px,1.35fr) minmax(245px,.95fr) minmax(300px,1.15fr)!important;
+   gap:10px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItInfoCard,
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard{
+   min-width:0!important;overflow:visible!important;height:auto!important;min-height:92px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard #ownerTodayWeatherHost{
+   width:100%!important;min-width:0!important;overflow:visible!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard #ownerTodayWeatherHost>div{
+   width:100%!important;min-width:0!important;max-width:none!important;
+   display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;
+   column-gap:12px!important;row-gap:3px!important;align-items:center!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard b{
+   white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard span,
+ #view-owner[data-owner-route="today"] .ownerItWeatherCard small{
+   white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+   overflow-wrap:normal!important;
+ }
+}
