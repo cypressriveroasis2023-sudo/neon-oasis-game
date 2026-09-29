@@ -11070,3 +11070,96 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
 .wl-it-shared-dashboard #ownerTodayWeatherHost .ownerWeatherWeek,.wl-it-shared-dashboard #ownerTodayWeatherHost .ownerWeatherToday{display:none!important}
 @media(max-width:900px){.wl-it-shared-dashboard .wl-it-owner-hero{grid-template-columns:1fr}.wl-it-shared-dashboard .wl-it-hero-greeting,.wl-it-shared-dashboard .wl-it-clock-card,.wl-it-shared-dashboard .wl-it-weather-card{height:auto;min-height:96px;max-height:none}.wl-it-shared-dashboard .wl-it-command-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-it-shared-main{grid-template-columns:1fr}.wl-it-shared-main>.wl-it-shared-recent,.wl-it-shared-main>.wl-it-shared-quick{grid-column:auto}}
 @media(max-width:520px){.wl-it-shared-dashboard .wl-it-command-stats{grid-template-columns:1fr}}
+
+
+/* ===== Owner mobile app layout — dedicated phone presentation 2026-09-29 =====
+   Desktop rules remain authoritative above 720px. */
+@media(max-width:720px){
+  #view-owner[data-owner-route="today"]{--mobile-pad:12px;background:#07151e!important;color:#f4f8fb!important}
+  #view-owner[data-owner-route="today"] .ownerItShell,
+  #view-owner[data-owner-route="today"] .ownerItMain,
+  #view-owner[data-owner-route="today"] .ownerItContent{width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;box-sizing:border-box!important}
+  #view-owner[data-owner-route="today"] .ownerItMain,
+  #view-owner[data-owner-route="today"] .ownerItContent{padding-left:var(--mobile-pad)!important;padding-right:var(--mobile-pad)!important}
+
+  /* Mobile command header: compact identity + actions, never desktop geometry. */
+  #view-owner[data-owner-route="today"] .ownerItTopbar{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:10px!important;align-items:center!important;min-height:74px!important;height:auto!important;padding:12px var(--mobile-pad)!important;margin:0!important}
+  #view-owner[data-owner-route="today"] .ownerItTopbar h1{font-size:24px!important;line-height:1.05!important;margin:2px 0 0!important}
+  #view-owner[data-owner-route="today"] .ownerItTopbar small{font-size:9px!important;letter-spacing:.18em!important}
+  #view-owner[data-owner-route="today"] .ownerItTopActions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+  #view-owner[data-owner-route="today"] .ownerItTopActions button{min-width:76px!important;min-height:42px!important;padding:8px 10px!important;font-size:11px!important;border-radius:9px!important}
+
+  /* Keep the two primary launchers touch friendly but shallow. */
+  #view-owner[data-owner-route="today"] .ownerItLaunchers{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin:8px 0 12px!important}
+  #view-owner[data-owner-route="today"] .ownerItLaunchers>button{min-height:54px!important;height:54px!important;padding:8px 10px!important;font-size:12px!important;border-radius:10px!important}
+
+  /* Hero is intentionally a phone stack, not a squeezed desktop row. */
+  #view-owner[data-owner-route="today"] .ownerItHeaderGrid,
+  #view-owner[data-owner-route="today"] .wl-it-owner-hero{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;margin:0 0 8px!important}
+  #view-owner[data-owner-route="today"] .ownerItGreeting,
+  #view-owner[data-owner-route="today"] .wl-it-hero-greeting{height:auto!important;min-height:118px!important;max-height:none!important;padding:18px!important;overflow:hidden!important;border-radius:14px!important}
+  #view-owner[data-owner-route="today"] .ownerItGreeting h2,
+  #view-owner[data-owner-route="today"] .wl-it-hero-greeting h2{font-size:clamp(30px,9vw,42px)!important;line-height:1.02!important;margin:14px 0 8px!important;color:#f7fbff!important}
+  #view-owner[data-owner-route="today"] .ownerItGreeting p,
+  #view-owner[data-owner-route="today"] .wl-it-hero-greeting p{font-size:13px!important;line-height:1.35!important;margin:0!important;color:#9db0bd!important}
+  #view-owner[data-owner-route="today"] .ownerItGreeting small,
+  #view-owner[data-owner-route="today"] .wl-it-hero-greeting small{color:#dce8ef!important}
+
+  /* Time + weather are compact mobile cards; weather content must never clip. */
+  #view-owner[data-owner-route="today"] .ownerItInfoCard,
+  #view-owner[data-owner-route="today"] .wl-it-clock-card{height:auto!important;min-height:86px!important;max-height:none!important;padding:14px 16px!important;border-radius:13px!important;overflow:visible!important}
+  #view-owner[data-owner-route="today"] .ownerItInfoCard b,
+  #view-owner[data-owner-route="today"] .wl-it-clock-card b{font-size:31px!important;line-height:1!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card{height:auto!important;min-height:118px!important;max-height:none!important;padding:14px 16px!important;border-radius:13px!important;overflow:hidden!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard #ownerTodayWeatherHost,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card #ownerTodayWeatherHost{height:auto!important;min-height:72px!important;max-height:none!important;overflow:visible!important;margin-top:4px!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherNow,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card .ownerWeatherNow{height:auto!important;min-height:72px!important;max-height:none!important;overflow:visible!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card .ownerWeatherCurrent{height:auto!important;min-height:68px!important;overflow:visible!important;display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;gap:12px!important;align-items:center!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div b,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card .ownerWeatherCurrent div b{font-size:34px!important;line-height:1!important}
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div span,
+  #view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherCurrent div small,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card .ownerWeatherCurrent div span,
+  #view-owner[data-owner-route="today"] .wl-it-weather-card .ownerWeatherCurrent div small{font-size:10px!important;line-height:1.25!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+
+  /* Phone KPIs are a dense 2-column command grid instead of full-width desktop slabs. */
+  #view-owner[data-owner-route="today"] .ownerItKpis,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin:8px 0!important}
+  #view-owner[data-owner-route="today"] .ownerItKpis>button,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats>button{min-width:0!important;min-height:88px!important;height:auto!important;padding:12px!important;border-radius:11px!important}
+  #view-owner[data-owner-route="today"] .ownerItKpis>button b,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats>button b{font-size:25px!important;line-height:1!important}
+  #view-owner[data-owner-route="today"] .ownerItKpis>button span,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats>button span{font-size:12px!important;line-height:1.15!important;margin-top:5px!important}
+  #view-owner[data-owner-route="today"] .ownerItKpis>button small,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats>button small{font-size:9px!important;line-height:1.2!important;margin-top:4px!important}
+  #view-owner[data-owner-route="today"] .ownerItKpis>button:last-child,
+  #view-owner[data-owner-route="today"] .wl-it-command-stats>button:last-child{grid-column:1/-1!important}
+
+  #view-owner[data-owner-route="today"] .ownerItMainGrid,
+  #view-owner[data-owner-route="today"] .wl-it-shared-main{display:block!important}
+  #view-owner[data-owner-route="today"] .ownerItPanel,
+  #view-owner[data-owner-route="today"] .wl-it-command-panel{margin:0 0 8px!important;border-radius:12px!important}
+}
+
+/* Mobile light mode gets explicit readable surfaces instead of inheriting dark-card text colors. */
+@media(max-width:720px){
+ html[data-theme="light"] #view-owner[data-owner-route="today"]{background:#f3f6f8!important;color:#132235!important}
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItGreeting,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-hero-greeting{background:linear-gradient(135deg,#17232c,#241015)!important;border-color:#536774!important;color:#fff!important}
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItGreeting h2,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-hero-greeting h2{color:#fff!important}
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItGreeting p,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-hero-greeting p{color:#c7d3da!important}
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItInfoCard,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-clock-card,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItWeatherCard,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-weather-card{background:#fff!important;border-color:#cbd7df!important;color:#132235!important}
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItInfoCard *,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-clock-card *,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .ownerItWeatherCard *,
+ html[data-theme="light"] #view-owner[data-owner-route="today"] .wl-it-weather-card *{color:#132235}
+}
