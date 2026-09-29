@@ -921,7 +921,7 @@ function applyCameraViewPreference(){
   try{v=localStorage.getItem(CAMERA_VIEW_PREF_KEY)||''}catch{}
   if((v==='units'||v==='devices')&&$('view'))$('view').value=v;
 }
-async function enterCameraHealth(session){$('authGate').classList.add('hidden');$('cameraLoginMsg').textContent='';let pr=null;try{const r=await wait(db.from('profiles').select('*').eq('user_id',session.user.id).single(),'Profile',12000);pr=r?.data||null;if(r?.error)console.warn('Camera Health profile lookup:',r.error)}catch(e){console.warn('Camera Health profile lookup failed:',e)}profile=pr||{role:'owner',active:true,user_id:session.user.id};if(pr&&(!pr.active||pr.role==='pending')){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Your account is not active yet. Contact the Owner/Admin.';return}if(pr&&!['owner','it'].includes(String(pr.role))){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Camera Health is available only to active Owner and IT accounts.';return}if(['owner','it'].includes(String(profile.role).toLowerCase())){$('importToggle').style.display='inline-block';$('manageUnitsBtn').style.display='inline-block';}applyCameraViewPreference();await load();await loadReconStatus();startLiveUpdates()}
+async function enterCameraHealth(session){$('authGate').classList.add('hidden');$('cameraLoginMsg').textContent='';let pr=null;try{const r=await wait(db.from('profiles').select('*').eq('user_id',session.user.id).single(),'Profile',12000);pr=r?.data||null;if(r?.error)console.warn('Camera Health profile lookup:',r.error)}catch(e){console.warn('Camera Health profile lookup failed:',e)}profile=pr||{role:'owner',active:true,user_id:session.user.id};if(pr&&(!pr.active||pr.role==='pending')){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Your account is not active yet. Contact the Owner/Admin.';return}if(pr&&!['owner','it'].includes(String(pr.role))){await db.auth.signOut();$('authGate').classList.remove('hidden');$('cameraLoginMsg').textContent='Camera Health is available only to active Owner and IT accounts.';return}if(['owner','it'].includes(String(profile.role).toLowerCase())){$('importToggle').style.display='inline-block';$('manageUnitsBtn').style.display='inline-block';}applyCameraViewPreference();await load();await loadReconStatus();startLiveUpdates();setTimeout(()=>autoCheckOnOpen(),250)}
 function refreshRemoveUnitOptions(){const keys=[...new Set(devices.map(d=>String(d.unit_key||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));['removeUnitKey','moveUnitKey'].forEach(id=>{const el=$(id);if(el)el.innerHTML='<option value="">Choose a unit…</option>'+keys.map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')})}
 function toggleManageUnits(show){const p=$('manageUnitsPanel');if(!p)return;p.style.display=show?'block':'none';if(show)refreshRemoveUnitOptions()}
 async function addOwnerUnit(){const msg=$('unitManageMsg');msg.textContent='Adding unit…';const args={p_unit_key:$('addUnitKey').value.trim(),p_unit_type:$('addUnitType').value,p_camera_count:Number($('addUnitCount').value||0),p_public_ip:$('addUnitIp').value.trim()||null,p_organization:$('addUnitOrg').value.trim()||'root',p_reason:$('addUnitReason').value.trim()};const {error}=await db.rpc('owner_add_camera_unit_v1',args);if(error){msg.textContent='Could not add unit: '+error.message;return}msg.textContent='Unit added ✓';await load();refreshRemoveUnitOptions()}
@@ -1035,7 +1035,34 @@ function openAllReconCameras(){
 if($('reconSummary')){
   $('reconSummary').onclick=openAllReconCameras;
   $('reconSummary').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAllReconCameras()}};
-}async function refreshFieldHealth(){
+}let autoOpenCheckRunning=false;
+async function autoCheckOnOpen(){
+  if(autoOpenCheckRunning)return;
+  const lockKey='cameraHealthAutoCheckStartedAt';
+  try{
+    const last=Number(sessionStorage.getItem(lockKey)||0);
+    if(Date.now()-last<30000)return;
+    sessionStorage.setItem(lockKey,String(Date.now()));
+  }catch{}
+  autoOpenCheckRunning=true;
+  const btn=$('refresh'),oldText=btn?.textContent||'↻ Refresh';
+  try{
+    const targets=devices.filter(d=>cameraGroup(d)!=='Reconeyez'&&d.public_ip&&d.monitoring_enabled!==false);
+    if(!targets.length)return;
+    let done=0,next=0;
+    if(btn){btn.disabled=true;btn.textContent='Live check 0 / '+targets.length+'…'}
+    const workers=Math.min(18,targets.length);
+    const run=async()=>{while(true){const idx=next++;if(idx>=targets.length)return;const d=targets[idx];await Promise.race([
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),6500))
+    ]);done++;if(btn)btn.textContent='Live check '+done+' / '+targets.length+'…'}};
+    await Promise.all(Array.from({length:workers},run));
+    await load({background:true});
+    if(btn)btn.textContent='✓ Current check '+targets.length+' cameras';
+  }catch(e){console.warn('Automatic Camera Health check-in failed',e);if(btn)btn.textContent='Auto check incomplete'}
+  finally{autoOpenCheckRunning=false;if(btn){btn.disabled=false;setTimeout(()=>{if(btn.textContent.startsWith('✓')||btn.textContent==='Auto check incomplete')btn.textContent=oldText},3000)}}
+}
+async function refreshFieldHealth(){
   const btn=$('refresh');if(btn.disabled)return;
   btn.disabled=true;const oldText=btn.textContent;
   try{
