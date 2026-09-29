@@ -10891,3 +10891,41 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
    padding:8px 12px 24px!important;
  }
 }
+
+
+/* Owner visual parity: polished session controls + IT color-coded KPI cards */
+#view-owner[data-owner-route="today"] .ownerItTopActions button{
+  height:34px!important;min-height:34px!important;padding:0 14px!important;
+  border:1px solid #344957!important;border-radius:8px!important;
+  background:#172630!important;color:#f4f8fa!important;
+  font-size:11px!important;font-weight:800!important;letter-spacing:.01em!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+#view-owner[data-owner-route="today"] .ownerItTopActions button:hover{background:#213542!important;border-color:#4c6575!important}
+#view-owner[data-owner-route="today"] .ownerItTopActions button:last-child{
+  background:linear-gradient(180deg,#682a2a,#4d2020)!important;
+  border-color:#9d4a4a!important;color:#fff!important;
+}
+#view-owner[data-owner-route="today"] .ownerItTopActions button:last-child:hover{background:linear-gradient(180deg,#7b3030,#5c2424)!important}
+#view-owner[data-owner-route="today"] .ownerItKpis>button{position:relative!important;overflow:hidden!important}
+#view-owner[data-owner-route="today"] .ownerItKpis>button.cyan{
+  background:linear-gradient(120deg,#0c2631,#0d1b25 72%)!important;
+  border-color:#17657b!important;border-top:2px solid #20c4e8!important;
+}
+#view-owner[data-owner-route="today"] .ownerItKpis>button.red{
+  background:linear-gradient(120deg,#35151b,#18171e 72%)!important;
+  border-color:#7d2833!important;border-top:2px solid #ef4552!important;
+}
+#view-owner[data-owner-route="today"] .ownerItKpis>button.green{
+  background:linear-gradient(120deg,#0c2b20,#0e1d1b 72%)!important;
+  border-color:#17623f!important;border-top:2px solid #31d27a!important;
+}
+#view-owner[data-owner-route="today"] .ownerItKpis>button.purple{
+  background:linear-gradient(120deg,#28163a,#171724 72%)!important;
+  border-color:#643891!important;border-top:2px solid #a968ec!important;
+}
+#view-owner[data-owner-route="today"] .ownerItKpis>button.amber{
+  background:linear-gradient(120deg,#38270d,#1e1b14 72%)!important;
+  border-color:#745419!important;border-top:2px solid #e8a72f!important;
+}
+#view-owner[data-owner-route="today"] .ownerItKpis>button:hover{filter:brightness(1.12)!important;transform:translateY(-1px)!important}
