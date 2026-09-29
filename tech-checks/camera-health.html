@@ -116,6 +116,54 @@ button,.btn,a.btn,[role="button"],.stat,.collapse-toggle,.camera-open-cta{pointe
 }
 .it-diagnostic-sheet{position:fixed;inset:0;z-index:99999;background:rgba(1,8,13,.94);padding:max(22px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom));overflow:auto}.it-diagnostic-panel{max-width:760px;margin:0 auto;background:#07131c;border:1px solid #2d5f7d;border-radius:18px;padding:18px;box-shadow:0 18px 70px #000}.it-diagnostic-panel h2{margin:0 0 4px;font-size:26px}.it-diag-sub{color:#91a8b9;margin-bottom:16px}.it-diag-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.it-diag-actions button{min-height:58px;border:1px solid #2b607f;background:#0d2636;color:#e9f7ff;border-radius:12px;font-weight:900;font-size:14px}.it-diag-actions button:first-child{border-color:#16bde9;box-shadow:0 0 18px rgba(22,189,233,.15)}.it-diag-result{margin-top:14px;padding:14px;border:1px solid #263c4d;border-radius:12px;background:#061018;color:#cfe0eb;line-height:1.45;min-height:90px}.it-diag-close{width:100%;margin-top:14px;min-height:48px}
 @media(max-width:520px){.it-diag-actions{grid-template-columns:1fr}}
+
+/* 2026-09-29 desktop camera-health board */
+@media (min-width:1200px){
+  #cameraListArea{width:100%;max-width:none}
+  .unitcards{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:10px!important;
+    padding:8px 0!important;
+    align-items:start!important;
+  }
+  .unitcard{
+    width:auto!important;
+    min-width:0!important;
+    padding:11px!important;
+    border-radius:12px!important;
+  }
+  .unitcard .cardtop{
+    min-height:48px!important;
+    padding:0 100px 6px 0!important;
+    gap:7px!important;
+  }
+  .unitcard .cardtitle{font-size:16px!important;line-height:1.08!important}
+  .unitcard .card-site{font-size:10px!important;line-height:1.2!important;margin-top:3px!important}
+  .unitcard .collapse-toggle{
+    right:8px!important;top:8px!important;min-width:84px!important;
+    padding:6px 8px!important;font-size:9px!important;
+  }
+  .unitcard .unit-health-summary{gap:4px!important;margin:6px 0!important}
+  .unitcard .unit-health-summary .uhs{padding:5px 3px!important;border-radius:7px!important}
+  .unitcard .unit-health-summary .uhs b{font-size:14px!important}
+  .unitcard .unit-health-summary .uhs span{font-size:8px!important}
+  .unitcard .unit-time-strip{margin:6px 0!important}
+  .unitcard .unit-time-strip>div{padding:5px 6px!important}
+  .unitcard .unit-time-strip span{font-size:8px!important}
+  .unitcard .unit-time-strip b{font-size:9px!important}
+  .unitcard .send-root-unit,.unitcard .verify-unit-now,.unitcard .degraded-front,.unitcard .troubleshoot-front{
+    margin:5px 0 0!important;padding:7px 8px!important;font-size:9px!important;
+  }
+  .unitcard:not(.expanded){min-height:0!important}
+  .unitcard:not(.expanded) .unit-expanded{display:none!important}
+  .unitcard.expanded{grid-column:span 2}
+  .unitcard.expanded .component-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media (min-width:1600px){
+  .unitcards{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .unitcard.expanded{grid-column:span 2}
+}
 </style><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
 @media(max-width:700px){
