@@ -10929,3 +10929,57 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
   border-color:#745419!important;border-top:2px solid #e8a72f!important;
 }
 #view-owner[data-owner-route="today"] .ownerItKpis>button:hover{filter:brightness(1.12)!important;transform:translateY(-1px)!important}
+
+
+/* Owner schedule readability — desktop job rows must never overlap. */
+@media(min-width:721px){
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerItPanelBody{
+   padding:10px!important;display:flex!important;flex-direction:column!important;gap:10px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayJob{
+   display:grid!important;
+   grid-template-columns:minmax(320px,2.2fr) minmax(115px,.55fr) minmax(180px,.85fr) minmax(120px,.55fr)!important;
+   gap:18px!important;align-items:center!important;
+   min-height:88px!important;height:auto!important;
+   padding:14px 16px!important;margin:0!important;
+   border:1px solid #263b49!important;border-radius:10px!important;
+   background:#0c1821!important;overflow:visible!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayJobMain{
+   display:grid!important;grid-template-columns:105px minmax(0,1fr)!important;
+   gap:16px!important;align-items:center!important;min-width:0!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayTicket,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodaySite,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayMeta,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayOwner,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayState{min-width:0!important}
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodaySite b,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodaySite span,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayOwner b,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayOwner span{
+   display:block!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+   overflow-wrap:anywhere!important;line-height:1.35!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodaySite span{margin-top:5px!important;color:#8ea0ac!important}
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayMeta{
+   display:flex!important;flex-wrap:wrap!important;gap:6px!important;align-content:center!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayOwner{padding:0 4px!important}
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayOwner b{font-size:12px!important;margin-bottom:5px!important}
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayState{
+   display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:center!important;gap:8px!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayState>span,
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerInlineControl{
+   position:static!important;inset:auto!important;transform:none!important;width:100%!important;
+   box-sizing:border-box!important;text-align:center!important;white-space:normal!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerInlineControl{min-height:32px!important;padding:7px 8px!important}
+}
+@media(min-width:721px) and (max-width:1180px){
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayJob{
+   grid-template-columns:minmax(260px,1.7fr) minmax(100px,.5fr) minmax(150px,.7fr)!important;
+ }
+ #view-owner[data-owner-route="today"] .ownerItSchedule .ownerTodayState{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 160px!important}
+}
