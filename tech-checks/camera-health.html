@@ -164,6 +164,73 @@ button,.btn,a.btn,[role="button"],.stat,.collapse-toggle,.camera-open-cta{pointe
   .unitcards{grid-template-columns:repeat(5,minmax(0,1fr))!important}
   .unitcard.expanded{grid-column:span 2}
 }
+
+/* 2026-09-29 true desktop unit-card layout override */
+@media (min-width:1200px){
+  #unitCards.unitcards{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:14px!important;
+  }
+  #unitCards .unitcard{
+    padding:14px!important;
+    min-width:0!important;
+  }
+  #unitCards .unitcard .cardtop{
+    min-height:62px!important;
+    padding-right:112px!important;
+  }
+  #unitCards .unitcard .cardtitle{font-size:20px!important}
+  #unitCards .unitcard .card-site{font-size:11px!important}
+  #unitCards .unitcard .unit-health-summary{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin:9px 0!important;
+  }
+  #unitCards .unitcard .unit-health-summary .uhs{padding:8px 6px!important}
+  #unitCards .unitcard .unit-health-summary .uhs b{font-size:17px!important}
+  #unitCards .unitcard .unit-time-strip{
+    grid-template-columns:1fr 1fr!important;
+    margin:8px 0!important;
+  }
+  #unitCards .unitcard .unit-time-strip>div{padding:8px 10px!important}
+  #unitCards .unitcard .front-camera-links{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin:8px 0!important;
+  }
+  #unitCards .unitcard .camera-front-link{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 16px!important;
+    grid-template-rows:auto auto!important;
+    min-height:52px!important;
+    padding:8px 10px!important;
+    text-align:left!important;
+  }
+  #unitCards .unitcard .camera-link-main{
+    grid-column:1!important;grid-row:1!important;
+    font-size:12px!important;white-space:normal!important;
+  }
+  #unitCards .unitcard .camera-link-state{
+    grid-column:1!important;grid-row:2!important;font-size:9px!important;
+  }
+  #unitCards .unitcard .camera-link-arrow{
+    grid-column:2!important;grid-row:1/3!important;font-size:20px!important;
+  }
+  #unitCards .unitcard .mockup-bottom-actions{
+    display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;
+  }
+  #unitCards .unitcard .mockup-bottom-actions button{
+    width:100%!important;min-width:0!important;margin:0!important;
+  }
+  #unitCards .unitcard.expanded{grid-column:span 2!important}
+  #unitCards .unitcard.expanded .component-list{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+@media (min-width:1750px){
+  #unitCards.unitcards{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+}
 </style><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
 @media(max-width:700px){
