@@ -9642,7 +9642,15 @@ async function forceTechWorkflowRefresh(reason='live'){
     return;
   }
   if(role==='it'&&!viewIT()?.classList.contains('hidden')){
-    if(techElementVisible(document.getElementById('wlItHome'))||techElementVisible(document.getElementById('wlItDayComplete')))return showITHome();
+    // Keep the visible IT dashboard stable. Realtime events are already absorbed
+    // by app.js refreshData(); rebuilding wlItHome here causes the full-screen flash.
+    // Queue the dashboard refresh and apply it only on an explicit navigation/action.
+    if(techElementVisible(document.getElementById('wlItHome'))||techElementVisible(document.getElementById('wlItDayComplete'))){
+      techWorkflowRefreshPending=true;
+      const sync=document.getElementById('syncStatus');
+      if(sync&&navigator.onLine)sync.textContent='Live data updated';
+      return;
+    }
     if(techElementVisible(document.getElementById('wlItJobLookup'))){
       const input=document.getElementById('wlITJobSearch');
       if(input?.value?.trim())return itFindJobByTicket();
