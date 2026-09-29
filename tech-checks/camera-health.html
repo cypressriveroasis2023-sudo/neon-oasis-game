@@ -1156,7 +1156,22 @@ function openITDiagnostics(unit){
  sheet.innerHTML='<div class="it-diagnostic-panel"><h2>IT Diagnostics</h2><div class="it-diag-sub">'+esc(unit)+' · guided live troubleshooting</div><div class="it-diag-actions"><button data-itdiag="connectivity">⚡ RUN LIVE CHECK</button><button data-itdiag="cameras">◉ CAMERA STATUS</button><button data-itdiag="router">▣ ROUTER / INHAND</button><button data-itdiag="ports">⌁ PORTS / SERVICES</button><button data-itdiag="logs">≡ RECENT LOGS</button><button data-itdiag="recorder">▤ NVR / RECORDER</button></div><div id="itDiagResult" class="it-diag-result">Select a diagnostic. Start with <b>RUN LIVE CHECK</b>. Results will show what responded, what failed, and the next area to inspect.</div><button class="mini it-diag-close">CLOSE DIAGNOSTICS</button></div>';
  document.body.appendChild(sheet);$('troubleSearch').value=unit;showTrouble();
  sheet.querySelector('.it-diag-close').onclick=()=>sheet.remove();
- sheet.querySelectorAll('[data-itdiag]').forEach(btn=>btn.onclick=async()=>{const kind=btn.dataset.itdiag,res=document.getElementById('itDiagResult');res.innerHTML='<b>'+esc(btn.textContent)+'</b><br>Running live diagnostic…';const hidden=[...document.querySelectorAll('[data-diag]')].find(x=>x.dataset.diag===kind);if(hidden){await runDiagnostic(kind,hidden);res.innerHTML=$('troubleResult').innerHTML}else res.innerHTML='Diagnostic is not available for this unit.';});
+ sheet.querySelectorAll('[data-itdiag]').forEach(btn=>btn.onclick=async()=>{
+   const kind=btn.dataset.itdiag,res=document.getElementById('itDiagResult'),label=btn.textContent;
+   sheet.querySelectorAll('[data-itdiag]').forEach(x=>x.disabled=true);
+   btn.textContent='CHECKING…';
+   res.innerHTML='<b>'+esc(label)+'</b><br><span class="yellow">Running live diagnostic for '+esc(unit)+'…</span>';
+   try{
+     await runDiagnostic(kind,btn);
+     const detail=$('troubleResult')?.innerHTML||'';
+     res.innerHTML=detail||'<span class="yellow">The check finished but returned no diagnostic detail.</span>';
+   }catch(err){
+     res.innerHTML='<b class="red">DIAGNOSTIC FAILED</b><br>'+esc(err?.message||String(err))+'<br><span class="small">Retry the check or open the camera detail page for direct verification.</span>';
+   }finally{
+     sheet.querySelectorAll('[data-itdiag]').forEach(x=>x.disabled=false);
+     btn.textContent=label;
+   }
+ });
 }
 document.addEventListener('click',e=>{const b=e.target.closest('.troubleshoot-front');if(!b)return;e.preventDefault();e.stopPropagation();openITDiagnostics(b.dataset.unit);});
 document.addEventListener('click',async e=>{const b=e.target.closest('.send-root-unit');if(!b)return;e.preventDefault();e.stopPropagation();const key=b.dataset.unit;if(!confirm('Move '+key+' to ROOT / SHOP? It will be removed from the active field-health board but kept in inventory.'))return;$('moveUnitReason').value='Moved to ROOT / shop from Camera Health';await moveOwnerUnit(true,key);});
@@ -1187,12 +1202,20 @@ function updateCameraSearch(){const q=$('globalSearch').value,m=cameraSearchMatc
 $('globalSearch').oninput=updateCameraSearch;
 $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const m=cameraSearchMatches(e.target.value);if(m.length)openCameraSearchResult(m[0]);e.target.blur()}});
 $('cameraSearchResults').addEventListener('click',e=>{const b=e.target.closest('.camera-search-result[data-search-index]');if(!b)return;const item=e.currentTarget.__matches?.[Number(b.dataset.searchIndex)];if(item)openCameraSearchResult(item);$('globalSearch').blur()});async function runTroubleshooting(){const btn=$('runTrouble'),q=$('troubleSearch')?.value||$('globalSearch')?.value||'',matches=findTroubleUnits(q);if(!matches.length){showTrouble();return}const [unit,ds]=matches[0],router=routers.find(r=>String(r.unit_key||'').toLowerCase()===String(unit).toLowerCase());btn.disabled=true;btn.textContent='Checking…';$('troubleResult').innerHTML='<b>'+esc(unit)+'</b><br>Running fresh camera/device connectivity checks'+(router?.router_public_ip?' and InHand router check…':'…');try{for(const d of ds.filter(x=>x.public_ip)){const {error}=await db.functions.invoke('camera-health-check',{body:{device_id:d.id}});if(error)console.warn(error)}await load();showTrouble();const freshRouter=routers.find(r=>String(r.unit_key||'').toLowerCase()===String(unit).toLowerCase()),routerLine=freshRouter?.router_public_ip?'<br><b>InHand Router:</b> '+esc(String(freshRouter.current_status||freshRouter.reported_status||'unknown').toUpperCase())+' · '+esc(String(freshRouter.router_public_ip).replace('/32',''))+':'+esc(freshRouter.web_port||8080):'';$('troubleResult').innerHTML+='<br><b>Fresh check complete.</b>'+routerLine}catch(e){$('troubleResult').innerHTML='<b>'+esc(unit)+'</b><br>Troubleshooting check could not complete: '+esc(e?.message||String(e))}finally{btn.disabled=false;btn.textContent='Run Troubleshooting'}}$('runTrouble').onclick=runTroubleshooting;$('troubleSearch').addEventListener('keydown',e=>{if(e.key==='Enter')runTroubleshooting()});async function diagnosticTarget(){const q=$('troubleSearch')?.value||$('globalSearch')?.value||'';const m=findTroubleUnits(q);if(!m.length){$('troubleResult').innerHTML='No matching unit. Search by unit, camera name, site, or public IP.';return null}return{unit:m[0][0],ds:m[0][1]}}
-async function freshDeviceChecks(ds){for(const d of ds.filter(x=>x.public_ip)){const {error}=await db.functions.invoke('camera-health-check',{body:{device_id:d.id}});if(error)console.warn('Diagnostic check failed',d.device_name,error)}await load()}
+async function freshDeviceChecks(ds){
+ const targets=ds.filter(x=>x.public_ip);
+ if(!targets.length){await load({background:true});return}
+ const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Live check timed out')),ms));
+ await Promise.allSettled(targets.map(d=>Promise.race([
+   db.functions.invoke('camera-health-check',{body:{device_id:d.id,fast_verify:true,skip_provider_sync:true}}).then(({error})=>{if(error)throw error}),
+   timeout(5500)
+ ])));
+ await load({background:true});
+}
 function diagState(d){return effectiveHealth(d)}
 function diagHeader(unit,label){return '<b>'+esc(unit)+' · '+esc(label)+'</b><br>'}
 document.addEventListener('click',e=>{const b=e.target.closest('.collapse-toggle');if(!b)return;e.preventDefault();e.stopPropagation();const card=b.closest('.unitcard'),open=!card.classList.contains('expanded');card.classList.toggle('expanded',open);b.textContent=open?'CLOSE DETAILS ↑':'OPEN DETAILS ↓';});
 async function runDiagnostic(kind,btn){const t=await diagnosticTarget();if(!t)return;const {unit,ds}=t;
-document.addEventListener('click',async e=>{const b=e.target.closest('.verify-unit-now');if(!b)return;e.preventDefault();e.stopPropagation();const unit=b.dataset.unit,ds=devices.filter(d=>String(d.unit_key||d.device_name)===String(unit));b.disabled=true;b.textContent='VERIFYING…';try{await Promise.all(ds.filter(d=>d.public_ip).map(d=>db.functions.invoke('camera-health-check',{body:{device_id:d.id}})));await load({background:true});render();}catch(err){console.warn('Unit verify failed',err);b.textContent='VERIFY FAILED — RETRY';b.disabled=false;}});
 document.querySelectorAll('[data-diag]').forEach(x=>x.classList.toggle('primary',x===btn));btn.disabled=true;const original=btn.textContent;btn.textContent='Checking…';$('troubleResult').innerHTML=diagHeader(unit,original)+'Running diagnostic…';try{
 if(kind==='connectivity'){await freshDeviceChecks(ds);const withIp=ds.filter(d=>d.public_ip),up=withIp.filter(d=>diagState(d)==='online'),bad=withIp.filter(d=>['offline','degraded'].includes(diagState(d)));$('troubleResult').innerHTML=diagHeader(unit,'Connectivity')+(withIp.length?'<b class="'+(bad.length?'red':'green')+'">'+up.length+' of '+withIp.length+' configured devices responding</b>':'<span class="yellow">No public IP is configured for this unit.</span>')+(bad.length?'<br>Not healthy: '+bad.map(d=>esc(d.device_name)+' ('+esc(diagState(d).toUpperCase())+')').join(' · '):'')+'<br><span class="small">Fresh camera-health checks completed now.</span>'}
 else if(kind==='cameras'){await freshDeviceChecks(ds);const cams=ds.filter(d=>String(d.device_type||'').toUpperCase()!=='NVR');$('troubleResult').innerHTML=diagHeader(unit,'Cameras')+(cams.length?cams.map(d=>'<div style="margin-top:6px"><b>'+esc(d.device_name)+'</b> · <span class="'+(diagState(d)==='online'?'green':diagState(d)==='offline'?'red':'yellow')+'">'+esc(diagState(d).toUpperCase())+'</span>'+(d.public_ip?' · '+esc(String(d.public_ip).replace('/32','')):' · no IP')+'</div>').join(''):'No camera components are mapped to this unit.')+'<br><span class="small">Statuses were refreshed before this result was shown.</span>'}
