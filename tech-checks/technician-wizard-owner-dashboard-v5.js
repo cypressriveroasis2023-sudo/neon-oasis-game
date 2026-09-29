@@ -847,7 +847,7 @@ function injectStyles() {
           display:grid!important;grid-template-columns:1fr!important;gap:14px!important;align-content:start!important;
           min-width:0!important;padding:18px!important;border:1px solid #263943!important;border-radius:14px!important;background:#0b1821!important
         }
-        #wlItTruckInventory .wl-it-truck-counts{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:7px!important}
+        #wlItTruckInventory .wl-it-truck-counts{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:7px!important}
         #wlItTruckInventory .wl-it-truck-counts i{padding:12px 6px!important;text-align:center!important;border-radius:9px!important}
         #wlItTruckInventory .wl-it-start{width:auto!important;min-height:42px!important;justify-self:start!important;padding:0 18px!important}
         #wlItTruckInventory>[data-wl-it-truck-inventory]{width:auto!important;min-width:150px!important;margin-top:14px!important}
@@ -1367,7 +1367,7 @@ function helpStepsForRole(role = currentRoleKey()) {
   if (role === 'service') return [
     { kicker:'WELCOME', title:'Service Tech · How Tech Check Works', body:`<p>Tech Check is your technician workflow. <b>MHelpDesk stays separate.</b> Use the MHelpDesk reference in Tech Check to make sure you are working on the correct ticket.</p><p>Each new delivery, pickup, service call, or swap uses its own current MHelpDesk ticket. When that job is finished, it closes. The <b>unit number stays universal</b> in Tech Check so the unit history can follow it across different tickets.</p>` },
     { kicker:'MY WORK TODAY', title:'Start with the work assigned to you', body:`<p>Owner-assigned jobs appear at the top of <b>My Work Today</b>. A job may be assigned directly to you or to the <b>Service Department queue</b>.</p><p>Tap <b>Open Service Job</b>, enter the exact current MHelpDesk ticket, tap <b>Find Job</b>, verify the ticket preview, then choose <b>Take This Job</b>. If it is a department-queue job, Take This Job claims it to you and the Owner can see which Service Tech took responsibility.</p>` },
-    { kicker:'START THE DAY', title:'Truck / Trailer Inspection → Required Truck Inventory → Field Work', body:`<p><b>Every work day:</b> the Truck Check is mandatory before leaving the shop. If you are taking a trailer, the Trailer Check is mandatory too.</p><p>After the safety inspection passes, physically verify your permanent truck inventory: <b>1 Sniper, 1 Ranger, 1 Spotter, 1 Solar Spotter, 3 exact SIM cards by SIM number, 25 Recon batteries, 4 AGM 12V 110Ah batteries, and 2 LiTime 12V 100Ah batteries.</b> Each SIM stays assigned to that truck until Service marks that exact SIM as used. When used, Tech Check makes the truck short, sends the SIM replacement to IT, and requires the new SIM number to be verified before the truck is ready again.</p>` },
+    { kicker:'START THE DAY', title:'Truck / Trailer Inspection → Required Truck Inventory → Field Work', body:`<p><b>Every work day:</b> the Truck Check is mandatory before leaving the shop. If you are taking a trailer, the Trailer Check is mandatory too.</p><p>After the safety inspection passes, physically verify your permanent truck inventory: <b>1 Sniper, 1 Ranger, 1 Spotter, 1 Solar Spotter, 3 exact SIM cards by SIM number, 25 Recon batteries, 4 AGM 12V 110Ah batteries, 2 LiTime 12V 100Ah batteries, and 4 × 12V 35Ah batteries.</b> Each SIM stays assigned to that truck until Service marks that exact SIM as used. When used, Tech Check makes the truck short, sends the SIM replacement to IT, and requires the new SIM number to be verified before the truck is ready again.</p>` },
     { kicker:'RECEIVE FROM IT', title:'Receive equipment from the named IT Tech', body:`<p>When IT creates the handoff, Tech Check shows the MHelpDesk ticket, customer/site, exact units, parts, and the name of the <b>IT Tech who prepared the handoff</b>.</p><p>Do not accept equipment just because it is physically there. First make sure the Tech Check job matches your current MHelpDesk ticket.</p>` },
     { kicker:'VERIFY THE HANDOFF', title:'Physically check every unit and part', body:`<p>Verify the exact unit tags, battery/battery-box counts, photos, and every listed part quantity before accepting the handoff.</p><p>If Tech Check says IT Tech Teddy prepared Unit 058 and two SIM cards, you should physically have Unit 058 and two SIM cards before continuing. A mismatch should be corrected before you accept the equipment.</p>` },
     { kicker:'SOLAR DELIVERY CHECKOUT', title:'Solar Spotter and Ranger support is assigned automatically', body:`<p>For a <b>Solar Spotter DELIVERY</b>, finish checking the Solar Spotter first. Tech Check then automatically requires <b>one Solar Stand per Solar Spotter</b>. In Service checkout, select the battery setup actually installed on that stand: <b>4 × AGM 12V 110Ah</b> or <b>1 × 12V 350Ah</b> per stand. Enter the stand tag, verify the MPPT update/test, verify the selected battery setup is charged, connect the solar panel + battery system + MPPT together, and confirm charging.</p><p>Take a clear Solar Stand tag photo and upload a picture of the MPPT / charging readings. Battery proof and Service sign-off are also saved. For a <b>Ranger DELIVERY</b>, Tech Check automatically requires <b>one solar panel and one LiTime 12V 110Ah battery per Ranger</b>, and Service verifies the Ranger MPPT and charging. Helios requires its battery box in the Service checkout plus the yard-tower MPPT / solar charging test.</p>` },
@@ -2345,7 +2345,7 @@ async function assignmentGateState(assignment) {
     const {data:departure,error:departureError}=await liveDb.rpc('service_departure_readiness_v1');
     if(departureError)return {ready:false,label:'START-DAY CHECK REQUIRED',detail:departureError.message||'Truck readiness could not be verified.'};
     if(!departure?.inspection_ready)return {ready:false,label:'TRUCK / TRAILER INSPECTION REQUIRED',detail:'Complete and pass today’s mandatory Truck Check and Trailer Check when a trailer is being used.'};
-    if(!departure?.inventory_ready)return {ready:false,label:'TRUCK INVENTORY / RESTOCK REQUIRED',detail:'Verify the permanent truck inventory and complete any IT restock before leaving the shop for a new Service job.'};
+    if(!departure?.inventory_ready)return {ready:false,label:'TRUCK INVENTORY REQUIRED',detail:'Verify the permanent truck inventory and correct any short count before leaving the shop for a new Service job.'};
   }
   const workType=String(assignment?.work_type||'').toLowerCase();
   const legacyPickup=!workType && /\bpick[ -]?up\b/i.test(String(assignment?.job_description||''));
@@ -2804,7 +2804,7 @@ function serviceNextActionHtml(state){
   if(state.inventoryDue){
     const readyCount=(state.truckReadiness?.units||[]).filter(u=>u.status==='assigned'&&u.unit_tag).length;
     const simCount=(state.truckReadiness?.sims||[]).filter(s=>s.status==='assigned'&&s.sim_number).length;
-    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>REQUIRED TRUCK INVENTORY</b><small>${readyCount}/4 permanent units · ${simCount}/3 exact SIM cards · Verify 25 Recon batteries · 4 AGM 12V 110Ah · 2 LiTime 12V 100Ah. Missing items must be restocked by IT.</small><button class='wl-service-start' data-wl-service-truck-inventory>CHECK / RESTOCK TRUCK</button></div>`;
+    return `<div class='wl-day-next-card urgent'><span>MANDATORY BEFORE LEAVING SHOP</span><b>REQUIRED TRUCK INVENTORY</b><small>${readyCount}/4 permanent units · ${simCount}/3 exact SIM cards · Verify 25 Recon batteries · 4 AGM 12V 110Ah · 2 LiTime 12V 100Ah · 4 × 12V 35Ah. Missing items must be restocked by IT.</small><button class='wl-service-start' data-wl-service-truck-inventory>CHECK / RESTOCK TRUCK</button></div>`;
   }
   if(state.spareCount>0){
     return `<div class='wl-day-next-card urgent'><span>NEXT REQUIRED ACTION</span><b>RESOLVE TRUCK SPARES · ${state.spareCount}</b><small>Used / unused backup equipment must be resolved before your day can close.</small><button class='wl-service-start' data-wl-service-resolve-spares>RESOLVE SPARES</button></div>`;
@@ -4370,7 +4370,7 @@ function serviceTruckRestockRowsHtml(readiness){
       ? `<button class='wl-service-start top8' data-wl-service-accept-truck-restock='${esc(r.id)}'>ACCEPT FROM IT →</button>`
       : (r.status==='awaiting_return'&&r.old_unit_tag
         ? `<button class='wl-big wl-red top8' data-wl-next-svc-return data-ticket='${esc(r.original_ticket_no||'')}' data-unit='${esc(r.old_unit_tag)}' data-type='${esc(r.item_type)}'>RETURN OLD UNIT TO IT →</button>`
-        : `<div class='small top8'>${r.status==='requested'?'IT RESTOCK REQUESTED':r.status==='preparing'?'IT IS PREPARING THIS':'WAITING FOR IT'}</div>`);
+        : `<div class='small top8'>${r.status==='requested'?'IT REPLACEMENT QUEUED':r.status==='preparing'?'IT IS PREPARING THIS':'WAITING FOR IT'}</div>`);
     return `<div class='wl-truck-restock-row ${r.status==='ready'?'ready':''}'><div><b>${esc(r.item_type)}</b><span>${detail}</span></div><em>${esc(String(r.status||'').replaceAll('_',' ').toUpperCase())}</em>${action}</div>`;
   }).join('')}</div>`;
 }
@@ -4419,6 +4419,7 @@ async function showServiceTruckInventoryCheck(){
         <label><span>Recon batteries <b>25 required</b></span><input id='wlTruckReconQty' type='number' inputmode='numeric' min='0' value='${Number(stock.recon_battery_qty||0)}'></label>
         <label><span>AGM 12V 110Ah <b>4 required</b></span><input id='wlTruckAgmQty' type='number' inputmode='numeric' min='0' value='${Number(stock.agm_12v_110ah_qty||0)}'></label>
         <label><span>LiTime 12V 100Ah <b>2 required</b></span><input id='wlTruckLiTimeQty' type='number' inputmode='numeric' min='0' value='${Number(stock.litime_12v_100ah_qty||0)}'></label>
+        <label><span>12V 35Ah <b>4 required</b></span><input id='wlTruck35AhQty' type='number' inputmode='numeric' min='0' value='${Number(stock.battery_12v_35ah_qty||0)}'></label>
       </div>
       <button class='wl-service-start top10' data-wl-save-truck-inventory>SAVE ALL TRUCK INVENTORY →</button>
       <div class='small top8' data-wl-truck-save-status>Save stores all 4 unit numbers, all 3 SIM numbers, and all battery counts.</div>
@@ -4439,13 +4440,15 @@ async function saveMyServiceTruckInventoryDraft(){
   const recon=Number(document.getElementById('wlTruckReconQty')?.value);
   const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
   const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
-  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))throw new Error('Enter valid battery quantities before saving.');
-  const {data,error}=await liveDb.rpc('service_save_my_truck_inventory_v2',{
+  const battery35=Number(document.getElementById('wlTruck35AhQty')?.value);
+  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime)||!Number.isFinite(battery35))throw new Error('Enter valid battery quantities before saving.');
+  const {data,error}=await liveDb.rpc('service_save_my_truck_inventory_v3',{
     p_units:units,
     p_sims:sims,
     p_recon_battery_qty:Math.max(0,Math.floor(recon)),
     p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
-    p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
+    p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime)),
+    p_battery_12v_35ah_qty:Math.max(0,Math.floor(battery35))
   });
   if(error)throw error;
   return data||{};
@@ -4485,22 +4488,24 @@ async function submitServiceTruckInventoryCheck(){
   const recon=Number(document.getElementById('wlTruckReconQty')?.value);
   const agm=Number(document.getElementById('wlTruckAgmQty')?.value);
   const litime=Number(document.getElementById('wlTruckLiTimeQty')?.value);
-  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime))return alert('Enter the actual battery quantities physically on the truck.');
+  const battery35=Number(document.getElementById('wlTruck35AhQty')?.value);
+  if(!Number.isFinite(recon)||!Number.isFinite(agm)||!Number.isFinite(litime)||!Number.isFinite(battery35))return alert('Enter the actual battery quantities physically on the truck.');
   document.body.classList.add('busy');
   try{
-    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v2',{
+    const {data,error}=await liveDb.rpc('submit_my_service_truck_inventory_check_v3',{
       p_unit_confirmations:unitConfirmations,
       p_sim_confirmations:simConfirmations,
       p_recon_battery_qty:Math.max(0,Math.floor(recon)),
       p_agm_12v_110ah_qty:Math.max(0,Math.floor(agm)),
-      p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime))
+      p_litime_12v_100ah_qty:Math.max(0,Math.floor(litime)),
+      p_battery_12v_35ah_qty:Math.max(0,Math.floor(battery35))
     });
     if(error)throw error;
     if(data?.inventory_ready){
       rememberTechCompletion('service','', 'TRUCK INVENTORY READY');
       return showSvcHome();
     }
-    alert('TRUCK NOT READY TO LEAVE SHOP\n\nMissing items were sent to the IT restock queue. Accept the prepared replacements/restock, then physically recheck the truck.');
+    alert('TRUCK NOT READY TO LEAVE SHOP\n\nThe live inventory is short or not verified. No restock request was sent. Correct the actual truck count/item, then physically verify the truck again.');
     return showServiceTruckInventoryCheck();
   }catch(error){alert(error?.message||'Could not save the truck inventory check.');}
   finally{document.body.classList.remove('busy');}
@@ -4550,7 +4555,7 @@ async function showServiceTruckUsage(){
       <div class='wl-question top10'>
         <div class='qnum'>USED TRUCK BATTERY STOCK</div>
         <label>MHelpDesk Ticket<select id='wlTruckUseStockTicket'>${ticketOptions}</select></label>
-        <label>Stock Type<select id='wlTruckUseStockType'><option value='Recon Battery'>Recon Battery</option><option value='AGM 12V 110Ah'>AGM 12V 110Ah</option><option value='LiTime 12V 100Ah'>LiTime 12V 100Ah</option></select></label>
+        <label>Stock Type<select id='wlTruckUseStockType'><option value='Recon Battery'>Recon Battery</option><option value='AGM 12V 110Ah'>AGM 12V 110Ah</option><option value='LiTime 12V 100Ah'>LiTime 12V 100Ah</option><option value='12V 35Ah'>12V 35Ah</option></select></label>
         <label>Quantity Used<input id='wlTruckUseStockQty' type='number' inputmode='numeric' min='1' value='1'></label>
         <button class='wl-big wl-red top10' data-wl-service-record-truck-stock-used>RECORD STOCK USED →</button>
       </div>`;
@@ -4593,7 +4598,7 @@ async function recordServiceTruckStockUsed(){
   try{
     const {error}=await liveDb.rpc('service_use_truck_stock_v1',{p_ticket_no:ticket,p_item_type:type,p_qty:qty});
     if(error)throw error;
-    alert('Truck stock usage recorded. IT restock is now required before the truck is ready for another new field job.');
+    alert('Truck stock usage recorded. The live truck count was reduced. No request was sent; update the count when replacement stock is physically on the truck.');
     return showSvcHome();
   }catch(error){alert(error?.message||'Could not record truck stock used.');}
   finally{document.body.classList.remove('busy');}
@@ -4629,14 +4634,15 @@ function itTruckInventoryCounts(row){
     sims:sims.filter(x=>x.status==='assigned'&&x.sim_number).length,
     recon:Number(stock.recon_battery_qty||0),
     agm:Number(stock.agm_12v_110ah_qty||0),
-    litime:Number(stock.litime_12v_100ah_qty||0)
+    litime:Number(stock.litime_12v_100ah_qty||0),
+    battery35:Number(stock.battery_12v_35ah_qty||0)
   };
 }
 function itTruckInventorySummaryHtml(row){
   const n=itTruckInventoryCounts(row),ready=Boolean(row.departure_ready);
   return `<article class='wl-it-truck-manage-row ${ready?'ready':'not-ready'}'>
     <div><span>SERVICE TRUCK</span><h3>${esc(row.service_tech_name||'Service Tech')}</h3><b>${ready?'READY TO LEAVE SHOP':'NOT READY'}</b></div>
-    <div class='wl-it-truck-counts'><i>${n.units}/4 <small>UNITS</small></i><i>${n.sims}/3 <small>SIMs</small></i><i>${n.recon}/25 <small>RECON</small></i><i>${n.agm}/4 <small>AGM</small></i><i>${n.litime}/2 <small>LiTime</small></i></div>
+    <div class='wl-it-truck-counts'><i>${n.units}/4 <small>UNITS</small></i><i>${n.sims}/3 <small>SIMs</small></i><i>${n.recon}/25 <small>RECON</small></i><i>${n.agm}/4 <small>AGM</small></i><i>${n.litime}/2 <small>LiTime</small></i><i>${n.battery35}/4 <small>12V 35Ah</small></i></div>
     <button class='wl-it-start' data-wl-it-manage-truck='${esc(row.service_tech_id)}'>MANAGE / LOAD TRUCK →</button>
   </article>`;
 }
@@ -4649,7 +4655,7 @@ async function showITServiceTruckInventory(){
     const rows=await loadITServiceTruckInventory();
     window.__wlItTruckInventoryRows=rows;
     card.innerHTML=`<button class='wl-back' data-wl-home='it'>← IT HOME</button>${progress('SERVICE TRUCKS','Permanent truck inventory',1,1)}
-      <div class='wl-it-restock-banner'><b>IT LOADS / RESTOCKS · SERVICE VERIFIES / USES</b><span>IT is the only department that adds official permanent truck inventory. Any IT change forces Service to physically verify the truck again before departure.</span></div>
+      <div class='wl-it-restock-banner'><b>LIVE SERVICE TRUCK INVENTORY</b><span>Service records what is physically on the truck. IT and Owner can correct official counts when needed. Short counts stay visible; the technician does not send a restock request from the daily inventory screen.</span></div>
       <div class='wl-it-truck-manage-list'>${rows.length?rows.map(itTruckInventorySummaryHtml).join(''):`<div class='ok'><b>No active Service technicians.</b></div>`}</div>
       <button class='wl-big wl-gray top10' data-wl-it-truck-inventory>REFRESH TRUCKS</button>`;
   }catch(error){card.innerHTML=techDashboardErrorHtml('it',error?.message||'Could not load Service truck inventory.');}
@@ -4669,7 +4675,7 @@ async function showITServiceTruckManager(serviceTechId){
   let audit=[];
   try{audit=await loadServiceTruckInventoryAudit(serviceTechId)}catch(error){console.warn('Could not load truck inventory audit',error)}
   card.innerHTML=`<button class='wl-back' data-wl-it-truck-inventory>← SERVICE TRUCKS</button>${progress('MANAGE SERVICE TRUCK',row.service_tech_name||'Service Tech',1,1)}
-    <div class='wl-it-restock-banner'><b>IT MAINTAINS THE OFFICIAL INVENTORY · SERVICE PHYSICALLY VERIFIES IT</b><span>IT can add, remove, or correct unit tags, exact SIM numbers, and battery counts. Every saved change records who changed it, what changed, and when. Any change forces Service to verify the truck again before departure.</span></div>
+    <div class='wl-it-restock-banner'><b>EDIT THE LIVE TRUCK INVENTORY</b><span>IT and Owner can add, remove, or correct unit tags, exact SIM numbers, and battery counts. Service can also record the physical inventory from its own screen. Every saved change is logged and requires Service to verify before departure.</span></div>
     <label class='top10'>Change note (optional)<input id='wlInventoryChangeNote' placeholder='Why are you changing this inventory?'></label>
     <div class='wl-it-truck-editor'>
       <div class='wl-truck-section-title'>PERMANENT UNITS · EXACT UNIT TAGS</div>
@@ -4679,7 +4685,7 @@ async function showITServiceTruckManager(serviceTechId){
       <div class='wl-truck-section-title'>SIM CARDS · EXACT NUMBERS</div>
       ${[1,2,3].map(slot=>{const s=sims.find(x=>Number(x.slot_no)===slot)||{};return `<div class='wl-it-load-line'><div><b>SIM ${slot}</b><span>${s.sim_number?'CURRENT · '+esc(s.sim_number):'NOT ASSIGNED'}</span></div><input id='wlLoadSim_${slot}' inputmode='numeric' placeholder='Exact SIM number — blank removes' value='${esc(s.sim_number||'')}'><label class='wl-it-inline-verify'><input id='wlLoadSimVerified_${slot}' type='checkbox'> exact number verified</label><button data-wl-it-load-sim='${slot}' data-service-tech='${esc(serviceTechId)}'>SAVE / CORRECT</button></div>`;}).join('')}
       <div class='wl-truck-section-title'>BATTERY STOCK · SET THE EXACT PHYSICAL COUNT</div>
-      ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='0' inputmode='numeric' value='${qty}'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>SET EXACT COUNT</button></div>`).join('')}
+      ${[['Recon Battery','Recon Batteries',Number(stock.recon_battery_qty||0),25],['AGM 12V 110Ah','AGM 12V 110Ah',Number(stock.agm_12v_110ah_qty||0),4],['LiTime 12V 100Ah','LiTime 12V 100Ah',Number(stock.litime_12v_100ah_qty||0),2],['12V 35Ah','12V 35Ah',Number(stock.battery_12v_35ah_qty||0),4]].map(([type,label,qty,target],i)=>`<div class='wl-it-load-line'><div><b>${label}</b><span>CURRENT · ${qty} / ${target}</span></div><input id='wlLoadStock_${i}' type='number' min='0' inputmode='numeric' value='${qty}'><button data-wl-it-load-stock='${i}' data-stock-type='${esc(type)}' data-service-tech='${esc(serviceTechId)}'>SET EXACT COUNT</button></div>`).join('')}
     </div>
     <details class='wl-it-more top10' open><summary>INVENTORY CHANGE HISTORY · ${audit.length}</summary>${itTruckAuditHtml(audit)}</details>`;
 }
