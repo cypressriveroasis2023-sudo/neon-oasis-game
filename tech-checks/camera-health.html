@@ -1098,12 +1098,17 @@ async function autoCheckOnOpen(){
   try{
     const targets=devices.filter(d=>cameraGroup(d)!=='Reconeyez'&&d.public_ip&&d.monitoring_enabled!==false);
     if(!targets.length)return;
+    if(btn){btn.disabled=true;btn.textContent='Syncing camera status…'}
+    await Promise.race([
+      db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
+    ]);
     let done=0,next=0;
-    if(btn){btn.disabled=true;btn.textContent='Live check 0 / '+targets.length+'…'}
+    if(btn)btn.textContent='Live check 0 / '+targets.length+'…';
     const workers=Math.min(18,targets.length);
     const run=async()=>{while(true){const idx=next++;if(idx>=targets.length)return;const d=targets[idx];await Promise.race([
-      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}).catch(e=>({error:e})),
-      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),6500))
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id,fast_verify:true,skip_provider_sync:true}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),4500))
     ]);done++;if(btn)btn.textContent='Live check '+done+' / '+targets.length+'…'}};
     await Promise.all(Array.from({length:workers},run));
     await load({background:true});
@@ -1118,17 +1123,22 @@ async function refreshFieldHealth(){
     btn.textContent='Loading cameras…';
     await load({background:true});
     const targets=devices.filter(d=>cameraGroup(d)!=='Reconeyez'&&d.public_ip&&d.monitoring_enabled!==false);
-    let done=0;
+    btn.textContent='Syncing camera status…';
+    await Promise.race([
+      db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
+    ]);
+    let done=0,next=0;
     const workers=Math.min(18,Math.max(1,targets.length));
-    let next=0;
     const run=async()=>{while(true){const idx=next++;if(idx>=targets.length)return;const d=targets[idx];await Promise.race([
-      db.functions.invoke('camera-health-check',{body:{device_id:d.id}}).catch(e=>({error:e})),
-      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),6500))
+      db.functions.invoke('camera-health-check',{body:{device_id:d.id,fast_verify:true,skip_provider_sync:true}}).catch(e=>({error:e})),
+      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),4500))
     ]);done++;btn.textContent='Checking cameras '+done+' / '+targets.length+'…'}};
     await Promise.all(Array.from({length:workers},run));
     btn.textContent='Loading results…';
     await load({background:true});
     btn.textContent='✓ Checked '+targets.length+' cameras';
+    try{sessionStorage.setItem('cameraHealthAutoCheckStartedAt',String(Date.now()));startHealthCountdown(Date.now())}catch{}
   }catch(e){
     console.error('Camera Health refresh failed',e);btn.textContent='Refresh failed';
   }finally{
@@ -1206,6 +1216,14 @@ async function freshDeviceChecks(ds){
  const targets=ds.filter(x=>x.public_ip);
  if(!targets.length){await load({background:true});return}
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Live check timed out')),ms));
+ const vp=new Set(['helios','nvr','ranger','solar_spotter','spotter']);
+ if(targets.some(d=>vp.has(String(d.monitoring_profile||'').toLowerCase()))){
+   const unitKey=String(targets[0]?.unit_key||'').trim();
+   await Promise.race([
+     db.functions.invoke('vigilant-sync',{body:unitKey?{unit_key:unitKey}:{device_id:targets[0].id}}).catch(e=>({error:e})),
+     new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),7000))
+   ]);
+ }
  await Promise.allSettled(targets.map(d=>Promise.race([
    db.functions.invoke('camera-health-check',{body:{device_id:d.id,fast_verify:true,skip_provider_sync:true}}).then(({error})=>{if(error)throw error}),
    timeout(5500)
