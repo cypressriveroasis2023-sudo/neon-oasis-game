@@ -10733,3 +10733,23 @@ body.ownerTruckInventoryEditing{overflow:hidden!important}
    max-width:100%!important;
  }
 }
+
+
+/* Owner dashboard parity with the IT command dashboard. */
+#view-owner[data-owner-route="today"] .ownerAppPage,#view-owner[data-owner-route="today"] #ownerRouteView{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+#view-owner[data-owner-route="today"] .ownerItDashboard{width:100%!important;max-width:none!important;margin:0!important;padding:14px 16px 22px!important;box-sizing:border-box!important;background:#071018!important}
+#view-owner[data-owner-route="today"] .ownerItHeaderGrid{display:grid!important;grid-template-columns:minmax(360px,1.05fr) minmax(250px,.75fr) minmax(300px,.9fr)!important;gap:12px!important;margin:0 0 8px!important}
+#view-owner[data-owner-route="today"] .ownerItGreeting,#view-owner[data-owner-route="today"] .ownerItInfoCard{min-height:112px!important;padding:16px 18px!important;border:1px solid #2b4050!important;border-radius:10px!important;background:#0d1923!important}
+#view-owner[data-owner-route="today"] .ownerItGreeting{background:linear-gradient(115deg,#111b24,#220c13 62%,#0c1821)!important}
+#view-owner[data-owner-route="today"] .ownerItGreeting h1{margin:5px 0 3px!important;color:#fff!important;font-size:27px!important;line-height:1.05!important}
+#view-owner[data-owner-route="today"] #ownerTodayClock{display:block!important;margin:5px 0 2px!important;color:#fff!important;font-size:28px!important;line-height:1!important}
+#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherWeek,#view-owner[data-owner-route="today"] .ownerItWeatherCard .ownerWeatherToday{display:none!important}
+#view-owner[data-owner-route="today"] .ownerItKpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:7px!important;margin:0 0 8px!important}
+#view-owner[data-owner-route="today"] .ownerItKpis>button{min-height:64px!important;margin:0!important;padding:9px 11px!important;border:1px solid #263746!important;border-radius:7px!important;background:#101b25!important;text-align:left!important;color:#fff!important}
+#view-owner[data-owner-route="today"] .ownerItMainGrid{display:grid!important;grid-template-columns:minmax(0,1.55fr) minmax(300px,.72fr)!important;gap:7px!important;margin:0!important}
+#view-owner[data-owner-route="today"] .ownerItPanel{margin:0!important;padding:0!important;border:1px solid #263746!important;border-radius:8px!important;background:#0f1a24!important;overflow:hidden!important;min-width:0!important}
+#view-owner[data-owner-route="today"] .ownerItPanel>header{min-height:39px!important;padding:9px 12px!important;border-bottom:1px solid #263746!important;background:#111e29!important}
+#view-owner[data-owner-route="today"] .ownerItPanelBody{min-height:150px!important;padding:9px!important}
+#view-owner[data-owner-route="today"] .ownerItRecent{grid-column:1}#view-owner[data-owner-route="today"] .ownerItQuick{grid-column:2}
+@media(max-width:1050px){#view-owner[data-owner-route="today"] .ownerItHeaderGrid{grid-template-columns:1fr 1fr!important}#view-owner[data-owner-route="today"] .ownerItGreeting{grid-column:1/-1!important}#view-owner[data-owner-route="today"] .ownerItKpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-owner[data-owner-route="today"] .ownerItMainGrid{grid-template-columns:1fr!important}#view-owner[data-owner-route="today"] .ownerItRecent,#view-owner[data-owner-route="today"] .ownerItQuick{grid-column:auto!important}}
+@media(max-width:600px){#view-owner[data-owner-route="today"] .ownerItDashboard{padding:6px!important}#view-owner[data-owner-route="today"] .ownerItHeaderGrid,#view-owner[data-owner-route="today"] .ownerItKpis{grid-template-columns:1fr!important}#view-owner[data-owner-route="today"] .ownerItGreeting{grid-column:auto!important}}
