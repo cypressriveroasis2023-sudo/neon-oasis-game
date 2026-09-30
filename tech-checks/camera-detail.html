@@ -196,7 +196,7 @@ function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
 function isShopDevice(d){const org=String(d?.organization||'').trim().toLowerCase();return org==='root'||String(d?.activation_state||'').toLowerCase()==='deactivated'||(cameraGroup(d)==='Reconeyez'&&org.includes('shop'))}
 function sourceFresh(d,ttlMs=15*60*1000){const t=d?.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
-function checkFresh(h,ttlMs=15*60*1000){const t=h?.checked_at?new Date(h.checked_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
+function checkFresh(h,ttlMs=15*60*1000){if(/Star4Live live API reports|Control Center live API reports/.test(String(h?.detail||'')))return false;const t=h?.checked_at?new Date(h.checked_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
 function hasDirectLiveProof(){
   const group=cameraGroup(device),probe=String(current?.overall_status||'').toLowerCase(),portOnline=Object.values(current?.port_status||{}).some(v=>v?.online===true);
   if(group==='Vigilant')return sourceFresh(device)&&String(device?.source_status||'').toLowerCase()==='online';
@@ -324,19 +324,19 @@ async function verifyNow(){
       await load();b.textContent='Reconeyez refreshed';return;
     }
     if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
-    if(!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');
+    if(cameraGroup(device)!=='Vigilant'&&!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');
     const profile=String(device.monitoring_profile||'').toLowerCase();
     const vigilant=['helios','nvr','ranger','solar_spotter','spotter'].includes(profile);
     if(vigilant){
       b.textContent='Syncing source…';
-      await Promise.race([db.functions.invoke('vigilant-sync',{body:{device_id:device.id}}),new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),7000))]);
+      const {data,error}=await db.functions.invoke('camera-provider-reconcile',{body:{mode:'vigilant'}});if(error||data?.error)throw new Error(data?.error||error.message);
     }
-    b.textContent='Verifying now…';
-    const {error}=await Promise.race([
+    if(vigilant&&!effectivePublicIP()){await load();b.textContent='✓ Provider refreshed';return;}\n    b.textContent='Verifying now…';
+    const {data:checkData,error}=await Promise.race([
       db.functions.invoke('camera-health-check',{body:{device_id:device.id,fast_verify:true,skip_provider_sync:true}}),
       new Promise(resolve=>setTimeout(()=>resolve({error:{message:'Live verification timed out'}}),5500))
     ]);
-    if(error)throw new Error(error.message||'Live verification failed');
+    if(error||checkData?.error)throw new Error(checkData?.error||error.message||'Live verification failed');
     await load();
     const st=effectiveHealth(device,current);
     b.textContent=st==='online'?'✓ Online':st==='offline'?'✕ Offline':st==='degraded'?'⚠ Degraded':'? Not verified';
