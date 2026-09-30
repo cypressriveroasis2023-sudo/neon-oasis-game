@@ -145,10 +145,10 @@ async function starInventory(db:any){
     .select("id,device_name,device_serial,external_device_id,monitoring_profile,unit_key,activation_state,organization")
     .eq("source","vigilant_control_center");
   if(error)throw error;
-  const bySerial=new Map<string,any>(),byName=new Map<string,any>();
+  const bySerial=new Map<string,any>(),byExternal=new Map<string,any>(),byName=new Map<string,any>();
   for(const d of locals||[]){
     if(d.device_serial)bySerial.set(String(d.device_serial).toLowerCase(),d);
-    if(d.external_device_id)bySerial.set(String(d.external_device_id).toLowerCase(),d);
+    if(d.external_device_id)byExternal.set(String(d.external_device_id).toLowerCase(),d);
     if(d.device_name)byName.set(String(d.device_name).toLowerCase(),d);
   }
   const now=new Date().toISOString();let matched=0,online=0,offline=0,unmatched=0;
@@ -156,7 +156,7 @@ async function starInventory(db:any){
   const byProfile:any={},coveredTrackerUnits=new Map<string,any>();
   for(const v of all){
     const resourceKey=String(v.deviceSerial||v.deviceName||"");
-    let d=bySerial.get(String(v.deviceSerial||"").toLowerCase())||byName.get(String(v.deviceName||"").toLowerCase());
+    let d=bySerial.get(String(v.deviceSerial||"").toLowerCase())||byExternal.get(String(v.deviceSerial||"").toLowerCase())||byName.get(String(v.deviceName||"").toLowerCase());
     if(!d){
       unmatched++;
       unmatchedResources.push({
@@ -184,7 +184,6 @@ async function starInventory(db:any){
       vigilant_status:isOnline?"Online":"Offline",
       source_status:isOnline?"online":"offline",
       source_last_seen_at:now,
-      external_device_id:String(v.deviceSerial||d.external_device_id||""),
       last_online_at:isOnline?now:undefined,
       source_metadata:{
         provider:"vigilant_star4live",status:v.status,latestOnline:v.latestOnline,
