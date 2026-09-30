@@ -375,15 +375,14 @@ async function saveUnitSite(){
   try{let q=db.from('camera_devices').update({organization:site,updated_at:new Date().toISOString()});if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);const {error}=await q;if(error)throw error;await load();b.textContent='Saved ✓';$('siteEditWrap').classList.add('hidden')}catch(e){console.error(e);alert('Could not save site: '+(e?.message||e));b.disabled=false;b.textContent='Save site to this unit'}
 }
 async function saveUnitPublicIP(){
-  if(!device||String(profile?.role||'')!=='owner')return;
+  if(!device||!['owner','it'].includes(String(profile?.role||'').toLowerCase()))return;
   const ip=String($('ipSetupInput').value||'').trim();
   if(!validIP(ip)){alert('Enter a valid IPv4 address, for example 166.193.43.178.');return}
   const oldIp=cleanIP(device.public_ip)||effectivePublicIP()||'';const b=$('saveIpBtn');b.disabled=true;b.textContent='Saving…';
   try{
-    let q=db.from('camera_devices').update({public_ip:ip,public_ip_source:'owner_manual',public_ip_mapped_at:new Date().toISOString(),updated_at:new Date().toISOString()});
-    if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);
-    const {error}=await q;if(error)throw error;
+    const {data,error}=await db.rpc('set_camera_unit_public_ip_v1',{p_device_id:device.id,p_public_ip:ip});if(error)throw error;
     await load();
+    if(cleanIP(device.public_ip)!==ip)throw new Error('The new IP did not persist after reload. Please retry.');
     b.textContent='Saved ✓';
     if(oldIp!==ip)alert('Public IP updated'+(oldIp?' from '+oldIp:'')+' to '+ip+'. Camera Health will use the new address.');
   }catch(e){console.error(e);alert('Could not save public IP: '+(e?.message||e));b.disabled=false;b.textContent='Save public IP to this unit'}
