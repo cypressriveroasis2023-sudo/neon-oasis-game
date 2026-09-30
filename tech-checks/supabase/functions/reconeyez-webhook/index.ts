@@ -20,9 +20,47 @@ function normalizeEvent(value: unknown) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function parseBatteryPercent(body: any) {
+  const raw = firstValue(body, [
+    "device_battery", "deviceBattery", "battery", "battery_level", "batteryLevel",
+    "battery_percent", "batteryPercent", "battery_percentage", "batteryPercentage", "device_info.battery_percentage",
+    "device.battery", "device.battery_level", "device.batteryLevel",
+    "data.device_battery", "data.deviceBattery", "data.battery",
+    "event.device_battery", "event.deviceBattery", "event.battery"
+  ]);
+  if (raw === null || raw === undefined) return null;
+  const m = String(raw).match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = Number(m[0]);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n) : null;
+}
+
+function parseCloudUrl(body: any) {
+  const raw = firstValue(body, [
+    "url", "cloud_url", "cloudUrl", "event_url", "eventUrl", "secure_url", "secureUrl",
+    "device_url", "deviceUrl", "link", "event.url", "event.link", "data.url",
+    "data.cloud_url", "data.cloudUrl", "data.event_url", "data.eventUrl"
+  ]);
+  const value = String(raw || "").trim();
+  return /^https:\/\//i.test(value) ? value : null;
+}
+
+function batteryStatusFromEvent(eventName: string, percent: number | null) {
+  const e = normalizeEvent(eventName);
+  if (e === "criticalbatteryshutdown" || e === "yt") return "critical";
+  if (e === "batterylow" || e === "xt") return "low";
+  if (e === "batteryrestored" || e === "xr") return "normal";
+  if (percent !== null) {
+    if (percent <= 10) return "critical";
+    if (percent <= 25) return "low";
+    return "normal";
+  }
+  return null;
+}
+
 function parseObservedAt(body: any) {
   const raw = firstValue(body, [
-    "observed_at", "event_time", "eventTime", "timestamp", "time", "created_at",
+    "observed_at", "event_time", "eventTime", "timestamp", "time", "created_at", "date_time",
     "event.observed_at", "event.timestamp", "data.timestamp"
   ]);
   if (!raw) return new Date().toISOString();
@@ -47,14 +85,14 @@ function healthFromEvent(eventName: string) {
   const e = normalizeEvent(eventName);
   const offline = new Set([
     "connectionlost", "communicationfail", "criticalbatteryshutdown",
-    "systemstopped"
+    "systemstopped", "yc", "yt", "tz"
   ]);
-  const degraded = new Set(["batterylow", "tamper", "tamperalarm"]);
+  const degraded = new Set(["batterylow", "tamper", "tamperalarm", "xt", "ta"]);
   const online = new Set([
     "deviceconnected", "communicationrestore", "batteryrestored",
     "routinecheck", "automatictest", "systemstarted",
     "persondetected", "vehicledetected", "movementdetected",
-    "armed", "disarmed", "closingreport", "openingreport"
+    "armed", "disarmed", "closingreport", "openingreport", "yk", "xr", "rp", "tw", "ba", "cl", "op"
   ]);
   if (offline.has(e)) return { health: "offline", source: "offline" };
   if (degraded.has(e)) return { health: "degraded", source: "online" };
@@ -79,7 +117,10 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const pathParts = url.pathname.split("/").filter(Boolean);
   const finalPath = pathParts[pathParts.length - 1] || "";
+  const authHeader = req.headers.get("authorization") || "";
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
   const candidate =
+    bearerMatch?.[1]?.trim() ||
     req.headers.get("x-reconeyez-token") ||
     url.searchParams.get("token") ||
     (finalPath !== "reconeyez-webhook" ? finalPath : "");
@@ -109,11 +150,18 @@ Deno.serve(async (req: Request) => {
     "event.code", "data.code"
   ]) || "");
   const externalId = String(firstValue(body, [
-    "device_guid", "deviceGuid", "guid", "device.guid", "device.id",
+    "device_guid", "deviceGuid", "guid", "device_info.guid", "device.guid", "device.id",
     "detector.guid", "detector.id", "source.guid", "source.deviceGuid",
     "data.device_guid", "data.deviceGuid", "data.guid"
   ]) || "");
   const observedAt = parseObservedAt(body);
+  const batteryPercent = parseBatteryPercent(body);
+  const reconCloudUrl = parseCloudUrl(body);
+  const signalStrengthDbmRaw = firstValue(body, ["signal_strength_dbm", "device_info.signal_strength_dbm"]);
+  const signalStrengthDbm = signalStrengthDbmRaw === null ? null : Number(signalStrengthDbmRaw);
+  const reconDeviceName = firstValue(body, ["device_info.name", "device_name", "deviceName"]);
+  const reconArea = firstValue(body, ["device_info.area", "area", "site_name", "siteName"]);
+  const batteryStatus = batteryStatusFromEvent(eventType || eventCode, batteryPercent);
 
   let camera: any = null;
   if (externalId) {
@@ -138,11 +186,10 @@ Deno.serve(async (req: Request) => {
   await db.from("camera_integrations").update({
     metadata: {
       ...integrationMetadata,
-      last_webhook_received_at: new Date().toISOString(),
-      last_webhook_event_type: eventType || eventCode || "unrecognized",
       ...(normalizeEvent(eventType || eventCode) === "integrationtest"
         ? { receiver_tested_at: new Date().toISOString(), receiver_test_status: "ok" }
-        : {})
+        : { last_webhook_received_at:new Date().toISOString(),last_webhook_event_type:eventType||eventCode||"unrecognized" })
+
     },
     updated_at: new Date().toISOString()
   }).eq("provider", "reconeyez");
@@ -196,7 +243,13 @@ Deno.serve(async (req: Request) => {
     ...(camera.source_metadata || {}),
     last_event_type: eventType || null,
     last_event_code: eventCode || null,
-    last_event_at: now
+    last_event_at: now,
+    ...(batteryPercent !== null ? { battery_percent: batteryPercent, battery_updated_at: now } : {}),
+    ...(batteryStatus ? { battery_status: batteryStatus, battery_status_updated_at: now } : {}),
+    ...(Number.isFinite(signalStrengthDbm) ? { signal_strength_dbm: signalStrengthDbm, signal_updated_at: now } : {}),
+    ...(reconDeviceName ? { reconeyez_device_name: String(reconDeviceName) } : {}),
+    ...(reconArea ? { reconeyez_area: String(reconArea) } : {}),
+    ...(reconCloudUrl ? { cloud_url: reconCloudUrl, cloud_url_updated_at: now } : {})
   };
 
   const devicePatch: any = {
@@ -247,7 +300,10 @@ Deno.serve(async (req: Request) => {
         previous_status: previous,
         event_type: eventType || null,
         event_code: eventCode || null,
-        external_device_id: externalId || null
+        external_device_id: externalId || null,
+        battery_percent: batteryPercent,
+        battery_status: batteryStatus,
+        cloud_url: reconCloudUrl
       }
     });
   }
@@ -258,6 +314,9 @@ Deno.serve(async (req: Request) => {
     matched: true,
     health_changed: previous !== mapping.health,
     camera_device_id: camera.id,
-    status: mapping.health
+    status: mapping.health,
+    battery_percent: batteryPercent,
+    battery_status: batteryStatus,
+    cloud_url: reconCloudUrl
   });
 });
