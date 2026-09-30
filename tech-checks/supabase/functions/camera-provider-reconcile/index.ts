@@ -196,12 +196,9 @@ async function starInventory(db:any){
       }
     }).eq("id",d.id);
     if(deviceWriteError)throw new Error("Star4Live device status write failed: "+deviceWriteError.message);
-    const {error:healthWriteError}=await db.from("camera_health_current").upsert({
-      camera_device_id:d.id,overall_status:isOnline?"online":"offline",
-      ip_reachable:isOnline,checked_at:now,consecutive_failures:isOnline?0:1,
-      detail:`Vigilant / Star4Live live API reports ${isOnline?"ONLINE":"OFFLINE"}`
-    },{onConflict:"camera_device_id"});
-    if(healthWriteError)throw new Error("Star4Live health status write failed: "+healthWriteError.message);
+    // Provider observations live in camera_devices.source_*.
+    // Preserve the separate direct-port check and its observation timestamp.
+
   }
   // A live Star4Live resource with an exact tracker unit name is valid tracker-level
   // evidence even when the local camera row has not been imported yet. This closes
