@@ -331,7 +331,8 @@ async function verifyNow(){
       b.textContent='Syncing source…';
       const {data,error}=await db.functions.invoke('camera-provider-reconcile',{body:{mode:'vigilant'}});if(error||data?.error)throw new Error(data?.error||error.message);
     }
-    if(vigilant&&!effectivePublicIP()){await load();b.textContent='✓ Provider refreshed';return;}\n    b.textContent='Verifying now…';
+    if(vigilant&&!effectivePublicIP()){await load();b.textContent='✓ Provider refreshed';return;}
+    b.textContent='Verifying now…';
     const {data:checkData,error}=await Promise.race([
       db.functions.invoke('camera-health-check',{body:{device_id:device.id,fast_verify:true,skip_provider_sync:true}}),
       new Promise(resolve=>setTimeout(()=>resolve({error:{message:'Live verification timed out'}}),5500))
