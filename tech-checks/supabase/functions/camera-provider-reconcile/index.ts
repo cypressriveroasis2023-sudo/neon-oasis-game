@@ -113,9 +113,9 @@ async function starInventory(db:any){
       const batch=res.data.resourceList;
       if(!q)inventoryDiagnostics.push({pageStart,returned:batch.length,data_keys:Object.keys(res.data),total:res.data.total??res.data.totalCount??res.data.resourceCount??null});
       let added=0;for(const v of batch){const key=String(v.deviceSerial||v.deviceName||"");if(key&&!serials.has(key)){serials.add(key);resources.push(v);added++}}
-      if(batch.length<100)return resources;
+      if(batch.length<100){const total=Number(res.data.total);if(Number.isFinite(total)&&resources.length!==total)throw new Error("Star4Live inventory count mismatch: received "+resources.length+" of "+total+" resources");return resources;}
       if(!added)throw new Error("Star4Live pagination repeated a page");
-      pageStart+=batch.length;
+      pageStart+=1;
     }
     throw new Error("Star4Live pagination exceeded 100 pages");
   }
