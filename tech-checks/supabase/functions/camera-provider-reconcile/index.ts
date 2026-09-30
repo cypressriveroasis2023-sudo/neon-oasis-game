@@ -104,13 +104,14 @@ async function starInventory(db:any){
   const trackerKeySet=new Set(trackerRowByKey.keys());
   const queries=[...new Set(trackerRows.map((x:any)=>String(x.unit_tag||"").trim()).filter(Boolean))];
   const endpoint=`${base}/openapi/user/organization/sub/resource/list`;
-  const inventoryDiagnostics:any[]=[];
+  const inventoryDiagnostics:any[]=[];let providerAccountSummary:any=null;
   async function inventoryPages(q:string){
     const resources:any[]=[];const serials=new Set<string>();let pageStart=0;
     for(let page=0;page<100;page++){
       const res=await post(endpoint,{organizationId:"283838",...(q?{deviceName:q}:{}),pageSize:100,pageStart,agentStr:0,userMode:0},token);
       if(!Array.isArray(res?.data?.resourceList))throw new Error("Star4Live returned no resource list");
       const batch=res.data.resourceList;
+      if(!q)providerAccountSummary={total_resources:res.data.total,online_resources:res.data.onlineCount,total_channels:res.data.totalChannel,online_channels:res.data.onlineChannelCount};
       if(!q)inventoryDiagnostics.push({pageStart,returned:batch.length,data_keys:Object.keys(res.data),total:res.data.total??res.data.totalCount??res.data.resourceCount??null});
       let added=0;for(const v of batch){const key=String(v.deviceSerial||v.deviceName||"");if(key&&!serials.has(key)){serials.add(key);resources.push(v);added++}}
       if(batch.length<100){const total=Number(res.data.total);if(Number.isFinite(total)&&resources.length!==total)throw new Error("Star4Live inventory count mismatch: received "+resources.length+" of "+total+" resources");return resources;}
@@ -254,7 +255,7 @@ async function starInventory(db:any){
     provider:"vigilant",server_host:base.replace(/^https?:\/\//,""),server_port:443,enabled:true,
     last_sync_at:now,last_sync_status:failures.length||!accountInventoryComplete?"partial":"ok",
     last_error:failures.length?(failures.length+" lookup failures; affected observations were left unchanged."):(accountInventoryComplete?null:"Full inventory unavailable: "+accountInventoryError),
-    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_listing_diagnostics:inventoryDiagnostics,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"combined_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
+    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,provider_account_summary:providerAccountSummary,account_listing_diagnostics:inventoryDiagnostics,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"combined_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
   },{onConflict:"provider"});
   if(integrationWriteError)throw new Error("Star4Live sync summary write failed: "+integrationWriteError.message);
   return {account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"tracker_search",server:base.replace(/^https?:\/\//,""),tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage};
