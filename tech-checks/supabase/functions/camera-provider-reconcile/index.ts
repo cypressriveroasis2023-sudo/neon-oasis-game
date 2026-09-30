@@ -10,7 +10,7 @@ async function loginPassword(p:string){const h=await md5(p);return md5(h+h.slice
 async function post(url:string,data:any,token?:string){
   const h:any={"content-type":"application/json;charset=UTF-8","accept":"application/json"};
   if(token)h.authorization=token;
-  const r=await fetch(url,{method:"POST",headers:h,body:JSON.stringify(data)});
+  const r=await fetch(url,{method:"POST",headers:h,body:JSON.stringify(data),signal:AbortSignal.timeout(15000)});
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(`Star4Live HTTP ${r.status}: ${j?.message||j?.msg||"request failed"}`);
   const code=j?.code;
@@ -107,7 +107,7 @@ async function starInventory(db:any){
   async function inventoryPages(q:string){
     const resources:any[]=[];const serials=new Set<string>();let pageStart=0;
     for(let page=0;page<100;page++){
-      const res=await post(endpoint,{organizationId:"283838",deviceName:q,pageSize:100,pageStart,agentStr:0,userMode:0},token);
+      const res=await post(endpoint,{organizationId:"283838",...(q?{deviceName:q}:{}),pageSize:100,pageStart,agentStr:0,userMode:0},token);
       if(!Array.isArray(res?.data?.resourceList))throw new Error("Star4Live returned no resource list");
       const batch=res.data.resourceList;
       let added=0;for(const v of batch){const key=String(v.deviceSerial||v.deviceName||"");if(key&&!serials.has(key)){serials.add(key);resources.push(v);added++}}
@@ -119,12 +119,19 @@ async function starInventory(db:any){
   }
   let accountInventory:any[]=[],accountInventoryError:string|null=null;
   try{accountInventory=await inventoryPages("");if(!accountInventory.length)throw new Error("Empty account inventory")}catch(e){accountInventoryError=String((e as any)?.message||e)}
-  const accountInventoryComplete=accountInventoryError===null;
-  const queryResults=accountInventoryComplete?[{q:"ALL",resources:accountInventory,error:null as string|null}]:await mapLimit(queries,6,async(q:string)=>{
+  let accountInventoryComplete=accountInventoryError===null;
+  const queryResults=await mapLimit(queries,6,async(q:string)=>{
     try{return {q,resources:await inventoryPages(q),error:null as string|null}}
     catch(e){return {q,resources:[],error:String((e as any)?.message||e)}}
   });
+  const accountSerials=new Set(accountInventory.map(v=>String(v.deviceSerial||v.deviceName||"")));
+  const outsideAccount=[...new Set(queryResults.flatMap(p=>p.resources.map((v:any)=>String(v.deviceSerial||v.deviceName||""))).filter(k=>!accountSerials.has(k)))];
+  if(accountInventoryComplete&&outsideAccount.length){
+    accountInventoryComplete=false;
+    accountInventoryError="Account listing omitted "+outsideAccount.length+" resources found by tracker searches; publishing the combined inventory.";
+  }
   const failures=queryResults.filter(x=>x.error);
+  if(accountInventory.length)queryResults.push({q:"ACCOUNT",resources:accountInventory,error:null});
   const all:any[]=[];const seen=new Set<string>(),resourceQueryTags=new Map<string,Set<string>>();
   for(const page of queryResults)for(const v of page.resources as any[]){
     const k=String(v.deviceSerial||v.deviceName||"");
@@ -173,7 +180,7 @@ async function starInventory(db:any){
       const cov=coveredTrackerUnits.get(tk)||{online:0,offline:0,rows:0};
       cov.rows++;isOnline?cov.online++:cov.offline++;coveredTrackerUnits.set(tk,cov);
     }
-    await db.from("camera_devices").update({
+    const {error:deviceWriteError}=await db.from("camera_devices").update({
       vigilant_status:isOnline?"Online":"Offline",
       source_status:isOnline?"online":"offline",
       source_last_seen_at:now,
@@ -186,11 +193,13 @@ async function starInventory(db:any){
         organizationId:v.organizationId||v.orgId||null,syncedAt:now
       }
     }).eq("id",d.id);
-    await db.from("camera_health_current").upsert({
+    if(deviceWriteError)throw new Error("Star4Live device status write failed: "+deviceWriteError.message);
+    const {error:healthWriteError}=await db.from("camera_health_current").upsert({
       camera_device_id:d.id,overall_status:isOnline?"online":"offline",
       ip_reachable:isOnline,checked_at:now,consecutive_failures:isOnline?0:1,
       detail:`Vigilant / Star4Live live API reports ${isOnline?"ONLINE":"OFFLINE"}`
     },{onConflict:"camera_device_id"});
+    if(healthWriteError)throw new Error("Star4Live health status write failed: "+healthWriteError.message);
   }
   // A live Star4Live resource with an exact tracker unit name is valid tracker-level
   // evidence even when the local camera row has not been imported yet. This closes
@@ -240,12 +249,13 @@ async function starInventory(db:any){
     }
   }
   const {data:intRow}=await db.from("camera_integrations").select("metadata").eq("provider","vigilant").maybeSingle();
-  await db.from("camera_integrations").upsert({
+  const {error:integrationWriteError}=await db.from("camera_integrations").upsert({
     provider:"vigilant",server_host:base.replace(/^https?:\/\//,""),server_port:443,enabled:true,
     last_sync_at:now,last_sync_status:failures.length||!accountInventoryComplete?"partial":"ok",
     last_error:failures.length?(failures.length+" lookup failures; affected observations were left unchanged."):(accountInventoryComplete?null:"Full inventory unavailable: "+accountInventoryError),
-    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"tracker_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
+    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"combined_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
   },{onConflict:"provider"});
+  if(integrationWriteError)throw new Error("Star4Live sync summary write failed: "+integrationWriteError.message);
   return {account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"tracker_search",server:base.replace(/^https?:\/\//,""),tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage};
 }
 async function reconInventory(db:any){
@@ -386,5 +396,9 @@ Deno.serve(async(req)=>{
     if(mode==="all"||mode==="avigilon"||mode==="direct")result.avigilon=await avigilonInventory(db);
     if(mode==="all"||mode==="witness")result.witness=await witnessInventory(db);
     return json(result);
-  }catch(e){console.error("RECONCILE_FAILURE",e);return json({ok:false,error:String((e as any)?.message||e)},500)}
+  }catch(e){
+    const message=String((e as any)?.message||e);console.error("RECONCILE_FAILURE",message);
+    if(mode==="vigilant")await db.from("camera_integrations").update({last_sync_status:"failed",last_error:message}).eq("provider","vigilant");
+    return json({ok:false,error:message},500)
+  }
 });
