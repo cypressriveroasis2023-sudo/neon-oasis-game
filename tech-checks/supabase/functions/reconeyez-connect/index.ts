@@ -79,6 +79,9 @@ async function syncInventory(db: ReturnType<typeof createClient>, list: ReconDev
   });
 
   const now = new Date().toISOString();
+  const {data:existingRows,error:existingError}=await db.from("camera_devices").select("device_serial,organization,activation_state,activation_source,source_metadata,vigilant_status").eq("source","reconeyez");
+  if(existingError)throw existingError;
+  const existingBySerial=new Map((existingRows||[]).map((x:any)=>[x.device_serial,x]));
   const rows = detectors
     .filter((d) => String(d.guid || "").trim())
     .map((d) => {
@@ -86,6 +89,7 @@ async function syncInventory(db: ReturnType<typeof createClient>, list: ReconDev
       const area = String(d.area || "").trim();
       const name = String(d.name || `Reconeyez ${guid.slice(-4)}`).trim();
       const shop = isShopArea(area);
+      const existing:any=existingBySerial.get(`reconeyez:${guid}`);
       return {
         device_serial: `reconeyez:${guid}`,
         external_device_id: guid,
@@ -93,8 +97,8 @@ async function syncInventory(db: ReturnType<typeof createClient>, list: ReconDev
         device_model: String(d.type || "Reconeyez detector"),
         device_type: "Reconeyez detector",
         device_owner: "Cameras Onsite",
-        organization: area || "Reconeyez",
-        vigilant_status: "Unknown",
+        organization: existing?.organization??(area || "Reconeyez"),
+        vigilant_status: existing?.vigilant_status??"Unknown",
         source: "reconeyez",
         source_imported_at: now,
         monitoring_enabled: true,
@@ -102,10 +106,11 @@ async function syncInventory(db: ReturnType<typeof createClient>, list: ReconDev
         monitoring_profile: "reconeyez",
         expected_ports: [],
         port_labels: {},
-        activation_state: shop ? "deactivated" : "active",
-        activation_source: shop ? "reconeyez_shop_area" : "reconeyez_area",
+        activation_state: existing?.activation_state??(shop ? "deactivated" : "active"),
+        activation_source: existing?.activation_source??(shop ? "reconeyez_shop_area" : "reconeyez_area"),
         unit_key: normalizeUnitKey(d),
         source_metadata: {
+          ...(existing?.source_metadata||{}),
           guid,
           area,
           description: String(d.description || ""),
@@ -308,7 +313,7 @@ Deno.serve(async (req: Request) => {
         last_sync_at: new Date().toISOString(),
         last_sync_status: "ok",
         last_error: null,
-        metadata: { last_inventory_count: list.length, last_detector_count: result.imported },
+        metadata: { ...(integration?.metadata||{}), last_inventory_count: list.length, last_detector_count: result.imported },
         updated_at: new Date().toISOString()
       }).eq("provider", "reconeyez");
       return json({ ok: true, connected: true, ...result });
