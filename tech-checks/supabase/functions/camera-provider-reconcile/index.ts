@@ -264,7 +264,7 @@ async function reconInventory(db:any){
   const username=String(secret?.username||""),password=String(secret?.password||""),host=String(secret?.server_host||"na.reconeyez.com"),port=Number(secret?.server_port||9028);
   if(!username||!password)throw new Error("Reconeyez has not been connected");
   const auth="Basic "+btoa(`${username}:${password}`);
-  const res=await fetch(`https://${host}:${port}/control/v1/get_device_list`,{headers:{Authorization:auth,Accept:"application/json","User-Agent":"CamerasOnsite-CameraHealth/1.0"}});
+  const res=await fetch(`https://${host}:${port}/control/v1/get_device_list`,{headers:{Authorization:auth,Accept:"application/json","User-Agent":"CamerasOnsite-CameraHealth/1.0"},signal:AbortSignal.timeout(45000)});
   const txt=await res.text();if(!res.ok)throw new Error(`Reconeyez HTTP ${res.status}`);
   const list=JSON.parse(txt);if(!Array.isArray(list))throw new Error("Reconeyez device list was not an array");
   const detectors=list.filter((d:any)=>String(d?.type||"").toLowerCase().startsWith("detector"));
@@ -296,7 +296,8 @@ async function reconInventory(db:any){
   }
   const now=new Date().toISOString();
   const {data:intRow}=await db.from("camera_integrations").select("metadata").eq("provider","reconeyez").maybeSingle();
-  await db.from("camera_integrations").upsert({provider:"reconeyez",server_host:host,server_port:port,enabled:true,last_sync_at:now,last_sync_status:"ok",last_error:null,metadata:{...(intRow?.metadata||{}),last_inventory_count:list.length,last_detector_count:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:now}},{onConflict:"provider"});
+  const {error:reconSummaryError}=await db.from("camera_integrations").upsert({provider:"reconeyez",server_host:host,server_port:port,enabled:true,last_sync_at:now,last_sync_status:"ok",last_error:null,metadata:{...(intRow?.metadata||{}),last_inventory_count:list.length,last_detector_count:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:now}},{onConflict:"provider"});
+  if(reconSummaryError)throw new Error("Reconeyez inventory summary save failed: "+reconSummaryError.message);
   return {server:host+":"+port,inventory_total:list.length,detectors:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage};
 }
 async function avigilonInventory(db:any){
@@ -397,7 +398,7 @@ Deno.serve(async(req)=>{
     return json(result);
   }catch(e){
     const message=String((e as any)?.message||e);console.error("RECONCILE_FAILURE",message);
-    if(mode==="vigilant")await db.from("camera_integrations").update({last_sync_status:"failed",last_error:message}).eq("provider","vigilant");
+    if(["vigilant","reconeyez","recon","witness","avigilon","direct"].includes(mode))await db.from("camera_integrations").update({last_sync_status:"failed",last_error:message}).eq("provider",mode==="recon"?"reconeyez":mode==="direct"?"avigilon":mode);
     return json({ok:false,error:message},500)
   }
 });
