@@ -1352,7 +1352,7 @@ if($('reconSummary')){
 async function refreshFieldHealth(){
   const btn=$('refresh');if(btn.disabled)return;
   if(!confirm('Run a NEW Camera Health check now? The saved snapshot stays unchanged until the new check completes.'))return;
-  btn.disabled=true;const idleText='↻ RESET / RUN NEW CHECK';
+  btn.disabled=true;const idleText='↻ REFRESH LIVE STATUS';
   try{
     btn.textContent='Checking refresh availability…';
     const {data:claim,error:claimError}=await db.rpc('claim_camera_health_refresh_v1');
@@ -1364,11 +1364,12 @@ async function refreshFieldHealth(){
       setTimeout(()=>{btn.textContent=idleText},2200);
       return;
     }
-    btn.textContent='Refreshing Camera Health…';
-    await Promise.race([
-      db.functions.invoke('vigilant-sync',{body:{action:'sync'}}).catch(e=>({error:e})),
-      new Promise(resolve=>setTimeout(()=>resolve({timeout:true}),20000))
-    ]);
+    btn.textContent='Syncing Star4Live…';
+    const {data:vigilantSync,error:vigilantSyncError}=await db.functions.invoke('vigilant-sync',{body:{action:'sync'}});
+    if(vigilantSyncError)throw vigilantSyncError;
+    if(vigilantSync?.error)throw new Error(String(vigilantSync.error));
+    btn.textContent='Loading Star4Live results…';
+    await load({background:true});
     btn.textContent='Checking Avigilon / CAM V…';
     await refreshSniperHealth();
     btn.textContent='Syncing Reconeyez inventory…';
