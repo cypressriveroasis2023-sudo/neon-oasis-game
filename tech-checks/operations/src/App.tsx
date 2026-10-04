@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
+import VisionHeader from './VisionHeader';
 import TodayDashboard from './TodayDashboard';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
@@ -154,6 +155,8 @@ function TechCheckWorkspace() {
   return <section className='panel module operations-tools' aria-label='Tech Check workspaces'><div className='panelhead'><h2>Tech Check</h2><span>Existing platform workspaces</span></div><div className='operations-tool-grid'><button onClick={()=>openLegacy('it')}><b>IT Tech Check</b><span>IT readiness, preparation, assignments and checks</span></button><button onClick={()=>openLegacy('service')}><b>Service Tech Check</b><span>Service readiness, field assignments and checks</span></button><button className='secondary' onClick={()=>openLegacy('team')}><b>Team / Truck Readiness</b><span>Open the existing Owner team board</span></button><button className='secondary' onClick={()=>openLegacy('accounts')}><b>Accounts & Permissions</b><span>Open the existing account controls</span></button></div></section>;
 }
 function OwnerApp() {
+  const [vision,setVision]=useState(()=>new URLSearchParams(location.search).get('theme')==='vision');
+  const switchLayout=(enabled:boolean)=>{const url=new URL(location.href);if(enabled)url.searchParams.set('theme','vision');else url.searchParams.delete('theme');history.replaceState(null,'',url);setVision(enabled);};
   const [active,setActive]=useState(currentWorkspace);
   const [session,setSession]=useState<Row|null>(null);
   const [sessionError,setSessionError]=useState('');
@@ -174,7 +177,7 @@ function OwnerApp() {
     finally{if(revision===checkRevision.current)setChecking(false);}
   },[]);
   useEffect(()=>{void check();return()=>{checkRevision.current+=1;};},[check]);
-  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('cos-operations-pages-theme',theme);},[theme]);
+  useEffect(()=>{document.documentElement.dataset.theme=vision?'dark':theme;localStorage.setItem('cos-operations-pages-theme',theme);},[theme,vision]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),30000);const change=()=>setActive(currentWorkspace());window.addEventListener('hashchange',change);return()=>{window.clearInterval(timer);window.removeEventListener('hashchange',change);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);};},[]);
   const requestWeather=useCallback(()=>{
     if(!navigator.geolocation){setWeatherStatus('Location unavailable');return;}
@@ -195,7 +198,7 @@ function OwnerApp() {
   const greeting=hour<12?'Good Morning':hour<18?'Good Afternoon':'Good Evening';
   const condition=weather?(weather.weather_code===0?'Clear':weather.weather_code<=3?'Partly cloudy':weather.weather_code<=48?'Fog':weather.weather_code<=67?'Rain':weather.weather_code<=77?'Wintry':weather.weather_code<=82?'Showers':'Storms'):'Weather unavailable';
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
-  return <div className='shell cos-command-shell owner-it-framework operations-shell'>
+  return <div className={'shell cos-command-shell owner-it-framework operations-shell'+(vision?' vision-shell':'')}>
     <aside className={'owner-it-side operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
       <div className='brand'><img src={asset('cameras-on-site-logo.webp')} alt='Cameras Onsite'/></div>
       <button className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu</button>
@@ -203,12 +206,15 @@ function OwnerApp() {
       <div className='platform'><strong>CAMERAS ONSITE</strong><span>Operations · Tech Check · Vision</span><button onClick={()=>openLegacy('it')}>IT Tech Check</button><button onClick={()=>openLegacy('service')}>Service Tech Check</button><button onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button><button onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button onClick={()=>openLegacy('logout')}>Sign out</button></div>
     </aside>
     <main className='owner-it-main'>
+      {vision?<VisionHeader active={active} navigate={navigate} now={now} connected={authorized} checking={checking} classic={()=>switchLayout(false)} allTools={()=>setMenu(true)}/>:<button className='vision-enable' onClick={()=>switchLayout(true)}>Try Vision layout</button>}
+      {!vision&&<>
       <section className='techbar owner-it-topbar'><div className='tech-id'><span className='tech-eye' aria-hidden='true'>◉</span><div><label>CAMERAS ONSITE · OPERATIONS</label><strong className='welcome-name'>{greeting}, {session?.name||'Owner'}</strong></div></div>
         <div className='tech-status'><button className='weather-tile operations-weather' onClick={requestWeather} title='Load weather for your current location'><span className='weather-icon' aria-hidden='true'>{weather?.weather_code===0?'☀':'☁'}</span><div className='weather-copy'><div className='weather-primary'><b>{weather?Math.round(weather.temperature_2m)+'°F':'—°F'}</b><strong>{condition}</strong></div><small>{weatherStatus}</small>{weather&&<small>Feels {Math.round(weather.apparent_temperature)}° · Wind {Math.round(weather.wind_speed_10m)} mph</small>}</div></button><div className='clock-tile'><b>{now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})}</b><small>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric'})} · CT</small></div><div className={'online-pill'+(!authorized?' operations-offline':'')}><i/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</div><button className={'theme-toggle '+theme} onClick={()=>setTheme(current=>current==='dark'?'light':'dark')} aria-label={'Switch to '+(theme==='dark'?'light':'dark')+' mode'}><span aria-hidden='true'>{theme==='dark'?'☀':'☾'}</span></button></div>
       </section>
+      </>}
       {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{active}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
-        :active==='Today'?<TodayDashboard setActive={navigate}/>
+        :active==='Today'?<TodayDashboard setActive={navigate} vision={vision}/>
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
