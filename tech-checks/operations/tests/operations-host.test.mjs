@@ -77,7 +77,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
   }
   const body = new Element('body');
   for (const id of ['view-owner', 'view-it', 'view-svc', 'appView', 'authView',
-    'cosOperationsMount', 'cosOperationsLegacy', 'cosOperationsReturn', 'tab-it', 'tab-svc']) {
+    'cosOperationsMount', 'cosOperationsLegacy', 'cosOperationsReturn', 'cosOperationsTechReturn', 'tab-owner', 'tab-it', 'tab-svc']) {
     nodes.set(id, new Element(id, ['view-it', 'view-svc', 'authView'].includes(id) ? ['hidden'] : []));
   }
   if (role !== 'owner') {
@@ -113,6 +113,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
       calls.tabs.push(id); window.show(view); calls.technicianHomes.push(technicianRole);
     });
   }
+  nodes.get('tab-owner').addEventListener('click', () => { calls.tabs.push('tab-owner'); window.show('owner'); });
   class MutationObserver {
     constructor(callback) { this.callback = callback; this.targets = []; this.pending = false; observers.push(this); }
     observe(target, options) { this.targets.push({ target, options }); }
@@ -163,6 +164,7 @@ test('owner mounts isolated Operations and retains existing legacy controls', ()
   assert.equal(h.nodes.get('cosOperationsLegacy').hidden, true);
   assert.equal(h.accountControl.parentElement, h.nodes.get('cosOperationsLegacy'));
   assert.equal(h.calls.auth, 0);
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
 });
 
 test('real IT and Service accounts never receive Operations or owner navigation', async () => {
@@ -172,6 +174,9 @@ test('real IT and Service accounts never receive Operations or owner navigation'
     const session = h.state.session;
     assert.equal(h.frame(), null);
     assert.equal(h.body.classList.contains('cos-operations-host'), false);
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+    assert.equal(h.calls.tabs.length, 0);
     await h.message({ type: 'COS_OPERATIONS_TOKEN_REQUEST', requestId: 'technician' }, {});
     await h.message({ type: 'COS_OPERATIONS_NAVIGATE', route: 'accounts' }, {});
     assert.equal(h.calls.auth, 0);
@@ -191,7 +196,11 @@ test('Operations role links click existing technician tabs and return to Operati
     assert.equal(h.calls.technicianHomes.at(-1), route);
     assert.equal(h.nodes.get(view).classList.contains('hidden'), false);
     assert.equal(h.body.classList.contains('cos-operations-host'), false);
-    h.window.show('owner'); h.flushMutations();
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, false);
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+    assert.equal(h.calls.tabs.at(-1), 'tab-owner');
+    assert.equal(h.nodes.get('view-owner').classList.contains('hidden'), false);
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
     assert.equal(h.body.classList.contains('cos-operations-host'), true);
   }
   assert.equal(h.state.profile, profile);
@@ -377,4 +386,48 @@ test('app becoming hidden while auth resolves cannot release a token before obse
   assert.equal(reply.role, null);
   h.flushMutations();
   assert.equal(h.frame(), null);
+});
+
+test('technician return stays hidden during both Owner Test previews and returns after ending preview', async () => {
+  const h = harness();
+  for (const role of ['it', 'service']) {
+    await h.navigate(role); h.flushMutations();
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, false);
+    h.preview(role);
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+    assert.equal(h.frame(), null);
+    assert.equal(h.state.role, 'owner');
+    h.preview(null);
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, false);
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+    assert.equal(h.calls.tabs.at(-1), 'tab-owner');
+    assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+    assert.ok(h.frame());
+  }
+});
+
+test('technician return hides while app is closed even if legacy owner state is still cached', async () => {
+  const h = harness();
+  await h.navigate('it'); h.flushMutations();
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, false);
+  h.nodes.get('appView').classList.add('hidden'); h.flushMutations();
+  assert.equal(h.state.role, 'owner');
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+  assert.equal(h.frame(), null);
+  h.nodes.get('appView').classList.remove('hidden'); h.flushMutations();
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, false);
+  h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+  assert.equal(h.calls.tabs.at(-1), 'tab-owner');
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+  assert.ok(h.frame());
+});
+
+test('technician return can reopen Operations through existing show fallback if owner tab is absent', async () => {
+  const h = harness();
+  await h.navigate('service'); h.flushMutations();
+  h.nodes.delete('tab-owner');
+  h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+  assert.equal(h.calls.shows.at(-1), 'owner');
+  assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+  assert.equal(h.body.classList.contains('cos-operations-host'), true);
 });
