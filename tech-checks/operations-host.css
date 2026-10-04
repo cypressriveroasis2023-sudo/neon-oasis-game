@@ -5,5 +5,7 @@ body.cos-operations-host #appView{width:100%!important;max-width:none!important;
 body.cos-operations-host #appView>.mobileTop{display:none!important}
 body.cos-operations-host #view-owner{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}
 body.cos-operations-host #cosOperationsMount{width:100%!important;height:100dvh}
-#cosOperationsReturn{position:relative;z-index:20;min-height:44px;margin:8px 12px}
+#cosOperationsReturn{position:fixed;right:12px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:20000;min-height:44px;margin:0;border:1px solid #2b90ad;background:#082c3c;color:#dffaff;box-shadow:0 4px 20px #0006}
+body.cos-operations-legacy:has(#view-owner:not(.hidden)){overflow-y:auto!important;overflow-x:hidden!important;height:auto!important;min-height:100dvh!important}
+body.cos-operations-legacy #appView{overflow:visible!important;height:auto!important;max-height:none!important}
 @media(max-width:700px){#cosOperationsFrame{min-height:0;height:100dvh}}
