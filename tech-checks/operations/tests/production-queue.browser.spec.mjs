@@ -20,7 +20,7 @@ async function setup(page,{actualHost=false}={}){
     expect(envelope.method).toBe('GET');expect(await route.request().headerValue('authorization')).toBe('Bearer synthetic-it-token');
     let value;
     if(envelope.path==='/api/tech/session')value={authorized:true,legacyTechnician:true,name:'Fixture IT',department:'it',role:'IT'};
-    else if(envelope.path==='/api/tech/assignments')value={profile:{display_name:'Fixture IT',department:'it'},visits:state.assigned?[{visit_id:visitId,job_id:'job',job_number:'FIX-501',customer_name:'Fixture customer',site_name:'Fixture site',visit_type:'IT_PREP',dispatch_status:'ready',scheduled_start:'2026-10-05T13:00:00Z'}]:[]};
+    else if(envelope.path==='/api/tech/assignments'){if(state.assignmentGate)await state.assignmentGate;value={profile:{display_name:'Fixture IT',department:'it'},visits:state.assigned?[{visit_id:visitId,job_id:'job',job_number:'FIX-501',customer_name:'Fixture customer',site_name:'Fixture site',visit_type:'IT_PREP',dispatch_status:'ready',scheduled_start:'2026-10-05T13:00:00Z'}]:[]};}
     else if(envelope.path==='/api/tech/tasks'){if(state.failTasks)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Fixture task source unavailable'})});value={items:[{id:'task',title:'Fixture preparation',instructions:'Use existing check procedure',status:'assigned',priority:'high'}]};}
     else if(envelope.path==='/api/tech/visits/'+visitId)value={visit:{id:visitId,visit_type:'IT_PREP',dispatch_status:'ready'},job:{id:'job',job_number:'FIX-501',customer_name:'Fixture customer'},site:{name:'Fixture site'},execution:{status:'not_started'},current_step:{title:'Inspect physical unit'}};
     else throw new Error('Unexpected queue path '+envelope.path);
@@ -73,4 +73,13 @@ test('actual overlay keeps existing check state and clears data on cross-tab log
   await expect(page.getByRole('button',{name:'Operations assignments',exact:true})).toBeHidden();
   await expect(page.locator('#nativeValue')).toHaveValue('preserved check');
   expect(state.requests.every(r=>r.method==='GET')).toBe(true);
+});
+
+test('old assignment details cannot reopen while a revoked queue refresh is pending',async({page})=>{
+  const{frame,state}=await setup(page);let release;state.assignmentGate=new Promise(done=>{release=done;});
+  await frame.getByRole('button',{name:'Refresh assignments',exact:true}).click();
+  await expect(frame.getByRole('button',{name:/FIX-501/})).toBeDisabled();
+  state.assigned=false;release();
+  await expect(frame.getByText('No assigned Operations visits.',{exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Assigned visit details'})).toHaveCount(0);
 });

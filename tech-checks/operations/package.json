@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --import tsx --test tests/*.test.mjs",
-    "test:browser": "playwright test --config tests/playwright.config.mjs"
+    "test:browser": "playwright test --config tests/playwright.config.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "19.0.0",
