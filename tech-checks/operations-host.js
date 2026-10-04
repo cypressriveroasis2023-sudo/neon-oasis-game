@@ -18,6 +18,8 @@ function present() {
   const visible = Boolean(user && effectiveOwner && appVisible && !ownerView?.classList.contains('hidden'));
   document.body.classList.toggle('cos-operations-host', visible && !legacyOpen);
   document.body.classList.toggle('cos-operations-legacy', visible && legacyOpen);
+  const techReturn = document.getElementById('cosOperationsTechReturn');
+  if (techReturn) techReturn.hidden = !(user && effectiveOwner && appVisible && ownerView?.classList.contains('hidden'));
   if (!mount || !legacy) return;
   if (visible && !frame) {
     frame = document.createElement('iframe');
@@ -44,7 +46,10 @@ function navigate(route) {
     return;
   }
   if (route === 'operations') {
-    legacyOpen = false; window.show?.('owner'); present(); return;
+    legacyOpen = false;
+    const tab = document.getElementById('tab-owner');
+    if (tab) tab.click(); else window.show?.('owner');
+    present(); return;
   }
   if (ownerRoutes.has(route)) {
     window.show?.('owner');
@@ -74,6 +79,7 @@ window.addEventListener('techcheck:view-changed', event => {
   present();
 });
 document.getElementById('cosOperationsReturn')?.addEventListener('click', () => navigate('operations'));
+document.getElementById('cosOperationsTechReturn')?.addEventListener('click', () => navigate('operations'));
 const observer = new MutationObserver(present);
 if (ownerView) observer.observe(ownerView, {attributes:true, attributeFilter:['class']});
 const appView = document.getElementById('appView');

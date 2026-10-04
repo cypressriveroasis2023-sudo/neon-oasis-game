@@ -11,7 +11,7 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
   const [selectedJobId,setSelectedJobId]=useState('');
   const [assignTech,setAssignTech]=useState('');
   const [newJob,setNewJob]=useState<any>({siteId:'',jobType:'DELIVERY',title:'',description:'',priority:'normal',shopPrep:false});
-  const [advance,setAdvance]=useState<any>({unitNumber:'',serviceTechnician:'Abel Cervantes',date:chicagoToday(),startTime:'08:00',endTime:'10:00',note:''});
+  const [advance,setAdvance]=useState<any>({unitNumber:'',serviceTechnician:'',date:chicagoToday(),startTime:'08:00',endTime:'10:00',note:''});
   const loadRevision = useRef(0);
   const load = async () => {
     const revision = ++loadRevision.current;
@@ -46,9 +46,13 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
   const remove=async()=>{if(!selected)return;const confirmation=await cosPrompt('Type DELETE '+selected.jobNumber+' to permanently remove this job');if(confirmation===null)return;if(!await cosConfirm('Permanently delete '+selected.jobNumber+'? This cannot be undone. Jobs with protected billing or dependency history will be blocked.'))return;setBusy('remove');try{await api.post('/api/jobs/'+selected.id+'/remove',{confirmation:confirmation.trim()});setSelectedJobId('');await refresh();show(selected.jobNumber+' permanently deleted')}catch(e:any){show(e?.response?.data?.error||e?.message||'Job could not be deleted')}finally{setBusy('')}};
   const advanceIt=async()=>{if(!selected)return;const unit=String(advance.unitNumber||selected.equipmentUnitTag||'').trim();if(!unit){show('Physical unit number is required before pushing IT work to Service');return}if(!advance.serviceTechnician||!advance.date||!advance.startTime||!advance.endTime){show('Service technician, date, start time and end time are required');return}if(advance.endTime<=advance.startTime){show('Service end time must be after the start time');return}if(!await cosConfirm('Owner verified IT prep for '+selected.jobNumber+' and schedule it to '+advance.serviceTechnician+' for Service?'))return;setBusy('advance');try{await api.post('/api/owner/jobs/'+selected.id+'/advance-it',{note:advance.note,unitNumber:unit,serviceTechnician:advance.serviceTechnician,start:advance.date+' '+advance.startTime,end:advance.date+' '+advance.endTime});await refresh();show(selected.jobNumber+' advanced from IT and scheduled to '+advance.serviceTechnician)}catch(e:any){show(e?.response?.data?.error||e?.message||'IT-to-Service advance failed')}finally{setBusy('')}};
   const approveTruck=async(check:any)=>{const note=await cosPrompt('Owner truck stock approval note (optional)');if(note===null)return;if(!await cosConfirm('Approve '+check.technician+' truck stock / check as Owner verified?'))return;setBusy('truck-'+check.id);try{const r=await api.post('/api/owner/truck-checks/'+check.id+'/approve',{note});await refresh();const missing=r.data.missing_fields||[];show('Truck stock approved'+(missing.length?' · '+missing.length+' identifier field(s) were missing and logged':'') )}catch(e:any){show(e?.response?.data?.error||e?.message||'Truck stock approval failed')}finally{setBusy('')}};
+  useEffect(()=>{
+    const roster=control.serviceTechnicians||[];
+    setAdvance((current:any)=>current.serviceTechnician&&!roster.includes(current.serviceTechnician)?{...current,serviceTechnician:''}:current);
+  },[control.serviceTechnicians]);
   const jobTechs=selected?.department?.toLowerCase()==='it'?(control.itTechnicians||[]):selected?.department?.toLowerCase()==='service'?(control.serviceTechnicians||[]):[...(control.itTechnicians||[]),...(control.serviceTechnicians||[])];
   return <section className='panel module owner-board-controls'>
-    <div className='panelhead'><div><h2>Owner Controls</h2><span>Owner-only overrides are audit-marked in production.</span></div><button className='secondary' onClick={()=>refresh()}>REFRESH</button></div>
+    <div className='panelhead'><div><h2>Owner Controls</h2><span>Owner-only overrides are audit-marked in production.</span></div><button className='secondary' onClick={()=>refresh().catch(()=>show('Owner controls could not be refreshed. Please retry.'))}>REFRESH</button></div>
     <div className='quote-detail-grid'>
       <label>Selected COS Job
         <select value={selection.selectedId} disabled={!!busy} onChange={e => setSelectedJobId(e.target.value)}>
@@ -69,7 +73,7 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
       <div className='quote-section-head'><div><h3>Owner Verified IT → Service</h3><small>Use this when you personally checked the unit/process. The normal IT Tech Check is cancelled as an Owner override, the IT visit is completed, and the Service handoff becomes authoritative.</small></div></div>
       <div className='quote-detail-grid'>
         <label>Physical unit number<input value={advance.unitNumber||selected.equipmentUnitTag||''} onChange={e=>setAdvance({...advance,unitNumber:e.target.value})}/></label>
-        <label>Service technician<select value={advance.serviceTechnician} onChange={e=>setAdvance({...advance,serviceTechnician:e.target.value})}>{(control.serviceTechnicians||[]).map((t:string)=><option key={t}>{t}</option>)}</select></label>
+        <label>Service technician<select value={advance.serviceTechnician} onChange={e=>setAdvance({...advance,serviceTechnician:e.target.value})}><option value="">Choose technician</option>{(control.serviceTechnicians||[]).map((t:string)=><option key={t}>{t}</option>)}</select></label>
         <label>Service date<input type='date' required value={advance.date} onChange={e=>setAdvance({...advance,date:e.target.value})}/></label>
         <label>Start time<input type='time' required value={advance.startTime} onChange={e=>setAdvance({...advance,startTime:e.target.value})}/></label>
         <label>End time<input type='time' required value={advance.endTime} onChange={e=>setAdvance({...advance,endTime:e.target.value})}/></label>
