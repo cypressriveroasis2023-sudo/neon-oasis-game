@@ -1,10 +1,17 @@
-// COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner.
+// COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or read-only technician.
 // No browser-supplied actor, organization, table, RPC name, service key, or identity provisioning.
 const LEGACY_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const LEGACY_PUBLISHABLE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const ORGANIZATION_ID = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const OWNER_LINKS = Object.freeze({
   'e4abc521-1ef3-45a6-9829-b87faff78210': '3f073784-96e7-43d8-b9e0-33ab31c3c8b1',
+});
+// Explicit existing same-person technician pairs; never match accounts by mutable contact email.
+const TECHNICIAN_LINKS = Object.freeze({
+  '4f7044b5-86b6-411f-8898-39bb64b4ddbc': { actorId: 'd0757b64-9623-4adc-afff-21cc7853e88a', name: 'Teddy Hopper', department: 'it', roleCode: 'it_technician' },
+  'b7cc3cbf-d11e-4d4a-9742-c07701857911': { actorId: '3caf7c00-627f-445f-bce4-ddeae574ee5c', name: 'Victor Garcia', department: 'it', roleCode: 'it_technician' },
+  '78e54fbd-c2db-4d18-8e3d-a9740adcf285': { actorId: '7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8', name: 'Abel Cervantes', department: 'service', roleCode: 'service_technician' },
+  '49dce28e-099a-40bb-a8d8-b39f9ffbabee': { actorId: '1a7d3523-8a3c-488a-9216-4e37f4f7ecb9', name: 'Josh Mireles', department: 'service', roleCode: 'service_technician' },
 });
 const ALLOWED_ORIGIN = 'https://cypressriveroasis2023-sudo.github.io';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,6 +26,15 @@ function textValue(value, label, required = false, max = 4000) {
   if (required && !result) fail(label + ' is required.');
   if (result.length > max) fail(label + ' is too long.');
   return result || null;
+}
+function allowedFields(body, fields, label = 'Request') {
+  const allowed = new Set(fields);
+  if (Object.keys(body).some(key => !allowed.has(key))) fail(label + ' contains unsupported fields.');
+}
+function enumValue(value, label, allowed, fallback) {
+  const result = textValue(value, label) || fallback;
+  if (!allowed.includes(result)) fail('Choose a valid ' + label.toLowerCase() + '.');
+  return result;
 }
 function idValue(value, label, required = true) {
   if (!required && (value == null || value === '')) return null;
@@ -122,16 +138,23 @@ export function createOperationsHandler(options) {
     if (!user || typeof user.id !== 'string' || !UUID.test(user.id)) fail('A verified Tech Check account is required.', 401);
     const profiles = await readJson(LEGACY_URL + '/rest/v1/profiles?select=user_id,full_name,role,active,archived_at&user_id=eq.' + user.id + '&limit=1', { headers }, 'Tech Check account access could not be verified.');
     const profile = Array.isArray(profiles) ? profiles[0] : null;
-    if (!profile || profile.user_id !== user.id || profile.role !== 'owner' || profile.active !== true || profile.archived_at) fail('An active COS Owner account is required.', 403);
-    const actorId = OWNER_LINKS[user.id.toLowerCase()];
-    const context = { legacyId: user.id, name: profile.full_name || 'Owner', authorization, headers, actorId };
+    if (!profile || profile.user_id !== user.id || !['owner', 'it', 'service'].includes(profile.role) || profile.active !== true || profile.archived_at) fail('An active COS account is required.', 403);
+    const technicianLink = TECHNICIAN_LINKS[user.id.toLowerCase()];
+    const legacyOwner = profile.role === 'owner';
+    const link = legacyOwner ? null : technicianLink;
+    const actorId = legacyOwner ? OWNER_LINKS[user.id.toLowerCase()] : link?.actorId;
+    const context = { legacyId: user.id, name: profile.full_name || (legacyOwner ? 'Owner' : 'Technician'), department: profile.role, legacyOwner, authorization, headers, actorId };
     if (!actorId) return context;
+    if (link && (profile.role !== link.department || String(profile.full_name || '').trim().toLowerCase() !== link.name.toLowerCase())) fail('Your linked technician identity details have changed. Ask an Owner to review the link.', 403);
     if (!serviceKey || !platformUrl) fail('The COS production connection is not configured.', 503);
-    const actors = await platformRead('user_profiles?select=user_id,active,department&organization_id=eq.' + ORGANIZATION_ID + '&user_id=eq.' + actorId + '&limit=1');
+    const actors = await platformRead('user_profiles?select=user_id,display_name,active,department&organization_id=eq.' + ORGANIZATION_ID + '&user_id=eq.' + actorId + '&limit=1');
     const actor = Array.isArray(actors) ? actors[0] : null;
-    if (!actor || actor.active !== true || actor.department !== 'owner') fail('Your linked COS production Owner account is inactive.', 403);
-    const roles = await platformRead('user_roles?select=role_id,roles!inner(code,organization_id)&user_id=eq.' + actorId + '&roles.organization_id=eq.' + ORGANIZATION_ID + '&roles.code=eq.owner&limit=1');
-    if (!Array.isArray(roles) || !roles.length) fail('Your linked COS production Owner role is not active.', 403);
+    const expectedDepartment = legacyOwner ? 'owner' : link.department;
+    if (!actor || actor.user_id !== actorId || actor.active !== true || actor.department !== expectedDepartment) fail('Your linked COS production account is inactive or has a different department.', 403);
+    if (link && String(actor.display_name || '').trim().toLowerCase() !== link.name.toLowerCase()) fail('Your linked production technician identity details have changed.', 403);
+    const roleCode = legacyOwner ? 'owner' : link.roleCode;
+    const roles = await platformRead('user_roles?select=role_id,roles!inner(code,organization_id)&user_id=eq.' + actorId + '&roles.organization_id=eq.' + ORGANIZATION_ID + '&roles.code=eq.' + roleCode + '&limit=1');
+    if (!Array.isArray(roles) || !roles.some(row => row.roles?.code === roleCode && row.roles?.organization_id === ORGANIZATION_ID)) fail('Your linked COS production role is not active.', 403);
     return context;
   };
   const assertRecord = async (table, id, fields = 'id') => {
@@ -181,16 +204,55 @@ export function createOperationsHandler(options) {
         if (method === 'GET' && Object.keys(body).length) fail('GET endpoints do not accept a request body.');
       }
       if (!path.startsWith('/api/')) fail('COS endpoint not found.', 404);
+      if (path.startsWith('/api/tech/')) {
+        if (context.legacyOwner || !['it', 'service'].includes(context.department)) fail('A signed-in technician account is required for the production queue.', 403);
+        if (method !== 'GET') fail('The production technician queue currently supports read-only access.', 405);
+        if (path === '/api/tech/session') return json({
+          authorized: Boolean(context.actorId), legacyTechnician: true, role: context.department === 'it' ? 'IT' : 'Service',
+          name: context.name, department: context.department, productionTechnicianUserId: context.actorId || null,
+          reason: context.actorId ? null : 'This technician account is not linked to its own COS production identity. Your existing Tech Check remains available.',
+        });
+        if (!context.actorId) fail('This technician account is not linked to COS production.', 403);
+        const payload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+        if (path === '/api/tech/my-day') return json(await rpc('appdeploy_technician_my_day', payload));
+        if (path === '/api/tech/tasks') return json(await rpc('appdeploy_technician_tasks_snapshot', payload));
+        if (path === '/api/tech/assignments') {
+          const rows = await platformAll('visit_assignments?select=user_id,visit_id,status,assigned_at,job_visits!inner(id,job_id,visit_number,visit_type,department,status,dispatch_status,scheduled_start,scheduled_end,instructions,jobs(job_number,title,job_type,priority,customers(name),sites(name)))&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&job_visits.organization_id=eq.' + ORGANIZATION_ID + '&job_visits.status=not.in.(completed,cancelled)&order=assigned_at.asc');
+          if (rows.some(row => row.user_id !== context.actorId || !row.job_visits || row.job_visits.id !== row.visit_id || row.job_visits.department?.toLowerCase() !== context.department)) fail('COS returned an inconsistent technician assignment collection.',503);
+          return json({ profile: { display_name: context.name, department: context.department }, visits: rows.map(row => {
+            const v = row.job_visits, j = v?.jobs;
+            return { visit_id: row.visit_id, visit_number: v?.visit_number, visit_type: v?.visit_type, department: v?.department, status: v?.status, dispatch_status: v?.dispatch_status, scheduled_start: v?.scheduled_start, scheduled_end: v?.scheduled_end, instructions: v?.instructions, assignment_status: row.status, job_id: v?.job_id, job_number: j?.job_number, job_title: j?.title, job_type: j?.job_type, priority: j?.priority, customer_name: j?.customers?.name, site_name: j?.sites?.name };
+          }) });
+        }
+        const visitRoute = /^\/api\/tech\/visits\/([^/]+)$/.exec(path);
+        if (visitRoute) {
+          const id = idValue(visitRoute[1], 'Visit');
+          await assertRecord('job_visits', id);
+          const assigned = await platformRead('visit_assignments?select=visit_id,user_id,assignment_role,status&visit_id=eq.' + id + '&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&limit=1');
+          if (!Array.isArray(assigned) || !assigned.some(row => row.visit_id === id && row.user_id === context.actorId && row.assignment_role === 'technician' && ['assigned','accepted'].includes(row.status))) fail('This visit is not assigned to your technician account.', 404);
+          const detail = await rpc('appdeploy_technician_visit_snapshot', { ...payload, p_visit_id: id });
+          if (!detail?.visit || detail.visit.id !== id) fail('The assigned visit workflow is not available yet.', 404);
+          const step = detail.current_step;
+          return json({ execution: detail.execution, visit: detail.visit, job: detail.job, site: detail.site, current_step: step ? { id: step.id, step_key: step.step_key, sequence_number: step.sequence_number, title: step.title, instruction: step.instruction, step_type: step.step_type, required: step.required } : null });
+        }
+        fail('COS technician endpoint not found.', 404);
+      }
+      if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
         productionOwnerUserId: context.actorId || null,
-        reason: context.actorId ? null : 'This Owner account is not linked to a COS production identity. Your existing Tech Check tools remain available.',
+        provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
+        reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
       if (method === 'GET') {
         const snapshots = {
-          '/api/jobs': 'appdeploy_owner_jobs_snapshot',
+          '/api/handoffs': 'appdeploy_handoffs_snapshot',
+          '/api/customers': 'appdeploy_customers_snapshot',
+          '/api/equipment': 'appdeploy_equipment_registry_snapshot',
+          '/api/work-requests': 'appdeploy_work_requests_snapshot',
+          '/api/team': 'appdeploy_team_snapshot',
           '/api/daily-board': 'cos_daily_board_snapshot',
           '/api/field-map': 'appdeploy_field_map_snapshot',
           '/api/owner-tasks': 'appdeploy_owner_tasks_snapshot',
@@ -202,6 +264,21 @@ export function createOperationsHandler(options) {
           '/api/owner-review/signatures': 'appdeploy_owner_review_signatures_snapshot',
         };
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
+        if (path === '/api/jobs') {
+          const snapshot = await rpc('appdeploy_owner_jobs_snapshot', actorPayload);
+          const visits = [...new Set((snapshot.items || []).map(item => item.visitId).filter(id => typeof id === 'string' && UUID.test(id)))];
+          const assignments = visits.length ? await platformAll('visit_assignments?select=visit_id,user_id,assigned_at,job_visits!inner(organization_id)&assignment_role=eq.technician&status=in.(assigned,accepted)&visit_id=in.(' + visits.join(',') + ')&job_visits.organization_id=eq.' + ORGANIZATION_ID + '&order=assigned_at.desc') : [];
+          const byVisit = new Map();
+          for (const assignment of assignments) if (!byVisit.has(assignment.visit_id)) byVisit.set(assignment.visit_id, assignment.user_id);
+          return json({ ...snapshot, items: (snapshot.items || []).map(item => ({ ...item, technicianUserId: byVisit.get(item.visitId) || null })) });
+        }
+        const detailRoute = /^\/api\/(quotes|ar|purchasing)\/([^/]+)$/.exec(path);
+        if (detailRoute) {
+          const contracts = { quotes: ['quotes', 'appdeploy_quote_detail', 'p_quote_id'], ar: ['invoices', 'appdeploy_invoice_detail', 'p_invoice_id'], purchasing: ['purchase_orders', 'appdeploy_purchase_order_detail', 'p_purchase_order_id'] };
+          const [table, name, parameter] = contracts[detailRoute[1]], id = idValue(detailRoute[2], 'Record');
+          await assertRecord(table, id);
+          return json(await rpc(name, { p_actor_user_id: context.actorId, [parameter]: id }));
+        }
         if (path === '/api/team-production') {
           const members = await platformRead('user_profiles?select=user_id,display_name,department,active&organization_id=eq.' + ORGANIZATION_ID + '&active=eq.true&department=in.(it,service)&order=display_name.asc');
           return json({ items: members.map(m => ({ userId: m.user_id, displayName: m.display_name, department: m.department, active: m.active, linked: true })) });
@@ -247,6 +324,63 @@ export function createOperationsHandler(options) {
       }
       if (!body) body = await requestBody(request);
       if (['p_actor_user_id', 'actorId', 'organizationId', 'p_organization_id'].some(k => k in body)) fail('Caller identity and organization are determined by sign-in.');
+      const directoryRoute = /^\/api\/(customers|sites|equipment)(?:\/([^/]+))?$/.exec(path);
+      if (directoryRoute) {
+        const kind = directoryRoute[1], id = directoryRoute[2] ? idValue(directoryRoute[2], 'Record') : null;
+        const table = kind === 'equipment' ? 'equipment_units' : kind;
+        if (id) await assertRecord(table, id);
+        let payload, name, parameter;
+        if (kind === 'customers') {
+          allowedFields(body, ['name','legalName','notes','status'], 'Customer request');
+          payload = { name: textValue(body.name,'Customer name',true,250), legalName: textValue(body.legalName,'Legal name',false,250), notes: textValue(body.notes,'Customer notes',false,12000), status: enumValue(body.status,'Status',['active','inactive'],'active') };
+          name = 'appdeploy_save_customer'; parameter = 'p_customer_id';
+        } else if (kind === 'sites') {
+          const fields = ['customerId','name','addressLine1','addressLine2','city','stateRegion','postalCode','country','accessInstructions','parkingInstructions','safetyNotes','operationalNotes','status'];
+          allowedFields(body, fields, 'Site request');
+          const customerId = idValue(body.customerId,'Customer');
+          await assertRecord('customers',customerId);
+          payload = { customerId, name: textValue(body.name,'Site name',true,250), status: enumValue(body.status,'Status',['active','inactive'],'active') };
+          for (const field of fields.filter(field => !['customerId','name','status'].includes(field))) payload[field] = textValue(body[field],field,false,field.endsWith('Instructions') || field.endsWith('Notes') ? 12000 : 250);
+          payload.country = (payload.country || 'US').toUpperCase();
+          if (!/^[A-Z]{2}$/.test(payload.country)) fail('Country must use a two-letter country code.');
+          name = 'appdeploy_save_site'; parameter = 'p_site_id';
+        } else {
+          allowedFields(body,['modelId','unitNumber','serialNumber','status','currentLocationType'],'Equipment request');
+          const modelId = idValue(body.modelId,'Equipment model');
+          await assertRecord('equipment_models',modelId);
+          payload = { modelId, unitNumber: textValue(body.unitNumber,'Unit number',true,160), serialNumber: textValue(body.serialNumber,'Serial number',false,160), status: enumValue(body.status,'Equipment status',['new','available','prep','ready','assigned','in_transit','installed','returning','intake','repair','quarantine','retired'],'available'), currentLocationType: textValue(body.currentLocationType,'Location type',false,160) };
+          name = 'appdeploy_save_equipment_unit'; parameter = 'p_unit_id';
+        }
+        return json(await rpc(name, { ...actorPayload, [parameter]: id, p_payload: payload }), id ? 200 : 201);
+      }
+      const quoteAction = /^\/api\/quotes\/([^/]+)\/action$/.exec(path);
+      if (quoteAction) {
+        allowedFields(body,['action','reason'],'Quote review request');
+        const action = enumValue(body.action,'Quote action',['approve','return'],null);
+        const reason = textValue(body.reason,'Return reason',action === 'return');
+        const id = idValue(quoteAction[1],'Quote');
+        await assertRecord('quotes',id);
+        return json(await rpc('appdeploy_review_quote_owner_approval', { p_actor_user_id: context.actorId, p_quote_id: id, p_action: action, p_notes: reason }));
+      }
+      const invoiceAction = /^\/api\/ar\/([^/]+)\/action$/.exec(path);
+      if (invoiceAction) {
+        allowedFields(body,['action'],'Invoice request');
+        const action = enumValue(body.action,'Invoice action',['approve','issue'],null), id = idValue(invoiceAction[1],'Invoice');
+        await assertRecord('invoices',id);
+        return json(await rpc(action === 'approve' ? 'appdeploy_approve_invoice' : 'appdeploy_issue_invoice', { p_actor_user_id: context.actorId, p_invoice_id: id }));
+      }
+      const purchasingAction = /^\/api\/purchasing\/([^/]+)\/(po-review|approve|return)$/.exec(path);
+      if (purchasingAction) {
+        const id = idValue(purchasingAction[1],'Purchase order'), payload = { p_actor_user_id: context.actorId, p_purchase_order_id: id };
+        await assertRecord('purchase_orders',id);
+        if (purchasingAction[2] === 'po-review') {
+          allowedFields(body,['action','reason'],'Purchase request review');
+          const action = enumValue(body.action,'PO action',['approve','return'],null);
+          return json(await rpc('appdeploy_review_purchase_order', { ...payload, p_action: action, p_reason: textValue(body.reason,'Return reason',action === 'return') }));
+        }
+        allowedFields(body,[],'AP review request');
+        return json(await rpc(purchasingAction[2] === 'approve' ? 'appdeploy_approve_purchase_for_payment' : 'appdeploy_return_purchase_for_review',payload));
+      }
       const gpsRoute = /^\/api\/field-map\/([^/]+)\/gps$/.exec(path);
       if (gpsRoute) {
         const id = idValue(gpsRoute[1], 'Unit'), input = gps(body);
@@ -266,6 +400,7 @@ export function createOperationsHandler(options) {
         return json(await rpc('appdeploy_save_owner_task', { ...actorPayload, p_task_id: id, p_payload: payload }), id ? 200 : 201);
       }
       if (path === '/api/owner/jobs/manual') {
+        allowedFields(body,['siteId','jobType','title','description','priority','shopPrep'],'Manual job request');
         const id = idValue(body.siteId, 'Site');
         await assertRecord('sites', id);
         const jobType = (textValue(body.jobType, 'Job type', true) || '').toUpperCase();
@@ -277,18 +412,22 @@ export function createOperationsHandler(options) {
       }
       const truck = /^\/api\/owner\/truck-checks\/([^/]+)\/approve$/.exec(path);
       if (truck) {
+        allowedFields(body,['note'],'Truck approval request');
         const id = idValue(truck[1], 'Truck check');
         await assertRecord('truck_checks', id);
         return json(await rpc('appdeploy_owner_approve_truck_stock', { p_actor_user_id: context.actorId, p_check_id: id, p_note: textValue(body.note, 'Owner note') }));
       }
       const advance = /^\/api\/owner\/jobs\/([^/]+)\/advance-it$/.exec(path);
       if (advance) {
+        allowedFields(body,['note','unitNumber','serviceTechnician','start','end'],'IT-to-Service request');
         const id = idValue(advance[1], 'Job'), s = schedule(body, true);
         await assertRecord('jobs', id);
         return json(await rpc('appdeploy_owner_advance_it_to_service', { p_actor_user_id: context.actorId, p_job_id: id, p_note: textValue(body.note, 'Owner note'), p_unit_number: textValue(body.unitNumber, 'Unit number'), p_service_technician_name: textValue(body.serviceTechnician, 'Technician'), p_start_local: s.start, p_end_local: s.end }));
       }
       const job = /^\/api\/jobs\/([^/]+)\/(schedule|assign|dispatch|close|remove|owner-review)$/.exec(path);
       if (job) {
+        const fields = { schedule:['start','end','technician'], assign:['technician'], dispatch:[], close:['reason'], remove:['confirmation'], 'owner-review':['action','reason'] };
+        allowedFields(body,fields[job[2]],'Job request');
         const id = idValue(job[1], 'Job'), payload = { p_actor_user_id: context.actorId, p_job_id: id };
         const record = await assertRecord('jobs', id, job[2] === 'remove' ? 'id,job_number' : 'id');
         if (job[2] === 'schedule') {
