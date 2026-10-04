@@ -26,6 +26,9 @@ export default function OperationsJobs({mode,show}:Props) {
   const [scheduleForm,setScheduleForm]=useState<ScheduleDraft>({date:'',startTime:'08:00',endTime:'10:00',technician:'',department:'service'});
   const [correctionJob,setCorrectionJob]=useState<OperationsRecord|null>(null);
   const [correctionReason,setCorrectionReason]=useState('');
+  const [lifecycleJob,setLifecycleJob]=useState<OperationsRecord|null>(null);
+  const [lifecycleAction,setLifecycleAction]=useState<'close'|'remove'|null>(null);
+  const [lifecycleInput,setLifecycleInput]=useState('');
   const revision=useRef(0);
   const mounted=useRef(false);
   const scheduleDialog=useRef<HTMLDialogElement|null>(null);
@@ -93,6 +96,22 @@ export default function OperationsJobs({mode,show}:Props) {
   const approve=async(job:OperationsRecord)=>{
     await perform('/api/jobs/'+job.id+'/owner-review',{action:'approve'},items=>confirmedReview(items,job.id,'approve'),'Operational closeout approved and verified · released to Billing.');
   };
+  const lifecycle=async()=>{
+    if(!lifecycleJob||!lifecycleAction)return;
+    const job=lifecycleJob;
+    if(lifecycleAction==='close'){
+      if(!lifecycleInput.trim()){setActionError('Enter a close reason.');return;}
+      const saved=await perform('/api/jobs/'+job.id+'/close',{reason:lifecycleInput.trim()},items=>{
+        const current=items.find(item=>item.id===job.id);return Boolean(current)&&statusKey(current!.status)==='closed';
+      },'Job closed and verified.');
+      if(saved){setLifecycleJob(null);setLifecycleAction(null);setLifecycleInput('');}
+      return;
+    }
+    const confirmation='DELETE '+job.jobNumber;
+    if(lifecycleInput.trim()!==confirmation){setActionError('Type '+confirmation+' exactly to delete this job.');return;}
+    const saved=await perform('/api/jobs/'+job.id+'/remove',{confirmation},items=>!items.some(item=>item.id===job.id),'Test job removed and verified.');
+    if(saved){setLifecycleJob(null);setLifecycleAction(null);setLifecycleInput('');}
+  };
   const returnCorrection=async()=>{
     if(!correctionJob||!correctionReason.trim()){setActionError('A correction reason is required.');return;}
     const job=correctionJob;
@@ -128,6 +147,8 @@ export default function OperationsJobs({mode,show}:Props) {
           {mode==='unscheduled'&&<button disabled={disabled} onClick={()=>openSchedule(job)}>Schedule + Assign</button>}
           {mode==='dispatch'&&canDispatch(job)&&<button disabled={disabled} onClick={()=>void dispatch(job)}>{statusKey(job.status)==='assigned'?'Dispatch Handoff':'Dispatch'}</button>}
           {mode==='dispatch'&&['scheduled','assigned'].includes(statusKey(job.status))&&!canDispatch(job)&&<small>Awaiting physical-unit identification by the assigned IT technician before dispatch.</small>}
+          {mode==='jobs'&&statusKey(job.status)!=='closed'&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setLifecycleJob(job);setLifecycleAction('close');setLifecycleInput('');}}>Close Job</button>}
+          {mode==='jobs'&&/test|e2e/i.test(String(job.jobNumber)+' '+String(job.customer)+' '+String(job.site))&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setLifecycleJob(job);setLifecycleAction('remove');setLifecycleInput('');}}>Delete Test Job</button>}
           {mode==='review'&&<><button disabled={disabled} onClick={()=>void approve(job)}>Approve + Release to Billing</button><button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setCorrectionJob(job);setCorrectionReason('');}}>Return for Correction</button></>}
         </div>
       </div>;
@@ -136,6 +157,7 @@ export default function OperationsJobs({mode,show}:Props) {
       {teamError&&<div className='daily-board-error' role='alert'>{teamError}<button className='secondary' onClick={()=>void loadTeam()}>Retry technician roster</button></div>}
       {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={loading||saving} onClick={refresh}>Refresh jobs</button>}</div>}
       <div className='schedule-form'><label>Service date<span>Choose the day the technician should arrive.</span><input disabled={saving} type='date' value={scheduleForm.date} onChange={event=>setScheduleForm({...scheduleForm,date:event.target.value})}/></label><label>Start time<span>Planned arrival time · CT.</span><input disabled={saving} type='time' value={scheduleForm.startTime} onChange={event=>setScheduleForm({...scheduleForm,startTime:event.target.value})}/></label><label>End time<span>Expected completion time · CT.</span><input disabled={saving} type='time' value={scheduleForm.endTime} onChange={event=>setScheduleForm({...scheduleForm,endTime:event.target.value})}/></label><label>Assign technician<span>Correct department technicians only.</span><select disabled={saving} value={scheduleForm.technician} onChange={event=>setScheduleForm({...scheduleForm,technician:event.target.value})}><option value=''>Choose technician</option>{available.map(person=><option key={person.userId||person.name} value={person.name}>{person.name}</option>)}</select></label></div><div className='schedule-summary'><b>VISIT DURATION · {Number.isFinite(durationMinutes)&&durationMinutes>0?`${Math.floor(durationMinutes/60)} hr ${durationMinutes%60} min`:'Choose an end time after the start'}</b><span>{scheduleForm.date||'Choose a date'} · {scheduleForm.startTime}–{scheduleForm.endTime} CT · {scheduleForm.technician||'Choose technician'}</span><small>Customer and site remain tied to this authoritative COS Job. Saving controls which technician receives the work.</small></div><div className='schedule-actions'><button className='secondary' disabled={saving} onClick={()=>setScheduleJob(null)}>CANCEL</button><button disabled={disabled||!scheduleForm.technician} onClick={()=>void saveSchedule()}>{saving?'SAVING…':'SAVE SCHEDULE & ASSIGN'}</button></div></section></dialog>}
+    {lifecycleJob&&lifecycleAction&&<dialog open className='schedule-overlay' aria-label={lifecycleAction==='close'?'Close Job':'Delete Test Job'} onCancel={event=>{if(saving)event.preventDefault();else setLifecycleJob(null);}}><section className='schedule-card'><div className='schedule-head'><div><small>OWNER JOB CONTROL</small><h2>{lifecycleAction==='close'?'Close Job':'Delete Test Job'}</h2><p>{lifecycleJob.jobNumber} · {lifecycleJob.customer}</p></div><button aria-label='Close job control' disabled={saving} onClick={()=>setLifecycleJob(null)}>×</button></div><div className='schedule-summary'><b>{lifecycleAction==='close'?'CLOSE WITH AUDIT HISTORY':'PERMANENT TEST-JOB REMOVAL'}</b><span>{lifecycleAction==='close'?'Closing preserves the COS record and audit trail.':'Deletion is only exposed for records visibly identified as TEST/E2E.'}</span><small>{lifecycleAction==='remove'?'Type DELETE '+lifecycleJob.jobNumber+' exactly.':'Enter the operational reason for closing this job.'}</small></div>{actionError&&<div className='daily-board-error' role='alert'>{actionError}</div>}<div className='schedule-form'><label>{lifecycleAction==='close'?'Close reason':'Confirmation'}<input disabled={saving} value={lifecycleInput} onChange={event=>setLifecycleInput(event.target.value)} placeholder={lifecycleAction==='close'?'Reason for closing…':'DELETE '+lifecycleJob.jobNumber}/></label></div><div className='schedule-actions'><button className='secondary' disabled={saving} onClick={()=>setLifecycleJob(null)}>CANCEL</button><button disabled={disabled||!lifecycleInput.trim()} onClick={()=>void lifecycle()}>{saving?'SAVING…':lifecycleAction==='close'?'CLOSE JOB':'DELETE TEST JOB'}</button></div></section></dialog>}
     {correctionJob&&<dialog ref={correctionDialog} className='schedule-overlay' aria-label='Return for Correction' onCancel={event=>{if(saving)event.preventDefault();else setCorrectionJob(null);}}><section className='schedule-card'><div className='schedule-head'><div><small>OWNER REVIEW</small><h2>Return for Correction</h2><p>{correctionJob.jobNumber} · {correctionJob.customer}</p></div><button aria-label='Close correction' disabled={saving} onClick={()=>setCorrectionJob(null)}>×</button></div><div className='schedule-summary'><b>CORRECTION REQUIRED</b><span>The completed evidence and audit history will be preserved.</span><small>This job will leave Billing readiness, return to scheduling, and require a fresh Tech Check before it can come back to Owner Review.</small></div>{actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={loading||saving} onClick={refresh}>Refresh jobs</button>}</div>}<div className='schedule-form'><label>Correction reason<span>Tell the technician exactly what must be corrected before this job can be approved.</span><textarea disabled={saving} rows={5} value={correctionReason} onChange={event=>setCorrectionReason(event.target.value)} placeholder='Describe the correction required…'/></label></div><div className='schedule-actions'><button className='secondary' disabled={saving} onClick={()=>setCorrectionJob(null)}>CANCEL</button><button disabled={disabled||!correctionReason.trim()} onClick={()=>void returnCorrection()}>{saving?'RETURNING…':'RETURN JOB FOR CORRECTION'}</button></div></section></dialog>}
   </div>;
 }
