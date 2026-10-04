@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { dashboardSources, loadTodayDashboard, summarizeTodayDashboard, type DashboardData } from './todayDashboardData';
 
-type Props = { setActive: (workspace: string) => void };
+type Props = { setActive: (workspace: string) => void; vision?: boolean };
 const metric = (count: number | null) => count === null ? '—' : count;
 const text = (value: unknown) => value == null ? '' : String(value);
 
-export default function LiveTodayDashboard({ setActive }: Props) {
+export default function LiveTodayDashboard({ setActive, vision = false }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const revision = useRef(0);
@@ -31,9 +31,21 @@ export default function LiveTodayDashboard({ setActive }: Props) {
     { title: 'Purchase Requests', count: summary.poApprovals.length, message: 'Waiting for Owner PO approval.', workspace: 'Purchasing' },
     { title: 'Job Issues', count: summary.jobIssues.length, message: 'These jobs are flagged for Owner attention. Review their details.', workspace: 'Needs Attention' },
     { title: 'Operational Reviews', count: summary.ownerJobs.length, message: 'Completed field work is waiting for Owner closeout.', workspace: 'Owner Review' },
-    { title: 'Quote Approvals', count: summary.quoteApprovals.length, message: 'Sales quotes are waiting for Owner decision.', workspace: 'Owner Review' },
+    { title: 'Quote Approvals', count: summary.quoteApprovals.length, message: 'Sales quotes are waiting for Owner decision.', workspace: 'Quotes' },
     { title: 'Invoice Approvals', count: summary.invoiceApprovals.length, message: 'Customer invoices are waiting for Owner approval.', workspace: 'Invoices' },
   ];
+  if (vision) return <div className='vision-today' aria-busy={loading}>
+    <h1>Today</h1><p>The decisions that need you next</p>
+    <button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : 'Refresh Today'}</button>
+    {failed.length > 0 && <section className='operations-error' role='alert'><h2>Some information is unavailable</h2><p>Missing information is not zero. Available work is shown below.</p>{failed.map(([key]) => <p key={key}>{data.errors[key]}</p>)}</section>}
+    <section className='panel vision-decisions'><h2>Needs your decision</h2>
+      {summary.unscheduled !== null && summary.unscheduled > 0 && <article><h3>{summary.unscheduled} {summary.unscheduled === 1 ? 'job' : 'jobs'} ready to schedule</h3><p>Choose a technician and visit window.</p><button onClick={() => setActive('Unscheduled')}>Schedule visits</button></article>}
+      {groups.filter(group => group.count > 0).map(group => <article key={group.title}><h3>{group.title} · {group.count}</h3><p>{group.message}</p><button onClick={() => setActive(group.workspace)}>Review {group.title.toLowerCase()}</button></article>)}
+      {summary.attention === 0 && summary.unscheduled === 0 && <p>No scheduling or review items in the loaded sources.</p>}
+      {!complete && <p>Some decisions may be missing until all sources load.</p>}
+    </section>
+    <div className='purchase-actions'><button onClick={() => setActive('Calendar')}>View schedule</button><button onClick={() => setActive('Owner Tasks')}>Owner tasks{summary.openTasks === null ? '' : ' · ' + summary.openTasks}</button><button onClick={() => setActive('Daily Board')}>Daily board</button></div>
+  </div>;
   return <div className='owner-command-home' aria-busy={loading}>
     <div className='purchase-actions'>
       <span>{loading ? 'Refreshing dashboard. Values below are from the previous response.' : complete ? 'Dashboard sources loaded.' : 'Dashboard partially unavailable. Missing values are not zero.'}</span>

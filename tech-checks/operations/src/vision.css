@@ -1,0 +1,55 @@
+/* Opt-in presentation only: native API, account and save handlers are unchanged. */
+.vision-enable{display:block;margin:8px auto 16px}
+.operations-shell.vision-shell{display:block!important;background:linear-gradient(150deg,#102737,#050e17 42%,#000)!important;color:#fff;--bg:#06131d;--panel:#081722;--border:#743030;--text:#fff;--muted:#e1ebf2;padding-bottom:0!important;font-family:Arial,sans-serif}
+.vision-shell>.owner-it-main{max-width:1280px;margin:0 auto!important;padding:20px!important;min-width:0;width:100%!important}
+.vision-shell>.operations-sidebar{display:none!important}
+.vision-shell>.operations-sidebar.operations-sidebar-open{display:block!important;position:fixed!important;inset:0 auto 0 0!important;width:min(340px,90vw)!important;height:100dvh!important;overflow:auto!important;z-index:1200!important;background:#06131d!important;box-shadow:0 0 0 100vmax #0009!important}
+.vision-shell .operations-menu-close{display:block!important}.vision-shell>.operations-bottom-nav{display:none!important}
+.vision-shell button{min-height:44px;border-radius:7px;border:1px solid #e62b2b;background:linear-gradient(135deg,#c00,#900);color:#fff;font:600 15px/1.35 Arial,sans-serif;padding:8px 14px;text-align:center;letter-spacing:.01em;white-space:normal}
+.vision-shell button:disabled{opacity:.55;cursor:not-allowed}
+.vision-shell :is(button,input,select,textarea,a):focus-visible{outline:3px solid #fff;outline-offset:3px}
+.vision-shell .record.op-record{background:#081722!important;border-color:#743030!important;color:#fff!important}
+.vision-shell .panel.module,.vision-shell .panel,.vision-shell .stats article{background:#081722;border:1px solid #743030;border-radius:12px;color:#fff;box-shadow:none}
+.vision-shell input,.vision-shell select,.vision-shell textarea{background:#040d15;color:#fff;border:1px solid #586b79;border-radius:8px;min-height:44px;max-width:100%;font-size:16px}
+.vision-shell input:not([type=checkbox]):not([type=radio]),.vision-shell select{text-align:center}
+.vision-shell input[type=checkbox],.vision-shell input[type=radio]{min-height:0;accent-color:#d00000}
+.vision-shell input::placeholder,.vision-shell textarea::placeholder{color:#bbcbd7;opacity:1}
+.vision-shell .purchase-actions{justify-content:center;flex-wrap:wrap}
+.vision-shell .command-page-header{text-align:center;background:none;border:0;padding:18px 0 8px}
+.vision-shell .command-page-header label{display:none}.vision-shell h1,.vision-shell h2,.vision-shell h3{color:#edf5fc;font-weight:500;letter-spacing:.045em}
+.vision-shell .command-page-header h1{font-size:26px}.vision-shell p,.vision-shell small,.vision-shell label,.vision-shell dt{color:#e9f1f6}
+.vision-shell .quote-detail-grid label,.vision-shell .operations-job-detail dl{text-align:center}.vision-shell .operations-job-detail dd{color:#fff}
+.vision-shell .vision-header{padding:4px 0 18px;margin-bottom:20px;border-bottom:1px solid #a00000;text-align:center}
+.vision-wordmark>div{display:flex;justify-content:center;align-items:center;font-size:48px;line-height:1;letter-spacing:.12em;color:#eaf2f8}
+.vision-wordmark>div>span:not(.vision-letter-eye){background:linear-gradient(#fff,#bacbd7 46%,#fff 57%,#d2e0e9);background-clip:text;-webkit-background-clip:text;color:transparent}
+.vision-letter-eye{position:relative;width:48px;height:48px;overflow:hidden;border-radius:50%;margin-right:6px;box-shadow:0 0 16px #f002;flex:0 0 48px}
+.vision-letter-eye img{position:absolute;width:190%;max-width:none;height:auto;left:-45%;top:-121%}
+.vision-wordmark p{font-size:11px;letter-spacing:.35em;margin:14px auto 18px;position:relative;width:max-content;max-width:100%;color:#fff}
+.vision-wordmark p:before{content:'';position:absolute;top:-8px;left:-15%;right:-15%;height:2px;background:linear-gradient(90deg,transparent,#f00,#fff,#f00,transparent);box-shadow:0 0 10px #f00}
+.vision-clock{display:grid;grid-template-columns:1fr 1fr;border:1px solid #b00000;border-radius:12px;padding:12px 0;background:linear-gradient(120deg,#102737,#02070d 55%,#102737);box-shadow:inset 0 1px 8px #f002}
+.vision-clock>div{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:0 8px}.vision-clock>div:first-child{border-right:1px solid #a00000}
+.vision-clock small{text-transform:uppercase;font-size:10px;font-weight:600;letter-spacing:.13em}
+.vision-clock time,.vision-clock strong{font-size:30px;font-weight:500;letter-spacing:.09em;font-variant-numeric:tabular-nums;text-transform:uppercase;color:#fff}
+.vision-primary-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;max-width:650px;margin:16px auto 0}
+.vision-shell .vision-primary-nav button{padding:8px 3px;background:linear-gradient(135deg,#980000,#710000);font-size:15px}.vision-shell .vision-primary-nav button[aria-current]{background:linear-gradient(135deg,#d60000,#9b0000);border-color:#fff}
+.vision-workspace-nav{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:12px auto}
+.vision-shell .vision-workspace-nav button{background:#102737;border-color:#586b79;font-size:13px;padding:6px 10px}.vision-shell .vision-workspace-nav button[aria-current]{border-color:#fff;border-bottom:3px solid #f00}
+.vision-access{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px}.vision-shell .vision-access button{font-size:12px;padding:5px 10px;background:#081722;border-color:#586b79}
+.vision-options{padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}.vision-options p{flex-basis:100%;font-size:13px}
+.vision-today{text-align:center;max-width:900px;margin:auto}.vision-today h1{font-size:26px;margin:10px 0}.vision-decisions{margin:20px 0;padding:18px!important}
+.vision-decisions article{padding:18px 0;border-top:1px solid #743030}.vision-decisions h2{margin:0 0 18px}.vision-decisions h3{font-size:19px;margin:0}.vision-decisions p{font-size:16px;line-height:1.5}
+.vision-shell .operations-error{background:#360909;color:#fff;border-color:#ff5b5b}.vision-shell .operations-notice{background:#123323;color:#fff;border-color:#72d79c}
+.vision-shell .daily-board-scheduled{background:#123b24!important;border-color:#72e79e!important}
+@media(max-width:700px){.vision-shell>.owner-it-main{padding:14px!important}.vision-wordmark>div{font-size:36px}.vision-letter-eye{width:37px;height:37px;flex-basis:37px}.vision-clock time,.vision-clock strong{font-size:24px;letter-spacing:.055em}.vision-clock small{font-size:9px;letter-spacing:.07em}.vision-shell .vision-primary-nav button{font-size:14px;padding:7px 2px}.vision-shell .command-page-header h1{font-size:23px}.vision-shell .operations-toast{bottom:16px!important}.vision-workspace-nav{gap:5px}}
+@media(max-width:350px){.vision-shell>.owner-it-main{padding:10px!important}.vision-clock time,.vision-clock strong{font-size:21px}.vision-shell .vision-primary-nav button{font-size:13px}}
+/* Override the older shell's fixed accent colors only inside the opt-in layout. */
+.operations-shell.vision-shell button{background:linear-gradient(135deg,#c00,#900)!important;border-color:#e62b2b!important;color:#fff!important;box-shadow:none!important}
+.operations-shell.vision-shell .vision-primary-nav button[aria-current]{border-color:#fff!important;background:linear-gradient(135deg,#d60000,#9b0000)!important}
+.operations-shell.vision-shell .vision-workspace-nav button{background:linear-gradient(135deg,#970000,#680000)!important}
+.vision-job-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin:15px 0}
+.vision-job-filters label{display:flex;flex-direction:column;gap:6px;min-width:0;text-align:center}
+.vision-shell .schedule-card{background:#081722!important;border-color:#743030!important;color:#fff;text-align:center}
+.vision-shell .schedule-head,.vision-shell .schedule-summary{background:#081722!important;color:#fff!important;justify-content:center}
+.vision-shell .schedule-form label{text-align:center;color:#fff}.vision-shell .schedule-actions{justify-content:center}
+@media(max-width:600px){.vision-job-filters{grid-template-columns:1fr}}
+.vision-shell .vision-preview-note{font-size:12px;margin:10px 0;color:#e1ebf2}
