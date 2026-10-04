@@ -1,0 +1,23 @@
+name: Verify published COS Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tech-checks/index.html'
+      - 'tech-checks/operations-host.*'
+      - 'tech-checks/operations/dist/**'
+      - '.github/workflows/cos-pages-smoke.yml'
+      - '.github/scripts/verify-cos-pages.mjs'
+permissions:
+  contents: read
+jobs:
+  verify-published-pages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify live Pages files match this commit
+        run: node .github/scripts/verify-cos-pages.mjs
