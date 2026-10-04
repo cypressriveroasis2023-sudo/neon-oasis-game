@@ -20,11 +20,19 @@ queueOverlay.appendChild(queueClose);
 document.body.appendChild(queueOverlay);
 let queueFrame = null;
 let queueFrameIdentity = null;
+let queueAuthSubject;
+let queueAuthObserved = false;
+function observeQueueAuth() {
+  const auth = queueContext()?.db.auth;
+  if (queueAuthObserved || typeof auth?.onAuthStateChange !== 'function') return;
+  queueAuthObserved = true;
+  auth.onAuthStateChange((_event, session) => { queueAuthSubject = session?.user?.id || null; presentQueue(); });
+}
 function queueIdentity() {
   const c = queueContext(), role = c?.getRole(), id = c?.getSession()?.user?.id;
   const profile = c?.getProfile();
   if (!['it','service'].includes(role) || c?.getEffectiveRole() !== role || !id ||
-      profile?.user_id !== id || profile?.active !== true || profile?.archived_at ||
+      (queueAuthSubject !== undefined && queueAuthSubject !== id) || profile?.user_id !== id || profile?.active !== true || profile?.archived_at ||
       !queueApp || queueApp.classList.contains('hidden') ||
       document.body.classList.contains('owner-test-role-preview')) return null;
   return { id, role };
@@ -36,6 +44,7 @@ function closeQueue() {
   document.body.classList.remove('cos-production-assignments-open');
 }
 function presentQueue() {
+  observeQueueAuth();
   const identity = queueIdentity();
   queueButton.hidden = !identity;
   if (queueFrame && !sameQueueIdentity(identity, queueFrameIdentity)) closeQueue();
@@ -65,6 +74,10 @@ window.addEventListener('message', async event => {
     let token = null;
     try {
       const fresh = await queueContext()?.db.auth.getSession();
+      if (requestedFrame === queueFrame && fresh?.data?.session?.user?.id !== identity.id) {
+        queueAuthSubject = fresh?.data?.session?.user?.id || null;
+        presentQueue();
+      }
       if (requestedFrame === queueFrame && sameQueueIdentity(identity, queueIdentity()) &&
           sameQueueIdentity(identity, queueFrameIdentity) && fresh?.data?.session?.user?.id === identity.id)
         token = fresh.data.session.access_token;

@@ -18,7 +18,7 @@ function harness(role='it'){
   app.id='appView';auth.id='authView';
   const state={role,effectiveRole:role,id:'legacy-tech',profile:{user_id:'legacy-tech',active:true},fresh:async()=>({data:{session:{user:{id:state.id},access_token:'fresh-token'}}})};
   const events={},calls={auth:0};
-  const window={location:{origin},addEventListener:(name,fn)=>(events[name]??=[]).push(fn),TechCheckContext:{getRole:()=>state.role,getEffectiveRole:()=>state.effectiveRole,getSession:()=>({user:{id:state.id}}),getProfile:()=>state.profile,db:{auth:{getSession:()=>{calls.auth++;return state.fresh();}}}}};
+  const window={location:{origin},addEventListener:(name,fn)=>(events[name]??=[]).push(fn),TechCheckContext:{getRole:()=>state.role,getEffectiveRole:()=>state.effectiveRole,getSession:()=>({user:{id:state.id}}),getProfile:()=>state.profile,db:{auth:{onAuthStateChange:fn=>{state.authListener=fn;return{};},getSession:()=>{calls.auth++;return state.fresh();}}}}};
   const document={body,getElementById:id=>nodes.find(node=>node.id===id)||null,createElement:type=>new Node(type)};
   class MutationObserver{constructor(fn){this.fn=fn;observers.push(this);}observe(){}}
   vm.runInNewContext(source,{window,document,MutationObserver});
@@ -50,10 +50,18 @@ test('late token response cannot reach a replaced or closed assignment frame',as
   const request=h.token(frame);h.node('cosProductionAssignmentsClose').click();h.open();resolve({data:{session:{user:{id:'legacy-tech'},access_token:'late'}}});await request;assert.equal(frame.contentWindow.messages.length,0);
 });
 test('fresh subject mismatch fails closed and owner navigation messages do nothing',async()=>{
-  const h=harness(),frame=h.open();h.state.fresh=async()=>({data:{session:{user:{id:'different'},access_token:'wrong'}}});await h.token(frame);assert.equal(frame.contentWindow.messages[0].value.accessToken,null);
-  await h.emit('message',{origin,source:frame.contentWindow,data:{type:'COS_OPERATIONS_NAVIGATE',route:'accounts'}});assert.equal(h.node('cosProductionAssignmentsOverlay').hidden,false);
-  await h.emit('message',{origin,source:frame.contentWindow,data:{type:'COS_OPERATIONS_NAVIGATE',route:'production-return'}});assert.equal(frame.removed,true);
+  const h=harness(),frame=h.open();h.state.fresh=async()=>({data:{session:{user:{id:'different'},access_token:'wrong'}}});await h.token(frame);assert.equal(frame.removed,true);assert.equal(frame.contentWindow.messages.length,0);
+  const next=harness(),nextFrame=next.open();
+  await next.emit('message',{origin,source:nextFrame.contentWindow,data:{type:'COS_OPERATIONS_NAVIGATE',route:'accounts'}});assert.equal(next.node('cosProductionAssignmentsOverlay').hidden,false);
+  await next.emit('message',{origin,source:nextFrame.contentWindow,data:{type:'COS_OPERATIONS_NAVIGATE',route:'production-return'}});assert.equal(nextFrame.removed,true);
 });
 test('a changed identity while getSession awaits never receives bearer',async()=>{
   const h=harness(),frame=h.open();let resolve;h.state.fresh=()=>new Promise(done=>{resolve=done;});const request=h.token(frame);h.state.id='other';h.state.profile.user_id='other';resolve({data:{session:{user:{id:'legacy-tech'},access_token:'old'}}});await request;assert.equal(frame.contentWindow.messages[0].value.accessToken,null);
+});
+
+test('cross-tab signout and account switch clear displayed queue using auth subscription',()=>{
+  for(const session of [null,{user:{id:'different-tech'}}]){const h=harness(),frame=h.open();h.state.authListener(session?'SIGNED_IN':'SIGNED_OUT',session);assert.equal(frame.removed,true);assert.equal(h.node('cosProductionAssignmentsButton').hidden,true);}
+});
+test('token refresh for same subject preserves frame and native role',()=>{
+  const h=harness(),frame=h.open();h.state.authListener('TOKEN_REFRESHED',{user:{id:'legacy-tech'}});assert.equal(frame.removed,undefined);assert.equal(h.node('cosProductionAssignmentsButton').hidden,false);
 });

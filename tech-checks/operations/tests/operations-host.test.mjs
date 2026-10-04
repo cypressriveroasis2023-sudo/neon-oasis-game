@@ -90,7 +90,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
   const window = new Events();
   window.location = { origin, assign: value => calls.locations.push(value) };
   window.TechCheckContext = {
-    db: { auth: { getSession: () => { calls.auth++; return state.getFreshSession(); } } },
+    db: { auth: { onAuthStateChange: listener => { state.authListener = listener; return {}; }, getSession: () => { calls.auth++; return state.getFreshSession(); } } },
     getSession: () => state.session,
     getProfile: () => state.profile,
     getRole: () => state.role,
@@ -249,10 +249,16 @@ test('fresh auth identity mismatch, missing session, and auth errors fail closed
   for (const getFreshSession of cases) {
     const h = harness();
     h.state.getFreshSession = getFreshSession;
+    const frame = h.frame();
     await h.token('denied');
-    const reply = h.frame().contentWindow.messages[0].value;
-    assert.equal(reply.accessToken, null);
-    assert.equal(reply.role, null);
+    if (h.frame()) {
+      const reply = frame.contentWindow.messages[0].value;
+      assert.equal(reply.accessToken, null);
+      assert.equal(reply.role, null);
+    } else {
+      assert.equal(frame.removed, true);
+      assert.equal(frame.contentWindow.messages.length, 0);
+    }
   }
 });
 
@@ -430,4 +436,11 @@ test('technician return can reopen Operations through existing show fallback if 
   assert.equal(h.calls.shows.at(-1), 'owner');
   assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
   assert.equal(h.body.classList.contains('cos-operations-host'), true);
+});
+
+test('cross-tab signout or subject change destroys owner iframe despite stale legacy state',()=>{
+  for(const session of [null,{user:{id:secondOwnerId}}]){const h=harness();const frame=h.frame();h.state.authListener(session?'SIGNED_IN':'SIGNED_OUT',session);h.flushMutations();assert.equal(frame.removed,true);assert.equal(h.frame(),null);}
+});
+test('same-subject token refresh retains owner frame',()=>{
+  const h=harness(),frame=h.frame();h.state.authListener('TOKEN_REFRESHED',{user:{id:ownerId}});h.flushMutations();assert.equal(h.frame(),frame);
 });

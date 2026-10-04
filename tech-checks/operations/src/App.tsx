@@ -6,12 +6,18 @@ import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
+import OperationsJobs from './OperationsJobs';
+import OperationsCalendar from './OperationsCalendar';
+import HandoffsWorkspace from './HandoffsWorkspace';
+import DirectoryWorkspace from './DirectoryWorkspace';
+import EquipmentWorkspace from './EquipmentWorkspace';
+import TeamWorkspace from './TeamWorkspace';
+import { QuotesWorkspace, InvoicesWorkspace, PurchasingWorkspace } from './FinanceWorkspaces';
 import './continuation.css';
 
 type Row = Record<string, any>;
-type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health';
-const native: NativeWorkspace[] = ['Today', 'Daily Board', 'Field Map', 'Owner Tasks', 'Jobs', 'Tech Check', 'Camera Health'];
-const routes: Record<NativeWorkspace, string> = { Today:'today', 'Daily Board':'daily-board', 'Field Map':'field-map', 'Owner Tasks':'owner-tasks', Jobs:'jobs', 'Tech Check':'tech-check', 'Camera Health':'camera-health' };
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
+const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
 const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 const legacy: Record<string,string> = { Vision:'vision' };
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
@@ -20,6 +26,20 @@ const descriptions: Record<string,string> = {
   'Field Map':'Find deployed COS units by GPS coordinates without changing operational placement.',
   'Owner Tasks':'Assign auditable daily work to IT and Service technicians.',
   Jobs:'Authoritative COS operational jobs and their current field assignments.',
+  Unscheduled:'Schedule and assign native Operations visits.',
+  Dispatch:'Review readiness and dispatch assigned field work.',
+  'Owner Review':'Review completed work and release eligible jobs to billing.',
+  Calendar:'Month, week and year views of scheduled Operations jobs.',
+  Handoffs:'Department routing for the next authorized work stage.',
+  Customers:'Customer records in the Operations system of record.',
+  Sites:'Operational sites and access information.',
+  Equipment:'Physical equipment registry and placement.',
+  Team:'Existing Operations technicians, workload and readiness.',
+  Quotes:'Owner quote review and live document details.',
+  Invoices:'Invoice review and issuing.',
+  Billing:'Invoice records and Owner approval.',
+  Purchasing:'Purchase requests, three-way matching and AP decisions.',
+  'Camera Health':'Live camera status and existing diagnostics.',
   'Tech Check':'Open the existing IT and Service workspaces using your current platform account.',
 };
 const slug = (value:string) => value.toLowerCase().replaceAll(' ','-');
@@ -37,31 +57,6 @@ function localInput(value:string) {
   if (!Number.isFinite(date.getTime())) return '';
   const pad=(n:number)=>String(n).padStart(2,'0');
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes());
-}
-function JobsWorkspace({openBoard}:{openBoard:()=>void}) {
-  const [items,setItems]=useState<Row[]|null>(null);
-  const [error,setError]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [search,setSearch]=useState('');
-  const [selected,setSelected]=useState<Row|null>(null);
-  const revision=useRef(0);
-  const refresh=useCallback(async()=>{
-    const request=++revision.current;
-    setLoading(true);
-    try { const rows=collection((await api.get('/api/jobs')).data); if(request===revision.current){setItems(rows);setError('');} }
-    catch(cause){if(request===revision.current)setError(errorMessage(cause,'Jobs could not be loaded.'));}
-    finally{if(request===revision.current)setLoading(false);}
-  },[]);
-  useEffect(()=>{void refresh();return()=>{revision.current+=1;};},[refresh]);
-  const query=search.trim().toLowerCase();
-  const rows=(items||[]).filter(row=>!query||[row.jobNumber,row.customer,row.site,row.technician,row.status].some(value=>String(value||'').toLowerCase().includes(query)));
-  return <section className='panel module operations-jobs' aria-label='COS Jobs'>
-    <div className='panelhead'><h2>COS Jobs</h2><button className='secondary' disabled={loading} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh jobs'}</button></div>
-    <div className='purchase-actions'><input aria-label='Search COS jobs' value={search} onChange={event=>setSearch(event.target.value)} placeholder='Search job, customer, site, technician…'/><button onClick={openBoard}>Schedule / assign on Daily Board</button></div>
-    {error&&<div className='operations-error' role='alert'>{error}{items&&<p>Showing the last successful records.</p>}</div>}
-    {!items&&!error?<p role='status'>Loading COS jobs…</p>:<div className='records'>{rows.length?rows.map(row=><button type='button' className='record op-record' key={row.id} onClick={()=>setSelected(row)}><div><strong>{row.jobNumber} · {row.customer}</strong><small>{row.site} · {row.technician||'Unassigned'} · {row.scheduled||'Not scheduled'}</small></div><em>{row.status}</em></button>):items&&<p>No jobs match this view.</p>}</div>}
-    {selected&&<section className='quote-card operations-job-detail' aria-label='Selected COS job'><div className='quote-section-head'><h3>{selected.jobNumber} · {selected.customer}</h3><button className='secondary' onClick={()=>setSelected(null)}>Close details</button></div><dl>{[['Site',selected.site],['Technician',selected.technician],['Status',selected.status],['Stage',selected.stage],['Department',selected.department],['Schedule',selected.scheduled],['Job type',selected.jobType],['Equipment',selected.equipmentUnitTag||selected.equipment]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||'—'}</dd></div>)}</dl><button onClick={openBoard}>Open Daily Board</button></section>}
-  </section>;
 }
 type TaskDraft={id?:string;title:string;instructions:string;priority:string;assignedUserId:string;assignedDepartment:string;relatedJobId:string;relatedSiteId:string;dueAt:string;ownerNotes:string};
 const emptyTask=():TaskDraft=>({title:'',instructions:'',priority:'medium',assignedUserId:'',assignedDepartment:'it',relatedJobId:'',relatedSiteId:'',dueAt:'',ownerNotes:''});
@@ -217,7 +212,18 @@ function OwnerApp() {
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
-        :active==='Jobs'?<JobsWorkspace openBoard={()=>navigate('Daily Board')}/>
+        :active==='Jobs'?<OperationsJobs mode='jobs' show={show}/>
+        :active==='Unscheduled'?<OperationsJobs mode='unscheduled' show={show}/>
+        :active==='Dispatch'?<OperationsJobs mode='dispatch' show={show}/>
+        :active==='Owner Review'?<OperationsJobs mode='review' show={show}/>
+        :active==='Calendar'?<OperationsCalendar show={show}/>
+        :active==='Handoffs'?<HandoffsWorkspace show={show}/>
+        :active==='Customers'||active==='Sites'?<DirectoryWorkspace kind={active} show={show}/>
+        :active==='Equipment'?<EquipmentWorkspace show={show}/>
+        :active==='Team'?<TeamWorkspace show={show} openWorkspace={navigate}/>
+        :active==='Quotes'?<QuotesWorkspace show={show}/>
+        :active==='Invoices'||active==='Billing'?<InvoicesWorkspace show={show}/>
+        :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?<TechCheckWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}

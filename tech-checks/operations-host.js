@@ -7,8 +7,20 @@ let frame = null;
 let frameUser = null;
 let legacyOpen = false;
 const context = () => window.TechCheckContext;
-const owner = () => context()?.getRole() === 'owner' && context()?.getSession()?.user?.id;
+let ownerAuthSubject;
+let ownerAuthObserved = false;
+const owner = () => {
+  const id = context()?.getRole() === 'owner' && context()?.getSession()?.user?.id;
+  return id && (ownerAuthSubject === undefined || ownerAuthSubject === id) ? id : null;
+};
+function observeOwnerAuth() {
+  const auth = context()?.db.auth;
+  if (ownerAuthObserved || typeof auth?.onAuthStateChange !== 'function') return;
+  ownerAuthObserved = true;
+  auth.onAuthStateChange((_event, session) => { ownerAuthSubject = session?.user?.id || null; present(); });
+}
 function present() {
+  observeOwnerAuth();
   const user = owner();
   const effectiveOwner = context()?.getEffectiveRole() === 'owner';
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
@@ -66,6 +78,10 @@ window.addEventListener('message', async event => {
     let token = null;
     try {
       const result = await context()?.db.auth.getSession();
+      if (event.source === frame?.contentWindow && result?.data?.session?.user?.id !== requestedUser) {
+        ownerAuthSubject = result?.data?.session?.user?.id || null;
+        present();
+      }
       if (!document.getElementById('appView')?.classList.contains('hidden') && context()?.getEffectiveRole() === 'owner' && owner() === requestedUser &&
           result?.data?.session?.user?.id === requestedUser &&
           event.source === frame?.contentWindow) token = result.data.session.access_token;

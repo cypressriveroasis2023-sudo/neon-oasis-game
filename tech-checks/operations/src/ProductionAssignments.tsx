@@ -14,6 +14,7 @@ export default function ProductionAssignments() {
   const sequence = useRef(0), detailSequence = useRef(0);
   const refresh = useCallback(async () => {
     const request = ++sequence.current;
+    detailSequence.current++; setDetail(null); setOpening(false);
     setLoading(true);
     try {
       const identity = (await api.get('/api/tech/session')).data;
