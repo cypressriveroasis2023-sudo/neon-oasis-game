@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api as operationsApi } from './api';
-import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionLabels, financeMoney, financePath, financeStatus, type FinanceApi, type FinanceDecision, type FinanceKind, type FinanceRecord } from './financePersistence';
+import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionLabels, financeDetailMatchesRow, financeMoney, financePath, financeStatus, type FinanceApi, type FinanceDecision, type FinanceKind, type FinanceRecord } from './financePersistence';
 import './financeWorkspaces.css';
 
 type Props = { show: (message: string) => void; api?: FinanceApi; referenceUrl?: string };
@@ -95,6 +95,7 @@ function FinanceWorkspace({ kind, show, api = operationsApi, referenceUrl = defa
     if (!selected || !decision || !detail || detailLoading || loading || saver.busy || saver.needsRefresh) return;
     setSaving(true); setError(''); setNotice('');
     const baseline = selected;
+    if (!financeDetailMatchesRow(kind, baseline, detail)) { setError('This record changed after the list loaded. Close the record and refresh before reviewing it.'); setSaving(false); return; }
     try {
       const result = await saver.save(kind, baseline, decision, reason);
       if (!mounted.current) return;

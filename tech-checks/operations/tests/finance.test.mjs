@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionRequest, financeMoney, hasConfirmedFinanceDecision } from '../src/financePersistence.ts';
+import { availableFinanceDecisions, checkedFinanceDetail, checkedFinanceList, createFinanceDecisionSaver, financeDecisionRequest, financeDetailMatchesRow, financeMoney, hasConfirmedFinanceDecision } from '../src/financePersistence.ts';
 const id = '11111111-1111-4111-8111-111111111111';
 const otherId = '22222222-2222-4222-8222-222222222222';
 const quote = { id, status: 'Pending Owner Approval', locked: true, revision: 3 };
@@ -112,4 +112,12 @@ test('invalid decisions reject before any API write', async () => {
   await assert.rejects(saver.save('quotes', quote, 'return_quote', ''), /reason is required/);
   await assert.rejects(saver.save('purchasing', { ...ap, paid: true }, 'approve_ap'), /unavailable/);
   assert.equal(writes, 0); assert.equal(saver.busy, false);
+});
+
+test('a stale list cannot authorize review of a changed detail or another quote revision', () => {
+  assert.equal(financeDetailMatchesRow('quotes', quote, { ...quote, status: 'review' }), true);
+  assert.equal(financeDetailMatchesRow('quotes', quote, { ...quote, revision: 4 }), false);
+  assert.equal(financeDetailMatchesRow('quotes', quote, { ...quote, status: 'draft' }), false);
+  assert.equal(financeDetailMatchesRow('invoices', invoice, { ...invoice, status: 'approved' }), false);
+  assert.equal(financeDetailMatchesRow('purchasing', ap, { ...ap, id: otherId }), false);
 });

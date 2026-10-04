@@ -21,6 +21,16 @@ export function checkedFinanceDetail(value: unknown, id: string): FinanceRecord 
   for (const key of ['lines', 'payments', 'documents']) if (Array.isArray(value[key]) && value[key].some((row: unknown) => !object(row))) throw new Error('Financial record details returned invalid line records.');
   return value;
 }
+export function financeDetailStatus(kind: FinanceKind, detail: FinanceRecord): string {
+  const value = financeStatus(detail.status);
+  if (kind === 'quotes') return ({ review: 'pending owner approval', approved: 'owner approved', returned: 'returned by owner' } as Record<string, string>)[value] || value;
+  return value;
+}
+/** Prevent decisions when a newer detail no longer matches the reviewed list record. */
+export function financeDetailMatchesRow(kind: FinanceKind, row: FinanceRecord, detail: FinanceRecord): boolean {
+  return row.id === detail.id && financeStatus(row.status) === financeDetailStatus(kind, detail) &&
+    (kind !== 'quotes' || Number.isSafeInteger(Number(row.revision)) && Number(row.revision) >= 1 && Number(row.revision) === Number(detail.revision));
+}
 export function financeMoney(value: unknown): string {
   if (typeof value === 'string') value = value.trim().replace(/^\$/, '').replaceAll(',', '');
   if (typeof value === 'string' && /^[+-]?\d+(?:\.\d+)?$/.test(value)) value = Number(value);
@@ -94,10 +104,8 @@ export function createFinanceDecisionSaver(api: FinanceApi) {
           const [list, record] = await Promise.all([api.get(financePath[kind]), api.get(financePath[kind] + '/' + baseline.id)]);
           const rows = checkedFinanceList(list.data), detail = checkedFinanceDetail(record.data, baseline.id);
           if (!hasConfirmedFinanceDecision(rows, baseline, decision)) throw new Error('Readback did not match the requested decision.');
-          const detailStatus = financeStatus(detail.status);
-          const listStatus = financeStatus(rows.find(row => row.id === baseline.id)?.status);
-          const mapped: Record<string, string> = { review: 'pending owner approval', approved: kind === 'quotes' ? 'owner approved' : 'approved', returned: kind === 'quotes' ? 'returned by owner' : 'purchase request returned' };
-          if ((mapped[detailStatus] || detailStatus) !== listStatus) throw new Error('Record details and list disagree.');
+          const saved = rows.find(row => row.id === baseline.id);
+          if (!saved || !financeDetailMatchesRow(kind, saved, detail)) throw new Error('Record details and list disagree.');
           return { status: 'confirmed', rows, detail };
         } catch {
           refreshRequired = true;
