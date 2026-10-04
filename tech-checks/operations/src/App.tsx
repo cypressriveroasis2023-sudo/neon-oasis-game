@@ -1,0 +1,224 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api, openLegacy } from './api';
+import TodayDashboard from './TodayDashboard';
+import DailyBoard from './DailyBoard';
+import FieldMap from './FieldMap';
+import OwnerBoardControls from './OwnerBoardControls';
+
+type Row = Record<string, any>;
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check';
+const native: NativeWorkspace[] = ['Today', 'Daily Board', 'Field Map', 'Owner Tasks', 'Jobs', 'Tech Check'];
+const routes: Record<NativeWorkspace, string> = { Today:'today', 'Daily Board':'daily-board', 'Field Map':'field-map', 'Owner Tasks':'owner-tasks', Jobs:'jobs', 'Tech Check':'tech-check' };
+const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+const legacy: Record<string,string> = { Vision:'vision', 'Camera Health':'camera-health' };
+const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
+const descriptions: Record<string,string> = {
+  'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
+  'Field Map':'Find deployed COS units by GPS coordinates without changing operational placement.',
+  'Owner Tasks':'Assign auditable daily work to IT and Service technicians.',
+  Jobs:'Authoritative COS operational jobs and their current field assignments.',
+  'Tech Check':'Open the existing IT and Service workspaces using your current platform account.',
+};
+const slug = (value:string) => value.toLowerCase().replaceAll(' ','-');
+function currentWorkspace() {
+  const key = location.hash.slice(1);
+  return nav.find(name => slug(name) === key) || 'Today';
+}
+const errorMessage = (cause:unknown, fallback:string) => cause instanceof Error ? cause.message : fallback;
+const collection = (data:any) => {
+  if (!data || !Array.isArray(data.items) || data.items.some((row:any)=>!row||typeof row!=='object'||Array.isArray(row))) throw new Error('Operations returned an incomplete record list.');
+  return data.items as Row[];
+};
+function localInput(value:string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad=(n:number)=>String(n).padStart(2,'0');
+  return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes());
+}
+function JobsWorkspace({openBoard}:{openBoard:()=>void}) {
+  const [items,setItems]=useState<Row[]|null>(null);
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [search,setSearch]=useState('');
+  const [selected,setSelected]=useState<Row|null>(null);
+  const revision=useRef(0);
+  const refresh=useCallback(async()=>{
+    const request=++revision.current;
+    setLoading(true);
+    try { const rows=collection((await api.get('/api/jobs')).data); if(request===revision.current){setItems(rows);setError('');} }
+    catch(cause){if(request===revision.current)setError(errorMessage(cause,'Jobs could not be loaded.'));}
+    finally{if(request===revision.current)setLoading(false);}
+  },[]);
+  useEffect(()=>{void refresh();return()=>{revision.current+=1;};},[refresh]);
+  const query=search.trim().toLowerCase();
+  const rows=(items||[]).filter(row=>!query||[row.jobNumber,row.customer,row.site,row.technician,row.status].some(value=>String(value||'').toLowerCase().includes(query)));
+  return <section className='panel module operations-jobs' aria-label='COS Jobs'>
+    <div className='panelhead'><h2>COS Jobs</h2><button className='secondary' disabled={loading} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh jobs'}</button></div>
+    <div className='purchase-actions'><input aria-label='Search COS jobs' value={search} onChange={event=>setSearch(event.target.value)} placeholder='Search job, customer, site, technician…'/><button onClick={openBoard}>Schedule / assign on Daily Board</button></div>
+    {error&&<div className='operations-error' role='alert'>{error}{items&&<p>Showing the last successful records.</p>}</div>}
+    {!items&&!error?<p role='status'>Loading COS jobs…</p>:<div className='records'>{rows.length?rows.map(row=><button type='button' className='record op-record' key={row.id} onClick={()=>setSelected(row)}><div><strong>{row.jobNumber} · {row.customer}</strong><small>{row.site} · {row.technician||'Unassigned'} · {row.scheduled||'Not scheduled'}</small></div><em>{row.status}</em></button>):items&&<p>No jobs match this view.</p>}</div>}
+    {selected&&<section className='quote-card operations-job-detail' aria-label='Selected COS job'><div className='quote-section-head'><h3>{selected.jobNumber} · {selected.customer}</h3><button className='secondary' onClick={()=>setSelected(null)}>Close details</button></div><dl>{[['Site',selected.site],['Technician',selected.technician],['Status',selected.status],['Stage',selected.stage],['Department',selected.department],['Schedule',selected.scheduled],['Job type',selected.jobType],['Equipment',selected.equipmentUnitTag||selected.equipment]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||'—'}</dd></div>)}</dl><button onClick={openBoard}>Open Daily Board</button></section>}
+  </section>;
+}
+type TaskDraft={id?:string;title:string;instructions:string;priority:string;assignedUserId:string;assignedDepartment:string;relatedJobId:string;relatedSiteId:string;dueAt:string;ownerNotes:string};
+const emptyTask=():TaskDraft=>({title:'',instructions:'',priority:'medium',assignedUserId:'',assignedDepartment:'it',relatedJobId:'',relatedSiteId:'',dueAt:'',ownerNotes:''});
+function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
+  const [items,setItems]=useState<Row[]|null>(null);
+  const [draft,setDraft]=useState<TaskDraft|null>(null);
+  const [error,setError]=useState('');
+  const [notice,setNotice]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [needsRefresh,setNeedsRefresh]=useState(false);
+  const [team,setTeam]=useState<Row[]>([]);
+  const [sites,setSites]=useState<Row[]>([]);
+  const [jobs,setJobs]=useState<Row[]>([]);
+  const [optionsError,setOptionsError]=useState('');
+  const running=useRef(false);
+  const revision=useRef(0);
+  const refresh=useCallback(async()=>{
+    const request=++revision.current;
+    setLoading(true);
+    try { const rows=collection((await api.get('/api/owner-tasks')).data); if(request===revision.current){setItems(rows);setError('');setNeedsRefresh(false);} return rows; }
+    catch(cause){if(request===revision.current)setError(errorMessage(cause,'Owner Tasks could not be loaded.'));return null;}
+    finally{if(request===revision.current)setLoading(false);}
+  },[]);
+  useEffect(()=>{
+    void refresh();
+    let live=true;
+    void Promise.allSettled([api.get('/api/team-production'),api.get('/api/sites'),api.get('/api/jobs')]).then(results=>{
+      if(!live)return;
+      const setters=[setTeam,setSites,setJobs];
+      const unavailable:string[]=[];
+      results.forEach((result,index)=>{
+        if(result.status==='fulfilled'){try{setters[index](collection(result.value.data));}catch{unavailable.push(['Technician','Site','Job'][index]);}}
+        else unavailable.push(['Technician','Site','Job'][index]);
+      });
+      setOptionsError(unavailable.length?unavailable.join(', ')+' selections could not be loaded. Department assignments remain available.':'');
+    });
+    return()=>{live=false;revision.current+=1;};
+  },[refresh]);
+  const edit=(row:Row)=>setDraft({
+    id:String(row.id),title:String(row.title||''),instructions:String(row.instructions||''),priority:String(row.priority||'medium'),
+    assignedUserId:String(row.assignedUserId||''),assignedDepartment:String(row.assignedDepartment||'it'),
+    relatedJobId:String(row.relatedJobId||''),relatedSiteId:String(row.relatedSiteId||''),dueAt:row.dueAt?localInput(String(row.dueAt)):'',ownerNotes:String(row.ownerNotes||''),
+  });
+  const save=async()=>{
+    if(running.current||!draft||needsRefresh)return;
+    if(!draft.title.trim()){setError('Task title is required.');return;}
+    if(!draft.assignedUserId&&!['it','service'].includes(draft.assignedDepartment)){setError('Select an IT or Service department.');return;}
+    const parsedDue=draft.dueAt?new Date(draft.dueAt):null;
+    if(parsedDue&&!Number.isFinite(parsedDue.getTime())){setError('Enter a valid due date and time.');return;}
+    const dueAt=parsedDue?parsedDue.toISOString():null;
+    const payload={...draft,title:draft.title.trim(),instructions:draft.instructions.trim(),ownerNotes:draft.ownerNotes.trim(),dueAt};
+    const previousIds=new Set((items||[]).map(row=>row.id));
+    running.current=true;setSaving(true);setError('');setNotice('');
+    let accepted=false;
+    try {
+      const response=await api.post('/api/owner-tasks',payload);
+      accepted=true;setDraft(null);
+      const fresh=await refresh();
+      const savedId=response.data?.id||response.data?.taskId||response.data?.task_id||draft.id;
+      const candidates=(fresh||[]).filter(row=>savedId?row.id===savedId:!previousIds.has(row.id));
+      const confirmed=candidates.length===1&&candidates[0].title===payload.title&&String(candidates[0].instructions||'').trim()===payload.instructions&&candidates[0].priority===payload.priority&&(!payload.assignedUserId?String(candidates[0].assignedDepartment||'')===payload.assignedDepartment:String(candidates[0].assignedUserId||'')===payload.assignedUserId)&&(!dueAt?!candidates[0].dueAt:Date.parse(candidates[0].dueAt)===Date.parse(dueAt));
+      if(!confirmed){setNeedsRefresh(true);setError('Save accepted, but the task could not be verified. Refresh Owner Tasks before saving again.');return;}
+      setNotice('Owner Task saved and verified.');show('Owner Task saved and verified.');
+      window.dispatchEvent(new Event('cos-board-updated'));
+    } catch(cause) {
+      setNeedsRefresh(true);
+      setError(accepted?'Save accepted, but confirmation is unavailable. Refresh Owner Tasks before saving again.':errorMessage(cause,'The task save could not be confirmed. Refresh before trying again.'));
+    } finally {running.current=false;setSaving(false);}
+  };
+  const set=(key:keyof TaskDraft,value:string)=>setDraft(current=>current?{...current,[key]:value}:current);
+  const open=(items||[]).filter(row=>!['complete','cancelled'].includes(row.status));
+  return <section className='panel module owner-task-workspace' aria-label='Owner Tasks'>
+    <div className='panelhead'><h2>Owner Tasks</h2><button className='secondary' disabled={loading||saving} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tasks'}</button></div>
+    <div className='purchase-actions'><button disabled={saving||needsRefresh} onClick={()=>{setDraft(emptyTask());setError('');}}>+ New Owner Task</button><span>{items?open.length+' open · '+open.filter(row=>row.priority==='high').length+' high priority':'Task counts unavailable'}</span></div>
+    {error&&<div className='operations-error' role='alert'>{error}</div>}{notice&&<p className='operations-notice' role='status'>{notice}</p>}
+    {draft&&<section className='quote-card directory-editor'><div className='quote-section-head'><div><h3>{draft.id?'Edit':'New'} Owner Task</h3><small>Assigned work remains auditable after completion.</small></div><div><button className='secondary' disabled={saving} onClick={()=>setDraft(null)}>Cancel</button><button disabled={saving||needsRefresh} onClick={()=>void save()}>{saving?'Saving…':'Save task'}</button></div></div>
+      {optionsError&&<p role='status'>{optionsError}</p>}
+      <div className='quote-detail-grid'>
+        <label>Task Title *<input disabled={saving} value={draft.title} onChange={event=>set('title',event.target.value)}/></label>
+        <label>Priority<select disabled={saving} value={draft.priority} onChange={event=>set('priority',event.target.value)}><option value='high'>High</option><option value='medium'>Medium</option><option value='low'>Low</option></select></label>
+        <label>Technician<select disabled={saving} value={draft.assignedUserId} onChange={event=>setDraft(current=>current?{...current,assignedUserId:event.target.value,assignedDepartment:event.target.value?'':current.assignedDepartment||'it'}:current)}><option value=''>Assign by department</option>{draft.assignedUserId&&!team.some(row=>row.userId===draft.assignedUserId)&&<option value={draft.assignedUserId}>Current assigned technician</option>}{team.filter(row=>row.active&&['it','service'].includes(String(row.department).toLowerCase())).map(row=><option key={row.userId} value={row.userId}>{row.displayName||row.name}</option>)}</select></label>
+        <label>Department<select disabled={saving||Boolean(draft.assignedUserId)} value={draft.assignedDepartment} onChange={event=>set('assignedDepartment',event.target.value)}><option value='it'>IT</option><option value='service'>Service</option></select></label>
+        <label>Due Date / Time (your local time)<input disabled={saving} type='datetime-local' value={draft.dueAt} onChange={event=>set('dueAt',event.target.value)}/></label>
+        <label>Related Job<select disabled={saving} value={draft.relatedJobId} onChange={event=>set('relatedJobId',event.target.value)}><option value=''>No job</option>{draft.relatedJobId&&!jobs.some(row=>row.id===draft.relatedJobId)&&<option value={draft.relatedJobId}>Current related job</option>}{jobs.filter(row=>row.status!=='Closed').map(row=><option key={row.id} value={row.id}>{row.jobNumber} · {row.customer}</option>)}</select></label>
+        <label>Related Site<select disabled={saving} value={draft.relatedSiteId} onChange={event=>set('relatedSiteId',event.target.value)}><option value=''>No site</option>{draft.relatedSiteId&&!sites.some(row=>row.id===draft.relatedSiteId)&&<option value={draft.relatedSiteId}>Current related site</option>}{sites.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+        <label className='wide'>Detailed Instructions<textarea disabled={saving} value={draft.instructions} onChange={event=>set('instructions',event.target.value)}/></label>
+        <label className='wide'>Owner Notes<textarea disabled={saving} value={draft.ownerNotes} onChange={event=>set('ownerNotes',event.target.value)}/></label>
+      </div>
+    </section>}
+    {!items&&!error?<p role='status'>Loading Owner Tasks…</p>:<div className='records'>{(items||[]).map(row=><button disabled={saving} type='button' className='record op-record' key={row.id} onClick={()=>edit(row)}><div><strong>{row.title}</strong><small>{String(row.priority||'').toUpperCase()} · {row.assignedTo||String(row.assignedDepartment||'').toUpperCase()} · {row.jobNumber||row.siteName||'General'}{row.dueAt?' · Due '+new Date(row.dueAt).toLocaleString():''}</small></div><em>{String(row.status||'').replaceAll('_',' ').toUpperCase()}</em></button>)}{items?.length===0&&<p>No Owner Tasks in the current records. Create a daily assignment for IT or Service.</p>}</div>}
+  </section>;
+}
+function TechCheckWorkspace() {
+  return <section className='panel module operations-tools' aria-label='Tech Check workspaces'><div className='panelhead'><h2>Tech Check</h2><span>Existing platform workspaces</span></div><div className='operations-tool-grid'><button onClick={()=>openLegacy('it')}><b>IT Tech Check</b><span>IT readiness, preparation, assignments and checks</span></button><button onClick={()=>openLegacy('service')}><b>Service Tech Check</b><span>Service readiness, field assignments and checks</span></button><button className='secondary' onClick={()=>openLegacy('team')}><b>Team / Truck Readiness</b><span>Open the existing Owner team board</span></button><button className='secondary' onClick={()=>openLegacy('accounts')}><b>Accounts & Permissions</b><span>Open the existing account controls</span></button></div></section>;
+}
+export default function App() {
+  const [active,setActive]=useState(currentWorkspace);
+  const [session,setSession]=useState<Row|null>(null);
+  const [sessionError,setSessionError]=useState('');
+  const [checking,setChecking]=useState(true);
+  const [theme,setTheme]=useState<'dark'|'light'>(()=>localStorage.getItem('cos-operations-pages-theme')==='light'?'light':'dark');
+  const [now,setNow]=useState(()=>new Date());
+  const [toast,setToast]=useState('');
+  const [menu,setMenu]=useState(false);
+  const [weather,setWeather]=useState<Row|null>(null);
+  const [weatherStatus,setWeatherStatus]=useState('Local weather');
+  const toastTimer=useRef<number|null>(null);
+  const checkRevision=useRef(0);
+  const show=useCallback((message:string)=>{setToast(message);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);toastTimer.current=window.setTimeout(()=>setToast(''),5000);},[]);
+  const check=useCallback(async()=>{
+    const revision=++checkRevision.current;setChecking(true);
+    try {const data=(await api.get('/api/session')).data;if(revision!==checkRevision.current)return;if(!data||typeof data.authorized!=='boolean')throw new Error('Operations authorization could not be verified.');setSession(data);setSessionError('');}
+    catch(cause){if(revision===checkRevision.current){setSession(null);setSessionError(errorMessage(cause,'Operations authorization could not be verified.'));}}
+    finally{if(revision===checkRevision.current)setChecking(false);}
+  },[]);
+  useEffect(()=>{void check();return()=>{checkRevision.current+=1;};},[check]);
+  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('cos-operations-pages-theme',theme);},[theme]);
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),30000);const change=()=>setActive(currentWorkspace());window.addEventListener('hashchange',change);return()=>{window.clearInterval(timer);window.removeEventListener('hashchange',change);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);};},[]);
+  const requestWeather=useCallback(()=>{
+    if(!navigator.geolocation){setWeatherStatus('Location unavailable');return;}
+    setWeatherStatus('Locating…');
+    navigator.geolocation.getCurrentPosition(async position=>{
+      try{const response=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+position.coords.latitude+'&longitude='+position.coords.longitude+'&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto');if(!response.ok)throw new Error('Weather unavailable');const data=await response.json();if(!data.current||!Number.isFinite(data.current.temperature_2m))throw new Error('Weather unavailable');setWeather(data.current);setWeatherStatus('Current location');}catch{setWeather(null);setWeatherStatus('Weather unavailable');}
+    },()=>{setWeather(null);setWeatherStatus('Enable local weather');},{enableHighAccuracy:false,timeout:10000,maximumAge:300000});
+  },[]);
+  const navigate=useCallback((name:string)=>{
+    setMenu(false);
+    if(legacy[name]){openLegacy(legacy[name]);return;}
+    setActive(name);
+    location.hash=slug(name);
+    window.scrollTo({top:0,behavior:'instant'});
+  },[]);
+  const authorized=session?.authorized===true;
+  const hour=Number(now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'2-digit',hour12:false}));
+  const greeting=hour<12?'Good Morning':hour<18?'Good Afternoon':'Good Evening';
+  const condition=weather?(weather.weather_code===0?'Clear':weather.weather_code<=3?'Partly cloudy':weather.weather_code<=48?'Fog':weather.weather_code<=67?'Rain':weather.weather_code<=77?'Wintry':weather.weather_code<=82?'Showers':'Storms'):'Weather unavailable';
+  const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
+  return <div className='shell cos-command-shell owner-it-framework operations-shell'>
+    <aside className={'owner-it-side operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
+      <div className='brand'><img src={asset('cameras-on-site-logo.webp')} alt='Cameras Onsite'/></div>
+      <button className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu</button>
+      <nav aria-label='COS Operations'>{nav.map(name=><button type='button' key={name} className={(active===name?'active ':'')+(name==='Vision'?'vision-nav-button':'')} onClick={()=>navigate(name)} aria-current={active===name?'page':undefined}>{name==='Vision'?<><img src={asset('vision-eye-round.svg')} alt=''/><span>VISION</span></>:name}{!native.includes(name as NativeWorkspace)&&!legacy[name]&&<span className='operations-reference-mark' aria-label='AppDeploy workspace'>↗</span>}</button>)}</nav>
+      <div className='platform'><strong>CAMERAS ONSITE</strong><span>Operations · Tech Check · Vision</span><button onClick={()=>openLegacy('it')}>IT Tech Check</button><button onClick={()=>openLegacy('service')}>Service Tech Check</button><button onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button><button onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button onClick={()=>openLegacy('logout')}>Sign out</button></div>
+    </aside>
+    <main className='owner-it-main'>
+      <section className='techbar owner-it-topbar'><div className='tech-id'><span className='tech-eye' aria-hidden='true'>◉</span><div><label>CAMERAS ONSITE · OPERATIONS</label><strong className='welcome-name'>{greeting}, {session?.name||'Owner'}</strong></div></div>
+        <div className='tech-status'><button className='weather-tile operations-weather' onClick={requestWeather} title='Load weather for your current location'><span className='weather-icon' aria-hidden='true'>{weather?.weather_code===0?'☀':'☁'}</span><div className='weather-copy'><div className='weather-primary'><b>{weather?Math.round(weather.temperature_2m)+'°F':'—°F'}</b><strong>{condition}</strong></div><small>{weatherStatus}</small>{weather&&<small>Feels {Math.round(weather.apparent_temperature)}° · Wind {Math.round(weather.wind_speed_10m)} mph</small>}</div></button><div className='clock-tile'><b>{now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})}</b><small>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric'})} · CT</small></div><div className={'online-pill'+(!authorized?' operations-offline':'')}><i/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</div><button className={'theme-toggle '+theme} onClick={()=>setTheme(current=>current==='dark'?'light':'dark')} aria-label={'Switch to '+(theme==='dark'?'light':'dark')+' mode'}><span aria-hidden='true'>{theme==='dark'?'☀':'☾'}</span></button></div>
+      </section>
+      {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{active}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
+      {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
+        :active==='Today'?<TodayDashboard setActive={navigate}/>
+        :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
+        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show}/></section>
+        :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
+        :active==='Jobs'?<JobsWorkspace openBoard={()=>navigate('Daily Board')}/>
+        :active==='Tech Check'?<TechCheckWorkspace/>
+        :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
+    </main>
+    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>More</button></nav>
+    {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
+  </div>;
+}

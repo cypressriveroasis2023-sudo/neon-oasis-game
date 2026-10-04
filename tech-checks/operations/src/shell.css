@@ -1,0 +1,54 @@
+/* Operations-only adjustments inside the isolated Pages application. */
+.operations-shell{min-width:0;--bg:#07121f;--panel:#101e30;--border:#23374d;--muted:#a4b3c7;--text:#eaf2fc}
+.operations-shell .operations-sidebar{display:block!important;height:100vh!important;overflow:auto!important;position:sticky!important;top:0!important}
+.operations-sidebar nav button{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}
+.operations-reference-mark{font-size:10px;opacity:.65}.operations-sidebar .platform{border-color:#0c3c57;background:#031725}
+.operations-sidebar .platform button{width:100%;text-align:left;margin-top:7px;padding:8px;border:1px solid #17435b;border-radius:7px;background:#082332;color:#c6e8f8;font:inherit;font-size:11px;cursor:pointer}
+.operations-shell .owner-it-main{overflow:visible;min-width:0}.operations-shell .owner-it-topbar{flex-wrap:wrap;position:relative!important;z-index:4!important}
+.operations-shell .owner-it-topbar .tech-id{min-width:0}.operations-shell .owner-it-topbar .welcome-name{overflow-wrap:anywhere}
+.operations-shell .owner-it-topbar .tech-status{flex-wrap:wrap;min-width:0;max-width:100%}.operations-shell .weather-tile{min-width:215px;max-width:270px;text-align:left;color:inherit;cursor:pointer}
+.operations-shell .weather-primary{display:flex!important}.operations-shell .weather-primary strong{white-space:normal}.operations-shell .weather-copy{display:block;min-width:0}
+.operations-shell .clock-tile{min-width:150px}.operations-shell .operations-offline{border-color:#b78738!important;background:#3c2a11!important;color:#ffe0a1!important}.operations-shell .operations-offline i{background:#e6b655;box-shadow:none}
+.operations-shell .command-page-header{padding:15px 16px;border-radius:10px;min-width:0}.operations-shell .command-page-header h1{font-size:34px;overflow-wrap:anywhere}
+.operations-shell .owner-command-home>.purchase-actions{margin-bottom:14px;gap:10px}.operations-shell .owner-command-home>.purchase-actions>span{font-size:12px;color:#9bb8ca}
+.operations-shell .operations-error{padding:14px;border:1px solid #ff787e;background:#45252b;color:#fff;border-radius:8px;margin:12px 0;overflow-wrap:anywhere}
+.operations-shell .operations-notice{padding:12px 14px;border:1px solid #5dd9a4;background:#15372e;color:#eafff7;border-radius:8px;margin:12px 0}
+.operations-shell .operations-tools{margin-top:14px}.operations-tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.operations-tool-grid>button{min-height:110px;display:grid;text-align:left;align-content:center;gap:8px;padding:18px;border:1px solid #0b5677;border-radius:12px;background:linear-gradient(135deg,#061827,#03111c);color:#dcefff;cursor:pointer}
+.operations-tool-grid>button b{font-size:18px}.operations-tool-grid>button span{color:#8dafc4;line-height:1.5;font-size:13px}.operations-tool-grid>button:hover{border-color:#27dae4}
+.operations-reference-link{display:inline-flex;align-items:center;min-height:44px;padding:12px 16px;border:1px solid #11809b;border-radius:9px;background:#07576a;color:#ecfeff;font-weight:800;text-decoration:none}
+.operations-shell .field-map-layout>aside{display:block!important;height:auto!important;position:static!important;top:auto!important;box-shadow:none!important}
+.operations-shell .field-map-layout{min-width:0}.operations-shell .field-map-center,.operations-shell .field-map-list,.operations-shell .field-map-detail{min-width:0}
+.operations-shell .operations-jobs>.purchase-actions input{min-width:0;flex:1 1 260px}.operations-shell .record.op-record{width:100%;color:inherit;text-align:left;min-width:0;overflow-wrap:anywhere}
+.operations-shell .record.op-record>div{min-width:0}.operations-shell .record.op-record strong,.operations-shell .record.op-record small{overflow-wrap:anywhere}
+.operations-shell .operations-job-detail dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.operations-job-detail dl>div{padding-bottom:10px;border-bottom:1px solid #244454}.operations-job-detail dt{color:#93b0c3;font-size:11px}.operations-job-detail dd{margin:4px 0;overflow-wrap:anywhere}
+.operations-shell .quote-detail-grid{min-width:0}.operations-shell .quote-detail-grid label{min-width:0}.operations-shell .quote-detail-grid input,.operations-shell .quote-detail-grid select,.operations-shell .quote-detail-grid textarea{max-width:100%;min-width:0}
+.operations-shell .directory-editor .quote-section-head{flex-wrap:wrap}.operations-shell .directory-editor .quote-section-head>div{min-width:0}
+.operations-bottom-nav,.operations-menu-close{display:none!important}
+.operations-toast{max-width:calc(100vw - 32px);white-space:normal;overflow-wrap:anywhere}
+@media(max-width:1100px) and (min-width:701px){.operations-shell .operations-sidebar{display:block!important}.operations-sidebar nav button{display:block!important}.operations-reference-mark{display:none}.operations-sidebar .platform{padding:5px}.operations-sidebar .platform span,.operations-sidebar .platform strong{font-size:8px}.operations-sidebar .platform button{font-size:9px;padding:7px 3px;overflow-wrap:anywhere}.operations-shell .owner-it-topbar .welcome-name{font-size:29px!important}.operations-shell .owner-it-topbar .tech-status{justify-content:flex-start}}
+@media(max-width:700px){
+  .operations-shell{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  .operations-shell .operations-sidebar{display:none!important}.operations-shell .operations-sidebar-open{display:block!important;position:fixed!important;top:0!important;left:0!important;bottom:calc(68px + env(safe-area-inset-bottom))!important;width:min(330px,90vw)!important;height:auto!important;z-index:1100!important;box-shadow:0 0 0 100vmax #0008!important}
+  .operations-menu-close{display:block!important;margin:0 0 12px!important}
+  .operations-shell .owner-it-main{padding:12px!important}.operations-shell .owner-it-topbar{gap:12px!important}.operations-shell .owner-it-topbar .tech-status{justify-content:flex-start;gap:7px}.operations-shell .weather-tile{min-width:0;flex:1 1 180px;padding:8px!important}.operations-shell .clock-tile{flex:1 1 120px;min-width:0;padding:8px!important}.operations-shell .clock-tile b{font-size:22px!important}.operations-shell .weather-tile b{font-size:22px}.operations-shell .online-pill{font-size:8px}.operations-shell .theme-toggle{width:36px!important;height:36px!important;min-width:36px!important}
+  .operations-bottom-nav{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;position:fixed;left:0;right:0;bottom:0;z-index:1050;border-top:1px solid #0c5670;background:#031725;padding:7px 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -5px 24px #0005}
+  .operations-bottom-nav button{padding:12px 2px;min-height:46px;font-size:10px;text-align:center;border-radius:8px;min-width:0;color:#b8d7e8}
+  .operations-bottom-nav button.active{background:linear-gradient(90deg,#07576a,#087c83);color:#27f2f4}
+  .operations-tool-grid,.operations-shell .operations-job-detail dl{grid-template-columns:1fr}.operations-shell .command-page-header{padding:12px;margin-bottom:14px}.operations-shell .command-page-header h1{font-size:28px}.operations-shell .panel.module{padding:12px}.operations-shell .purchase-actions{flex-wrap:wrap}
+  .operations-shell .owner-task-workspace .record{align-items:flex-start;gap:10px}.operations-shell .quote-detail-grid{grid-template-columns:1fr}.operations-shell .quote-detail-grid .wide{grid-column:auto}
+  .operations-toast{left:12px!important;right:12px!important;bottom:calc(80px + env(safe-area-inset-bottom))!important}
+}
+html[data-theme='light'] .operations-shell{background:#f0f5fa!important;color:#182d40;--bg:#edf4f9;--panel:#fff;--border:#cad9e4;--muted:#536b7e;--text:#182d40}
+html[data-theme='light'] .operations-shell>.operations-sidebar{background:linear-gradient(180deg,#edf5fb,#e3eff7)!important;border-color:#bed6e5!important}
+html[data-theme='light'] .operations-sidebar nav button{color:#24465b!important}html[data-theme='light'] .operations-sidebar nav button.active{color:#fff!important;background:#075f75!important}
+html[data-theme='light'] .operations-shell .owner-it-topbar .welcome-name{color:#164563!important}html[data-theme='light'] .operations-shell .owner-it-topbar .tech-id label{color:#3d617b!important}
+html[data-theme='light'] .operations-shell .owner-it-topbar .weather-tile,html[data-theme='light'] .operations-shell .owner-it-topbar .clock-tile{background:#fff!important;color:#182d40!important;border-color:#c5d8e5!important}
+html[data-theme='light'] .operations-shell .panel.module,html[data-theme='light'] .operations-shell .owner-command-home .panel,html[data-theme='light'] .operations-shell .owner-command-home .stats article{background:#fff!important;border-color:#bdd4e4!important;color:#182d40!important;box-shadow:0 4px 15px #3457730a}
+html[data-theme='light'] .operations-shell .owner-command-home .stats article b{color:#182d40!important}html[data-theme='light'] .operations-shell .owner-command-home .stats article span,html[data-theme='light'] .operations-shell .owner-command-home .stats article i{color:#526c81!important}
+html[data-theme='light'] .operations-shell .panelhead,html[data-theme='light'] .operations-shell .command-page-header{background:#eaf3f9!important;border-color:#c6d9e7!important;color:#182d40}
+html[data-theme='light'] .operations-shell .command-page-header h1{color:#182d40}html[data-theme='light'] .operations-shell .command-page-header label{color:#086f88}
+html[data-theme='light'] .operations-shell .operations-tool-grid>button{background:#fff;color:#163e58;border-color:#b3d2e4}html[data-theme='light'] .operations-shell .operations-tool-grid>button span{color:#536b7e}
+html[data-theme='light'] .operations-shell .daily-board-card{color:#182d40}html[data-theme='light'] .operations-shell .daily-board-card.daily-board-scheduled{background:#e1f5e9;border-color:#238b56}
+html[data-theme='light'] .operations-shell .daily-board-card.daily-board-scheduled>span,html[data-theme='light'] .operations-shell .daily-board-card.daily-board-scheduled footer b{color:#226341}
+html[data-theme='light'] .operations-shell .cos-daily-board-tv{--bg:#07121f;--panel:#101e30;--border:#293b52;--muted:#b8c5d5;--text:#eaf2fc;color:#eaf2fc}html[data-theme='light'] .operations-shell .cos-daily-board-tv .daily-board-card{color:#eaf2fc}

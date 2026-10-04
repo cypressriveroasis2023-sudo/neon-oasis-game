@@ -1,0 +1,61 @@
+name: Verify COS Operations
+on:
+  push:
+    branches: [cos-operations-pages, main]
+    paths:
+      - 'tech-checks/operations/**'
+      - 'tech-checks/operations-host.*'
+      - 'tech-checks/supabase/functions/cos-operations-pages/**'
+      - '.github/workflows/cos-operations.yml'
+  pull_request:
+    paths:
+      - 'tech-checks/operations/**'
+      - 'tech-checks/operations-host.*'
+      - 'tech-checks/supabase/functions/cos-operations-pages/**'
+permissions:
+  contents: write
+concurrency:
+  group: cos-operations-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package.json
+      - name: Confirm existing technician workflows are unchanged
+        run: git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../app.js ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Browser test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-browser-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
+      - name: Commit verified static bundle on integration branch
+        if: github.event_name == 'push' && github.ref_name == 'cos-operations-pages'
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tech-checks/operations/dist tech-checks/operations/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Build verified COS Operations static bundle"
+            git push origin HEAD:cos-operations-pages
+          fi

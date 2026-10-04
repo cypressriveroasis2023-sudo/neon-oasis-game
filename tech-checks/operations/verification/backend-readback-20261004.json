@@ -1,0 +1,46 @@
+{
+  "referenceAppId": "cos-operations-platform-preview-wpbf1y",
+  "referenceVersion": "1791112322806",
+  "productionRead": {
+    "jobs": 13,
+    "tasks": 0,
+    "dailyBoardJobs": 13,
+    "fieldMap": {
+      "unitGps": 0,
+      "fieldUnits": 1,
+      "missingGps": 1,
+      "mappedUnits": 0
+    },
+    "grantsPreserved": true
+  },
+  "gps": {
+    "nativeWriteReturnedUnit": true,
+    "freshSnapshotSameUnitCoordinates": true,
+    "freshSnapshotUsesUnitGps": true,
+    "historyWriteVisible": true,
+    "originalUnitRestored": true,
+    "historyRestored": true,
+    "auditRestored": true
+  },
+  "tasks": {
+    "nativeCreateReturnedId": true,
+    "freshSnapshotSameTask": true,
+    "nativeStatusPreserved": true,
+    "freshSnapshotSameTaskEdited": true,
+    "originalTaskCountRestored": true,
+    "testTaskAbsent": true
+  },
+  "schedule": {
+    "nativeAssignmentVisible": true,
+    "nativeWriteReturnedVisit": true,
+    "nativeLocalTimezonePreserved": true,
+    "freshDailyBoardSameTechnician": true,
+    "freshDailyBoardSameJobSchedule": true,
+    "originalJobVisitsAssignmentsAttentionRestored": true
+  },
+  "limitations": [
+    "Native database save/read-back checked inside rolled-back transactions; committed browser save/refresh still requires an authenticated owner session.",
+    "Platform technician identities and visits are separate from legacy IT/Service queues; legacy accounts and data have not been migrated or cross-linked."
+  ],
+  "verificationMode": "Read-only schema inspection plus native production writes contained in exception-rolled-back subtransactions. No permanent operational rows, accounts, roles, permissions, or schemas changed."
+}
