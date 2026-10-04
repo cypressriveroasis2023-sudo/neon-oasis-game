@@ -204,7 +204,7 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   expect(state.writes).toHaveLength(0);
   await frame.getByLabel('Latitude', { exact: true }).fill('29.800000');
   await frame.getByLabel('Accuracy (meters)', { exact: true }).fill('');
-  await frame.getByLabel('Source', { exact: true }).selectOption('manual');
+  await frame.getByLabel('Source').selectOption('manual');
   await frame.getByLabel('Note', { exact: true }).fill('Synthetic gate location');
   await frame.getByRole('button', { name: 'Save Unit GPS' }).click();
   await expect(frame.getByRole('status').filter({ hasText: 'FIX-RG-002 GPS location saved and verified.' }).first()).toBeVisible();
