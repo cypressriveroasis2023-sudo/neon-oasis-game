@@ -1,0 +1,89 @@
+{
+  "verificationDate": "2026-10-04",
+  "baseCommit": "99e5c79dedce198363f653704c969bf356122bd7",
+  "appDeployVersion": "1791112322806",
+  "branch": "codex/cos-backend-phase2-identity",
+  "deploymentPerformed": false,
+  "schemaOrPermissionsChanged": false,
+  "accountsCreatedOrReset": false,
+  "permanentProductionRecordChanges": false,
+  "mockedDataUsedInProduction": false,
+  "backendContractTests": {
+    "cases": 85,
+    "passed": 85,
+    "mode": "Injected remote auth/session/PostgREST transports in tests only. Same exported handler as edge runtime. Node CI equivalent committed; root runs actual Node CI."
+  },
+  "finance": {
+    "mode": "Existing production rows only; successful PO decisions and all artifacts rolled back; native invalid-state denials verified",
+    "poReturnNativeResult": true,
+    "quoteRecordsUnchanged": true,
+    "poApprovalNativeResult": true,
+    "unmatchedAPReturnDenied": true,
+    "issuedInvoiceReplayDenied": true,
+    "unmatchedAPApprovalDenied": true,
+    "issuedInvoiceApprovalDenied": true,
+    "poReturnFreshNativeSnapshot": true,
+    "issuedInvoiceExactlyUnchanged": true,
+    "poApprovalFreshNativeSnapshot": true,
+    "poRecordAndAuditExactlyRestored": true,
+    "quoteMissingPendingReturnDenied": true,
+    "apPositiveVerificationUnavailable": "No actual matched Ready for AP Approval packet exists",
+    "quoteMissingPendingApprovalDenied": true,
+    "unmatchedAPPacketExactlyUnchanged": true,
+    "quotePositiveVerificationUnavailable": "Both real review quotes lack a current-version Pending Owner approval; the sole Draft quote lacks a site. Eligibility was not manufactured.",
+    "invoicePositiveVerificationUnavailable": "No actual draft/review invoices or uninvoiced Billing Ready jobs exist"
+  },
+  "directoryAndEquipment": {
+    "mode": "Actual existing rows, native save RPC, independent fresh native snapshot; every changed value and artifact restored by subtransaction rollback. No creates, status changes or installed/assignment changes.",
+    "siteExistingRowSave": true,
+    "customerExistingRowSave": true,
+    "siteFreshNativeSnapshot": true,
+    "equipmentExistingRowSave": true,
+    "customerFreshNativeSnapshot": true,
+    "equipmentFreshNativeSnapshot": true,
+    "siteRowAndAuditExactlyRestored": true,
+    "customerRowAndAuditExactlyRestored": true,
+    "equipmentRowAuditAndLocationsExactlyRestored": true
+  },
+  "technicianQueue": {
+    "mode": "Native service RPC actor argument on four real existing technicians; no user tokens minted or borrowed; aggregate receipt only. Bridge bearer authentication verified separately by injected-transport tests.",
+    "queueCounts": [
+      {
+        "department": "it",
+        "myDayVisitCount": 0,
+        "nativeTaskCount": 0,
+        "activeOwnAssignedVisits": 2
+      },
+      {
+        "department": "it",
+        "myDayVisitCount": 0,
+        "nativeTaskCount": 0,
+        "activeOwnAssignedVisits": 0
+      },
+      {
+        "department": "service",
+        "myDayVisitCount": 0,
+        "nativeTaskCount": 0,
+        "activeOwnAssignedVisits": 0
+      },
+      {
+        "department": "service",
+        "myDayVisitCount": 0,
+        "nativeTaskCount": 0,
+        "activeOwnAssignedVisits": 3
+      }
+    ],
+    "ownAssignedWorkflowReadable": true,
+    "otherTechnicianNativeDetailEmpty": true,
+    "allFourTechnicianNativeReadsPassed": true,
+    "nativeTasksOwnIdentityOrDepartmentOnly": true,
+    "profilesRolesAndAssignmentsExactlyUnchanged": true
+  },
+  "remainingProof": "A fresh authenticated browser save and page refresh using the actual owner's own legacy session has not been performed. Production SQL/native RPC proof and isolated bearer validation tests do not establish that end-to-end browser result. No account token was minted, borrowed, requested, or logged.",
+  "eligibilityAndLinkageLimits": {
+    "additionalOwners": "Two other existing legacy owners have no verified same-person platform auth/profile/Owner-role identity. They remain unlinked and retain existing Tech Check access; no James actor borrowing.",
+    "technicianAssignments": "Four existing technician identity pairs are explicitly linked read-only. Existing legacy assignments are preserved; native assignments are read separately and never duplicated.",
+    "technicianWrites": "Production queue is read-only. Existing IT and Service native legacy workflows remain unchanged. New native visit completion/evidence/truck workflows need a separately reviewed write contract before being exposed.",
+    "finance": "Quote approvals require genuine current-version pending approval artifact. Invoice/AP positive transitions await genuinely eligible production records. No fake eligibility or approval artifacts were created."
+  }
+}
