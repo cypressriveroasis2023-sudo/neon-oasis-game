@@ -164,3 +164,39 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     if(name==='native task create contract permitted'&&(rpcCalls.at(-1).body.p_task_id!==null||rpcCalls.at(-1).body.p_payload.priority!=='medium'))throw new Error('Task create contract changed.');
   });
 }
+
+// Isolated owner-action coverage: no real jobs or truck records are mutated.
+const ownerActions = [
+ ['manual job','/api/owner/jobs/manual',{siteId:recordId,jobType:'SERVICE',title:'Fixture service',shopPrep:true},201,'sites','appdeploy_owner_create_manual_job',{p_actor_user_id:actorId,p_site_id:recordId,p_job_type:'SERVICE',p_title:'Fixture service',p_description:null,p_priority:'normal',p_requires_shop_prep:true}],
+ ['job close','/api/jobs/'+recordId+'/close',{reason:'Fixture close'},200,'jobs','appdeploy_owner_close_job',{p_actor_user_id:actorId,p_job_id:recordId,p_reason:'Fixture close'}],
+ ['truck approval','/api/owner/truck-checks/'+recordId+'/approve',{note:'Fixture verified'},200,'truck_checks','appdeploy_owner_approve_truck_stock',{p_actor_user_id:actorId,p_check_id:recordId,p_note:'Fixture verified'}],
+ ['IT to Service','/api/owner/jobs/'+recordId+'/advance-it',{unitNumber:'FIX-001',serviceTechnician:'Casey Service',start:'2026-10-04T08:00',end:'2026-10-04T10:00',note:'Fixture verified'},200,'jobs','appdeploy_owner_advance_it_to_service',{p_actor_user_id:actorId,p_job_id:recordId,p_note:'Fixture verified',p_unit_number:'FIX-001',p_service_technician_name:'Casey Service',p_start_local:'2026-10-04 08:00',p_end_local:'2026-10-04 10:00'}],
+];
+for (const [name,path,input,status,table,rpc,payload] of ownerActions) {
+ for (const variant of ['allowed','outside organization','technician','actor override','native rejection']) {
+  test(name+' contract: '+variant,async()=>{
+   const calls=[];
+   const scenario=variant==='outside organization'?{outsideOrg:true}:variant==='technician'?{userId:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'}:variant==='native rejection'?{rpcDenied:true}:{};
+   const mock=transport(scenario,calls);
+   const fetch=async(url,init)=>{
+    if(url.includes('/rest/v1/truck_checks?')){calls.push({url,method:init?.method||'GET',body:null});return json(scenario.outsideOrg?[]:[{id:recordId}]);}
+    return mock(url,init);
+   };
+   const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'test-server-key',fetch});
+   const body=variant==='actor override'?{...input,actorId:recordId}:input;
+   const response=await handler(request(path,'POST',body));
+   const expected=variant==='allowed'?status:variant==='outside organization'?404:variant==='technician'?403:variant==='actor override'?400:409;
+   const data=await response.json();
+   if(response.status!==expected)throw new Error('Expected '+expected+', received '+response.status+': '+JSON.stringify(data));
+   const writes=calls.filter(call=>call.url.includes('/rest/v1/rpc/'));
+   if(variant==='allowed'||variant==='native rejection'){
+    if(writes.length!==1||!writes[0].url.endsWith('/rpc/'+rpc))throw new Error('Native action was skipped, changed, or replayed.');
+    const actual=writes[0].body;
+    if(JSON.stringify(actual)!==JSON.stringify(payload))throw new Error('Native payload mismatch: '+JSON.stringify(actual));
+    const lookup=calls.find(call=>call.url.includes('/rest/v1/'+table+'?'));
+    if(!lookup?.url.includes('organization_id=eq.'+orgId))throw new Error('Record lookup was not scoped to the organization.');
+    if(variant==='native rejection'&&!data.error.includes('Native department or workflow guard'))throw new Error('Native denial was hidden.');
+   }else if(writes.length)throw new Error('Rejected request reached a native mutation.');
+  });
+ }
+}
