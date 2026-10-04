@@ -136,11 +136,13 @@ export default function OperationsJobs({mode,show}:Props) {
     {!rows&&!error?<div className='loading' role='status'>Loading COS Jobs…</div>:<div className='records'>{visible.map(job=>{
       const location=technicianLocationUrl(job.lastLocation);
       const correction=Array.isArray(job.activity)?job.activity.filter((entry:unknown)=>typeof entry==='string'&&entry.startsWith('Returned by Owner:')).at(-1):'';
+      const reviewBlockers=mode==='review'?[...(!job.equipmentUnitTag?['Physical unit identification is missing.']:[]),...(job.techCheck&&!job.techCheck.complete?['Technician workflow / Tech Check is incomplete.']:[]),...(job.damageReported?['Returned-unit damage requires review.']:[]),...(Array.isArray(job.needsAttention)&&job.needsAttention.length?['Needs Attention items remain open.']:[]),...(Array.isArray(job.photos)&&job.photos.length===0?['No field photos are attached to this response.']:[])]:[];
       return <div className='record op-record' key={job.id}>
         <div><strong>{job.jobNumber} · {job.customer}</strong><small>{job.site} · {job.jobType} · {job.equipment||'Equipment not assigned'}{job.equipmentUnitTag?' · '+(String(job.jobType).toUpperCase()==='SWAP'?'Site / returned ':'Unit ')+job.equipmentUnitTag:' · UNIT TAG REQUIRED'}{String(job.jobType).toUpperCase()==='SERVICE'?' · '+(job.shopPrep?'Shop prep required':'Direct Service'):''} · Stage: {job.stage||'Legacy workflow'} · {job.scheduled||'Not scheduled'} · {job.technician||'Unassigned'}{statusKey(job.status)==='en route'?' · LIVE GPS':''}</small>
           {statusKey(job.status)==='unscheduled'&&correction&&<span className='owner-techcheck'>OWNER CORRECTION · {String(correction).replace('Returned by Owner: ','')}</span>}
           {location&&<a className='owner-location' href={location} target='_blank' rel='noopener noreferrer'>View technician location · {Number(job.lastLocation.latitude).toFixed(4)}, {Number(job.lastLocation.longitude).toFixed(4)}</a>}
           {job.techCheck&&<span className='owner-techcheck'>Tech Check · {job.techCheck.complete?'Complete':'Step '+(Number(job.techCheck.step||0)+1)}</span>}
+          {mode==='review'&&reviewBlockers.length>0&&<div className='daily-board-error owner-review-blockers' role='status'><b>Review before approval</b>{reviewBlockers.map(blocker=><small key={blocker}>{blocker}</small>)}<small>The backend remains the final billing-readiness authority.</small></div>}
           {mode==='review'&&<JobEvidence job={job}/>}
         </div>
         <div className='row-actions'><em>{job.status}</em>
