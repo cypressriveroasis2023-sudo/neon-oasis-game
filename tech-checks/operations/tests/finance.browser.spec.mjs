@@ -52,6 +52,7 @@ async function start(page) {
         if (kind === 'quotes' && path.endsWith('/action')) {
           row.status = body.action === 'approve' ? 'Owner Approved' : 'Draft';
           row.locked = body.action === 'approve';
+          if (body.action === 'return') row.revision += 1;
           data = { quote_id: row.id, status: body.action === 'approve' ? 'approved' : 'draft', returned: body.action === 'return' };
         } else if (kind === 'invoices' && path.endsWith('/action')) {
           row.status = body.action === 'approve' ? 'Approved' : 'Issued'; data = { invoice_id: row.id };
@@ -80,8 +81,18 @@ async function navigate(frame, name) {
 }
 async function noOverflow(page) {
   const frame = page.frames().find(item => item.parentFrame());
-  const size = await frame.evaluate(() => ({ width: innerWidth, content: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) }));
-  expect(size.content).toBeLessThanOrEqual(size.width + 1);
+  const size = await frame.evaluate(() => ({
+    width: innerWidth,
+    content: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+    overflow: Array.from(document.querySelectorAll('body *')).filter(element => {
+      const bounds = element.getBoundingClientRect(), style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && bounds.width > 0 && bounds.right > innerWidth + 1;
+    }).map(element => {
+      const bounds = element.getBoundingClientRect(), style = getComputedStyle(element);
+      return { tag: element.tagName, className: element.className, text: element.textContent?.trim().slice(0, 70), left: bounds.left, right: bounds.right, width: bounds.width, display: style.display, position: style.position, minWidth: style.minWidth, maxWidth: style.maxWidth, grid: style.gridTemplateColumns, flex: style.flex, whiteSpace: style.whiteSpace };
+    }).sort((a, b) => b.right - a.right).slice(0, 25),
+  }));
+  expect(size.content, JSON.stringify(size)).toBeLessThanOrEqual(size.width + 1);
 }
 test('native Quotes show real detail and require a return reason; one decision persists after reload', async ({ page }) => {
   const { frame, state } = await start(page);
@@ -97,7 +108,7 @@ test('native Quotes show real detail and require a return reason; one decision p
   await expect(dialog.getByRole('status').filter({ hasText: 'Return to Sales saved and verified.' })).toBeVisible();
   expect(state.writes).toHaveLength(1);
   expect(state.writes[0].body).toEqual({ action: 'return', reason: 'Synthetic scope needs clarification' });
-  expect(state.quotes[0].revision).toBe(3);
+  expect(state.quotes[0].revision).toBe(4);
   await noOverflow(page);
   await page.reload();
   await navigate(frame, 'Quotes');

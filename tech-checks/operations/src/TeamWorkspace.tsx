@@ -35,7 +35,7 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
     <div className='purchase-actions'>
       <button className='secondary' disabled={loading} onClick={()=>void load()}>{loading?'REFRESHING…':'REFRESH TEAM'}</button>
       <input aria-label='Search production team' value={query} onChange={event=>setQuery(event.target.value)} placeholder='Search team member or department…'/>
-      <label>Department<select value={department} onChange={event=>setDepartment(event.target.value)}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option></select></label>
+      <label>Department<select aria-label='Department' value={department} onChange={event=>setDepartment(event.target.value)}><option value=''>All departments</option><option value='it'>IT</option><option value='service'>Service</option></select></label>
       {members&&<span>{members.length} active production profiles</span>}
     </div>
     {Object.values(errors).length>0&&<div className='operations-error' role='alert'>{Object.entries(errors).map(([source,error])=><p key={source}>{error}{(source==='team'?members:source==='jobs'?jobs:checks)&&' Showing the last successful '+(source==='checks'?'readiness':source)+' records.'}</p>)}</div>}

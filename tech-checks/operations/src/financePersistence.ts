@@ -70,7 +70,7 @@ export function hasConfirmedFinanceDecision(rows: FinanceRecord[], baseline: Fin
   if (matches.length !== 1) return false;
   const row = matches[0], status = financeStatus(row.status);
   if (decision === 'approve_quote') return status === 'owner approved' && row.locked === true && Number(row.revision) === Number(baseline.revision);
-  if (decision === 'return_quote') return status === 'draft' && row.locked === false && Number.isSafeInteger(Number(baseline.revision)) && Number(row.revision) === Number(baseline.revision);
+  if (decision === 'return_quote') return status === 'draft' && row.locked === false && Number.isSafeInteger(Number(baseline.revision)) && Number(baseline.revision) >= 1 && Number(row.revision) === Number(baseline.revision) + 1;
   if (decision === 'approve_invoice') return status === 'approved';
   if (decision === 'issue_invoice') return status === 'issued';
   if (decision === 'approve_po') return row.poApproved === true && status === 'open po';

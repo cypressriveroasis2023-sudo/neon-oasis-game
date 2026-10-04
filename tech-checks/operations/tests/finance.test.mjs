@@ -44,10 +44,10 @@ test('decision payloads use exact allowlisted endpoints with required trimmed re
   assert.throws(() => financeDecisionRequest('purchasing', po, 'return_po', 'x'.repeat(4001)), /4000/);
   assert.throws(() => financeDecisionRequest('invoices', invoice, 'approve_quote'), /unavailable/);
 });
-test('readback confirms native transitions including quote return without creating a revision', () => {
+test('readback confirms native transitions including quote return creating exactly one Draft revision', () => {
   const cases = [
     [quote, 'approve_quote', { ...quote, status: 'Owner Approved' }],
-    [quote, 'return_quote', { ...quote, status: 'Draft', locked: false }],
+    [quote, 'return_quote', { ...quote, status: 'Draft', locked: false, revision: 4 }],
     [invoice, 'approve_invoice', { ...invoice, status: 'Approved' }],
     [{ ...invoice, status: 'Approved' }, 'issue_invoice', { ...invoice, status: 'Issued' }],
     [po, 'approve_po', { ...po, status: 'Open PO', poApproved: true }],
@@ -61,7 +61,8 @@ test('readback confirms native transitions including quote return without creati
     assert.equal(hasConfirmedFinanceDecision([{ ...after, id: otherId }], before, decision), false, decision);
     assert.equal(hasConfirmedFinanceDecision([after, after], before, decision), false, decision);
   }
-  assert.equal(hasConfirmedFinanceDecision([{ ...quote, status: 'Draft', locked: false, revision: 4 }], quote, 'return_quote'), false);
+  assert.equal(hasConfirmedFinanceDecision([{ ...quote, status: 'Draft', locked: false, revision: 3 }], quote, 'return_quote'), false);
+  assert.equal(hasConfirmedFinanceDecision([{ ...quote, status: 'Draft', locked: false, revision: 5 }], quote, 'return_quote'), false);
   assert.equal(hasConfirmedFinanceDecision([{ ...ap, status: 'Needs Review', match: 'Matched' }], ap, 'return_ap'), false);
 });
 test('one finance decision runs at a time and is confirmed by independent list and detail reads', async () => {

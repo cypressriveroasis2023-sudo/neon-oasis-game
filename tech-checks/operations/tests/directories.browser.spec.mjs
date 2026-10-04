@@ -56,19 +56,28 @@ async function setup(page){
   });
   await page.goto('/directory-fixture');
   const frame=page.frameLocator('#operations');
-  await expect(frame.getByRole('navigation',{name:'COS Operations'})).toBeAttached();
+  await expect(frame.locator('.operations-shell')).toBeAttached();
+  const more=frame.getByRole('button',{name:'More',exact:true});
+  if(await more.isVisible())await more.click();
+  await expect(frame.getByRole('navigation',{name:'COS Operations'})).toBeVisible();
   return{state,frame};
 }
 async function open(frame,name){
+  const more=frame.getByRole('button',{name:'More',exact:true});
+  if(await more.isVisible()&&await more.getAttribute('aria-expanded')!=='true')await more.click();
   const nav=frame.getByRole('navigation',{name:'COS Operations'});
+  await expect(nav).toBeVisible();
   const button=nav.getByRole('button',{name,exact:true});
-  if(!await button.isVisible())await frame.getByRole('button',{name:'More',exact:true}).click();
   await button.click();
   return frame.getByRole('region',{name:name+' Workspace',exact:true});
 }
 async function noOverflow(page){
   const frame=page.frames().find(value=>value.parentFrame());
   const metrics=await frame.evaluate(()=>({viewport:innerWidth,width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)}));
+  if(metrics.width>metrics.viewport+1){
+    const overflowing=await frame.evaluate(()=>Array.from(document.body.querySelectorAll('*')).map(element=>({tag:element.tagName,class:element.className,text:element.textContent?.slice(0,90),left:element.getBoundingClientRect().left,right:element.getBoundingClientRect().right,scroll:element.scrollWidth,width:element.clientWidth})).filter(value=>value.right>innerWidth+1||value.scroll>value.width+1).slice(0,30));
+    console.log('Directory overflow diagnostics',JSON.stringify({metrics,overflowing}));
+  }
   expect(metrics.width).toBeLessThanOrEqual(metrics.viewport+1);
 }
 

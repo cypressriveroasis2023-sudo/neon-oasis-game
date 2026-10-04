@@ -156,7 +156,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
 
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
-  assert.equal(h.frame().src, './operations/dist/index.html?v=operations-v100-20261004');
+  assert.equal(h.frame().src, './operations/dist/index.html?v=operations-v100-phase2-20261004');
   assert.equal(h.frame().allow, 'geolocation');
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);

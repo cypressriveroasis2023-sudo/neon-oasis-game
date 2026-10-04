@@ -48,8 +48,8 @@ export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:
     :['name','customer','siteNumber','addressLine1','addressLine2','city','stateRegion','postalCode','status','accessInstructions','parkingInstructions','safetyNotes']);
   const set=(key:string,value:string)=>setForm(current=>current?{...current,[key]:value}:current);
   const field=(key:string,label:string,large=false)=>large
-    ?<label className='wide' key={key}>{label}<textarea value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>
-    :<label key={key}>{label}<input value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>;
+    ?<label className='wide' key={key}>{label}<textarea aria-label={label} value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>
+    :<label key={key}>{label}<input aria-label={label} value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>;
   return <section className='panel module operations-directory' aria-label={kind+' Workspace'}>
     <div className='panelhead'><h2>{kind} Workspace</h2><span>Live operational data</span></div>
     <div className='purchase-actions'>
@@ -70,13 +70,13 @@ export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:
       <fieldset disabled={busy||uncertain} style={{border:0,padding:0,margin:0,minWidth:0}}>
         {kind==='Customers'?<div className='quote-detail-grid'>
           {field('name','Customer Name *')}{field('legalName','Legal Name')}
-          <label>Status<select value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
+          <label>Status<select aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
           {field('notes','Notes',true)}
         </div>:<div className='crm-form-section'>
           <h4>Customer & Site</h4><div className='quote-detail-grid'>
-            <label>Customer *<select value={form.customerId||''} onChange={event=>set('customerId',event.target.value)}><option value=''>Select customer</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+            <label>Customer *<select aria-label='Customer *' value={form.customerId||''} onChange={event=>set('customerId',event.target.value)}><option value=''>Select customer</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
             {field('name','Site Name *')}
-            <label>Status<select value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
+            <label>Status<select aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
           </div>
           <h4>Location</h4><div className='quote-detail-grid'>{[['addressLine1','Address'],['addressLine2','Address 2'],['city','City'],['stateRegion','State'],['postalCode','ZIP'],['country','Country']].map(([key,label])=>field(key,label))}</div>
           <h4>Technician Instructions</h4><div className='quote-detail-grid'>{[['accessInstructions','Access Instructions'],['parkingInstructions','Parking Instructions'],['safetyNotes','Safety Notes'],['operationalNotes','Operational Notes']].map(([key,label])=>field(key,label,true))}</div>

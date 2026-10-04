@@ -37,7 +37,7 @@ function present() {
     frame = document.createElement('iframe');
     frame.id = 'cosOperationsFrame';
     frame.title = 'COS Operations';
-    frame.src = './operations/dist/index.html?v=operations-v100-20261004';
+    frame.src = './operations/dist/index.html?v=operations-v100-phase2-20261004';
     frame.allow = 'geolocation';
     frame.referrerPolicy = 'same-origin';
     mount.replaceChildren(frame);

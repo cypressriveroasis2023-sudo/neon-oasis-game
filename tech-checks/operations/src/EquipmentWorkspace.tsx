@@ -41,11 +41,11 @@ export default function EquipmentWorkspace({show}:{show:(message:string)=>void})
       <div className='quote-section-head'><div><h3>{form.id?'Edit':'Add'} Equipment Unit</h3><small>Owner registry controls for the COS production inventory.</small></div><div className='purchase-actions'><button className='secondary' disabled={busy} onClick={()=>{setForm(null);if(!uncertain)setSaveError('');}}>Cancel</button><button disabled={busy||uncertain} onClick={()=>void save()}>{busy?'SAVING…':'SAVE UNIT'}</button></div></div>
       {saveError&&<div className='operations-error' role='alert'>{saveError}</div>}
       <fieldset disabled={busy||uncertain} style={{border:0,padding:0,margin:0,minWidth:0}}><div className='quote-detail-grid'>
-        <label>Model *<select value={form.modelId||''} onChange={event=>set('modelId',event.target.value)}><option value=''>Select model</option>{data?.models.map(model=><option key={model.id} value={model.id}>{model.name}{model.code?' · '+model.code:''}</option>)}</select></label>
-        <label>Unit Number *<input value={form.unitNumber||''} onChange={event=>set('unitNumber',event.target.value)}/></label>
-        <label>Serial Number<input value={form.serialNumber||''} onChange={event=>set('serialNumber',event.target.value)}/></label>
-        <label>Status<select value={form.status||''} onChange={event=>set('status',event.target.value)}><option value=''>Select status</option>{equipmentStatuses.map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</select></label>
-        <label>Location Type<input value={form.currentLocationType||''} onChange={event=>set('currentLocationType',event.target.value)} placeholder='shop / field / truck'/></label>
+        <label>Model *<select aria-label='Model *' value={form.modelId||''} onChange={event=>set('modelId',event.target.value)}><option value=''>Select model</option>{data?.models.map(model=><option key={model.id} value={model.id}>{model.name}{model.code?' · '+model.code:''}</option>)}</select></label>
+        <label>Unit Number *<input aria-label='Unit Number *' value={form.unitNumber||''} onChange={event=>set('unitNumber',event.target.value)}/></label>
+        <label>Serial Number<input aria-label='Serial Number' value={form.serialNumber||''} onChange={event=>set('serialNumber',event.target.value)}/></label>
+        <label>Status<select aria-label='Status' value={form.status||''} onChange={event=>set('status',event.target.value)}><option value=''>Select status</option>{equipmentStatuses.map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</select></label>
+        <label>Location Type<input aria-label='Location Type' value={form.currentLocationType||''} onChange={event=>set('currentLocationType',event.target.value)} placeholder='shop / field / truck'/></label>
       </div></fieldset>
     </section>}
     {data&&<div className='records'>{filtered.length?filtered.map(unit=><div className='record op-record' key={unit.id}>
