@@ -3,6 +3,7 @@ on:
   push:
     branches: [cos-operations-pages, main]
     paths:
+      - 'tech-checks/index.html'
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
       - 'tech-checks/production-assignments-host.*'
@@ -10,10 +11,12 @@ on:
       - '.github/workflows/cos-operations.yml'
   pull_request:
     paths:
+      - 'tech-checks/index.html'
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
+      - '.github/workflows/cos-operations.yml'
 permissions:
   contents: write
 concurrency:
