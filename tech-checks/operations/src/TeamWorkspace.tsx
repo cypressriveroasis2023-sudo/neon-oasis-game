@@ -42,9 +42,14 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
     {!members&&!errors.team&&<div className='loading' role='status'>Loading live team…</div>}
     {members&&<div className='records'>{rows.length?rows.map(member=>{
       const check=checks?.find(row=>row.userId===member.userId);
+      const assigned=(jobs||[]).filter(job=>job.technicianUserId===member.userId||String(job.technician||'').trim().toLowerCase()===String(member.displayName||'').trim().toLowerCase()).filter(job=>!['closed','cancelled'].includes(String(job.status||'').toLowerCase()));
+      const blocked=assigned.filter(job=>['scheduled','assigned'].includes(String(job.status||'').toLowerCase())&&!job.equipmentUnitTag);
+      const inProgress=assigned.filter(job=>['dispatched','in progress','en route'].includes(String(job.status||'').toLowerCase()));
+      const techChecks=assigned.filter(job=>job.techCheck&&!job.techCheck.complete);
       return <div className='record op-record' key={member.userId}>
         <div><strong>{member.displayName}</strong><small>{String(member.department).toUpperCase()} Technician · {jobs?teamJobCount(member,jobs)+' active assigned jobs':'Assigned jobs unavailable'}</small>
-          <div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span></div>
+          <div className='audit-mini'><span>Readiness: {check?check.status:checks?'No readiness record':'Unavailable'}</span><span>Dispatch blockers: {jobs?blocked.length:'—'}</span><span>Tech Checks in progress: {jobs?techChecks.length:'—'}</span><span>Field work active: {jobs?inProgress.length:'—'}</span></div>
+          {jobs&&assigned.length>0&&<div className='team-readiness-jobs'>{assigned.slice(0,6).map(job=><div key={job.id}><b>{job.jobNumber}</b><span>{job.site||job.customer} · {job.status}</span><small>{job.techCheck?(job.techCheck.complete?'Tech Check complete':'Tech Check step '+(Number(job.techCheck.step||0)+1)):blocked.includes(job)?'Waiting for physical unit identification':'Workflow ready for current stage'}</small></div>)}{assigned.length>6&&<small>+ {assigned.length-6} more assigned jobs</small>}</div>}
         </div>
         <em>{member.active?'ACTIVE PROFILE':'INACTIVE PROFILE'}</em>
       </div>;
