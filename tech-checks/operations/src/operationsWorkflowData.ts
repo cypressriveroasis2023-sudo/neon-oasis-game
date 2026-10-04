@@ -47,6 +47,8 @@ export function safeEvidenceUrl(value: unknown): string | null {
 export function technicianLocationUrl(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const location = value as OperationsRecord;
+  const numeric = (coordinate: unknown) => typeof coordinate === 'number' || typeof coordinate === 'string' && Boolean(coordinate.trim()) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(coordinate.trim());
+  if (!numeric(location.latitude) || !numeric(location.longitude)) return null;
   const latitude = Number(location.latitude), longitude = Number(location.longitude);
   if (location.latitude == null || location.longitude == null || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
   return 'https://www.google.com/maps/search/?api=1&query=' + latitude + ',' + longitude;

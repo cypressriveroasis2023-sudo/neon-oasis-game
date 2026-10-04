@@ -63,6 +63,8 @@ test('evidence links reject executable schemes and invalid technician coordinate
   assert.equal(safeEvidenceUrl('https://example.test/photo'),'https://example.test/photo');
   assert.equal(technicianLocationUrl({latitude:91,longitude:0}),null);
   assert.equal(technicianLocationUrl({latitude:null,longitude:null}),null);
+  assert.equal(technicianLocationUrl({latitude:'',longitude:''}),null);
+  assert.equal(technicianLocationUrl({latitude:false,longitude:false}),null);
   assert.equal(technicianLocationUrl({latitude:0,longitude:0}),'https://www.google.com/maps/search/?api=1&query=0,0');
 });
 
