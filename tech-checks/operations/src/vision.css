@@ -53,3 +53,47 @@
 .vision-shell .schedule-form label{text-align:center;color:#fff}.vision-shell .schedule-actions{justify-content:center}
 @media(max-width:600px){.vision-job-filters{grid-template-columns:1fr}}
 .vision-shell .vision-preview-note{font-size:12px;margin:10px 0;color:#e1ebf2}
+
+
+/* Approved VISION visual parity pass: presentation only. */
+.operations-shell.vision-shell{background:
+ radial-gradient(circle at 50% 6%,rgba(201,0,18,.13),transparent 24rem),
+ linear-gradient(180deg,#02070d 0,#06131d 34%,#02070c 100%)!important}
+.vision-shell>.owner-it-main{max-width:1180px!important}
+.vision-shell .vision-header{position:relative;overflow:hidden;padding:18px 16px 24px!important;border:1px solid #321018!important;border-radius:18px;background:linear-gradient(180deg,rgba(8,23,34,.92),rgba(1,7,12,.98));box-shadow:0 20px 60px #0008,inset 0 0 40px #c0000012}
+.vision-shell .vision-header:before{content:'';position:absolute;left:50%;top:-150px;transform:translateX(-50%);width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,#ff001d22 0 12%,#ff001d0d 24%,transparent 62%);pointer-events:none}
+.vision-wordmark{position:relative;z-index:1}
+.vision-wordmark>div{font-family:"Arial Narrow",Arial,sans-serif;font-weight:700;font-size:56px!important;letter-spacing:.24em!important;text-shadow:0 1px #fff8,0 0 22px #d4000026}
+.vision-letter-eye{width:62px!important;height:62px!important;flex-basis:62px!important;margin:0 8px 0 -2px!important;border:1px solid #ff3346!important;box-shadow:0 0 8px #ff001d,0 0 28px #c40000aa,0 0 70px #a000004f!important;background:#03070b}
+.vision-letter-eye:after{content:'';position:absolute;inset:5px;border:1px solid #fff6;border-radius:50%;box-shadow:inset 0 0 18px #f000}
+.vision-wordmark p{font-weight:700!important;letter-spacing:.48em!important;color:#dfe8ef!important;margin-top:16px!important}
+.vision-clock{position:relative;z-index:1;max-width:680px;margin:22px auto 0!important;border:1px solid #8f1c29!important;background:linear-gradient(135deg,#071824,#010509 50%,#0b1c28)!important;box-shadow:0 0 0 1px #ffffff0b,inset 0 0 24px #e0000018,0 10px 30px #0008!important}
+.vision-clock time,.vision-clock strong{font-family:"Arial Narrow",Arial,sans-serif;font-weight:700!important;background:linear-gradient(#fff,#b8c5ce 48%,#fff 62%,#aebbc4);background-clip:text;-webkit-background-clip:text;color:transparent!important}
+.vision-primary-nav{position:relative;z-index:1;max-width:720px!important;gap:9px!important;margin-top:20px!important}
+.operations-shell.vision-shell .vision-primary-nav button{min-height:40px!important;border-radius:999px!important;background:linear-gradient(180deg,#111d26,#05090d)!important;border:1px solid #5b2229!important;color:#dce6ed!important;font-size:13px!important;letter-spacing:.08em!important;text-transform:uppercase;box-shadow:inset 0 1px #fff0a!important}
+.operations-shell.vision-shell .vision-primary-nav button[aria-current]{background:linear-gradient(180deg,#be0018,#65000d)!important;border-color:#ff5b6a!important;color:#fff!important;box-shadow:0 0 14px #ef001c66,inset 0 1px #fff5!important}
+.vision-workspace-nav{position:relative;z-index:1;margin-top:14px!important}
+.operations-shell.vision-shell .vision-workspace-nav button{min-height:34px!important;border-radius:999px!important;background:#08131c!important;border:1px solid #263e4d!important;color:#bdcad3!important;font-size:11px!important;letter-spacing:.04em!important}
+.operations-shell.vision-shell .vision-workspace-nav button[aria-current]{border-color:#d21d31!important;color:#fff!important;box-shadow:0 0 10px #c0000038!important}
+.vision-shell .command-page-header{padding:24px 0 14px!important}.vision-shell .command-page-header h1{font-family:"Arial Narrow",Arial,sans-serif;font-weight:700!important;text-transform:uppercase;letter-spacing:.14em!important;background:linear-gradient(#fff,#9fb0bd 48%,#fff 64%,#a8b7c2);background-clip:text;-webkit-background-clip:text;color:transparent!important}
+.vision-shell .panel.module,.vision-shell .panel,.vision-shell .record.op-record,.vision-shell .stats article{background:linear-gradient(160deg,#091924,#03090e)!important;border:1px solid #253d4b!important;box-shadow:inset 0 1px #ffffff08,0 14px 34px #0005!important}
+.vision-shell .record.op-record{border-left:2px solid #9d1725!important}
+.operations-shell.vision-shell button{border-radius:10px!important;background:linear-gradient(180deg,#d0091e,#8d0010)!important;border:1px solid #ff4052!important;box-shadow:inset 0 1px #fff4,0 5px 16px #0006!important}
+.operations-shell.vision-shell button.secondary{background:linear-gradient(180deg,#142632,#071018)!important;border-color:#3e5665!important;color:#e6eef3!important}
+.vision-shell input,.vision-shell select,.vision-shell textarea{background:linear-gradient(180deg,#07131c,#02070b)!important;border-color:#334b5a!important;box-shadow:inset 0 1px 6px #000!important}
+.vision-shell .schedule-card{background:linear-gradient(160deg,#071722,#02070b)!important;border:1px solid #7d1b27!important;box-shadow:0 0 0 1px #fff08,0 30px 90px #000c,0 0 35px #b0000026!important}
+.vision-shell .schedule-summary{border:1px solid #23583c!important;background:linear-gradient(180deg,#082319,#06150f)!important}
+.vision-access{position:relative;z-index:1}.vision-access span{padding:7px 12px;border:1px solid #285443;border-radius:999px;background:#071b15;color:#8cf0bd!important}
+@media(max-width:700px){
+ .vision-shell>.owner-it-main{padding:10px!important}
+ .vision-shell .vision-header{padding:14px 10px 18px!important;border-radius:14px}
+ .vision-wordmark>div{font-size:38px!important;letter-spacing:.18em!important}
+ .vision-letter-eye{width:46px!important;height:46px!important;flex-basis:46px!important}
+ .vision-wordmark p{font-size:9px!important;letter-spacing:.34em!important}
+ .vision-clock{margin-top:16px!important;padding:10px 0!important}
+ .vision-primary-nav{gap:5px!important}.operations-shell.vision-shell .vision-primary-nav button{min-height:36px!important;font-size:11px!important;padding:6px 2px!important}
+ .vision-workspace-nav{gap:5px!important}.operations-shell.vision-shell .vision-workspace-nav button{min-height:31px!important;padding:5px 8px!important;font-size:10px!important}
+ .vision-shell .record.op-record{border-radius:14px!important;padding:16px!important}
+ .vision-shell .row-actions{justify-content:center!important;gap:8px!important}
+ .vision-shell .row-actions button{min-height:38px!important;padding:7px 11px!important;font-size:13px!important}
+}
