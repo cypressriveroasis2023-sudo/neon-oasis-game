@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 type Health = { totalDevices:number;online:number;offline:number;review:number;shopRoot:number;healthRows:number;fieldDevices:number;refreshedAt:string;rows:any[] };
 export function validateCameraHealth(value: any): Health {
-  if (!value || ['totalDevices','online','offline','review','shopRoot','healthRows','fieldDevices'].some(key => !Number.isInteger(value[key]) || value[key] < 0) || !Array.isArray(value.rows) || value.rows.some((row:any) => !row || typeof row.id !== 'string' || typeof row.name !== 'string' || !['online','offline','review'].includes(row.status)) || value.rows.length !== value.fieldDevices || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt)))
+  if (!value || ['totalDevices','online','offline','review','shopRoot','healthRows','fieldDevices'].some(key => !Number.isInteger(value[key]) || value[key] < 0) || !Array.isArray(value.rows) || value.rows.some((row:any) => !row || (typeof row.id !== 'string' && typeof row.id !== 'number') || typeof row.name !== 'string' || !['online','offline','review'].includes(row.status)) || value.rows.length !== value.fieldDevices || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt)))
     throw new Error('Camera Health returned an incomplete summary.');
   return value;
 }

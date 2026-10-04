@@ -112,7 +112,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     const allowed=technicians.filter(t=>!card.department||!t.department||t.department===card.department);
     const current=technician||((card.assignee!=='Unassigned'&&technicianMap.has(card.assignee))?card.assignee:'')||allowed[0]?.name||'';
     const startTime=start?.[2]||'08:00';
-    setAssignment({date:start?.[1]||today,startTime,endTime:end?.[1]===start?.[1]?end?.[2]:plusTwoHours(startTime),technician:current});
+    setAssignment({date:start?.[1]||today,startTime,endTime:end&&start&&end[1]===start[1]?end[2]:plusTwoHours(startTime),technician:current});
     setActionError('');
     setAssigning(card);
     setSelected(null);

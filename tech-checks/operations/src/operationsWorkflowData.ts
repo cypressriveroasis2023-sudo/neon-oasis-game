@@ -31,10 +31,10 @@ export function jobDepartment(job: OperationsRecord): string {
   const type = String(job.jobType || '').toUpperCase();
   return ['DELIVERY', 'SWAP'].includes(type) || type === 'SERVICE' && job.shopPrep === true ? 'it' : 'service';
 }
-export function assignmentTechnicians(team: OperationsRecord[], department: string) {
+export function assignmentTechnicians(team: OperationsRecord[], department: string): Array<OperationsRecord & { name: string; userId?: string }> {
   return team.filter(person => person.active === true && statusKey(person.department) === department &&
     typeof (person.displayName || person.name) === 'string' && String(person.displayName || person.name).trim())
-    .map(person => ({ ...person, name: String(person.displayName || person.name).trim() }))
+    .map(person => ({ ...person, userId: typeof person.userId === 'string' && person.userId.trim() ? person.userId : undefined, name: String(person.displayName || person.name).trim() }))
     .sort((a,b) => a.name.localeCompare(b.name));
 }
 export function canDispatch(job: OperationsRecord): boolean {
