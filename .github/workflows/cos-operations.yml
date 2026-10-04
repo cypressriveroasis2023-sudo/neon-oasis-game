@@ -5,12 +5,14 @@ on:
     paths:
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
       - '.github/workflows/cos-operations.yml'
   pull_request:
     paths:
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
 permissions:
   contents: write

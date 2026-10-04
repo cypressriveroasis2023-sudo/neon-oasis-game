@@ -4,13 +4,16 @@ import TodayDashboard from './TodayDashboard';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
+import ProductionAssignments from './ProductionAssignments';
+import CameraHealthWorkspace from './CameraHealthWorkspace';
+import './continuation.css';
 
 type Row = Record<string, any>;
-type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check';
-const native: NativeWorkspace[] = ['Today', 'Daily Board', 'Field Map', 'Owner Tasks', 'Jobs', 'Tech Check'];
-const routes: Record<NativeWorkspace, string> = { Today:'today', 'Daily Board':'daily-board', 'Field Map':'field-map', 'Owner Tasks':'owner-tasks', Jobs:'jobs', 'Tech Check':'tech-check' };
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health';
+const native: NativeWorkspace[] = ['Today', 'Daily Board', 'Field Map', 'Owner Tasks', 'Jobs', 'Tech Check', 'Camera Health'];
+const routes: Record<NativeWorkspace, string> = { Today:'today', 'Daily Board':'daily-board', 'Field Map':'field-map', 'Owner Tasks':'owner-tasks', Jobs:'jobs', 'Tech Check':'tech-check', 'Camera Health':'camera-health' };
 const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
-const legacy: Record<string,string> = { Vision:'vision', 'Camera Health':'camera-health' };
+const legacy: Record<string,string> = { Vision:'vision' };
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
@@ -155,7 +158,7 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
 function TechCheckWorkspace() {
   return <section className='panel module operations-tools' aria-label='Tech Check workspaces'><div className='panelhead'><h2>Tech Check</h2><span>Existing platform workspaces</span></div><div className='operations-tool-grid'><button onClick={()=>openLegacy('it')}><b>IT Tech Check</b><span>IT readiness, preparation, assignments and checks</span></button><button onClick={()=>openLegacy('service')}><b>Service Tech Check</b><span>Service readiness, field assignments and checks</span></button><button className='secondary' onClick={()=>openLegacy('team')}><b>Team / Truck Readiness</b><span>Open the existing Owner team board</span></button><button className='secondary' onClick={()=>openLegacy('accounts')}><b>Accounts & Permissions</b><span>Open the existing account controls</span></button></div></section>;
 }
-export default function App() {
+function OwnerApp() {
   const [active,setActive]=useState(currentWorkspace);
   const [session,setSession]=useState<Row|null>(null);
   const [sessionError,setSessionError]=useState('');
@@ -216,9 +219,14 @@ export default function App() {
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<JobsWorkspace openBoard={()=>navigate('Daily Board')}/>
         :active==='Tech Check'?<TechCheckWorkspace/>
+        :active==='Camera Health'?<CameraHealthWorkspace/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>
     <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>More</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
   </div>;
+}
+
+export default function App() {
+  return new URLSearchParams(location.search).get('mode') === 'production-assignments' ? <ProductionAssignments/> : <OwnerApp/>;
 }

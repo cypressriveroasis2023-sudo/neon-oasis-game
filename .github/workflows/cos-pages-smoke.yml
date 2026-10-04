@@ -5,6 +5,7 @@ on:
     paths:
       - 'tech-checks/index.html'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/operations/dist/**'
       - '.github/workflows/cos-pages-smoke.yml'
       - '.github/scripts/verify-cos-pages.mjs'

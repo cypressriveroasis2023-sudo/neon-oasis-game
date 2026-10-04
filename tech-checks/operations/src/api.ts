@@ -23,8 +23,9 @@ function requestParentToken(): Promise<string> {
       const message = event.data;
       if (!message || message.type !== 'COS_OPERATIONS_TOKEN_RESPONSE' || message.requestId !== requestId) return;
       cleanup();
-      if (message.role !== 'owner' || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
-        reject(new OperationsApiError('Your existing Owner session is unavailable. Return to Tech Check and sign in again.', 401));
+      const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
+      if (!(queueMode ? ['it','service'].includes(message.role) : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
+        reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
       } else resolve(message.accessToken);
     };
     window.addEventListener('message', receive);
@@ -40,6 +41,7 @@ function requestParentToken(): Promise<string> {
 }
 async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResponse<T>> {
   if (!/^\/api\/[a-zA-Z0-9_\-\/]+$/.test(path)) throw new OperationsApiError('This Operations request is unavailable.', 400);
+  if (new URLSearchParams(location.search).get('mode') === 'production-assignments' && (method !== 'GET' || !path.startsWith('/api/tech/'))) throw new OperationsApiError('This assignment view permits only technician record reads.', 403);
   const token = await requestParentToken();
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 30000);
@@ -68,7 +70,7 @@ export const api = {
   get: <T = any>(path: string) => request<T>('GET', path),
   post: <T = any>(path: string, body?: unknown) => request<T>('POST', path, body),
 };
-const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations']);
+const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);
 export function openLegacy(route: string) {
   if (!legacyRoutes.has(route) || window.parent === window || location.origin === 'null') return;
   window.parent.postMessage({ type: 'COS_OPERATIONS_NAVIGATE', route }, location.origin);
