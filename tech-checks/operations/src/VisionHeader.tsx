@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export const visionGroups = [
   { name: 'Today', home: 'Today', pages: ['Today', 'Daily Board', 'Owner Tasks'] },
@@ -13,6 +13,8 @@ export default function VisionHeader({ active, navigate, now, connected, checkin
 }) {
   const [options, setOptions] = useState(false);
   const group = visionGroups.find(item => item.pages.includes(active));
+  const [selectedGroup,setSelectedGroup]=useState(group?.name||'Today');
+  useEffect(()=>{if(group?.name)setSelectedGroup(group.name);},[group?.name]);
   const date = (options: Intl.DateTimeFormatOptions) => now.toLocaleString('en-US', { timeZone: 'America/Chicago', ...options });
   return <header className='vision-header'>
     <div className='vision-wordmark' aria-label='Vision by Cameras Onsite'>
@@ -23,7 +25,7 @@ export default function VisionHeader({ active, navigate, now, connected, checkin
       <div><small>CENTRAL TIME</small><time dateTime={now.toISOString()}>{date({ hour: 'numeric', minute: '2-digit' })}</time></div>
       <div><small>{date({ weekday: 'long' })} · {date({ year: 'numeric' })}</small><strong>{date({ month: 'short', day: '2-digit' })}</strong></div>
     </div>
-    <nav className='vision-primary-nav' aria-label='Vision main sections'>{visionGroups.map(item => <button key={item.name} type='button' aria-current={group?.name === item.name ? 'page' : undefined} onClick={() => navigate(item.home)}>{item.name}</button>)}</nav>
+    <nav className='vision-primary-nav' aria-label='Vision main sections'>{visionGroups.map(item => <button key={item.name} type='button' aria-current={selectedGroup === item.name ? 'page' : undefined} onClick={() => {setSelectedGroup(item.name);navigate(item.home);}}>{item.name}</button>)}</nav>
     <nav className='vision-workspace-nav' aria-label='Workspaces in this section'>{group?.pages.map(name => <button type='button' key={name} aria-current={active === name ? 'page' : undefined} onClick={() => navigate(name)}>{name === 'Equipment' ? 'Unit directory' : name === 'Unscheduled' ? 'Schedule visits' : name}</button>)}</nav>
     <p className='vision-preview-note'>Vision interface preview · existing Operations records</p>
     <div className='vision-access'><span role='status'>{connected ? 'Connected to COS Operations' : checking ? 'Verifying account…' : 'Account verification required'}</span><button type='button' aria-expanded={options} onClick={() => setOptions(value => !value)}>Options</button></div>
