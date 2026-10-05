@@ -8,6 +8,7 @@ import OwnerBoardControls from './OwnerBoardControls';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
 import VrmWorkspace from './VrmWorkspace';
+import RouterWorkspace from './RouterWorkspace';
 import OperationsJobs from './OperationsJobs';
 import OperationsCalendar from './OperationsCalendar';
 import HandoffsWorkspace from './HandoffsWorkspace';
@@ -18,9 +19,9 @@ import { QuotesWorkspace, InvoicesWorkspace, PurchasingWorkspace } from './Finan
 import './continuation.css';
 
 type Row = Record<string, any>;
-type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
-const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
-const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
+const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
+const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 const legacy: Record<string,string> = { Vision:'vision' };
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
@@ -42,6 +43,7 @@ const descriptions: Record<string,string> = {
   Billing:'Invoice records and Owner approval.',
   Purchasing:'Purchase requests, three-way matching and AP decisions.',
   'Camera Health':'Live camera status and existing diagnostics.',
+  'InHand Routers':'Router inventory, IP addresses and timestamped management-port observations.',
   'Victron VRM':'Battery, solar and power dashboards for Helios units 1–9.',
   'Tech Check':'Open the existing IT and Service workspaces using your current platform account.',
 };
@@ -160,6 +162,7 @@ function TechCheckWorkspace() {
   return <section className='panel module operations-tools' aria-label='Tech Check workspaces'><div className='panelhead'><h2>Tech Check</h2><span>Existing platform workspaces</span></div><div className='operations-tool-grid'><button onClick={()=>openLegacy('it')}><b>IT Tech Check</b><span>IT readiness, preparation, assignments and checks</span></button><button onClick={()=>openLegacy('service')}><b>Service Tech Check</b><span>Service readiness, field assignments and checks</span></button><button className='secondary' onClick={()=>openLegacy('team')}><b>Team / Truck Readiness</b><span>Open the existing Owner team board</span></button><button className='secondary' onClick={()=>openLegacy('accounts')}><b>Accounts & Permissions</b><span>Open the existing account controls</span></button></div></section>;
 }
 function OwnerApp() {
+  const [mapUnitId, setMapUnitId] = useState('');
   // One owner app link; CSS follows the live iframe viewport on every device.
   // The standard workspace opens by default; VISION is an explicit optional view.
   const [vision,setVision]=useState(()=>new URLSearchParams(location.search).get('theme')==='vision');
@@ -225,7 +228,7 @@ function OwnerApp() {
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
         :active==='Today'?<TodayDashboard setActive={navigate} vision={vision}/>
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
-        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show}/></section>
+        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={mapUnitId} openWorkspace={navigate}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show}/>
@@ -241,6 +244,7 @@ function OwnerApp() {
         :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?<TechCheckWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
+        :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Field Map');}}/>
         :active==='Victron VRM'?<VrmWorkspace/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>

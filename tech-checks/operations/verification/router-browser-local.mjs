@@ -1,0 +1,18 @@
+import {createServer} from 'node:http';import {readFile} from 'node:fs/promises';import {join,extname} from 'node:path';import {chromium} from 'playwright';import assert from 'node:assert/strict';import {mountRouterFixture} from '../tests/fixtures/routers.mjs';
+const origin='http://127.0.0.1:4197';
+const server=createServer(async(req,res)=>{try{const path=new URL(req.url,origin).pathname;const bytes=await readFile(join(process.cwd(),'dist',path==='/'?'index.html':path));res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml'})[extname(path)]||'text/html');res.end(bytes);}catch{res.writeHead(404);res.end();}});await new Promise(resolve=>server.listen(4197,'127.0.0.1',resolve));
+const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+try{for(const width of [390,1024,1440]){
+ const page=await browser.newPage({viewport:{width,height:900}});const {frame,state}=await mountRouterFixture(page,{origin});
+ await frame.getByLabel('InHand router overview').waitFor({timeout:15000});await frame.getByText('View routers & IPs',{exact:true}).click();await frame.getByText('Router inventory & reachability',{exact:true}).waitFor();
+ const records=frame.getByLabel('Router records',{exact:true});assert.equal(await records.getByRole('button').count(),4);
+ await frame.getByLabel('Search routers').fill('192.0.2.3');assert.equal(await records.getByRole('button').count(),1);assert.match(await frame.getByLabel('Selected router details').textContent(),/This name is duplicated/);
+ await frame.getByLabel('Search routers').fill('');await frame.getByLabel('Router status filter').selectOption('stale');assert.match(await records.textContent(),/SS 039/);assert.equal(await records.getByRole('button').count(),1);
+ await frame.getByLabel('Router status filter').selectOption('reachable');assert.match(await frame.getByLabel('Selected router details').textContent(),/192.0.2.1/);
+ await page.screenshot({path:'/tmp/cos-router-'+width+'.png',fullPage:true});
+ await frame.getByRole('button',{name:'View same-name COS unit'}).click({timeout:10000});await frame.getByLabel('Router context for selected unit').getByText('Same-name match only.',{exact:false}).waitFor();assert.equal(await frame.locator('.cos-field-pin').count(),1);assert.equal(await frame.getByLabel('Latitude',{exact:true}).inputValue(),'30');
+ const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));assert.ok(size.content<=size.width,JSON.stringify(size));
+ assert.ok(state.requests.every(r=>r.method==='GET'));console.log('PASS responsive router/map workflow '+width);await page.close();
+ }
+ const page=await browser.newPage();const {frame,state}=await mountRouterFixture(page,{origin,fail:true,gps:false});await frame.getByLabel('InHand router overview').getByRole('alert').waitFor();assert.deepEqual(await frame.locator('.router-metrics b').allTextContents(),['—','—','—','—']);state.fail=false;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();await frame.getByLabel('InHand router overview').getByText('4',{exact:true}).waitFor();await frame.getByRole('button',{name:'Open location map'}).click();await frame.getByLabel('Router context for selected unit').getByText('No router GPS.',{exact:false}).waitFor();assert.equal(await frame.locator('.cos-field-pin').count(),0);assert.equal(await frame.getByLabel('Latitude',{exact:true}).inputValue(),'');console.log('PASS source failure retry and no GPS remains unpinned');await page.close();
+}catch(error){console.error(error);process.exitCode=1;}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { RouterOverview } from './RouterWorkspace';
 import { dashboardSources, loadTodayDashboard, summarizeTodayDashboard, type DashboardData } from './todayDashboardData';
 
 type Props = { setActive: (workspace: string) => void; vision?: boolean };
@@ -38,6 +39,7 @@ export default function LiveTodayDashboard({ setActive, vision = false }: Props)
     <h1>Today</h1><p>The decisions that need you next</p>
     <button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : 'Refresh Today'}</button>
     {failed.length > 0 && <section className='operations-error' role='alert'><h2>Some information is unavailable</h2><p>Missing information is not zero. Available work is shown below.</p>{failed.map(([key]) => <p key={key}>{data.errors[key]}</p>)}</section>}
+    <RouterOverview openWorkspace={setActive}/>
     <section className='panel vision-decisions'><h2>Needs your decision</h2>
       {summary.unscheduled !== null && summary.unscheduled > 0 && <article><h3>{summary.unscheduled} {summary.unscheduled === 1 ? 'job' : 'jobs'} ready to schedule</h3><p>Choose a technician and visit window.</p><button onClick={() => setActive('Unscheduled')}>Schedule visits</button></article>}
       {groups.filter(group => group.count > 0).map(group => <article key={group.title}><h3>{group.title} · {group.count}</h3><p>{group.message}</p><button onClick={() => setActive(group.workspace)}>Review {group.title.toLowerCase()}</button></article>)}
@@ -64,6 +66,7 @@ export default function LiveTodayDashboard({ setActive, vision = false }: Props)
       <article><span>UNSCHEDULED</span><b>{metric(summary.unscheduled)}</b><i>{summary.unscheduled === null ? 'Unavailable' : 'Ready to schedule'}</i></article>
       <article><span>NEEDS ATTENTION</span><b>{metric(summary.attention)}</b><i>{summary.attention === null ? 'Review total unverified' : 'Owner + financial review items'}</i></article>
     </section>
+    <RouterOverview openWorkspace={setActive}/>
     <section className='grid'>
       <article className='panel'>
         <div className='panelhead'><h2>Operational Timeline</h2><span>{data.jobs === null ? 'Unavailable' : loading ? 'Refreshing' : 'Live jobs'}</span></div>

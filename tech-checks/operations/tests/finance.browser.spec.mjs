@@ -36,7 +36,8 @@ async function start(page) {
     state.requests.push(envelope);
     if (state.failed.has(path)) return route.fulfill({ status: 503, contentType: 'application/json', headers, body: JSON.stringify({ error: 'Synthetic financial source unavailable' }) });
     let data;
-    if (method === 'GET' && path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
+    if (method === 'GET' && path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+    else if (method === 'GET' && path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
     else if (method === 'GET' && ['/api/jobs', '/api/owner-tasks'].includes(path)) data = { items: [] };
     else {
       const kind = Object.keys(paths).find(key => path === paths[key] || path.startsWith(paths[key] + '/'));

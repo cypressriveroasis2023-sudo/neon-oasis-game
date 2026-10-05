@@ -40,7 +40,7 @@ async function mount(page, { vision = false } = {}) {
     const request = route.request().postDataJSON();
     requests.push(request);
     expect(request.method).toBe('GET');
-    const data = request.path === '/api/session' ? { authorized:true, name:'Fixture owner', role:'Owner' } : { items:[] };
+    const data = request.path === '/api/routers' ? { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() } : request.path === '/api/session' ? { authorized:true, name:'Fixture owner', role:'Owner' } : { items:[] };
     return route.fulfill({ headers, contentType:'application/json', body:JSON.stringify(data) });
   });
   await page.goto(appPath);

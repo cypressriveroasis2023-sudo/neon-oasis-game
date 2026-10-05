@@ -33,7 +33,8 @@ async function setup(page){
     if(state.failed.has(path))return route.fulfill({status:503,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:JSON.stringify({error:'Fixture source unavailable'})});
     let data;
     if(method==='GET'){
-      if(path==='/api/session')data={authorized:true,name:'Fixture Owner',role:'Owner'};
+      if(path==='/api/routers')data={ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+      else if(path==='/api/session')data={authorized:true,name:'Fixture Owner',role:'Owner'};
       else if(path==='/api/customers')data={items:state.mismatch?state.customers.map(row=>({...row,notes:'Old note'})):state.customers};
       else if(path==='/api/sites')data={items:state.sites};
       else if(path==='/api/equipment')data={items:state.units,models:state.models};

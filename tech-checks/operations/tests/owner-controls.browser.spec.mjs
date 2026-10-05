@@ -20,6 +20,7 @@ async function mount(page,workspace='daily-board'){
   if(method==='GET'){
    if(state.readGate&&['/api/jobs','/api/owner/control-data','/api/owner-tasks'].includes(path))await state.readGate;
    if(state.failRead&&['/api/jobs','/api/owner/control-data'].includes(path))return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic refresh unavailable'})});
+   if(path==='/api/routers')return answer({ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() });
    if(path==='/api/session')return answer({authorized:true,name:'Fixture Owner',role:'Owner'});
    if(path==='/api/jobs')return answer({items:state.jobs});
    if(path==='/api/owner/control-data')return answer(state.control);
