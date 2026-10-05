@@ -189,8 +189,10 @@ function OwnerApp() {
   const navigate=useCallback((name:string)=>{
     setMenu(false);
     if(legacy[name]){openLegacy(legacy[name]);return;}
-    setActive(name);
-    location.hash=slug(name);
+    const next=native.includes(name as NativeWorkspace)?name:'Today';
+    setActive(next);
+    const nextHash=slug(next);
+    if(location.hash.slice(1)!==nextHash) history.replaceState(null,'','#'+nextHash);
     window.scrollTo({top:0,behavior:'instant'});
   },[]);
   const authorized=session?.authorized===true;
