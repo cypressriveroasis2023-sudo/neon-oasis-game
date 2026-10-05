@@ -24,7 +24,7 @@ const parentHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8')
   </script><script type="module" src="./operations-host.js"></script></body>`);
 const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.svg':'image/svg+xml', '.jpeg':'image/jpeg', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp' };
 
-async function mount(page) {
+async function mount(page, { vision = false } = {}) {
   const requests = [];
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
@@ -45,6 +45,7 @@ async function mount(page) {
   });
   await page.goto(appPath);
   await expect(page.locator('#cosOperationsFrame')).toBeVisible();
+  if (vision) await page.frameLocator('#cosOperationsFrame').getByRole('button', { name:'Use Vision layout' }).click();
   return { frame:page.frameLocator('#cosOperationsFrame'), requests };
 }
 
@@ -82,19 +83,28 @@ async function responsiveLayout(page, frame) {
 
 test('the same app link gives the embedded Operations app the full device viewport', async ({ page }, testInfo) => {
   const { frame, requests } = await mount(page);
-  await responsiveLayout(page, frame);
-  await expect(frame.getByRole('button', { name:'Use Vision layout' })).toHaveCount(0);
+  const standardLayout = async () => {
+    await expect(frame.getByRole('button', { name:'Use Vision layout' })).toBeVisible();
+    await expect(frame.getByRole('navigation', { name:'Vision main sections' })).toHaveCount(0);
+    await fillsViewport(page);
+    const desktop = page.viewportSize().width > 700;
+    const sidebar = frame.getByRole('complementary', { name:'Operations navigation' });
+    const mobileNav = frame.getByRole('navigation', { name:'Mobile Operations navigation' });
+    if (desktop) { await expect(sidebar).toBeVisible(); await expect(mobileNav).toBeHidden(); }
+    else { await expect(sidebar).toBeHidden(); await expect(mobileNav).toBeVisible(); }
+  };
+  await standardLayout();
   await page.screenshot({ path:testInfo.outputPath('actual-parent.png'), fullPage:true });
-  await testInfo.attach('Actual Tech Check parent and responsive VISION', { path:testInfo.outputPath('actual-parent.png'), contentType:'image/png' });
+  await testInfo.attach('Default responsive Operations', { path:testInfo.outputPath('actual-parent.png'), contentType:'image/png' });
   await page.reload();
-  await responsiveLayout(page, frame);
+  await standardLayout();
   expect(new URL(page.url()).pathname).toBe(appPath);
   expect(new URL(page.url()).search).toBe('');
   expect(requests.every(request => request.method === 'GET')).toBe(true);
 });
 
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
-  const { frame } = await mount(page);
+  const { frame } = await mount(page, { vision:true });
   await frame.getByRole('navigation', { name:'Vision main sections' }).getByRole('button', { name:'Jobs', exact:true }).click();
   const search = frame.getByRole('searchbox', { name:'Find a job' });
   await search.fill('keep this filter');
@@ -108,8 +118,8 @@ test('rotation and desktop resizing preserve the same frame, route and in-progre
   }
 });
 
-test('explicit Classic rollback preserves the route and can restore automatic VISION', async ({ page }) => {
-  const { frame } = await mount(page);
+test('optional VISION preserves the route and can return to the standard workspace', async ({ page }) => {
+  const { frame } = await mount(page, { vision:true });
   await frame.getByRole('navigation', { name:'Vision main sections' }).getByRole('button', { name:'Jobs', exact:true }).click();
   await frame.getByRole('button', { name:'Options', exact:true }).click();
   await frame.getByRole('button', { name:'Use classic layout' }).click();
@@ -120,11 +130,11 @@ test('explicit Classic rollback preserves the route and can restore automatic VI
   await frame.getByRole('button', { name:'Use Vision layout' }).click();
   await responsiveLayout(page, frame);
   expect(await frame.locator('body').evaluate(() => location.hash)).toBe('#jobs');
-  expect(await frame.locator('body').evaluate(() => new URLSearchParams(location.search).has('theme'))).toBe(false);
+  expect(await frame.locator('body').evaluate(() => new URLSearchParams(location.search).get('theme'))).toBe('vision');
 });
 
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
-  const { frame } = await mount(page);
+  const { frame } = await mount(page, { vision:true });
   await frame.getByRole('button', { name:'Options', exact:true }).click();
   await frame.getByRole('button', { name:'All existing tools' }).click();
   await frame.getByRole('button', { name:'Existing Owner Tools', exact:true }).click();
