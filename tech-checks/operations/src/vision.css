@@ -164,3 +164,18 @@
  .operations-shell.vision-shell .vision-workspace-nav button{min-height:24px!important;padding:2px 7px!important;font-size:8px!important;border-radius:999px!important}
  .vision-access{margin-top:3px!important}
 }
+
+
+/* Desktop VISION command-center composition. */
+@media(min-width:901px){
+ .vision-shell>.owner-it-main{max-width:1280px!important;padding:24px 32px 48px!important}
+ .vision-shell .vision-header{display:grid!important;grid-template-columns:minmax(260px,.8fr) minmax(420px,1.25fr) minmax(220px,.7fr)!important;grid-template-areas:"brand clock access" "primary primary primary" "workspace workspace workspace"!important;align-items:center!important;column-gap:24px!important;row-gap:10px!important;padding:18px 24px!important;margin-bottom:18px!important}
+ .vision-wordmark{grid-area:brand!important;text-align:left!important}.vision-wordmark>div{justify-content:flex-start!important;font-size:40px!important;letter-spacing:.18em!important}.vision-letter-eye{width:48px!important;height:48px!important;flex-basis:48px!important}.vision-wordmark p{margin:10px 0 0 4px!important;font-size:9px!important;letter-spacing:.35em!important}.vision-wordmark p:before{left:0!important;right:0!important}
+ .vision-clock{grid-area:clock!important;width:100%!important;max-width:560px!important;margin:0 auto!important;padding:9px 0!important}.vision-clock time,.vision-clock strong{font-size:24px!important}.vision-clock small{font-size:9px!important}
+ .vision-access{grid-area:access!important;justify-content:flex-end!important;margin:0!important}.vision-access span{font-size:10px!important;white-space:nowrap}
+ .vision-primary-nav{grid-area:primary!important;width:min(100%,760px)!important;max-width:760px!important;margin:2px auto 0!important;gap:7px!important}.operations-shell.vision-shell .vision-primary-nav button{min-height:34px!important;padding:5px 12px!important;font-size:11px!important;border-radius:9px!important}
+ .vision-workspace-nav{grid-area:workspace!important;margin:0 auto!important;gap:5px!important;max-width:980px!important}.operations-shell.vision-shell .vision-workspace-nav button{min-height:28px!important;padding:4px 10px!important;font-size:10px!important}
+ .vision-preview-note{display:none!important}
+ .vision-options{position:absolute!important;right:24px!important;top:78px!important;width:260px!important;z-index:20!important;text-align:left!important}
+ .vision-shell .command-page-header{padding:12px 0 8px!important}.vision-shell .command-page-header h1{font-size:28px!important}
+}
