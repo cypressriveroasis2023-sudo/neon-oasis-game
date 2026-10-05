@@ -38,7 +38,10 @@ test('technician queue loads real-shaped assignments/details on desktop and mobi
   await expect(frame.getByRole('region',{name:'Assigned visit details'})).toBeVisible();
   await expect(frame.getByText('Inspect physical unit',{exact:true})).toBeVisible();
   await frame.getByRole('button',{name:'Close visit details'}).click();
+  const queueFrame=page.frames().find(f=>f.url().includes('mode=production-assignments'));
+  const reloaded=page.waitForEvent('framenavigated',f=>f===queueFrame);
   await page.locator('#queue').evaluate(frame=>{frame.src=frame.src;});
+  await reloaded;
   await expect(frame.getByRole('button',{name:/FIX-501/})).toBeVisible();
   expect(state.requests.every(request=>request.method==='GET'&&request.path.startsWith('/api/tech/'))).toBe(true);
   const overflow=await page.frames().find(f=>f.url().includes('mode=production-assignments')).evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);

@@ -76,13 +76,16 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
   const [jobs,setJobs]=useState<Row[]>([]);
   const [optionsError,setOptionsError]=useState('');
   const running=useRef(false);
+  const activeTaskReads=useRef(0);
   const revision=useRef(0);
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(fromSave=false)=>{
+    if(running.current&&!fromSave)return null;
+    activeTaskReads.current++;
     const request=++revision.current;
     setLoading(true);
     try { const rows=collection((await api.get('/api/owner-tasks')).data); if(request===revision.current){setItems(rows);setError('');setNeedsRefresh(false);} return rows; }
     catch(cause){if(request===revision.current)setError(errorMessage(cause,'Owner Tasks could not be loaded.'));return null;}
-    finally{if(request===revision.current)setLoading(false);}
+    finally{activeTaskReads.current--;if(request===revision.current)setLoading(false);}
   },[]);
   useEffect(()=>{
     void refresh();
@@ -101,27 +104,27 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
   },[refresh]);
   const edit=(row:Row)=>setDraft({
     id:String(row.id),title:String(row.title||''),instructions:String(row.instructions||''),priority:String(row.priority||'medium'),
-    assignedUserId:String(row.assignedUserId||''),assignedDepartment:String(row.assignedDepartment||'it'),
+    assignedUserId:String(row.assignedUserId||''),assignedDepartment:row.assignedUserId?'':String(row.assignedDepartment||'it'),
     relatedJobId:String(row.relatedJobId||''),relatedSiteId:String(row.relatedSiteId||''),dueAt:row.dueAt?localInput(String(row.dueAt)):'',ownerNotes:String(row.ownerNotes||''),
   });
   const save=async()=>{
-    if(running.current||!draft||needsRefresh)return;
+    if(running.current||activeTaskReads.current>0||!draft||needsRefresh)return;
     if(!draft.title.trim()){setError('Task title is required.');return;}
     if(!draft.assignedUserId&&!['it','service'].includes(draft.assignedDepartment)){setError('Select an IT or Service department.');return;}
     const parsedDue=draft.dueAt?new Date(draft.dueAt):null;
     if(parsedDue&&!Number.isFinite(parsedDue.getTime())){setError('Enter a valid due date and time.');return;}
     const dueAt=parsedDue?parsedDue.toISOString():null;
-    const payload={...draft,title:draft.title.trim(),instructions:draft.instructions.trim(),ownerNotes:draft.ownerNotes.trim(),dueAt};
+    const payload={...draft,assignedDepartment:draft.assignedUserId?'':draft.assignedDepartment,title:draft.title.trim(),instructions:draft.instructions.trim(),ownerNotes:draft.ownerNotes.trim(),dueAt};
     const previousIds=new Set((items||[]).map(row=>row.id));
     running.current=true;setSaving(true);setError('');setNotice('');
     let accepted=false;
     try {
       const response=await api.post('/api/owner-tasks',payload);
       accepted=true;setDraft(null);
-      const fresh=await refresh();
+      const fresh=await refresh(true);
       const savedId=response.data?.id||response.data?.taskId||response.data?.task_id||draft.id;
       const candidates=(fresh||[]).filter(row=>savedId?row.id===savedId:!previousIds.has(row.id));
-      const confirmed=candidates.length===1&&candidates[0].title===payload.title&&String(candidates[0].instructions||'').trim()===payload.instructions&&candidates[0].priority===payload.priority&&(!payload.assignedUserId?String(candidates[0].assignedDepartment||'')===payload.assignedDepartment:String(candidates[0].assignedUserId||'')===payload.assignedUserId)&&(!dueAt?!candidates[0].dueAt:Date.parse(candidates[0].dueAt)===Date.parse(dueAt));
+      const confirmed=candidates.length===1&&candidates[0].title===payload.title&&String(candidates[0].instructions||'').trim()===payload.instructions&&candidates[0].priority===payload.priority&&String(candidates[0].assignedUserId||'')===payload.assignedUserId&&String(candidates[0].assignedDepartment||'')===payload.assignedDepartment&&String(candidates[0].relatedJobId||'')===payload.relatedJobId&&String(candidates[0].relatedSiteId||'')===payload.relatedSiteId&&String(candidates[0].ownerNotes||'').trim()===payload.ownerNotes&&(!dueAt?!candidates[0].dueAt:Date.parse(candidates[0].dueAt)===Date.parse(dueAt));
       if(!confirmed){setNeedsRefresh(true);setError('Save accepted, but the task could not be verified. Refresh Owner Tasks before saving again.');return;}
       setNotice('Owner Task saved and verified.');show('Owner Task saved and verified.');
       window.dispatchEvent(new Event('cos-board-updated'));
@@ -134,9 +137,9 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
   const open=(items||[]).filter(row=>!['complete','cancelled'].includes(row.status));
   return <section className='panel module owner-task-workspace' aria-label='Owner Tasks'>
     <div className='panelhead'><h2>Owner Tasks</h2><button className='secondary' disabled={loading||saving} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tasks'}</button></div>
-    <div className='purchase-actions'><button disabled={saving||needsRefresh} onClick={()=>{setDraft(emptyTask());setError('');}}>+ New Owner Task</button><span>{items?open.length+' open · '+open.filter(row=>row.priority==='high').length+' high priority':'Task counts unavailable'}</span></div>
+    <div className='purchase-actions'><button disabled={saving||loading||needsRefresh} onClick={()=>{setDraft(emptyTask());setError('');}}>+ New Owner Task</button><span>{items?open.length+' open · '+open.filter(row=>row.priority==='high').length+' high priority':'Task counts unavailable'}</span></div>
     {error&&<div className='operations-error' role='alert'>{error}</div>}{notice&&<p className='operations-notice' role='status'>{notice}</p>}
-    {draft&&<section className='quote-card directory-editor'><div className='quote-section-head'><div><h3>{draft.id?'Edit':'New'} Owner Task</h3><small>Assigned work remains auditable after completion.</small></div><div><button className='secondary' disabled={saving} onClick={()=>setDraft(null)}>Cancel</button><button disabled={saving||needsRefresh} onClick={()=>void save()}>{saving?'Saving…':'Save task'}</button></div></div>
+    {draft&&<section className='quote-card directory-editor'><div className='quote-section-head'><div><h3>{draft.id?'Edit':'New'} Owner Task</h3><small>Assigned work remains auditable after completion.</small></div><div><button className='secondary' disabled={saving} onClick={()=>setDraft(null)}>Cancel</button><button disabled={saving||loading||needsRefresh} onClick={()=>void save()}>{saving?'Saving…':'Save task'}</button></div></div>
       {optionsError&&<p role='status'>{optionsError}</p>}
       <div className='quote-detail-grid'>
         <label>Task Title *<input disabled={saving} value={draft.title} onChange={event=>set('title',event.target.value)}/></label>
@@ -193,10 +196,10 @@ function OwnerApp() {
   const navigate=useCallback((name:string)=>{
     setMenu(false);
     if(legacy[name]){openLegacy(legacy[name]);return;}
-    const next=native.includes(name as NativeWorkspace)?name:'Today';
+    const next=nav.includes(name)?name:'Today';
     setActive(next);
     const nextHash=slug(next);
-    if(location.hash.slice(1)!==nextHash) history.replaceState(null,'','#'+nextHash);
+    if(location.hash.slice(1)!==nextHash){window.dispatchEvent(new Event('cos-workspace-navigation'));history.pushState(null,'','#'+nextHash);}
     window.scrollTo({top:0,behavior:'instant'});
   },[]);
   const authorized=session?.authorized===true;
@@ -224,10 +227,10 @@ function OwnerApp() {
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
-        :active==='Jobs'?<OperationsJobs mode='jobs' show={show}/>
-        :active==='Unscheduled'?<OperationsJobs mode='unscheduled' show={show}/>
-        :active==='Dispatch'?<OperationsJobs mode='dispatch' show={show}/>
-        :active==='Owner Review'?<OperationsJobs mode='review' show={show}/>
+        :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show}/>
+        :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show}/>
+        :active==='Dispatch'?<OperationsJobs key='dispatch' mode='dispatch' show={show}/>
+        :active==='Owner Review'?<OperationsJobs key='review' mode='review' show={show}/>
         :active==='Calendar'?<OperationsCalendar show={show}/>
         :active==='Handoffs'?<HandoffsWorkspace show={show}/>
         :active==='Customers'||active==='Sites'?<DirectoryWorkspace kind={active} show={show}/>
@@ -239,7 +242,7 @@ function OwnerApp() {
         :active==='Tech Check'?<TechCheckWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
         :active==='Victron VRM'?<VrmWorkspace/>
-        :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
+        :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>
     <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>More</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}

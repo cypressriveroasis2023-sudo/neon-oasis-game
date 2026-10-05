@@ -115,6 +115,15 @@ test('uncertain assignment write is not replayed and is never reported as confir
   assert.equal(result.status, 'unconfirmed');
   assert.match(result.message, /Refresh the board/);
   assert.equal(writes, 1); assert.equal(reads, 0); assert.equal(saver.busy, false);
+  assert.equal(saver.needsRefresh, true);
+  assert.deepEqual(await saver.save('/api/jobs/' + id + '/schedule', {}, expectation), { status: 'refresh_required' });
+  assert.throws(() => saver.acknowledgeRefresh({}), /incomplete response/);
+  assert.equal(saver.needsRefresh, true);
+  assert.equal(writes, 1);
+  saver.acknowledgeRefresh(board([job]));
+  assert.equal(saver.needsRefresh, false);
+  await saver.save('/api/jobs/' + id + '/schedule', {}, expectation);
+  assert.equal(writes, 2);
 });
 
 test('accepted assignment with failed or mismatched readback remains accepted but unverified', async t => {
@@ -124,6 +133,9 @@ test('accepted assignment with failed or mismatched readback remains accepted bu
       const saver = createBoardAssignmentSaver({ post: async () => { writes++; } }, readFresh);
       const result = await saver.save('/api/jobs/' + id + '/schedule', {}, expectation);
       assert.equal(result.status, 'accepted_unverified'); assert.equal(writes, 1); assert.equal(saver.busy, false);
+      assert.equal(saver.needsRefresh, true);
+      assert.deepEqual(await saver.save('/api/jobs/' + id + '/schedule', {}, expectation), { status: 'refresh_required' });
+      assert.equal(writes, 1);
     });
   }
 });
@@ -198,7 +210,9 @@ test('owner GPS sends one write, verifies persisted coordinates and rejects conc
   const saver = createGpsSaver({ post: async (path, body) => { writes++; assert.equal(path, '/api/field-map/' + unitId + '/gps'); assert.deepEqual(body, gps); await gate.promise; return { data: { id: unitId, ...gps, recordedAt: stamp } }; }, get: async () => { reads++; return { data: fieldSnapshot() }; } });
   const pending = saver.owner(unitId, gps);
   await assert.rejects(saver.owner(unitId, gps), /already in progress/);
-  assert.equal(writes, 1); gate.resolve();
+  assert.equal(writes, 1);
+  saver.acknowledgeRefresh(fieldSnapshot());
+  gate.resolve();
   assert.equal((await pending).items[0].id, unitId);
   assert.equal(reads, 1); assert.equal(writes, 1);
 });
@@ -215,6 +229,15 @@ test('owner GPS never retries writes when outcome or readback is uncertain', asy
     const saver = createGpsSaver({ ...variant, post: async (...args) => { writes++; return variant.post(...args); } });
     await assert.rejects(saver.owner(unitId, gps), error => error instanceof GpsSaveUnverifiedError && error.mayHaveSaved === true);
     assert.equal(writes, 1);
+    assert.equal(saver.needsRefresh, true);
+    await assert.rejects(saver.owner(unitId, gps), /Refresh the Field Map/);
+    assert.equal(writes, 1);
+    assert.throws(() => saver.acknowledgeRefresh({}), /incomplete response/);
+    assert.equal(saver.needsRefresh, true);
+    saver.acknowledgeRefresh(fieldSnapshot());
+    assert.equal(saver.needsRefresh, false);
+    await assert.rejects(saver.owner(unitId, gps), GpsSaveUnverifiedError);
+    assert.equal(writes, 2);
   });
 });
 
@@ -224,6 +247,7 @@ test('invalid owner GPS is rejected before the API is called', async () => {
   await assert.rejects(saver.owner('not-a-uuid', gps), /valid unit/);
   await assert.rejects(saver.owner(unitId, { ...gps, latitude: 91 }), /between/);
   assert.equal(writes, 0);
+  assert.equal(saver.needsRefresh, false);
 });
 
 test('technician GPS confirms assigned job and visit and never accepts another visit readback', async () => {

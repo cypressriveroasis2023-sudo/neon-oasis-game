@@ -1,0 +1,224 @@
+{
+  "auditDate": "2026-10-05",
+  "productionUrl": "https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/tech-checks/",
+  "liveBaselineSha": "470749fcb7d19e15f9982d2d0c0bdd1d133546b7",
+  "conclusion": "Partial end-to-end verification with concrete fixes; not a 100 percent production certification.",
+  "safety": {
+    "productionRecordMutations": false,
+    "financialTransactions": false,
+    "externalCommunications": false,
+    "permissionOrIdentityChanges": false,
+    "syntheticMutations": "Every browser fixture intercepts or blocks external requests; no production mutation is sent."
+  },
+  "nativeModules": [
+    {
+      "name": "Today",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Dashboard sources, partial-source errors and navigation"
+    },
+    {
+      "name": "Daily Board",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Filters, scheduling/assignment, owner controls and uncertain-save recovery"
+    },
+    {
+      "name": "Field Map",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "GPS validation, save/readback, failures, explicit refresh and reload"
+    },
+    {
+      "name": "Owner Tasks",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Create/edit/cancel, assignments, related job/site/notes, stale readback and refresh/save exclusion"
+    },
+    {
+      "name": "Jobs",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "List/filter, close/delete, typed confirmation, cancellation and Back/Forward"
+    },
+    {
+      "name": "Unscheduled",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Department-correct scheduling and persisted assignment"
+    },
+    {
+      "name": "Dispatch",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "One write, independent readback and failure/recovery guards"
+    },
+    {
+      "name": "Owner Review",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Correction and preserved evidence; boolean attention warnings"
+    },
+    {
+      "name": "Calendar",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Month/week/year scheduled-record views"
+    },
+    {
+      "name": "Handoffs",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Routing snapshot and failed refresh without false empty state"
+    },
+    {
+      "name": "Camera Health",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Summary contracts; live summary read only"
+    },
+    {
+      "name": "Customers",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Editor validation, save, independent readback and reload"
+    },
+    {
+      "name": "Sites",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Editor validation, save, independent readback and reload"
+    },
+    {
+      "name": "Equipment",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Creation, placement, save verification and reload"
+    },
+    {
+      "name": "Team",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Exact technician UUID, renamed/colliding names and terminal-job exclusions"
+    },
+    {
+      "name": "Quotes",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Details, review/return and list/detail readback"
+    },
+    {
+      "name": "Invoices",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Review/issue and list/detail readback"
+    },
+    {
+      "name": "Billing",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Alias of native invoice review"
+    },
+    {
+      "name": "Purchasing",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "PO/AP review and list/detail readback"
+    },
+    {
+      "name": "Tech Check",
+      "liveOwnerRead": "passed at baseline",
+      "coverage": "Launcher; actual owner-to-legacy entry and return read checks only"
+    },
+    {
+      "name": "Victron VRM",
+      "liveOwnerRead": "passed after concurrent PR16 on 91bdf78",
+      "coverage": "All nine installation selectors and disabled-sharing/authorized-embed/error browser regressions; no sharing or account settings changed"
+    }
+  ],
+  "externalModules": [
+    "CRM",
+    "Work Requests",
+    "Accounting",
+    "Collections",
+    "Payments",
+    "Needs Attention",
+    "History",
+    "Reports",
+    "Activity"
+  ],
+  "externalBoundary": "Navigation now reaches explicit AppDeploy handoff; external site is reachable but requires its separate sign-in. Financial builders, receipt/payment posting, documents and email remain there.",
+  "roles": {
+    "linkedOwner": "Real sign-in, reload and read-only module navigation verified at baseline. Native mutation coverage is synthetic.",
+    "fourLinkedTechnicians": "Native read-only assignments/tasks/details; synthetic access isolation, revocation and logout/account-switch coverage. No real technician session or technician evidence/completion certification.",
+    "otherOwnersAndRoles": "Existing legacy tools remain; no new native platform linkage or permissions added."
+  },
+  "fixedAreas": [
+    "Nine external module buttons returning to Today",
+    "Workspace Back/Forward and modal lifecycle cancellation",
+    "Owner mutation false-success reports and uncertainty/repeated-submit protection",
+    "Board and owner GPS uncertainty/retry protection",
+    "Job action uncertainty/retry protection",
+    "Task related fields and individual-versus-department assignment readback",
+    "Task and owner refresh/save overlap",
+    "Nested truck shortage/override details",
+    "Team detail UUID identity mismatch",
+    "Owner Review boolean Needs Attention warning",
+    "Dispatch technician-department instructions"
+  ],
+  "verification": {
+    "nodeTests": {
+      "passed": 209,
+      "failed": 0,
+      "includesLiveAnonymousCorsChecks": 3
+    },
+    "browserTests": {
+      "passed": 141,
+      "failed": 0,
+      "projects": [
+        390,
+        1024,
+        1440
+      ]
+    },
+    "typecheck": "passed",
+    "build": "passed",
+    "browserScope": "Chromium at 390x844, 1024x900 and 1440x900; responsive tests additionally resize through 320\u20131920 px. Real iOS Safari and hardware/location/camera behavior are not certified.",
+    "runner": "Standard GitHub Actions Playwright suite is authoritative. Local direct runner uses unchanged spec assertions, isolated fixtures and a local static server because CLI discovery stalls in this executor.",
+    "liveReadScope": "20 native module read views on 470749f under real Owner session, sign-in, reload, detail open/cancel and legacy return; additional Victron VRM owner read passed after concurrent PR16 on 91bdf78. All before this candidate deployment.",
+    "developmentStrictMode": {
+      "passed": 3,
+      "failed": 0,
+      "scope": "Owner creation initialization and synthetic save/reload"
+    },
+    "technicianPreservation": "passed against f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3",
+    "finalLocalVerificationUtc": "2026-10-05T16:00:47Z"
+  },
+  "openBoundaries": [
+    {
+      "area": "IT override to billing",
+      "status": "Deployed function logic cancels overridden IT execution while billing requires every execution completed. Isolated backend validation/migration review is separate; no production SQL changed. No currently cancelled workflows found in read-only aggregate."
+    },
+    {
+      "area": "Return-for-correction workflow restart",
+      "status": "Read-only deployed function inspection indicates that return-for-correction preserves a completed execution, redispatch reuses it, and workflow start requires not_started. Fresh technician correction execution requires separate backend validation and repair; no production SQL changed here."
+    },
+    {
+      "area": "Manual job creation readback",
+      "status": "Existing jobs snapshot exposes identity/type/current visit but omits submitted title, description, priority and site IDs. UI now says the new job was found in current records, not that every submitted field was independently verified."
+    },
+    {
+      "area": "Legacy Service owner preview",
+      "status": "Live Owner-to-Service dashboard readiness remains Checking today with a refresh error. Actual technician sessions were not tested; do not extrapolate technician-wide failure."
+    },
+    {
+      "area": "Evidence links",
+      "status": "Some native photo/signature paths are relative storage paths and do not yield usable absolute file links. UI preserves evidence presence instead of inventing a file URL; backend-supported file delivery remains separate."
+    },
+    {
+      "area": "Whole-parent reload",
+      "status": "Existing session survives, but whole parent reload returns embedded Operations to Today. Child reload and Back/Forward preserve workspace."
+    },
+    {
+      "area": "Full operational journey",
+      "status": "Owner create to real technician completion/evidence to handoff to review to billing was not mutated in production. Native technician completion remains an AppDeploy workflow, separate from legacy Tech Check records."
+    },
+    {
+      "area": "Deletion and recovery",
+      "status": "Synthetic permanent deletion requires exact typed confirmation and backend receipt plus fresh-list absence. Production dependency guards remain. There is no native undo for permanent deletion; closure preserves history."
+    }
+  ],
+  "sourceEvidence": [
+    "../src/App.tsx",
+    "../src/OwnerBoardControls.tsx",
+    "../src/ownerActionPersistence.ts",
+    "../tests/owner-controls.browser.spec.mjs",
+    "../tests/team.browser.spec.mjs",
+    "../tests/operations.browser.spec.mjs",
+    "../tests/workflows.browser.spec.mjs",
+    "../tests/production-queue.browser.spec.mjs",
+    "https://github.com/cypressriveroasis2023-sudo/neon-oasis-game/actions/runs/37323977938"
+  ],
+  "compatibilityRebaseSha": "91bdf78ac44069647a24b32d25a4523a24fa9e6d"
+}

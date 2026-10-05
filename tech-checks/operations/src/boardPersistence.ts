@@ -15,6 +15,16 @@ export type AssignmentExpectation = {
   end?: string;
 };
 
+function checkedBoard(value: unknown): BoardSnapshot {
+  const snapshot = value as BoardSnapshot | null;
+  if (!snapshot || !Array.isArray(snapshot.jobs) || !Array.isArray(snapshot.tasks) ||
+      !Array.isArray(snapshot.readiness) || typeof snapshot.asOf !== 'string' ||
+      !Number.isFinite(Date.parse(snapshot.asOf))) {
+    throw new Error('The daily board received an incomplete response.');
+  }
+  return snapshot;
+}
+
 /** Coalesce background reads; queue a NEW read after pending work when verifying a write. */
 export function createBoardReader(api: BoardApi) {
   let pending: Promise<BoardSnapshot> | null = null;
@@ -23,13 +33,7 @@ export function createBoardReader(api: BoardApi) {
     const previous = pending;
     const request = Promise.resolve(previous).catch(() => undefined).then(async () => {
       const { data } = await api.get('/api/daily-board');
-      const value = data as BoardSnapshot | null;
-      if (!value || !Array.isArray(value.jobs) || !Array.isArray(value.tasks) ||
-          !Array.isArray(value.readiness) || typeof value.asOf !== 'string' ||
-          !Number.isFinite(Date.parse(value.asOf))) {
-        throw new Error('The daily board received an incomplete response.');
-      }
-      return value;
+      return checkedBoard(data);
     });
     pending = request;
     const clear = () => { if (pending === request) pending = null; };
@@ -59,6 +63,7 @@ export function hasConfirmedAssignment(snapshot: BoardSnapshot | null, expected:
 
 export type AssignmentSaveResult =
   | { status: 'busy' }
+  | { status: 'refresh_required' }
   | { status: 'unconfirmed' | 'accepted_unverified'; message: string }
   | { status: 'confirmed'; snapshot: BoardSnapshot };
 
@@ -67,15 +72,19 @@ export function createBoardAssignmentSaver(
   api: { post: (path: string, body: unknown) => Promise<unknown> },
   readFresh: () => Promise<BoardSnapshot | null>,
 ) {
-  let inFlight = false;
+  let inFlight = false, refreshRequired = false;
   return {
     get busy() { return inFlight; },
+    get needsRefresh() { return refreshRequired; },
+    acknowledgeRefresh(value: unknown) { checkedBoard(value); if (!inFlight) refreshRequired = false; },
     async save(path: string, body: unknown, expected: AssignmentExpectation): Promise<AssignmentSaveResult> {
       if (inFlight) return { status: 'busy' };
+      if (refreshRequired) return { status: 'refresh_required' };
       inFlight = true;
       try {
         try { await api.post(path, body); }
         catch (cause) {
+          refreshRequired = true;
           const failure = cause as { response?: { data?: { error?: unknown } } };
           const detail = failure?.response?.data?.error;
           return { status: 'unconfirmed', message: typeof detail === 'string' ? detail :
@@ -84,6 +93,7 @@ export function createBoardAssignmentSaver(
         let snapshot: BoardSnapshot | null = null;
         try { snapshot = await readFresh(); } catch { /* Report accepted-but-unverified, not a failed write. */ }
         if (!snapshot || !hasConfirmedAssignment(snapshot, expected)) {
+          refreshRequired = true;
           return { status: 'accepted_unverified', message:
             'Save accepted, but the requested assignment could not be confirmed. Refresh the board before trying again.' };
         }

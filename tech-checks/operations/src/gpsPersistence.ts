@@ -27,14 +27,17 @@ function assertResult(result: unknown, unitId: string, expected: GpsCoordinates,
 }
 /** Writes are sent once. A failed confirmation is never retried as a write. */
 export function createGpsSaver(api: Api) {
-  let running = false;
+  let running = false, ownerRefreshRequired = false;
   async function exclusive<T>(work: () => Promise<T>): Promise<T> {
     if (running) throw new Error('A GPS save is already in progress.');
     running = true;
     try { return await work(); } finally { running = false; }
   }
   return {
+    get needsRefresh() { return ownerRefreshRequired; },
+    acknowledgeRefresh(value: unknown) { checkedFieldMap(value); if (!running) ownerRefreshRequired = false; },
     owner: (unitId: string, input: unknown) => exclusive(async () => {
+      if (ownerRefreshRequired) throw new Error('Refresh the Field Map before saving GPS again.');
       if (!uuid(unitId)) throw new Error('Select a valid unit before saving GPS.');
       const payload = gpsWrite(input, 'owner');
       try {
@@ -43,7 +46,7 @@ export function createGpsSaver(api: Api) {
         const saved = snapshot.items.find((item: Row) => item.id === unitId);
         if (!saved || saved.hasUnitGps !== true || saved.coordinateSource !== payload.source || result.source !== payload.source || stamp(saved.gpsRecordedAt) !== stamp(result.recordedAt) || !gpsMatches({ ...saved, accuracyM: saved.gpsAccuracyM }, payload)) throw new GpsSaveUnverifiedError();
         return snapshot;
-      } catch { throw new GpsSaveUnverifiedError(); }
+      } catch { ownerRefreshRequired = true; throw new GpsSaveUnverifiedError(); }
     }),
     technician: (jobId: string, unitId: string, visitId: string, input: unknown) => exclusive(async () => {
       if (![jobId, unitId, visitId].every(uuid)) throw new Error('The assigned job, visit and unit must be available before saving GPS.');

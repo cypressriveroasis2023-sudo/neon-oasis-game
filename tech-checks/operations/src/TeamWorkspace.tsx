@@ -42,7 +42,8 @@ export default function TeamWorkspace({show,openWorkspace}:{show:(message:string
     {!members&&!errors.team&&<div className='loading' role='status'>Loading live team…</div>}
     {members&&<div className='records'>{rows.length?rows.map(member=>{
       const check=checks?.find(row=>row.userId===member.userId);
-      const assigned=(jobs||[]).filter(job=>job.technicianUserId===member.userId||String(job.technician||'').trim().toLowerCase()===String(member.displayName||'').trim().toLowerCase()).filter(job=>!['closed','cancelled'].includes(String(job.status||'').toLowerCase()));
+      // Details and readiness must use the same authoritative UUID/status rule as the count.
+      const assigned=(jobs||[]).filter(job=>teamJobCount(member,[job])===1);
       const blocked=assigned.filter(job=>['scheduled','assigned'].includes(String(job.status||'').toLowerCase())&&!job.equipmentUnitTag);
       const inProgress=assigned.filter(job=>['dispatched','in progress','en route'].includes(String(job.status||'').toLowerCase()));
       const techChecks=assigned.filter(job=>job.techCheck&&!job.techCheck.complete);

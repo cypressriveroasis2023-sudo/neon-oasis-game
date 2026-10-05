@@ -85,19 +85,23 @@ export function moveCalendar(cursor: string, view: 'Month' | 'Week' | 'Year', di
   return dateDay(date);
 }
 type JobApi = { get(path: string): Promise<{ data: unknown }>; post(path: string, body?: unknown): Promise<unknown> };
-export type JobSaveResult = { status: 'busy' } | { status: 'confirmed'; rows: OperationsRecord[] } |
+export type JobSaveResult = { status: 'busy' | 'refresh_required' } | { status: 'confirmed'; rows: OperationsRecord[] } |
   { status: 'unconfirmed' | 'accepted_unverified'; message: string };
 /** Send a write once, then require an independent native jobs snapshot before reporting success. */
 export function createJobActionSaver(api: JobApi) {
-  let running = false;
+  let running = false, refreshRequired = false;
   return {
     get busy() { return running; },
+    get needsRefresh() { return refreshRequired; },
+    acknowledgeRefresh(value: unknown) { jobItems(value); if (!running) refreshRequired = false; },
     async save(path: string, body: unknown, confirmed: (rows: OperationsRecord[]) => boolean): Promise<JobSaveResult> {
       if (running) return { status: 'busy' };
+      if (refreshRequired) return { status: 'refresh_required' };
       running = true;
       try {
         try { await api.post(path, body); }
         catch (cause) {
+          refreshRequired = true;
           const failure = cause as { response?: { data?: { error?: unknown } } };
           const detail = failure?.response?.data?.error;
           return { status: 'unconfirmed', message: typeof detail === 'string' ? detail : 'The save could not be confirmed. Refresh this workspace before trying again.' };
@@ -106,6 +110,7 @@ export function createJobActionSaver(api: JobApi) {
           const rows = jobItems((await api.get('/api/jobs')).data);
           if (confirmed(rows)) return { status: 'confirmed', rows };
         } catch { /* An accepted write is never automatically replayed. */ }
+        refreshRequired = true;
         return { status: 'accepted_unverified', message: 'Save accepted, but the requested job change could not be verified. Refresh this workspace before trying again.' };
       } finally { running = false; }
     },
