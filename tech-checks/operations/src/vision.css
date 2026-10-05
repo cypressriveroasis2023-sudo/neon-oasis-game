@@ -35,7 +35,7 @@
 .vision-workspace-nav{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:12px auto}
 .vision-shell .vision-workspace-nav button{background:#102737;border-color:#586b79;font-size:13px;padding:6px 10px}.vision-shell .vision-workspace-nav button[aria-current]{border-color:#fff;border-bottom:3px solid #f00}
 .vision-access{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px}.vision-shell .vision-access button{font-size:12px;padding:5px 10px;background:#081722;border-color:#586b79}
-.vision-options{padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}.vision-options p{flex-basis:100%;font-size:13px}
+.vision-options{box-sizing:border-box;width:100%;min-width:0;margin-top:12px;padding:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;border:1px solid #334b5a;border-radius:10px;background:#081722;text-align:center}.vision-options p{flex:1 1 360px;min-width:0;margin:0;font-size:13px;line-height:1.5}.operations-shell.vision-shell .vision-options button{flex:0 1 auto;max-width:100%;min-height:40px!important;padding:8px 14px!important;font-size:13px!important;line-height:1.4!important;white-space:normal;background:linear-gradient(180deg,#142632,#071018)!important;border-color:#526876!important;color:#e6eef3!important}
 .vision-today{text-align:center;max-width:900px;margin:auto}.vision-today h1{font-size:26px;margin:10px 0}.vision-decisions{margin:20px 0;padding:18px!important}
 .vision-decisions article{padding:18px 0;border-top:1px solid #743030}.vision-decisions h2{margin:0 0 18px}.vision-decisions h3{font-size:19px;margin:0}.vision-decisions p{font-size:16px;line-height:1.5}
 .vision-shell .operations-error{background:#360909;color:#fff;border-color:#ff5b5b}.vision-shell .operations-notice{background:#123323;color:#fff;border-color:#72d79c}
@@ -176,7 +176,7 @@
  .vision-primary-nav{grid-area:primary!important;width:min(100%,760px)!important;max-width:760px!important;margin:2px auto 0!important;gap:7px!important}.operations-shell.vision-shell .vision-primary-nav button{min-height:34px!important;padding:5px 12px!important;font-size:11px!important;border-radius:9px!important}
  .vision-workspace-nav{grid-area:workspace!important;margin:0 auto!important;gap:5px!important;max-width:980px!important}.operations-shell.vision-shell .vision-workspace-nav button{min-height:28px!important;padding:4px 10px!important;font-size:10px!important}
  .vision-preview-note{display:none!important}
- .vision-options{position:absolute!important;right:24px!important;top:78px!important;width:260px!important;z-index:20!important;text-align:left!important}
+ .vision-options{grid-column:1/-1;margin-top:2px}
  .vision-shell .command-page-header{padding:12px 0 8px!important}.vision-shell .command-page-header h1{font-size:28px!important}
 }
 
