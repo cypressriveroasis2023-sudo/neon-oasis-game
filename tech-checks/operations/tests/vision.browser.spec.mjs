@@ -44,7 +44,7 @@ test('Vision groups native workspaces and can return to classic without changing
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  }
  await frame.getByRole('button',{name:'Options',exact:true}).click();await frame.getByRole('button',{name:'All existing tools'}).click();await expect(frame.getByRole('button',{name:'Close menu'})).toBeVisible();await frame.getByRole('button',{name:'Close menu'}).click();
- await frame.getByRole('button',{name:'Use classic layout'}).click();await expect(frame.getByRole('button',{name:'Try Vision layout'})).toBeVisible();expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+ await frame.getByRole('button',{name:'Use classic layout'}).click();await expect(frame.getByRole('button',{name:'Use Vision layout'})).toBeVisible();expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('Missing data stays unavailable rather than becoming a zero-work claim',async({page})=>{const {frame}=await mount(page,{failJobs:true});await expect(frame.getByRole('heading',{name:'Some information is unavailable'})).toBeVisible();await expect(frame.getByText('No scheduling or review items in the loaded sources.')).toHaveCount(0);});
 test('Technician token cannot unlock owner Vision',async({page})=>{const {frame,requests}=await mount(page,{role:'service'});await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();expect(requests).toHaveLength(0);});

@@ -1,9 +1,11 @@
 #cosOperationsMount[hidden],#cosOperationsLegacy[hidden],#cosOperationsTechReturn[hidden]{display:none!important}
-#cosOperationsFrame{display:block;width:100%;height:100dvh;min-height:560px;border:0;background:#03131f}
+#cosOperationsFrame{display:block;width:100%;height:100dvh;min-height:0;border:0;background:#03131f}
 body.cos-operations-host{overflow:hidden!important}
 body.cos-operations-host #appView{width:100%!important;max-width:none!important;padding:0!important;margin:0!important}
-body.cos-operations-host #appView>.mobileTop{display:none!important}
-body.cos-operations-host #view-owner{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}
+body.cos-operations-host #appView:has(#view-owner:not(.hidden))>.mobileTop{display:none!important}
+/* The legacy owner grid reserves a 220px sidebar. Operations owns this entire
+   viewport; keep that grid and its bottom-nav padding only in legacy mode. */
+body.cos-operations-host #appView #view-owner:not(.hidden){display:block!important;margin:0!important;padding:0!important;width:100%!important;max-width:none!important;height:100dvh!important;min-height:0!important}
 body.cos-operations-host #cosOperationsMount{width:100%!important;height:100dvh}
 #cosOperationsReturn,#cosOperationsTechReturn{position:fixed;right:12px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:20000;min-height:44px;margin:0;border:1px solid #2b90ad;background:#082c3c;color:#dffaff;box-shadow:0 4px 20px #0006}
 body.cos-operations-legacy:has(#view-owner:not(.hidden)){overflow-y:auto!important;overflow-x:hidden!important;height:auto!important;min-height:100dvh!important}
