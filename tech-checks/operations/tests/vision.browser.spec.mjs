@@ -19,7 +19,7 @@ async function mount(page,{role='owner',failJobs=false}={}){
  });
  await page.goto(origin+'/vision-test');return {frame:page.frameLocator('iframe'),requests};
 }
-test('Vision groups native workspaces and can return to classic without changing the hash',async({page})=>{
+test('Vision groups native workspaces and can return to classic without changing the hash',async({page},testInfo)=>{
  const {frame,requests}=await mount(page);
  await expect(frame.getByText('Connected to COS Operations',{exact:true})).toBeVisible();
  await expect(frame.getByText('1 job ready to schedule')).toBeVisible();
@@ -43,7 +43,27 @@ test('Vision groups native workspaces and can return to classic without changing
   if(name==='Jobs'){await frame.getByRole('searchbox',{name:'Find a job'}).fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();await frame.getByRole('searchbox',{name:'Find a job'}).fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();}
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  }
- await frame.getByRole('button',{name:'Options',exact:true}).click();await frame.getByRole('button',{name:'All existing tools'}).click();await expect(frame.getByRole('button',{name:'Close menu'})).toBeVisible();await frame.getByRole('button',{name:'Close menu'}).click();
+ await nav.getByRole('button',{name:'Units',exact:true}).click();
+ await frame.getByRole('button',{name:'Options',exact:true}).click();
+ const optionsLayout=await frame.locator('.vision-options').evaluate(panel=>{
+  const box=element=>element.getBoundingClientRect().toJSON();
+  const header=panel.closest('header');
+  return {panel:box(panel),header:box(header),controls:[...header.querySelectorAll('.vision-primary-nav,.vision-workspace-nav,.vision-access')].map(box),children:[...panel.children].map(element=>({rect:box(element),clipped:element.scrollWidth>element.clientWidth||element.scrollHeight>element.clientHeight})),width:innerWidth,content:document.documentElement.scrollWidth};
+ });
+ expect(optionsLayout.panel.top).toBeGreaterThanOrEqual(Math.max(...optionsLayout.controls.map(box=>box.bottom)));
+ expect(optionsLayout.panel.bottom).toBeLessThanOrEqual(optionsLayout.header.bottom);
+ expect(optionsLayout.content).toBeLessThanOrEqual(optionsLayout.width);
+ for(const child of optionsLayout.children){
+  expect(child.clipped).toBe(false);
+  expect(child.rect.left).toBeGreaterThanOrEqual(optionsLayout.panel.left);
+  expect(child.rect.right).toBeLessThanOrEqual(optionsLayout.panel.right);
+ }
+ for(let i=0;i<optionsLayout.children.length;i++)for(let j=i+1;j<optionsLayout.children.length;j++){
+  const a=optionsLayout.children[i].rect,b=optionsLayout.children[j].rect;
+  expect(a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top).toBe(false);
+ }
+ await frame.locator('.vision-header').screenshot({path:testInfo.outputPath('vision-options.png')});
+ await frame.getByRole('button',{name:'All existing tools'}).click();await expect(frame.getByRole('button',{name:'Close menu'})).toBeVisible();await frame.getByRole('button',{name:'Close menu'}).click();
  await frame.getByRole('button',{name:'Use classic layout'}).click();await expect(frame.getByRole('button',{name:'Use Vision layout'})).toBeVisible();expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('Missing data stays unavailable rather than becoming a zero-work claim',async({page})=>{const {frame}=await mount(page,{failJobs:true});await expect(frame.getByRole('heading',{name:'Some information is unavailable'})).toBeVisible();await expect(frame.getByText('No scheduling or review items in the loaded sources.')).toHaveCount(0);});
