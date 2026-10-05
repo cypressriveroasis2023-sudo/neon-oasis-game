@@ -67,3 +67,11 @@ Units → Victron VRM includes the nine installation IDs verified in the signed-
 The Owner-authorized `GET /api/vrm-portal` returns the fleet and optional read-only per-installation embeds. Configure approved links only in the Edge Function secret `COS_VRM_EMBEDS`, a JSON object keyed by installation ID. Never commit sharing tokens or API credentials. Invalid origins, mismatched installations, and unknown IDs fail closed. An unset secret leaves all signed-in portal links available with no embedded dashboards.
 
 VRM sharing is disabled by default and must be approved before activation: anyone possessing a sharing link can view that dashboard. Hide exact locations and leave Victron World publication off. COS authorization restricts link delivery but cannot revoke a copied Victron link; disable sharing in VRM to revoke it, then remove the corresponding secret entry. Readings refresh at the installation's VRM reporting interval; inspect last-update time before operational decisions.
+
+### Private Owner Review evidence
+
+Owner Review loads eligible saved photos and signatures only when an existing authorized Owner chooses View. The protected `GET /api/evidence/:id` bridge rechecks the current active same-organization Owner identity, role and job-view permission, then verifies the document/job organization and private bucket/path before reading bytes. It never returns a Storage URL, signed URL or credential, and does not create roles, grants, identities or public buckets.
+
+The current JSON transport supports private JPEG/PNG/WebP and photo-GIF previews up to 4 MiB. Larger or unsupported files stay preserved with an explicit explanation. Preview bytes are local to the page, clear on close/navigation/background, and expire from the view after one minute; reopening rechecks access. The host clears previews even when it hides an iframe without unmounting it.
+
+Focused reader tests use synthetic files only. A production success check requires a legitimate saved evidence record; no sample job or upload is created for verification. The separate AppDeploy Operations viewer follows the same reader contract.

@@ -101,6 +101,9 @@ function present() {
     mount.replaceChildren(frame);
     frameUser = user;
   }
+  if (frame && (!visible || legacyOpen)) {
+    frame.contentWindow?.postMessage({ type: 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' }, window.location.origin);
+  }
   mount.hidden = legacyOpen;
   legacy.hidden = !legacyOpen;
 }
