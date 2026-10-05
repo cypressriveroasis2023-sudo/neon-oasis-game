@@ -28,7 +28,10 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
  await frame.getByRole('button',{name:'View all InHand routers'}).click();
- await page.goBack();await expect(frame.getByLabel('COS field unit map')).toBeVisible();
+ await frame.locator('body').evaluate(()=>history.back());
+ await expect(frame.getByLabel('COS field unit map')).toBeVisible();
+ await frame.locator('body').evaluate(()=>history.forward());
+ await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toBeVisible();
 });
 test('missing GPS remains unpinned and source failure can retry without fabricating healthy fleet',async({page})=>{
  const {frame,state}=await mountRouterFixture(page,{fail:true,gps:false});
