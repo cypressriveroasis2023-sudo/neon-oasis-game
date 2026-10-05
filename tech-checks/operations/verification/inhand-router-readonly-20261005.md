@@ -27,7 +27,7 @@ This phase connects native COS Operations to the existing Camera Health router i
 
 ## Verification
 
-Final local run rebased on the private-evidence release: 307 Node unit/contract tests passed, strict TypeScript passed, production Vite build passed. Focused headless Chromium ran the compiled UI at widths 390, 1024 and 1440: search/filter/IP drilldown, duplicate-name refusal, same-name map selection, unchanged stored coordinate, source outage/retry, and missing GPS remaining unpinned. All requests were intercepted synthetic read-only fixtures; these are not authenticated production proofs. The normal Playwright CLI stalls during collection under this local Node 24 environment; the repository's Node 22 GitHub CI remains the full-suite gate. Final CI results belong in the PR.
+Final local run with main 13072d7 (private-evidence and VISION layout releases) integrated: 307 Node unit/contract tests passed, strict TypeScript passed, production Vite build passed. Focused headless Chromium ran the compiled UI at widths 390, 1024 and 1440: search/filter/IP drilldown, duplicate-name refusal, same-name map selection, unchanged stored coordinate, source outage/retry, and missing GPS remaining unpinned. All requests were intercepted synthetic read-only fixtures; these are not authenticated production proofs. The normal Playwright CLI stalls during collection under this local Node 24 environment; the repository's Node 22 GitHub CI remains the full-suite gate. Final CI results belong in the PR. The PR carries source only; the publishing-branch workflow rebuilds and commits the verified static bundle after merge. Router polling updates popup content without clearing the marker or recentering the map.
 
 ## Release and rollback
 
