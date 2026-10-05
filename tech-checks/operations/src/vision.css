@@ -179,3 +179,9 @@
  .vision-options{position:absolute!important;right:24px!important;top:78px!important;width:260px!important;z-index:20!important;text-align:left!important}
  .vision-shell .command-page-header{padding:12px 0 8px!important}.vision-shell .command-page-header h1{font-size:28px!important}
 }
+
+/* Keep command controls inside smaller desktop windows. */
+@media(min-width:901px) and (max-width:1100px){
+ .vision-shell .vision-header{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;grid-template-areas:"brand clock" "primary primary" "workspace workspace" "access access"!important;column-gap:16px!important}
+ .vision-shell .vision-access{justify-content:center!important}
+}
