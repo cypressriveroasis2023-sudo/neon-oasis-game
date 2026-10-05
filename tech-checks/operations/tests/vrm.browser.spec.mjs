@@ -34,6 +34,7 @@ test('All nine verified VRM portals work with sharing disabled',async({page})=>{
  await expect(frame.getByText('0 of 9 dashboards enabled inside COS.',{exact:false})).toBeVisible();
  const nav=frame.getByRole('navigation',{name:'Helios installations'});
  await expect(nav.getByRole('button')).toHaveCount(9);
+ const layout=await nav.evaluate(el=>({display:getComputedStyle(el).display,columns:getComputedStyle(el).gridTemplateColumns.split(' ').length,width:innerWidth}));expect(layout.display).toBe('grid');expect(layout.columns).toBe(layout.width>=1200?9:3);
  for(const unit of vrmPortalConfig().items){
   await nav.getByRole('button',{name:unit.name+' VRM portal',exact:true}).click();
   await expect(frame.getByRole('link',{name:'Open '+unit.name+' in VRM ↗',exact:true})).toHaveAttribute('href',unit.portalUrl);
