@@ -23,9 +23,16 @@ test('Vision groups native workspaces and can return to classic without changing
  const {frame,requests}=await mount(page);
  await expect(frame.getByText('Connected to COS Operations',{exact:true})).toBeVisible();
  await expect(frame.getByText('1 job ready to schedule')).toBeVisible();
+ const expectedHash={Jobs:'#jobs',Team:'#team',Units:'#equipment',Money:'#invoices',Today:'#today'};
  for(const name of ['Jobs','Team','Units','Money','Today']){
-  await frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true}).click();
-  await expect(frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true})).toHaveAttribute('aria-current','page');
+  const button=frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true});
+  await expect(button).toBeVisible();
+  await expect(async()=>{
+   await button.click();
+   const hash=await frame.locator('body').evaluate(()=>location.hash);
+   expect(hash).toBe(expectedHash[name]);
+  }).toPass({timeout:5000,intervals:[100,250,500]});
+  await expect(button).toHaveAttribute('aria-current','page');
   if(name==='Jobs'){await frame.getByRole('searchbox',{name:'Find a job'}).fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();await frame.getByRole('searchbox',{name:'Find a job'}).fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();}
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  }
