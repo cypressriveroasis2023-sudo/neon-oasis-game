@@ -40,7 +40,8 @@ async function openFixture(page,workspace) {
     if(state.failedPaths.has(path))return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Fixture source unavailable'})});
     let data;
     if(method==='GET') {
-      if(path==='/api/session')data={authorized:true,role:'Owner',name:'Fixture Owner'};
+      if(path==='/api/routers')data={ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+      else if(path==='/api/session')data={authorized:true,role:'Owner',name:'Fixture Owner'};
       else if(path==='/api/jobs'){
         data={items:structuredClone(state.readbackMismatch?state.jobs.map(row=>row.id===jobId?{...row,status:'Scheduled'}:row):state.jobs)};
         if(state.holdJobsRead)await new Promise(resolve=>{state.releaseJobsRead=resolve;});

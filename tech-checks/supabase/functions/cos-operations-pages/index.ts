@@ -1,3 +1,4 @@
+import { routerSnapshot } from './routers.ts';
 import { vrmPortalConfig } from './vrm.ts';
 import { createPrivateEvidenceReader, PrivateEvidenceError } from './privateEvidence.ts';
 // COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or read-only technician.
@@ -317,6 +318,13 @@ export function createOperationsHandler(options) {
             const job = Array.isArray(r.jobs) ? r.jobs[0] : r.jobs;
             return { id: r.id, quoteNumber: r.quote_number, customer: r.customers?.name || '', site: r.sites?.name || '', title: v?.title || '', description: v?.scope || v?.notes || '', amount: Number(v?.total || 0), discountTotal: Number(v?.discount_total || 0), taxTotal: Number(v?.tax_total || 0), issueDate: r.issue_date, validUntil: r.valid_until, status: statuses[r.status] || r.status, locked: r.status !== 'draft', revision: Number(r.current_version) || 1, jobNumber: job?.job_number, activity: ['Production record · Supabase system of record'] };
           }) });
+        }
+        if (path === '/api/routers') {
+          const [routers, units] = await Promise.all([
+            legacyAll('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc', context.headers),
+            platformAll('equipment_units?select=id,unit_number&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+          ]);
+          return json(routerSnapshot(routers, units));
         }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([

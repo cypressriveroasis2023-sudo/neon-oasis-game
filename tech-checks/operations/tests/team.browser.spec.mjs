@@ -28,7 +28,8 @@ test('Team details and readiness follow authoritative technician UUIDs and activ
       return route.fulfill({status:405,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic Team is read-only'})});
     }
     let data;
-    if (envelope.path === '/api/session') data = {authorized:true,name:'Fixture Owner',role:'Owner'};
+    if (envelope.path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+    else if (envelope.path === '/api/session') data = {authorized:true,name:'Fixture Owner',role:'Owner'};
     else if (envelope.path === '/api/team-production') data = {items:[
       {userId:firstId,displayName:'Same Name',department:'service',active:true,linked:true},
       {userId:secondId,displayName:'Other Person',department:'it',active:true,linked:true},

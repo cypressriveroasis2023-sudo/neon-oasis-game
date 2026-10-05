@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
+import { useRouters } from './useRouters';
+import { RouterBadge, routerTime } from './RouterWorkspace';
+import { routerLabels, routerStatus } from '../../supabase/functions/cos-operations-pages/routers';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
@@ -32,13 +35,14 @@ type Snapshot = {
   generatedAt:string;
 };
 
-type Props = { show:(message:string)=>void };
+type Props = { show:(message:string)=>void; initialUnitId?:string; openWorkspace?:(name:string)=>void };
 
 const hasCoords = (unit: FieldUnit) => hasGpsCoordinates(unit);
 const statusColor=(status:string)=>status==='installed'?'#35d48a':status==='in_transit'?'#f0bd57':status==='returning'?'#ff8b5c':'#56b8ff';
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show}:Props){
+export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
+  const routers=useRouters();
   const [data,setData]=useState<Snapshot|null>(null);
   const [error,setError]=useState('');
   const [search,setSearch]=useState('');
@@ -61,6 +65,7 @@ export default function FieldMap({show}:Props){
   const mapNode=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<L.Map|null>(null);
   const layerRef=useRef<L.LayerGroup|null>(null);
+  const markersRef=useRef(new Map<string,L.Marker>());
 
   const load=async()=>{
     if (working.current) return;
@@ -73,7 +78,8 @@ export default function FieldMap({show}:Props){
       setData(snapshot);
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
-      const first = snapshot.items.find(hasCoords) || snapshot.items[0];
+      const first = snapshot.items.find(unit => unit.id === initialUnitId) || snapshot.items.find(hasCoords) || snapshot.items[0];
+      if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('The same-name COS unit is not in the field map records. No router GPS is available.');
       setSelectedId(current => snapshot.items.some(unit => unit.id === current) ? current : first?.id || '');
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
@@ -87,6 +93,7 @@ export default function FieldMap({show}:Props){
 
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
+  const selectedRouters=routers.data?.items.filter(row=>row.match==='exact_name' && row.candidateUnit?.id===selectedId)||[];
   const filtered=useMemo(()=>{
     const q=search.trim().toLowerCase();
     return items.filter(unit=>{
@@ -142,6 +149,7 @@ export default function FieldMap({show}:Props){
     const layer=layerRef.current;
     if(!map||!layer)return;
     layer.clearLayers();
+    markersRef.current.clear();
     const mapped=filtered.filter(hasCoords);
     const bounds:L.LatLngExpression[]=[];
     for(const unit of mapped){
@@ -157,6 +165,7 @@ export default function FieldMap({show}:Props){
         })
       });
       marker.bindPopup(gpsPopup(document, unit));
+      markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current) setSelectedId(unit.id); });
       marker.addTo(layer);
     }
@@ -168,6 +177,24 @@ export default function FieldMap({show}:Props){
       map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14});
     }
   },[filtered,selectedId,data?.generatedAt]);
+
+  // Updating router observations must not clear an open popup or recenter a map the owner panned.
+  useEffect(()=>{
+    for(const unit of filtered){
+      const marker=markersRef.current.get(unit.id);
+      if(!marker)continue;
+      const popup=gpsPopup(document,unit);
+      popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
+      const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
+      if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
+      const openPopup=marker.getPopup();
+      if(openPopup){
+        const autoPan=openPopup.options.autoPan;
+        openPopup.options.autoPan=false;
+        try{openPopup.setContent(popup);}finally{openPopup.options.autoPan=autoPan;}
+      }
+    }
+  },[filtered,selectedId,data?.generatedAt,routers.data,routers.now]);
 
   const captureGps=()=>{
     if(!selected || working.current)return;
@@ -240,6 +267,7 @@ export default function FieldMap({show}:Props){
       <button className='secondary' disabled={busy} onClick={()=>void load()}>Refresh</button>
     </div>
 
+    <div className='router-map-note'><b>Router GPS feed not connected</b><p>Map pins show stored COS coordinates with their original source and timestamp. Router IPs and port checks do not supply live locations.</p>{routers.error&&<p role='alert'>Router information unavailable: {routers.error}</p>}{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
@@ -274,6 +302,9 @@ export default function FieldMap({show}:Props){
             <div><dt>Last unit GPS</dt><dd>{selected.gpsRecordedAt?new Date(selected.gpsRecordedAt).toLocaleString():'Not recorded'}</dd></div>
           </dl>
 
+          <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3>
+            {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
+          </section>
           <div className='field-map-coordinate-form'>
             <h3>Update unit GPS</h3>
             <p>Coordinates only. This does not change site, unit status, FIELD/ROOT/shop placement, or job assignment.</p>

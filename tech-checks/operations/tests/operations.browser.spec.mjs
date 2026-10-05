@@ -60,6 +60,7 @@ async function fixturePage(page) {
     let data;
     if (method === 'GET') {
       if (path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
+      else if (path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
       else if (path === '/api/jobs') data = { items: state.jobs };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
       else if (['/api/quotes', '/api/ar', '/api/purchasing'].includes(path)) data = { items: [] };
