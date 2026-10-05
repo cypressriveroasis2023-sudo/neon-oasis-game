@@ -62,8 +62,14 @@ test('router polling preserves an open map popup',async({page})=>{
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await frame.locator('.cos-field-pin-wrap').click();
  await expect(frame.locator('.leaflet-popup-content')).toContainText('Same-name router');
+ const canvas=await frame.getByLabel('COS field unit map').boundingBox();
+ await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
+ await page.mouse.down();await page.mouse.move(canvas.x+canvas.width/2+120,canvas.y+canvas.height/2,{steps:8});await page.mouse.up();
+ await page.clock.runFor(1000);
+ const transform=await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform);
  const readsBefore=state.requests.filter(r=>r.path==='/api/routers').length;
  await page.clock.fastForward(61000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
  await expect(frame.locator('.leaflet-popup-content')).toContainText('Stored COS coordinates');
+ expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
 });
