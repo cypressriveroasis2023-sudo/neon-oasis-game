@@ -25,6 +25,13 @@ test('Vision groups native workspaces and can return to classic without changing
  await expect(frame.getByText('1 job ready to schedule')).toBeVisible();
  for(const name of ['Jobs','Team','Units','Money','Today']){
   await frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true}).click();
+  const state=await frame.locator('body').evaluate(()=>({
+   hash:location.hash,
+   heading:[...document.querySelectorAll('h1,h2')].map(el=>el.textContent?.trim()).filter(Boolean).slice(0,6),
+   primary:[...document.querySelectorAll('.vision-primary-nav button')].map(el=>({text:el.textContent?.trim(),current:el.getAttribute('aria-current')})),
+   workspace:[...document.querySelectorAll('.vision-workspace-nav button')].map(el=>({text:el.textContent?.trim(),current:el.getAttribute('aria-current')}))
+  }));
+  console.log('VISION_NAV_STATE',name,JSON.stringify(state));
   await expect(frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true})).toHaveAttribute('aria-current','page');
   if(name==='Jobs'){await frame.getByRole('searchbox',{name:'Find a job'}).fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();await frame.getByRole('searchbox',{name:'Find a job'}).fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();}
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
