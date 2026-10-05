@@ -45,3 +45,11 @@ Browser fixtures exist only in tests. Production uses authenticated backend resp
 ## Rollback
 
 Revert the Operations commit set starting after f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3, or restore that commit's tech-checks/index.html to remove the new entry points. The existing technician source and schema were not replaced. The owner bridge can also be removed independently without altering either database's records.
+
+### Helios Victron VRM
+
+Units → Victron VRM includes the nine installation IDs verified in the signed-in fleet. Portal links require Victron sign-in. COS does not manufacture or cache battery/solar readings.
+
+The Owner-authorized `GET /api/vrm-portal` returns the fleet and optional read-only per-installation embeds. Configure approved links only in the Edge Function secret `COS_VRM_EMBEDS`, a JSON object keyed by installation ID. Never commit sharing tokens or API credentials. Invalid origins, mismatched installations, and unknown IDs fail closed. An unset secret leaves all signed-in portal links available with no embedded dashboards.
+
+VRM sharing is disabled by default and must be approved before activation: anyone possessing a sharing link can view that dashboard. Hide exact locations and leave Victron World publication off. COS authorization restricts link delivery but cannot revoke a copied Victron link; disable sharing in VRM to revoke it, then remove the corresponding secret entry. Readings refresh at the installation's VRM reporting interval; inspect last-update time before operational decisions.

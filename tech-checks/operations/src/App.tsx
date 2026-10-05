@@ -7,6 +7,7 @@ import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
+import VrmWorkspace from './VrmWorkspace';
 import OperationsJobs from './OperationsJobs';
 import OperationsCalendar from './OperationsCalendar';
 import HandoffsWorkspace from './HandoffsWorkspace';
@@ -17,9 +18,9 @@ import { QuotesWorkspace, InvoicesWorkspace, PurchasingWorkspace } from './Finan
 import './continuation.css';
 
 type Row = Record<string, any>;
-type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
-const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
-const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
+const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
+const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 const legacy: Record<string,string> = { Vision:'vision' };
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
@@ -41,6 +42,7 @@ const descriptions: Record<string,string> = {
   Billing:'Invoice records and Owner approval.',
   Purchasing:'Purchase requests, three-way matching and AP decisions.',
   'Camera Health':'Live camera status and existing diagnostics.',
+  'Victron VRM':'Battery, solar and power dashboards for Helios units 1–9.',
   'Tech Check':'Open the existing IT and Service workspaces using your current platform account.',
 };
 const slug = (value:string) => value.toLowerCase().replaceAll(' ','-');
@@ -236,6 +238,7 @@ function OwnerApp() {
         :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?<TechCheckWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
+        :active==='Victron VRM'?<VrmWorkspace/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>
     <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>More</button></nav>
