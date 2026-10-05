@@ -48,7 +48,13 @@ The [verification matrix](verification/end-to-end-20261005.json) distinguishes r
 
 Owner controls now verify resulting job/visit/approval state after a write, keep uncertain actions locked until a successful explicit refresh, and prevent overlapping refreshes and writes. Manual job creation confirms the new returned identity and workflow in the current jobs list; the existing snapshot does not expose title, description, priority or site IDs for full-field readback. Task saves verify related records, owner notes and both individual/department assignment fields. Truck approval retains nested shortage details and does not imply receipt.
 
-Workspace navigation reaches all AppDeploy handoff panels, supports Back/Forward, and dismisses old job dialogs when changing workspaces. AppDeploy may require a separate sign-in. Legacy IT/Service code, identity mappings, backend RPCs, database policy and permissions are unchanged by these front-end fixes. The separate IT-override/billing incompatibility and owner-preview Service-readiness error remain listed in the matrix until independently resolved.
+Workspace navigation reaches all AppDeploy handoff panels, supports Back/Forward, and dismisses old job dialogs when changing workspaces. AppDeploy may require a separate sign-in. Legacy IT/Service code, identity mappings, backend RPCs, database policy and permissions are unchanged by these front-end fixes. Separate backend lifecycle boundaries remain listed in the matrix until independently resolved.
+
+### Owner viewing Service tools
+
+The host now labels the three daily truck/trailer/inventory actions `Service Tech sign-in required` and disables them only while a normal Owner is viewing the Service home. An accessible explanation makes clear that daily checks belong to the signed-in Service Tech. Job lookup, equipment return and return-to-Operations remain available. The guard clears on role/view/auth changes and does not apply to real Service accounts or the existing owner test-persona preview.
+
+Live diagnosis confirmed that the protected legacy home calls `service_departure_readiness_v1` with the normal Owner's identity; that RPC requires an active Service Tech target and rejects the Owner before its data-maintenance steps. The original legacy call and console warning remain; the host does not retry it or turn the rejection into a successful readiness result. This endpoint can initialize truck baseline/restock data for Service targets, so it must not be treated as a read-only production probe. Actual technician sessions and genuine technician network failures are separate from this owner-only presentation fix. Browser regression runs the protected Service-home render/read functions against synthetic clients at phone/tablet/desktop widths, including successful Service/persona results, an actual Service error, legacy redraws, role changes and navigation.
 
 ## Rollback
 

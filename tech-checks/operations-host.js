@@ -13,6 +13,63 @@ const owner = () => {
   const id = context()?.getRole() === 'owner' && context()?.getSession()?.user?.id;
   return id && (ownerAuthSubject === undefined || ownerAuthSubject === id) ? id : null;
 };
+const serviceOwnerStatus = 'Service Tech sign-in required';
+const serviceOwnerNotice = 'You are viewing Service tools as Owner. Daily truck, trailer and inventory checks belong to the signed-in Service Tech. Sign in with your own Service Tech account to complete them.';
+let serviceOwnerPresentation = null;
+function restoreServiceOwnerPresentation() {
+  if (!serviceOwnerPresentation) return;
+  const { help, helpText, helpId, helpRole, buttons } = serviceOwnerPresentation;
+  if (help.textContent === serviceOwnerNotice) help.textContent = helpText;
+  if (help.id === 'cosOwnerServiceNotice') helpId ? help.id = helpId : help.removeAttribute('id');
+  if (help.getAttribute('role') === 'note') helpRole === null ? help.removeAttribute('role') : help.setAttribute('role', helpRole);
+  for (const saved of buttons) {
+    const { button, status, icon } = saved;
+    if (status.textContent === serviceOwnerStatus) status.textContent = saved.statusText;
+    if (icon?.textContent === '→') icon.textContent = saved.iconText;
+    button.disabled = saved.disabled;
+    button.classList.toggle('complete', saved.complete);
+    if (button.getAttribute('aria-describedby') === 'cosOwnerServiceNotice') {
+      saved.description === null ? button.removeAttribute('aria-describedby') : button.setAttribute('aria-describedby', saved.description);
+    }
+  }
+  serviceOwnerPresentation = null;
+}
+function presentServiceOwnerContext() {
+  const service = document.getElementById('view-svc');
+  const home = service?.querySelector?.('#wlSvcHome');
+  const help = home?.querySelector('.wl-service-help');
+  // This is an Owner-view explanation, never a readiness result or a technician
+  // identity override. The protected Service workflow and RPC stay unchanged.
+  const active = owner() && context()?.getEffectiveRole() === 'owner' &&
+    !document.body.classList.contains('owner-test-role-preview') &&
+    !document.getElementById('appView')?.classList.contains('hidden') &&
+    !service?.classList.contains('hidden') && home?.style.display !== 'none' && help;
+  if (!active) { restoreServiceOwnerPresentation(); return; }
+  if (serviceOwnerPresentation?.help !== help) restoreServiceOwnerPresentation();
+  if (!serviceOwnerPresentation) {
+    const buttons = [...home.querySelectorAll('[data-wl-svc="inspect"], [data-wl-service-trailer-inspection], [data-wl-service-truck-inventory]')]
+      .map(button => ({ button, status:button.querySelector('small'), icon:button.querySelector('b') }))
+      .filter(({ status }) => status)
+      .map(({ button, status, icon }) => ({ button, status, icon, statusText:status.textContent, iconText:icon?.textContent,
+        disabled:button.disabled, complete:button.classList.contains('complete'), description:button.getAttribute('aria-describedby') }));
+    serviceOwnerPresentation = { help, helpText:help.textContent, helpId:help.id, helpRole:help.getAttribute('role'), buttons };
+  }
+  // The legacy refresh may repaint its helper text after its expected Owner
+  // role rejection. Reapply only this explanation; do not retry the RPC.
+  if (help.textContent !== serviceOwnerNotice) {
+    serviceOwnerPresentation.helpText = help.textContent;
+    help.textContent = serviceOwnerNotice;
+  }
+  if (help.id !== 'cosOwnerServiceNotice') help.id = 'cosOwnerServiceNotice';
+  if (help.getAttribute('role') !== 'note') help.setAttribute('role', 'note');
+  for (const { button, status, icon } of serviceOwnerPresentation.buttons) {
+    if (status.textContent !== serviceOwnerStatus) status.textContent = serviceOwnerStatus;
+    if (icon && icon.textContent !== '→') icon.textContent = '→';
+    if (!button.disabled) button.disabled = true;
+    if (button.classList.contains('complete')) button.classList.remove('complete');
+    if (button.getAttribute('aria-describedby') !== 'cosOwnerServiceNotice') button.setAttribute('aria-describedby', 'cosOwnerServiceNotice');
+  }
+}
 function observeOwnerAuth() {
   const auth = context()?.db.auth;
   if (ownerAuthObserved || typeof auth?.onAuthStateChange !== 'function') return;
@@ -21,6 +78,7 @@ function observeOwnerAuth() {
 }
 function present() {
   observeOwnerAuth();
+  presentServiceOwnerContext();
   const user = owner();
   const effectiveOwner = context()?.getEffectiveRole() === 'owner';
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
@@ -109,4 +167,8 @@ const previewObserver = new MutationObserver(() => {
   if (preview !== lastPreview) { lastPreview = preview; present(); }
 });
 previewObserver.observe(document.body, {attributes:true, attributeFilter:['class']});
+const serviceView = document.getElementById('view-svc');
+if (serviceView) new MutationObserver(presentServiceOwnerContext).observe(serviceView, {
+  childList:true, subtree:true, attributes:true, attributeFilter:['class','style']
+});
 present();

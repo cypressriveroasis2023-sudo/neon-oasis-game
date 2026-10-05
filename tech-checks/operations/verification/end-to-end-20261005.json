@@ -189,8 +189,8 @@
       "status": "Existing jobs snapshot exposes identity/type/current visit but omits submitted title, description, priority and site IDs. UI now says the new job was found in current records, not that every submitted field was independently verified."
     },
     {
-      "area": "Legacy Service owner preview",
-      "status": "Live Owner-to-Service dashboard readiness remains Checking today with a refresh error. Actual technician sessions were not tested; do not extrapolate technician-wide failure."
+      "area": "Legacy Service normal Owner view",
+      "status": "Live Owner-to-Service diagnosis confirmed that service_departure_readiness_v1 rejects the normal Owner identity with Active Service Tech required before data-maintenance steps. Host-only fix labels and disables the three owner daily-check actions with an accessible Service Tech sign-in required explanation, preserving real Service accounts and owner test personas. Protected legacy RPC call and console warning remain unchanged. Browser tests use actual legacy home functions with synthetic data; production technician accounts and writes were not exercised. The RPC can initialize truck baseline/restock data for valid Service targets and is not a read-only probe."
     },
     {
       "area": "Evidence links",
