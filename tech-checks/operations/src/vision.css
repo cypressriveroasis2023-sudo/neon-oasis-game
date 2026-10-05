@@ -97,3 +97,39 @@
  .vision-shell .row-actions{justify-content:center!important;gap:8px!important}
  .vision-shell .row-actions button{min-height:38px!important;padding:7px 11px!important;font-size:13px!important}
 }
+
+/* Mobile command-center correction from signed-in acceptance screenshot. */
+@media(max-width:700px){
+ .vision-shell .vision-header{padding:10px 10px 12px!important;margin-bottom:10px!important}
+ .vision-wordmark>div{font-size:34px!important;line-height:.95!important;letter-spacing:.16em!important}
+ .vision-letter-eye{width:42px!important;height:42px!important;flex-basis:42px!important;margin:0 5px!important}
+ .vision-wordmark p{margin:9px auto 10px!important;font-size:8px!important;letter-spacing:.31em!important}
+ .vision-wordmark p:before{top:-5px!important}
+ .vision-clock{margin:8px auto 0!important;padding:7px 0!important;border-radius:10px!important}
+ .vision-clock>div{gap:2px!important;padding:0 5px!important}
+ .vision-clock small{font-size:8px!important;letter-spacing:.06em!important}
+ .vision-clock time,.vision-clock strong{font-size:21px!important;letter-spacing:.035em!important}
+ .vision-primary-nav{margin:9px auto 0!important;gap:4px!important}
+ .operations-shell.vision-shell .vision-primary-nav button{min-height:31px!important;padding:4px 2px!important;font-size:10px!important;letter-spacing:.025em!important;border-color:#394955!important;background:#08131b!important}
+ .operations-shell.vision-shell .vision-primary-nav button[aria-current]{background:#111d26!important;border-color:#ef3145!important;box-shadow:inset 0 -2px #e6001c,0 0 9px #d0000038!important}
+ .vision-workspace-nav{margin:6px auto!important;gap:4px!important}
+ .operations-shell.vision-shell .vision-workspace-nav button{min-height:27px!important;padding:3px 7px!important;font-size:9px!important;background:transparent!important;border-color:#2c3e49!important}
+ .operations-shell.vision-shell .vision-workspace-nav button[aria-current]{background:#101b23!important;border-color:#b51a2b!important}
+ .vision-preview-note{display:none!important}
+ .vision-access{margin-top:6px!important;gap:6px!important}
+ .vision-access span{font-size:9px!important;padding:4px 8px!important}
+ .operations-shell.vision-shell .vision-access button{min-height:27px!important;padding:3px 8px!important;font-size:9px!important;background:#0c1820!important;border-color:#3b4c57!important}
+ .vision-shell .command-page-header{padding:10px 0 5px!important}
+ .vision-shell .command-page-header h1{font-size:20px!important;letter-spacing:.09em!important;margin:0!important}
+ .vision-today h1{font-size:21px!important;margin:6px 0!important}
+ .vision-today>p{font-size:13px!important;margin:4px 0 8px!important}
+ .vision-today>.purchase-actions{margin:6px 0 10px!important}
+ .vision-today>.purchase-actions button{min-height:34px!important;padding:5px 10px!important;font-size:12px!important}
+ .vision-decisions{margin:8px 0!important;padding:12px!important}
+ .vision-decisions h2{font-size:17px!important;margin:0 0 8px!important}
+ .vision-decisions article{padding:10px 0!important}
+ .vision-decisions h3{font-size:16px!important}
+ .vision-decisions p{font-size:13px!important;line-height:1.35!important;margin:5px 0 8px!important}
+ .vision-decisions article button{min-height:34px!important;padding:5px 10px!important;font-size:12px!important}
+ .vision-shell .panel.module,.vision-shell .panel{border-radius:12px!important}
+}
