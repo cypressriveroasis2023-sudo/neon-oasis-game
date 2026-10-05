@@ -56,3 +56,28 @@ test('Authorized embedded dashboards follow the selected installation',async({pa
 test('Failed configuration preserves portal access without a fake dashboard',async({page})=>{
  const {frame}=await mount(page,{failVrm:true});await openVrm(frame);await expect(frame.getByRole('alert')).toContainText('VRM configuration unavailable');await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);await expect(frame.getByRole('link',{name:'Open HELIOS 001 in VRM ↗',exact:true})).toBeVisible();
 });
+test('Dashboard controls resize without losing the selected installation or issuing writes',async({page},testInfo)=>{
+ const embeds=Object.fromEntries(vrmPortalConfig().items.map(unit=>[unit.installationId,`https://vrm.victronenergy.com/installation/${unit.installationId}/embed/synthetic-only`]));
+ const {frame,requests}=await mount(page,{config:vrmPortalConfig(JSON.stringify(embeds))});await openVrm(frame);
+ const dashboard=frame.locator('iframe.vrm-dashboard');
+ const compactHeight=await dashboard.evaluate(el=>el.getBoundingClientRect().height);
+ await expect(frame.getByRole('button',{name:'Previous Helios unit',exact:true})).toBeDisabled();
+ await frame.getByRole('button',{name:'Expand dashboard',exact:true}).click();
+ await expect(frame.getByRole('button',{name:'Compact view',exact:true})).toHaveAttribute('aria-expanded','true');
+ expect(await dashboard.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(compactHeight);
+ await frame.getByRole('button',{name:'Next Helios unit',exact:true}).click();
+ await expect(dashboard).toHaveAttribute('title','HELIOS 002 Victron dashboard');
+ await frame.getByRole('button',{name:'Reload view',exact:true}).click();
+ await expect(dashboard).toHaveAttribute('title','HELIOS 002 Victron dashboard');
+ await frame.getByRole('button',{name:'Compact view',exact:true}).click();
+ expect(await dashboard.evaluate(el=>el.getBoundingClientRect().height)).toBe(compactHeight);
+ await frame.getByRole('navigation',{name:'Helios installations'}).getByRole('button',{name:'HELIOS 009 Dashboard enabled',exact:true}).click();
+ await expect(frame.getByRole('button',{name:'Next Helios unit',exact:true})).toBeDisabled();
+ await frame.getByRole('button',{name:'Previous Helios unit',exact:true}).click();
+ await expect(dashboard).toHaveAttribute('title','HELIOS 008 Victron dashboard');
+ await frame.getByText('Dashboard help & reporting',{exact:true}).click();
+ await expect(frame.getByText('For history, alarms, trends, and installation settings,',{exact:false})).toBeVisible();
+ const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
+ expect(requests.every(r=>r.method==='GET')).toBeTruthy();
+ if(process.env.COS_LAYOUT_PROOF){await frame.getByRole('heading',{name:'Helios power monitoring'}).scrollIntoViewIfNeeded();await page.screenshot({path:`${process.env.COS_LAYOUT_PROOF}/vrm-${testInfo.project.name}.png`,fullPage:true});}
+});
