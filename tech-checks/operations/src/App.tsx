@@ -161,9 +161,9 @@ function TechCheckWorkspace() {
 }
 function OwnerApp() {
   // One owner app link; CSS follows the live iframe viewport on every device.
-  // Classic is an explicit fallback, never a remembered mobile/desktop mode.
-  const [vision,setVision]=useState(()=>new URLSearchParams(location.search).get('theme')!=='classic');
-  const switchLayout=(enabled:boolean)=>{const url=new URL(location.href);if(enabled)url.searchParams.delete('theme');else url.searchParams.set('theme','classic');history.replaceState(null,'',url);setVision(enabled);};
+  // The standard workspace opens by default; VISION is an explicit optional view.
+  const [vision,setVision]=useState(()=>new URLSearchParams(location.search).get('theme')==='vision');
+  const switchLayout=(enabled:boolean)=>{const url=new URL(location.href);if(enabled)url.searchParams.set('theme','vision');else url.searchParams.delete('theme');history.replaceState(null,'',url);setVision(enabled);};
   const [active,setActive]=useState(currentWorkspace);
   const [session,setSession]=useState<Row|null>(null);
   const [sessionError,setSessionError]=useState('');
