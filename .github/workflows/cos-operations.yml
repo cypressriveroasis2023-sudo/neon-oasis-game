@@ -14,6 +14,7 @@ on:
       - 'tech-checks/operations-host.*'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
+      - '.github/workflows/cos-operations.yml'
 permissions:
   contents: write
 concurrency:
@@ -57,8 +58,22 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          publishing_branch="${{ github.ref_name }}"
+          git fetch origin "$publishing_branch"
+          if git diff --quiet "origin/$publishing_branch" -- tech-checks/operations/dist tech-checks/operations/package-lock.json; then
+            echo "Verified bundle is already published."
+            exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$publishing_branch")" ]; then
+            echo "Publishing branch advanced; its own verification must publish the newer bundle."
+            exit 0
+          fi
           git add tech-checks/operations/dist tech-checks/operations/package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "Build verified COS Operations static bundle"
-            git push origin HEAD:${{ github.ref_name }}
+            if ! git push origin "HEAD:$publishing_branch"; then
+              git fetch origin "$publishing_branch"
+              # A concurrent run may have published these exact verified bytes.
+              git diff --exit-code "origin/$publishing_branch" -- tech-checks/operations/dist tech-checks/operations/package-lock.json
+            fi
           fi
