@@ -72,10 +72,13 @@ async function responsiveLayout(page, frame) {
   await fillsViewport(page);
   const size = await frame.locator('.vision-header').evaluate(header => ({
     width:innerWidth, content:document.documentElement.scrollWidth, display:getComputedStyle(header).display,
+    main:header.parentElement.getBoundingClientRect().toJSON(),
     header:header.getBoundingClientRect().toJSON(),
     options:header.querySelector('.vision-options-toggle').getBoundingClientRect().toJSON(),
   }));
   expect(size.content).toBeLessThanOrEqual(size.width);
+  expect(size.main.width).toBe(size.width);
+  expect(size.header.width).toBeGreaterThanOrEqual(size.width - 64);
   expect(size.display).toBe(size.width >= 901 ? 'grid' : 'block');
   expect(size.options.left).toBeGreaterThanOrEqual(size.header.left);
   expect(size.options.right).toBeLessThanOrEqual(size.header.right);
@@ -109,7 +112,7 @@ test('rotation and desktop resizing preserve the same frame, route and in-progre
   const search = frame.getByRole('searchbox', { name:'Find a job' });
   await search.fill('keep this filter');
   await frame.locator('body').evaluate(() => { window.responsiveFrameMarker = 'same-frame'; });
-  for (const [width, height] of [[1440,900], [390,844], [844,390], [320,568], [900,650], [901,650], [1024,768], [1920,1080]]) {
+  for (const [width, height] of [[1440,900], [390,844], [844,390], [320,568], [900,650], [901,650], [1024,768], [1920,1080], [2560,1440]]) {
     await page.setViewportSize({ width, height });
     await responsiveLayout(page, frame);
     await expect(search).toHaveValue('keep this filter');
@@ -145,3 +148,19 @@ test('existing Owner Tools restore their legacy layout and return to full-width 
   await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
   await responsiveLayout(page, frame);
 });
+
+ test('VISION Today uses the available screen width at normal browser zoom', async ({ page }, testInfo) => {
+  const { frame } = await mount(page, { vision:true });
+  await responsiveLayout(page, frame);
+  await expect(frame.locator('.vision-today')).toHaveAttribute('aria-busy','false');
+  const layout=await frame.locator('.vision-today').evaluate(today=>({
+    zoom:visualViewport.scale, today:today.getBoundingClientRect().toJSON(),
+    header:document.querySelector('.vision-header').getBoundingClientRect().toJSON(),
+    decisions:today.querySelector('.vision-decisions').getBoundingClientRect().toJSON()
+  }));
+  console.log('VISION at 100% zoom:',JSON.stringify(layout));
+  expect(layout.zoom).toBe(1);
+  expect(layout.today.width).toBeCloseTo(layout.header.width,0);
+  expect(layout.decisions.width).toBeCloseTo(layout.today.width,0);
+  await page.screenshot({path:testInfo.outputPath('vision-fluid-screen.png'),fullPage:true});
+ });
