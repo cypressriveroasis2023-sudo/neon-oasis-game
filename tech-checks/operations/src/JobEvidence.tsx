@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { safeEvidenceUrl, type OperationsRecord } from './operationsWorkflowData';
+import { type OperationsRecord } from './operationsWorkflowData';
+import { api } from './api';
+import PrivateEvidence from './PrivateEvidence';
 const list = (value: unknown): OperationsRecord[] => Array.isArray(value) ? value.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)) : [];
-function EvidencePhoto({photo}:{photo:OperationsRecord}) {
-  const [failed,setFailed]=useState(false);
-  const url=safeEvidenceUrl(photo.url);
-  return <figure>{url&&!failed?<a href={url} target='_blank' rel='noopener noreferrer'><img src={url} alt={photo.kind||'Job evidence'} loading='lazy' onError={()=>setFailed(true)}/></a>:<div className='owner-photo-missing'>{failed?'Photo could not be loaded. The record is preserved.':'Photo preserved; file link unavailable.'}</div>}<figcaption>{photo.stage||'Field Work'} · {photo.department||'Field'} · {photo.by||photo.recordedBy||'Recorded evidence'}<small>{photo.kind||'photo'}</small></figcaption></figure>;
+function EvidencePhoto({ photo }: { photo: OperationsRecord }) {
+  return <figure>
+    <PrivateEvidence api={api} value={photo.url} documentId={photo.id} label='photo'/>
+    <figcaption>{photo.stage || 'Field Work'} · {photo.department || 'Field'} · {photo.by || photo.recordedBy || 'Recorded evidence'}<small>{photo.kind || 'photo'}</small></figcaption>
+  </figure>;
 }
-function SignatureLink({signature}:{signature:OperationsRecord}) {
-  const url=safeEvidenceUrl(signature.url);
-  return <small>{signature.kind==='technician'?'Technician':'Customer / site'} signature · {signature.name||'Recorded signer'}{signature.by||signature.capturedBy?' · captured by '+(signature.by||signature.capturedBy):''}{url?<> · <a href={url} target='_blank' rel='noopener noreferrer'>Open signature</a></>:<> · Signature recorded; file link unavailable.</>}</small>;
+function SignatureLink({ signature }: { signature: OperationsRecord }) {
+  return <span>{signature.kind === 'technician' ? 'Technician' : 'Customer / site'} signature · {signature.name || 'Recorded signer'}{signature.by || signature.capturedBy ? ' · captured by ' + (signature.by || signature.capturedBy) : ''}
+    <PrivateEvidence api={api} value={signature.url} documentId={signature.documentId} label='signature'/>
+  </span>;
 }
 export default function JobEvidence({job}:{job:OperationsRecord}) {
   const checks=list(job.techCheckHistory),photos=list(job.photos),signatures=list(job.signatures),notes=list(job.notes);
