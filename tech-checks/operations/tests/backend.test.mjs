@@ -42,6 +42,11 @@ function request(path, method='GET', body={}, headers={}) {
   });
 }
 const cases = [
+ ['owner VRM fleet permitted', '/api/vrm-portal', 'GET', {}, 200],
+ ['IT VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'it'}],
+ ['service VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'service'}],
+ ['unmapped VRM denied', '/api/vrm-portal', 'GET', {}, 403, {userId:'2e304f31-2500-415a-90b5-dbadd7d56f61'}],
+ ['VRM configuration writes denied', '/api/vrm-portal', 'POST', {}, 404],
  ['missing bearer', '/api/jobs', 'GET', {}, 401, {}, {Authorization:''}],
  ['invalid remote bearer', '/api/jobs', 'GET', {}, 401, {invalidToken:true}],
  ['IT technician denied', '/api/jobs', 'GET', {}, 403, {role:'it'}],

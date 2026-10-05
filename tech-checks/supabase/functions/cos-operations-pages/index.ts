@@ -1,3 +1,4 @@
+import { vrmPortalConfig } from './vrm.ts';
 // COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or read-only technician.
 // No browser-supplied actor, organization, table, RPC name, service key, or identity provisioning.
 const LEGACY_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
@@ -247,6 +248,10 @@ export function createOperationsHandler(options) {
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
       if (method === 'GET') {
+        if (path === '/api/vrm-portal') {
+          try { return json(vrmPortalConfig(options.vrmEmbeds)); }
+          catch { fail('VRM dashboard configuration is unavailable.', 503); }
+        }
         const snapshots = {
           '/api/handoffs': 'appdeploy_handoffs_snapshot',
           '/api/customers': 'appdeploy_customers_snapshot',
@@ -458,5 +463,6 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
   Deno.serve(createOperationsHandler({
     platformUrl: Deno.env.get('SUPABASE_URL'),
     serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    vrmEmbeds: Deno.env.get('COS_VRM_EMBEDS'),
   }));
 }
