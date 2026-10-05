@@ -50,6 +50,7 @@ export default function FieldMap({show}:Props){
   const [source,setSource]=useState('manual');
   const [note,setNote]=useState('');
   const [busy,setBusy]=useState(false);
+  const [refreshRequired,setRefreshRequired]=useState(false);
   const [history,setHistory]=useState<any[]>([]);
   const [historyError,setHistoryError]=useState('');
   const [historyLoading,setHistoryLoading]=useState(false);
@@ -62,15 +63,23 @@ export default function FieldMap({show}:Props){
   const layerRef=useRef<L.LayerGroup|null>(null);
 
   const load=async()=>{
+    if (working.current) return;
+    working.current = true;
+    setBusy(true);
     setError('');
     try{
       const response=await api.get('/api/field-map');
       const snapshot = checkedFieldMap(response.data) as unknown as Snapshot;
       setData(snapshot);
+      gpsSaver.current.acknowledgeRefresh(snapshot);
+      setRefreshRequired(gpsSaver.current.needsRefresh);
       const first = snapshot.items.find(hasCoords) || snapshot.items[0];
       setSelectedId(current => snapshot.items.some(unit => unit.id === current) ? current : first?.id || '');
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
+    } finally {
+      working.current = false;
+      setBusy(false);
     }
   };
 
@@ -186,7 +195,7 @@ export default function FieldMap({show}:Props){
   };
 
   const saveGps = async () => {
-    if (!selected || working.current) return;
+    if (!selected || working.current || gpsSaver.current.needsRefresh) return;
     working.current = true;
     setBusy(true);
     setGpsMessage('');
@@ -205,6 +214,7 @@ export default function FieldMap({show}:Props){
     } finally {
       working.current = false;
       setBusy(false);
+      setRefreshRequired(gpsSaver.current.needsRefresh);
     }
   };
 
@@ -231,6 +241,7 @@ export default function FieldMap({show}:Props){
     </div>
 
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
+    {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
     {!data&&!error?<div className='loading'>Loading production field units…</div>:<div className='field-map-layout'>
       <aside className='field-map-list' aria-label='Field units'>
@@ -275,7 +286,7 @@ export default function FieldMap({show}:Props){
             <label>Note<input disabled={busy} value={note} onChange={e=>setNote(e.target.value)} placeholder='Pole, gate, entrance, move reason…'/></label>
             <div className='field-map-actions'>
               <button className='secondary' disabled={busy} onClick={captureGps}>Use My Current GPS</button>
-              <button disabled={busy} onClick={()=>void saveGps()}>{busy?'Saving…':'Save Unit GPS'}</button>
+              <button disabled={busy||refreshRequired} onClick={()=>void saveGps()}>{busy?'Saving…':'Save Unit GPS'}</button>
             </div>
             {hasCoords(selected)&&<a className='field-map-open' href={'https://www.google.com/maps/search/?api=1&query='+selected.latitude+','+selected.longitude} target='_blank' rel='noreferrer'>Open this unit in Google Maps ↗</a>}
           </div>

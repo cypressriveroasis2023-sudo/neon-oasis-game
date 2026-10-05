@@ -26,6 +26,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [refreshRequired,setRefreshRequired]=useState(false);
   const [now,setNow]=useState(()=>new Date());
   const [person,setPerson]=useState('');
   const [department,setDepartment]=useState('');
@@ -62,6 +63,15 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     }
   }, [readBoard]);
   const assignmentSaver = useMemo(() => createBoardAssignmentSaver(api, () => load(true)), [api, load]);
+
+  const refresh = async () => {
+    if (assignmentSaver.busy) return;
+    const data = await load(true);
+    if (!data) return;
+    assignmentSaver.acknowledgeRefresh(data);
+    setRefreshRequired(assignmentSaver.needsRefresh);
+    setActionError('');
+  };
 
   useEffect(()=>{
     mounted.current=true;void load();
@@ -106,7 +116,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     return card.kind==='job'&&card.record.completionKind!=='visit'&&!['owner review','completed','complete','closed','billing ready','paid','cancelled','canceled'].includes(status);
   };
   const startAssignment=(card:BoardCard,technician?:string)=>{
-    if(!canManage(card))return;
+    if(!canManage(card)||assignmentSaver.needsRefresh||running.current>0)return;
     const start=String(card.record.scheduled||'').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
     const end=String(card.record.scheduledEnd||'').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
     const allowed=technicians.filter(t=>!card.department||!t.department||t.department===card.department);
@@ -118,7 +128,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     setSelected(null);
   };
   const dropOn = async (name: string) => {
-    if (!dragged || assignmentSaver.busy) return;
+    if (!dragged || assignmentSaver.busy || assignmentSaver.needsRefresh || running.current>0) return;
     const card = dragged, target = technicianMap.get(name);
     setDragged(null);
     if (!target || !canManage(card)) return;
@@ -134,11 +144,11 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       if (result.status === 'confirmed') {
         setNotice((card.reference || 'COS Job') + ' assignment saved and verified.');
         window.dispatchEvent(new Event('cos-board-updated'));
-      } else if (result.status !== 'busy') setActionError(result.message);
-    } finally { setSaving(false); }
+      } else if (result.status !== 'busy' && result.status !== 'refresh_required') setActionError(result.message);
+    } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
   };
   const saveAssignment = async () => {
-    if (assignmentSaver.busy) return;
+    if (assignmentSaver.busy || assignmentSaver.needsRefresh || running.current>0) return;
     if (!assigning || !assignment.date || !assignment.startTime || !assignment.endTime || !assignment.technician) {
       setActionError('Date, start time, end time and technician are required.'); return;
     }
@@ -157,17 +167,17 @@ export default function DailyBoard({api,openWorkspace}:Props) {
         setAssigning(null);
         setNotice('Schedule and technician assignment saved and verified.');
         window.dispatchEvent(new Event('cos-board-updated'));
-      } else if (result.status !== 'busy') {
+      } else if (result.status !== 'busy' && result.status !== 'refresh_required') {
         if (result.status === 'accepted_unverified') setAssigning(null);
         setActionError(result.message);
       }
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
   };
 
   return <section className={'cos-daily-board'+(tv?' cos-daily-board-tv':'')} aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
-      <div className='daily-board-actions'><button className='secondary' disabled={busy} onClick={()=>void load()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(v=>!v);setRotation(0);setSelected(null);}}>{tv?'Exit TV View':'TV View'}</button>{!tv&&<button onClick={()=>open('Owner Tasks')}>+ Assign Task</button>}</div>
+      <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(v=>!v);setRotation(0);setSelected(null);}}>{tv?'Exit TV View':'TV View'}</button>{!tv&&<button onClick={()=>open('Owner Tasks')}>+ Assign Task</button>}</div>
     </header>
 
     <div className='daily-board-range' aria-label='Board range'><button className={scope==='day'?'active':''} onClick={()=>setScope('day')}>Day</button><button className={scope==='week'?'active':''} onClick={()=>setScope('week')}>Week</button><span>{scope==='day'?'Today + overdue / unscheduled work':'Next 7 days + overdue / unscheduled work'}</span></div>
@@ -188,8 +198,8 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       <article><b>{counts.complete}</b><span>COMPLETED TODAY</span></article>
     </section>
 
-    {(error||stale)&&<div className='daily-board-error' role='alert'><strong>{lastSuccess?'Showing the last successful snapshot.':'Live records are unavailable.'}</strong> {error||'Refresh is delayed.'} <button className='secondary' disabled={busy} onClick={()=>void load()}>Retry</button></div>}
-    {actionError&&<div className='daily-board-error' role='alert'>{actionError}</div>}
+    {(error||stale)&&<div className='daily-board-error' role='alert'><strong>{lastSuccess?'Showing the last successful snapshot.':'Live records are unavailable.'}</strong> {error||'Refresh is delayed.'} <button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Retry</button></div>}
+    {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Refresh before another assignment</button>}</div>}
     {notice&&<div className='daily-board-notice' role='status'>{notice}</div>}
 
     {lastSuccess&&<section className='daily-board-readiness' aria-label='Daily truck readiness'><h3>Daily Truck Readiness <small>Today’s recorded checks</small></h3><div>{readiness.map(row=>{const summary=readinessSummary(row);return <article key={row.userId}><strong>{row.name} <small>{row.department.toUpperCase()}</small></strong>{(['truck','trailer','inventory'] as const).map(key=><p key={key}><span>{key==='truck'?'Truck inspection':key==='trailer'?'Trailer inspection':'Inventory record'}</span><b className={'daily-readiness-'+summary[key].state}>{summary[key].label}</b></p>)}<small>{row.completedAt?'Completed '+boardDateLabel(row.completedAt):row.startedAt?'Started '+boardDateLabel(row.startedAt):'No check recorded today'}</small></article>;})}</div>{!readiness.length&&<p>{sameDay?'No technicians match these filters.':'Refresh required before showing today’s readiness.'}</p>}</section>}
@@ -202,11 +212,11 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       const page=rotation%pages;
       const shown=tv?items.slice(page*3,page*3+3):items;
       const technician=technicianMap.get(name);
-      const dropReady=Boolean(dragged&&technician&&canManage(dragged)&&(!dragged.department||!technician.department||dragged.department===technician.department));
+      const dropReady=Boolean(!busy&&!refreshRequired&&dragged&&technician&&canManage(dragged)&&(!dragged.department||!technician.department||dragged.department===technician.department));
       return <section key={name} className={'daily-board-person'+(name==='Unassigned'?' unassigned':'')+(dropReady?' drop-ready':'')} aria-label={name} onDragOver={e=>{if(dropReady)e.preventDefault();}} onDrop={()=>dropOn(name)}>
         <h3><span>{name}</span><b>{items.length}</b>{technician&&<small>{technician.department.toUpperCase()}</small>}</h3>
         {tv&&pages>1&&<small className='daily-board-page'>Page {page+1} of {pages} · Rotates every 15 seconds</small>}
-        {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!saving&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(card)}>
+        {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(card)}>
           <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.kind==='job'?(card.record.completionKind==='visit'?'COMPLETED VISIT':'COS JOB'):'ASSIGNED TASK'}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
           <strong>{card.title}</strong>
           <span>{[card.reference,card.site].filter(Boolean).join(' · ')||'General work'}</span>
@@ -229,7 +239,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       <p>{selected.assignee} · {selected.status} · {boardDateLabel(selected.date)}</p>
       <p>{selected.kind==='job'?[selected.record.jobType,selected.record.equipment,selected.record.equipmentUnitTag].filter(Boolean).join(' · '):selected.record.instructions||''}</p>
       {jobNotes(selected)&&<p className='daily-board-detail-note'>{jobNotes(selected)}</p>}
-      <div className='daily-board-actions'>{canManage(selected)&&<button onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></div>
+      <div className='daily-board-actions'>{canManage(selected)&&<button disabled={busy||refreshRequired} onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></div>
     </section></dialog>}
 
     {assigning&&<dialog ref={assignDialog} className='daily-board-detail daily-board-assignment' aria-label='Schedule and reassign job' onCancel={event=>{if(saving)event.preventDefault();else setAssigning(null);}}><section>
@@ -237,7 +247,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       <small>MANAGEMENT SCHEDULING</small>
       <h3>{assigning.reference} · {assigning.title}</h3>
       <p>{assigning.site} · {assigning.record.jobType||'COS Job'} · {assigning.record.equipmentUnitTag||assigning.record.equipment||'Equipment pending'}</p>
-      {actionError&&<div className='daily-board-error' role='alert'>{actionError}</div>}
+      {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>Refresh before another assignment</button>}</div>}
       <div className='daily-board-assignment-grid'>
         <label>Service date<input type='date' disabled={saving} value={assignment.date} onChange={e=>setAssignment({...assignment,date:e.target.value})}/></label>
         <label>Start time<input type='time' disabled={saving} value={assignment.startTime} onChange={e=>setAssignment({...assignment,startTime:e.target.value})}/></label>
@@ -245,7 +255,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
         <label>Technician<select disabled={saving} value={assignment.technician} onChange={e=>setAssignment({...assignment,technician:e.target.value})}><option value=''>Select technician</option>{technicians.filter(t=>!assigning.department||!t.department||t.department===assigning.department).map(t=><option key={t.name} value={t.name}>{t.name} · {t.department.toUpperCase()}</option>)}</select></label>
       </div>
       <p className='daily-board-assignment-note'>Saving updates the existing production visit. Drag-and-drop never bypasses scheduling or department validation.</p>
-      <div className='daily-board-actions'><button className='secondary' disabled={saving} onClick={()=>setAssigning(null)}>Cancel</button><button disabled={saving||!assignment.technician} onClick={saveAssignment}>{saving?'Saving…':'Save Schedule & Assignment'}</button></div>
+      <div className='daily-board-actions'><button className='secondary' disabled={saving} onClick={()=>setAssigning(null)}>Cancel</button><button disabled={busy||saving||refreshRequired||!assignment.technician} onClick={saveAssignment}>{saving?'Saving…':'Save Schedule & Assignment'}</button></div>
     </section></dialog>}
   </section>;
 }

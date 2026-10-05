@@ -94,6 +94,9 @@ test('accepted writes require an independent readback and do not replay on read 
   assert.equal(result.status,'accepted_unverified');
   assert.equal(writes,1);
   assert.equal(reads,1);
+  assert.equal(saver.needsRefresh,true);
+  assert.equal((await saver.save('/api/jobs/'+id+'/dispatch',{},()=>true)).status,'refresh_required');
+  assert.equal(writes,1);
 });
 
 test('connection failures never trigger an automatic write retry',async()=>{
@@ -102,6 +105,14 @@ test('connection failures never trigger an automatic write retry',async()=>{
   assert.equal((await saver.save('/api/jobs/'+id+'/schedule',{},()=>true)).status,'unconfirmed');
   assert.equal(writes,1);
   assert.equal(reads,0);
+  assert.equal(saver.needsRefresh,true);
+  assert.equal((await saver.save('/api/jobs/'+id+'/schedule',{},()=>true)).status,'refresh_required');
+  assert.throws(()=>saver.acknowledgeRefresh({items:[job(),job()]}));
+  assert.equal(saver.needsRefresh,true);
+  saver.acknowledgeRefresh({items:[job()]});
+  assert.equal(saver.needsRefresh,false);
+  await saver.save('/api/jobs/'+id+'/schedule',{},()=>true);
+  assert.equal(writes,2);
 });
 
 test('a stale readback is accepted but unverified, and a matching fresh read confirms',async()=>{

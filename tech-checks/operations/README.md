@@ -42,6 +42,14 @@ GitHub Actions runs preservation checks, unit/contract tests and desktop/mobile 
 
 Browser fixtures exist only in tests. Production uses authenticated backend responses. Schedule and GPS writes are issued once and confirmed with a fresh backend snapshot. Connection failures do not automatically replay writes. Production database checks exercised native schedule, task and GPS saves with fresh snapshot readback inside rolled-back transactions. The next-pass verification also exercised native purchase review and Customer/Site/Equipment saves with full row/audit restoration, and invalid-state quote/invoice/AP denials. Four technicians' own reads and cross-technician denials were checked without changing identities or assignments. Browser tests verify saving and reload with test-only intercepted fixtures; a signed-in production browser save/reload has not yet been exercised.
 
+## End-to-end audit, 2026-10-05
+
+The [verification matrix](verification/end-to-end-20261005.json) distinguishes real authenticated owner reads from synthetic mutations, external workspaces, role boundaries and remaining gaps. All 20 native owner workspace reads loaded against the baseline deployment. This is not a full production write/technician/billing certification.
+
+Owner controls now verify resulting job/visit/approval state after a write, keep uncertain actions locked until a successful explicit refresh, and prevent overlapping refreshes and writes. Manual job creation confirms the new returned identity and workflow in the current jobs list; the existing snapshot does not expose title, description, priority or site IDs for full-field readback. Task saves verify related records, owner notes and both individual/department assignment fields. Truck approval retains nested shortage details and does not imply receipt.
+
+Workspace navigation reaches all AppDeploy handoff panels, supports Back/Forward, and dismisses old job dialogs when changing workspaces. AppDeploy may require a separate sign-in. Legacy IT/Service code, identity mappings, backend RPCs, database policy and permissions are unchanged by these front-end fixes. The separate IT-override/billing incompatibility and owner-preview Service-readiness error remain listed in the matrix until independently resolved.
+
 ## Rollback
 
 Revert the Operations commit set starting after f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3, or restore that commit's tech-checks/index.html to remove the new entry points. The existing technician source and schema were not replaced. The owner bridge can also be removed independently without altering either database's records.

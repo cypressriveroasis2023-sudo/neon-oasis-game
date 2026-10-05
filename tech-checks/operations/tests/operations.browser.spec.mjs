@@ -182,6 +182,24 @@ test('Daily Board keeps the last snapshot when refresh fails and reports unverif
   await expect(frame.getByRole('alert')).toContainText('Save accepted, but the requested assignment could not be confirmed.');
   await expect(frame.getByText('Schedule and technician assignment saved and verified.', { exact: true })).toHaveCount(0);
   expect(state.writes).toHaveLength(1);
+  const card = frame.locator('.daily-board-card').filter({ hasText: 'Fixture North Yard' });
+  await card.click();
+  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
+  await frame.getByRole('button', { name: 'Close details' }).click();
+  state.failedPaths.add('/api/daily-board');
+  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
+  await expect(frame.getByRole('alert').first()).toContainText('Showing the last successful snapshot.');
+  await card.click();
+  await expect(frame.getByRole('button', { name: 'Schedule / Reassign' })).toBeDisabled();
+  await frame.getByRole('button', { name: 'Close details' }).click();
+  expect(state.writes).toHaveLength(1);
+  state.failedPaths.delete('/api/daily-board');
+  state.readbackMismatch = false;
+  await frame.getByRole('button', { name: 'Refresh before another assignment' }).click();
+  const recovered = await assignmentDialog(frame);
+  await recovered.getByRole('button', { name: 'Save Schedule & Assignment' }).click();
+  await expect(frame.getByRole('status').filter({ hasText: 'Schedule and technician assignment saved and verified.' })).toBeVisible();
+  expect(state.writes).toHaveLength(2);
   await noOverflow(page);
 });
 
@@ -219,4 +237,30 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   await expect(frame.locator('.field-map-history')).toContainText('Synthetic gate location');
   expect(state.writes).toHaveLength(1);
   await noOverflow(page);
+});
+
+
+test('Field Map blocks another GPS write until a successful manual refresh', async ({ page }) => {
+  const { state, frame } = await fixturePage(page);
+  await open(frame, 'Field Map');
+  const save = frame.getByRole('button', { name: 'Save Unit GPS' });
+  await expect(save).toBeEnabled();
+  await frame.getByLabel('Latitude', { exact: true }).fill('29.81');
+  state.failedPaths.add('/api/field-map');
+  await save.click();
+  await expect(frame.getByRole('alert').first()).toContainText('GPS may have been saved');
+  await expect(save).toBeDisabled();
+  expect(state.writes).toHaveLength(1);
+  await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(frame.getByRole('alert').first()).toContainText('Synthetic source unavailable');
+  await expect(save).toBeDisabled();
+  expect(state.writes).toHaveLength(1);
+  state.failedPaths.delete('/api/field-map');
+  await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(save).toBeEnabled();
+  await expect(frame.getByLabel('Latitude', { exact: true })).toHaveValue('29.81');
+  await frame.getByLabel('Latitude', { exact: true }).fill('29.82');
+  await save.click();
+  await expect(frame.getByRole('status').filter({ hasText: 'GPS location saved and verified.' }).first()).toBeVisible();
+  expect(state.writes).toHaveLength(2);
 });
