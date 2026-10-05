@@ -54,3 +54,16 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
  await expect(records(frame)).toHaveCount(0);
  await expect(frame.getByText('192.0.2.1/32',{exact:true})).toHaveCount(0);
 });
+
+test('router polling preserves an open map popup',async({page})=>{
+ await page.clock.install({time:new Date()});
+ const {frame,state}=await mountRouterFixture(page);
+ await frame.getByRole('button',{name:'Open location map'}).click();
+ await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
+ await frame.locator('.cos-field-pin-wrap').click();
+ await expect(frame.locator('.leaflet-popup-content')).toContainText('Same-name router');
+ const readsBefore=state.requests.filter(r=>r.path==='/api/routers').length;
+ await page.clock.fastForward(61000);
+ await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
+ await expect(frame.locator('.leaflet-popup-content')).toContainText('Stored COS coordinates');
+});

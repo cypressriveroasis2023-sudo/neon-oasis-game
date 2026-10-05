@@ -14,14 +14,14 @@ export function useRouters() {
         if (status === 401 || status === 403) setData(null);
         setError(cause instanceof Error ? cause.message : 'Router inventory could not be loaded.');
       }
-    } finally { running.current = false; if (revision.current === request) setLoading(false); }
+    } finally { if (revision.current === request) { running.current = false; setLoading(false); } }
   }, []);
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => { setNow(Date.now()); if (!document.hidden) void refresh(); }, 60000);
     const visible = () => { if (!document.hidden) { setNow(Date.now()); void refresh(); } };
     document.addEventListener('visibilitychange', visible);
-    return () => { revision.current++; window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
+    return () => { revision.current++; running.current = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
   }, [refresh]);
   return { data, error, loading, refresh, now };
 }

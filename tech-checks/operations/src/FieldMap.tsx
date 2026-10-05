@@ -65,6 +65,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
   const mapNode=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<L.Map|null>(null);
   const layerRef=useRef<L.LayerGroup|null>(null);
+  const markersRef=useRef(new Map<string,L.Marker>());
 
   const load=async()=>{
     if (working.current) return;
@@ -148,6 +149,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
     const layer=layerRef.current;
     if(!map||!layer)return;
     layer.clearLayers();
+    markersRef.current.clear();
     const mapped=filtered.filter(hasCoords);
     const bounds:L.LatLngExpression[]=[];
     for(const unit of mapped){
@@ -162,11 +164,8 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
           iconAnchor:[27,34]
         })
       });
-      const popup=gpsPopup(document, unit);
-      popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
-      const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
-      if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
-      marker.bindPopup(popup);
+      marker.bindPopup(gpsPopup(document, unit));
+      markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current) setSelectedId(unit.id); });
       marker.addTo(layer);
     }
@@ -176,6 +175,19 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
       map.setView(bounds[0],14);
     }else if(bounds.length>1){
       map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14});
+    }
+  },[filtered,selectedId,data?.generatedAt]);
+
+  // Updating router observations must not clear an open popup or recenter a map the owner panned.
+  useEffect(()=>{
+    for(const unit of filtered){
+      const marker=markersRef.current.get(unit.id);
+      if(!marker)continue;
+      const popup=gpsPopup(document,unit);
+      popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
+      const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
+      if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
+      marker.setPopupContent(popup);
     }
   },[filtered,selectedId,data?.generatedAt,routers.data,routers.now]);
 
