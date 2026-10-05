@@ -23,6 +23,10 @@ test('Vision groups native workspaces and can return to classic without changing
  const {frame,requests}=await mount(page);
  await expect(frame.getByText('Connected to COS Operations',{exact:true})).toBeVisible();
  await expect(frame.getByText('1 job ready to schedule')).toBeVisible();
+ const nav=frame.getByRole('navigation',{name:'Vision main sections'});
+ const backgrounds=await nav.locator('button').evaluateAll(buttons=>buttons.map(button=>({name:button.textContent,active:button.getAttribute('aria-current'),background:getComputedStyle(button).backgroundImage})));
+ expect(backgrounds.find(button=>button.active)?.background).toContain('201, 11, 34');
+ expect(backgrounds.filter(button=>!button.active).every(button=>button.background.includes('17, 29, 38'))).toBeTruthy();
  const expectedHash={Jobs:'#jobs',Team:'#team',Units:'#equipment',Money:'#invoices',Today:'#today'};
  for(const name of ['Jobs','Team','Units','Money','Today']){
   const button=frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name,exact:true});

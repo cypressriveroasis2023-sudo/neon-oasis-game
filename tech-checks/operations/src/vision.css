@@ -140,3 +140,42 @@
 .vision-shell .vision-wordmark,.vision-shell .vision-clock{position:relative;z-index:1}
 .vision-shell .vision-primary-nav,.vision-shell .vision-workspace-nav,.vision-shell .vision-access,.vision-shell .vision-options{position:relative;z-index:4!important;pointer-events:auto!important}
 .vision-shell .vision-primary-nav button,.vision-shell .vision-workspace-nav button,.vision-shell .vision-access button,.vision-shell .vision-options button{position:relative;z-index:5!important;pointer-events:auto!important}
+
+
+/* Compact command-center navigation: active red, inactive dark/silver. */
+.operations-shell.vision-shell .vision-primary-nav button{background:linear-gradient(180deg,#111d26,#05090d)!important;border-color:#344854!important;color:#c9d4dc!important;box-shadow:inset 0 1px #ffffff0a!important}
+.operations-shell.vision-shell .vision-primary-nav button[aria-current]{background:linear-gradient(180deg,#c90b22,#76000f)!important;border-color:#ff4a5c!important;color:#fff!important;box-shadow:0 0 12px #d900214d,inset 0 1px #ffffff40!important}
+.operations-shell.vision-shell .vision-workspace-nav button{background:transparent!important;border-color:#263b47!important;color:#aebdc7!important;box-shadow:none!important}
+.operations-shell.vision-shell .vision-workspace-nav button[aria-current]{background:#101a22!important;border-color:#a91c2b!important;color:#fff!important;box-shadow:inset 0 -2px #d3192e!important}
+.vision-access{justify-content:center!important;gap:8px!important}
+.vision-access span{display:inline-flex!important;align-items:center!important;gap:6px!important;padding:4px 8px!important;background:transparent!important;border:0!important;color:#8eddb6!important;font-size:10px!important}
+.vision-access span i{display:block;width:6px;height:6px;border-radius:50%;background:#35df8c;box-shadow:0 0 8px #35df8c}
+.operations-shell.vision-shell .vision-options-toggle{width:30px!important;min-width:30px!important;height:26px!important;min-height:26px!important;padding:0!important;border-radius:999px!important;background:#0a151d!important;border-color:#3a4b56!important;color:#cbd6dd!important;letter-spacing:.08em!important;box-shadow:none!important}
+@media(max-width:700px){
+ .vision-shell .vision-header{padding:8px 8px 10px!important}
+ .vision-wordmark>div{font-size:31px!important}
+ .vision-letter-eye{width:39px!important;height:39px!important;flex-basis:39px!important}
+ .vision-wordmark p{margin:7px auto 8px!important}
+ .vision-clock{margin-top:6px!important;padding:6px 0!important}
+ .vision-clock time,.vision-clock strong{font-size:19px!important}
+ .vision-primary-nav{margin-top:7px!important;gap:4px!important}
+ .operations-shell.vision-shell .vision-primary-nav button{min-height:29px!important;padding:3px 2px!important;font-size:9px!important;border-radius:9px!important}
+ .vision-workspace-nav{margin:5px auto!important;gap:3px!important}
+ .operations-shell.vision-shell .vision-workspace-nav button{min-height:24px!important;padding:2px 7px!important;font-size:8px!important;border-radius:999px!important}
+ .vision-access{margin-top:3px!important}
+}
+
+
+/* Desktop VISION command-center composition. */
+@media(min-width:901px){
+ .vision-shell>.owner-it-main{max-width:1280px!important;padding:24px 32px 48px!important}
+ .vision-shell .vision-header{display:grid!important;grid-template-columns:minmax(260px,.8fr) minmax(420px,1.25fr) minmax(220px,.7fr)!important;grid-template-areas:"brand clock access" "primary primary primary" "workspace workspace workspace"!important;align-items:center!important;column-gap:24px!important;row-gap:10px!important;padding:18px 24px!important;margin-bottom:18px!important}
+ .vision-wordmark{grid-area:brand!important;text-align:left!important}.vision-wordmark>div{justify-content:flex-start!important;font-size:40px!important;letter-spacing:.18em!important}.vision-letter-eye{width:48px!important;height:48px!important;flex-basis:48px!important}.vision-wordmark p{margin:10px 0 0 4px!important;font-size:9px!important;letter-spacing:.35em!important}.vision-wordmark p:before{left:0!important;right:0!important}
+ .vision-clock{grid-area:clock!important;width:100%!important;max-width:560px!important;margin:0 auto!important;padding:9px 0!important}.vision-clock time,.vision-clock strong{font-size:24px!important}.vision-clock small{font-size:9px!important}
+ .vision-access{grid-area:access!important;justify-content:flex-end!important;margin:0!important}.vision-access span{font-size:10px!important;white-space:nowrap}
+ .vision-primary-nav{grid-area:primary!important;width:min(100%,760px)!important;max-width:760px!important;margin:2px auto 0!important;gap:7px!important}.operations-shell.vision-shell .vision-primary-nav button{min-height:34px!important;padding:5px 12px!important;font-size:11px!important;border-radius:9px!important}
+ .vision-workspace-nav{grid-area:workspace!important;margin:0 auto!important;gap:5px!important;max-width:980px!important}.operations-shell.vision-shell .vision-workspace-nav button{min-height:28px!important;padding:4px 10px!important;font-size:10px!important}
+ .vision-preview-note{display:none!important}
+ .vision-options{position:absolute!important;right:24px!important;top:78px!important;width:260px!important;z-index:20!important;text-align:left!important}
+ .vision-shell .command-page-header{padding:12px 0 8px!important}.vision-shell .command-page-header h1{font-size:28px!important}
+}
