@@ -5,7 +5,7 @@ export const visionGroups = [
   { name: 'Jobs', home: 'Jobs', pages: ['Jobs', 'Unscheduled', 'Dispatch', 'Owner Review', 'Calendar', 'Handoffs', 'Customers', 'Sites'] },
   { name: 'Team', home: 'Team', pages: ['Team', 'Tech Check'] },
   { name: 'Units', home: 'Equipment', pages: ['Equipment', 'Field Map', 'Camera Health'] },
-  { name: 'Money', home: 'Billing', pages: ['Billing', 'Quotes', 'Invoices', 'Purchasing'] },
+  { name: 'Money', home: 'Invoices', pages: ['Invoices', 'Billing', 'Quotes', 'Purchasing'] },
 ];
 export default function VisionHeader({ active, navigate, now, connected, checking, classic, allTools }: {
   active: string; navigate: (name: string) => void; now: Date; connected: boolean;
