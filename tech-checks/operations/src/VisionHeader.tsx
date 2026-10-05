@@ -26,7 +26,7 @@ export default function VisionHeader({ active, navigate, now, connected, checkin
     <nav className='vision-primary-nav' aria-label='Vision main sections'>{visionGroups.map(item => <button key={item.name} type='button' aria-current={group?.name === item.name ? 'page' : undefined} onClick={() => navigate(item.home)}>{item.name}</button>)}</nav>
     <nav className='vision-workspace-nav' aria-label='Workspaces in this section'>{group?.pages.map(name => <button type='button' key={name} aria-current={active === name ? 'page' : undefined} onClick={() => navigate(name)}>{name === 'Equipment' ? 'Unit directory' : name === 'Unscheduled' ? 'Schedule visits' : name}</button>)}</nav>
     <p className='vision-preview-note'>Vision interface preview · existing Operations records</p>
-    <div className='vision-access'><span role='status'>{connected ? 'Connected to COS Operations' : checking ? 'Verifying account…' : 'Account verification required'}</span><button type='button' aria-expanded={options} onClick={() => setOptions(value => !value)}>Options</button></div>
+    <div className='vision-access'><span role='status'><i aria-hidden='true'></i>{connected ? 'COS Operations' : checking ? 'Verifying…' : 'Verification required'}</span><button className='vision-options-toggle' type='button' aria-label='Vision options' aria-expanded={options} onClick={() => setOptions(value => !value)}>•••</button></div>
     {options && <div className='vision-options'><p>Vision interface preview · uses your existing account and live Operations records.</p><button type='button' onClick={classic}>Use classic layout</button><button type='button' onClick={allTools}>All existing tools</button></div>}
   </header>;
 }
