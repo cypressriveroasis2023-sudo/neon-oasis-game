@@ -9,7 +9,7 @@ async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm
   const url=route.request().url();
   if(url===origin+'/vision-test')return route.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style></head><body><iframe title="Native Vision" src="/?theme=vision"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,accessToken:'synthetic-only',role:'${role}'},location.origin)});</script></body></html>`});
   if(url.startsWith(origin+'/'))return route.continue();
-  if(url.startsWith('https://vrm.victronenergy.com/installation/')&&url.includes('/embed/'))return route.fulfill({contentType:'text/html',body:'<h1>Synthetic Victron dashboard</h1>'});
+  if(url.startsWith('https://vrm.victronenergy.com/installation/')&&url.includes('/embed/'))return route.fulfill({contentType:'text/html',body:'<main style="text-align:center;font-family:Arial,sans-serif;background:#303030;color:#fff;padding:48px 16px;min-height:100vh;box-sizing:border-box"><h1>Test dashboard · no live readings</h1><p>The live COS screen loads battery, solar, and load readings from Victron here.</p></main><style>body{margin:0}</style>'});
   if(url!==edge)return route.abort('blockedbyclient');
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -39,6 +39,7 @@ test('All nine verified VRM portals work with sharing disabled',async({page})=>{
   await nav.getByRole('button',{name:unit.name+' VRM portal',exact:true}).click();
   await expect(frame.getByRole('link',{name:'Open '+unit.name+' in VRM ↗',exact:true})).toHaveAttribute('href',unit.portalUrl);
   await expect(nav.getByRole('button',{name:unit.name+' VRM portal',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(frame.getByRole('definition').filter({hasText:String(unit.installationId)})).toHaveText(String(unit.installationId));
  }
  await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
@@ -61,6 +62,8 @@ test('Dashboard controls resize without losing the selected installation or issu
  const {frame,requests}=await mount(page,{config:vrmPortalConfig(JSON.stringify(embeds))});await openVrm(frame);
  const dashboard=frame.locator('iframe.vrm-dashboard');
  const compactHeight=await dashboard.evaluate(el=>el.getBoundingClientRect().height);
+ const position=await dashboard.evaluate(el=>{const outer=el.parentElement.getBoundingClientRect(),inner=el.getBoundingClientRect();return Math.abs((outer.left+outer.right)/2-(inner.left+inner.right)/2)});expect(position).toBeLessThanOrEqual(2);
+ await expect(frame.getByText('9 / 9 configured',{exact:true})).toBeVisible();
  await expect(frame.getByRole('button',{name:'Previous Helios unit',exact:true})).toBeDisabled();
  await frame.getByRole('button',{name:'Expand dashboard',exact:true}).click();
  await expect(frame.getByRole('button',{name:'Compact view',exact:true})).toHaveAttribute('aria-expanded','true');
@@ -79,5 +82,5 @@ test('Dashboard controls resize without losing the selected installation or issu
  await expect(frame.getByText('For history, alarms, trends, and installation settings,',{exact:false})).toBeVisible();
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
- if(process.env.COS_LAYOUT_PROOF){await frame.getByRole('heading',{name:'Helios power monitoring'}).scrollIntoViewIfNeeded();await page.screenshot({path:`${process.env.COS_LAYOUT_PROOF}/vrm-${testInfo.project.name}.png`,fullPage:true});}
+ if(process.env.COS_LAYOUT_PROOF){await frame.locator('.vrm-workspace').evaluate(el=>el.scrollIntoView({block:'start'}));await page.screenshot({path:`${process.env.COS_LAYOUT_PROOF}/vrm-${testInfo.project.name}.png`,fullPage:true});}
 });

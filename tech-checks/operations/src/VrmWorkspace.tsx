@@ -42,9 +42,18 @@ export default function VrmWorkspace() {
         <a className='operations-reference-link' href={unit.portalUrl} target='_blank' rel='noopener noreferrer'>Open {unit.name} in VRM ↗</a>
       </div>
     </div>
+    <div className='vrm-dashboard-stage'>
+    <dl className='vrm-installation-info' aria-label='Selected installation information'>
+      <div><dt>Unit</dt><dd>{unit.name}</dd></div>
+      <div><dt>VRM installation</dt><dd>{unit.installationId}</dd></div>
+      <div><dt>Dashboard access</dt><dd>{loading ? 'Checking access' : error ? 'Check unavailable' : unit.embedUrl ? 'Read-only enabled' : 'Open in VRM'}</dd></div>
+      <div><dt>Embedded dashboards</dt><dd>{loading || error ? 'Not verified' : enabled + ' / 9 configured'}</dd></div>
+    </dl>
     {unit.embedUrl ? <>
       <iframe id='vrm-dashboard' key={unit.installationId + '-' + revision} className='vrm-dashboard' title={unit.name + ' Victron dashboard'} src={unit.embedUrl} referrerPolicy='no-referrer' sandbox='allow-scripts allow-same-origin allow-forms allow-popups' allow='fullscreen'/>
     </> : <div className='vrm-awaiting' role='status'><h3>{loading ? 'Checking embedded dashboard access…' : 'Open this unit in VRM'}</h3><p>The full portal is available with your Victron sign-in. Displaying its dashboard here awaits approval of VRM’s read-only sharing settings.</p><a className='operations-reference-link' href={unit.portalUrl} target='_blank' rel='noopener noreferrer'>View {unit.name} dashboard ↗</a></div>}
+    <p className='vrm-reporting-context'>Battery, solar, and load readings are supplied by Victron below. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts.</p>
+    </div>
     {!loading && !error && <p className='vrm-note'>{enabled} of 9 dashboards enabled inside COS. Unit names and portal links are verified; battery and solar readings come from Victron.</p>}
     <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard; Refresh dashboards checks access to all nine installations.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS shows Victron’s read-only dashboard; it does not change equipment settings.</p></details>
   </section>;

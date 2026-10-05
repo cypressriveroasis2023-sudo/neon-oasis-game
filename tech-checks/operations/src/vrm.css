@@ -10,3 +10,11 @@
 #root .operations-shell .vrm-workspace .purchase-actions button.secondary,#root .operations-shell .vrm-workspace .vrm-view-actions button.secondary{background:linear-gradient(180deg,#1b2b39,#101923)!important;border-color:#465b6b!important;color:#edf3f8!important}
 html[data-theme='light'] .vrm-workspace .vrm-fleet-heading span,html[data-theme='light'] .vrm-workspace .vrm-eyebrow,html[data-theme='light'] .vrm-workspace .vrm-access-status,html[data-theme='light'] .vrm-workspace .vrm-note,html[data-theme='light'] .vrm-workspace .vrm-help{color:#40586c}
 html[data-theme='light'] .vrm-workspace .vrm-help summary{color:#182d40}
+.vrm-dashboard-stage{padding:16px;border:1px solid #354958;border-radius:12px;background:#080f17}
+.vrm-installation-info{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 auto 16px;max-width:1040px;text-align:center}
+.vrm-installation-info>div{min-width:0;padding:12px 8px;background:#111e2a;border:1px solid #354958;border-radius:8px}
+.vrm-workspace .vrm-installation-info dt{color:#b4c2ce;font-size:11px;font-weight:500;letter-spacing:.04em}.vrm-installation-info dd{margin:7px 0 0;color:#edf3f8;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.vrm-dashboard-stage .vrm-dashboard,.vrm-dashboard-stage .vrm-awaiting{max-width:1040px;margin-inline:auto}
+.vrm-workspace .vrm-reporting-context{max-width:800px;margin:14px auto 0;text-align:center;color:#b4c2ce;font-size:12px;line-height:1.6}
+html[data-theme='light'] .vrm-dashboard-stage{background:#eaf1f6;border-color:#b9cbd8}html[data-theme='light'] .vrm-installation-info>div{background:#fff;border-color:#b9cbd8}html[data-theme='light'] .vrm-workspace .vrm-installation-info dt,html[data-theme='light'] .vrm-workspace .vrm-reporting-context{color:#40586c}html[data-theme='light'] .vrm-installation-info dd{color:#182d40}
+@media(max-width:700px){.vrm-dashboard-stage{padding:10px}.vrm-installation-info{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.vrm-installation-info dd{font-size:12px}.vrm-installation-info>div{padding:10px 5px}}
