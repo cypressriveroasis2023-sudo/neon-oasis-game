@@ -1,0 +1,160 @@
+import { test, expect } from '@playwright/test';
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve, extname } from 'node:path';
+
+const origin = 'http://127.0.0.1:4173';
+const repo = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+const legacy = readFileSync(resolve(repo, 'tech-checks/technician-wizard-owner-dashboard-v5.js'), 'utf8');
+const section = (start, end) => {
+  const from = legacy.indexOf(start), to = legacy.indexOf(end, from);
+  if (from < 0 || to <= from) throw new Error('Protected legacy test function was not found');
+  return legacy.slice(from, to);
+};
+// Run the actual protected Service-home render/read functions. Only their data
+// client is synthetic. No request reaches a database or a technician account.
+const legacyHome = [
+  section('function esc(v)', 'function resetWizardPosition'),
+  section('async function currentTechIdentity()', 'async function setJobAssignmentStatusCompat'),
+  section('async function loadMyServiceTruckReadiness()', 'function serviceTruckUnitOrder'),
+  section('async function latestServiceInspectionToday()', 'async function startTrailerInspection'),
+  section('async function showSvcHome()', 'function showServiceJobLookup'),
+].join('\n');
+const sourceHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+const types = { '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.svg':'image/svg+xml', '.html':'text/html' };
+const fixtureScript = `
+  window.fixture = { role:'owner', subject:'fixture-owner', preview:null, mode:'success', calls:[], actions:[] };
+  const liveDb = {
+    auth: { onAuthStateChange:fn => { fixture.authChanged=fn; return {}; },
+      getSession:async()=>({data:{session:fixture.subject?{user:{id:fixture.subject},access_token:'synthetic-only'}:null}}),
+      getUser:async()=>({data:{user:{id:fixture.subject}}}) },
+    rpc:async(name,args)=>{
+      fixture.calls.push({name,args});
+      if (fixture.role==='owner'&&!fixture.preview) return {error:{message:'Active Service Tech required.'}};
+      if (fixture.mode==='failure') return {error:{message:'Synthetic unavailable'}};
+      if (fixture.mode==='pending') return new Promise(resolve=>{fixture.resolve=resolve;});
+      return {data:{inspection_ready:true,inventory_ready:true}};
+    },
+    from:()=>{const query={select:()=>query,eq:()=>query,gte:()=>query,order:()=>query,
+      limit:async()=>({data:[{truck_checks:{},taking_trailer:false}]})};return query;}
+  };
+  function ownerTestPreviewContext(){return fixture.preview;}
+  function ownerTestPreviewFor(role){return fixture.preview?.preview_role===role?fixture.preview:null;}
+  function resetWizardPosition(){}
+  function takeTechCompletion(){return null;}
+  function techCompletionBanner(){return '';}
+  window.TechCheckContext={db:liveDb,getRole:()=>fixture.role,
+    getEffectiveRole:()=>fixture.preview?.preview_role||fixture.role,
+    getSession:()=>fixture.subject?{user:{id:fixture.subject}}:null};
+  ${legacyHome}
+  window.renderServiceHome=showSvcHome;
+  window.setIdentity=(role,preview=false)=>{
+    fixture.role=role;fixture.subject=role?'fixture-'+role:null;
+    fixture.preview=preview?{persona_id:'fixture-persona',preview_role:'service',ticket:'fixture-only'}:null;
+    document.body.classList.toggle('owner-test-role-preview',preview);
+    document.getElementById('whoRole').textContent=preview||role==='service'?'Service Tech':role==='owner'?'Owner/Admin':'IT Technician';
+    document.getElementById('whoName').textContent='Fixture Person';
+    document.getElementById('appView').classList.toggle('hidden',!role);
+    fixture.authChanged?.('SIGNED_IN',fixture.subject?{user:{id:fixture.subject}}:null);
+    dispatchEvent(new CustomEvent('techcheck:data-refreshed'));
+  };
+  window.show=view=>{
+    for (const name of ['owner','it','svc']) document.getElementById('view-'+name).classList.toggle('hidden',name!==view);
+    dispatchEvent(new CustomEvent('techcheck:view-changed',{detail:{view}}));
+  };
+  document.getElementById('sessionLoading').remove();
+  document.getElementById('tab-owner').addEventListener('click',()=>show('owner'));
+  document.getElementById('tab-svc').addEventListener('click',()=>{show('svc');renderServiceHome();});
+  document.addEventListener('click',event=>{
+    if (event.target.closest('[data-wl-service-open-job]')) fixture.actions.push('job');
+    if (event.target.closest('[data-wl-service-return]')) fixture.actions.push('return');
+  });
+  setIdentity('owner');show('svc');renderServiceHome();
+`;
+const html = sourceHtml.replace('</body>', `<script>${fixtureScript}</script><script type="module" src="./operations-host.js"></script></body>`);
+
+async function mount(page) {
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== origin) return route.abort('blockedbyclient');
+    if (url.pathname === '/tech-checks/') return route.fulfill({ contentType:'text/html', body:html });
+    const path = resolve(repo, '.' + decodeURIComponent(url.pathname));
+    if (path.startsWith(repo + '/') && existsSync(path)) return route.fulfill({ path, contentType:types[extname(path)] || 'application/octet-stream' });
+    return route.abort('blockedbyclient');
+  });
+  await page.goto('/tech-checks/');
+  await expect(page.locator('#wlSvcHome')).toBeVisible();
+}
+const daily = page => page.locator('#wlSvcHome [data-wl-svc="inspect"], #wlSvcHome [data-wl-service-trailer-inspection], #wlSvcHome [data-wl-service-truck-inventory]');
+
+async function expectOwnerNotice(page) {
+  await expect(page.locator('#cosOwnerServiceNotice')).toContainText('viewing Service tools as Owner');
+  await expect(page.locator('#wlSvcHome')).not.toContainText('Checking today');
+  await expect(daily(page)).toHaveCount(3);
+  for (const button of await daily(page).all()) {
+    await expect(button).toBeDisabled();
+    await expect(button).toContainText('Service Tech sign-in required');
+    await expect(button).toHaveAttribute('aria-describedby','cosOwnerServiceNotice');
+    await expect(button).not.toHaveClass(/complete/);
+  }
+}
+
+test('Owner Service home explains account requirements after the real legacy RPC rejection', async ({ page }, testInfo) => {
+  await mount(page);
+  await expectOwnerNotice(page);
+  await expect(page.getByRole('note')).toContainText('Daily truck, trailer and inventory checks belong to the signed-in Service Tech');
+  await page.locator('#wlSvcHome [data-wl-service-open-job]').click();
+  await page.locator('#wlSvcHome [data-wl-service-return]').click();
+  expect(await page.evaluate(()=>fixture.actions)).toEqual(['job','return']);
+  const calls = await page.evaluate(()=>fixture.calls);
+  expect(calls).toEqual([{name:'service_departure_readiness_v1'}]);
+  await page.screenshot({path:testInfo.outputPath('owner-service-context.png'),fullPage:true});
+  await testInfo.attach('Owner-only Service account notice',{path:testInfo.outputPath('owner-service-context.png'),contentType:'image/png'});
+});
+
+test('repeated legacy refreshes and replacement home nodes cannot restore misleading Owner checks', async ({ page }) => {
+  await mount(page);
+  for (let index=0;index<3;index++) {
+    await page.evaluate(async()=>{if(document.getElementById('wlSvcHome')) document.getElementById('wlSvcHome').remove();await renderServiceHome();});
+    await expectOwnerNotice(page);
+  }
+  expect(await page.evaluate(()=>fixture.calls.length)).toBe(4);
+  await page.locator('#cosOperationsTechReturn').click();
+  await expect(page.locator('#view-owner')).toBeVisible();
+  await expect(page.locator('#cosOwnerServiceNotice')).toHaveCount(0);
+  await expect(daily(page).first()).toBeEnabled();
+  await page.evaluate(()=>document.getElementById('tab-svc').click());
+  await expectOwnerNotice(page);
+});
+
+test('real Service and owner test-persona renders preserve their original readiness and launch controls', async ({ page }) => {
+  await mount(page);
+  for (const [role,preview] of [['service',false],['owner',true]]) {
+    await page.evaluate(async([role,preview])=>{setIdentity(role,preview);await renderServiceHome();},[role,preview]);
+    await expect(page.locator('#cosOwnerServiceNotice')).toHaveCount(0);
+    await expect(daily(page).nth(0)).toContainText('Completed Today');
+    await expect(daily(page).nth(1)).toContainText('No Trailer Today');
+    await expect(daily(page).nth(2)).toContainText('Completed Today');
+    for (const button of await daily(page).all()) {
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveClass(/complete/);
+      await expect(button).not.toHaveAttribute('aria-describedby','cosOwnerServiceNotice');
+    }
+  }
+  expect((await page.evaluate(()=>fixture.calls)).at(-1)).toEqual({name:'service_departure_readiness_v1',args:{p_service_tech_id:'fixture-persona'}});
+  await page.evaluate(async()=>{setIdentity('owner');await renderServiceHome();});
+  await expectOwnerNotice(page);
+  await page.evaluate(()=>setIdentity(null));
+  await expect(page.locator('#cosOwnerServiceNotice')).toHaveCount(0);
+  await expect(daily(page).first()).toBeEnabled();
+});
+
+test('a genuine Service readiness failure stays a failure and is never mislabeled an Owner restriction', async ({ page }) => {
+  await mount(page);
+  await page.evaluate(async()=>{setIdentity('service');fixture.mode='failure';document.getElementById('wlSvcHome').remove();await renderServiceHome();});
+  await expect(page.locator('#cosOwnerServiceNotice')).toHaveCount(0);
+  await expect(daily(page).first()).toBeEnabled();
+  await expect(daily(page).first()).toContainText('Checking today');
+  await expect(page.locator('#wlSvcHome .wl-service-help')).toHaveText('Service page is ready. Live status will refresh automatically.');
+  expect(await page.evaluate(()=>fixture.calls.length)).toBe(2);
+});
