@@ -187,7 +187,12 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
       popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
       const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
       if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
-      marker.setPopupContent(popup);
+      const openPopup=marker.getPopup();
+      if(openPopup){
+        const autoPan=openPopup.options.autoPan;
+        openPopup.options.autoPan=false;
+        try{openPopup.setContent(popup);}finally{openPopup.options.autoPan=autoPan;}
+      }
     }
   },[filtered,selectedId,data?.generatedAt,routers.data,routers.now]);
 
