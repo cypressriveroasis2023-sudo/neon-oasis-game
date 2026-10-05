@@ -133,3 +133,10 @@
  .vision-decisions article button{min-height:34px!important;padding:5px 10px!important;font-size:12px!important}
  .vision-shell .panel.module,.vision-shell .panel{border-radius:12px!important}
 }
+
+/* Ensure desktop VISION nav hit targets stay above decorative header layers. */
+.vision-shell .vision-header{isolation:isolate}
+.vision-shell .vision-header:before{z-index:0!important;pointer-events:none!important}
+.vision-shell .vision-wordmark,.vision-shell .vision-clock{position:relative;z-index:1}
+.vision-shell .vision-primary-nav,.vision-shell .vision-workspace-nav,.vision-shell .vision-access,.vision-shell .vision-options{position:relative;z-index:4!important;pointer-events:auto!important}
+.vision-shell .vision-primary-nav button,.vision-shell .vision-workspace-nav button,.vision-shell .vision-access button,.vision-shell .vision-options button{position:relative;z-index:5!important;pointer-events:auto!important}
