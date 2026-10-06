@@ -24,16 +24,16 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
     const html=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     const scripts=[...html.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
-    const originalMarkup=html.replace(/<meta name="theme-color"[^>]+>/g,'')
-      .replace(/<link rel="stylesheet" href="\.\/company-tools-theme\.css\?v=company-20261006">\n?/g,'').trim();
+    const originalMarkup=html.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')
+      .replace(/<link rel="stylesheet" href="\.\/company-tools-theme\.css\?v=company-dark-20261006c">\n?/g,'').trim();
     assert.equal(createHash('sha256').update(originalMarkup).digest('hex'),markupHashes[name]);
-    assert.equal((html.match(/href="\.\/company-tools-theme\.css\?v=company-20261006"/g)||[]).length,1);
+    assert.equal((html.match(/href="\.\/company-tools-theme\.css\?v=company-dark-20261006c"/g)||[]).length,1);
     assert.ok(html.lastIndexOf('company-tools-theme.css')>html.lastIndexOf('</style>'));
-    assert.match(html,/<meta name="theme-color" content="#F1F4F9">/);
+    assert.match(html,/<meta name="theme-color" content="#0B111C">/);
   });
 }
 test('company tools palette uses local Open Sans and leaves display state to legacy code',()=>{
-  for (const color of ['#F1F4F9','#FFFFFF','#F8FAFD','#172C47','#60748F','#DCE4EF','#315FDF','#E7EEFF','#E8F4EC','#287451','#FFF1D9','#8A601E']) assert.ok(theme.includes(color));
+  for (const color of ['#0B111C','#111B2A','#172337','#E6EDF7','#A3B3CA','#2C3B51','#315FDF','#91B0FF','#203456','#15352D','#83D6AD','#3B2D18','#EDC27B','#3E202B','#F4A2AC']) assert.ok(theme.includes(color));
   for(const weight of ['regular','semibold','bold']) {
     assert.ok(readFileSync(new URL(`../../resources/fonts/open-sans-${weight}.woff`,import.meta.url)).length>10000);
     assert.ok(theme.includes(`./resources/fonts/open-sans-${weight}.woff`));

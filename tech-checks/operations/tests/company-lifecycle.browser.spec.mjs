@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import { buildSync } from 'esbuild';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -16,7 +17,7 @@ const script = compiled.outputFiles.find(file => file.path.endsWith('.js')).text
 const css = compiled.outputFiles.find(file => file.path.endsWith('.css')).text + ['continuation.css', 'index.css', 'shell.css', 'companyTheme.css'].map(file => readFileSync(resolve(operations, 'src', file), 'utf8')).join('\n');
 async function mount(page) {
   // Every request is local synthetic markup or blocked. No production records or writes.
-  await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4173/company-lifecycle-fixture') ? route.fulfill({ contentType: 'text/html', body: `<html data-theme='light'><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{margin:0}*{box-sizing:border-box}${css}</style><div id='root'></div><script>${script}</script></html>` }) : route.abort('blockedbyclient'));
+  await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4173/company-lifecycle-fixture') ? route.fulfill({ contentType: 'text/html', body: `<html data-theme='dark'><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{margin:0}*{box-sizing:border-box}${css}</style><div id='root'></div><script>${script}</script></html>` }) : route.abort('blockedbyclient'));
   await page.goto('/company-lifecycle-fixture');
 }
 
@@ -44,6 +45,8 @@ test('connected stages and tabs preserve truthful unknowns and exact selected jo
   await expect(page.getByLabel('Selected action')).toHaveText('synthetic-job-a:Jobs');
   const size = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
   expect(size.content).toBeLessThanOrEqual(size.width + 1);
+  expect((await auditDarkPresentation(details)).failures).toEqual([]);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: info.outputPath('company-lifecycle-detail.png'), fullPage: true });
 });
 

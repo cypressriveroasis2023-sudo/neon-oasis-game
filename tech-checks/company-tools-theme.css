@@ -22,22 +22,23 @@
   font-display: swap;
 }
 :root {
-  color-scheme: light;
-  --cos-page: #F1F4F9;
-  --cos-app: #FFFFFF;
-  --cos-soft: #F8FAFD;
-  --cos-text: #172C47;
-  --cos-muted: #60748F;
-  --cos-line: #DCE4EF;
-  --cos-blue: #315FDF;
-  --cos-selected: #E7EEFF;
-  --cos-green: #287451;
-  --cos-green-bg: #E8F4EC;
-  --cos-amber: #8A601E;
-  --cos-amber-bg: #FFF1D9;
-  --cos-red: #A33543;
-  --cos-red-bg: #FCEBED;
-  --cos-shadow: 0 8px 28px rgba(23,44,71,.07);
+  color-scheme: dark;
+  --cos-page: #0B111C;
+  --cos-app: #111B2A;
+  --cos-soft: #172337;
+  --cos-text: #E6EDF7;
+  --cos-muted: #A3B3CA;
+  --cos-line: #2C3B51;
+  --cos-blue: #91B0FF;
+  --cos-primary: #315FDF;
+  --cos-selected: #203456;
+  --cos-green: #83D6AD;
+  --cos-green-bg: #15352D;
+  --cos-amber: #EDC27B;
+  --cos-amber-bg: #3B2D18;
+  --cos-red: #F4A2AC;
+  --cos-red-bg: #3E202B;
+  --cos-shadow: 0 8px 28px rgba(0,0,0,.24);
   /* Existing detail and Vision components consume these presentation tokens. */
   --bg: var(--cos-page);
   --bg2: var(--cos-soft);
@@ -45,9 +46,9 @@
   --panel2: var(--cos-soft);
   --panel3: var(--cos-selected);
   --line: var(--cos-line);
-  --line2: #C4D2E5;
+  --line2: #415777;
   --text: var(--cos-text);
-  --soft: #425D7D;
+  --soft: #C5D2E4;
   --muted: var(--cos-muted);
   --muted2: var(--cos-muted);
   --green: var(--cos-green);
@@ -77,7 +78,7 @@ body button, body a.btn, body .action, body .back, body .linkbtn {
 }
 body button:hover, body a.btn:hover, body .action:hover, body .back:hover, body .linkbtn:hover {
   background: var(--cos-soft);
-  border-color: #AEBFDB;
+  border-color: #52709A;
 }
 body button:disabled { cursor: not-allowed; }
 body input:not([type="checkbox"]):not([type="radio"]), body select, body textarea {
@@ -85,18 +86,18 @@ body input:not([type="checkbox"]):not([type="radio"]), body select, body textare
   max-width: 100%;
   background: var(--cos-app);
   color: var(--cos-text);
-  border-color: var(--cos-line);
+  border-color: #617895;
   border-radius: 9px;
   accent-color: var(--cos-blue);
 }
 body input::placeholder, body textarea::placeholder { color: var(--cos-muted); opacity: 1; }
 body :is(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid #8EA9F2 !important;
+  outline: 3px solid #91B0FF !important;
   outline-offset: 3px;
 }
 body .primary, body .action.primary, body #sign, body .verify-unit-now {
-  background: var(--cos-blue) !important;
-  border-color: var(--cos-blue) !important;
+  background: var(--cos-primary) !important;
+  border-color: var(--cos-primary) !important;
   color: #FFFFFF !important;
   text-shadow: none !important;
 }
@@ -134,15 +135,15 @@ body .authcard label { font-weight: 600; }
 body .authcard h2 { font-size: 25px; }
 body .error, body .notice.red, body .bad {
   background: var(--cos-red-bg);
-  border-color: #E5B8BE;
+  border-color: #673746;
   color: var(--cos-red);
 }
 body .notice, body .setupbox, body .warn {
   background: var(--cos-amber-bg);
-  border-color: #E6C992;
+  border-color: #60492B;
   color: var(--cos-amber);
 }
-body .ok { background: var(--cos-green-bg); border-color: #B7D6C3; color: var(--cos-green); }
+body .ok { background: var(--cos-green-bg); border-color: #2B5948; color: var(--cos-green); }
 
 /* Camera Health: quiet navigation, legible readings and separate state cues. */
 body .cos-sidebar { background: var(--cos-soft); border-color: var(--cos-line); }
@@ -155,19 +156,19 @@ body .cos-topline { background: var(--cos-page); border-bottom: 1px solid var(--
 body .cos-title h1 { font-size: 28px; }
 body .cos-title.vision-health-title>div>div { color: var(--cos-muted); }
 body .health-kpis .stat { background: var(--cos-app); border-color: var(--cos-line); }
-body .health-kpis .stat.master.online { background: var(--cos-green-bg); border-color: #B7D6C3; }
-body .health-kpis .stat.master.offline { background: var(--cos-red-bg); border-color: #E5B8BE; }
-body .health-kpis .stat.master.pending { background: var(--cos-amber-bg); border-color: #E6C992; }
-body .health-kpis .stat.master.inventory { background: var(--cos-selected); border-color: #C4D2F3; }
+body .health-kpis .stat.master.online { background: var(--cos-green-bg); border-color: #2B5948; }
+body .health-kpis .stat.master.offline { background: var(--cos-red-bg); border-color: #673746; }
+body .health-kpis .stat.master.pending { background: var(--cos-amber-bg); border-color: #60492B; }
+body .health-kpis .stat.master.inventory { background: var(--cos-selected); border-color: #355587; }
 body .health-kpis .stat[role="button"]:hover { border-color: var(--cos-blue); }
 body .health-kpis .stat small, body .health-kpis .stat[role="button"] small { color: var(--cos-muted); }
 body .stat b { font-weight: 650; }
 body .toolbar { background: var(--cos-app); }
 body .quickfilter { font-weight: 600; }
 body .quickfilter.active { outline: 2px solid var(--cos-blue); outline-offset: 1px; background: var(--cos-selected); }
-body .quickfilter.online { color: var(--cos-green); border-color: #B7D6C3; }
-body .quickfilter.offline { color: var(--cos-red); border-color: #E5B8BE; }
-body .quickfilter.degraded { color: var(--cos-amber); border-color: #E6C992; }
+body .quickfilter.online { color: var(--cos-green); border-color: #2B5948; }
+body .quickfilter.offline { color: var(--cos-red); border-color: #673746; }
+body .quickfilter.degraded { color: var(--cos-amber); border-color: #60492B; }
 body .opstitle, body .eventrow, body .historyrow, body .issue-row,
 body .panel th, body .panel td, body .unitcard .web-links { border-color: var(--cos-line); }
 body .panel th { background: var(--cos-soft); color: var(--cos-muted); }
@@ -210,15 +211,15 @@ body .unitcard .card-site.shop { color: var(--cos-amber) !important; }
 body .unitcard .site-chip, body .unitcard .type-chip { color: var(--cos-muted); background: var(--cos-soft); border-color: var(--cos-line); }
 body .statuspill, body .unitcard .statuspill, body .pill { background: var(--cos-soft); color: var(--cos-muted); border: 1px solid var(--cos-line); font-weight: 700; }
 html body .statuspill.online, html body .unitcard.online .statuspill.online, body .pill.online {
-  background: var(--cos-green-bg) !important; color: var(--cos-green) !important; border-color: #B7D6C3 !important; box-shadow: none !important;
+  background: var(--cos-green-bg) !important; color: var(--cos-green) !important; border-color: #2B5948 !important; box-shadow: none !important;
 }
 html body .statuspill.offline, html body .unitcard.offline .statuspill.offline, body .pill.offline {
-  background: var(--cos-red-bg) !important; color: var(--cos-red) !important; border-color: #E5B8BE !important; box-shadow: none !important;
+  background: var(--cos-red-bg) !important; color: var(--cos-red) !important; border-color: #673746 !important; box-shadow: none !important;
 }
 html body .statuspill.degraded, html body .statuspill.verifying, html body .statuspill.waiting,
 html body .unitcard.degraded .statuspill.degraded, body .pill.degraded, body .pill.verifying,
 body .unitcard .unitissuepill, body .unitcard.online .unitissuepill {
-  background: var(--cos-amber-bg) !important; color: var(--cos-amber) !important; border-color: #E6C992 !important; box-shadow: none !important;
+  background: var(--cos-amber-bg) !important; color: var(--cos-amber) !important; border-color: #60492B !important; box-shadow: none !important;
 }
 body .unit-health-summary .uhs span { color: var(--cos-muted); }
 body .unit-health-summary .uhs.up, body .unit-time-strip .time-good { background: var(--cos-green-bg); }
@@ -234,12 +235,12 @@ body .unitcard .last-success-ping { color: var(--cos-green) !important; text-sha
 body .unitcard .last-success-ping.missing { color: var(--cos-amber) !important; }
 body .component { background: var(--cos-soft); border-color: var(--cos-line); }
 body .component.camera-good, body .unitcard .component:has(.statuspill.online) {
-  background: var(--cos-green-bg) !important; border-color: #B7D6C3 !important; box-shadow: inset 3px 0 0 var(--cos-green) !important;
+  background: var(--cos-green-bg) !important; border-color: #2B5948 !important; box-shadow: inset 3px 0 0 var(--cos-green) !important;
 }
 body .component.camera-offline, body .unitcard .component:has(.statuspill.offline) {
-  background: var(--cos-red-bg) !important; border-color: #E5B8BE !important; box-shadow: inset 3px 0 0 var(--cos-red) !important;
+  background: var(--cos-red-bg) !important; border-color: #673746 !important; box-shadow: inset 3px 0 0 var(--cos-red) !important;
 }
-body .component.camera-issue { background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; box-shadow: inset 3px 0 0 var(--cos-amber) !important; }
+body .component.camera-issue { background: var(--cos-amber-bg) !important; border-color: #60492B !important; box-shadow: inset 3px 0 0 var(--cos-amber) !important; }
 body .component.camera-waiting { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; box-shadow: inset 3px 0 0 var(--cos-muted) !important; }
 body .component.camera-detail-link>b, body .component.camera-good>b,
 body .component.camera-offline>b, body .component.camera-issue>b { color: var(--cos-text) !important; }
@@ -257,16 +258,16 @@ body .camera-open-cta, body .component.camera-good .camera-open-cta,
 body .component.camera-offline .camera-open-cta, body .component.camera-issue .camera-open-cta,
 body .camera-detail-link:hover .camera-open-cta, body .web-link, body .unitcard .web-link,
 body .web-link:hover, body .it-diag-actions button, body #mobileActivityToggle {
-  background: var(--cos-selected) !important; border-color: #C4D2F3 !important; color: var(--cos-blue) !important; box-shadow: none !important; font-weight: 600 !important;
+  background: var(--cos-selected) !important; border-color: #355587 !important; color: var(--cos-blue) !important; box-shadow: none !important; font-weight: 600 !important;
 }
 body .camera-link-main { color: var(--cos-text); }
 body .camera-link-arrow { color: var(--cos-blue); }
 body .camera-front-link.online .camera-link-state { color: var(--cos-green); }
 body .camera-front-link.offline .camera-link-state { color: var(--cos-red); }
 body .unitcard .send-root-unit, body .unitcard .degraded-front, body .unitcard.online .downline {
-  background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; color: var(--cos-amber) !important;
+  background: var(--cos-amber-bg) !important; border-color: #60492B !important; color: var(--cos-amber) !important;
 }
-body .downline { background: var(--cos-red-bg); border-color: #E5B8BE; color: var(--cos-red); }
+body .downline { background: var(--cos-red-bg); border-color: #673746; color: var(--cos-red); }
 body .unit-camera-emblem, body .unitcard .unit-camera-emblem, body .unitcard.online .unit-camera-emblem,
 body .unitcard.offline .unit-camera-emblem, body .unitcard.degraded .unit-camera-emblem, body .camera-link-icon {
   background: var(--cos-soft) !important; border-color: var(--cos-line) !important; color: var(--cos-blue); box-shadow: none !important;
@@ -275,9 +276,9 @@ body .unit-camera-emblem span { background: var(--cos-selected); }
 body .unitcard.online .unit-camera-emblem span { border-color: var(--cos-green); }
 body .unitcard.offline .unit-camera-emblem span { border-color: var(--cos-red); }
 body .unitcard.degraded .unit-camera-emblem span { border-color: var(--cos-amber); }
-body .it-diagnostic-sheet { background: rgba(23,44,71,.32); }
-body .it-diag-actions button:first-child { background: var(--cos-blue) !important; color: white !important; border-color: var(--cos-blue) !important; }
-body #removeUnitBtn { color: var(--cos-red) !important; border-color: #E5B8BE !important; }
+body .it-diagnostic-sheet { background: rgba(3,8,16,.76); }
+body .it-diag-actions button:first-child { background: var(--cos-primary) !important; color: white !important; border-color: var(--cos-primary) !important; }
+body #removeUnitBtn { color: var(--cos-red) !important; border-color: #673746 !important; }
 body #deviceTable tr { background: var(--cos-app) !important; border-color: var(--cos-line) !important; }
 body #deviceTable tbody tr.device-status-online { background: var(--cos-app) !important; box-shadow: inset 3px 0 0 var(--cos-green) !important; }
 body #deviceTable tbody tr.device-status-offline { background: var(--cos-app) !important; box-shadow: inset 3px 0 0 var(--cos-red) !important; }
@@ -288,25 +289,25 @@ body #deviceTable tbody tr.device-status-online td, body #deviceTable tbody tr.d
 body #deviceTable td:nth-child(3)>a { color: var(--cos-blue) !important; text-shadow: none !important; }
 
 /* Camera detail: use the same cards and restrained state colors. */
-body .topbar { background: rgba(241,244,249,.97); border-color: var(--cos-line); }
+body .topbar { background: rgba(11,17,28,.97); border-color: var(--cos-line); }
 body .title { font-size: clamp(28px,5vw,38px); line-height: 1.2; }
 body .health-overview .card { border-width: 1px; }
 body .health-overview .card.info { background: var(--cos-soft); border-color: var(--cos-line); }
-body .health-overview .card.good { background: var(--cos-green-bg); border-color: #B7D6C3; }
-body .health-overview .card.bad { background: var(--cos-red-bg); border-color: #E5B8BE; }
-body .health-overview .card.warn { background: var(--cos-amber-bg); border-color: #E6C992; }
+body .health-overview .card.good { background: var(--cos-green-bg); border-color: #2B5948; }
+body .health-overview .card.bad { background: var(--cos-red-bg); border-color: #673746; }
+body .health-overview .card.warn { background: var(--cos-amber-bg); border-color: #60492B; }
 body .section-card { background: var(--cos-app) !important; border-color: var(--cos-line) !important; }
 body .section-card>.label { color: var(--cos-text); border-color: var(--cos-line); }
 body .kv, body .kv>div, body .event { border-color: var(--cos-line); }
 body .kv>div:nth-child(odd) { color: var(--cos-muted); background: var(--cos-soft); font-weight: 500; }
 body .kv>div:nth-child(even) { color: var(--cos-text); background: var(--cos-app); font-weight: 600; }
-body .shop-action { background: var(--cos-selected); border-color: #C4D2F3; }
-body .shop-action.at-shop { background: var(--cos-green-bg); border-color: #B7D6C3; }
+body .shop-action { background: var(--cos-selected); border-color: #355587; }
+body .shop-action.at-shop { background: var(--cos-green-bg); border-color: #2B5948; }
 body .value { font-weight: 650; }
 body .port { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-muted); }
-body .port.ok, body:has(#cameraName) .ports .port:not(.off):not(.pending):not(.bad) { background: var(--cos-green-bg) !important; border-color: #B7D6C3 !important; color: var(--cos-green) !important; }
-body .port.off, body .port.bad { background: var(--cos-red-bg) !important; border-color: #E5B8BE !important; color: var(--cos-red) !important; }
-body .port.pending { background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; color: var(--cos-amber) !important; }
+body .port.ok, body:has(#cameraName) .ports .port:not(.off):not(.pending):not(.bad) { background: var(--cos-green-bg) !important; border-color: #2B5948 !important; color: var(--cos-green) !important; }
+body .port.off, body .port.bad { background: var(--cos-red-bg) !important; border-color: #673746 !important; color: var(--cos-red) !important; }
+body .port.pending { background: var(--cos-amber-bg) !important; border-color: #60492B !important; color: var(--cos-amber) !important; }
 
 /* IT repair retains its existing sign-in and ticket workflow. */
 body .wrap>.hero { background: var(--cos-soft); color: var(--cos-text); border: 1px solid var(--cos-line); border-radius: 12px; }
@@ -314,7 +315,7 @@ body .wrap>.hero b { color: var(--cos-blue); }
 body .wrap>.hero h1 { margin: 12px 0 4px; }
 body .wrap .card { box-shadow: none; }
 body .wrap .unit { border-color: var(--cos-line); }
-body .wrap button { background: var(--cos-blue); color: #FFFFFF; border-color: var(--cos-blue); }
+body .wrap button { background: var(--cos-primary); color: #FFFFFF; border-color: var(--cos-primary); }
 body .wrap button.secondary { background: var(--cos-app); color: var(--cos-text); border-color: var(--cos-line); }
 body .wrap :is(h2) { margin: 0 0 10px; }
 
@@ -333,7 +334,7 @@ body .vision-nav-v36 button, body .vision-nav-v36 a,
 body .vision-history button, body .vision-back-link { color: var(--cos-muted); background: transparent; font-weight: 600; }
 body .vision-nav-v36 button span, body .vision-nav-v36 a span { color: inherit; }
 body .vision-nav-v36 .active, body .vision-nav-v36 button:hover, body .vision-nav-v36 a:hover,
-body .vision-history button.active, body .vision-history button:hover { color: var(--cos-blue); background: var(--cos-selected); border-color: #C4D2F3; box-shadow: none; }
+body .vision-history button.active, body .vision-history button:hover { color: var(--cos-blue); background: var(--cos-selected); border-color: #355587; box-shadow: none; }
 body .vision-side-label, body .vision-history button small, body .vision-owner-name,
 body .vision-welcome p, body .vision-assistant-head, body .vision-answer-copy, body .vision-assignment-row,
 body .vision-action-card p, body .vision-action-card small, body .vision-parts-row small,
@@ -354,7 +355,7 @@ body .vision-knowledge-list-head b, body .vision-language-eval-status b, body .v
 body .vision-agent-facts span, body .vision-plan-step b, body .vision-preview-login>b { color: var(--cos-text); }
 body .vision-answer-title { font-weight: 650; }
 body .vision-turn.user .vision-bubble, body.vision-voice-session .vision-turn.user .vision-bubble {
-  background: var(--cos-selected); border-color: #C4D2F3; color: var(--cos-text); box-shadow: none;
+  background: var(--cos-selected); border-color: #355587; color: var(--cos-text); box-shadow: none;
 }
 body .vision-icon-button, body .vision-new-chat, body .vision-quick-grid button,
 body .vision-cancel, body .vision-tech-choice-grid button, body .vision-order-actions button,
@@ -365,7 +366,7 @@ body .vision-knowledge-item, body .vision-new-header {
 }
 body .vision-icon-button:hover, body .vision-new-chat:hover, body .vision-quick-grid button:hover,
 body .vision-tech-choice-grid button:hover, body .vision-draft-choices button:hover,
-body .vision-knowledge-item:hover, body .vision-knowledge-item.active { background: var(--cos-selected); border-color: #C4D2F3; color: var(--cos-blue); }
+body .vision-knowledge-item:hover, body .vision-knowledge-item.active { background: var(--cos-selected); border-color: #355587; color: var(--cos-blue); }
 body .vision-job-card, body .vision-action-card, body .vision-context-block, body .vision-direct,
 body .vision-next, body .vision-draft-card, body .vision-draft-question, body .vision-plan-card,
 body .vision-knowledge-shell, body .vision-preview-login { background: var(--cos-app); border-color: var(--cos-line); color: var(--cos-text); box-shadow: none; }
@@ -374,7 +375,7 @@ body .vision-order-panel, body .vision-order-head, body .vision-knowledge-head,
 body .vision-parts-row, body .vision-context-grid div, body .vision-draft-grid>div,
 body .vision-draft-description, body .vision-plan-step, body .vision-agent-facts>div,
 body .vision-language-eval-status, body .vision-eval-mismatches>div { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-text); }
-body .vision-job-meta span, body .vision-pill, body .vision-plan-step-num { background: var(--cos-selected); color: #425D7D; }
+body .vision-job-meta span, body .vision-pill, body .vision-plan-step-num { background: var(--cos-selected); color: #C5D2E4; }
 body .vision-assignment-list, body .vision-context-row, body .vision-draft-head,
 body .vision-knowledge-editor, body .vision-knowledge-status { border-color: var(--cos-line); }
 body .vision-next b, body .vision-new-chat span, body .vision-kicker, body .vision-draft-head small,
@@ -383,29 +384,29 @@ body .vision-preview-login small { color: var(--cos-blue); }
 body .vision-live-status, body .vision-direct.good, body .vision-action-card.audited,
 body .vision-plan-step.ready, body .vision-language-eval-status.good,
 body .vision-knowledge-status.approved, body .vision-voice-status.heard {
-  background: var(--cos-green-bg); border-color: #B7D6C3; color: var(--cos-green);
+  background: var(--cos-green-bg); border-color: #2B5948; color: var(--cos-green);
 }
 body .vision-action-card.audited small, body .vision-plan-step.ready small { color: var(--cos-green); }
 body .vision-direct.warn, body .vision-action-card.blocked, body .vision-plan-step.needs-input,
 body .vision-language-eval-status.warn, body .vision-knowledge-status.draft,
-body .vision-voice-status.busy { background: var(--cos-amber-bg); border-color: #E6C992; color: var(--cos-amber); }
+body .vision-voice-status.busy { background: var(--cos-amber-bg); border-color: #60492B; color: var(--cos-amber); }
 body .vision-action-card.blocked small, body .vision-plan-step.needs-input small { color: var(--cos-amber); }
-body .vision-plan-step.guided { background: var(--cos-selected); border-color: #C4D2F3; }
+body .vision-plan-step.guided { background: var(--cos-selected); border-color: #355587; }
 body .vision-plan-step.guided small { color: var(--cos-blue); }
 body .vision-knowledge-status.retired { background: var(--cos-page); color: var(--cos-muted); }
 body .vision-knowledge-actions button.danger, body .vision-voice-status.recording,
-body .vision-preview-login-status { background: var(--cos-red-bg); border-color: #E5B8BE; color: var(--cos-red); }
+body .vision-preview-login-status { background: var(--cos-red-bg); border-color: #673746; color: var(--cos-red); }
 body .vision-confirm, body .vision-send, body .vision-order-actions button.primary,
 body .vision-knowledge-actions button.primary, body .vision-preview-login button {
-  background: var(--cos-blue); border-color: var(--cos-blue); color: #FFFFFF; box-shadow: none;
+  background: var(--cos-primary); border-color: var(--cos-primary); color: #FFFFFF; box-shadow: none;
 }
 body .vision-composer textarea, body .vision-composer-v36 textarea { background: transparent; color: var(--cos-text); }
 body .vision-composer textarea::placeholder, body .vision-composer-v36 textarea::placeholder { color: var(--cos-muted); }
-body .vision-composer:focus-within { border-color: #8EA9F2 !important; box-shadow: 0 0 0 3px var(--cos-selected) !important; }
+body .vision-composer:focus-within { border-color: #91B0FF !important; box-shadow: 0 0 0 3px var(--cos-selected) !important; }
 body .vision-add-v36, body .vision-keyboard-v36, body .vision-compose-icon { background: transparent; color: var(--cos-muted); border-color: transparent; }
 body .vision-menu-v37 span { background: var(--cos-text); }
 body .vision-teach-button, body .vision-language-eval-button, body .vision-icon-button { font-weight: 600; }
-body .vision-knowledge-modal, body .vision-app.sidebar-open .vision-shade, body .vision-app.order-open .vision-shade { background: rgba(23,44,71,.32); }
+body .vision-knowledge-modal, body .vision-app.sidebar-open .vision-shade, body .vision-app.order-open .vision-shade { background: rgba(3,8,16,.76); }
 body .vision-mode-label, body .vision-rotating-prompt { color: var(--cos-muted); }
 body .vision-voice-status { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-muted); }
 body .vision-knowledge-editor label { font-size: 12px; }
@@ -449,15 +450,15 @@ body .vision-knowledge-head span, body .vision-knowledge-item p { font-size: 12p
 
 /* Specific legacy inline-presentation overrides retain the underlying statuses. */
 body .unitcard .site-chip, body .unitcard .type-chip { color: var(--cos-muted) !important; border-color: var(--cos-line) !important; }
-body .unitcard.online .unit-camera-emblem span { color: var(--cos-green) !important; border-color: #B7D6C3 !important; background: var(--cos-green-bg) !important; box-shadow: none !important; }
-body .unitcard.offline .unit-camera-emblem span { color: var(--cos-red) !important; border-color: #E5B8BE !important; background: var(--cos-red-bg) !important; box-shadow: none !important; }
-body .unitcard.degraded .unit-camera-emblem span { color: var(--cos-amber) !important; border-color: #E6C992 !important; background: var(--cos-amber-bg) !important; box-shadow: none !important; }
+body .unitcard.online .unit-camera-emblem span { color: var(--cos-green) !important; border-color: #2B5948 !important; background: var(--cos-green-bg) !important; box-shadow: none !important; }
+body .unitcard.offline .unit-camera-emblem span { color: var(--cos-red) !important; border-color: #673746 !important; background: var(--cos-red-bg) !important; box-shadow: none !important; }
+body .unitcard.degraded .unit-camera-emblem span { color: var(--cos-amber) !important; border-color: #60492B !important; background: var(--cos-amber-bg) !important; box-shadow: none !important; }
 body .unit-time-strip .time-good:before { background: var(--cos-green-bg); box-shadow: none; }
 html body #unitCards .cardtop { border-color: var(--cos-line) !important; }
 body .cos-topline { background: var(--cos-page) !important; border-color: var(--cos-line) !important; box-shadow: none; }
 body .health-kpis .stat[role="button"]:hover { background: var(--cos-soft) !important; border-color: var(--cos-blue) !important; }
 body .health-kpis .stat[role="button"] small { color: var(--cos-muted) !important; }
-body #reviewIssues { background: var(--cos-selected) !important; color: var(--cos-blue) !important; border-color: #C4D2F3 !important; }
+body #reviewIssues { background: var(--cos-selected) !important; color: var(--cos-blue) !important; border-color: #355587 !important; }
 body .unitcard .mockup-bottom-actions .collapse-toggle { position: static !important; inset: auto !important; width: 100% !important; min-width: 0 !important; }
 body .unitcard .mockup-bottom-actions { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
 /* Legacy Vision v37 used important dark colors on controls. Keep its layout and
@@ -467,18 +468,18 @@ html body #visionApp .vision-sidebar { box-shadow: none !important; }
 html body #visionApp .vision-topbar { border-bottom: 1px solid var(--cos-line) !important; }
 html body .vision-menu-v37, html body .vision-new-header { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; color: var(--cos-text) !important; }
 html body .vision-add-v36, html body .vision-keyboard-v36 { color: var(--cos-muted) !important; opacity: 1; }
-html body .vision-send-v36 { background: var(--cos-blue) !important; color: #FFFFFF !important; }
+html body .vision-send-v36 { background: var(--cos-primary) !important; color: #FFFFFF !important; }
 html body .vision-composer-v36 textarea { color: var(--cos-text) !important; }
 html body .vision-composer-v36 textarea::placeholder, html body .vision-rotating-prompt,
 html body .vision-side-label { color: var(--cos-muted) !important; }
 html body .vision-knowledge-editor select, html body .vision-knowledge-editor input,
 html body .vision-knowledge-editor textarea, html body .vision-knowledge-list-head select,
-html body .vision-parts-row input { background: var(--cos-app); color: var(--cos-text); border-color: var(--cos-line); }
+html body .vision-parts-row input { background: var(--cos-app); color: var(--cos-text); border-color: #617895; }
 body .vision-action-buttons button, body .vision-icon-button { font-size: 12px; }
 body .vision-action-card p { font-size: 12px; }
 body .unitcard .meta { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; }
 body .unitcard .cardtop { padding-top: 0 !important; padding-right: 0 !important; }
-body .unit-health-summary .uhs.up { border-color: #B7D6C3; }
-body .unit-health-summary .uhs.down { border-color: #E5B8BE; }
-body #issuesSummary { border-color: #E6C992 !important; }
-body #healthDropBanner { border-color: #E5B8BE !important; }
+body .unit-health-summary .uhs.up { border-color: #2B5948; }
+body .unit-health-summary .uhs.down { border-color: #673746; }
+body #issuesSummary { border-color: #60492B !important; }
+body #healthDropBanner { border-color: #673746 !important; }

@@ -218,7 +218,7 @@ function OwnerApp() {
     finally{if(revision===checkRevision.current)setChecking(false);}
   },[]);
   useEffect(()=>{void check();return()=>{checkRevision.current+=1;};},[check]);
-  useEffect(()=>{document.documentElement.dataset.theme='light';localStorage.setItem('cos-operations-pages-theme','light');},[]);
+  useEffect(()=>{document.documentElement.dataset.theme='dark';localStorage.setItem('cos-operations-pages-theme','dark');},[]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),30000);const change=()=>{window.dispatchEvent(new Event('cos-workspace-navigation'));setRoute(readWorkspaceRoute());};window.addEventListener('hashchange',change);window.addEventListener('popstate',change);return()=>{window.clearInterval(timer);window.removeEventListener('hashchange',change);window.removeEventListener('popstate',change);if(toastTimer.current!==null)window.clearTimeout(toastTimer.current);};},[]);
   const requestWeather=useCallback(()=>{
     if(!navigator.geolocation){setWeatherStatus('Location unavailable');return;}

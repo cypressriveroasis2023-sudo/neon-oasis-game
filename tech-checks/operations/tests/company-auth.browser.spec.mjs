@@ -43,26 +43,30 @@ async function readable(locator,background){
   expect(contrast(style.text,background||style.background)).toBeGreaterThanOrEqual(4.5);
   return style;
 }
-for(const width of [320,390,701,1024,1440])test('real host authentication surfaces stay light and contained at '+width,async({page},testInfo)=>{
+for(const width of [320,390,701,1024,1440])test('real host authentication surfaces stay dark and contained at '+width,async({page},testInfo)=>{
   await page.setViewportSize({width,height:1000});
-  await page.emulateMedia({colorScheme:'dark'});
+  await page.emulateMedia({colorScheme:'light'});
   await mountHost(page);
+  await expect(page.locator('html')).toHaveCSS('color-scheme','dark');
+  await expect(page.locator('#sessionLoading')).toHaveCSS('background-color','rgb(11, 17, 28)');
+  await readable(page.locator('.visionLaunchStatus'),'rgb(11, 17, 28)');
   for(const state of ['signin','reset','forced']){
     await showState(page,state);
     const view=page.locator(state==='forced'?'#forcePasswordView':'#authView');
     await expect(view).toBeVisible();
     await expect(page.locator('#sessionLoading')).toHaveCount(0);
     const hero=view.locator('.hero');
-    expect(await hero.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
-    await readable(view.locator('.cos-vision-brand strong'),'rgb(255, 255, 255)');
-    await readable(view.locator('.cos-vision-brand small'),'rgb(255, 255, 255)');
+    expect(await hero.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(17, 27, 42)');
+    await readable(view.locator('.cos-vision-brand strong'),'rgb(17, 27, 42)');
+    await readable(view.locator('.cos-vision-brand small'),'rgb(17, 27, 42)');
     for(const card of await view.locator('.card:visible').all()){
-      expect(await card.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
-      for(const heading of await card.locator('h2,h3').all())await readable(heading,'rgb(255, 255, 255)');
+      expect(await card.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(17, 27, 42)');
+      for(const heading of await card.locator('h2,h3').all())await readable(heading,'rgb(17, 27, 42)');
     }
     for(const input of await view.locator('input:visible').all()){
-      const style=await readable(input);expect(style.background).toBe('rgb(255, 255, 255)');
-      await input.focus();expect(await input.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(49, 95, 223)');
+      const style=await readable(input);expect(style.background).toBe('rgb(17, 27, 42)');
+      const border=await input.evaluate(el=>getComputedStyle(el).borderTopColor);expect(contrast(border,style.background)).toBeGreaterThanOrEqual(3);
+      await input.focus();expect(await input.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(145, 176, 255)');
     }
     for(const button of await view.locator('.btn:visible').all()){
       const style=await readable(button);expect(style.background).toBe('rgb(49, 95, 223)');expect(style.text).toBe('rgb(255, 255, 255)');
@@ -93,5 +97,96 @@ test('signed-out IT and Service tile subtitles have accessible contrast',async({
   for(const button of await frame.locator('.operations-tool-grid>button').all()){
     const bg=await button.evaluate(el=>getComputedStyle(el).backgroundColor);
     await readable(button.locator('b'),bg);await readable(button.locator('span'),bg);
+  }
+});
+
+const legacy=readFileSync(resolve(repo,'tech-checks/technician-wizard-owner-dashboard-v5.js'),'utf8');
+function legacySection(start,end){
+  const from=legacy.indexOf(start),to=legacy.indexOf(end,from);
+  if(from<0||to<=from)throw new Error('Legacy presentation section missing: '+start);
+  return legacy.slice(from,to);
+}
+const legacyPresentation=[
+  legacySection('function esc(v)','function resetWizardPosition'),
+  legacySection('function injectStyles()','function progress('),
+  legacySection('function ensureTechMenuPanel()','async function maybeShowFirstTimeWalkthrough()'),
+  legacySection('function ensureITCommandDashboardStyles()','function startITCommandClockWeather()'),
+].join('\n');
+
+async function mountLegacyPresentation(page){
+  await mountHost(page);
+  // Run the protected menu/dashboard renderers and their real injected CSS,
+  // with empty synthetic data and no database, weather, auth or action handlers.
+  await page.evaluate(source=>{
+    new Function(`${source}
+      const currentRoleKey=()=>window.fixtureRole||'it';
+      const pushAlertState=async()=>null;
+      const resetWizardPosition=()=>{};
+      const techDashboardLoadingHtml=label=>'<div class="small">'+label+'</div>';
+      const techDashboardErrorHtml=(role,error)=>{throw new Error(error);};
+      const techDashboardTimeout=value=>value;
+      const itDayState=async()=>({currentAssignments:[],waitingReturns:[],truckRestockQueue:[],serviceQueue:[],drafts:[]});
+      const loadITManagedTickets=async()=>[];
+      const takeTechCompletion=()=>null;
+      const techCompletionBanner=()=>'';
+      const techCheckDateKey=()=> '2026-10-06';
+      const itNextActionHtml=()=>'<div class="small">Synthetic empty work queue</div>';
+      const itServiceQueueHtml=()=>'';
+      const startITCommandClockWeather=()=>{};
+      injectStyles();
+      window.renderDarkMenu=openTechMenu;
+      window.renderDarkIT=showITHome;
+    `)();
+    document.getElementById('sessionLoading').remove();
+    document.getElementById('appView').classList.remove('hidden');
+    document.getElementById('view-it').classList.remove('hidden');
+    document.getElementById('whoRole').textContent='IT Technician';
+    document.getElementById('whoName').textContent='Synthetic Technician';
+  },legacyPresentation);
+}
+async function readableOnSurface(locator){
+  for(const item of await locator.all()){
+    if(!await item.isVisible())continue;
+    const background=await item.evaluate(el=>{
+      for(let node=el;node;node=node.parentElement){const color=getComputedStyle(node).backgroundColor;if(color!=='rgba(0, 0, 0, 0)')return color;}
+      return 'rgb(11, 17, 28)';
+    });
+    await readable(item,background);
+  }
+}
+
+test('real injected IT dashboard and native question surfaces remain dark',async({page},testInfo)=>{
+  await mountLegacyPresentation(page);
+  await page.evaluate(()=>renderDarkIT());
+  await expect(page.locator('#view-it .wl-it-command-shell')).toBeVisible();
+  for(const width of [320,390,768,1440]){
+    await page.setViewportSize({width,height:1000});
+    await expect(page.locator('#view-it .wl-it-command-shell')).toHaveCSS('background-color','rgb(17, 27, 42)');
+    await readableOnSurface(page.locator('.wl-it-command-shell h1,.wl-it-command-shell h2,.wl-it-command-stats span,.wl-it-command-stats small,.wl-it-readiness-actions b,.wl-it-readiness-actions span,.wl-it-empty,.wl-it-quick-grid b,.wl-it-quick-grid span'));
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width+1);
+    await page.screenshot({path:testInfo.outputPath(`dark-it-dashboard-${width}.png`),fullPage:true});
+  }
+  await page.evaluate(()=>{
+    document.querySelector('#wlItHome').innerHTML='<div class="wl-head"><div class="kicker">IT READINESS</div><h2>Equipment check</h2></div><div class="wl-question"><div class="qnum">Required step</div><div class="qtext">Is the camera recording?</div><div class="wl-options"><button class="pass on">Yes, verified</button><button class="fail">No, needs work</button></div><div class="wl-proof"><div class="wl-note">Keep the required evidence attached.</div></div></div><div class="wl-stop"><b>Release blocked</b><div class="small">Required evidence is missing.</div></div><div class="wl-history"><details class="wl-status-complete" open><summary>Completed check</summary><div class="body">Verified synthetic state</div></details><details class="wl-status-waiting"><summary>Waiting for a check</summary></details></div>';
+  });
+  for(const selector of ['.wl-head','.wl-question','.wl-proof']) await expect(page.locator(selector)).toHaveCSS('background-color','rgb(17, 27, 42)');
+  await readableOnSurface(page.locator('.wl-head h2,.qnum,.qtext,.wl-options button,.wl-note,.wl-stop b,.wl-stop .small,.wl-history summary'));
+  await page.screenshot({path:testInfo.outputPath('dark-native-question.png'),fullPage:true});
+});
+
+test('real dynamically injected owner and technician menus keep dark readable dialogs',async({page},testInfo)=>{
+  await mountLegacyPresentation(page);
+  for(const role of ['it','service','owner']){
+    await page.evaluate(async role=>{window.fixtureRole=role;await renderDarkMenu();},role);
+    const panel=page.locator('#wlTechMenuPanel');
+    for(const width of [320,390,768,1440]){
+      await page.setViewportSize({width,height:1000});
+      await expect(panel.locator('.wl-menu-sheet')).toHaveCSS('background-color','rgb(17, 27, 42)');
+      await readableOnSurface(panel.locator('h2,b,small,.wl-menu-section-label'));
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width+1);
+      if(width===390||width===1440)await page.screenshot({path:testInfo.outputPath(`dark-native-menu-${role}-${width}.png`)});
+    }
+    await page.evaluate(()=>document.getElementById('wlTechMenuPanel').classList.add('hidden'));
+    await expect(panel).toBeHidden();
   }
 });

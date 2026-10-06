@@ -88,9 +88,9 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
   await frame.locator('.operations-shell').screenshot({path:testInfo.outputPath('unified-operations.png')});
   await expect(frame.getByRole('button',{name:/Switch to (light|dark) mode/})).toHaveCount(0);
-  const light=await frame.locator('.command-page-header').evaluate(element=>({background:getComputedStyle(element).backgroundColor,text:getComputedStyle(element.querySelector('h1')).color}));
-  expect(light.text).toBe('rgb(23, 44, 71)');
-  expect(await frame.locator('html').getAttribute('data-theme')).toBe('light');
+  const dark=await frame.locator('.command-page-header').evaluate(element=>({background:getComputedStyle(element).backgroundColor,text:getComputedStyle(element.querySelector('h1')).color}));
+  expect(dark.text).toBe('rgb(230, 237, 247)');
+  expect(await frame.locator('html').getAttribute('data-theme')).toBe('dark');
   expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
@@ -155,12 +155,12 @@ test('rotation and desktop resizing preserve the same frame, route and in-progre
   }
 });
 
-test('old VISION bookmarks preserve route and query parameters under the approved light presentation', async ({ page }) => {
+test('old VISION bookmarks preserve route and query parameters under the approved dark presentation', async ({ page }) => {
   const { frame, requests } = await mount(page);
   await expect(frame.getByRole('button',{name:/Switch to (light|dark) mode/})).toHaveCount(0);
   await frame.locator('body').evaluate(()=>{location.href=location.pathname+'?theme=vision&source=saved-link#jobs';});
   await expect(frame.getByRole('heading',{name:'Job flow',exact:true})).toBeVisible();
-  expect(await frame.locator('html').getAttribute('data-theme')).toBe('light');
+  expect(await frame.locator('html').getAttribute('data-theme')).toBe('dark');
   await responsiveLayout(page,frame);
   expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
   await frame.locator('body').evaluate(()=>location.reload());
