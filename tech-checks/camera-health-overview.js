@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  const statusLabel=value=>({verifying:'NOT VERIFIED',mapping:'NEEDS MAPPING',placement:'LOCATION REVIEW',shop:'SHOP / ROOT',inactive:'INACTIVE'})[value]||String(value||'unknown').toUpperCase();
+  const statusLabel=value=>({verifying:'NOT VERIFIED',mapping:'STATUS UNVERIFIED',service:'SERVICE REACHABLE',placement:'LOCATION REVIEW',shop:'SHOP / ROOT',inactive:'INACTIVE'})[value]||String(value||'unknown').toUpperCase();
   const normalized=value=>typeof value==='string'?value.trim().replace(/\s+/g,' ').toUpperCase():'';
   function placement(device,tracker=[]){
     const activation=normalized(device.activation_state),org=normalized(device.organization),unit=normalized(device.unit_key);
@@ -32,35 +32,64 @@
     for(const h of health){if(!object(h)||!id(h.camera_device_id)||!seen.has(String(h.camera_device_id))||checked.has(String(h.camera_device_id)))throw new Error('Camera health contains malformed or duplicate identities.');checked.add(String(h.camera_device_id))}
     for(const t of tracker)if(!object(t)||['canonical_family','unit_tag','source_label','tracker_state'].some(k=>typeof t[k]!=='string'))throw new Error('Tracker placement records are malformed.');
   }
-  function classifyUnit(ds,tracker=[],now=Date.now()){
+  function providerRecord(d){return !d.__trackerOnly&&['vigilant_control_center','reconeyez'].includes(d.source)&&(cameraRecord(d)||normalized(d.device_type)==='NVR')}
+  function providerState(d,now=Date.now()){
+    if(normalized(d.activation_state)!=='ACTIVE'||!providerRecord(d))return 'verifying';
+    return root.CameraHealthHistory.timestamp(d.source_last_seen_at,now).state==='fresh'&&['online','offline'].includes(d.source_status)?d.source_status:'verifying';
+  }
+  function serviceState(d,health={},now=Date.now()){
+    if(normalized(d.activation_state)!=='ACTIVE')return 'verifying';
+    const h=d.__trackerOnly&&d.__providerLabel==='Witness'?d.__evidence:health[d.id];
+    if(!h||root.CameraHealthHistory.timestamp(h.checked_at,now).state!=='fresh')return 'verifying';
+    const state=d.__trackerOnly?h.status:h.overall_status;
+    if(state==='online'&&(d.__trackerOnly?h.reachable===true:h.ip_reachable===true))return 'online';
+    if(state==='offline'&&(h.confirmed_outage===true||Number.isInteger(h.consecutive_failures)&&h.consecutive_failures>=3))return 'offline';
+    return state==='degraded'&&h.ip_reachable===true?'degraded':'verifying';
+  }
+  function combinedState(states,empty='verifying'){
+    if(!states.length)return empty;
+    return states.every(s=>s==='online')?'online':states.every(s=>s==='offline')?'offline':states.some(s=>['online','offline','degraded'].includes(s))?'degraded':'verifying';
+  }
+  function classifyUnit(ds,tracker=[],now=Date.now(),health={}){
     const active=ds.filter(d=>placement(d,tracker)!=='inactive');
     if(!active.length)return {scope:'inactive',state:'inactive'};
     const scopes=new Set(active.map(d=>placement(d,tracker))),scope=scopes.size===1?[...scopes][0]:'unknown';
     if(scope==='shop')return {scope,state:'shop'};
-    if(active.every(d=>d.__trackerOnly))return {scope,state:'mapping'};
-    const cameras=active.filter(cameraRecord),states=cameras.map(d=>cameraState(d,now));
-    const state=!states.length?'mapping':states.every(s=>s==='online')?'online':states.every(s=>s==='offline')?'offline':states.some(s=>s==='online'||s==='offline')?'degraded':'verifying';
-    return {scope,state,recorderOffline:active.some(d=>recorderFailure(d,now))};
+    const cameras=active.filter(cameraRecord),providers=active.filter(providerRecord);
+    const camera=combinedState(cameras.map(d=>cameraState(d,now)),'mapping');
+    const provider=combinedState(providers.map(d=>providerState(d,now)));
+    const service=combinedState(active.map(d=>serviceState(d,health,now)));
+    const state=provider!=='verifying'?provider:service==='online'?'service':providers.length?'verifying':'mapping';
+    const systemKind=providers.length&&providers.every(d=>normalized(d.device_type)==='NVR')?'recorder':providers.length&&providers.every(d=>normalized(d.device_type).includes('DETECTOR'))?'detector':'system';
+    return {scope,state,providerState:provider,cameraState:camera,serviceState:service,systemKind,recorderOffline:active.some(d=>recorderFailure(d,now))};
+  }
+  function coverage(groups){
+    const active=groups.filter(g=>['field','unknown'].includes(g.scope));
+    const count=(key,state)=>active.filter(g=>g[key]===state).length;
+    const online=count('providerState','online'),offline=count('providerState','offline');
+    return {total:active.length,online,offline,review:active.length-online-offline,degraded:count('providerState','degraded'),serviceReachable:active.filter(g=>g.providerState==='verifying'&&g.serviceState==='online').length,cameraOnline:count('cameraState','online'),cameraOffline:count('cameraState','offline'),cameraMixed:active.filter(g=>['degraded','verifying'].includes(g.cameraState)).length,cameraUnavailable:count('cameraState','mapping')};
   }
   function card(g,{effectiveHealth,cameraGroup,isShop}){
-    const active=g.ds.filter(d=>placement(d)!=='inactive'),states=active.filter(cameraRecord).map(effectiveHealth),online=states.filter(s=>s==='online').length,offline=states.filter(s=>s==='offline').length;
-    const count=active.filter(cameraRecord).length;
-    const summary=count?`${online} online · ${offline} offline · ${states.length-online-offline} to verify`:'Camera mapping not verified';
-    const recorder=active.filter(d=>recorderFailure(d)).length;
-    const site=g.scope==='inactive'?'Inactive inventory':g.scope==='shop'?'SHOP / ROOT':g.scope==='unknown'?'Location unverified · saved site: '+(g.ds[0]?.organization||'not linked'):g.ds[0]?.organization||'Site not linked';
+    const active=g.ds.filter(d=>placement(d)!=='inactive'),cameras=active.filter(cameraRecord),states=cameras.map(effectiveHealth);
+    const online=states.filter(s=>s==='online').length,offline=states.filter(s=>s==='offline').length,count=cameras.length;
+    const sources=[...new Set(active.map(cameraGroup))].join(' / ')||cameraGroup(g.ds[0]);
+    const cameraSummary=count?`${online} online · ${offline} offline · ${states.length-online-offline} to verify`:'Camera channel status unavailable';
+    const providerSummary=g.systemKind==='recorder'?'Recorder '+(g.providerState==='verifying'?'status unverified':g.providerState)+'; camera channel status unavailable':g.providerState==='degraded'?'Mixed provider status; review the individual camera/recorder observations':g.state==='service'?'Service endpoint reachable; provider and camera status unverified':g.serviceState==='offline'&&g.providerState==='verifying'?'Service check failed; camera status remains unverified':'';
+    const site=g.scope==='inactive'?'Inactive inventory':g.scope==='shop'?'SHOP / ROOT':g.scope==='unknown'?'Location unverified · saved site: '+(active[0]?.organization||'not linked'):active[0]?.organization||'Site not linked';
+    const primary=(g.systemKind==='recorder'?'RECORDER ':g.systemKind==='detector'?'DETECTOR ':'')+statusLabel(g.state);
     return '<button type="button" class="unitcard compact-unit '+esc(g.state)+'" data-unit="'+esc(g.k)+'" aria-label="Open '+esc(g.k)+' unit details">'+
-      '<span class="compact-unit-top"><span class="compact-unit-title">'+esc(g.k)+'</span><span class="statuspill '+esc(g.state)+'">'+esc((cameraGroup(g.ds[0])==='Reconeyez'?'DETECTORS ':'')+statusLabel(g.state))+'</span></span>'+
+      '<span class="compact-unit-top"><span class="compact-unit-title">'+esc(g.k)+'</span><span class="statuspill '+esc(g.state)+'">'+esc(primary)+'</span></span>'+
       (g.scope==='unknown'?'<span class="placement-warning">LOCATION REVIEW · Field or shop not verified</span>':'')+
-      '<span class="compact-unit-site">'+esc(site)+'</span><span class="compact-unit-meta">'+esc(cameraGroup(g.ds[0]))+' · '+(count?count+' resource record'+(count===1?'':'s'):g.ds.every(d=>d.__trackerOnly)?'Tracker equipment':'No mapped camera channels')+'</span>'+
-      '<span class="compact-unit-summary">'+(recorder?'<span class="recorder-warning">Recorder provider reports OFFLINE · camera channels unverified</span>':'')+esc(g.state==='shop'?'Active shop inventory; excluded from field outage totals':g.state==='inactive'?'Deactivated or retired; excluded from field outage totals':summary)+'</span><span class="compact-unit-open">View unit details <span aria-hidden="true">→</span></span></button>';
+      '<span class="compact-unit-site">'+esc(site)+'</span><span class="compact-unit-meta">'+esc(sources)+' · '+esc(g.systemKind==='recorder'?'Provider recorder observation':count?count+' camera/detector resource'+(count===1?'':'s'):g.state==='service'?'Service-port observation':'Provider status not verified')+'</span>'+
+      '<span class="compact-unit-summary">'+(providerSummary?'<span class="system-evidence-summary">'+esc(providerSummary)+'</span>':'')+'<span class="camera-evidence-badge">'+esc(g.state==='shop'?'Active shop inventory; excluded from operational outage totals':g.state==='inactive'?'Deactivated or retired; excluded from operational outage totals':cameraSummary)+'</span><span class="compact-unit-open">View unit details <span aria-hidden="true">→</span></span></button>';
   }
   function details(g,{health,cameraGroup,effectiveHealth,reconBatteryBadge}){
     const ds=g.ds.filter(d=>!d.__trackerOnly);
     const components=g.ds.map(d=>{
-      const state=effectiveHealth(d),provider=cameraGroup(d);
-      if(d.__trackerOnly)return '<article class="unit-component"><h3>'+esc(d.device_name||g.k)+'</h3><p>'+esc(d.__reason)+' Camera health and physical location are not verified.</p><p class="small">'+esc(d.public_ip?'Configured endpoint is available for this unit.':'No configured endpoint.')+'</p></article>';
-      const diagnostic=!cameraRecord(d)&&['vigilant_control_center','reconeyez'].includes(d.source)?'<p>Last reported recorder status: <b>'+esc(String(d.source_status||'unknown').toUpperCase())+'</b> · '+esc(root.CameraHealthHistory.format(d.source_last_seen_at))+(root.CameraHealthHistory.timestamp(d.source_last_seen_at).state==='fresh'?' · Current provider observation':' · Stale or invalid observation; current recorder status unverified')+' · Camera channels not verified.</p>':'';
-      return '<article class="unit-component"><div class="unit-component-heading"><h3>'+esc(d.device_name||'Camera')+'</h3><span class="statuspill '+esc(state)+'">'+esc(statusLabel(state))+'</span></div><p class="small">'+esc(provider)+(provider==='Reconeyez'?' · DETECTOR · '+esc(reconBatteryBadge(d)):' · '+esc(d.device_type||'Camera resource'))+'</p>'+diagnostic+root.CameraHealthHistory.strip([d],health,cameraGroup)+'<a class="btn" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'">Open resource & ports →</a></article>';
+      const recorder=normalized(d.device_type)==='NVR',state=recorder?providerState(d):effectiveHealth(d),provider=cameraGroup(d),service=serviceState(d,health);
+      if(d.__trackerOnly){const observation=d.__evidence;return '<article class="unit-component"><h3>'+esc(d.device_name||g.k)+'</h3><p>'+esc(d.__reason)+' Camera health and physical location are not verified.</p><p class="small">Service evidence: '+esc(service==='online'?'Reachable':service==='offline'?'Check failed':'Unverified')+(observation?.checked_at?' · '+esc(root.CameraHealthHistory.format(observation.checked_at)):'')+'</p></article>'}
+      const diagnostic=recorder?'<p>Camera channel status unavailable. Last reported recorder status: <b>'+esc(String(d.source_status||'unknown').toUpperCase())+'</b> · '+esc(root.CameraHealthHistory.format(d.source_last_seen_at))+(root.CameraHealthHistory.timestamp(d.source_last_seen_at).state==='fresh'?' · Current provider observation':' · Stale or invalid observation; current recorder status unverified')+'</p>':!providerRecord(d)?'<p>Service-port evidence: '+esc(service==='online'?'Reachable':service==='offline'?'Check failed':'Unverified')+'. Provider and camera status are unverified.</p>':'';
+      return '<article class="unit-component"><div class="unit-component-heading"><h3>'+esc(d.device_name||'Camera')+'</h3><span class="statuspill '+esc(state)+'">'+esc((recorder?'RECORDER ':'')+statusLabel(state))+'</span></div><p class="small">'+esc(provider)+(provider==='Reconeyez'?' · DETECTOR · '+esc(reconBatteryBadge(d)):' · '+esc(d.device_type||'Camera resource'))+'</p>'+diagnostic+root.CameraHealthHistory.strip([d],health,cameraGroup)+'<a class="btn" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'">Open resource & ports →</a></article>';
     }).join('');
     return '<section class="unit-components" aria-label="Camera and detector components">'+components+'</section>'+(ds.length?'<details class="unit-manage"><summary>Unit management</summary><button type="button" class="mini send-root-unit" data-unit="'+esc(g.k)+'">Move to ROOT / SHOP</button></details>':'');
   }
@@ -103,5 +132,5 @@
     const events=value.history.map(row=>'<li>'+esc(root.CameraHealthHistory.format(row.observed_at))+' · '+esc(row.event_type||row.event_code||'Unknown event')+' · '+esc(eventStatus(row.event_type||row.event_code).toUpperCase())+'</li>').join('');
     return '<article class="component-observation" data-component-id="'+esc(value.id)+'"><div class="unit-component-heading"><h3>'+esc(value.name)+' · '+value.type+'</h3><span class="statuspill '+esc(value.state)+'">'+esc(label)+'</span></div><p>Last reported status: <b>'+esc(value.reported.toUpperCase())+'</b> · '+esc(value.event)+'</p><p>Observed: '+esc(time)+(value.freshness==='stale'?' · Saved observation is older than 15 minutes; current health is not verified.':'')+'</p><p class="'+(value.battery!=null&&value.battery<=25?'yellow':'small')+'">Battery: '+esc(battery)+' · Recorded with this observation</p><p class="small">Device ID: '+esc(value.id)+' · Exact provider area: '+esc(value.area)+'</p><details><summary>Recent '+value.type.toLowerCase()+' events</summary><ul>'+events+'</ul></details></article>';
   }
-  root.CameraHealthOverview={card,details,statusLabel,placement,cameraRecord,cameraState,classifyUnit,validateSources,mappedArea,componentType,eventStatus,component,componentHtml};
+  root.CameraHealthOverview={card,details,statusLabel,placement,cameraRecord,cameraState,providerRecord,providerState,serviceState,coverage,classifyUnit,validateSources,mappedArea,componentType,eventStatus,component,componentHtml};
 })(globalThis);

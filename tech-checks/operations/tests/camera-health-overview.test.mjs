@@ -47,8 +47,8 @@ const current={id:1,unit_key:'RANGER 901',organization:'Exact customer site',act
 test('camera outages require mapped camera provider evidence, never tracker ports or recorders',()=>{
  assert.equal(api.cameraState(current,now),'offline');
  for(const change of [{__trackerOnly:true,__evidence:{status:'offline',checked_at:current.source_last_seen_at}},{source:'2026_unit_tracker'},{device_type:'NVR'},{device_type:null},{device_type:'new infrastructure'},{activation_state:null},{source_last_seen_at:'2026-10-06T15:00:00Z'},{source_last_seen_at:'2030-01-01T00:00:00Z'},{source_last_seen_at:'2026-02-30T10:00:00Z'},{source_status:'garbage'}])assert.notEqual(api.cameraState({...current,...change},now),'offline');
- assert.equal(api.classifyUnit([{...current,device_type:'NVR'}],[],now).state,'mapping');
- assert.equal(api.classifyUnit([current,{...current,id:2,device_type:'NVR',source_status:'online'}],[],now).state,'offline');
+ assert.equal(api.classifyUnit([{...current,device_type:'NVR'}],[],now).state,'offline');assert.equal(api.classifyUnit([{...current,device_type:'NVR'}],[],now).cameraState,'mapping');
+ assert.equal(api.classifyUnit([current,{...current,id:2,device_type:'NVR',source_status:'online'}],[],now).state,'degraded');
 });
 test('placement, activation and observed health remain distinct and fail closed',()=>{
  const tracker=[{source_label:'Ranger 901',tracker_state:'shop'}];
@@ -68,7 +68,7 @@ test('unmapped placeholders have gray mapping labels and no offline camera claim
  const d={...current,__trackerOnly:true,__providerLabel:'Witness',organization:'TRACKER · SITE NOT LINKED'};
  const g={k:'SPOTTER 904',ds:[d],...api.classifyUnit([d],[],now)};
  const html=api.card(g,{effectiveHealth:x=>api.cameraState(x,now),cameraGroup:()=> 'Witness',isShop:()=>false});
- assert.match(html,/NEEDS MAPPING/);assert.match(html,/Location unverified/);assert.doesNotMatch(html,/statuspill offline|\bOFFLINE\b/);
+ assert.match(html,/STATUS UNVERIFIED/);assert.match(html,/Location unverified/);assert.doesNotMatch(html,/statuspill offline|\bOFFLINE\b/);
 });
 test('malformed and duplicate source identities cannot produce fleet totals',()=>{
  assert.doesNotThrow(()=>api.validateSources([current],[{camera_device_id:1}],[]));
@@ -89,4 +89,36 @@ test('inactive resources and partial camera health cannot create contradictory u
  assert.equal(api.classifyUnit([current,{...current,id:2,source_status:'online'}],[],now).state,'degraded');
 });
 
-test('fresh recorder outage stays a separate priority warning without certifying camera health',()=>{const value=api.classifyUnit([{...current,device_type:'NVR'}],[],now);assert.equal(value.state,'mapping');assert.equal(value.recorderOffline,true);assert.equal(api.classifyUnit([{...current,device_type:'NVR',source_last_seen_at:'2026-10-06T15:00:00Z'}],[],now).recorderOffline,false)});
+test('fresh recorder outage stays a separate priority warning without certifying camera health',()=>{const value=api.classifyUnit([{...current,device_type:'NVR'}],[],now);assert.equal(value.state,'offline');assert.equal(value.cameraState,'mapping');assert.equal(value.recorderOffline,true);assert.equal(api.classifyUnit([{...current,device_type:'NVR',source_last_seen_at:'2026-10-06T15:00:00Z'}],[],now).recorderOffline,false)});
+
+test('provider systems count recorders once while camera coverage stays independent',()=>{
+ const nvr={...current,device_type:'NVR',source_status:'online'};
+ const g=api.classifyUnit([nvr],[],now);assert.equal(g.state,'online');assert.equal(g.providerState,'online');assert.equal(g.cameraState,'mapping');
+ const mixed=api.classifyUnit([{...current,source_status:'online'},{...nvr,id:2,source_status:'offline'}],[],now);
+ assert.equal(mixed.state,'degraded');assert.equal(mixed.providerState,'degraded');assert.equal(mixed.cameraState,'online');assert.equal(mixed.recorderOffline,true);
+ assert.equal(api.classifyUnit([{...current,source_status:'online'},nvr],[],now).state,'online');
+ for(const change of [{activation_state:null},{source_last_seen_at:'2030-01-01T00:00:00Z'},{source_last_seen_at:'2026-10-06T15:00:00Z'},{device_type:'router'},{source:'2026_unit_tracker'}])assert.equal(api.providerState({...nvr,...change},now),'verifying');
+});
+test('service success is visible but cannot override current provider failure or stale data',()=>{
+ const d={...current,source:'2026_unit_tracker',device_type:'Sniper'};
+ const checks={1:{overall_status:'online',ip_reachable:true,checked_at:current.source_last_seen_at}};
+ const g=api.classifyUnit([d],[],now,checks);assert.equal(g.state,'service');assert.equal(g.providerState,'verifying');assert.equal(g.cameraState,'mapping');
+ assert.equal(api.classifyUnit([current],[],now,checks).state,'offline');
+ assert.equal(api.classifyUnit([d],[],now+16*60000,checks).state,'mapping');
+ assert.equal(api.serviceState(d,{1:{...checks[1],ip_reachable:false}},now),'verifying');
+});
+test('one synthetic244-unit dataset partitions provider systems, service-only evidence and camera coverage',()=>{
+ let id=1000;const groups=[],checks={};
+ const add=(n,kind,status,service)=>{for(let i=0;i<n;i++){
+  const d={...current,id:++id,unit_key:'SYNTHETIC '+id,device_type:kind==='nvr'?'NVR':kind==='port'?'Sniper':'IPC',source:kind==='port'?'2026_unit_tracker':'vigilant_control_center',source_status:status};
+  if(service)checks[d.id]={overall_status:service,ip_reachable:service==='online',confirmed_outage:service==='offline',checked_at:current.source_last_seen_at};
+  const ds=kind==='mixed'?[{...d,source_status:'online'},{...d,id:++id,source_status:'offline'}]:[d];groups.push({k:d.unit_key,ds});
+ }};
+ add(82,'camera','online');add(2,'camera','offline');add(3,'mixed','online');add(4,'camera',null);add(57,'nvr','online');add(1,'nvr','offline');add(26,'port',null,'online');add(2,'port',null,'offline');add(5,'port',null);
+ for(const [n,status] of [[7,'online'],[27,'offline'],[28,null]])for(let i=0;i<n;i++){const d={...current,id:null,unit_key:'SYNTHETIC '+(++id),__trackerOnly:true,__providerLabel:'Witness',source:'tracker_evidence',source_status:null,__evidence:status?{status,reachable:status==='online',confirmed_outage:status==='offline',checked_at:current.source_last_seen_at}:null};groups.push({k:d.unit_key,ds:[d]})}
+ const classified=groups.map(g=>({...g,...api.classifyUnit(g.ds,[],now,checks)}));const counts=api.coverage(classified);
+ assert.equal(classified.length,244);assert.equal(counts.online,139);assert.equal(counts.offline,3);assert.equal(counts.review,102);assert.equal(counts.serviceReachable,33);assert.equal(counts.review-counts.serviceReachable,69);assert.equal(counts.online+counts.offline+counts.review,244);
+ assert.equal(counts.cameraOnline,82);assert.equal(counts.cameraOffline,2);assert.equal(counts.cameraMixed,7);assert.equal(counts.cameraUnavailable,153);assert.equal(counts.degraded,3);
+});
+
+test('Witness service success requires matching positive reachability',()=>{const d={...current,__trackerOnly:true,__providerLabel:'Witness',source:'tracker_evidence',__evidence:{status:'online',checked_at:current.source_last_seen_at,reachable:true}};assert.equal(api.serviceState(d,{},now),'online');for(const reachable of [false,null,undefined])assert.equal(api.serviceState({...d,__evidence:{...d.__evidence,reachable}}, {},now),'verifying')});
