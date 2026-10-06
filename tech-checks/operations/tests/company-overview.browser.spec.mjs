@@ -132,3 +132,51 @@ test('intermediate-width stage cards preserve all labels, counts and arrows', as
     await page.screenshot({ path: testInfo.outputPath('company-overview-' + width + '.png') });
   }
 });
+
+test('round original VISION branding stays readable through responsive navigation and menu dismissal', async ({ page }, testInfo) => {
+  for (const width of [320, 375, 390, 700, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: width <= 700 ? 844 : 1000 });
+    const { frame } = await mount(page);
+    const brand = frame.locator(width <= 700 ? '.company-mobile-brand' : '.company-brand');
+    await expect(brand).toBeVisible();
+    await expect(brand.locator('strong')).toHaveText('VISION');
+    await expect(brand.locator('small')).toHaveText('COS Operations');
+    const geometry = await brand.evaluate(el => {
+      const image = el.querySelector('img');
+      const style = getComputedStyle(image);
+      const rect = image.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      return {
+        loaded: image.complete && image.naturalWidth === 1254 && image.naturalHeight === 1254,
+        src: image.getAttribute('src'), width: rect.width, height: rect.height,
+        radius: style.borderRadius, fit: style.objectFit,
+        textFits: [...el.querySelectorAll('strong,small')].every(text => text.scrollWidth <= text.clientWidth),
+        fits: box.left >= 0 && box.right <= innerWidth,
+        background: getComputedStyle(document.body).backgroundColor,
+      };
+    });
+    expect(geometry).toMatchObject({ loaded: true, radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    expect(geometry.src).toContain('resources/cameras-on-site-logo.webp');
+    expect(geometry.width).toBe(width <= 700 ? 34 : 38);
+    expect(geometry.height).toBe(geometry.width);
+    expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });
+    const more = frame.getByRole('button', { name: 'More', exact: true });
+    await more.click();
+    const menu = frame.getByRole('dialog', { name: 'Operations navigation' });
+    await expect(menu.locator('.company-brand')).toBeVisible();
+    await expect(menu.locator('.company-brand strong')).toHaveText('VISION');
+    expect(await menu.locator('.company-brand-mark').evaluate(el => getComputedStyle(el).borderRadius)).toBe('50%');
+    const close = menu.getByRole('button', { name: 'Close menu' });
+    expect((await close.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(more).toBeFocused();
+    await more.click();
+    await frame.getByRole('dialog').getByRole('button', { name: 'Job flow', exact: true }).click();
+    await expect(frame.getByRole('heading', { name: 'Job flow', exact: true })).toBeVisible();
+    await expect(brand).toBeVisible();
+    await frame.locator('body').evaluate(() => history.back());
+    await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
+  }
+});
