@@ -24,3 +24,24 @@
     transform: translateX(0) !important;
   }
 }
+
+/* The approved glance is readable at normal dashboard viewing distance. */
+svg.company-eye { display:block; flex:none; border-radius:50%; overflow:hidden; background:#080b12; object-fit:contain; }
+#root .company-brand { flex-direction:column; align-items:flex-start; gap:10px; margin-bottom:28px; }
+#root .company-brand .company-eye { width:104px !important; height:104px !important; }
+#root .company-mobile-brand .company-eye { width:64px !important; height:64px !important; }
+#root .company-mobile-brand { align-items:center; }
+#root .operations-sidebar-open .company-brand { flex-direction:row; align-items:center; }
+#root .operations-sidebar-open .company-brand .company-eye { width:64px !important; height:64px !important; }
+svg.company-eye.cos-eye-brand { width:72px !important; height:72px !important; }
+svg.company-eye.cos-eye-hero { width:192px !important; height:192px !important; margin:0 auto; }
+svg.company-eye.cos-eye-avatar { width:32px !important; height:32px !important; }
+#root .auth-gate .company-eye { margin-bottom:24px; }
+#root .vision-orb-stage .vision-ring { display:none !important; }
+#root .vision-orb-stage, #root .vision-orb { animation:none !important; transform:none !important; }
+@media(max-width:700px) {
+  #root .company-utility-bar { min-height:88px; }
+  #root .company-brand { margin-bottom:18px; }
+  svg.company-eye.cos-eye-brand { width:64px !important; height:64px !important; }
+  svg.company-eye.cos-eye-hero { width:160px !important; height:160px !important; }
+}

@@ -3,7 +3,7 @@ import { housingArtwork, lensArtwork } from './eyeArtwork';
 import './animatedEye.css';
 
 /** Presentation only: the approved fixed housing and subtle horizontal glance. */
-export default function AnimatedEye() {
+export default function AnimatedEye({ variant = 'header' }: { variant?: 'header' | 'brand' | 'hero' | 'avatar' }) {
   const ref = useRef<SVGSVGElement>(null);
   const apertureId = `cos-eye-${useId().replace(/:/g, '')}`;
 
@@ -30,7 +30,8 @@ export default function AnimatedEye() {
   return (
     <svg
       ref={ref}
-      className='company-brand-mark company-eye'
+      className={`company-eye cos-eye-${variant}${variant === 'header' ? ' company-brand-mark' : ''}`}
+      data-cos-eye='approved'
       viewBox='0 0 1254 1254'
       width='38'
       height='38'
