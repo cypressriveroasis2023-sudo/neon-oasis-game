@@ -19,3 +19,10 @@ body.cos-operations-legacy #appView{overflow:visible!important;height:auto!impor
 #cosProductionAssignmentsClose{position:absolute;right:12px;top:12px;z-index:1;min-height:44px;width:44px;border:1px solid #2b90ad;background:#082c3c;color:#dffaff}
 body.cos-production-assignments-open{overflow:hidden!important}
 @media(max-width:700px){#cosProductionAssignmentsClose{width:36px;font-size:22px;right:8px;top:8px}}
+
+/* Authenticated native assignments stay visible on the IT landing. */
+.cos-native-assignments{margin:12px 0 18px;padding:16px;border:1px solid #3d6681;border-left:4px solid #55c5e8;border-radius:14px;background:#102331;color:#e6edf7}
+.cos-native-assignment-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cos-native-assignment-head h2{flex:1;margin:0;min-width:160px;font-size:20px}.cos-native-assignment-head button{min-height:44px;padding:8px 12px;border:1px solid #52748a;background:#173749;color:#e6edf7;border-radius:8px}
+.cos-native-assignments>p{margin:8px 0 12px;color:#aec0ce;font-size:13px}.cos-native-assignment-content{display:grid;gap:8px}.cos-native-assignment-content>p{margin:8px 0;color:#bfd0dd}
+.cos-native-assignment-row{display:grid;gap:5px;text-align:left;width:100%;min-width:0;padding:12px;border:1px solid #3d6179;border-radius:9px;background:#081927;color:#e6edf7;overflow-wrap:anywhere}.cos-native-assignment-row strong{font-size:15px}.cos-native-assignment-row span{font-size:13px;color:#bbccda}.cos-native-assignment-row small{color:#f3c56b;font-weight:700}.cos-native-assignment-row:hover{border-color:#64c9e5;background:#122e40}
+@media(max-width:700px){.cos-native-assignments{padding:12px}.cos-native-assignment-head h2{flex-basis:100%;font-size:18px}}

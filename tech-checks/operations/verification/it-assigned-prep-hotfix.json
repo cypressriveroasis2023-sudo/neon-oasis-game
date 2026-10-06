@@ -1,0 +1,14 @@
+{
+  "baseline": "9af9f5328cb38f1af895c9218783e18b9e96a063",
+  "scope": "Read-only native assigned-job panel on the existing IT landing and authorized pending-workflow detail fallback",
+  "checked_at_utc": "2026-10-06T20:55:00Z",
+  "offline_tests": {"passed": 415, "failed": 0, "live_probes_excluded": true},
+  "focused_browser_tests": {"passed": 33, "failed": 0, "viewport_widths": [390, 1024, 1440]},
+  "private_deployed_source_regressions": {"passed": 193, "failed": 0},
+  "private_pending_visit_tests": {"passed": 27, "failed": 0},
+  "typecheck": "passed",
+  "build": "passed",
+  "production_data_mutations": false,
+  "permission_or_identity_changes": false,
+  "notes": ["UI evidence uses synthetic fixture jobs only.", "The native assigned queue was read-only verified; the affected technician browser was not available for direct inspection.", "Private deployment source must preserve all existing InHand, router, VRM and evidence modules. Do not deploy the repository bridge wholesale."]
+}
