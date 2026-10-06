@@ -1,0 +1,54 @@
+/* Matching presentation for the separate AppDeploy source snapshot.
+   No API, session, role, permission, readiness or check behavior changes. */
+.cos-vision-appdeploy{--cos-bg:#080e18;--cos-panel:#101b2a;--cos-raised:#172436;--cos-line:#2b3c50;--cos-text:#edf2f7;--cos-muted:#b0bdce;--cos-red:#f3454f;color:var(--cos-text);background:var(--cos-bg);min-height:100dvh;font-family:Inter,Arial,sans-serif}
+.cos-vision-appdeploy .cos-vision-brand{display:flex!important;align-items:center;gap:10px;min-width:0}
+.cos-vision-appdeploy .cos-vision-brand>img{width:38px!important;height:38px!important;object-fit:contain!important;flex:none}
+.cos-vision-appdeploy .cos-vision-brand strong{display:block;font-size:21px!important;line-height:1.2;letter-spacing:3px;color:var(--cos-text)!important}
+.cos-vision-appdeploy .cos-vision-brand small{display:block;font-size:11px!important;letter-spacing:1px;color:var(--cos-muted)!important}
+.cos-vision-appdeploy .cos-vision-technician-brand{padding:16px clamp(12px,2vw,28px);background:#0c1522;border-bottom:1px solid var(--cos-line)}
+#root .cos-vision-appdeploy button:not(.active):not(.selected):not(.primary):not(.new):not(.danger){background:var(--cos-raised)!important;border-color:var(--cos-line)!important;color:var(--cos-text)!important;box-shadow:none!important}
+#root .cos-vision-appdeploy :is(.shell,.mobile-owner,.tech-mobile,.it-command){background:var(--cos-bg)!important;color:var(--cos-text)!important;min-width:0}
+#root .cos-vision-appdeploy .shell{grid-template-columns:220px minmax(0,1fr)!important}
+#root .cos-vision-appdeploy .shell>aside,#root .cos-vision-appdeploy .it-side{background:#0c1522!important;border-color:var(--cos-line)!important;padding:20px 12px!important;box-shadow:none!important}
+#root .cos-vision-appdeploy .shell>main{padding:22px clamp(16px,2vw,32px)!important;min-width:0;width:100%;max-width:none!important}
+#root .cos-vision-appdeploy .brand{padding:0 8px 20px!important}
+#root .cos-vision-appdeploy .cos-owner-sidebar-nav button:not(.cos-primary-workspace):not(.active){display:none!important}
+#root .cos-vision-appdeploy .shell>aside nav button,#root .cos-vision-appdeploy .it-side nav button{font-size:13px!important;font-weight:500!important;min-height:44px!important;padding:10px 12px!important;color:var(--cos-text)!important;background:transparent!important;border:1px solid transparent!important;border-radius:9px!important}
+#root .cos-vision-appdeploy .shell>aside nav button.active,#root .cos-vision-appdeploy .it-side nav button.active{background:#361d2a!important;border-color:#89424b!important;box-shadow:inset 3px 0 var(--cos-red)!important}
+#root .cos-vision-appdeploy :is(.techbar,.it-top){background:#0c1522!important;border:1px solid var(--cos-line)!important;box-shadow:none!important;border-radius:12px!important;padding:14px 16px!important;min-width:0;flex-wrap:wrap;gap:12px!important}
+#root .cos-vision-appdeploy .tech-id{display:flex!important;flex-wrap:wrap;gap:16px!important;min-width:0}
+#root .cos-vision-appdeploy .tech-eye{display:none!important}
+#root .cos-vision-appdeploy .welcome-name{font-size:18px!important;line-height:1.4!important;color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(.clock-tile,.weather-tile){background:var(--cos-panel)!important;border:1px solid var(--cos-line)!important;box-shadow:none!important;border-radius:8px!important;padding:8px 12px!important;color:var(--cos-text)!important;min-width:0!important}
+#root .cos-vision-appdeploy .clock-tile b{font-size:18px!important}
+#root .cos-vision-appdeploy .weather-primary b{font-size:17px!important}
+#root .cos-vision-appdeploy .weather-primary strong,#root .cos-vision-appdeploy .weather-copy small,#root .cos-vision-appdeploy .clock-tile small{font-size:11px!important;color:var(--cos-muted)!important}
+#root .cos-vision-appdeploy .weather-icon{font-size:18px!important}
+#root .cos-vision-appdeploy :is(.panel,.command-page-header,.quote-card,.owner-mobile-jobs article,.tech-job-card,.it-panel,.it-kpi,.service-command-home,.no-tech-jobs){background:var(--cos-panel)!important;border-color:var(--cos-line)!important;box-shadow:none!important;border-radius:12px!important;color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(h1,h2,h3,strong,b){color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(.small,.muted,small,label){color:var(--cos-muted)!important}
+#root .cos-vision-appdeploy .command-page-header h1{font-size:28px!important}
+#root .cos-vision-appdeploy :is(input,select,textarea){background:var(--cos-bg)!important;border-color:var(--cos-line)!important;color:var(--cos-text)!important;border-radius:8px!important;max-width:100%;font-size:16px!important}
+#root .cos-vision-appdeploy button.secondary,#root .cos-vision-appdeploy .record,#root .cos-vision-appdeploy .service-command-grid button,#root .cos-vision-appdeploy .cos-workspace-menu button{background:var(--cos-raised)!important;border:1px solid var(--cos-line)!important;color:var(--cos-text)!important;box-shadow:none!important;border-radius:9px!important;font-weight:500!important;min-height:44px!important;white-space:normal!important;overflow-wrap:anywhere;font-size:14px!important}
+#root .cos-vision-appdeploy .service-command-home{padding:20px!important;max-width:780px;width:100%;margin:0 auto}
+#root .cos-vision-appdeploy .service-command-home header h1{font-size:26px!important;line-height:1.3}
+#root .cos-vision-appdeploy .service-command-grid{grid-template-columns:1fr!important;gap:10px!important}
+#root .cos-vision-appdeploy .service-command-grid button{text-align:left!important;padding:14px 16px!important;min-height:66px!important}
+#root .cos-vision-appdeploy .service-command-grid button.required{border-left:3px solid var(--cos-red)!important}
+#root .cos-vision-appdeploy .service-command-grid button span{color:var(--cos-muted)!important;font-size:12px!important}
+#root .cos-vision-appdeploy .tech-bottom{background:#0c1522!important;border-color:var(--cos-line)!important}
+#root .cos-vision-appdeploy .tech-bottom button{background:transparent!important;color:var(--cos-muted)!important;min-height:44px;font-weight:500!important}
+#root .cos-vision-appdeploy .tech-bottom button.active{background:#361d2a!important;color:#fff!important;border-color:#89424b!important}
+#root .cos-vision-appdeploy .cos-workspace-menu>button{padding:10px 14px!important;font-size:13px!important}
+#root .cos-vision-appdeploy .cos-workspace-menu-overlay{position:fixed;inset:0;background:#0009;z-index:5000;padding:16px;display:flex;align-items:flex-start;justify-content:flex-end}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet{background:var(--cos-panel);color:var(--cos-text);border:1px solid var(--cos-line);border-radius:14px;padding:20px;width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet header{display:flex!important;align-items:center;justify-content:space-between;gap:12px;padding:0 0 18px!important;margin:0!important;background:transparent!important;border:0!important}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet h2{font-size:21px!important;margin:4px 0 0}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav button{text-align:left;padding:12px!important}
+html[data-theme='light'] #root .cos-vision-appdeploy{--cos-bg:#f4f6fa;--cos-panel:#fff;--cos-raised:#edf2f7;--cos-line:#c9d4e0;--cos-text:#152436;--cos-muted:#516478}
+html[data-theme='light'] #root .cos-vision-appdeploy :is(.shell>aside,.it-side,.techbar,.it-top,.tech-bottom,.mobile-owner>header,.tech-mobile>header){background:var(--cos-panel)!important}
+html[data-theme='light'] #root .cos-vision-appdeploy :is(.shell>aside nav button.active,.it-side nav button.active,.tech-bottom button.active){color:#fff!important}
+@media(max-width:900px){#root .cos-vision-appdeploy .shell{grid-template-columns:1fr!important}#root .cos-vision-appdeploy .tech-status{flex-wrap:wrap;gap:8px!important}#root .cos-vision-appdeploy .it-command{grid-template-columns:1fr!important}}
+@media(max-width:700px){#root .cos-vision-appdeploy .mobile-owner>header,#root .cos-vision-appdeploy .tech-mobile>header{background:#0c1522!important;border:1px solid var(--cos-line)!important;border-radius:12px;padding:16px!important;margin-bottom:16px;flex-wrap:wrap;gap:12px}#root .cos-vision-appdeploy .mobile-owner>header h1{font-size:24px!important}#root .cos-vision-appdeploy .service-command-home{padding:16px!important}#root .cos-vision-appdeploy .cos-workspace-menu-overlay{padding:10px}#root .cos-vision-appdeploy .cos-workspace-menu-sheet{padding:16px;max-height:calc(100dvh - 20px)}}
+@media(max-width:380px){#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav{grid-template-columns:1fr}}

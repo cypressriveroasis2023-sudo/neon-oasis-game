@@ -1,0 +1,146 @@
+[
+  {
+    "name": "COS remains signed out for reconciliation QA",
+    "sanity": true,
+    "viewport": "desktop",
+    "description": "Verifies the production sign-in gate without initializing an Owner identity or creating operational records. Owner selector positive and invalid-selection cases run separately in tests/ownerJobSelection.test.mjs with synthetic records; this signed-out run does not certify authenticated controls. Normal Owner session and actor resolution are additionally covered by isolated Auth-directory/PostgREST transports: valid existing identity, missing/inactive/revoked accounts and no implicit Auth/profile/role/audit writes. Explicit provisioning is not exercised by hosted QA. Owner Review loading, native snapshot success, genuine empty queues, persistent failures/retries and independent mobile reads are covered by separate local synthetic transport/browser tests; hosted signed-out QA does not certify a real Owner review or evidence file delivery. History native snapshot evidence availability, real-zero versus unknown counts, and persistent load errors/retries are separately covered by isolated transport and synthetic browser tests; no all-job evidence aggregation or private preview delivery is claimed. Owner Tech Check overview completion/evidence/failed-check availability and persistent read-error/retry states are covered by separate synthetic browser tests; hosted signed-out QA does not certify complete operational evidence data. The shared presentation and workspace-menu behavior are separately verified with synthetic local Chromium fixtures; hosted signed-out QA does not certify an authenticated technician workflow.",
+    "covers": [
+      "signed-out COS gate",
+      "reconciliation QA performs no production writes",
+      "Owner Controls are unavailable before sign-in",
+      "GET /api/session read-only existing Owner validation (isolated transports)",
+      "shared native Owner actor resolution without implicit provisioning (isolated transports)",
+      "missing/inactive/revoked Owner fails closed without borrowing another actor (isolated transports)",
+      "GET /api/owner-review existing active Owner native snapshot read (isolated transports)",
+      "Owner Review desktop/mobile loading, error/retry, successful empty queue and stale-request handling (local synthetic Chromium tests)",
+      "mobile jobs and billing reads are independent of Owner Review failure (local synthetic Chromium tests)",
+      "missing private evidence delivery is labeled unavailable; no broken native evidence links (local synthetic Chromium tests)",
+      "GET /api/jobs marks native placeholder evidence arrays unavailable without additional source reads or writes (isolated transports)",
+      "History unknown counts do not display zero; successful empty queue, failed/malformed read, retry and stale navigation are separate states (local synthetic Chromium tests)",
+      "Owner Tech Check overview does not infer completion or zero failures from omitted/placeholder fields (synthetic Chromium tests)",
+      "Owner Tech Check overview preserves real lifecycle/attention flags and separates loading/error/retry/successful empty states (synthetic Chromium tests)",
+      "Shared navy/silver VISION presentation across desktop/mobile Owner, IT and Service shells (local synthetic Chromium)",
+      "Workspace menu selection, focus restoration, Escape and Tab boundaries (local synthetic Chromium)"
+    ],
+    "steps": [
+      "Open the COS app signed out; do not sign in, enter demo mode, or create data",
+      "Verify the sign-in gate appears and Owner operational workspaces remain hidden"
+    ],
+    "expected": "The sign-in gate is visible and no production workflow is opened."
+  },
+  {
+    "name": "Anonymous reconciliation source inventory is denied",
+    "viewport": "desktop",
+    "description": "Verifies raw legacy source inventory remains behind existing authentication.",
+    "covers": [
+      "GET /api/reconciliation/source-page/:table anonymous denial",
+      "legacy record privacy"
+    ],
+    "steps": [
+      "Remain signed out; do not sign in or enter demo mode",
+      "From the browser request https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/reconciliation/source-page/cos_jobs without credentials",
+      "Verify the response returns Unauthorized and includes no job records"
+    ],
+    "expected": "HTTP 401 denies the inventory request and exposes no source records."
+  },
+  {
+    "name": "Anonymous operational storage inventory is denied",
+    "viewport": "mobile",
+    "description": "Verifies the storage inventory cannot expose evidence paths to an anonymous browser.",
+    "covers": [
+      "GET /api/reconciliation/storage-page anonymous denial",
+      "evidence path privacy"
+    ],
+    "steps": [
+      "Remain signed out; do not sign in or enter demo mode",
+      "From the browser request https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/reconciliation/storage-page without credentials",
+      "Verify the response returns Unauthorized and includes no file paths"
+    ],
+    "expected": "HTTP 401 denies the storage request and exposes no evidence paths."
+  },
+  {
+    "name": "Read-only capture page stays isolated from operational session initialization",
+    "viewport": "desktop",
+    "description": "Checks the reconciliation page signed out without opening an operational Owner workspace or running provisioning.",
+    "covers": [
+      "Phase 1C isolated capture sign-in gate",
+      "no COS session initializer"
+    ],
+    "steps": [
+      "Remain signed out; do not sign in or create data",
+      "Open /phase-1c-reconciliation",
+      "Verify COS Phase 1C — Read-only reconciliation capture and SIGN IN WITH APPDEPLOY appear",
+      "Verify CAPTURE READ-ONLY INVENTORY is unavailable while signed out and no /api/session request is made on this page"
+    ],
+    "expected": "Only the read-only capture sign-in page appears; no Owner initialization or operational writes occur."
+  },
+  {
+    "name": "Anonymous evidence, scheduling and technician workflow access are denied",
+    "viewport": "mobile",
+    "description": "Verifies protected reads and scheduling writes require authentication without creating identities or operational records. Positive save, refresh and trigger-completed visit handoff behavior are tested separately with local synthetic transports; this signed-out run certifies neither a real technician handoff nor database write persistence.",
+    "covers": [
+      "GET /api/reconciliation/storage-hash anonymous denial",
+      "private evidence digest protection",
+      "POST /api/jobs/:id/schedule authentication boundary",
+      "POST /api/jobs/:id/assign authentication boundary",
+      "POST /api/owner/jobs/:id/advance-it authentication boundary",
+      "Daily Board scheduling access",
+      "Owner IT-to-Service access",
+      "GET /api/session authentication boundary",
+      "GET /api/tech/visits/:id authentication boundary",
+      "POST /api/tech/visits/:id/complete authentication boundary",
+      "technician account resolution",
+      "assigned visit details and completion use protected backend routes",
+      "trigger-completed visit with active assignment remains eligible for guarded handoff; completed-assignment replay and unfinished evidence are rejected in local regression",
+      "GET /api/owner-tasks authentication boundary",
+      "Today dashboard authenticated task read; partial loading and unknown counts tested separately with local synthetic transports",
+      "POST /api/field-map/:id/gps authentication boundary",
+      "POST /api/tech/jobs/:id/field-gps authentication boundary",
+      "GPS required inputs, exact-unit read-back and text-only popups covered separately by local regression and Chromium DOM tests"
+    ],
+    "steps": [
+      "Remain signed out. Do not sign in, enter demo mode, provision identities or seed production records.",
+      "Request https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/reconciliation/storage-hash?path=jobs/test.jpg without credentials. Verify HTTP 401 and no digest, signed URL or source records.",
+      "Using the same https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y base, send JSON POST requests with credentials omitted and empty JSON objects to /api/jobs/00000000-0000-0000-0000-000000000000/schedule, /api/jobs/00000000-0000-0000-0000-000000000000/assign, and /api/owner/jobs/00000000-0000-0000-0000-000000000000/advance-it.",
+      "Verify all three scheduling write endpoints return HTTP 401 and no operational records.",
+      "Using the same app API base, request GET /api/session and GET /api/tech/visits/00000000-0000-0000-0000-000000000000 without credentials. POST an empty JSON object without credentials to /api/tech/visits/00000000-0000-0000-000000000000/complete.",
+      "Verify the two reads and the completion endpoint all return HTTP 401. Also request GET /api/owner-tasks using the same app API base without credentials; verify HTTP 401 and no task data. Confirm the application stays at its sign-in gate; do not create accounts or complete a real visit.",
+      "Using that API base while signed out, POST empty JSON objects with credentials omitted to /api/field-map/00000000-0000-0000-0000-000000000000/gps and /api/tech/jobs/00000000-0000-0000-0000-000000000000/field-gps. Both must return HTTP 401 without changing a coordinate. Do not sign in, upload evidence or change a real job."
+    ],
+    "expected": "All ten requests deny access before operational reads or writes. Authenticated account, assigned-details, completion, Today loading and GPS save logic are separately covered by local regression tests. No real authenticated workflow, physical GPS capture or hosted map success is claimed by this signed-out QA run."
+  },
+  {
+    "name": "Anonymous Owner Review and History snapshots are denied",
+    "viewport": "desktop",
+    "description": "Checks the new native Owner Review reader authentication boundary without signing in or creating any operational records. Positive authorization, valid/invalid snapshot and retry states use isolated transports and synthetic local browser records only.",
+    "covers": [
+      "GET /api/owner-review anonymous denial",
+      "Owner Review job and evidence metadata privacy",
+      "GET /api/jobs anonymous denial",
+      "History job/evidence metadata privacy"
+    ],
+    "steps": [
+      "Remain signed out. Do not sign in, enter demo mode, create accounts, upload evidence or change a real job.",
+      "Request https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/owner-review and https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/jobs without credentials.",
+      "Verify HTTP 401 with no job records, photos, signatures or storage paths."
+    ],
+    "expected": "Both snapshots return HTTP 401 before any operational read or provisioning. The application remains at the sign-in gate."
+  },
+  {
+    "name": "Anonymous private evidence preview is denied",
+    "viewport": "mobile",
+    "description": "Verifies the new evidence reader requires authentication without login, upload, signing, grants or operational writes. Positive existing-Owner same-org preview, IDOR/MIME/size failures, retry, close, stale responses and native iframe cleanup were tested separately with local synthetic API/Storage fixtures. No hosted real-file success is claimed.",
+    "covers": [
+      "GET /api/evidence/:id authentication boundary",
+      "private photo and signature byte protection",
+      "existing Owner same-org raster preview and revoked-role denial (isolated transports)",
+      "on-demand preview, close/retry, stale-response and iframe hide cleanup (synthetic Chromium)"
+    ],
+    "steps": [
+      "Remain signed out. Do not sign in, create accounts, upload evidence or change a real job.",
+      "Request https://api-v2.appdeploy.ai/app/cos-operations-platform-preview-wpbf1y/api/evidence/00000000-0000-0000-0000-000000000000 without credentials.",
+      "Verify HTTP 401 and no file bytes, document metadata, storage paths, keys, redirects or signed URLs. Verify the app remains at its sign-in gate."
+    ],
+    "expected": "The private evidence endpoint denies anonymous access before reading a document or object. No real authenticated file delivery is claimed by this signed-out test."
+  }
+]

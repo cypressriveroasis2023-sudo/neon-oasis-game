@@ -5,6 +5,8 @@ on:
     paths:
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/vision-platform.css'
+      - 'tech-checks/index.html'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
       - '.github/workflows/cos-operations.yml'
@@ -12,6 +14,8 @@ on:
     paths:
       - 'tech-checks/operations/**'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/vision-platform.css'
+      - 'tech-checks/index.html'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
       - '.github/workflows/cos-operations.yml'

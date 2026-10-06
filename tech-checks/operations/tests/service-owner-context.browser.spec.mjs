@@ -87,6 +87,30 @@ async function mount(page) {
 }
 const daily = page => page.locator('#wlSvcHome [data-wl-svc="inspect"], #wlSvcHome [data-wl-service-trailer-inspection], #wlSvcHome [data-wl-service-truck-inventory]');
 
+test('shared VISION Service presentation keeps real readiness and job actions readable',async({page},testInfo)=>{
+  await mount(page);
+  await page.evaluate(async()=>{setIdentity('service');show('svc');await renderServiceHome();});
+  const home=page.locator('#wlSvcHome');
+  await expect(home.getByRole('button',{name:/Enter Ticket Number/})).toBeVisible();
+  await expect(home.getByRole('button',{name:/Truck Inspection/})).toContainText('Completed Today');
+  const brand=page.locator('#appView > .mobileTop .cos-vision-brand');
+  await expect(brand).toContainText('VISION');
+  await expect(brand.locator('img')).toBeVisible();
+  for(const width of [320,390,1024,1440]){
+    await page.setViewportSize({width,height:900});
+    const layout=await home.evaluate(element=>({background:getComputedStyle(element).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
+    expect(layout.background).toBe('rgb(16, 27, 42)');
+    expect(layout.scroll).toBeLessThanOrEqual(layout.width);
+    for(const control of layout.controls){expect(control.height).toBeGreaterThanOrEqual(44);expect(control.left).toBeGreaterThanOrEqual(0);expect(control.right).toBeLessThanOrEqual(layout.width);}
+  }
+  await home.getByRole('button',{name:/Enter Ticket Number/}).click();
+  expect(await page.evaluate(()=>fixture.actions)).toContain('job');
+  await home.getByRole('button',{name:/Return Equipment to IT/}).click();
+  expect(await page.evaluate(()=>fixture.actions)).toContain('return');
+  await page.setViewportSize({width:testInfo.project.use.viewport.width,height:900});
+  await page.locator('#appView').screenshot({path:testInfo.outputPath('unified-service.png')});
+});
+
 async function expectOwnerNotice(page) {
   await expect(page.locator('#cosOwnerServiceNotice')).toContainText('viewing Service tools as Owner');
   await expect(page.locator('#wlSvcHome')).not.toContainText('Checking today');

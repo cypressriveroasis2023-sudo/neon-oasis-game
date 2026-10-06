@@ -226,6 +226,7 @@
 .visionLaunchWord{font-family:"Helvetica Neue","Avenir Next","Segoe UI",system-ui,sans-serif;font-size:clamp(37px,9.7vw,56px);font-weight:200;letter-spacing:.30em;line-height:1;margin-left:.30em;color:#eef1f4;text-shadow:0 2px 18px rgba(0,0,0,.55)}.visionLaunchWord span{color:#e62a3a}.visionLaunchCompany{margin-top:18px;color:#a6afb8;font-size:11px;font-weight:900;letter-spacing:.30em}.visionLaunchStatus{margin-top:37px!important;color:#8798a7!important;font-size:15px!important;font-weight:650!important;letter-spacing:.035em}.visionLaunch button{margin-top:24px}
 @keyframes visionPulse{0%{transform:scale(.82);opacity:0}30%{opacity:.72}100%{transform:scale(1.16);opacity:0}}@keyframes visionLogoGlow{0%,100%{filter:contrast(1.1) saturate(1.1) drop-shadow(0 0 15px rgba(218,20,38,.55))}50%{filter:contrast(1.16) saturate(1.25) drop-shadow(0 0 34px rgba(255,27,48,.9))}}@keyframes visionFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.015)}}@media(prefers-reduced-motion:reduce){.visionLaunchOrb,.visionLaunchHalo,.visionLaunchLogo{animation:none!important}}
 </style>  <link rel="stylesheet" href="./operations-host.css?v=operations-v100-phase2-20261004" />
+    <link rel="stylesheet" href="./vision-platform.css?v=unified-vision-20261005" />
   </head>
   <body>
     <div id="app">
@@ -233,7 +234,7 @@
       <script>setTimeout(function(){var panel=document.getElementById('sessionLoading');if(panel){panel.querySelector('.visionLaunchStatus').textContent='Taking longer than expected. Check your connection and try again.';document.getElementById('sessionLoadingRetry').hidden=false;}},15000);</script>
       <div id="authView" class="wrap auth hidden">
         <div class="hero">
-          <div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div>
+          <div class="cos-vision-brand"><img src="./operations/dist/resources/vision-eye-round.svg" alt=""><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div><div class="techBrand"><h1>Tech Check</h1></div>
         </div>
         <div class="card">
           <h2>Sign In</h2>
@@ -269,7 +270,7 @@
       </div>
 
       <div id="forcePasswordView" class="wrap auth hidden">
-        <div class="hero"><div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div></div>
+        <div class="hero"><div class="cos-vision-brand"><img src="./operations/dist/resources/vision-eye-round.svg" alt=""><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div><div class="techBrand"><h1>Tech Check</h1></div></div>
         <div class="card">
           <h2>Create Your Private Password</h2>
           <div id="forcePasswordIntro" class="small">Your temporary password worked. Before using Tech Check, create a private password that only you know. This is required one time after account setup or an Owner reset.</div>
@@ -285,7 +286,7 @@
         <div id="connectionBanner" class="connectionBanner hidden" role="status" aria-live="polite"></div>
         <div class="mobileTop">
         <div class="hero">
-          <div class="brandLockup"><div class="brandTarget"><span></span></div><div class="brandWords"><b>CAMERAS</b><strong>ONSITE</strong></div></div><div class="brandDivider"></div><div class="techBrand"><h1>Tech Check</h1><div class="tagline">PEOPLE. TECHNOLOGY. SECURITY.</div></div>
+          <div class="cos-vision-brand"><img src="./operations/dist/resources/vision-eye-round.svg" alt=""><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div><div class="techBrand"><h1>Tech Check</h1></div>
         </div>
         <div class="accountbar">
           <div>
