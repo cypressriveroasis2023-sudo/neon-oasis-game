@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 
 // Isolated browser fixtures only; all external requests are blocked.
@@ -65,14 +66,10 @@ async function setup(page){
   return{state,frame};
 }
 async function open(frame,name){
-  const more=frame.getByRole('button',{name:'More',exact:true});
-  if(await more.isVisible()&&await more.getAttribute('aria-expanded')!=='true')await more.click();
-  const nav=frame.getByRole('navigation',{name:'COS Operations'});
-  await expect(nav).toBeVisible();
-  const button=nav.getByRole('button',{name,exact:true});
-  await button.click();
+  await openWorkspace(frame,name);
   return frame.getByRole('region',{name:name+' Workspace',exact:true});
 }
+
 async function noOverflow(page){
   const frame=page.frames().find(value=>value.parentFrame());
   const metrics=await frame.evaluate(()=>({viewport:innerWidth,width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)}));

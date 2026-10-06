@@ -1,4 +1,8 @@
 import AnimatedEye from './AnimatedEye';
+import VisionAreas, { AreaIcon, primaryWorkspace } from './VisionAreas';
+import OperationsAreas from './OperationsAreas';
+import UnitsOnHand from './UnitsOnHand';
+import { primaryAreas } from './visionAreas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 import TodayDashboard from './TodayDashboard';
@@ -26,7 +30,9 @@ const legacy: Record<string,string> = { Vision:'vision' };
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
-  'Field Map':'Find deployed COS units by GPS coordinates without changing operational placement.',
+  'Field Map':'Find field units using recorded GPS, installed-site coordinates or their site address.',
+  'Units On Hand':'Shop and yard inventory, availability and preparation status.',
+  Operations:'Jobs, scheduling, customers and finance in your existing workflows.',
   'Owner Tasks':'Assign auditable daily work to IT and Service technicians.',
   Jobs:'Authoritative COS operational jobs and their current field assignments.',
   Unscheduled:'Schedule and assign native Operations visits.',
@@ -186,8 +192,7 @@ function OwnerApp() {
   const [toast,setToast]=useState('');
   const [menu,setMenu]=useState(false);
   const menuRef=useRef<HTMLElement|null>(null);
-  const [menuSearch,setMenuSearch]=useState('');
-  const openMenu=useCallback(()=>{setMenuSearch('');setMenu(true);},[]);
+  const openMenu=useCallback(()=>{setMenu(true);},[]);
   useEffect(()=>{
     if(!menu)return;
     const previous=document.activeElement as HTMLElement|null;
@@ -258,32 +263,30 @@ function OwnerApp() {
   const authorized=session?.authorized===true;
   const condition=weather?(weather.weather_code===0?'Clear':weather.weather_code<=3?'Partly cloudy':weather.weather_code<=48?'Fog':weather.weather_code<=67?'Rain':weather.weather_code<=77?'Wintry':weather.weather_code<=82?'Showers':'Storms'):'Weather unavailable';
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
-  const search=menuSearch.trim().toLowerCase();
-  const matchingGroups=workspaceGroups.map(area=>({...area,items:area.items.filter(name=>!search||(area.label+' '+workspaceLabel(name)+' '+(descriptions[name]||'')).toLowerCase().includes(search))})).filter(area=>area.items.length>0);
+  const selectedArea=primaryWorkspace(active);
   const ownerInitials=String(session?.name||'Owner').split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
   return <div className='shell operations-shell company-shell'>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
     <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
       <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
-      <div className='company-menu-search'><label htmlFor='company-menu-search'>Find a workspace</label><input id='company-menu-search' type='search' value={menuSearch} onChange={event=>setMenuSearch(event.target.value)} placeholder='Jobs, equipment, customers…'/></div>
-      <p className='company-nav-heading'>Company</p>
-      <nav className='operations-area-nav' aria-label='COS areas'>{workspaceGroups.map(area=><button type='button' key={area.label} className={group.label===area.label?'active':''} onClick={()=>navigate(area.home)} aria-current={group.label===area.label?'true':undefined}><span className='company-nav-dot' aria-hidden='true'/>{area.label}</button>)}</nav>
-      <nav className='operations-workspace-menu' aria-label='COS Operations'>{matchingGroups.map(area=><section key={area.label} aria-label={area.label+' tools'}><h2>{area.label}</h2>{area.items.map(name=><button type='button' key={name} className={active===name||(active==='Invoices'&&name==='Billing')?'active':''} onClick={()=>navigate(name)} aria-current={active===name||(active==='Invoices'&&name==='Billing')?'page':undefined}>{workspaceLabel(name)}{!native.includes(name as NativeWorkspace)&&!legacy[name]&&<span className='operations-reference-mark' aria-hidden='true' title='Opens AppDeploy workspace'>↗</span>}</button>)}</section>)}{matchingGroups.length===0&&<p className='company-menu-empty' role='status'>No matching workspace. Try a different name.</p>}<section aria-label='Assistant tools'><h2>Assistant</h2><button type='button' className='vision-nav-button' onClick={()=>navigate('Vision')}><img src={asset('vision-eye-round.svg')} alt=''/><span>Vision assistant</span></button></section></nav>
-      <div className='company-sidebar-footer'><button type='button' className='company-settings' onClick={openMenu}>Settings &amp; help</button><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
-      <div className='platform'><h2>Workspace &amp; account</h2><button onClick={()=>{setMenu(false);openLegacy('it');}}>IT Tech Check</button><button onClick={()=>{setMenu(false);openLegacy('service');}}>Service Tech Check</button><button onClick={()=>{setMenu(false);openLegacy('accounts');}}>Accounts &amp; Permissions</button><button onClick={()=>{setMenu(false);openLegacy('more');}}>Existing Owner Tools</button><button onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button><div className='company-utilities'><button className='company-weather' onClick={requestWeather} title='Load weather for your current location'><span aria-hidden='true'>{weather?.weather_code===0?'☀':'☁'}</span> {weather?Math.round(weather.temperature_2m)+'°F · '+condition:'Local weather'}<small>{weatherStatus}</small>{weather&&<small>Feels {Math.round(weather.apparent_temperature)}° · Wind {Math.round(weather.wind_speed_10m)} mph</small>}</button><p>{now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} · {now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric'})} CT</p></div></div>
+      <p className='company-nav-heading'>Your workspace</p>
+      <nav className='operations-area-nav' aria-label='COS Operations'>{primaryAreas.map(area=><button type='button' key={area.workspace} className={selectedArea===area.workspace?'active':''} onClick={()=>navigate(area.workspace)} aria-current={selectedArea===area.workspace?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
+      <div className='company-sidebar-footer'><div className='company-sidebar-actions'><button type='button' onClick={()=>navigate('Tech Check')}>IT &amp; Service Tech Checks</button><button type='button' onClick={()=>navigate('Vision')}>Vision assistant</button><button type='button' onClick={()=>{setMenu(false);openLegacy('accounts');}}>Accounts &amp; Permissions</button><button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
     </aside>
     <main className='owner-it-main' inert={menu}>
       <section className='company-utility-bar' aria-label='Workspace utilities'>
         <div className='company-mobile-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div><span className='company-breadcrumb'>{workspaceLabel(active)}</span>
-        <button type='button' className='company-search-trigger' onClick={openMenu}><svg aria-hidden='true' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='10.5' cy='10.5' r='6.5'/><path d='m16 16 4 4'/></svg><span>Search company workspaces</span></button>
+        <button type='button' className='company-search-trigger vision-nav-return' onClick={()=>navigate('Daily Board')}>Open dispatch board</button>
         <span className={'company-connection'+(!authorized?' company-connection-pending':'')} role='status'><i aria-hidden='true'/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</span>
-        <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>More <span aria-hidden='true'>☰</span></button>
+        <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu <span aria-hidden='true'>☰</span></button>
       </section>
-      {active!=='Today'&&<nav className='operations-section-nav' aria-label={group.label+' workspaces'}>{group.items.map(name=><button type='button' key={name} aria-current={active===name||(active==='Invoices'&&name==='Billing')?'page':undefined} className={active===name||(active==='Invoices'&&name==='Billing')?'active':''} onClick={()=>navigate(name)}>{workspaceLabel(name)}{!native.includes(name as NativeWorkspace)&&!legacy[name]&&<span aria-hidden='true' title='Opens AppDeploy workspace'> ↗</span>}</button>)}</nav>}
+
       {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
-        :active==='Today'?<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/>
+        :active==='Today'?<>{!route.detail&&<VisionAreas api={api} navigate={navigate}/>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :active==='Operations'?<OperationsAreas navigate={navigate}/>
+        :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={mapUnitId} openWorkspace={navigate}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
@@ -305,7 +308,7 @@ function OwnerApp() {
         :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}
     </main>
-    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{[{label:'Overview',home:'Today',area:'Overview'},{label:'Jobs',home:'Jobs',area:'Job flow'},{label:'Assets',home:'Equipment',area:'Equipment'}].map(area=><button type='button' key={area.label} className={group.label===area.area?'active':''} aria-current={group.label===area.area?'true':undefined} onClick={()=>navigate(area.home)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} className={!['Overview','Job flow','Equipment'].includes(group.label)?'active':''} onClick={openMenu}>More</button></nav>
+    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{[{label:'Dashboard',workspace:'Today'},{label:'Field View',workspace:'Field Map'},{label:'Team',workspace:'Team'}].map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
   </div>;
 }

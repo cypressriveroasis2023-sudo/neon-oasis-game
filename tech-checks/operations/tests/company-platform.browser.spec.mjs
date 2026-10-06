@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import { workspaces, workspaceLabel } from '../src/workspaceNavigation.ts';
@@ -39,10 +40,7 @@ test('every company destination remains reachable with a dark responsive boundar
   test.setTimeout(120000);
   const {frame, requests} = await mount(page);
   for (const workspace of workspaces.filter(name => !['Vision','Invoices'].includes(name))) {
-    await frame.getByRole('button',{name:'More',exact:true}).click();
-    const menu = frame.getByRole('dialog',{name:'Operations navigation'});
-    await menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:workspaceLabel(workspace),exact:true}).click();
-    await expect(menu).toHaveCount(0);
+    await openWorkspace(frame, workspace);
     await expect.poll(() => frame.locator('body').evaluate(()=>location.hash)).toBe('#' + workspace.toLowerCase().replaceAll(' ','-'));
     await expect(frame.locator('.owner-it-main')).toBeVisible();
     if (external.includes(workspace)) {

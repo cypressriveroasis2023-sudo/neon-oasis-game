@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
+import { locationLink } from './visionAreas';
 import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
 import { routerLabels, routerStatus } from '../../supabase/functions/cos-operations-pages/routers';
@@ -275,8 +276,8 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
       <aside className='field-map-list' aria-label='Field units'>
         {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
-          <span className={hasCoords(unit)?'mapped':'missing'}>{hasCoords(unit)?'MAP':'GPS?'}</span>
-          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small>
+          <span className={hasCoords(unit)?'mapped':'missing'}>{hasCoords(unit)?'MAP':unit.address?.trim()?'ADDRESS':'LOCATION?'}</span>
+          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small>
         </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>
 
@@ -319,7 +320,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
               <button className='secondary' disabled={busy} onClick={captureGps}>Use My Current GPS</button>
               <button disabled={busy||refreshRequired} onClick={()=>void saveGps()}>{busy?'Saving…':'Save Unit GPS'}</button>
             </div>
-            {hasCoords(selected)&&<a className='field-map-open' href={'https://www.google.com/maps/search/?api=1&query='+selected.latitude+','+selected.longitude} target='_blank' rel='noreferrer'>Open this unit in Google Maps ↗</a>}
+            {locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open this unit GPS in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
           </div>
 
           <div className='field-map-history'>

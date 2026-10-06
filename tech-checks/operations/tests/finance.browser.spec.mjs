@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 // Finance fixture data is test-only. The route guard prevents all remote
 // requests from reaching an actual service, including financial writes.
@@ -76,11 +77,10 @@ async function start(page) {
   return { frame, state };
 }
 async function navigate(frame, name) {
-  const more = frame.getByRole('button', { name: 'More', exact: true });
-  if (await more.isVisible()) await more.click();
-  await frame.getByRole('navigation', { name: 'COS Operations', exact: true }).getByRole('button', { name:name==='Invoices'?'Billing & Invoices':name, exact: true }).click();
+  await openWorkspace(frame,name);
   await expect(frame.getByRole('region', { name: name + ' review', exact: true })).toBeVisible();
 }
+
 async function noOverflow(page) {
   const frame = page.frames().find(item => item.parentFrame());
   const size = await frame.evaluate(() => ({

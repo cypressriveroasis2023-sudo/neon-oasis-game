@@ -1,8 +1,9 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
 const card=frame=>frame.locator('.company-health-card').filter({has:frame.getByRole('heading',{name:'InHand Routers',exact:true})});
-async function openMap(frame){await frame.getByRole('button',{name:'More',exact:true}).click();await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Field Map',exact:true}).click();}
+async function openMap(frame){await openWorkspace(frame,'Field Map');}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
  await expect(card(frame)).toBeVisible();

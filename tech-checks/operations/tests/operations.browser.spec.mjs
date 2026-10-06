@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 
 // Synthetic records exist only in this test file. Every external request is
@@ -100,9 +101,7 @@ async function fixturePage(page) {
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   return { state, frame };
 }
-async function open(frame, name) {
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:name==='Daily Board'?'Dispatch Board':name==='Jobs'?'Job flow':name,exact:true}).click();
+async function open(frame, name) { await openWorkspace(frame, name);
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());
