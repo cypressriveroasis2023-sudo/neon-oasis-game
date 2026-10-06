@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openWorkspace } from './navigation-helper.mjs';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 const origin = 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -173,7 +174,7 @@ test('approved red eye branding stays readable through responsive navigation and
     await expect(menu).toHaveCount(0);
     await expect(more).toBeFocused();
     await more.click();
-    await frame.getByRole('dialog').getByRole('button', { name: 'Job flow', exact: true }).click();
+    await openWorkspace(frame, 'Jobs');
     await expect(frame.getByRole('heading', { name: 'Job flow', exact: true })).toBeVisible();
     await expect(brand).toBeVisible();
     await frame.locator('body').evaluate(() => history.back());

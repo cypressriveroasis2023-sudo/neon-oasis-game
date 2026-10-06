@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {vrmPortalConfig} from '../../supabase/functions/cos-operations-pages/vrm.ts';
 const origin='http://127.0.0.1:4173';
@@ -25,8 +26,7 @@ async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm
 
 async function openVrm(frame){
  await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
- await frame.getByRole('button',{name:'More',exact:true}).click();
- await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Victron VRM',exact:true}).click();
+ await openWorkspace(frame,'Victron VRM');
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toBeVisible();
 }
 test('All nine verified VRM portals work with sharing disabled',async({page})=>{

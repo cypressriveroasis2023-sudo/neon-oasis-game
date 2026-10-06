@@ -1,8 +1,9 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
 const card=frame=>frame.locator('.company-health-card').filter({has:frame.getByRole('heading',{name:'InHand Routers',exact:true})});
-async function openMap(frame){await frame.getByRole('button',{name:'More',exact:true}).click();await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Field Map',exact:true}).click();}
+async function openMap(frame){await openWorkspace(frame,'Field Map');}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
  await expect(card(frame)).toBeVisible();
@@ -27,7 +28,7 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(frame.locator('.field-map-detail')).toContainText('Manual');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('30');
- await expect(frame.locator('.router-map-note')).toContainText('Router GPS feed not connected');
+ await expect(frame.locator('.router-map-note')).toContainText('Router checks do not supply live locations.');
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
  await frame.getByRole('button',{name:'View all InHand routers'}).click();

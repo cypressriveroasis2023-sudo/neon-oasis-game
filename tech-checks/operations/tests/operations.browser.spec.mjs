@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 
 // Synthetic records exist only in this test file. Every external request is
@@ -65,7 +66,7 @@ async function fixturePage(page) {
       else if (path === '/api/jobs') data = { items: state.jobs };
       else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
-      else if (['/api/quotes', '/api/ar', '/api/purchasing'].includes(path)) data = { items: [] };
+      else if (['/api/quotes', '/api/ar', '/api/purchasing', '/api/vrm-portal', '/api/equipment', '/api/team-production'].includes(path)) data = { items: [] };
       else if (path === '/api/owner/control-data') data = { sites: [], truckChecks: [], serviceTechnicians: state.readiness.filter(row => row.department === 'service').map(row => row.name), itTechnicians: state.readiness.filter(row => row.department === 'it').map(row => row.name) };
       else if (path === '/api/daily-board') data = { jobs: state.readbackMismatch ? state.jobs.map(job => ({ ...job, technician: 'Previous Service' })) : state.jobs, tasks: state.tasks, readiness: state.readiness, asOf: now };
       else if (path === '/api/field-map') data = mapSnapshot(state);
@@ -100,9 +101,7 @@ async function fixturePage(page) {
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   return { state, frame };
 }
-async function open(frame, name) {
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:name==='Daily Board'?'Dispatch Board':name==='Jobs'?'Job flow':name,exact:true}).click();
+async function open(frame, name) { await openWorkspace(frame, name);
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());

@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import {readFileSync} from 'node:fs';
@@ -43,10 +44,10 @@ test('approved shell is dark with exact desktop proportions and a compact mobile
   await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
   const facts=await frame.locator('.company-shell').evaluate(shell=>({theme:document.documentElement.dataset.theme,font:getComputedStyle(shell).fontFamily,bg:getComputedStyle(shell).backgroundColor,sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).backgroundColor,width:shell.querySelector('.operations-sidebar').getBoundingClientRect().width,bar:shell.querySelector('.company-utility-bar').getBoundingClientRect().height,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
   expect(facts.theme).toBe('dark');expect(facts.font).toContain('Open Sans');expect(facts.bg).toBe('rgb(17, 27, 42)');expect(facts.sidebar).toBe('rgb(23, 35, 55)');expect(facts.scroll).toBeLessThanOrEqual(facts.viewport+1);
-  if(facts.viewport>700){expect(facts.width).toBe(184);expect(facts.bar).toBe(76);await expect(frame.getByRole('navigation',{name:'COS areas'}).getByRole('button')).toHaveCount(7);}else{await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button')).toHaveCount(4);}
+  if(facts.viewport>700){expect(facts.width).toBe(184);expect(facts.bar).toBe(76);await expect(frame.getByRole('navigation',{name:'COS Operations'}).getByRole('button')).toHaveCount(8);}else{await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button')).toHaveCount(4);}
   await page.screenshot({path:testInfo.outputPath('company-approved-shell.png'),fullPage:true});
 });
-test('More search, focus trapping, Escape and return focus work without changing the active route',async({page})=>{
+test('Single menu, focus trapping, Escape and return focus work without changing the active route',async({page})=>{
   const {frame}=await mount(page);
   const more=frame.getByRole('button',{name:'More',exact:true});
   await more.click();
@@ -54,21 +55,18 @@ test('More search, focus trapping, Escape and return focus work without changing
   const close=menu.getByRole('button',{name:'Close menu'});
   await expect(close).toBeFocused();
   expect((await auditDarkPresentation(menu)).failures).toEqual([]);
-  await menu.getByRole('searchbox',{name:'Find a workspace'}).fill('routers');
-  await expect(menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
-  await expect(menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
-  await menu.getByRole('searchbox',{name:'Find a workspace'}).fill('no-match-fixture');
-  await expect(menu.getByText('No matching workspace. Try a different name.')).toBeVisible();
+  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button')).toHaveCount(8);
+  await expect(menu.getByRole('navigation',{name:'COS Operations'}).getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
+  await expect(menu.getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
   await close.focus();await close.press('Shift+Tab');
-  await expect(menu.getByRole('button',{name:/Local weather/})).toBeFocused();
+  await expect(menu.getByRole('button',{name:'Sign out',exact:true})).toBeFocused();
   await page.keyboard.press('Tab');await expect(close).toBeFocused();
   await close.press('Escape');await expect(menu).toHaveCount(0);await expect(more).toBeFocused();
   await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
 });
 test('native records forms and load errors remain dark and readable on narrow screens',async({page},testInfo)=>{
   const {frame}=await mount(page);
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Owner Tasks',exact:true}).click();
+  await openWorkspace(frame,'Owner Tasks');
   await frame.getByRole('button',{name:'+ New Owner Task',exact:true}).click();
   const input=frame.getByLabel('Task Title *');await expect(input).toBeVisible();
   expect(await input.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}))).toEqual({bg:'rgb(17, 27, 42)',color:'rgb(230, 237, 247)'});

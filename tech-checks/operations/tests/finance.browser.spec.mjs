@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 // Finance fixture data is test-only. The route guard prevents all remote
 // requests from reaching an actual service, including financial writes.
@@ -39,7 +40,7 @@ async function start(page) {
     if (method === 'GET' && path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
     else if (method === 'GET' && path === '/api/camera-health/summary') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
     else if (method === 'GET' && path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
-    else if (method === 'GET' && ['/api/jobs', '/api/owner-tasks'].includes(path)) data = { items: [] };
+    else if (method === 'GET' && ['/api/jobs', '/api/owner-tasks', '/api/vrm-portal', '/api/equipment', '/api/field-map', '/api/team-production'].includes(path)) data = { items: [] };
     else {
       const kind = Object.keys(paths).find(key => path === paths[key] || path.startsWith(paths[key] + '/'));
       if (!kind) throw new Error('Unexpected finance fixture path: ' + path);
@@ -76,11 +77,10 @@ async function start(page) {
   return { frame, state };
 }
 async function navigate(frame, name) {
-  const more = frame.getByRole('button', { name: 'More', exact: true });
-  if (await more.isVisible()) await more.click();
-  await frame.getByRole('navigation', { name: 'COS Operations', exact: true }).getByRole('button', { name:name==='Invoices'?'Billing & Invoices':name, exact: true }).click();
+  await openWorkspace(frame,name);
   await expect(frame.getByRole('region', { name: name + ' review', exact: true })).toBeVisible();
 }
+
 async function noOverflow(page) {
   const frame = page.frames().find(item => item.parentFrame());
   const size = await frame.evaluate(() => ({

@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 // Isolated synthetic mutation coverage. No external request reaches production.
 const origin='http://127.0.0.1:4173', edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -29,7 +30,7 @@ async function mount(page,workspace='daily-board'){
    if(path==='/api/owner-tasks')return answer({items:state.tasks.map(task=>({...task,...(state.taskMismatch?{relatedJobId:null,relatedSiteId:null,ownerNotes:'old note'}:{}),...(state.taskAssignedMismatch?{assignedUserId:checkId}:{})}))});
    if(path==='/api/sites')return answer({items:state.control.sites});
    if(path==='/api/team-production')return answer({items:[{userId:checkId,displayName:'Casey Service',department:'service',active:true}]});
-   if(['/api/quotes','/api/ar','/api/purchasing'].includes(path))return answer({items:[]});
+   if(['/api/quotes','/api/ar','/api/purchasing','/api/vrm-portal','/api/equipment','/api/field-map'].includes(path))return answer({items:[]});
    throw Error('Unexpected synthetic GET '+path);
   }
   expect(method).toBe('POST');state.writes.push(envelope);
@@ -59,9 +60,7 @@ async function selectJob(controls){await controls.getByLabel('Selected COS Job')
 async function prompt(frame,value){const dialog=frame.getByRole('dialog');await expect(dialog).toBeVisible();if(value!==undefined)await dialog.locator('input,textarea').fill(value);await dialog.getByRole('button',{name:'SAVE & CONTINUE',exact:true}).click();}
 async function confirm(frame){await frame.getByRole('dialog').getByRole('button',{name:'CONFIRM & CONTINUE',exact:true}).click();}
 async function navigate(page,frame,name){
- const button=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:new RegExp('^'+(name==='Jobs'?'Job flow':name)+'(?:$| AppDeploy| ↗)')});
- if(!await button.isVisible())await frame.getByRole('button',{name:'More',exact:true}).click();
- await button.click();
+ await openWorkspace(frame,name);
 }
 
 test('Owner creates one synthetic job, verifies its fresh identity and preserves it after reload',async({page})=>{
