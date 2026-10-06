@@ -6,6 +6,8 @@ on:
       - 'tech-checks/index.html'
       - 'tech-checks/company-*.css'
       - 'tech-checks/camera-health.html'
+      - 'tech-checks/camera-health-history.js'
+      - 'tech-checks/camera-health-history.css'
       - 'tech-checks/camera-detail.html'
       - 'tech-checks/onsite-vision.html'
       - 'tech-checks/it-send-repair.html'

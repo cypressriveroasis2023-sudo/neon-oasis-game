@@ -67,6 +67,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 @media(max-width:760px){.health-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.kv{grid-template-columns:1fr}.kv>div:nth-child(odd){border-bottom:0;padding-bottom:3px}.kv>div:nth-child(even){padding-top:3px}.kv>div:nth-last-child(-n+2){border-bottom:1px solid #1e303d}}
 </style>
 <link rel="stylesheet" href="./company-tools-theme.css?v=company-dark-20261006c">
+<link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 </head>
 <body>
 <div class="shell">
@@ -106,16 +107,16 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
     <section class="grid">
       <div class="health-overview">
       <div class="card info">
-        <div class="label">Last successful live check</div>
+        <div class="label">Last successful connection</div>
         <div class="value" id="lastPing">—</div>
         <div class="small" id="lastPingAgo"></div>
       </div>
       <div class="card info">
-        <div class="label">Last verification attempt</div>
+        <div class="label" id="lastCheckedLabel">Last check attempted</div>
         <div class="value" id="lastChecked">—</div>
         <div class="small" id="lastCheckedAgo"></div>
       </div>
-      <div class="card good">
+      <div class="card info" id="sourceStatusCard">
         <div class="label">Current source status</div>
         <div class="value" id="sourceStatus">—</div>
         <div class="small" id="sourceDetail"></div>
@@ -175,6 +176,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   </main>
 </div>
 
+<script src="./camera-health-history.js?v=20261006"></script>
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -220,17 +222,21 @@ function coreHeliosInterfacesOnline(){
 function sourceDetailText(){const group=cameraGroup(device),st=effectiveHealth(device,current),probe=checkFresh(current,15*60*1000)?String(current?.overall_status||'unknown').toUpperCase():'STALE / NOT CHECKED';if(group==='Vigilant')return 'Star4Live authoritative status: '+st.toUpperCase()+'. Last provider observation: '+(device.source_last_seen_at?fmt(device.source_last_seen_at):'none')+'. Direct port diagnostic: '+probe+'. Router diagnostics are shown separately.';if(group==='Reconeyez')return 'Reconeyez authoritative status: '+st.toUpperCase()+'. Last live cloud event: '+(device.source_last_seen_at?fmt(device.source_last_seen_at):'none')+'. Inventory synchronization alone does not prove online status.';return group+' direct approved-port status: '+st.toUpperCase()+'. Offline requires three consecutive failed checks. Last check: '+(current?.checked_at?fmt(current.checked_at):'none')}
 
 function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),vig=(sourceFresh(device)?String(device?.source_status||'unknown'):'stale').toLowerCase();if(st==='online')return'';if(st==='degraded')return group==='Vigilant'?(vig==='online'?'Vigilant reports ONLINE, but the direct public-IP/port check is NOT RESPONDING. Overall status is DEGRADED.':'The direct connection is responding, but Vigilant reports OFFLINE. Overall status is DEGRADED because the sources disagree.'):'Health sources disagree. Verify this camera.';if(st==='offline')return group==='Vigilant'?'Star4Live reports this resource OFFLINE.':group==='Reconeyez'?'Reconeyez cloud currently reports this detector OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return group==='Reconeyez'?'Waiting for a definitive Reconeyez cloud health event.':'No definitive ONLINE/OFFLINE result is available yet.';return''}
-function latestSuccessfulPing(){const group=cameraGroup(device);if(group==='Reconeyez'&&device?.source_last_seen_at)return device.source_last_seen_at;if(group==='Vigilant'){if(String(device?.vigilant_status||'').trim().toLowerCase()!=='online')return null;return device?.last_online_at||null}if(device?.last_probe_online_at)return device.last_probe_online_at;const ev=events.find(e=>String(e.status||'').toLowerCase()==='online');return ev?.observed_at||null}
 function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
 function interfaceLinks(){const out=[];const ip=effectivePublicIP();if(!ip)return out;const ps=current?.port_status||{},labels=device?.port_labels||{};for(const [p0,v] of Object.entries(ps)){if(!v?.online)continue;const p=Number(p0),proto=(p===443||p===8443)?'https':'http';const url=proto+'://'+ip+(p===80||p===443?'':':'+p);out.push([url,labels[p0]||('Port '+p)])}if(!out.length)out.push(['http://'+ip,'Open public IP']);return [...new Map(out.map(x=>[x[0],x])).values()]}
 function render(){
-  const st=effectiveHealth(device,current),ping=latestSuccessfulPing(),checked=current?.checked_at||device?.last_health_checked_at||null,reason=issueReason();
+  const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
   $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
   $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+(device.organization||'No site');
   $('statusPill').textContent=st.toUpperCase();$('statusPill').className='pill '+st;
   $('statusSource').textContent=cameraGroup(device)+' · '+sourceStatusText();
-  $('lastPing').textContent=ping?fmt(ping):(cameraGroup(device)==='Reconeyez'?'No Reconeyez event received yet':'No successful ping recorded');$('lastPingAgo').textContent=ping?ago(ping):(cameraGroup(device)==='Reconeyez'?'Cloud health will update here automatically.':'Run Verify now to test this camera.');
-  $('lastChecked').textContent=checked?fmt(checked):'Never checked';$('lastCheckedAgo').textContent=checked?ago(checked):'';
+  const {attempt,success}=connectionHistory;
+  $('lastPing').textContent=success.state==='invalid'?'Unknown (invalid timestamp)':CameraHealthHistory.format(success.at);
+  $('lastPingAgo').textContent=success.at?success.note:'No verified successful connection time';
+  $('lastCheckedLabel').textContent=attempt.label;
+  $('lastChecked').textContent=attempt.state==='invalid'?'Unknown (invalid timestamp)':CameraHealthHistory.format(attempt.at);
+  $('lastCheckedAgo').textContent=attempt.source+' · '+attempt.outcome;
+  $('sourceStatusCard').className='card '+(st==='online'?'good':st==='offline'?'bad':'warn');
   $('sourceStatus').textContent=sourceStatusText();$('sourceDetail').textContent=sourceDetailText();
   const liveNow=effectiveHealth(device,current)==='online',heliosCoreUp=coreHeliosInterfacesOnline(),failedChecks=Number(current?.consecutive_failures||0);
   if(liveNow&&heliosCoreUp){
@@ -283,7 +289,7 @@ function render(){
   }else ipSetup.classList.add('hidden');
 
   const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
-  $('ports').innerHTML=portKeys.map(p=>{const v=ps[String(p)]||ps[p],checked=Boolean(current?.checked_at),online=Boolean(v?.online),cls=online?'':(checked?' off':' pending'),suffix=online?' ✓'+(v?.latency_ms?' · '+v.latency_ms+'ms':''):(checked?' · no response':' · not checked');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
+  $('ports').innerHTML=portKeys.map(p=>{const v=ps[String(p)]||ps[p],checked=Boolean(current?.checked_at),fresh=checkFresh(current),online=fresh&&Boolean(v?.online),cls=online?'':(fresh&&checked?' off':' pending'),suffix=online?' ✓'+(v?.latency_ms?' · '+v.latency_ms+'ms':''):(!fresh&&checked?' · previous result; not current':checked?' · no response':' · not checked');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
   $('portEmpty').textContent=portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
   $('portEmpty').classList.toggle('hidden',portKeys.length>0);
   $('routerInfo').innerHTML=routerSummaryHTML();

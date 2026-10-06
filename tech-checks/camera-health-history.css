@@ -1,0 +1,9 @@
+/* Check history never implies that an offline or unverified device is connected. */
+body .unit-time-strip .time-attempt, body .unit-time-strip .time-history,
+body .unit-health-summary .uhs.zero-up { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; }
+body .unit-time-strip .time-attempt b, body .unit-time-strip .time-history b,
+body .unit-health-summary .uhs.zero-up b, body .unitcard .connection-history { color: var(--cos-text) !important; text-shadow: none !important; }
+body .unit-time-strip .time-attempt span, body .unit-time-strip .time-history span,
+body .unit-time-strip small { color: var(--cos-muted) !important; }
+body .unit-time-strip small { font-size: 11px; line-height: 1.45; margin-top: 6px; overflow-wrap: anywhere; }
+body .unit-time-strip .time-attempt span, body .unit-time-strip .time-history span { text-transform: uppercase; }

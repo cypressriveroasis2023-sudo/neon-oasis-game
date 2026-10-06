@@ -76,3 +76,19 @@ Owner Review loads eligible saved photos and signatures only when an existing au
 The current JSON transport supports private JPEG/PNG/WebP and photo-GIF previews up to 4 MiB. Larger or unsupported files stay preserved with an explicit explanation. Preview bytes are local to the page, clear on close/navigation/background, and expire from the view after one minute; reopening rechecks access. The host clears previews even when it hides an iframe without unmounting it.
 
 Focused reader tests use synthetic files only. A production success check requires a legitimate saved evidence record; no sample job or upload is created for verification. The separate AppDeploy Operations viewer follows the same reader contract.
+
+### Camera Health connection history
+
+The diagnostic unit cards and camera detail view share `camera-health-history.js`.
+They keep the latest check/observation separate from the last recorded successful
+connection. Star4Live uses `source_last_seen_at` with its reported outcome and
+`last_online_at` for historical online evidence. Reconeyez uses the same provider
+fields but labels the incoming observation as a cloud status update. Direct
+service-port diagnostics use `checked_at` and `last_probe_online_at`; a responding
+port does not prove camera video. Router recovery timestamps are not substituted.
+
+History is neutral even while a unit is offline or unverified, with explicit local
+timezone labels. Missing values remain unrecorded; malformed or future values are
+unknown. CSV inventory refreshes preserve existing success timestamps. Stale port
+results no longer display a current green response or latency. Tests exercise the
+actual card/detail presentation against synthetic data, without operational writes.
