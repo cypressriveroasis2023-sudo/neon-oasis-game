@@ -1,0 +1,112 @@
+/* Shared presentation only. Workflow fields, event handlers and permission gates
+   remain owned by the existing Operations / IT / Service implementations. */
+:root{--cos-vision-bg:#080e18;--cos-vision-panel:#101b2a;--cos-vision-raised:#172436;--cos-vision-border:#2b3c50;--cos-vision-text:#edf2f7;--cos-vision-muted:#b0bdce;--cos-vision-red:#f3454f}
+.cos-vision-brand{display:flex;align-items:center;gap:10px;min-width:0;color:var(--cos-vision-text)}
+.cos-vision-brand>img{width:38px!important;height:38px!important;border-radius:50%;object-fit:cover;flex:none}
+.cos-vision-brand strong{display:block;font-size:21px!important;line-height:1.2!important;font-weight:600!important;letter-spacing:3px!important;color:var(--cos-vision-text)!important}
+.cos-vision-brand small{display:block;color:var(--cos-vision-muted)!important;font-size:11px!important;line-height:1.5!important;letter-spacing:1px}
+#root .operations-shell:not(.vision-shell){background:var(--cos-vision-bg)!important;color:var(--cos-vision-text);--bg:var(--cos-vision-bg);--panel:var(--cos-vision-panel);--border:var(--cos-vision-border);--muted:var(--cos-vision-muted);--text:var(--cos-vision-text);grid-template-columns:220px minmax(0,1fr)!important}
+#root .operations-shell:not(.vision-shell)>.owner-it-main{padding:22px clamp(16px,2vw,32px) 40px!important;max-width:none!important;width:100%!important}
+#root .operations-shell .operations-sidebar{background:#0c1522!important;border-right:1px solid var(--cos-vision-border)!important;padding:20px 12px!important}
+#root .operations-sidebar .brand{padding:0 8px 20px!important;margin:0!important}
+#root .operations-sidebar .brand .cos-vision-brand{width:100%}
+#root .operations-sidebar nav{display:grid;gap:5px!important}
+#root .operations-sidebar nav button{background:transparent!important;border:1px solid transparent!important;color:var(--cos-vision-text)!important;font-size:13px!important;font-weight:500!important;min-height:44px!important;padding:10px 12px!important;border-radius:9px!important}
+#root .operations-sidebar nav button.active{background:#361d2a!important;border-color:#89424b!important;box-shadow:inset 3px 0 var(--cos-vision-red)!important;color:#fff!important}
+#root .operations-sidebar nav button:hover{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important}
+#root .operations-sidebar:not(.operations-sidebar-open) nav button.operations-secondary-nav{display:none!important}
+#root .operations-sidebar:not(.operations-sidebar-open) .platform{margin-top:20px;background:transparent!important;border:0!important}
+#root .operations-sidebar:not(.operations-sidebar-open) .platform button{display:none}
+#root .operations-sidebar .platform{background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-muted)!important}
+#root .operations-sidebar .platform button{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;font-size:13px!important;min-height:44px}
+#root .operations-shell:not(.vision-shell) .owner-it-topbar{background:#0c1522!important;border:1px solid var(--cos-vision-border)!important;border-radius:12px!important;padding:14px 16px!important;box-shadow:none!important;gap:14px!important;margin-bottom:20px!important}
+#root .operations-shell:not(.vision-shell) .tech-eye{display:none}
+#root .operations-shell:not(.vision-shell) .tech-id{gap:16px!important;flex-wrap:wrap}
+#root .operations-shell:not(.vision-shell) .tech-id label{font-size:11px!important;color:var(--cos-vision-muted)!important}
+#root .operations-shell:not(.vision-shell) .welcome-name{font-size:18px!important;line-height:1.4!important;color:var(--cos-vision-text)!important}
+#root .operations-shell:not(.vision-shell) .tech-status{gap:8px!important}
+#root .operations-shell:not(.vision-shell) .weather-tile{min-width:0!important;max-width:none!important;padding:8px!important;background:var(--cos-vision-panel)!important;border:1px solid var(--cos-vision-border)!important;border-radius:8px!important;box-shadow:none!important}
+#root .operations-shell:not(.vision-shell) .weather-icon{font-size:18px!important}#root .operations-shell:not(.vision-shell) .weather-primary b{font-size:17px!important}#root .operations-shell:not(.vision-shell) .weather-primary strong{font-size:12px!important}#root .operations-shell:not(.vision-shell) .weather-copy small{font-size:11px!important}
+#root .operations-shell:not(.vision-shell) .clock-tile{min-width:0!important;background:var(--cos-vision-panel)!important;border:1px solid var(--cos-vision-border)!important;box-shadow:none!important;padding:8px 12px!important;border-radius:8px!important}#root .operations-shell:not(.vision-shell) .clock-tile b{font-size:18px!important}#root .operations-shell:not(.vision-shell) .clock-tile small{font-size:11px!important;color:var(--cos-vision-muted)!important}
+#root .operations-shell:not(.vision-shell) .online-pill{font-size:10px!important;letter-spacing:.4px!important;min-height:30px!important;padding:6px 8px!important}
+#root .operations-shell:not(.vision-shell) .vision-enable{position:static!important;display:inline-flex!important;background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;font-size:12px!important;min-height:36px!important;padding:7px 11px!important;box-shadow:none!important;margin:0 0 10px!important}
+#root .operations-shell:not(.vision-shell) .panel,#root .operations-shell:not(.vision-shell) .command-page-header{background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important;border-radius:12px!important}
+#root .operations-shell:not(.vision-shell) .command-page-header h1{font-size:28px!important}
+#root .operations-shell:not(.vision-shell) .panel h2{font-size:20px!important}
+#root .operations-shell:not(.vision-shell) .panel button.secondary,#root .operations-shell:not(.vision-shell) .record,#root .operations-shell:not(.vision-shell) .operations-tool-grid>button{background:var(--cos-vision-raised)!important;color:var(--cos-vision-text)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important}
+#root .operations-shell .operations-open-menu{min-height:44px;background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:9px;padding:9px 14px;font:inherit;font-size:13px;cursor:pointer}
+#root .operations-shell:not(.vision-shell) .theme-toggle{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important}
+#root .operations-shell .operations-menu-backdrop{position:fixed;inset:0;z-index:1090;background:#0009;border:0;padding:0;cursor:default}
+#root .operations-shell .operations-sidebar-open{display:block!important;position:fixed!important;inset:0 auto 0 0!important;top:0!important;width:min(560px,100vw)!important;height:100dvh!important;max-height:100dvh!important;z-index:1100!important;overflow:auto!important;box-shadow:15px 0 50px #0005!important}
+#root .operations-shell .operations-sidebar-open nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+#root .operations-shell .operations-sidebar-open nav button{min-width:0!important;overflow-wrap:anywhere;background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important}
+#root .operations-shell .operations-sidebar-open .operations-menu-close{display:block!important;min-height:44px!important;background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;margin-bottom:18px!important}
+#root .operations-shell .operations-bottom-nav{background:#0c1522!important;border-color:var(--cos-vision-border)!important}
+#root .operations-shell .operations-bottom-nav button{background:transparent!important;color:var(--cos-vision-muted)!important;font-weight:500!important}
+#root .operations-shell .operations-bottom-nav button.active{background:#361d2a!important;color:#fff!important;border-color:#89424b!important}
+html[data-theme='light'] #root .operations-shell:not(.vision-shell){--cos-vision-bg:#f4f6fa;--cos-vision-panel:#fff;--cos-vision-raised:#edf2f7;--cos-vision-border:#c9d4e0;--cos-vision-text:#152436;--cos-vision-muted:#516478;background:var(--cos-vision-bg)!important;color:var(--cos-vision-text)!important}
+html[data-theme='light'] #root .operations-shell:not(.vision-shell) :is(.operations-sidebar,.owner-it-topbar,.operations-bottom-nav){background:var(--cos-vision-panel)!important}
+html[data-theme='light'] #root .operations-shell:not(.vision-shell) .command-page-header h1{color:var(--cos-vision-text)!important}
+
+/* Existing technician surfaces: match the shell without replacing a check. */
+body:has(#view-it:not(.hidden)),body:has(#view-svc:not(.hidden)){background:var(--cos-vision-bg)!important;color:var(--cos-vision-text)!important}
+#appView:has(#view-it:not(.hidden)),#appView:has(#view-svc:not(.hidden)){width:100%!important;max-width:none!important;padding:16px clamp(12px,2vw,28px)!important;background:var(--cos-vision-bg)!important;color:var(--cos-vision-text)!important;box-sizing:border-box}
+#appView:has(#view-it:not(.hidden))>.mobileTop,#appView:has(#view-svc:not(.hidden))>.mobileTop{background:#0c1522!important;border:1px solid var(--cos-vision-border);border-radius:12px;margin-bottom:18px;position:relative!important;top:auto!important;padding:12px 16px;z-index:60}
+#appView>.mobileTop>.hero{background:transparent!important;box-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;margin:0!important;gap:20px!important;min-height:0!important}
+#appView>.mobileTop>.hero .techBrand h1{font-size:14px!important;margin:0!important;color:var(--cos-vision-muted)!important;letter-spacing:0!important}
+#appView>.mobileTop>.hero .tagline,#appView>.mobileTop>.hero .brandDivider{display:none!important}
+#appView>.mobileTop>.accountbar{background:transparent!important;border:0!important;padding:10px 0!important;margin:0!important;color:var(--cos-vision-text)!important;box-shadow:none!important;gap:12px;flex-wrap:wrap}
+#appView>.mobileTop>.accountbar .pill{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-muted)!important;font-size:11px!important}
+#appView>.mobileTop>.accountbar>div:first-child{flex:1 1 180px;min-width:0}
+#appView>.mobileTop>.accountbar button{background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:8px!important;min-height:44px!important;padding:9px 12px!important;font-size:12px!important;box-shadow:none!important}
+#appView>.mobileTop>.techStatusRow{display:flex!important;gap:12px!important;margin:0!important;flex-wrap:wrap;justify-content:space-between}
+#appView>.mobileTop>.techStatusRow>div{background:transparent!important;border:0!important;padding:0!important;min-height:0!important;box-shadow:none!important;font-size:11px!important;color:var(--cos-vision-muted)!important}
+#appView>.mobileTop>.techStatusRow b,#appView>.mobileTop>.techStatusRow span{font-size:11px!important;color:var(--cos-vision-muted)!important}
+#appView .mainRoleTabs{gap:8px;padding:8px 0 0!important;border:0!important;background:transparent!important}
+#appView .mainRoleTabs button{background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:8px!important;min-height:44px;font-size:12px!important}
+#appView #view-it,#appView #view-svc{min-width:0;color:var(--cos-vision-text)!important}
+#appView #view-it :is(.card,.wl-it-command-panel,.wl-it-command-stat,.wl-it-dashboard-item,.wl-it-readiness-strip,.wl-it-ops-section),#appView #view-svc :is(.card,.wl-service-simple-card,.wl-service-ticket-found){background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;box-shadow:none!important;border-radius:12px!important}
+#appView #view-it :is(h1,h2,h3,b),#appView #view-svc :is(h1,h2,h3,b){color:var(--cos-vision-text)!important}
+#appView #view-it :is(p,.small,label),#appView #view-svc :is(p,.small,label){color:var(--cos-vision-muted)!important}
+#appView #view-it :is(input,select,textarea),#appView #view-svc :is(input,select,textarea){background:var(--cos-vision-bg)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:8px!important;box-sizing:border-box;max-width:100%;font-size:16px!important}
+#appView #view-it button,#appView #view-svc button{min-height:44px!important;border-radius:9px!important;font-size:14px!important;line-height:1.4!important;box-shadow:none!important;white-space:normal!important;overflow-wrap:anywhere}
+#appView #view-it :is(.wl-gray,.mini),#appView #view-svc :is(.wl-gray,.mini){background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important}
+#appView #view-it .wl-it-command-shell{background:var(--cos-vision-bg)!important;border:1px solid var(--cos-vision-border)!important;border-radius:12px!important;grid-template-columns:220px minmax(0,1fr)!important}
+#appView #view-it .wl-it-command-sidebar{background:#0c1522!important;border-color:var(--cos-vision-border)!important;padding:20px 12px!important}
+#appView #view-it .wl-it-command-workspace{padding:22px clamp(16px,2vw,32px)!important}
+#appView #view-it .wl-it-command-brand{display:none!important}
+#appView #view-it .wl-it-command-nav button,#appView #view-it .wl-it-command-nav a{font-weight:500!important;font-size:13px!important;color:var(--cos-vision-text)!important;padding:10px 12px!important}
+#appView #view-it .wl-it-command-nav .active{background:#361d2a!important;border-color:#89424b!important;border-left:3px solid var(--cos-vision-red)!important}
+#appView #view-it .wl-it-command-head h1{font-size:24px!important;line-height:1.3!important}
+#appView #view-it .wl-it-hero-greeting{background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;padding:14px 16px!important;border-radius:12px!important}
+#appView #view-it .wl-it-hero-greeting h2{font-size:24px!important;line-height:1.3!important}
+#appView #view-it .wl-it-owner-hero{grid-template-columns:minmax(0,1fr) minmax(160px,.5fr) minmax(160px,.5fr)!important}
+#appView #view-it :is(.wl-it-clock-card,.wl-it-weather-card){background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;padding:14px!important;border-radius:12px!important}
+#appView #view-it .wl-it-big-clock{font-size:26px!important;line-height:1.4!important}
+#appView #view-it .wl-it-command-stats{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))!important}
+#appView #view-it .wl-it-command-stat{border-top:1px solid var(--cos-vision-border)!important;padding:14px!important}
+#appView #view-it .wl-it-command-stat.red{border-top:2px solid var(--cos-vision-red)!important}
+#appView #view-it .wl-it-command-grid,#appView #view-it .wl-it-dashboard-row{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))!important}
+#appView #view-it .wl-it-quick-grid button,#appView #view-it .wl-it-quick-grid a{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important}
+#appView #view-svc #wlSvcHome{background:var(--cos-vision-panel)!important;border:1px solid var(--cos-vision-border)!important;max-width:780px!important;width:100%!important;margin:0 auto!important;border-radius:12px!important;padding:20px!important;box-sizing:border-box}
+#appView #view-svc .wl-service-simple-shell{padding:0!important;text-align:left!important}
+#appView #view-svc .wl-service-simple-shell h1{font-size:26px!important;line-height:1.3!important;text-align:left!important;margin:6px 0 18px!important}
+#appView #view-svc .wl-service-simple-kicker{font-size:11px!important;letter-spacing:1px!important;color:var(--cos-vision-muted)!important;text-align:left!important}
+#appView #view-svc .wl-service-action-list{display:grid!important;gap:10px!important;max-width:none!important}
+#appView #view-svc .wl-service-action-pill{background:var(--cos-vision-raised)!important;color:var(--cos-vision-text)!important;border:1px solid var(--cos-vision-border)!important;min-height:66px!important;padding:13px 16px!important;border-radius:10px!important;font-size:16px!important;text-align:left!important}
+#appView #view-svc .wl-service-action-pill small{color:var(--cos-vision-muted)!important;font-size:12px!important;line-height:1.5!important}
+#appView #view-svc .wl-service-action-pill[data-wl-service-open-job]{border-left:3px solid var(--cos-vision-red)!important}
+#appView #view-svc .wl-service-action-pill.complete{border-color:#3e6a58!important}
+#appView #view-svc .wl-service-action-pill.complete b{color:#91d6b8!important}
+#appView #view-svc .wl-service-help{color:var(--cos-vision-muted)!important;font-size:12px!important;line-height:1.5!important;text-align:left!important}
+#wlTechMenuPanel .wl-app-menu-card,#wlTechMenuPanel .wl-tech-menu-card,#wlTechMenuPanel .card{background:var(--cos-vision-panel)!important;color:var(--cos-vision-text)!important;border-color:var(--cos-vision-border)!important}
+#wlTechMenuPanel .wl-app-menu-item{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:10px!important;min-height:60px!important;font-size:14px!important}
+#wlTechMenuPanel .wl-app-menu-item small{color:var(--cos-vision-muted)!important}
+#wlTechMenuPanel .wl-menu-sheet{background:var(--cos-vision-panel)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:16px!important}
+#wlTechMenuPanel .wl-menu-head{background:#0c1522!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important}
+#wlTechMenuPanel :is(h2,b){color:var(--cos-vision-text)!important}
+#cosOperationsTechReturn,#cosOperationsReturn,#cosProductionAssignmentsButton{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;color:var(--cos-vision-text)!important}
+@media(max-width:1100px){#appView #view-it .wl-it-owner-hero{grid-template-columns:1fr 1fr!important}#appView #view-it .wl-it-hero-greeting{grid-column:1/-1!important}}
+@media(max-width:900px){#appView #view-it .wl-it-command-shell{grid-template-columns:1fr!important}#appView #view-it .wl-it-command-sidebar{border-right:0!important;border-bottom:1px solid var(--cos-vision-border)!important;padding:12px!important}#appView #view-it .wl-it-command-nav{grid-template-columns:repeat(2,minmax(0,1fr))!important}#appView #view-it .wl-it-command-workspace{padding:16px!important}}
+@media(max-width:700px){#root .operations-shell:not(.vision-shell){grid-template-columns:1fr!important}#root .operations-shell:not(.vision-shell)>.owner-it-main{padding:12px 12px 24px!important}#root .operations-shell:not(.vision-shell) .tech-id{width:100%;gap:12px!important}#root .operations-shell:not(.vision-shell) .welcome-name{font-size:16px!important}#root .operations-shell:not(.vision-shell) .tech-status{width:100%;justify-content:flex-start!important}#root .operations-shell:not(.vision-shell) .weather-tile{flex:1 1 140px!important}#root .operations-shell .operations-sidebar-open{bottom:calc(68px + env(safe-area-inset-bottom))!important;height:calc(100dvh - 68px - env(safe-area-inset-bottom))!important}#root .operations-shell .operations-sidebar-open nav{grid-template-columns:1fr 1fr!important}#root .operations-shell .operations-open-menu{display:none}#root .operations-shell .operations-bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important}#appView>.mobileTop>.hero .techBrand{display:none!important}#appView>.mobileTop>.accountbar{align-items:flex-start!important}#appView>.mobileTop>.accountbar .accountActions{display:flex!important;flex-wrap:wrap;gap:6px!important}#appView #view-svc #wlSvcHome{padding:16px!important}#appView #view-it .wl-it-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:380px){#root .operations-shell .operations-sidebar-open nav{grid-template-columns:1fr!important}#appView #view-it .wl-it-owner-hero{grid-template-columns:1fr!important}#appView #view-it .wl-it-quick-grid{grid-template-columns:1fr!important}}

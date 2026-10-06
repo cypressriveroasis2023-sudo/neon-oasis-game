@@ -67,6 +67,33 @@ async function fillsViewport(page) {
   await expect(page.locator('#appView>.mobileTop')).toBeHidden();
 }
 
+test('shared Operations menu opens tools, loads a workspace and closes with Escape', async ({ page }, testInfo) => {
+  const { frame, requests } = await mount(page);
+  const more=frame.getByRole('button',{name:'More',exact:true});
+  await more.click();
+  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
+  await menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Tech Check',exact:true}).click();
+  await expect(menu).toHaveCount(0);
+  await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
+  expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#tech-check');
+  await more.click();
+  await frame.getByRole('dialog',{name:'Operations navigation'}).screenshot({path:testInfo.outputPath('unified-menu.png')});
+  await frame.getByRole('button',{name:'Close menu'}).press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
+  await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
+  const sizes=await frame.locator('body').evaluate(()=>({viewport:innerWidth,content:document.documentElement.scrollWidth}));
+  expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
+  await frame.locator('.operations-shell').screenshot({path:testInfo.outputPath('unified-operations.png')});
+  await frame.getByRole('button',{name:'Switch to light mode'}).click();
+  const light=await frame.locator('.command-page-header').evaluate(element=>({background:getComputedStyle(element).backgroundColor,text:getComputedStyle(element.querySelector('h1')).color}));
+  expect(light.background).toBe('rgb(255, 255, 255)');expect(light.text).toBe('rgb(21, 36, 54)');
+  await frame.getByRole('button',{name:'Switch to dark mode'}).click();
+  expect(requests.every(request=>request.method==='GET')).toBe(true);
+});
+
 async function responsiveLayout(page, frame) {
   await expect(frame.getByText('Connected to COS Operations', { exact:true })).toBeVisible();
   await fillsViewport(page);

@@ -23,6 +23,7 @@ type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | '
 const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
 const nav = ['Today','Daily Board','Field Map','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 const legacy: Record<string,string> = { Vision:'vision' };
+const primaryWorkspaces = new Set(['Today','Daily Board','Jobs','Field Map','Calendar','Tech Check','Equipment','Owner Review']);
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
@@ -175,6 +176,24 @@ function OwnerApp() {
   const [now,setNow]=useState(()=>new Date());
   const [toast,setToast]=useState('');
   const [menu,setMenu]=useState(false);
+  const menuRef=useRef<HTMLElement|null>(null);
+  useEffect(()=>{
+    if(!menu)return;
+    const previous=document.activeElement as HTMLElement|null;
+    const panel=menuRef.current;
+    panel?.querySelector<HTMLButtonElement>('.operations-menu-close')?.focus();
+    const keyboard=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();setMenu(false);}
+      if(event.key==='Tab'&&panel){
+        const controls=Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled),a[href]')).filter(element=>element.getClientRects().length>0);
+        const first=controls[0],last=controls[controls.length-1];
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+      }
+    };
+    window.addEventListener('keydown',keyboard);
+    return()=>{window.removeEventListener('keydown',keyboard);previous?.focus();};
+  },[menu]);
   const [weather,setWeather]=useState<Row|null>(null);
   const [weatherStatus,setWeatherStatus]=useState('Local weather');
   const toastTimer=useRef<number|null>(null);
@@ -211,17 +230,19 @@ function OwnerApp() {
   const condition=weather?(weather.weather_code===0?'Clear':weather.weather_code<=3?'Partly cloudy':weather.weather_code<=48?'Fog':weather.weather_code<=67?'Rain':weather.weather_code<=77?'Wintry':weather.weather_code<=82?'Showers':'Storms'):'Weather unavailable';
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
   return <div className={'shell cos-command-shell owner-it-framework operations-shell'+(vision?' vision-shell':'')}>
-    <aside className={'owner-it-side operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
-      <div className='brand'><img src={asset('cameras-on-site-logo.webp')} alt='Cameras Onsite'/></div>
+    {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
+    <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'owner-it-side operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
+      <div className='brand'><div className='cos-vision-brand'><img src={asset('vision-eye-round.svg')} alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div></div>
       <button className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu</button>
-      <nav aria-label='COS Operations'>{nav.map(name=><button type='button' key={name} className={(active===name?'active ':'')+(name==='Vision'?'vision-nav-button':'')} onClick={()=>navigate(name)} aria-current={active===name?'page':undefined}>{name==='Vision'?<><img src={asset('vision-eye-round.svg')} alt=''/><span>VISION</span></>:name}{!native.includes(name as NativeWorkspace)&&!legacy[name]&&<span className='operations-reference-mark' aria-label='AppDeploy workspace'>↗</span>}</button>)}</nav>
+      <nav aria-label='COS Operations'>{nav.map(name=><button type='button' key={name} className={(active===name?'active ':'')+(!primaryWorkspaces.has(name)?'operations-secondary-nav ':'')+(name==='Vision'?'vision-nav-button':'')} onClick={()=>navigate(name)} aria-current={active===name?'page':undefined}>{name==='Vision'?<><img src={asset('vision-eye-round.svg')} alt=''/><span>VISION</span></>:name}{!native.includes(name as NativeWorkspace)&&!legacy[name]&&<span className='operations-reference-mark' aria-label='AppDeploy workspace'>↗</span>}</button>)}</nav>
       <div className='platform'><strong>CAMERAS ONSITE</strong><span>Operations · Tech Check · Vision</span><button onClick={()=>openLegacy('it')}>IT Tech Check</button><button onClick={()=>openLegacy('service')}>Service Tech Check</button><button onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button><button onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button onClick={()=>openLegacy('logout')}>Sign out</button></div>
     </aside>
     <main className='owner-it-main'>
       {vision?<VisionHeader active={active} navigate={navigate} now={now} connected={authorized} checking={checking} classic={()=>switchLayout(false)} allTools={()=>setMenu(true)}/>:<button className='vision-enable' onClick={()=>switchLayout(true)}>Use Vision layout</button>}
       {!vision&&<>
-      <section className='techbar owner-it-topbar'><div className='tech-id'><span className='tech-eye' aria-hidden='true'>◉</span><div><label>CAMERAS ONSITE · OPERATIONS</label><strong className='welcome-name'>{greeting}, {session?.name||'Owner'}</strong></div></div>
+      <section className='techbar owner-it-topbar'><div className='tech-id'><div className='cos-vision-brand'><img src={asset('vision-eye-round.svg')} alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div><div><label>OPERATIONS</label><strong className='welcome-name'>{greeting}, {session?.name||'Owner'}</strong></div></div>
         <div className='tech-status'><button className='weather-tile operations-weather' onClick={requestWeather} title='Load weather for your current location'><span className='weather-icon' aria-hidden='true'>{weather?.weather_code===0?'☀':'☁'}</span><div className='weather-copy'><div className='weather-primary'><b>{weather?Math.round(weather.temperature_2m)+'°F':'—°F'}</b><strong>{condition}</strong></div><small>{weatherStatus}</small>{weather&&<small>Feels {Math.round(weather.apparent_temperature)}° · Wind {Math.round(weather.wind_speed_10m)} mph</small>}</div></button><div className='clock-tile'><b>{now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})}</b><small>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric'})} · CT</small></div><div className={'online-pill'+(!authorized?' operations-offline':'')}><i/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</div><button className={'theme-toggle '+theme} onClick={()=>setTheme(current=>current==='dark'?'light':'dark')} aria-label={'Switch to '+(theme==='dark'?'light':'dark')+' mode'}><span aria-hidden='true'>{theme==='dark'?'☀':'☾'}</span></button></div>
+        <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={()=>setMenu(true)}>☰ Menu</button>
       </section>
       </>}
       {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{active}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
@@ -248,7 +269,7 @@ function OwnerApp() {
         :active==='Victron VRM'?<VrmWorkspace/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>
-    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>More</button></nav>
+    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-label='More' aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>☰ Menu</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
   </div>;
 }

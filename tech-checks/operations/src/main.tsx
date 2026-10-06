@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import './shell.css';
 import './vision.css';
+import '../../vision-platform.css';
 const root = document.getElementById('root');
 if (!root) throw new Error('Operations root is missing.');
 ReactDOM.createRoot(root).render(<React.StrictMode><App /></React.StrictMode>);

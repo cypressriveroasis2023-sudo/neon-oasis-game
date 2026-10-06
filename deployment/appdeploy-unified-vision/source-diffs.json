@@ -1,0 +1,52 @@
+{
+  "app_id": "cos-operations-platform-preview-wpbf1y",
+  "base_version": "1791234207722",
+  "files": [
+    {
+      "filename": "src/App.tsx",
+      "diffs": [
+        {
+          "from": "import PrivateEvidence from './PrivateEvidence';",
+          "to": "import PrivateEvidence from './PrivateEvidence';\nimport WorkspaceMenu from './WorkspaceMenu';"
+        },
+        {
+          "from": "<aside className='owner-it-side'><div className='brand'><img src='/resources/cameras-on-site-logo.webp' alt='Cameras Onsite'/></div><nav>",
+          "to": "<aside className='owner-it-side'><div className='brand'><div className='cos-vision-brand'><img src='/resources/vision-eye-round.svg' alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div></div><nav className='cos-owner-sidebar-nav'>"
+        },
+        {
+          "from": "nav.filter(n=>n!=='Demo Reset').map(n=><button key={n} className={(active===n?'active ':'')+(n==='Vision'?'vision-nav-button':'')}",
+          "to": "nav.filter(n=>n!=='Demo Reset').map(n=><button key={n} className={(active===n?'active ':'')+(['Today','Daily Board','Field Map','Calendar','Jobs','Tech Check','Owner Review','Equipment'].includes(n)?'cos-primary-workspace ':'')+(n==='Vision'?'vision-nav-button':'')}"
+        },
+        {
+          "from": "<main className='owner-it-main'><section className='techbar owner-it-topbar'><div className='tech-id'><span className='tech-eye'>◉</span>",
+          "to": "<main className='owner-it-main'><section className='techbar owner-it-topbar'><div className='tech-id'><div className='cos-vision-brand'><img src='/resources/vision-eye-round.svg' alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div>"
+        },
+        {
+          "from": "{theme==='dark'?'☀':'☾'}</span></button></div></section><header className=",
+          "to": "{theme==='dark'?'☀':'☾'}</span></button></div><WorkspaceMenu items={nav.filter(name=>name!=='Demo Reset')} navigate={setActive}/></section><header className="
+        },
+        {
+          "from": "<header><div><small>CAMERAS ONSITE</small><h1>{view === 'board'",
+          "to": "<header><div><div className='cos-vision-brand'><img src='/resources/vision-eye-round.svg' alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE</small></div></div><h1>{view === 'board'"
+        },
+        {
+          "from": "<button className='role-switch' onClick={onTechnician}>Technician View</button></header>",
+          "to": "<WorkspaceMenu items={['Jobs','Daily Board','Field Map','Owner Tasks','Tech Check','Calendar','Owner Review','Billing']} navigate={name=>setView(name==='Daily Board'?'board':name==='Field Map'?'map':name==='Owner Tasks'?'tasks':name==='Tech Check'?'readiness':name==='Calendar'?'calendar':name==='Owner Review'?'review':name==='Billing'?'billing':'jobs')}/><button className='role-switch' onClick={onTechnician}>Technician View</button></header>"
+        }
+      ]
+    },
+    {
+      "filename": "src/main.tsx",
+      "diffs": [
+        {
+          "from": "import './index.css';",
+          "to": "import './index.css';\nimport './vision-platform.css';"
+        },
+        {
+          "from": "{isReconciliation ? <ReconciliationCapture /> : <App />}",
+          "to": "{isReconciliation ? <ReconciliationCapture /> : <div className='cos-vision-appdeploy'><App /></div>}"
+        }
+      ]
+    }
+  ]
+}
