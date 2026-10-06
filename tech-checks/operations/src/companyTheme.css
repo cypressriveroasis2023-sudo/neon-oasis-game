@@ -1,0 +1,145 @@
+/* COS company-wide light system. Presentation only; operational controls and
+   authorization remain in their existing workspaces. Loaded after legacy CSS. */
+@font-face{font-family:'Open Sans';src:url('../../resources/fonts/open-sans-regular.woff') format('woff');font-style:normal;font-weight:400 500;font-display:swap}
+@font-face{font-family:'Open Sans';src:url('../../resources/fonts/open-sans-semibold.woff') format('woff');font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:'Open Sans';src:url('../../resources/fonts/open-sans-bold.woff') format('woff');font-style:normal;font-weight:700 900;font-display:swap}
+:root,html[data-theme='light']{font-family:'Open Sans',Arial,sans-serif;color-scheme:light;background:#F1F4F9;color:#172C47;--cos-blue:#315FDF;--cos-text:#172C47;--cos-muted:#60748F;--cos-border:#DCE4EF;--cos-sidebar:#F8FAFD;--cos-selected:#E7EEFF;--cos-green-bg:#E8F4EC;--cos-green:#287451;--cos-amber-bg:#FFF1D9;--cos-amber:#8A601E;--cos-vision-bg:#F1F4F9;--cos-vision-panel:#FFFFFF;--cos-vision-raised:#F8FAFD;--cos-vision-border:#DCE4EF;--cos-vision-text:#172C47;--cos-vision-muted:#60748F;--cos-vision-red:#315FDF;--bg:#F1F4F9;--panel:#FFFFFF;--border:#DCE4EF;--line:#DCE4EF;--muted:#60748F;--text:#172C47}
+html body{margin:0;background:#F1F4F9;color:#172C47;font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.5}
+button,input,select,textarea{font-family:inherit}button,a,input,select,textarea{touch-action:manipulation}button:not(:disabled),summary{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #315FDF!important;outline-offset:3px}
+#root .operations-shell{--bg:#F1F4F9;--panel:#FFFFFF;--border:#DCE4EF;--line:#DCE4EF;--muted:#60748F;--text:#172C47;--cos-vision-bg:#F1F4F9;--cos-vision-panel:#FFFFFF;--cos-vision-raised:#F8FAFD;--cos-vision-border:#DCE4EF;--cos-vision-text:#172C47;--cos-vision-muted:#60748F;--cos-vision-red:#315FDF;background:#fff!important;color:#172C47!important;min-width:0}
+#root .company-shell{display:grid!important;grid-template-columns:184px minmax(0,1fr)!important;min-height:100dvh;padding:0}
+#root .company-shell>.owner-it-main{padding:0 28px 40px!important;margin:0!important;width:100%!important;max-width:none!important;min-width:0!important;overflow:visible}
+#root .company-shell>.operations-sidebar{position:sticky!important;top:0!important;height:100dvh!important;width:184px;min-width:0;padding:28px 13px 24px!important;display:flex!important;flex-direction:column;overflow-y:auto!important;overflow-x:hidden;background:#F8FAFD!important;border-right:1px solid #DCE4EF!important;box-shadow:none!important;z-index:100}
+.company-brand{display:flex;align-items:center;gap:10px;padding:0 11px;margin:0 0 46px;min-height:38px}.company-brand-mark{display:flex;align-items:center;justify-content:center;gap:5px;flex:none;background:#315FDF;border-radius:9px;width:34px;height:34px}.company-brand-mark i{display:block;background:#fff;width:5px;height:19px;border-radius:2px}.company-brand-mark i+i{height:12px;align-self:flex-end;margin-bottom:8px}.company-brand strong{display:block;font-size:18px;font-weight:700;line-height:1.3;color:#172C47}.company-brand small{display:block;font-size:11px;line-height:1.4;color:#60748F}
+.company-nav-heading{font-size:10px;text-transform:uppercase;font-weight:600;color:#60748F;margin:0 11px 16px;letter-spacing:.02em}
+#root .operations-sidebar .operations-area-nav{display:grid!important;grid-template-columns:1fr;gap:9px!important}
+#root .operations-sidebar .operations-area-nav button{display:flex!important;align-items:center;justify-content:flex-start!important;gap:13px!important;padding:12px 14px!important;min-height:44px!important;background:transparent!important;border:0!important;border-radius:9px!important;box-shadow:none!important;font-size:14px!important;font-weight:400!important;line-height:1.4;color:#60748F!important;text-align:left!important;white-space:normal}
+.company-nav-dot{width:7px;height:7px;flex:none;background:currentColor;border-radius:50%}
+#root .operations-sidebar .operations-area-nav button.active{background:#E7EEFF!important;color:#315FDF!important;font-weight:600!important}
+#root .operations-sidebar .operations-area-nav button:hover{background:#EDF2FA!important;color:#315FDF!important}
+.company-sidebar-footer{margin-top:auto;padding-top:42px}.company-settings{display:block;width:100%;border:0;border-top:1px solid #DCE4EF;background:transparent;color:#60748F;padding:23px 11px;font-size:12px;text-align:left;min-height:44px}.company-owner{display:flex;align-items:center;gap:10px;padding:0 10px;min-width:0}.company-owner>span{display:grid;place-items:center;width:30px;height:30px;background:#E7EEFF;border-radius:50%;color:#466391;font-size:10px;flex:none}.company-owner>div{min-width:0}.company-owner strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere;color:#385271}.company-owner small{display:block;font-size:10px;color:#60748F;margin-top:3px}
+#root .operations-sidebar:not(.operations-sidebar-open) :is(.operations-workspace-menu,.platform,.operations-menu-close,.company-menu-search){display:none!important}
+#root .operations-sidebar-open .company-sidebar-footer,#root .operations-sidebar-open .company-nav-heading,#root .operations-sidebar-open .operations-area-nav{display:none!important}
+.company-utility-bar{height:76px;min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 -28px 30px;padding:0 28px;border-bottom:1px solid #E4EAF2;background:#fff}
+.company-breadcrumb{color:#60748F;font-size:14px;flex:1;min-width:0}.company-mobile-brand{display:none}.company-search-trigger{display:flex;align-items:center;gap:10px;border:1px solid #E6EBF2;background:#F5F7FA;color:#60748F;min-height:40px;width:min(343px,35vw);border-radius:8px;padding:10px 15px;font-size:12px;text-align:left}.company-search-trigger svg{width:16px;height:16px;flex:none}.company-search-trigger:hover{border-color:#B8C8E6}.company-connection{display:flex;align-items:center;gap:6px;color:#287451;background:#E8F4EC;padding:5px 9px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;margin-left:auto}.company-connection i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor}.company-connection-pending{color:#8A601E;background:#FFF1D9}
+#root .operations-shell .operations-open-menu{display:inline-flex!important;align-items:center;gap:10px;padding:8px 11px;background:transparent;border:1px solid #DCE4EF;border-radius:7px;min-height:40px;font:inherit;font-size:12px;color:#60748F;box-shadow:none}
+.operations-section-nav{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #DCE4EF;padding:0;margin:0 0 25px;min-width:0}
+#root .operations-shell .operations-section-nav button{background:transparent!important;color:#60748F!important;border:0!important;border-bottom:3px solid transparent!important;border-radius:0!important;padding:10px 14px!important;min-height:44px!important;font-size:13px!important;font-weight:400!important;box-shadow:none!important;white-space:normal}
+#root .operations-shell .operations-section-nav button.active{color:#315FDF!important;border-bottom-color:#315FDF!important;font-weight:600!important}
+#root .operations-shell .command-page-header{display:flex!important;align-items:start;padding:0!important;border:0!important;box-shadow:none!important;background:transparent!important;margin:0 0 28px!important;min-width:0;text-align:left}
+#root .operations-shell .command-page-header label{font-size:10px;color:#60748F!important;letter-spacing:.06em;font-weight:600}
+#root .operations-shell .command-page-header h1{font-size:30px!important;font-weight:600!important;letter-spacing:-.5px;line-height:1.35;color:#172C47!important;margin:5px 0 8px!important}
+#root .operations-shell .command-page-header p{font-size:13px;color:#60748F!important;margin:0;line-height:1.6}
+/* Native controls and all modal surfaces use the same readable light palette. */
+#root .operations-shell :is(.panel,.record,.quote-card,.stats article,.cos-daily-board,.router-detail,.router-notice,.vrm-awaiting,.schedule-card,.daily-board-detail>section,.finance-detail-dialog,.daily-board-status article,.daily-board-person,.daily-board-readiness article,.field-map-list,.field-map-detail,.field-map-kpis article){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;border-radius:10px}
+#root .operations-shell .panel{padding:20px;min-width:0}#root .operations-shell .panelhead{background:transparent!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;padding:0 0 14px;min-width:0;flex-wrap:wrap}
+#root .operations-shell :is(h1,h2,h3,h4){color:#172C47;font-weight:600;letter-spacing:normal;overflow-wrap:anywhere}#root .operations-shell h2{font-size:20px}#root .operations-shell :is(p,dt,small,.muted,.panelhead>span,.purchase-actions>span){color:#60748F;line-height:1.6}
+#root .operations-shell :where(.panel,.cos-daily-board,.router-workspace,.field-map-workspace,.workspace-overview,.owner-command-home) button:not(.workspace-job):not(.daily-board-card):not(.record),#root .production-assignment-view>header button{min-height:40px;border:1px solid #315FDF!important;border-radius:7px;background:#315FDF!important;color:#fff!important;padding:9px 13px;box-shadow:none!important;text-shadow:none!important;font-size:13px;font-weight:600!important;line-height:1.45}
+#root .operations-shell :is(button.secondary,.row-actions button.secondary,.purchase-actions button.secondary,.daily-board-actions button.secondary,.vrm-workspace .purchase-actions button.secondary,.vrm-workspace .vrm-view-actions button.secondary){background:#fff!important;color:#46607E!important;border:1px solid #DCE4EF!important;box-shadow:none!important}
+#root .operations-shell :is(button.active,button.selected,.router-list>button.selected,.vrm-workspace .vrm-unit-grid button.selected){background:#E7EEFF!important;color:#315FDF!important;border-color:#B5C7F4!important;box-shadow:none!important}
+#root .operations-shell :is(button.danger,.line-remove){background:#FFF0F1!important;border-color:#EDC5CB!important;color:#9D3342!important}
+#root .operations-shell :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-family:'Open Sans',Arial,sans-serif!important;background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important;min-height:42px;padding:10px 12px;min-width:0;max-width:100%;font-size:14px;line-height:1.5;letter-spacing:normal}
+#root .operations-shell input::placeholder,#root .operations-shell textarea::placeholder{color:#73849B!important;opacity:1}
+#root .operations-shell :is(input[type=checkbox],input[type=radio]){accent-color:#315FDF;width:auto;min-height:0}
+#root .operations-shell label{color:#46607E;font-size:12px;line-height:1.5}
+#root .operations-shell :is(input:disabled,select:disabled,textarea:disabled){background:#F1F4F9!important;color:#60748F!important;opacity:1}
+#root .operations-shell :is(.record,.job){background:#fff!important;border:1px solid #DCE4EF!important;border-radius:9px;color:#172C47!important;min-width:0;box-shadow:none!important}
+#root .operations-shell :is(.record:hover,.record:focus-visible,.job:hover){background:#F8FAFD!important;border-color:#BACCEE!important}
+#root .operations-shell :is(.record strong,.record b,.job strong,.stats b){color:#172C47!important}
+#root .operations-shell :is(.record small,.job small,.stats span,.stats i,.operations-tool-grid span){color:#60748F!important}
+#root .operations-shell :is(.record em,.job em,.router-badge,.evidence-summary){background:#F1F4F9;color:#60748F;border-color:#DCE4EF;box-shadow:none;border-radius:6px;letter-spacing:0}
+#root .operations-shell :is(.operations-error,.daily-board-error,.field-map-error,.camera-health-error){background:#FFF1F1!important;color:#933B42!important;border:1px solid #ECCDD0!important;border-radius:8px;padding:14px;line-height:1.6}
+#root .operations-shell :is(.operations-notice,.daily-board-notice){background:#E8F4EC!important;color:#287451!important;border:1px solid #CAE4D4!important;border-radius:8px;padding:14px}
+#root .operations-shell :is(.operations-error p,.daily-board-error p,.field-map-error p){color:inherit!important}
+#root .operations-shell :is(.operations-reference-link,.field-map-open,.finance-feature-links a){color:#315FDF!important;background:transparent!important;border-color:#DCE4EF!important;font-size:13px;box-shadow:none!important}
+#root .operations-shell .operations-reference-link{display:inline-flex;align-items:center;min-height:44px;padding:10px 14px;border:1px solid #DCE4EF;border-radius:7px;text-decoration:none}
+#root .operations-shell .operations-tool-grid>button{background:#F8FAFD!important;color:#172C47!important;border:1px solid #DCE4EF!important;text-align:left;min-height:110px;padding:18px}
+#root .operations-shell :is(.router-reachable,.mapped,.good,.state-good,.stock-good,.daily-board-card.daily-board-scheduled,.daily-board-card.daily-board-complete){background:#E8F4EC!important;color:#287451!important;border-color:#CAE4D4!important}
+#root .operations-shell :is(.router-stale,.missing,.state-pending,.attention,.priority.high){background:#FFF1D9;color:#8A601E;border-color:#EED7AC}
+#root .operations-shell :is(.router-unreachable,.state-bad,.stock-short){background:#FFF0F1!important;color:#9D3342!important;border-color:#EDC5CB!important}
+#root .operations-shell :is(.daily-board-card,.daily-board-detail-note,.schedule-context,.schedule-summary,.vrm-awaiting){background:#F8FAFD!important;color:#172C47!important;border-color:#DCE4EF!important}
+#root .operations-shell .daily-board-card{border-left-color:#315FDF!important}#root .operations-shell .daily-board-card-attention{border-left-color:#B17C25!important}#root .operations-shell .daily-board-person{border-top-color:#315FDF!important}#root .operations-shell .daily-board-person.unassigned{border-top-color:#D1A04D!important}
+#root .operations-shell :is(.daily-board-card-meta b,.daily-board-person h3>b,.daily-board-header small,.daily-board-detail>section>small,.field-map-detail>small){color:#315FDF!important}
+#root .operations-shell :is(.daily-readiness-good,.daily-board-card-scheduled footer b,.daily-board-card-scheduled .daily-board-card-meta b){color:#287451!important}#root .operations-shell .daily-readiness-pending{color:#8A601E!important}#root .operations-shell .daily-readiness-attention{color:#9D3342!important}
+#root .operations-shell .cos-daily-board-tv{--bg:#F1F4F9;--panel:#fff;--border:#DCE4EF;--muted:#60748F;--text:#172C47;background:#F1F4F9!important;color:#172C47!important}
+#root .operations-shell :is(.vrm-workspace,.vrm-help,.vrm-workspace .vrm-note,.vrm-access-status,.vrm-step-controls span,.vrm-workspace .vrm-eyebrow,.vrm-fleet-heading span){color:#60748F!important;background-color:#fff}
+#root .operations-shell .vrm-help summary{color:#172C47!important}.vrm-dashboard{background:#F1F4F9;border-color:#DCE4EF}
+#root .operations-shell :is(.calendar-grid,.calendar-day,.calendar-year section){border-color:#DCE4EF!important;background:#fff!important;color:#172C47!important}#root .operations-shell .calendar-day.today{border-color:#315FDF!important;background:#F8FAFD!important}#root .operations-shell .calendar-day button{background:#E7EEFF!important;color:#315FDF!important;border-color:#CFDAF8!important;border-radius:6px}
+#root .operations-shell .field-map-layout>aside{position:static!important;height:auto!important;box-shadow:none!important}
+#root .operations-shell .field-map-layout{grid-template-columns:minmax(200px,.8fr) minmax(0,1.5fr) minmax(240px,1fr)}
+#root .operations-shell .field-map-legend{background:#ffffffee!important;color:#172C47!important;border-color:#DCE4EF!important}
+#root .operations-shell :is(.leaflet-popup-content-wrapper,.leaflet-popup-tip,.leaflet-control-zoom a){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important}
+#root .operations-shell .router-list>button{background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;box-shadow:none!important;text-align:left!important}
+#root .operations-shell :is(.finance-detail-fields>div,.finance-lines article,.finance-match>* ){border-color:#DCE4EF!important;background:#F8FAFD}
+#root .operations-shell .finance-detail-dialog{color:#172C47!important}#root .operations-shell .finance-detail-dialog::backdrop{background:#172C4770}
+html body :is(.cos-dialog-card,.cos-dialog-panel){width:min(540px,100%);max-height:calc(100dvh - 40px);overflow:auto;padding:26px;border:1px solid #DCE4EF;border-radius:12px;background:#fff!important;color:#172C47!important;box-shadow:0 20px 80px #172C4733;font-family:'Open Sans',Arial,sans-serif}
+html body .cos-dialog-overlay{background:#172C4770;backdrop-filter:blur(3px)}html body .cos-dialog-eyebrow{color:#60748F;font-size:10px;letter-spacing:.06em;font-weight:600}html body :is(.cos-dialog-card,.cos-dialog-panel) h2{font-size:23px;font-weight:600;line-height:1.4;margin:0 0 10px;overflow-wrap:anywhere}html body :is(.cos-dialog-card,.cos-dialog-panel) p{color:#60748F;font-size:13px;line-height:1.6;margin:0 0 20px}html body .cos-dialog-field{display:grid;gap:7px;font-size:10px;color:#60748F;margin-bottom:20px}html body :is(.cos-dialog-field input,.cos-dialog-field textarea,.cos-dialog-input){border:1px solid #DCE4EF;border-radius:7px;background:#fff;color:#172C47;min-height:44px;font-size:16px;padding:11px;max-width:100%;width:100%;box-sizing:border-box}html body .cos-dialog-field textarea{min-height:110px}html body .cos-dialog-actions button{font:inherit;font-size:12px;border:1px solid #DCE4EF;border-radius:7px;padding:11px 14px;min-height:44px;min-width:0}html body :is(.cos-dialog-cancel,.cos-dialog-secondary){background:#fff;color:#60748F}html body :is(.cos-dialog-save,.cos-dialog-primary){background:#315FDF;color:#fff;border-color:#315FDF}
+#root .operations-shell dialog.schedule-overlay{background:#172C4770!important}#root .operations-shell .schedule-card{background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important}#root .operations-shell .schedule-head{border-color:#DCE4EF!important;background:transparent!important}#root .operations-shell .schedule-head h2{color:#172C47!important}#root .operations-shell .schedule-form label{color:#60748F!important}
+#root .production-assignment-view{display:block!important;max-width:none!important;margin:0!important;width:100%;padding:28px!important;min-height:100dvh!important}
+#root .operations-shell .operations-toast{background:#172C47!important;color:#fff!important;border:1px solid #172C47;font-size:13px;font-weight:400;box-shadow:0 8px 30px #172C4729}
+/* One searchable menu exposes every canonical route and legacy host action. */
+#root .company-shell .operations-menu-backdrop{display:block;position:fixed;inset:0;z-index:1090;background:#172C4766;border:0;border-radius:0;padding:0;cursor:default}
+#root .company-shell>.operations-sidebar-open{display:flex!important;position:fixed!important;inset:0 auto 0 0!important;width:min(460px,100vw)!important;height:100dvh!important;max-height:100dvh!important;z-index:1100!important;padding:24px!important;overflow-y:auto!important;background:#F8FAFD!important;box-shadow:12px 0 50px #172C4726!important}
+#root .operations-sidebar-open .company-brand{margin:0 0 22px;padding:0}
+#root .operations-sidebar-open .operations-menu-close{display:flex!important;align-items:center;justify-content:space-between;width:100%;min-height:44px!important;border:1px solid #DCE4EF;background:#fff;color:#60748F;border-radius:7px;padding:10px 12px;margin:0 0 18px!important;font:inherit;font-size:13px}
+#root .operations-sidebar-open .company-menu-search{display:grid;gap:7px;margin:0 0 26px}.company-menu-search label{color:#60748F;font-size:12px}.company-menu-search input{width:100%;min-height:44px;padding:11px;border:1px solid #DCE4EF;border-radius:7px;background:#fff;color:#172C47;font-size:16px}
+#root .operations-sidebar-open .operations-workspace-menu{display:grid!important;grid-template-columns:1fr!important;gap:24px!important}
+#root .operations-workspace-menu section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}#root .operations-workspace-menu h2,#root .operations-sidebar .platform h2{grid-column:1/-1;color:#60748F;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:0 0 2px}
+#root .operations-workspace-menu section button,#root .operations-sidebar .platform button{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;white-space:normal;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #DCE4EF;background:#fff;color:#46607E;border-radius:7px;box-shadow:none;font:inherit;font-size:12px;line-height:1.5;margin:0;overflow-wrap:anywhere}
+#root .operations-workspace-menu section button.active{background:#E7EEFF!important;color:#315FDF!important;border-color:#B5C7F4!important}.operations-reference-mark{font-size:12px;color:#60748F}.company-menu-empty{font-size:13px;line-height:1.6;color:#60748F}
+#root .operations-sidebar .vision-nav-button{justify-content:flex-start}#root .operations-sidebar .vision-nav-button img{width:24px;height:24px;object-fit:contain;border-radius:50%}
+#root .operations-sidebar .platform{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:24px 0 0;margin:26px 0 0;border:0;border-top:1px solid #DCE4EF;border-radius:0;background:transparent!important}
+.company-utilities{grid-column:1/-1;margin-top:10px;border-top:1px solid #DCE4EF;padding-top:16px}.company-utilities p{font-size:12px;color:#60748F}.company-weather{flex-wrap:wrap}.company-weather small{flex-basis:100%;font-size:11px}
+#root .company-shell .operations-bottom-nav{display:none!important}
+/* Preserve the existing selected-job mobile journey and keyboard focus. */
+#root .operations-shell .workspace-overview .workspace-back{display:inline-flex!important;align-items:center;min-height:44px}
+@media(max-width:1200px){#root .operations-shell .field-map-layout{grid-template-columns:minmax(180px,.6fr) minmax(0,1fr)}#root .operations-shell .field-map-detail{grid-column:1/-1}.company-search-trigger{width:min(280px,30vw)}.company-utility-bar{gap:12px}}
+@media(max-width:900px){#root .company-shell{grid-template-columns:184px minmax(0,1fr)!important}.company-connection{display:none}.company-search-trigger{width:220px}.company-breadcrumb{font-size:12px}#root .operations-shell .operations-job-detail dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+  #root .company-shell{display:block!important;padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+  #root .company-shell>.operations-sidebar{display:none!important}
+  #root .company-shell>.operations-sidebar-open{display:flex!important;width:min(420px,100vw)!important;bottom:0!important;height:100dvh!important}
+  #root .company-shell>.owner-it-main{padding:0 24px 28px!important}
+  .company-utility-bar{height:84px;min-height:84px;margin:0 -24px 26px;padding:0 24px;gap:12px}
+  .company-mobile-brand{display:flex;align-items:center;gap:12px;min-width:0;font-size:14px}.company-mobile-brand strong{color:#315FDF;font-weight:700}.company-mobile-brand span{font-weight:600;color:#172C47}
+  .company-breadcrumb,.company-search-trigger{display:none}.company-connection{display:flex;font-size:9px;padding:4px 6px;gap:4px}.company-connection i{display:none}
+  #root .operations-shell .operations-open-menu{display:none!important}
+  #root .company-shell .operations-bottom-nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0;position:fixed;inset:auto 0 0;z-index:1050;background:#F8FAFD!important;border-top:1px solid #DCE4EF;box-shadow:none;padding:6px 10px calc(6px + env(safe-area-inset-bottom))}
+  #root .company-shell .operations-bottom-nav button{min-height:48px;font-size:11px;font-weight:400;background:transparent!important;color:#60748F!important;border:0;border-radius:0;box-shadow:none!important;text-align:center;padding:10px 3px}
+  #root .company-shell .operations-bottom-nav button.active{color:#315FDF!important;font-weight:600!important;background:transparent!important}
+  .operations-section-nav{flex-wrap:nowrap;overflow-x:auto;max-width:100%;margin:0 0 22px;padding-bottom:0}.operations-section-nav button{flex:0 0 auto;max-width:175px}
+  #root .operations-shell .command-page-header h1{font-size:26px!important}.operations-shell .panel.module{padding:16px!important}#root .operations-shell :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-size:16px}
+  #root .operations-shell .field-map-layout,#root .operations-shell .operations-job-detail dl{grid-template-columns:1fr}
+  #root .operations-shell .field-map-detail{grid-column:auto}
+  #root .operations-shell .workspace-overview[data-detail-open=false] .workspace-detail{display:none!important}
+  #root .operations-shell .workspace-overview[data-detail-open=true] .workspace-work{display:none!important}
+  #root .operations-shell .workspace-overview[data-detail-open=true] .workspace-detail{display:block!important}
+  #root .operations-shell .workspace-overview .workspace-back{display:inline-flex!important;align-items:center;min-height:44px;margin-bottom:18px}
+  #root .operations-shell .overview-detail-open>:not(.workspace-overview):not(.company-jobs-section):not(.purchase-actions):not([role=alert]){display:none!important}
+  #root .production-assignment-view{padding:16px!important}#root .operations-shell .operations-toast{bottom:calc(80px + env(safe-area-inset-bottom))!important}
+}
+@media(max-width:380px){#root .company-shell>.owner-it-main{padding-left:20px!important;padding-right:20px!important}.company-utility-bar{padding-left:20px;padding-right:20px;margin-left:-20px;margin-right:-20px}.company-mobile-brand{gap:8px;font-size:13px}.company-connection{font-size:8px}#root .operations-sidebar-open .operations-workspace-menu section{grid-template-columns:1fr}#root .operations-sidebar .platform{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Utility buttons must not inherit the old global red call-to-action treatment. */
+#root .company-shell .company-search-trigger{background:#F5F7FA!important;color:#60748F!important;border:1px solid #E6EBF2!important;box-shadow:none!important;text-shadow:none!important;font-weight:400!important}
+#root .company-shell .operations-open-menu{background:#fff!important;color:#60748F!important;border:1px solid #DCE4EF!important;box-shadow:none!important;text-shadow:none!important;font-weight:400!important}
+.operations-job-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin:15px 0}.operations-job-filters label{display:flex;flex-direction:column;gap:6px;min-width:0;text-align:left}
+@media(max-width:600px){.operations-job-filters{grid-template-columns:1fr}}
+
+/* Remove residual red-theme type effects without changing a control's action. */
+#root .operations-shell button{text-shadow:none!important}
+#root .operations-shell :is(b,strong){color:inherit!important}
+#root .operations-shell :is(input,select,textarea){font-weight:400!important}
+#root .company-shell .company-mobile-brand strong{color:#315FDF!important}
+#root#root .company-shell .operations-bottom-nav button.active{background:transparent!important;color:#315FDF!important}
+#root#root .company-shell .operations-section-nav button{background:transparent!important}
+#root .operations-shell .quote-detail-grid .wide{grid-column:1/-1}
+#root .operations-shell :is(.purchase-actions,.panelhead,.quote-section-head){flex-wrap:wrap}
+#root .operations-shell :is(.panelhead,.quote-section-head)>div{min-width:0}
+#root .operations-shell .operations-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#root .operations-shell .daily-board-people{grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr))}
+@media(max-width:700px){#root .operations-shell .operations-tool-grid{grid-template-columns:1fr}#root .operations-shell :is(.record,.op-record){flex-wrap:wrap}#root .operations-shell :is(.purchase-actions,.panelhead,.quote-section-head)>*{max-width:100%}}
+/* Opening the fixed drawer must not shift the underlying grid column. */
+#root .company-shell>.owner-it-main{grid-column:2}
+@media(max-width:700px){#root .company-shell>.owner-it-main{grid-column:auto}}

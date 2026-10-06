@@ -4,6 +4,12 @@ on:
     branches: [main]
     paths:
       - 'tech-checks/index.html'
+      - 'tech-checks/company-*.css'
+      - 'tech-checks/camera-health.html'
+      - 'tech-checks/camera-detail.html'
+      - 'tech-checks/onsite-vision.html'
+      - 'tech-checks/it-send-repair.html'
+      - 'tech-checks/resources/fonts/**'
       - 'tech-checks/operations-host.*'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/operations/dist/**'

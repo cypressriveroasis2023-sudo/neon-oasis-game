@@ -13,8 +13,15 @@ const files = [
   'tech-checks/operations-host.css',
   'tech-checks/vision-platform.css',
   'tech-checks/vision-workspace.js',
+  'tech-checks/company-host-theme.css',
+  'tech-checks/company-tools-theme.css',
+  'tech-checks/camera-health.html',
+  'tech-checks/camera-detail.html',
+  'tech-checks/onsite-vision.html',
+  'tech-checks/it-send-repair.html',
   'tech-checks/app.js',
   'tech-checks/technician-wizard-owner-dashboard-v5.js',
+  ...walk('tech-checks/resources/fonts'),
   ...walk('tech-checks/operations/dist')
 ];
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');

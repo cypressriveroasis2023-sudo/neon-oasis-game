@@ -49,7 +49,7 @@ test('IT technical navigation and forms fit with the real protected IT styleshee
   const styleEnd=legacy.indexOf('`;',styleStart);
   if(start<0||styleEnd<styleStart)throw Error('Protected IT presentation source not found');
   const protectedCss=legacy.slice(styleStart,styleEnd);
-  const shared=readFileSync(resolve(repo,'tech-checks/vision-platform.css'),'utf8');
+  const shared=readFileSync(resolve(repo,'tech-checks/vision-platform.css'),'utf8')+readFileSync(resolve(repo,'tech-checks/company-host-theme.css'),'utf8');
   await page.route('**/*',route=>{
     if(route.request().url()!=='http://127.0.0.1:4173/unified-it')return route.abort('blockedbyclient');
     return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}*{box-sizing:border-box}${protectedCss}${shared}</style><div id="appView"><section id="view-it"><div class="wl-it-command-shell"><aside class="wl-it-command-sidebar"><nav class="wl-it-command-nav"><button class="active">Dashboard</button><button>Create Job</button><button>Managed Tickets</button><button>Truck Inventory</button><button>IT Intake</button><button>Equipment Prep</button></nav></aside><main class="wl-it-command-workspace"><header class="wl-it-command-head"><div><h1>IT workspace</h1><p>Technical preparation</p></div></header><section class="wl-it-command-panel"><label>MHelpDesk Ticket<input aria-label="MHelpDesk Ticket" value=""></label><button type="button" id="open">Open ticket</button><p id="result" role="status"></p></section></main></div></section></div><script>document.getElementById('open').onclick=()=>document.getElementById('result').textContent='Preview ticket '+document.querySelector('input').value;</script>`});
@@ -58,7 +58,7 @@ test('IT technical navigation and forms fit with the real protected IT styleshee
   for(const width of [320,390,1024,1440,2560]){
     await page.setViewportSize({width,height:900});
     const layout=await page.locator('.wl-it-command-shell').evaluate(element=>({bg:getComputedStyle(element).backgroundColor,viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
-    expect(layout.bg).toBe('rgb(17, 22, 25)');expect(layout.scroll).toBeLessThanOrEqual(layout.viewport);
+    expect(layout.bg).toBe('rgb(255, 255, 255)');expect(layout.scroll).toBeLessThanOrEqual(layout.viewport);
   }
   await page.getByRole('textbox',{name:'MHelpDesk Ticket'}).fill('FIX-IT-01');
   await page.getByRole('button',{name:'Open ticket'}).click();

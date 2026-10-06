@@ -1,3 +1,6 @@
+import { validateCameraHealth } from './CameraHealthWorkspace';
+import { readRouterSnapshot, type RouterSnapshot } from '../../supabase/functions/cos-operations-pages/routers';
+
 export type DashboardRow = Record<string, unknown>;
 export const dashboardSources = [
   ['jobs', '/api/jobs', 'Jobs'],
@@ -56,4 +59,31 @@ export function summarizeTodayDashboard(data: DashboardData) {
     attention: attentionKnown ? attentionCount : null,
     verifiedAttentionItems: attentionCount,
   };
+}
+
+/** Health is sourced independently so one failed integration never hides another. */
+export type CompanyEquipmentData = {
+  camera: ReturnType<typeof validateCameraHealth> | null;
+  routers: RouterSnapshot | null;
+  errors: Partial<Record<'camera' | 'routers', string>>;
+};
+export async function loadCompanyEquipment(api: DashboardApi): Promise<CompanyEquipmentData> {
+  const result: CompanyEquipmentData = { camera: null, routers: null, errors: {} };
+  await Promise.all([
+    (async () => {
+      try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary')).data); }
+      catch (cause) { result.errors.camera = equipmentError(cause, 'Camera Health'); }
+    })(),
+    (async () => {
+      try { result.routers = readRouterSnapshot((await api.get('/api/routers')).data); }
+      catch (cause) { result.errors.routers = equipmentError(cause, 'Router inventory'); }
+    })(),
+  ]);
+  return result;
+}
+function equipmentError(cause: unknown, label: string) {
+  const status = cause && typeof cause === 'object' ? (cause as { response?: { status?: number } }).response?.status : undefined;
+  return status === 401 || status === 403
+    ? label + ': sign-in or Owner access needs attention.'
+    : label + ' could not be loaded. Refresh Overview to verify this section.';
 }

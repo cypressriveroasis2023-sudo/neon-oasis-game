@@ -2,13 +2,15 @@
 /** Presentation routes only. Authorization and actions stay in their existing workspaces. */
 export const workspaces = ['Today','Daily Board','Field Map','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 export const workspaceGroups = [
-  { label:'Overview', home:'Today', items:['Today','Daily Board','Owner Tasks','Needs Attention','Activity'] },
-  { label:'Jobs', home:'Jobs', items:['Jobs','Unscheduled','Dispatch','Calendar','Owner Review','Handoffs','Tech Check'] },
-  { label:'Fleet & Map', home:'Field Map', items:['Field Map','Equipment','Camera Health','InHand Routers','Victron VRM'] },
-  { label:'Customers', home:'Customers', items:['Customers','Sites','Work Requests','CRM','Quotes'] },
-  { label:'Office', home:'Team', items:['Team','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },
+  { label:'Overview', home:'Today', items:['Today','Daily Board','Needs Attention','Activity'] },
+  { label:'Job flow', home:'Jobs', items:['Jobs','Owner Review','Handoffs','Tech Check'] },
+  { label:'Schedule', home:'Calendar', items:['Calendar','Unscheduled','Dispatch'] },
+  { label:'Equipment', home:'Equipment', items:['Equipment','Field Map','Camera Health','InHand Routers','Victron VRM'] },
+  { label:'Customers', home:'Customers', items:['Customers','Sites','Work Requests','CRM'] },
+  { label:'Team', home:'Team', items:['Team','Owner Tasks'] },
+  { label:'Finance', home:'Billing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },
 ];
-export const workspaceLabel = (name:string) => ({Today:'Overview','Daily Board':'Dispatch Board',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
+export const workspaceLabel = (name:string) => ({Today:'Overview','Daily Board':'Dispatch Board',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
 export const workspaceGroup = (name:string) => workspaceGroups.find(group=>group.items.includes(name==='Invoices'?'Billing':name)) || workspaceGroups[0];
 export type WorkspaceRoute = { workspace:string; jobId:string; detail:boolean };
 export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {

@@ -1,0 +1,484 @@
+/* COS company visual system. Presentation only: workflow visibility, authentication,
+   diagnostics, status calculation and original event handlers remain untouched. */
+@font-face {
+  font-family: "Open Sans";
+  src: url("./resources/fonts/open-sans-regular.woff") format("woff");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Open Sans";
+  src: url("./resources/fonts/open-sans-semibold.woff") format("woff");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Open Sans";
+  src: url("./resources/fonts/open-sans-bold.woff") format("woff");
+  font-style: normal;
+  font-weight: 650 950;
+  font-display: swap;
+}
+:root {
+  color-scheme: light;
+  --cos-page: #F1F4F9;
+  --cos-app: #FFFFFF;
+  --cos-soft: #F8FAFD;
+  --cos-text: #172C47;
+  --cos-muted: #60748F;
+  --cos-line: #DCE4EF;
+  --cos-blue: #315FDF;
+  --cos-selected: #E7EEFF;
+  --cos-green: #287451;
+  --cos-green-bg: #E8F4EC;
+  --cos-amber: #8A601E;
+  --cos-amber-bg: #FFF1D9;
+  --cos-red: #A33543;
+  --cos-red-bg: #FCEBED;
+  --cos-shadow: 0 8px 28px rgba(23,44,71,.07);
+  /* Existing detail and Vision components consume these presentation tokens. */
+  --bg: var(--cos-page);
+  --bg2: var(--cos-soft);
+  --panel: var(--cos-app);
+  --panel2: var(--cos-soft);
+  --panel3: var(--cos-selected);
+  --line: var(--cos-line);
+  --line2: #C4D2E5;
+  --text: var(--cos-text);
+  --soft: #425D7D;
+  --muted: var(--cos-muted);
+  --muted2: var(--cos-muted);
+  --green: var(--cos-green);
+  --red: var(--cos-red);
+  --red2: var(--cos-blue);
+  --yellow: var(--cos-amber);
+  --blue: var(--cos-blue);
+  --shadow: var(--cos-shadow);
+}
+html, body {
+  background: var(--cos-page);
+  color: var(--cos-text);
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+button, input, select, textarea, a.btn, .action, .back, .linkbtn {
+  font-family: inherit;
+}
+body button, body a.btn, body .action, body .back, body .linkbtn {
+  background: var(--cos-app);
+  border: 1px solid var(--cos-line);
+  color: var(--cos-text);
+  font-weight: 600;
+  border-radius: 9px;
+  min-height: 42px;
+  box-shadow: none;
+}
+body button:hover, body a.btn:hover, body .action:hover, body .back:hover, body .linkbtn:hover {
+  background: var(--cos-soft);
+  border-color: #AEBFDB;
+}
+body button:disabled { cursor: not-allowed; }
+body input:not([type="checkbox"]):not([type="radio"]), body select, body textarea {
+  min-width: 0;
+  max-width: 100%;
+  background: var(--cos-app);
+  color: var(--cos-text);
+  border-color: var(--cos-line);
+  border-radius: 9px;
+  accent-color: var(--cos-blue);
+}
+body input::placeholder, body textarea::placeholder { color: var(--cos-muted); opacity: 1; }
+body :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #8EA9F2 !important;
+  outline-offset: 3px;
+}
+body .primary, body .action.primary, body #sign, body .verify-unit-now {
+  background: var(--cos-blue) !important;
+  border-color: var(--cos-blue) !important;
+  color: #FFFFFF !important;
+  text-shadow: none !important;
+}
+body .primary:hover, body .action.primary:hover, body #sign:hover {
+  background: #254DBB !important;
+  border-color: #254DBB !important;
+}
+body .small, body .empty, body .loading, body .subtitle, body .label,
+body .brand small, body .authcard p, body .stat span, body .stat small,
+body .trouble, body .pager span, body .interface-title, body .ipline,
+body .camera-link-state, body .it-diag-sub {
+  color: var(--cos-muted);
+}
+body :is(h1,h2,h3), body .title { color: var(--cos-text); font-weight: 650; letter-spacing: -.02em; text-shadow: none; }
+body .green { color: var(--cos-green) !important; }
+body .red, body .autherr { color: var(--cos-red) !important; }
+body .yellow { color: var(--cos-amber) !important; }
+body .dot.online { background: var(--cos-green); }
+body .dot.offline { background: var(--cos-red); }
+body .dot.degraded { background: var(--cos-amber); }
+body .dot.unknown { background: var(--cos-muted); }
+body .stat, body .panel, body .card, body .opspanel, body .authcard, body .routeritem,
+body .it-diagnostic-panel {
+  background: var(--cos-app);
+  border-color: var(--cos-line);
+  color: var(--cos-text);
+  border-radius: 12px;
+  box-shadow: none;
+}
+body .authgate { background: var(--cos-page); overflow-y: auto; }
+body .authcard { box-shadow: var(--cos-shadow); padding: 28px; }
+body .authcard .brand b { font-size: 19px; line-height: 1.35; font-weight: 650; }
+body .authcard input { font-size: 16px; }
+body .authcard label { font-weight: 600; }
+body .authcard h2 { font-size: 25px; }
+body .error, body .notice.red, body .bad {
+  background: var(--cos-red-bg);
+  border-color: #E5B8BE;
+  color: var(--cos-red);
+}
+body .notice, body .setupbox, body .warn {
+  background: var(--cos-amber-bg);
+  border-color: #E6C992;
+  color: var(--cos-amber);
+}
+body .ok { background: var(--cos-green-bg); border-color: #B7D6C3; color: var(--cos-green); }
+
+/* Camera Health: quiet navigation, legible readings and separate state cues. */
+body .cos-sidebar { background: var(--cos-soft); border-color: var(--cos-line); }
+body .cos-wordmark { color: var(--cos-text); font-size: 21px; font-weight: 700; line-height: 1.4; }
+body .cos-wordmark span { color: var(--cos-blue); }
+body .cos-submark, body .cos-title div { color: var(--cos-muted); }
+body .cos-nav button, body .cos-nav a { background: transparent; color: var(--cos-muted); font-weight: 600; }
+body .cos-nav .active { background: var(--cos-selected); color: var(--cos-blue); }
+body .cos-topline { background: var(--cos-page); border-bottom: 1px solid var(--cos-line); gap: 16px; }
+body .cos-title h1 { font-size: 28px; }
+body .cos-title.vision-health-title>div>div { color: var(--cos-muted); }
+body .health-kpis .stat { background: var(--cos-app); border-color: var(--cos-line); }
+body .health-kpis .stat.master.online { background: var(--cos-green-bg); border-color: #B7D6C3; }
+body .health-kpis .stat.master.offline { background: var(--cos-red-bg); border-color: #E5B8BE; }
+body .health-kpis .stat.master.pending { background: var(--cos-amber-bg); border-color: #E6C992; }
+body .health-kpis .stat.master.inventory { background: var(--cos-selected); border-color: #C4D2F3; }
+body .health-kpis .stat[role="button"]:hover { border-color: var(--cos-blue); }
+body .health-kpis .stat small, body .health-kpis .stat[role="button"] small { color: var(--cos-muted); }
+body .stat b { font-weight: 650; }
+body .toolbar { background: var(--cos-app); }
+body .quickfilter { font-weight: 600; }
+body .quickfilter.active { outline: 2px solid var(--cos-blue); outline-offset: 1px; background: var(--cos-selected); }
+body .quickfilter.online { color: var(--cos-green); border-color: #B7D6C3; }
+body .quickfilter.offline { color: var(--cos-red); border-color: #E5B8BE; }
+body .quickfilter.degraded { color: var(--cos-amber); border-color: #E6C992; }
+body .opstitle, body .eventrow, body .historyrow, body .issue-row,
+body .panel th, body .panel td, body .unitcard .web-links { border-color: var(--cos-line); }
+body .panel th { background: var(--cos-soft); color: var(--cos-muted); }
+body .issue-row, body .issue-subhead { background: var(--cos-soft); border-color: var(--cos-line); }
+body .issue-subhead, body .issue-subhead span, body .troubleshoot summary, body .ipline b { color: var(--cos-text); }
+body .eventrow>.eventdetail { color: var(--cos-muted) !important; }
+body .eventstatus.online, body .platform.alibi { color: var(--cos-green); }
+body .eventstatus.offline { color: var(--cos-red); }
+body .eventstatus.degraded, body .eventstatus.verifying { color: var(--cos-amber); }
+body .platform.avigilon { color: var(--cos-blue); }
+body .event-camera-link { background: transparent; }
+body .event-camera-link:active { background: var(--cos-selected); }
+body .unit-detail, body .troubleshoot, body .meta, body .unitcard .meta,
+body .unit-health-summary .uhs, body .unit-time-strip, body .it-diag-result,
+body .camera-search-result { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-text); }
+body .unitcard, body .unitcard.online, body .unitcard.offline, body .unitcard.degraded,
+body .unitcard.verifying, body .unitcard.unknown {
+  background: var(--cos-app) !important;
+  border: 1px solid var(--cos-line) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+body .unitcard.online { border-left: 4px solid var(--cos-green) !important; }
+body .unitcard.offline { border-left: 4px solid var(--cos-red) !important; }
+body .unitcard.degraded { border-left: 4px solid var(--cos-amber) !important; }
+body .unitcard:hover { box-shadow: var(--cos-shadow) !important; }
+body .unitcard.search-hit { outline-color: var(--cos-blue); box-shadow: 0 0 0 5px var(--cos-selected) !important; }
+html body #unitCards .cardtitle, html body .unitcard .cardtitle {
+  color: var(--cos-text) !important;
+  font-family: "Open Sans", sans-serif !important;
+  font-weight: 650 !important;
+  text-shadow: none !important;
+  line-height: 1.25 !important;
+}
+body .unitcard .cardtitle:before { color: var(--cos-green) !important; }
+body .unitcard.offline .cardtitle:before { color: var(--cos-red) !important; }
+body .unitcard.degraded .cardtitle:before { color: var(--cos-amber) !important; }
+body .unitcard .card-site { color: var(--cos-muted) !important; }
+body .unitcard .card-site.shop { color: var(--cos-amber) !important; }
+body .unitcard .site-chip, body .unitcard .type-chip { color: var(--cos-muted); background: var(--cos-soft); border-color: var(--cos-line); }
+body .statuspill, body .unitcard .statuspill, body .pill { background: var(--cos-soft); color: var(--cos-muted); border: 1px solid var(--cos-line); font-weight: 700; }
+html body .statuspill.online, html body .unitcard.online .statuspill.online, body .pill.online {
+  background: var(--cos-green-bg) !important; color: var(--cos-green) !important; border-color: #B7D6C3 !important; box-shadow: none !important;
+}
+html body .statuspill.offline, html body .unitcard.offline .statuspill.offline, body .pill.offline {
+  background: var(--cos-red-bg) !important; color: var(--cos-red) !important; border-color: #E5B8BE !important; box-shadow: none !important;
+}
+html body .statuspill.degraded, html body .statuspill.verifying, html body .statuspill.waiting,
+html body .unitcard.degraded .statuspill.degraded, body .pill.degraded, body .pill.verifying,
+body .unitcard .unitissuepill, body .unitcard.online .unitissuepill {
+  background: var(--cos-amber-bg) !important; color: var(--cos-amber) !important; border-color: #E6C992 !important; box-shadow: none !important;
+}
+body .unit-health-summary .uhs span { color: var(--cos-muted); }
+body .unit-health-summary .uhs.up, body .unit-time-strip .time-good { background: var(--cos-green-bg); }
+body .unit-health-summary .uhs.down { background: var(--cos-red-bg); }
+body .unit-health-summary .uhs.up b, body .unit-time-strip .time-good span, body .unit-time-strip .time-good b,
+body .unit-time-strip .time-good:before { color: var(--cos-green); }
+body .unit-health-summary .uhs.down b { color: var(--cos-red); }
+body .unit-health-summary .uhs.check b { color: var(--cos-amber); }
+body .unit-health-summary .uhs.total b, body .unit-time-strip .time-check b { color: var(--cos-text); }
+body .unit-time-strip .time-check span { color: var(--cos-muted); }
+body .unit-time-strip>div+div { border-color: var(--cos-line); }
+body .unitcard .last-success-ping { color: var(--cos-green) !important; text-shadow: none !important; }
+body .unitcard .last-success-ping.missing { color: var(--cos-amber) !important; }
+body .component { background: var(--cos-soft); border-color: var(--cos-line); }
+body .component.camera-good, body .unitcard .component:has(.statuspill.online) {
+  background: var(--cos-green-bg) !important; border-color: #B7D6C3 !important; box-shadow: inset 3px 0 0 var(--cos-green) !important;
+}
+body .component.camera-offline, body .unitcard .component:has(.statuspill.offline) {
+  background: var(--cos-red-bg) !important; border-color: #E5B8BE !important; box-shadow: inset 3px 0 0 var(--cos-red) !important;
+}
+body .component.camera-issue { background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; box-shadow: inset 3px 0 0 var(--cos-amber) !important; }
+body .component.camera-waiting { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; box-shadow: inset 3px 0 0 var(--cos-muted) !important; }
+body .component.camera-detail-link>b, body .component.camera-good>b,
+body .component.camera-offline>b, body .component.camera-issue>b { color: var(--cos-text) !important; }
+body .component.camera-good .camera-state-label { color: var(--cos-green) !important; }
+body .component.camera-offline .camera-state-label { color: var(--cos-red) !important; }
+body .component.camera-issue .camera-state-label { color: var(--cos-amber) !important; }
+body .recon-battery-badge { color: var(--cos-muted) !important; }
+body .unitcard.online .green, body .component.camera-good .green { color: var(--cos-green) !important; }
+body .unitcard.offline .red, body .component.camera-offline .red { color: var(--cos-red) !important; }
+body .unitcard .camera-front-link, body .camera-front-link, body .camera-front-link:hover,
+body .unitcard .collapse-toggle, body .unitcard.expanded .collapse-toggle, body .unitcard .collapse-toggle:hover,
+body .unitcard .troubleshoot-front, body .mockup-bottom-actions .always-trouble,
+body .unit-open-hint, body .unitcard.offline .unit-open-hint, body .unitcard.online .unit-open-hint,
+body .camera-open-cta, body .component.camera-good .camera-open-cta,
+body .component.camera-offline .camera-open-cta, body .component.camera-issue .camera-open-cta,
+body .camera-detail-link:hover .camera-open-cta, body .web-link, body .unitcard .web-link,
+body .web-link:hover, body .it-diag-actions button, body #mobileActivityToggle {
+  background: var(--cos-selected) !important; border-color: #C4D2F3 !important; color: var(--cos-blue) !important; box-shadow: none !important; font-weight: 600 !important;
+}
+body .camera-link-main { color: var(--cos-text); }
+body .camera-link-arrow { color: var(--cos-blue); }
+body .camera-front-link.online .camera-link-state { color: var(--cos-green); }
+body .camera-front-link.offline .camera-link-state { color: var(--cos-red); }
+body .unitcard .send-root-unit, body .unitcard .degraded-front, body .unitcard.online .downline {
+  background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; color: var(--cos-amber) !important;
+}
+body .downline { background: var(--cos-red-bg); border-color: #E5B8BE; color: var(--cos-red); }
+body .unit-camera-emblem, body .unitcard .unit-camera-emblem, body .unitcard.online .unit-camera-emblem,
+body .unitcard.offline .unit-camera-emblem, body .unitcard.degraded .unit-camera-emblem, body .camera-link-icon {
+  background: var(--cos-soft) !important; border-color: var(--cos-line) !important; color: var(--cos-blue); box-shadow: none !important;
+}
+body .unit-camera-emblem span { background: var(--cos-selected); }
+body .unitcard.online .unit-camera-emblem span { border-color: var(--cos-green); }
+body .unitcard.offline .unit-camera-emblem span { border-color: var(--cos-red); }
+body .unitcard.degraded .unit-camera-emblem span { border-color: var(--cos-amber); }
+body .it-diagnostic-sheet { background: rgba(23,44,71,.32); }
+body .it-diag-actions button:first-child { background: var(--cos-blue) !important; color: white !important; border-color: var(--cos-blue) !important; }
+body #removeUnitBtn { color: var(--cos-red) !important; border-color: #E5B8BE !important; }
+body #deviceTable tr { background: var(--cos-app) !important; border-color: var(--cos-line) !important; }
+body #deviceTable tbody tr.device-status-online { background: var(--cos-app) !important; box-shadow: inset 3px 0 0 var(--cos-green) !important; }
+body #deviceTable tbody tr.device-status-offline { background: var(--cos-app) !important; box-shadow: inset 3px 0 0 var(--cos-red) !important; }
+body #deviceTable tbody tr.device-status-verifying, body #deviceTable tbody tr.device-status-degraded { background: var(--cos-app) !important; box-shadow: inset 3px 0 0 var(--cos-amber) !important; }
+body #deviceTable tbody tr.device-status-online td:nth-child(2)>b { color: var(--cos-green) !important; }
+body #deviceTable tbody tr.device-status-offline td:nth-child(2)>b { color: var(--cos-red) !important; }
+body #deviceTable tbody tr.device-status-online td, body #deviceTable tbody tr.device-status-offline td { border-color: var(--cos-line) !important; }
+body #deviceTable td:nth-child(3)>a { color: var(--cos-blue) !important; text-shadow: none !important; }
+
+/* Camera detail: use the same cards and restrained state colors. */
+body .topbar { background: rgba(241,244,249,.97); border-color: var(--cos-line); }
+body .title { font-size: clamp(28px,5vw,38px); line-height: 1.2; }
+body .health-overview .card { border-width: 1px; }
+body .health-overview .card.info { background: var(--cos-soft); border-color: var(--cos-line); }
+body .health-overview .card.good { background: var(--cos-green-bg); border-color: #B7D6C3; }
+body .health-overview .card.bad { background: var(--cos-red-bg); border-color: #E5B8BE; }
+body .health-overview .card.warn { background: var(--cos-amber-bg); border-color: #E6C992; }
+body .section-card { background: var(--cos-app) !important; border-color: var(--cos-line) !important; }
+body .section-card>.label { color: var(--cos-text); border-color: var(--cos-line); }
+body .kv, body .kv>div, body .event { border-color: var(--cos-line); }
+body .kv>div:nth-child(odd) { color: var(--cos-muted); background: var(--cos-soft); font-weight: 500; }
+body .kv>div:nth-child(even) { color: var(--cos-text); background: var(--cos-app); font-weight: 600; }
+body .shop-action { background: var(--cos-selected); border-color: #C4D2F3; }
+body .shop-action.at-shop { background: var(--cos-green-bg); border-color: #B7D6C3; }
+body .value { font-weight: 650; }
+body .port { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-muted); }
+body .port.ok, body:has(#cameraName) .ports .port:not(.off):not(.pending):not(.bad) { background: var(--cos-green-bg) !important; border-color: #B7D6C3 !important; color: var(--cos-green) !important; }
+body .port.off, body .port.bad { background: var(--cos-red-bg) !important; border-color: #E5B8BE !important; color: var(--cos-red) !important; }
+body .port.pending { background: var(--cos-amber-bg) !important; border-color: #E6C992 !important; color: var(--cos-amber) !important; }
+
+/* IT repair retains its existing sign-in and ticket workflow. */
+body .wrap>.hero { background: var(--cos-soft); color: var(--cos-text); border: 1px solid var(--cos-line); border-radius: 12px; }
+body .wrap>.hero b { color: var(--cos-blue); }
+body .wrap>.hero h1 { margin: 12px 0 4px; }
+body .wrap .card { box-shadow: none; }
+body .wrap .unit { border-color: var(--cos-line); }
+body .wrap button { background: var(--cos-blue); color: #FFFFFF; border-color: var(--cos-blue); }
+body .wrap button.secondary { background: var(--cos-app); color: var(--cos-text); border-color: var(--cos-line); }
+body .wrap :is(h2) { margin: 0 0 10px; }
+
+/* OnSite Vision: preserve its assistant eye, animations and all dialog states. */
+:root { --vision-v37-black: var(--cos-app); --vision-v37-panel: var(--cos-soft); --vision-v37-line: var(--cos-line); }
+html body #visionApp, html body #visionApp .vision-main, html body .vision-loading { background: var(--cos-app) !important; color: var(--cos-text); }
+html body #visionApp .vision-sidebar { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; }
+html body #visionApp .vision-topbar { background: var(--cos-app) !important; border-color: var(--cos-line); }
+html body #visionApp .vision-composer-wrap { background: var(--cos-app) !important; }
+html body #visionApp .vision-composer-v36 { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; box-shadow: none !important; }
+html body .vision-brand-word, html body .vision-wordmark, html body .vision-top-wordmark,
+html body #visionLoading .vision-splash .vision-brand-word > span:not(.vision-brand-o) { color: var(--cos-text) !important; }
+html body .vision-brand-o { color: var(--cos-blue) !important; text-shadow: none !important; }
+html body .vision-brand-lockup>small, html body #visionLoading .vision-splash-status { color: var(--cos-muted) !important; }
+body .vision-nav-v36 button, body .vision-nav-v36 a,
+body .vision-history button, body .vision-back-link { color: var(--cos-muted); background: transparent; font-weight: 600; }
+body .vision-nav-v36 button span, body .vision-nav-v36 a span { color: inherit; }
+body .vision-nav-v36 .active, body .vision-nav-v36 button:hover, body .vision-nav-v36 a:hover,
+body .vision-history button.active, body .vision-history button:hover { color: var(--cos-blue); background: var(--cos-selected); border-color: #C4D2F3; box-shadow: none; }
+body .vision-side-label, body .vision-history button small, body .vision-owner-name,
+body .vision-welcome p, body .vision-assistant-head, body .vision-answer-copy, body .vision-assignment-row,
+body .vision-action-card p, body .vision-action-card small, body .vision-parts-row small,
+body .vision-system-note, body .vision-typing, body .vision-compose-note, body .vision-empty-order,
+body .vision-context-grid span, body .vision-context-row span, body .vision-draft-grid span,
+body .vision-draft-description span, body .vision-knowledge-head span, body .vision-knowledge-editor label,
+body .vision-knowledge-item p, body .vision-knowledge-meta, body .vision-knowledge-head small,
+body .vision-knowledge-editor-head small, body .vision-knowledge-list-head small,
+body .vision-language-eval-status>span, body .vision-eval-mismatches small,
+body .vision-plan-step span, body .vision-plan-notes, body .vision-agent-facts small,
+body .vision-orb-hint, body .vision-preview-login>span, body .vision-preview-login label { color: var(--cos-muted); }
+body .vision-top-title b, body .vision-turn.assistant .vision-bubble, body.vision-voice-session .vision-turn.assistant .vision-bubble,
+body .vision-answer-title, body .vision-job-head b, body .vision-direct b, body .vision-action-card b,
+body .vision-assignment-row b, body .vision-parts-row b, body .vision-empty-order b,
+body .vision-context-grid b, body .vision-draft-grid b, body .vision-draft-description b,
+body .vision-draft-head b, body .vision-knowledge-head b, body .vision-knowledge-editor-head b,
+body .vision-knowledge-list-head b, body .vision-language-eval-status b, body .vision-agent-answer,
+body .vision-agent-facts span, body .vision-plan-step b, body .vision-preview-login>b { color: var(--cos-text); }
+body .vision-answer-title { font-weight: 650; }
+body .vision-turn.user .vision-bubble, body.vision-voice-session .vision-turn.user .vision-bubble {
+  background: var(--cos-selected); border-color: #C4D2F3; color: var(--cos-text); box-shadow: none;
+}
+body .vision-icon-button, body .vision-new-chat, body .vision-quick-grid button,
+body .vision-cancel, body .vision-tech-choice-grid button, body .vision-order-actions button,
+body .vision-draft-choices button, body .vision-teach-button, body .vision-language-eval-button,
+body .vision-knowledge-actions button, body .vision-knowledge-editor-head button,
+body .vision-knowledge-item, body .vision-new-header {
+  background: var(--cos-app); border-color: var(--cos-line); color: var(--cos-text); box-shadow: none;
+}
+body .vision-icon-button:hover, body .vision-new-chat:hover, body .vision-quick-grid button:hover,
+body .vision-tech-choice-grid button:hover, body .vision-draft-choices button:hover,
+body .vision-knowledge-item:hover, body .vision-knowledge-item.active { background: var(--cos-selected); border-color: #C4D2F3; color: var(--cos-blue); }
+body .vision-job-card, body .vision-action-card, body .vision-context-block, body .vision-direct,
+body .vision-next, body .vision-draft-card, body .vision-draft-question, body .vision-plan-card,
+body .vision-knowledge-shell, body .vision-preview-login { background: var(--cos-app); border-color: var(--cos-line); color: var(--cos-text); box-shadow: none; }
+body .vision-job-card, body .vision-draft-card { border-left-color: var(--cos-blue); }
+body .vision-order-panel, body .vision-order-head, body .vision-knowledge-head,
+body .vision-parts-row, body .vision-context-grid div, body .vision-draft-grid>div,
+body .vision-draft-description, body .vision-plan-step, body .vision-agent-facts>div,
+body .vision-language-eval-status, body .vision-eval-mismatches>div { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-text); }
+body .vision-job-meta span, body .vision-pill, body .vision-plan-step-num { background: var(--cos-selected); color: #425D7D; }
+body .vision-assignment-list, body .vision-context-row, body .vision-draft-head,
+body .vision-knowledge-editor, body .vision-knowledge-status { border-color: var(--cos-line); }
+body .vision-next b, body .vision-new-chat span, body .vision-kicker, body .vision-draft-head small,
+body .vision-draft-question small, body .vision-plan-card>small, body .vision-teach-button span,
+body .vision-preview-login small { color: var(--cos-blue); }
+body .vision-live-status, body .vision-direct.good, body .vision-action-card.audited,
+body .vision-plan-step.ready, body .vision-language-eval-status.good,
+body .vision-knowledge-status.approved, body .vision-voice-status.heard {
+  background: var(--cos-green-bg); border-color: #B7D6C3; color: var(--cos-green);
+}
+body .vision-action-card.audited small, body .vision-plan-step.ready small { color: var(--cos-green); }
+body .vision-direct.warn, body .vision-action-card.blocked, body .vision-plan-step.needs-input,
+body .vision-language-eval-status.warn, body .vision-knowledge-status.draft,
+body .vision-voice-status.busy { background: var(--cos-amber-bg); border-color: #E6C992; color: var(--cos-amber); }
+body .vision-action-card.blocked small, body .vision-plan-step.needs-input small { color: var(--cos-amber); }
+body .vision-plan-step.guided { background: var(--cos-selected); border-color: #C4D2F3; }
+body .vision-plan-step.guided small { color: var(--cos-blue); }
+body .vision-knowledge-status.retired { background: var(--cos-page); color: var(--cos-muted); }
+body .vision-knowledge-actions button.danger, body .vision-voice-status.recording,
+body .vision-preview-login-status { background: var(--cos-red-bg); border-color: #E5B8BE; color: var(--cos-red); }
+body .vision-confirm, body .vision-send, body .vision-order-actions button.primary,
+body .vision-knowledge-actions button.primary, body .vision-preview-login button {
+  background: var(--cos-blue); border-color: var(--cos-blue); color: #FFFFFF; box-shadow: none;
+}
+body .vision-composer textarea, body .vision-composer-v36 textarea { background: transparent; color: var(--cos-text); }
+body .vision-composer textarea::placeholder, body .vision-composer-v36 textarea::placeholder { color: var(--cos-muted); }
+body .vision-composer:focus-within { border-color: #8EA9F2 !important; box-shadow: 0 0 0 3px var(--cos-selected) !important; }
+body .vision-add-v36, body .vision-keyboard-v36, body .vision-compose-icon { background: transparent; color: var(--cos-muted); border-color: transparent; }
+body .vision-menu-v37 span { background: var(--cos-text); }
+body .vision-teach-button, body .vision-language-eval-button, body .vision-icon-button { font-weight: 600; }
+body .vision-knowledge-modal, body .vision-app.sidebar-open .vision-shade, body .vision-app.order-open .vision-shade { background: rgba(23,44,71,.32); }
+body .vision-mode-label, body .vision-rotating-prompt { color: var(--cos-muted); }
+body .vision-voice-status { background: var(--cos-soft); border-color: var(--cos-line); color: var(--cos-muted); }
+body .vision-knowledge-editor label { font-size: 12px; }
+body .vision-knowledge-head span, body .vision-knowledge-item p { font-size: 12px; }
+
+/* No visibility rules: hidden states and workflow-specific responsive controls
+   continue to be governed exclusively by the original page styles and scripts. */
+@media (max-width: 1100px) {
+  body .cos-topline { flex-wrap: wrap; }
+  body .cos-search { min-width: 220px; }
+}
+@media (max-width: 768px) {
+  body .authgate { padding: 16px; align-items: safe center; }
+  body .authcard { padding: 22px; }
+  body .authcard .brand { align-items: flex-start; }
+  body .authcard .brand b { font-size: 17px; }
+  body .cos-title h1 { font-size: 26px !important; font-weight: 650 !important; line-height: 1.25 !important; }
+  body .unitcard .cardtitle { font-size: 24px !important; }
+  body #deviceTable td:nth-child(3)>a { font-size: 25px !important; line-height: 1.2 !important; }
+  body .back, body .action { white-space: normal; overflow-wrap: anywhere; }
+  body .health-overview .card { padding: 12px; }
+  body .health-overview .value { font-size: 19px; }
+  body .health-overview .label { letter-spacing: .06em; }
+  body .vision-knowledge-row { grid-template-columns: minmax(0,1fr); }
+  body .vision-knowledge-head { gap: 12px; padding: 16px; }
+  body .vision-knowledge-head>div { min-width: 0; }
+  body .vision-knowledge-head b { font-size: 17px; }
+  body .vision-knowledge-head span { overflow-wrap: anywhere; }
+  body .vision-knowledge-actions button { min-height: 44px; }
+  body .vision-context-grid, body .vision-draft-grid { min-width: 0; }
+}
+@media (max-width: 390px) {
+  body .authcard { padding: 18px; }
+  body .health-overview { grid-template-columns: minmax(0,1fr); }
+  body .toprow { flex-wrap: wrap; }
+  body .wrap { padding: 12px; }
+  body .wrap .card, body .wrap>.hero { padding: 16px; }
+  body .wrap .row { flex-direction: column; }
+  body .vision-knowledge-editor, body .vision-knowledge-list-pane { padding: 12px; }
+}
+
+/* Specific legacy inline-presentation overrides retain the underlying statuses. */
+body .unitcard .site-chip, body .unitcard .type-chip { color: var(--cos-muted) !important; border-color: var(--cos-line) !important; }
+body .unitcard.online .unit-camera-emblem span { color: var(--cos-green) !important; border-color: #B7D6C3 !important; background: var(--cos-green-bg) !important; box-shadow: none !important; }
+body .unitcard.offline .unit-camera-emblem span { color: var(--cos-red) !important; border-color: #E5B8BE !important; background: var(--cos-red-bg) !important; box-shadow: none !important; }
+body .unitcard.degraded .unit-camera-emblem span { color: var(--cos-amber) !important; border-color: #E6C992 !important; background: var(--cos-amber-bg) !important; box-shadow: none !important; }
+body .unit-time-strip .time-good:before { background: var(--cos-green-bg); box-shadow: none; }
+html body #unitCards .cardtop { border-color: var(--cos-line) !important; }
+body .cos-topline { background: var(--cos-page) !important; border-color: var(--cos-line) !important; box-shadow: none; }
+body .health-kpis .stat[role="button"]:hover { background: var(--cos-soft) !important; border-color: var(--cos-blue) !important; }
+body .health-kpis .stat[role="button"] small { color: var(--cos-muted) !important; }
+body #reviewIssues { background: var(--cos-selected) !important; color: var(--cos-blue) !important; border-color: #C4D2F3 !important; }
+body .unitcard .mockup-bottom-actions .collapse-toggle { position: static !important; inset: auto !important; width: 100% !important; min-width: 0 !important; }
+body .unitcard .mockup-bottom-actions { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+/* Legacy Vision v37 used important dark colors on controls. Keep its layout and
+   voice activity states while adapting the controls to the company palette. */
+html body .vision-nav-v36 .active, html body .vision-history button.active { background: var(--cos-selected) !important; color: var(--cos-blue) !important; }
+html body #visionApp .vision-sidebar { box-shadow: none !important; }
+html body #visionApp .vision-topbar { border-bottom: 1px solid var(--cos-line) !important; }
+html body .vision-menu-v37, html body .vision-new-header { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; color: var(--cos-text) !important; }
+html body .vision-add-v36, html body .vision-keyboard-v36 { color: var(--cos-muted) !important; opacity: 1; }
+html body .vision-send-v36 { background: var(--cos-blue) !important; color: #FFFFFF !important; }
+html body .vision-composer-v36 textarea { color: var(--cos-text) !important; }
+html body .vision-composer-v36 textarea::placeholder, html body .vision-rotating-prompt,
+html body .vision-side-label { color: var(--cos-muted) !important; }
+html body .vision-knowledge-editor select, html body .vision-knowledge-editor input,
+html body .vision-knowledge-editor textarea, html body .vision-knowledge-list-head select,
+html body .vision-parts-row input { background: var(--cos-app); color: var(--cos-text); border-color: var(--cos-line); }
+body .vision-action-buttons button, body .vision-icon-button { font-size: 12px; }
+body .vision-action-card p { font-size: 12px; }
+body .unitcard .meta { background: var(--cos-soft) !important; border-color: var(--cos-line) !important; }
+body .unitcard .cardtop { padding-top: 0 !important; padding-right: 0 !important; }
+body .unit-health-summary .uhs.up { border-color: #B7D6C3; }
+body .unit-health-summary .uhs.down { border-color: #E5B8BE; }
+body #issuesSummary { border-color: #E6C992 !important; }
+body #healthDropBanner { border-color: #E5B8BE !important; }

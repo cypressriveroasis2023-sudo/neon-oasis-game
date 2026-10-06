@@ -37,6 +37,7 @@ async function start(page) {
     if (state.failed.has(path)) return route.fulfill({ status: 503, contentType: 'application/json', headers, body: JSON.stringify({ error: 'Synthetic financial source unavailable' }) });
     let data;
     if (method === 'GET' && path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+    else if (method === 'GET' && path === '/api/camera-health/summary') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
     else if (method === 'GET' && path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
     else if (method === 'GET' && ['/api/jobs', '/api/owner-tasks'].includes(path)) data = { items: [] };
     else {
@@ -71,7 +72,7 @@ async function start(page) {
   });
   await page.goto('/finance-harness');
   const frame = page.frameLocator('#operations');
-  await expect(frame.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   return { frame, state };
 }
 async function navigate(frame, name) {

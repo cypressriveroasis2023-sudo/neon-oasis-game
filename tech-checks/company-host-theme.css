@@ -1,0 +1,45 @@
+/* Approved COS presentation for existing IT, Service, account and menu surfaces.
+   Deliberately CSS-only: no workflow markup, checks, permissions or bridge changes. */
+@font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-regular.woff') format('woff');font-style:normal;font-weight:400 500;font-display:swap}
+@font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-semibold.woff') format('woff');font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-bold.woff') format('woff');font-style:normal;font-weight:700 900;font-display:swap}
+:root,html,html[data-theme],body,body[data-theme]{color-scheme:light;--cos-vision-bg:#F1F4F9;--cos-vision-panel:#FFFFFF;--cos-vision-raised:#F8FAFD;--cos-vision-border:#DCE4EF;--cos-vision-text:#172C47;--cos-vision-muted:#60748F;--cos-vision-red:#315FDF;--bg:#F1F4F9;--panel:#FFFFFF;--border:#DCE4EF;--line:#DCE4EF;--muted:#60748F;--text:#172C47;--accent:#315FDF;--red:#315FDF;--good:#287451;--warn:#8A601E}
+html body{background:#F1F4F9!important;color:#172C47!important;font-family:'Open Sans',Arial,sans-serif!important;line-height:1.5}
+html body :is(button,input,select,textarea){font-family:'Open Sans',Arial,sans-serif!important}
+html body :is(button,a,input,textarea,select,summary):focus-visible{outline:2px solid #315FDF!important;outline-offset:3px}
+html body #appView{background:#F1F4F9!important;color:#172C47!important}
+html body #appView>.mobileTop,html body #appView>.mobileTop>.hero,html body #appView>.mobileTop>.accountbar,html body #appView>.mobileTop>.techStatusRow{background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important}
+html body #appView>.mobileTop .techBrand h1,html body #appView>.mobileTop :is(#whoName,.brandTitle){color:#172C47!important;letter-spacing:normal!important}
+html body #appView>.mobileTop :is(.small,.pill,label,small),html body #appView>.mobileTop>.techStatusRow :is(b,span){color:#60748F!important}
+html body #appView>.mobileTop :is(button,.pill),html body #appView .mainRoleTabs button{background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important;box-shadow:none!important;border-radius:7px!important}
+html body #appView .mainRoleTabs button.active{background:#E7EEFF!important;color:#315FDF!important;border-color:#BCCCF4!important}
+html body #appView :is(#view-it,#view-svc,#view-service){color:#172C47!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.card,.panel,.wl-it-command-panel,.wl-it-command-stat,.wl-it-dashboard-item,.wl-it-readiness-strip,.wl-it-ops-section,.wl-it-hero-greeting,.wl-it-clock-card,.wl-it-weather-card,.wl-service-simple-card,.wl-service-ticket-found,.wl-service-action-pill,.vision-ticket-entry){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;border-radius:10px!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(h1,h2,h3,h4,b,strong){color:#172C47!important;font-weight:600!important;letter-spacing:normal!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(p,small,label,.small,.muted,.wl-it-command-kicker,.wl-service-simple-kicker,.wl-service-help){color:#60748F!important;line-height:1.6!important;text-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important;font-size:16px!important;max-width:100%;min-width:0;box-sizing:border-box}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(input,textarea)::placeholder{color:#73849B!important;opacity:1}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(input[type=checkbox],input[type=radio]){accent-color:#315FDF}
+html body #appView :is(#view-it,#view-svc,#view-service) button{background:#315FDF!important;color:#fff!important;border-color:#315FDF!important;box-shadow:none!important;border-radius:7px!important;text-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) button :is(b,strong,small,span){color:inherit!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(button.secondary,button.wl-gray,button.mini,.wl-it-quick-grid button,.wl-it-quick-grid a,.wl-service-action-pill){background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(button.active,button.selected,[aria-selected=true]){background:#E7EEFF!important;color:#315FDF!important;border-color:#B5C7F4!important}
+html body #appView #view-it .wl-it-command-shell{background:#fff!important;border-color:#DCE4EF!important;border-radius:10px!important}
+html body #appView #view-it .wl-it-command-sidebar{background:#F8FAFD!important;border-color:#DCE4EF!important}
+html body #appView #view-it .wl-it-command-nav :is(button,a){background:transparent!important;color:#60748F!important;border-color:transparent!important;border-radius:7px!important;font-weight:400!important}
+html body #appView #view-it .wl-it-command-nav .active{background:#E7EEFF!important;color:#315FDF!important;border-color:transparent!important;border-left-color:#315FDF!important;box-shadow:none!important;font-weight:600!important}
+html body #appView #view-it .wl-it-command-stat.red{border-top-color:#315FDF!important}
+html body #appView #view-svc #wlSvcHome{background:transparent!important;border-color:#DCE4EF!important}
+html body #appView #view-svc .wl-service-action-pill[data-wl-service-open-job]{border-left-color:#315FDF!important}
+html body #appView #view-svc .wl-service-action-pill.complete{background:#E8F4EC!important;border-color:#CAE4D4!important;color:#287451!important}
+html body #appView #view-svc .wl-service-action-pill.complete :is(b,strong,small){color:#287451!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-card,.wl-tech-menu-card,.card,.wl-menu-sheet,.wl-menu-head){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;font-family:'Open Sans',Arial,sans-serif!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-item,button){background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important;border-radius:8px!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(h1,h2,b,strong){color:#172C47!important}html body :is(#wlTechMenuPanel,#wlAppMenuPanel) small{color:#60748F!important}
+html body :is(#cosOperationsTechReturn,#cosOperationsReturn,#cosProductionAssignmentsButton){background:#E7EEFF!important;color:#315FDF!important;border-color:#BCCCF4!important;border-radius:7px!important;box-shadow:none!important}
+html body :is(#loginView,#resetView,#forcedPasswordView,#sessionLoading,.visionLaunch){background:#F1F4F9!important;color:#172C47!important}
+html body :is(#loginView,#resetView,#forcedPasswordView) :is(.card,.panel){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important}
+html body :is(#loginView,#resetView,#forcedPasswordView) :is(input,select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important}
+html body :is(#loginView,#resetView,#forcedPasswordView) :is(button,.primary){background:#315FDF!important;color:#fff!important;border-color:#315FDF!important;border-radius:7px!important;box-shadow:none!important}
+html body :is(#loginView,#resetView,#forcedPasswordView) :is(h1,h2,h3){color:#172C47!important}html body :is(#loginView,#resetView,#forcedPasswordView) :is(p,small,label){color:#60748F!important}
+html body .visionLaunchWord{color:#172C47!important;text-shadow:none!important}html body :is(.visionLaunchCompany,.visionLaunchStatus){color:#60748F!important}.cos-vision-brand{color:#172C47}

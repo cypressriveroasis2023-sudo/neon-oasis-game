@@ -100,7 +100,7 @@ test('shared VISION Service presentation keeps real readiness and job actions re
   for(const width of [320,390,1024,1440]){
     await page.setViewportSize({width,height:900});
     const layout=await home.evaluate(element=>({background:getComputedStyle(document.getElementById('appView')).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
-    expect(layout.background).toBe('rgb(17, 22, 25)');
+    expect(layout.background).toBe('rgb(241, 244, 249)');
     expect(layout.scroll).toBeLessThanOrEqual(layout.width);
     for(const control of layout.controls){expect(control.height).toBeGreaterThanOrEqual(44);expect(control.left).toBeGreaterThanOrEqual(0);expect(control.right).toBeLessThanOrEqual(layout.width);}
   }
