@@ -3,19 +3,20 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
+// Camera Health: reviewed offline/shop source-classification hotfix; exact area mapping and all writes preserved.
 // Camera pages: reviewed 2026-10-06 check-history and unit-overview changes, covered by source-aware and navigation tests.
 // Vision includes the reviewed visible-composer repair (behavior covered by vision-composer.browser.spec.mjs).
 // Other tools retain origin/main 276c6d5e2c98c41a8ba71e78c560b04d6f9b998b hashes.
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "795434d04cec2dfb7787b0319eccd108b0aa71c6c4904716acf6f3716d038fc6",
+  "camera-health": "d37aed1756f8680ac500602a81a672f0a468c88e15ff3f89495739bf018e50c5",
   "camera-detail": "faf3e804d74932e3adb1e096e4b6f6cca3dc703000eedca673cf76665a3ec219",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "5f6b169f1df77e115d7dbe4ea40531e853ae0d421a9e2b453d7734b134d49536",
+  "camera-health": "45efefa445ccb850244cf901e286f238fa47421591483b79d57cf2fec8792c31",
   "camera-detail": "9368d545ec84c6cd46bc51257381b116c3b3d8478e6474c91f36e8e1b6187de4",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"

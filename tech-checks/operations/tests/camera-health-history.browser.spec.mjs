@@ -22,11 +22,11 @@ const shared=`${helper}\n${escape}
  const fixedNow=Date.parse('2026-10-06T12:30:00Z');Date.now=()=>fixedNow;
  const evidenceFresh=value=>CameraHealthHistory.timestamp(value).state==='fresh';
  ${effective}
- window.fixture={device:{id:159,device_name:'RANGER 022',unit_key:'RANGER 022',organization:'Synthetic test site',group:'Vigilant',source_status:'offline',source_last_seen_at:'2026-10-06T12:25:10Z',last_online_at:'2026-10-06T10:55:10Z',last_probe_online_at:null,vigilant_status:'Offline'},current:{overall_status:'online',ip_reachable:true,checked_at:'2026-09-30T01:00:00Z',port_status:{80:{online:true,latency_ms:5}}}};
+ window.fixture={device:{id:159,source:'vigilant_control_center',device_type:'IPC',activation_state:'active',device_name:'RANGER 022',unit_key:'RANGER 022',organization:'Synthetic test site',group:'Vigilant',source_status:'offline',source_last_seen_at:'2026-10-06T12:25:10Z',last_online_at:'2026-10-06T10:55:10Z',last_probe_online_at:null,vigilant_status:'Offline'},current:{overall_status:'online',ip_reachable:true,checked_at:'2026-09-30T01:00:00Z',port_status:{80:{online:true,latency_ms:5}}}};
 `;
 const listScript=`${shared}
  ${overview}
- let devices=[fixture.device],health={159:fixture.current},history=[],unitPage=1;const UNITS_PER_PAGE=25;
+ let boardDataReady=true;let devices=[fixture.device],health={159:fixture.current},history=[],unitPage=1;const UNITS_PER_PAGE=25;
  const fleetGroups=()=>[{k:'RANGER 022',state:effectiveHealth(fixture.device),ds:[fixture.device]}];
  const fleetMatches=()=>true,syncMobileCameraLayout=()=>{},isShop=()=>false,isCountedCamera=()=>true;
  const isCameraIssue=d=>effectiveHealth(d)!=='online',isReconAwaitingStatus=()=>false,cameraIssueReason=()=> 'Provider reports offline';
