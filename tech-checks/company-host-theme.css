@@ -37,9 +37,27 @@ html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-card,.wl-tech-m
 html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-item,button){background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important;border-radius:8px!important}
 html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(h1,h2,b,strong){color:#172C47!important}html body :is(#wlTechMenuPanel,#wlAppMenuPanel) small{color:#60748F!important}
 html body :is(#cosOperationsTechReturn,#cosOperationsReturn,#cosProductionAssignmentsButton){background:#E7EEFF!important;color:#315FDF!important;border-color:#BCCCF4!important;border-radius:7px!important;box-shadow:none!important}
-html body :is(#loginView,#resetView,#forcedPasswordView,#sessionLoading,.visionLaunch){background:#F1F4F9!important;color:#172C47!important}
-html body :is(#loginView,#resetView,#forcedPasswordView) :is(.card,.panel){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important}
-html body :is(#loginView,#resetView,#forcedPasswordView) :is(input,select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important}
-html body :is(#loginView,#resetView,#forcedPasswordView) :is(button,.primary){background:#315FDF!important;color:#fff!important;border-color:#315FDF!important;border-radius:7px!important;box-shadow:none!important}
-html body :is(#loginView,#resetView,#forcedPasswordView) :is(h1,h2,h3){color:#172C47!important}html body :is(#loginView,#resetView,#forcedPasswordView) :is(p,small,label){color:#60748F!important}
+/* Real authentication roots from index.html. Reset requests live inside #authView.
+   Do not set display: authentication/approval visibility stays with existing JS. */
+html body :is(#authView,#forcePasswordView,#sessionLoading,.visionLaunch){background:#F1F4F9!important;color:#172C47!important}
+html body :is(#authView,#forcePasswordView){width:100%;max-width:580px;min-width:0;padding:28px 20px 42px;box-sizing:border-box;--tc-text:#172C47;--tc-muted:#60748F;--tc-red:#315FDF}
+html body :is(#authView,#forcePasswordView) .hero{background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:10px!important;box-shadow:none!important;padding:20px!important;gap:16px!important;flex-wrap:wrap;min-width:0}
+html body :is(#authView,#forcePasswordView) .cos-vision-brand strong{color:#172C47!important;text-shadow:none!important}
+html body :is(#authView,#forcePasswordView) .cos-vision-brand small{color:#60748F!important;text-shadow:none!important}
+html body :is(#authView,#forcePasswordView) .techBrand h1{color:#60748F!important;font-size:18px!important;letter-spacing:normal!important;line-height:1.4}
+html body :is(#authView,#forcePasswordView) :is(.card,.panel){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:10px!important;box-shadow:none!important;min-width:0}
+html body :is(#authView,#forcePasswordView) :is(input,select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important;min-width:0;max-width:100%;width:100%;font-size:16px!important;min-height:44px;box-sizing:border-box}
+html body :is(#authView,#forcePasswordView) :is(input,textarea)::placeholder{color:#60748F!important;opacity:1}
+html body :is(#authView,#forcePasswordView) :is(input,select,textarea):focus{outline:2px solid #315FDF!important;outline-offset:2px;border-color:#315FDF!important}
+html body :is(#authView,#forcePasswordView) :is(button,.primary){background:#315FDF!important;color:#fff!important;border:1px solid #315FDF!important;border-radius:7px!important;box-shadow:none!important;text-shadow:none!important;font-weight:600!important;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+html body :is(#authView,#forcePasswordView) button.mini{background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important}
+html body :is(#authView,#forcePasswordView) button.danger{background:#FFF0F1!important;color:#9D3342!important;border-color:#EDC5CB!important}
+html body :is(#authView,#forcePasswordView) :is(h1,h2,h3,b,strong){color:#172C47!important;text-shadow:none!important;overflow-wrap:anywhere}
+html body :is(#authView,#forcePasswordView) :is(h2,h3){font-weight:600!important;line-height:1.4}
+html body :is(#authView,#forcePasswordView) :is(p,small,label,.small){color:#60748F!important;line-height:1.6;text-shadow:none!important;overflow-wrap:anywhere}
+html body :is(#authView,#forcePasswordView) .ok{background:#E8F4EC!important;color:#287451!important;border-color:#CAE4D4!important}
+html body :is(#authView,#forcePasswordView) .warn{background:#FFF1D9!important;color:#8A601E!important;border-color:#EED7AC!important}
+html body :is(#authView,#forcePasswordView) .bad{background:#FFF0F1!important;color:#9D3342!important;border-color:#EDC5CB!important}
+html body :is(#authView,#forcePasswordView) :is(.ok,.warn,.bad) :is(b,strong,.small){color:inherit!important}
+@media(max-width:380px){html body :is(#authView,#forcePasswordView){padding:18px 14px 30px}html body :is(#authView,#forcePasswordView) :is(.hero,.card){padding:16px!important}}
 html body .visionLaunchWord{color:#172C47!important;text-shadow:none!important}html body :is(.visionLaunchCompany,.visionLaunchStatus){color:#60748F!important}.cos-vision-brand{color:#172C47}
