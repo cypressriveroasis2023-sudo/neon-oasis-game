@@ -1,6 +1,7 @@
 // Isolated contract/auth tests. All remote services use injected in-memory transports.
 // Run from operations: node --import tsx --test tests/backend.test.mjs
 import test from 'node:test';
+import assert from 'node:assert/strict';
 import { createOperationsHandler } from '../../supabase/functions/cos-operations-pages/index.ts';
 const ownerId = 'e4abc521-1ef3-45a6-9829-b87faff78210';
 const actorId = '3f073784-96e7-43d8-b9e0-33ab31c3c8b1';
@@ -41,6 +42,28 @@ function request(path, method='GET', body={}, headers={}) {
     body:JSON.stringify({path,method,body}),
   });
 }
+test('Cloudflare production origin supports transport without bypassing authentication', async () => {
+  const calls = [];
+  const handler = createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'test-service-key',fetch:transport({},calls)});
+  const cloudflareOrigin = 'https://cos-vision-integration-preview.pages.dev';
+  const preflight = await handler(new Request('https://platform.example/functions/v1/cos-operations-pages', {method:'OPTIONS',headers:{Origin:cloudflareOrigin}}));
+  assert.equal(preflight.status,204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'),cloudflareOrigin);
+  const denied = await handler(request('/api/session','GET',{}, {Origin:cloudflareOrigin,Authorization:''}));
+  assert.equal(denied.status,401);
+  assert.equal(denied.headers.get('access-control-allow-origin'),cloudflareOrigin);
+  assert.equal(calls.length,0);
+});
+test('Cloudflare lookalikes and unrelated Pages projects are rejected before data access', async () => {
+  const calls = [];
+  const handler = createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'test-service-key',fetch:transport({},calls)});
+  for (const foreignOrigin of ['https://other-project.pages.dev','https://cos-vision-integration-preview.pages.dev.attacker.example','https://branch.cos-vision-integration-preview.pages.dev']) {
+    const denied = await handler(new Request('https://platform.example/functions/v1/cos-operations-pages',{method:'OPTIONS',headers:{Origin:foreignOrigin}}));
+    assert.equal(denied.status,403);
+    assert.equal(denied.headers.get('access-control-allow-origin'),null);
+  }
+  assert.equal(calls.length,0);
+});
 const cases = [
  ['owner VRM fleet permitted', '/api/vrm-portal', 'GET', {}, 200],
  ['IT VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'it'}],

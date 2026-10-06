@@ -16,7 +16,10 @@ const TECHNICIAN_LINKS = Object.freeze({
   '78e54fbd-c2db-4d18-8e3d-a9740adcf285': { actorId: '7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8', name: 'Abel Cervantes', department: 'service', roleCode: 'service_technician' },
   '49dce28e-099a-40bb-a8d8-b39f9ffbabee': { actorId: '1a7d3523-8a3c-488a-9216-4e37f4f7ecb9', name: 'Josh Mireles', department: 'service', roleCode: 'service_technician' },
 });
-const ALLOWED_ORIGIN = 'https://cypressriveroasis2023-sudo.github.io';
+const ALLOWED_ORIGINS = new Set([
+  'https://cypressriveroasis2023-sudo.github.io',
+  'https://cos-vision-integration-preview.pages.dev',
+]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 class HttpError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -185,8 +188,9 @@ export function createOperationsHandler(options) {
   };
   return async request => {
     const origin = request.headers.get('Origin');
+    const allowedOrigin = !origin || ALLOWED_ORIGINS.has(origin);
     const cors = {
-      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+      ...(allowedOrigin ? { 'Access-Control-Allow-Origin': origin || 'https://cypressriveroasis2023-sudo.github.io' } : {}),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
       'Access-Control-Max-Age': '600',
@@ -196,7 +200,7 @@ export function createOperationsHandler(options) {
       'X-Content-Type-Options': 'nosniff',
     };
     const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
-    if (origin && origin !== ALLOWED_ORIGIN) return json({ error: 'This origin is not allowed.' }, 403);
+    if (!allowedOrigin) return json({ error: 'This origin is not allowed.' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     try {
       if (!['GET', 'POST'].includes(request.method)) fail('Method not supported.', 405);
