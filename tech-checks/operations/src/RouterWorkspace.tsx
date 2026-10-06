@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouters } from './useRouters';
 import { routerLabels, routerStatus, summarizeRouters, type RouterRow } from '../../supabase/functions/cos-operations-pages/routers';
 import './routers.css';
+import InhandPilotPanel from './InhandPilotPanel';
 export const routerTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded';
 export function RouterBadge({ row, now }: { row: RouterRow; now: number }) { const status = routerStatus(row, now); return <span className={'router-badge router-' + status}>{routerLabels[status]}</span>; }
 export function RouterOverview({ openWorkspace }: { openWorkspace: (name: string) => void }) {
@@ -22,6 +23,7 @@ export default function RouterWorkspace({ openMap }: { openMap: (unitId: string)
   const filtered = items.filter(row => (filter === 'all' || routerStatus(row, now) === filter || filter === 'needs_link' && row.match !== 'exact_name') && [row.unitKey, row.name, row.model, row.publicIp, row.unitIp].filter(Boolean).join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   const selected = filtered.find(row => row.id === selectedId) || filtered[0];
   return <section className='panel module router-workspace' aria-label='InHand Routers workspace'>
+    <InhandPilotPanel/>
     <div className='panelhead'><div><h2>Router inventory & reachability</h2><span>{data ? items.length + ' Camera Health router records' : 'Camera Health source'}</span></div><button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing routers…' : 'Refresh routers'}</button></div>
     <div className='router-notice'><b>InHand GPS feed not connected</b><p>These records provide saved IPs and management-port checks. They contain no GPS, cellular signal, SIM, or cloud online/offline telemetry. Refresh reads existing observations; it does not run a router probe.</p></div>
     {error && <p className='operations-error' role='alert'>{error}{data && ' Showing the last successful inventory.'}</p>}
