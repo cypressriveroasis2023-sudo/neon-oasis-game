@@ -24,9 +24,9 @@ async function mount(page,{role='owner',failJobs=false,config={items:[]},failVrm
 }
 
 async function openVrm(frame){
- await expect(frame.getByText('Connected to COS Operations',{exact:true})).toBeVisible();
- await frame.getByRole('navigation',{name:'Vision main sections'}).getByRole('button',{name:'Units',exact:true}).click();
- await frame.getByRole('button',{name:'Victron VRM',exact:true}).click();
+ await expect(frame.getByText('OPERATIONS CONNECTED',{exact:true})).toBeVisible();
+ await frame.getByRole('button',{name:'More',exact:true}).click();
+ await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Victron VRM',exact:true}).click();
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toBeVisible();
 }
 test('All nine verified VRM portals work with sharing disabled',async({page})=>{

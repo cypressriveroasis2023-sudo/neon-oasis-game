@@ -24,7 +24,7 @@ const parentHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8')
   </script><script type="module" src="./operations-host.js"></script></body>`);
 const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.svg':'image/svg+xml', '.jpeg':'image/jpeg', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp' };
 
-async function mount(page, { vision = false } = {}) {
+async function mount(page) {
   const requests = [];
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
@@ -45,7 +45,6 @@ async function mount(page, { vision = false } = {}) {
   });
   await page.goto(appPath);
   await expect(page.locator('#cosOperationsFrame')).toBeVisible();
-  if (vision) await page.frameLocator('#cosOperationsFrame').getByRole('button', { name:'Use Vision layout' }).click();
   return { frame:page.frameLocator('#cosOperationsFrame'), requests };
 }
 
@@ -73,6 +72,7 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   await more.click();
   const menu=frame.getByRole('dialog',{name:'Operations navigation'});
   await expect(menu).toBeVisible();
+  await responsiveLayout(page,frame);
   await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
   await menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Tech Check',exact:true}).click();
   await expect(menu).toHaveCount(0);
@@ -95,26 +95,31 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
 });
 
 async function responsiveLayout(page, frame) {
-  await expect(frame.getByText('Connected to COS Operations', { exact:true })).toBeVisible();
+  await expect(frame.getByText('OPERATIONS CONNECTED', { exact:true })).toBeVisible();
   await fillsViewport(page);
-  const size = await frame.locator('.vision-header').evaluate(header => ({
-    width:innerWidth, content:document.documentElement.scrollWidth, display:getComputedStyle(header).display,
-    main:header.parentElement.getBoundingClientRect().toJSON(),
-    header:header.getBoundingClientRect().toJSON(),
-    options:header.querySelector('.vision-options-toggle').getBoundingClientRect().toJSON(),
-  }));
+  const size = await frame.locator('.owner-it-topbar').evaluate(header => {
+    const main=header.parentElement, style=getComputedStyle(main);
+    return {width:innerWidth,content:document.documentElement.scrollWidth,
+      main:main.getBoundingClientRect().toJSON(),header:header.getBoundingClientRect().toJSON(),
+      padding:parseFloat(style.paddingLeft)+parseFloat(style.paddingRight),
+      menu:header.querySelector('.operations-open-menu').getBoundingClientRect().toJSON()};
+  });
   expect(size.content).toBeLessThanOrEqual(size.width);
-  expect(size.main.width).toBe(size.width);
-  expect(size.header.width).toBeGreaterThanOrEqual(size.width - 64);
-  expect(size.display).toBe(size.width >= 901 ? 'grid' : 'block');
-  expect(size.options.left).toBeGreaterThanOrEqual(size.header.left);
-  expect(size.options.right).toBeLessThanOrEqual(size.header.right);
+  expect(size.main.width).toBeCloseTo(size.width-(size.width>700?104:0),0);
+  expect(size.header.width).toBeCloseTo(size.main.width-size.padding,0);
+  if(size.width>700){
+    expect(size.menu.left).toBeGreaterThanOrEqual(size.header.left);
+    expect(size.menu.right).toBeLessThanOrEqual(size.header.right);
+  }else{
+    await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'More',exact:true})).toBeVisible();
+  }
+  await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
 }
 
 test('the same app link gives the embedded Operations app the full device viewport', async ({ page }, testInfo) => {
   const { frame, requests } = await mount(page);
   const standardLayout = async () => {
-    await expect(frame.getByRole('button', { name:'Use Vision layout' })).toBeVisible();
+    await expect(frame.getByRole('button', { name:/Use (classic|Vision) layout/i })).toHaveCount(0);
     await expect(frame.getByRole('navigation', { name:'Vision main sections' })).toHaveCount(0);
     await fillsViewport(page);
     const desktop = page.viewportSize().width > 700;
@@ -134,8 +139,9 @@ test('the same app link gives the embedded Operations app the full device viewpo
 });
 
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
-  const { frame } = await mount(page, { vision:true });
-  await frame.getByRole('navigation', { name:'Vision main sections' }).getByRole('button', { name:'Jobs', exact:true }).click();
+  const { frame } = await mount(page);
+  await frame.getByRole('button',{name:'More',exact:true}).click();
+  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Jobs',exact:true}).click();
   const search = frame.getByRole('searchbox', { name:'Find a job' });
   await search.fill('keep this filter');
   await frame.locator('body').evaluate(() => { window.responsiveFrameMarker = 'same-frame'; });
@@ -148,46 +154,49 @@ test('rotation and desktop resizing preserve the same frame, route and in-progre
   }
 });
 
-test('optional VISION preserves the route and can return to the standard workspace', async ({ page }) => {
-  const { frame } = await mount(page, { vision:true });
-  await frame.getByRole('navigation', { name:'Vision main sections' }).getByRole('button', { name:'Jobs', exact:true }).click();
-  await frame.getByRole('button', { name:'Options', exact:true }).click();
-  await frame.getByRole('button', { name:'Use classic layout' }).click();
-  await expect(frame.getByRole('button', { name:'Use Vision layout' })).toBeVisible();
-  expect(await frame.locator('body').evaluate(() => location.hash)).toBe('#jobs');
-  await frame.locator('body').evaluate(() => location.reload());
-  await expect(frame.getByRole('button', { name:'Use Vision layout' })).toBeVisible();
-  await frame.getByRole('button', { name:'Use Vision layout' }).click();
-  await responsiveLayout(page, frame);
-  expect(await frame.locator('body').evaluate(() => location.hash)).toBe('#jobs');
-  expect(await frame.locator('body').evaluate(() => new URLSearchParams(location.search).get('theme'))).toBe('vision');
+test('old VISION bookmarks preserve route, other query parameters and color preference', async ({ page }) => {
+  const { frame, requests } = await mount(page);
+  await frame.getByRole('button',{name:'Switch to light mode'}).click();
+  await frame.locator('body').evaluate(()=>{location.href=location.pathname+'?theme=vision&source=saved-link#jobs';});
+  await expect(frame.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Switch to dark mode'})).toBeVisible();
+  await responsiveLayout(page,frame);
+  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
+  await frame.locator('body').evaluate(()=>location.reload());
+  await expect(frame.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();
+  await responsiveLayout(page,frame);
+  expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
+  expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
-  const { frame } = await mount(page, { vision:true });
-  await frame.getByRole('button', { name:'Options', exact:true }).click();
-  await frame.getByRole('button', { name:'All existing tools' }).click();
+  const { frame } = await mount(page);
+  await frame.getByRole('button', { name:'More', exact:true }).click();
   await frame.getByRole('button', { name:'Existing Owner Tools', exact:true }).click();
   await expect(page.locator('body')).toHaveClass(/cos-operations-legacy/);
   await expect(page.locator('#cosOperationsMount')).toBeHidden();
   await expect(page.locator('#cosOperationsLegacy')).toBeVisible();
   await page.locator('#cosOperationsReturn').click();
+  await expect(frame.getByRole('dialog',{name:'Operations navigation'})).toHaveCount(0);
   await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
   await responsiveLayout(page, frame);
 });
 
- test('VISION Today uses the available screen width at normal browser zoom', async ({ page }, testInfo) => {
-  const { frame } = await mount(page, { vision:true });
+test('approved Today workspace uses the available screen width at normal browser zoom', async ({ page }, testInfo) => {
+  const { frame } = await mount(page);
   await responsiveLayout(page, frame);
-  await expect(frame.locator('.vision-today')).toHaveAttribute('aria-busy','false');
-  const layout=await frame.locator('.vision-today').evaluate(today=>({
+  await expect(frame.locator('.owner-command-home')).toHaveAttribute('aria-busy','false');
+  const layout=await frame.locator('.workspace-overview').evaluate(today=>({
     zoom:visualViewport.scale, today:today.getBoundingClientRect().toJSON(),
-    header:document.querySelector('.vision-header').getBoundingClientRect().toJSON(),
-    decisions:today.querySelector('.vision-decisions').getBoundingClientRect().toJSON()
+    header:document.querySelector('.owner-it-topbar').getBoundingClientRect().toJSON(),
+    work:today.querySelector('.workspace-work').getBoundingClientRect().toJSON(),
+    details:today.querySelector('.workspace-detail').getBoundingClientRect().toJSON()
   }));
-  console.log('VISION at 100% zoom:',JSON.stringify(layout));
   expect(layout.zoom).toBe(1);
   expect(layout.today.width).toBeCloseTo(layout.header.width,0);
-  expect(layout.decisions.width).toBeCloseTo(layout.today.width,0);
-  await page.screenshot({path:testInfo.outputPath('vision-fluid-screen.png'),fullPage:true});
- });
+  for(const section of [layout.work,layout.details]){
+    expect(section.left).toBeGreaterThanOrEqual(layout.today.left);
+    expect(section.right).toBeLessThanOrEqual(layout.today.right+1);
+  }
+  await page.screenshot({path:testInfo.outputPath('approved-fluid-screen.png'),fullPage:true});
+});
