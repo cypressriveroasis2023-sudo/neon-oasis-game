@@ -32,6 +32,10 @@
         {
           "from": "<button className='role-switch' onClick={onTechnician}>Technician View</button></header>",
           "to": "<WorkspaceMenu items={['Jobs','Daily Board','Field Map','Owner Tasks','Tech Check','Calendar','Owner Review','Billing']} navigate={name=>setView(name==='Daily Board'?'board':name==='Field Map'?'map':name==='Owner Tasks'?'tasks':name==='Tech Check'?'readiness':name==='Calendar'?'calendar':name==='Owner Review'?'review':name==='Billing'?'billing':'jobs')}/><button className='role-switch' onClick={onTechnician}>Technician View</button></header>"
+        },
+        {
+          "from": "if(session.role!=='Owner')return <><ProductionTechnicianMobile show={show} tech={session.technician}/>",
+          "to": "if(session.role!=='Owner')return <><div className='cos-vision-technician-brand'><div className='cos-vision-brand'><img src='/resources/vision-eye-round.svg' alt=''/><div><strong>VISION</strong><small>CAMERAS ONSITE · {session.role}</small></div></div></div><ProductionTechnicianMobile show={show} tech={session.technician}/>"
         }
       ]
     },

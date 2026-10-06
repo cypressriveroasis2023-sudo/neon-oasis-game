@@ -5,6 +5,8 @@
 .cos-vision-appdeploy .cos-vision-brand>img{width:38px!important;height:38px!important;object-fit:contain!important;flex:none}
 .cos-vision-appdeploy .cos-vision-brand strong{display:block;font-size:21px!important;line-height:1.2;letter-spacing:3px;color:var(--cos-text)!important}
 .cos-vision-appdeploy .cos-vision-brand small{display:block;font-size:11px!important;letter-spacing:1px;color:var(--cos-muted)!important}
+.cos-vision-appdeploy .cos-vision-technician-brand{padding:16px clamp(12px,2vw,28px);background:#0c1522;border-bottom:1px solid var(--cos-line)}
+#root .cos-vision-appdeploy button:not(.active):not(.selected):not(.primary):not(.new):not(.danger){background:var(--cos-raised)!important;border-color:var(--cos-line)!important;color:var(--cos-text)!important;box-shadow:none!important}
 #root .cos-vision-appdeploy :is(.shell,.mobile-owner,.tech-mobile,.it-command){background:var(--cos-bg)!important;color:var(--cos-text)!important;min-width:0}
 #root .cos-vision-appdeploy .shell{grid-template-columns:220px minmax(0,1fr)!important}
 #root .cos-vision-appdeploy .shell>aside,#root .cos-vision-appdeploy .it-side{background:#0c1522!important;border-color:var(--cos-line)!important;padding:20px 12px!important;box-shadow:none!important}

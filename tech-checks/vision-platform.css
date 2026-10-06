@@ -34,6 +34,7 @@
 #root .operations-shell:not(.vision-shell) .command-page-header h1{font-size:28px!important}
 #root .operations-shell:not(.vision-shell) .panel h2{font-size:20px!important}
 #root .operations-shell:not(.vision-shell) .panel button.secondary,#root .operations-shell:not(.vision-shell) .record,#root .operations-shell:not(.vision-shell) .operations-tool-grid>button{background:var(--cos-vision-raised)!important;color:var(--cos-vision-text)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important}
+#root .operations-shell:not(.vision-shell) main button:not(.active):not(.selected):not(.primary):not(.new):not(.danger){background:var(--cos-vision-raised)!important;color:var(--cos-vision-text)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important}
 #root .operations-shell .operations-open-menu{min-height:44px;background:var(--cos-vision-raised)!important;border:1px solid var(--cos-vision-border)!important;color:var(--cos-vision-text)!important;border-radius:9px;padding:9px 14px;font:inherit;font-size:13px;cursor:pointer}
 #root .operations-shell:not(.vision-shell) .theme-toggle{background:var(--cos-vision-raised)!important;border-color:var(--cos-vision-border)!important;box-shadow:none!important}
 #root .operations-shell .operations-menu-backdrop{position:fixed;inset:0;z-index:1090;background:#0009;border:0;padding:0;cursor:default}
