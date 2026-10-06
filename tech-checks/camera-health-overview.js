@@ -24,7 +24,7 @@
   }
   function mappedArea(unit,devices){
     const own=devices.filter(d=>d.source==='reconeyez'&&String(d.unit_key||'').trim().toUpperCase()===unit);
-    const areaOf=d=>typeof d.source_metadata?.area==='string'?d.source_metadata.area:null;
+    const areaOf=d=>{const metadata=d.source_metadata||{};const area=typeof metadata.area==='string'?metadata.area:null;const observed=metadata.reconeyez_area;return observed&&observed!==area?null:area};
     const areas=[...new Set(own.map(areaOf).filter(Boolean))];
     if(!own.length||areas.length!==1||own.some(d=>areaOf(d)!==areas[0]))return null;
     const area=areas[0],units=new Set(devices.filter(d=>d.source==='reconeyez'&&areaOf(d)===area).map(d=>String(d.unit_key||'').trim().toUpperCase()));
