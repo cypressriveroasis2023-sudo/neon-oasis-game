@@ -18,6 +18,21 @@ export function isOnHand(unit: Record<string, any>) {
     && !unit.installedSiteId
     && !['installed', 'in transit', 'returning'].includes(locationKey(unit.status));
 }
+export const unitIdentity = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function onHandInventory(data: any) {
+  const valid = (rows: any) => Array.isArray(rows) && rows.every((row: any) => row && typeof row === 'object' && typeof row.unitNumber === 'string' && typeof row.status === 'string' && (row.currentLocationType == null || typeof row.currentLocationType === 'string'));
+  if (!valid(data?.items) || data.trackerUnits != null && !valid(data.trackerUnits)) throw new Error('Unit placement records could not be verified.');
+  const native = data.items as Record<string, any>[], tracker = (data.trackerUnits || []) as Record<string, any>[];
+  const nativePlaced = new Set(native.filter(row => row.currentLocationType || row.installedSiteId || ['installed', 'retired', 'deleted', 'in_transit', 'returning', 'assigned'].includes(row.status)).map(row => unitIdentity(row.unitNumber)));
+  const trackerKnown = new Set(tracker.map(row => unitIdentity(row.unitNumber)));
+  const units = native.filter(isOnHand), seen = new Set(units.map(row => unitIdentity(row.unitNumber)));
+  for (const row of tracker) {
+    const key = unitIdentity(row.unitNumber);
+    if (!key || !isOnHand(row) || nativePlaced.has(key) || seen.has(key)) continue;
+    units.push(row); seen.add(key);
+  }
+  return { units, unknown: native.filter(row => !row.currentLocationType && !trackerKnown.has(unitIdentity(row.unitNumber))).length, snapshot: data.trackerSnapshot };
+}
 export function locationLink(unit: { latitude?: unknown; longitude?: unknown; address?: string }) {
   const numeric = (value: unknown) => (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isFinite(Number(value));
   const coordinates = numeric(unit.latitude) && numeric(unit.longitude) && Math.abs(Number(unit.latitude)) <= 90 && Math.abs(Number(unit.longitude)) <= 180;

@@ -7,7 +7,7 @@ const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operatio
 const stamp = '2026-10-06T16:00:00Z';
 const shop = { id:'11111111-1111-4111-8111-111111111111', unitNumber:'SHOP-FIX-001', modelName:'Fixture Spotter', status:'available', currentLocationType:'shop' };
 const gps = { id:'22222222-2222-4222-8222-222222222222', unitNumber:'FIELD-FIX-001', status:'installed', currentLocationType:'site', site:'Fixture installed yard', address:'1 Fixture St, Houston, TX', latitude:29.7, longitude:-95.4, hasUnitGps:false, coordinateSource:'site' };
-const address = { id:'33333333-3333-4333-8333-333333333333', unitNumber:'FIELD-FIX-002', status:'installed', currentLocationType:'site', site:'Fixture address yard', address:'2 Fixture St, Houston, TX', latitude:null, longitude:null, hasUnitGps:false };
+const address = { id:'33333333-3333-4333-8333-333333333333', unitNumber:'FIELD-FIX-002', status:'field', currentLocationType:'field', site:'Fixture address yard', address:'2 Fixture St, Houston, TX', latitude:null, longitude:null, hasUnitGps:false, readOnly:true, recordSource:'Fixture tracker', sourceVerifiedAt:stamp };
 const unknown = { id:'44444444-4444-4444-8444-444444444444', unitNumber:'UNKNOWN-FIX-001', status:'available', currentLocationType:null };
 async function mount(page) {
   const requests=[];
@@ -51,6 +51,8 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await frame.getByRole('button',{name:/FIELD-FIX-002/}).click();
   await expect(frame.getByRole('link',{name:/Open installed address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');
   await expect(frame.getByText('Installed address available. A map pin needs verified coordinates.')).toBeVisible();
+  await expect(frame.getByRole('button',{name:'Save Unit GPS',exact:true})).toHaveCount(0);
+  await expect(frame.getByRole('heading',{name:'Tracker location',exact:true})).toBeVisible();
   await openWorkspace(frame,'Today');
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);

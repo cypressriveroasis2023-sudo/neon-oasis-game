@@ -43,7 +43,7 @@ async function setup(page){
       else if(path==='/api/team-production')data={items:state.team};
       else if(path==='/api/jobs')data={items:state.jobs};
       else if(path==='/api/daily-board')data={jobs:state.jobs,tasks:[],readiness:state.readiness,asOf:new Date().toISOString()};
-      else if(['/api/quotes','/api/ar','/api/purchasing','/api/owner-tasks'].includes(path))data={items:[]};
+      else if(['/api/quotes','/api/ar','/api/purchasing','/api/owner-tasks','/api/vrm-portal','/api/field-map'].includes(path))data={items:[]};
       else throw new Error('Unexpected directory fixture GET: '+path);
     }else{
       state.writes.push(envelope);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { primaryAreas, visionAreas, isOnHand } from './visionAreas';
+import { primaryAreas, visionAreas, onHandInventory } from './visionAreas';
 import './visionAreas.css';
 
 type Api = { get(path: string): Promise<{ data: any }> };
@@ -35,9 +35,8 @@ function summary(workspace: string, data: any): string {
   }
   const rows = records(data);
   if (workspace === 'Units On Hand') {
-    if (rows.some(row => row.currentLocationType != null && typeof row.currentLocationType !== 'string' || typeof row.status !== 'string')) throw new Error('Placement unavailable');
-    const units = rows.filter(isOnHand);
-    return `${units.length} confirmed on hand · ${rows.filter(row => !row.currentLocationType).length} placement not recorded`;
+    const { units, unknown } = onHandInventory(data);
+    return `${units.length} confirmed on hand · ${unknown} placement not recorded`;
   }
   if (workspace === 'Field Map') {
     const { fieldUnits, mappedUnits } = data.summary || {};

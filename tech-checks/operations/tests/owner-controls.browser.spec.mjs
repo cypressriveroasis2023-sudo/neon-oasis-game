@@ -30,7 +30,7 @@ async function mount(page,workspace='daily-board'){
    if(path==='/api/owner-tasks')return answer({items:state.tasks.map(task=>({...task,...(state.taskMismatch?{relatedJobId:null,relatedSiteId:null,ownerNotes:'old note'}:{}),...(state.taskAssignedMismatch?{assignedUserId:checkId}:{})}))});
    if(path==='/api/sites')return answer({items:state.control.sites});
    if(path==='/api/team-production')return answer({items:[{userId:checkId,displayName:'Casey Service',department:'service',active:true}]});
-   if(['/api/quotes','/api/ar','/api/purchasing'].includes(path))return answer({items:[]});
+   if(['/api/quotes','/api/ar','/api/purchasing','/api/vrm-portal','/api/equipment','/api/field-map'].includes(path))return answer({items:[]});
    throw Error('Unexpected synthetic GET '+path);
   }
   expect(method).toBe('POST');state.writes.push(envelope);

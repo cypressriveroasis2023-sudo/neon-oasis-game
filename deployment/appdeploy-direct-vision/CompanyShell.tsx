@@ -228,9 +228,8 @@ export function NativeConnectedTool({ kind }: { kind: string }) {
         Open main COS workspace ↗
       </a>
       <p>
-        Choose {kind} under Equipment. Your existing COS sign-in is required.
+        Use the {kind} area in the main menu. Your existing COS sign-in is required.
       </p>
     </section>
   );
 }
-

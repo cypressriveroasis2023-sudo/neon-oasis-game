@@ -66,7 +66,7 @@ async function fixturePage(page) {
       else if (path === '/api/jobs') data = { items: state.jobs };
       else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
-      else if (['/api/quotes', '/api/ar', '/api/purchasing'].includes(path)) data = { items: [] };
+      else if (['/api/quotes', '/api/ar', '/api/purchasing', '/api/vrm-portal', '/api/equipment', '/api/team-production'].includes(path)) data = { items: [] };
       else if (path === '/api/owner/control-data') data = { sites: [], truckChecks: [], serviceTechnicians: state.readiness.filter(row => row.department === 'service').map(row => row.name), itTechnicians: state.readiness.filter(row => row.department === 'it').map(row => row.name) };
       else if (path === '/api/daily-board') data = { jobs: state.readbackMismatch ? state.jobs.map(job => ({ ...job, technician: 'Previous Service' })) : state.jobs, tasks: state.tasks, readiness: state.readiness, asOf: now };
       else if (path === '/api/field-map') data = mapSnapshot(state);

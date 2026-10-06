@@ -18,7 +18,7 @@
 #root .operations-sidebar .operations-area-nav button svg{width:18px;height:18px;flex:none}
 #root .operations-sidebar-open .company-nav-heading{display:block!important}
 #root .operations-shell .operations-sidebar-open .operations-area-nav{display:grid!important}
-#root .operations-sidebar .company-sidebar-footer{padding-top:24px;display:block!important}
+#root .operations-shell .operations-sidebar .company-sidebar-footer{padding-top:24px;display:block!important}
 #root .operations-sidebar .company-sidebar-actions{display:grid;gap:4px;margin-bottom:18px;padding-top:16px;border-top:1px solid var(--cos-border)}
 #root .operations-sidebar .company-sidebar-actions button{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--cos-muted)!important;text-align:left!important;justify-content:flex-start!important;font-size:11px!important;padding:9px 8px!important;min-height:38px}
 #root .operations-shell .operations-open-menu{display:inline-flex!important}
