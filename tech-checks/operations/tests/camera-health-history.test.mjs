@@ -60,7 +60,7 @@ test('unit aggregation names the resource and does not imply all resources succe
 test('CSV refresh preserves success history and both views share source-aware formatting',()=>{
  const list=readFileSync(new URL('../../camera-health.html',import.meta.url),'utf8');
  const detail=readFileSync(new URL('../../camera-detail.html',import.meta.url),'utf8');
- assert.match(list,/CameraHealthHistory\.strip\(g.ds,health,cameraGroup\)/);
+ assert.match(readFileSync(new URL('../../camera-health-overview.js',import.meta.url),'utf8'),/CameraHealthHistory\.strip\(\[d\],health,cameraGroup\)/);
  for(const html of [list,detail])assert.match(html,/camera-health-history\.js\?v=20261006/);
  assert.doesNotMatch(list,/last_online_at:null|✓ LAST SUCCESS|No successful ping recorded/);
  assert.doesNotMatch(detail,/latestSuccessfulPing|Last successful live check/);

@@ -6,6 +6,7 @@ const repo=resolve(fileURLToPath(new URL('../../..',import.meta.url)));
 const origin='http://127.0.0.1:4173';
 const list=readFileSync(resolve(repo,'tech-checks/camera-health.html'),'utf8');
 const detail=readFileSync(resolve(repo,'tech-checks/camera-detail.html'),'utf8');
+const overview=readFileSync(resolve(repo,'tech-checks/camera-health-overview.js'),'utf8');
 const helper=readFileSync(resolve(repo,'tech-checks/camera-health-history.js'),'utf8');
 function section(source,start,end){const a=source.indexOf(start),b=source.indexOf(end,a+start.length);if(a<0||b<0)throw new Error('Missing real presentation function');return source.slice(a,b);}
 const listRender=section(list,'function renderUnits()','\nfunction ');
@@ -24,13 +25,14 @@ const shared=`${helper}\n${escape}
  window.fixture={device:{id:159,device_name:'RANGER 022',unit_key:'RANGER 022',organization:'Synthetic test site',group:'Vigilant',source_status:'offline',source_last_seen_at:'2026-10-06T12:25:10Z',last_online_at:'2026-10-06T10:55:10Z',last_probe_online_at:null,vigilant_status:'Offline'},current:{overall_status:'online',ip_reachable:true,checked_at:'2026-09-30T01:00:00Z',port_status:{80:{online:true,latency_ms:5}}}};
 `;
 const listScript=`${shared}
+ ${overview}
  let devices=[fixture.device],health={159:fixture.current},history=[],unitPage=1;const UNITS_PER_PAGE=25;
  const fleetGroups=()=>[{k:'RANGER 022',state:effectiveHealth(fixture.device),ds:[fixture.device]}];
  const fleetMatches=()=>true,syncMobileCameraLayout=()=>{},isShop=()=>false,isCountedCamera=()=>true;
  const isCameraIssue=d=>effectiveHealth(d)!=='online',isReconAwaitingStatus=()=>false,cameraIssueReason=()=> 'Provider reports offline';
  const healthAssessment=()=>({reason:'Provider reports offline'}),cameraPlatform=cameraGroup,reconBatteryBadge=()=> 'Unknown',fmtDown=()=> '',outageSummary=()=>({events:[]}),reconMeta=()=>({}),reconCloudLink=()=> '#';
  ${listRender}
- window.repaint=()=>renderUnits();$('authGate').classList.add('hidden');repaint();
+ window.repaint=()=>{renderUnits();$('unitDetailMain').innerHTML=CameraHealthOverview.details(fleetGroups()[0],{health,cameraGroup,effectiveHealth,reconBatteryBadge});};$('authGate').classList.add('hidden');repaint();$('unitDetailDialog').showModal();
 `;
 const detailScript=`${shared}
  ${sourceFresh}
@@ -51,12 +53,12 @@ async function mount(page,name){
  await page.goto(`/tech-checks/${name}.html`);
 }
 test.use({timezoneId:'America/Chicago'});
-test('actual offline camera card separates provider attempt and historical connection at every width',async({page},info)=>{
+test('actual unit details separate provider attempt and historical connection at every width',async({page},info)=>{
  const errors=[];page.on('pageerror',error=>errors.push(error.message));await mount(page,'camera-health');
- const card=page.locator('#unitCards .unitcard');await expect(card).toHaveCount(1);await expect(card).toHaveClass(/offline/);
+ const card=page.locator('#unitDetailMain .unit-component');await expect(card).toHaveCount(1);await expect(page.locator('#unitCards .unitcard')).toHaveClass(/offline/);
  await expect(card.locator('.time-attempt')).toContainText('Last check attempted');await expect(card.locator('.time-attempt')).toContainText('7:25:10 AM CDT');await expect(card.locator('.time-attempt')).toContainText('Reported OFFLINE');
  await expect(card.locator('.time-history')).toContainText('5:55:10 AM CDT');await expect(card.locator('.time-history')).toContainText('Historical record');
- await expect(card.locator('.time-good')).toHaveCount(0);await expect(card.locator('.uhs.zero-up')).toContainText('0');
+ await expect(card.locator('.time-good')).toHaveCount(0);await expect(page.locator('#unitCards .unitcard')).toContainText('0 online');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   await expect(card.locator('.time-history b')).toHaveCSS('color','rgb(230, 237, 247)');
@@ -68,7 +70,7 @@ test('actual offline camera card separates provider attempt and historical conne
  await page.evaluate(()=>{fixture.device.source_last_seen_at='2026-10-06T12:29:10Z';repaint();});
  await expect(card.locator('.time-attempt')).toContainText('7:29:10 AM CDT');await expect(card.locator('.time-history')).toContainText('5:55:10 AM CDT');
  await page.evaluate(()=>{fixture.device.source_status='online';fixture.device.last_online_at=fixture.device.source_last_seen_at;repaint();});
- await expect(card).toHaveClass(/online/);await expect(card.locator('.time-history')).toContainText('7:29:10 AM CDT');
+ await expect(page.locator('#unitCards .unitcard')).toHaveClass(/online/);await expect(card.locator('.time-history')).toContainText('7:29:10 AM CDT');
  await expect(card.locator('.time-history b')).toHaveCSS('color','rgb(230, 237, 247)');expect(errors).toEqual([]);
 });
 test('actual detail preserves offline success, rejects offline Reconeyez events and flags bad dates',async({page})=>{

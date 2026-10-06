@@ -3,18 +3,18 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
-// Camera pages: reviewed 2026-10-06 check-history correction, covered by source-aware tests.
+// Camera pages: reviewed 2026-10-06 check-history and unit-overview changes, covered by source-aware and navigation tests.
 // Other tools retain origin/main 276c6d5e2c98c41a8ba71e78c560b04d6f9b998b hashes.
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "23cefa922e9cf0eb76bac9fa3607fa36da0ae0ad0a09dbec74a3998e6358c37a",
+  "camera-health": "9cce540f2aa8f3166b74202173b561d29c96849e845db54a33e94ae14bda7c93",
   "camera-detail": "faf3e804d74932e3adb1e096e4b6f6cca3dc703000eedca673cf76665a3ec219",
   "onsite-vision": "1024b0cfd45738b1a39661b7ec9946c459034899b2db6a32aaedfd0044b487a4",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "1367ce2c0846dfc29b16b7dabf76a43cfab5c36f69e852eea860ed3491c033e7",
+  "camera-health": "fb3706bc20862df7bc89e17205b9f8d7eae24bd7842edb6298a0c620a64a6aa6",
   "camera-detail": "9368d545ec84c6cd46bc51257381b116c3b3d8478e6474c91f36e8e1b6187de4",
   "onsite-vision": "1ca7830dc31d34bb56184dcbe4cc4aacc71ff403dc6c7cadb3f2c061aea2b08f",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
