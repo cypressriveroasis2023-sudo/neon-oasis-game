@@ -36,3 +36,9 @@ test('detector movement or area rename invalidates its prior inventory area unti
  assert.equal(api.mappedArea('RII-028',[{...device,source_metadata:{area:'Exact vendor area',reconeyez_area:'New provider area'}}]),null);
  assert.equal(api.mappedArea('RII-028',[{...device,source_metadata:{area:'Exact vendor area',reconeyez_area:'Exact vendor area'}}]),'Exact vendor area');
 });
+
+test('conflicting observed or inventory area on another unit keeps the join ambiguous',()=>{
+ for(const metadata of [{area:'Old area',reconeyez_area:'Exact vendor area'},{area:'Exact vendor area',reconeyez_area:'New area'}]){
+  assert.equal(api.mappedArea('RII-028',[device,{...device,unit_key:'RII-029',source_metadata:metadata}]),null);
+ }
+});
