@@ -1,0 +1,106 @@
+/* Matching presentation for the separate AppDeploy source snapshot.
+   No API, session, role, permission, readiness or check behavior changes. */
+.cos-vision-appdeploy{--cos-bg:#111619;--cos-panel:#1b2227;--cos-raised:#242d34;--cos-line:#3b454d;--cos-text:#f4f5f7;--cos-muted:#b9c1c9;--cos-red:#ff142c;color:var(--cos-text);background:var(--cos-bg);min-height:100dvh;font-family:Inter,Arial,sans-serif}
+.cos-vision-appdeploy .cos-vision-brand{display:flex!important;align-items:center;gap:10px;min-width:0}
+.cos-vision-appdeploy .cos-vision-brand>img{width:38px!important;height:38px!important;object-fit:contain!important;flex:none}
+.cos-vision-appdeploy .cos-vision-brand strong{display:block;font-size:21px!important;line-height:1.2;letter-spacing:3px;color:var(--cos-text)!important}
+.cos-vision-appdeploy .cos-vision-brand small{display:block;font-size:11px!important;letter-spacing:1px;color:var(--cos-muted)!important}
+.cos-vision-appdeploy .cos-vision-technician-brand{padding:16px clamp(12px,2vw,28px);background:#0d1215;border-bottom:1px solid var(--cos-line)}
+#root .cos-vision-appdeploy button:not(.active):not(.selected):not(.primary):not(.new):not(.danger){background:var(--cos-raised)!important;border-color:var(--cos-line)!important;color:var(--cos-text)!important;box-shadow:none!important}
+#root .cos-vision-appdeploy :is(.shell,.mobile-owner,.tech-mobile,.it-command){background:var(--cos-bg)!important;color:var(--cos-text)!important;min-width:0}
+#root .cos-vision-appdeploy .shell{grid-template-columns:220px minmax(0,1fr)!important}
+#root .cos-vision-appdeploy .shell>aside,#root .cos-vision-appdeploy .it-side{background:#0d1215!important;border-color:var(--cos-line)!important;padding:20px 12px!important;box-shadow:none!important}
+#root .cos-vision-appdeploy .shell>main{padding:22px clamp(16px,2vw,32px)!important;min-width:0;width:100%;max-width:none!important}
+#root .cos-vision-appdeploy .brand{padding:0 8px 20px!important}
+#root .cos-vision-appdeploy .cos-owner-sidebar-nav button:not(.cos-primary-workspace):not(.active){display:none!important}
+#root .cos-vision-appdeploy .shell>aside nav button,#root .cos-vision-appdeploy .it-side nav button{font-size:13px!important;font-weight:500!important;min-height:44px!important;padding:10px 12px!important;color:var(--cos-text)!important;background:transparent!important;border:1px solid transparent!important;border-radius:9px!important}
+#root .cos-vision-appdeploy .shell>aside nav button.active,#root .cos-vision-appdeploy .it-side nav button.active{background:#292d32!important;border-color:#ff142c!important;box-shadow:inset 3px 0 var(--cos-red)!important}
+#root .cos-vision-appdeploy :is(.techbar,.it-top){background:#0d1215!important;border:1px solid var(--cos-line)!important;box-shadow:none!important;border-radius:12px!important;padding:14px 16px!important;min-width:0;flex-wrap:wrap;gap:12px!important}
+#root .cos-vision-appdeploy .tech-id{display:flex!important;flex-wrap:wrap;gap:16px!important;min-width:0}
+#root .cos-vision-appdeploy .tech-eye{display:none!important}
+#root .cos-vision-appdeploy .welcome-name{font-size:18px!important;line-height:1.4!important;color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(.clock-tile,.weather-tile){background:var(--cos-panel)!important;border:1px solid var(--cos-line)!important;box-shadow:none!important;border-radius:8px!important;padding:8px 12px!important;color:var(--cos-text)!important;min-width:0!important}
+#root .cos-vision-appdeploy .clock-tile b{font-size:18px!important}
+#root .cos-vision-appdeploy .weather-primary b{font-size:17px!important}
+#root .cos-vision-appdeploy .weather-primary strong,#root .cos-vision-appdeploy .weather-copy small,#root .cos-vision-appdeploy .clock-tile small{font-size:11px!important;color:var(--cos-muted)!important}
+#root .cos-vision-appdeploy .weather-icon{font-size:18px!important}
+#root .cos-vision-appdeploy :is(.panel,.command-page-header,.quote-card,.owner-mobile-jobs article,.tech-job-card,.it-panel,.it-kpi,.service-command-home,.no-tech-jobs){background:var(--cos-panel)!important;border-color:var(--cos-line)!important;box-shadow:none!important;border-radius:12px!important;color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(h1,h2,h3,strong,b){color:var(--cos-text)!important}
+#root .cos-vision-appdeploy :is(.small,.muted,small,label){color:var(--cos-muted)!important}
+#root .cos-vision-appdeploy .command-page-header h1{font-size:28px!important}
+#root .cos-vision-appdeploy :is(input,select,textarea){background:var(--cos-bg)!important;border-color:var(--cos-line)!important;color:var(--cos-text)!important;border-radius:8px!important;max-width:100%;font-size:16px!important}
+#root .cos-vision-appdeploy button.secondary,#root .cos-vision-appdeploy .record,#root .cos-vision-appdeploy .service-command-grid button,#root .cos-vision-appdeploy .cos-workspace-menu button{background:var(--cos-raised)!important;border:1px solid var(--cos-line)!important;color:var(--cos-text)!important;box-shadow:none!important;border-radius:9px!important;font-weight:500!important;min-height:44px!important;white-space:normal!important;overflow-wrap:anywhere;font-size:14px!important}
+#root .cos-vision-appdeploy .service-command-home{padding:20px!important;max-width:780px;width:100%;margin:0 auto}
+#root .cos-vision-appdeploy .service-command-home header h1{font-size:26px!important;line-height:1.3}
+#root .cos-vision-appdeploy .service-command-grid{grid-template-columns:1fr!important;gap:10px!important}
+#root .cos-vision-appdeploy .service-command-grid button{text-align:left!important;padding:14px 16px!important;min-height:66px!important}
+#root .cos-vision-appdeploy .service-command-grid button.required{border-left:3px solid var(--cos-red)!important}
+#root .cos-vision-appdeploy .service-command-grid button span{color:var(--cos-muted)!important;font-size:12px!important}
+#root .cos-vision-appdeploy .tech-bottom{background:#0d1215!important;border-color:var(--cos-line)!important}
+#root .cos-vision-appdeploy .tech-bottom button{background:transparent!important;color:var(--cos-muted)!important;min-height:44px;font-weight:500!important}
+#root .cos-vision-appdeploy .tech-bottom button.active{background:#292d32!important;color:#fff!important;border-color:#ff142c!important}
+#root .cos-vision-appdeploy .cos-workspace-menu>button{padding:10px 14px!important;font-size:13px!important}
+#root .cos-vision-appdeploy .cos-workspace-menu-overlay{position:fixed;inset:0;background:#0009;z-index:5000;padding:16px;display:flex;align-items:flex-start;justify-content:flex-end}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet{background:var(--cos-panel);color:var(--cos-text);border:1px solid var(--cos-line);border-radius:14px;padding:20px;width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet header{display:flex!important;align-items:center;justify-content:space-between;gap:12px;padding:0 0 18px!important;margin:0!important;background:transparent!important;border:0!important}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet h2{font-size:21px!important;margin:4px 0 0}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav button{text-align:left;padding:12px!important}
+html[data-theme='light'] #root .cos-vision-appdeploy{--cos-bg:#f4f6fa;--cos-panel:#fff;--cos-raised:#f4f5f7;--cos-line:#c9d4e0;--cos-text:#152436;--cos-muted:#516478}
+html[data-theme='light'] #root .cos-vision-appdeploy :is(.shell>aside,.it-side,.techbar,.it-top,.tech-bottom,.mobile-owner>header,.tech-mobile>header){background:var(--cos-panel)!important}
+html[data-theme='light'] #root .cos-vision-appdeploy :is(.shell>aside nav button.active,.it-side nav button.active,.tech-bottom button.active){color:#fff!important}
+@media(max-width:900px){#root .cos-vision-appdeploy .shell{grid-template-columns:1fr!important}#root .cos-vision-appdeploy .tech-status{flex-wrap:wrap;gap:8px!important}#root .cos-vision-appdeploy .it-command{grid-template-columns:1fr!important}}
+@media(max-width:700px){#root .cos-vision-appdeploy .mobile-owner>header,#root .cos-vision-appdeploy .tech-mobile>header{background:#0d1215!important;border:1px solid var(--cos-line)!important;border-radius:12px;padding:16px!important;margin-bottom:16px;flex-wrap:wrap;gap:12px}#root .cos-vision-appdeploy .mobile-owner>header h1{font-size:24px!important}#root .cos-vision-appdeploy .service-command-home{padding:16px!important}#root .cos-vision-appdeploy .cos-workspace-menu-overlay{padding:10px}#root .cos-vision-appdeploy .cos-workspace-menu-sheet{padding:16px;max-height:calc(100dvh - 20px)}}
+@media(max-width:380px){#root .cos-vision-appdeploy .cos-workspace-menu-sheet nav{grid-template-columns:1fr}}
+
+
+.cos-vision-appdeploy{--cos-vision-bg:var(--cos-bg);--cos-vision-panel:var(--cos-panel);--cos-vision-raised:var(--cos-raised);--cos-vision-border:var(--cos-line);--cos-vision-text:var(--cos-text);--cos-vision-muted:var(--cos-muted);--cos-vision-red:var(--cos-red)}
+/* Approved charcoal master/detail layout. Data and actions use existing flows. */
+.workspace-overview{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:28px;align-items:start;margin:16px 0 28px;color:var(--cos-vision-text)}
+.workspace-work,.workspace-detail{min-width:0}
+.workspace-title p,.workspace-kicker{font-size:11px;letter-spacing:1.5px;color:var(--cos-vision-muted);margin:0 0 10px}
+.workspace-title h1{font-size:clamp(28px,3.5vw,48px)!important;line-height:1.15!important;letter-spacing:-1px!important;font-weight:650!important;color:var(--cos-vision-text)!important;margin:0 0 22px!important}
+.workspace-tabs{display:flex;gap:24px;border-bottom:1px solid var(--cos-vision-border);margin-bottom:22px}
+#root#root .cos-vision-appdeploy .workspace-tabs button{background:transparent!important;border:0!important;border-bottom:3px solid transparent!important;border-radius:0!important;box-shadow:none!important;color:var(--cos-vision-muted)!important;padding:12px 3px!important;min-height:44px;font-size:14px!important}
+#root#root .cos-vision-appdeploy .workspace-tabs button[aria-current]{color:var(--cos-vision-text)!important;border-bottom-color:var(--cos-vision-red)!important}
+.workspace-list-title{font-size:12px!important;letter-spacing:1px!important;text-transform:uppercase;margin:0 0 14px!important;color:var(--cos-vision-muted)!important}
+.workspace-job-list{display:grid;gap:0}
+#root#root .cos-vision-appdeploy .workspace-job{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:transparent!important;border:0!important;border-bottom:1px solid var(--cos-vision-border)!important;border-left:3px solid transparent!important;border-radius:0!important;padding:18px 14px!important;min-height:90px;box-shadow:none!important;color:var(--cos-vision-text)!important}
+#root#root .cos-vision-appdeploy .workspace-job.selected{background:var(--cos-vision-raised)!important;border-left-color:var(--cos-vision-red)!important;border-radius:9px!important}
+.workspace-job>span:nth-child(2){min-width:0;flex:1}.workspace-job strong{display:block;font-size:16px;font-weight:600;line-height:1.4}.workspace-job small{display:block;color:var(--cos-vision-muted);font-size:12px;line-height:1.5;margin-top:4px;overflow-wrap:anywhere}.workspace-record-icon{font-size:28px;color:var(--cos-vision-muted);flex:none}
+.workspace-shortcuts{border-top:1px solid var(--cos-vision-border);padding-top:22px;margin-top:24px}.workspace-shortcuts h2{font-size:15px!important;margin:0 0 14px!important}.workspace-shortcuts>div{display:flex;flex-wrap:wrap;gap:10px}.workspace-shortcuts button{min-height:44px;font-size:13px!important}
+.workspace-detail{background:var(--cos-vision-panel);border:1px solid var(--cos-vision-border);border-radius:12px;padding:24px}.workspace-detail>h2{font-size:28px!important;line-height:1.2!important;margin:0 0 12px!important;overflow-wrap:anywhere}.workspace-detail>p{font-size:13px;color:var(--cos-vision-muted);line-height:1.5;overflow-wrap:anywhere}.workspace-detail dl{margin:20px 0}.workspace-detail dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:14px;padding:13px 0;border-bottom:1px solid var(--cos-vision-border);font-size:13px}.workspace-detail dt{color:var(--cos-vision-muted)}.workspace-detail dd{margin:0;text-align:right;overflow-wrap:anywhere;color:var(--cos-vision-text)}
+#root#root .cos-vision-appdeploy .workspace-primary{background:var(--cos-vision-red)!important;border:1px solid var(--cos-vision-red)!important;color:#fff!important;box-shadow:none!important;width:100%;min-height:48px;font-size:15px!important}
+.workspace-helios{margin-top:26px;padding-top:22px;border-top:1px solid var(--cos-vision-border)}.workspace-helios h3{font-size:16px!important;margin:0 0 15px!important}.workspace-helios p{font-size:12px;color:var(--cos-vision-muted)}.workspace-units{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.workspace-units button{min-height:44px;min-width:0;padding:7px!important;font-size:13px!important}
+#root#root .cos-vision-appdeploy .workspace-units button[aria-pressed=true]{border:1px solid var(--cos-vision-red)!important;background:var(--cos-vision-panel)!important;color:var(--cos-vision-text)!important}
+
+#root .cos-vision-appdeploy .shell{grid-template-columns:104px minmax(0,1fr)!important}
+#root .cos-vision-appdeploy .shell>aside{padding:20px 7px!important}
+#root .cos-vision-appdeploy .shell>aside .cos-vision-brand>div,#root .cos-vision-appdeploy .shell>aside .platform{display:none!important}
+#root .cos-vision-appdeploy .shell>aside nav button{min-height:58px!important;text-align:center!important;font-size:12px!important;padding:9px 4px!important}
+#root .cos-vision-appdeploy .shell>main{padding:0 26px 28px!important}
+#root .cos-vision-appdeploy .owner-it-today-header{display:none!important}
+#root .cos-vision-appdeploy .owner-it-topbar{border:0!important;border-bottom:1px solid var(--cos-line)!important;background:transparent!important;border-radius:0!important;padding:16px 0!important}
+#root .cos-vision-appdeploy .weather-tile{display:none!important}
+#root .cos-vision-appdeploy .owner-command-home>.grid{display:block!important}
+#root .cos-vision-appdeploy .owner-command-home>.stats{gap:10px!important}
+#root .cos-vision-appdeploy .owner-command-home>.stats article{background:var(--cos-panel)!important;border:1px solid var(--cos-line)!important;padding:14px!important;border-radius:9px!important;box-shadow:none!important;min-width:0}
+#root .cos-vision-appdeploy .owner-command-home>.stats b{font-size:26px!important}
+#root .cos-vision-appdeploy .service-command-home{background:transparent!important;border:0!important;max-width:960px!important}
+#root .cos-vision-appdeploy .service-command-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#root .cos-vision-appdeploy .service-command-grid button{min-height:110px!important}
+#root .cos-vision-appdeploy .vision-ticket-entry{display:grid;gap:16px;background:var(--cos-panel);padding:20px;border:1px solid var(--cos-line);border-radius:10px;margin:20px 0 24px}
+#root .cos-vision-appdeploy .vision-ticket-entry label{display:grid;gap:10px;font-size:14px}
+#root .cos-vision-appdeploy .vision-ticket-entry input{width:100%;min-height:48px;padding:14px;border:1px solid var(--cos-line)}
+#root .cos-vision-appdeploy .vision-ticket-entry button{background:var(--cos-red)!important;color:#fff!important;min-height:50px;font-size:15px;border:0!important}
+#root .cos-vision-appdeploy .vision-ticket-entry button:disabled{opacity:.5}
+@media(max-width:1100px){.cos-vision-appdeploy .workspace-overview{grid-template-columns:minmax(0,1fr) minmax(260px,.85fr);gap:18px}.cos-vision-appdeploy .workspace-detail{padding:18px}}
+@media(max-width:900px){#root .cos-vision-appdeploy .shell{grid-template-columns:1fr!important}.cos-vision-appdeploy .workspace-overview{grid-template-columns:1fr}}
+@media(max-width:700px){#root .cos-vision-appdeploy .shell>main{padding:0 14px 30px!important}#root .cos-vision-appdeploy .service-command-grid button{padding:14px!important;font-size:14px!important}}
+
+#root#root .cos-vision-appdeploy .workspace-overview .workspace-title{display:block!important;text-align:left!important;background:transparent!important;border:0!important;padding:0!important}
+#root#root .cos-vision-appdeploy .workspace-overview .workspace-title h1{text-align:left!important;float:none!important;width:auto!important}
+#root#root .cos-vision-appdeploy .workspace-overview .workspace-detail{display:block!important;position:static!important;width:auto!important;height:auto!important}
+#root#root .cos-vision-appdeploy .workspace-overview .workspace-primary{background:var(--cos-red)!important;color:#fff!important;border:1px solid var(--cos-red)!important}
+#root#root .cos-vision-appdeploy .workspace-overview button{font-weight:500!important;letter-spacing:0!important}
+#root#root .cos-vision-appdeploy .workspace-overview .workspace-helios>button{min-height:44px;width:100%;padding:10px!important;margin-top:8px}

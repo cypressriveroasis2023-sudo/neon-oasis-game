@@ -12,6 +12,7 @@ const files = [
   'tech-checks/production-assignments-host.js',
   'tech-checks/operations-host.css',
   'tech-checks/vision-platform.css',
+  'tech-checks/vision-workspace.js',
   'tech-checks/app.js',
   'tech-checks/technician-wizard-owner-dashboard-v5.js',
   ...walk('tech-checks/operations/dist')

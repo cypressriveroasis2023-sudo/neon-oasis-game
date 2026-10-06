@@ -62,6 +62,7 @@ async function fixturePage(page) {
       if (path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
       else if (path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
       else if (path === '/api/jobs') data = { items: state.jobs };
+      else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
       else if (['/api/quotes', '/api/ar', '/api/purchasing'].includes(path)) data = { items: [] };
       else if (path === '/api/owner/control-data') data = { sites: [], truckChecks: [], serviceTechnicians: state.readiness.filter(row => row.department === 'service').map(row => row.name), itTechnicians: state.readiness.filter(row => row.department === 'it').map(row => row.name) };
@@ -121,6 +122,28 @@ async function assignmentDialog(frame) {
   await dialog.getByLabel('Technician').selectOption('Casey Service');
   return dialog;
 }
+
+test('approved workspace selects real job details and opens only that job without writes', async ({ page }, testInfo) => {
+  const { state, frame } = await fixturePage(page);
+  await frame.getByRole('button', { name: /Delivery · FIX-102/ }).click();
+  const details=frame.getByRole('complementary',{name:'Selected job details'});
+  await expect(details).toContainText('Jordan IT');
+  await expect(details).toContainText('East Entrance');
+  for(const width of [320,390,1024,1440,2560]){
+    await page.setViewportSize({width,height:1000});
+    const layout=await frame.locator('.workspace-overview').evaluate(el=>({right:el.getBoundingClientRect().right,viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
+    expect(layout.right).toBeLessThanOrEqual(layout.viewport+1);
+    expect(layout.scroll).toBeLessThanOrEqual(layout.viewport+1);
+  }
+  await page.setViewportSize(testInfo.project.use.viewport);
+  await page.screenshot({path:testInfo.outputPath('approved-workspace.png'),fullPage:true});
+  await details.getByRole('button',{name:'Open job & actions →'}).click();
+  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
+  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-102');
+  await frame.getByRole('button',{name:'Show all jobs'}).click();
+  await expect(frame.locator('.ops-workflows .record')).toHaveCount(2);
+  expect(state.writes).toEqual([]);
+});
 
 test('Today preserves verified sources when one source fails and fits the viewport', async ({ page }) => {
   const { state, frame } = await fixturePage(page);

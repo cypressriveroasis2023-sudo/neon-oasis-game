@@ -19,6 +19,7 @@ const legacyHome = [
   section('async function loadMyServiceTruckReadiness()', 'function serviceTruckUnitOrder'),
   section('async function latestServiceInspectionToday()', 'async function startTrailerInspection'),
   section('async function showSvcHome()', 'function showServiceJobLookup'),
+  section('function showServiceJobLookup()', 'async function serviceFindJobByTicket'),
 ].join('\n');
 const sourceHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const types = { '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.svg':'image/svg+xml', '.html':'text/html' };
@@ -98,8 +99,8 @@ test('shared VISION Service presentation keeps real readiness and job actions re
   await expect(brand.locator('img')).toBeVisible();
   for(const width of [320,390,1024,1440]){
     await page.setViewportSize({width,height:900});
-    const layout=await home.evaluate(element=>({background:getComputedStyle(element).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
-    expect(layout.background).toBe('rgb(16, 27, 42)');
+    const layout=await home.evaluate(element=>({background:getComputedStyle(document.getElementById('appView')).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
+    expect(layout.background).toBe('rgb(17, 22, 25)');
     expect(layout.scroll).toBeLessThanOrEqual(layout.width);
     for(const control of layout.controls){expect(control.height).toBeGreaterThanOrEqual(44);expect(control.left).toBeGreaterThanOrEqual(0);expect(control.right).toBeLessThanOrEqual(layout.width);}
   }
@@ -181,4 +182,25 @@ test('a genuine Service readiness failure stays a failure and is never mislabele
   await expect(daily(page).first()).toContainText('Checking today');
   await expect(page.locator('#wlSvcHome .wl-service-help')).toHaveText('Service page is ready. Live status will refresh automatically.');
   expect(await page.evaluate(()=>fixture.calls.length)).toBe(2);
+});
+
+test('approved ticket entry forwards to the protected lookup and survives a home refresh',async({page},testInfo)=>{
+  await mount(page);
+  await page.evaluate(()=>{setIdentity('service');show('svc');return renderServiceHome();});
+  await page.addScriptTag({content:readFileSync(resolve(repo,'tech-checks/vision-workspace.js'),'utf8')});
+  await expect(page.locator('.vision-ticket-entry')).toHaveCount(1);
+  await page.evaluate(()=>renderServiceHome());
+  await expect(page.locator('.vision-ticket-entry')).toHaveCount(1);
+  await page.getByLabel('Ticket number',{exact:true}).fill('FIX-204');
+  await page.screenshot({path:testInfo.outputPath('approved-service.png'),fullPage:true});
+  await page.evaluate(()=>{
+    window.fixture.lookups=[];
+    document.addEventListener('click',event=>{
+      if(event.target.closest('[data-wl-service-open-job]'))showServiceJobLookup();
+      if(event.target.closest('[data-wl-service-find-job]'))fixture.lookups.push(document.getElementById('wlServiceJobSearch').value);
+    });
+  });
+  await page.getByRole('button',{name:'Open service check →'}).click();
+  await expect(page.locator('#wlServiceJobSearch')).toHaveValue('FIX-204');
+  expect(await page.evaluate(()=>fixture.lookups)).toEqual(['FIX-204']);
 });
