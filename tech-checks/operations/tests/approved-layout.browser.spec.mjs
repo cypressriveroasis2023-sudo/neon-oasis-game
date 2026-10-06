@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 const origin='http://127.0.0.1:4173';
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -26,19 +27,11 @@ test('old VISION links open only the approved workspace and keep native navigati
  await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
  await expect(frame.locator('.vision-header,.vision-shell')).toHaveCount(0);
  expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('theme'))).toBe(false);
- const expectedHash={'Job flow':'#jobs',Team:'#team',Equipment:'#equipment','Billing & Invoices':'#billing',Overview:'#today'};
+ const expectedHash={'Jobs':'#jobs',Team:'#team',Equipment:'#equipment',Billing:'#billing',Today:'#today'};
  for(const [name,hash] of Object.entries(expectedHash)){
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
-  await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
-  await menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name,exact:true}).click();
-  await expect(menu).toHaveCount(0);
+  await openWorkspace(frame,name);
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  const selected=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name,exact:true});
-  await expect(selected).toHaveAttribute('aria-current','page');
-  await frame.getByRole('button',{name:'Close menu'}).click();
-  if(name==='Job flow'){
+  if(name==='Jobs'){
    const search=frame.getByRole('searchbox',{name:'Find a job'});
    await search.fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();
    await search.fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();

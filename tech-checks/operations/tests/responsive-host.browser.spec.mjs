@@ -1,3 +1,4 @@
+import { openWorkspace } from './navigation-helper.mjs';
 import { test, expect } from '@playwright/test';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -74,7 +75,7 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   await expect(menu).toBeVisible();
   await responsiveLayout(page,frame);
   await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
-  await menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Tech Check',exact:true}).click();
+  await menu.getByRole('button',{name:'IT & Service Tech Checks',exact:true}).click();
   await expect(menu).toHaveCount(0);
   await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#tech-check');
@@ -141,8 +142,7 @@ test('the same app link gives the embedded Operations app the full device viewpo
 
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
   const { frame } = await mount(page);
-  await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Job flow',exact:true}).click();
+  await openWorkspace(frame,'Jobs');
   const search = frame.getByRole('searchbox', { name:'Find a job' });
   await search.fill('keep this filter');
   await frame.locator('body').evaluate(() => { window.responsiveFrameMarker = 'same-frame'; });
@@ -173,7 +173,7 @@ test('old VISION bookmarks preserve route and query parameters under the approve
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
   const { frame } = await mount(page);
   await frame.getByRole('button', { name:'More', exact:true }).click();
-  await frame.getByRole('button', { name:'Existing Owner Tools', exact:true }).click();
+  await frame.getByRole('button', { name:'Accounts & Permissions', exact:true }).click();
   await expect(page.locator('body')).toHaveClass(/cos-operations-legacy/);
   await expect(page.locator('#cosOperationsMount')).toBeHidden();
   await expect(page.locator('#cosOperationsLegacy')).toBeVisible();
