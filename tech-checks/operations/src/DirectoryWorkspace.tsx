@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
+import CustomerContactPicker from './CustomerContactPicker';
 import './directoryWorkspace.css';
 import {DirectorySaveError,definition,records,saveDirectory,searchRecords} from './directoryData.js';
 import type {Row} from './directoryData.js';
@@ -10,11 +11,17 @@ const fresh=(kind:Kind):Row=>kind==='Customers'
   ?{name:'',legalName:'',notes:'',status:'active'}
   :{customerId:'',name:'',addressLine1:'',addressLine2:'',city:'',stateRegion:'TX',postalCode:'',country:'US',accessInstructions:'',parkingInstructions:'',safetyNotes:'',operationalNotes:'',status:'active'};
 
-export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:string)=>void}) {
+export default function DirectoryWorkspace({kind,show,createCustomerId,cancelCreate,onSiteCreated,onBusyChange,onSitesRefreshed}:{kind:Kind;show:(message:string)=>void;createCustomerId?:string;cancelCreate?:()=>void;onSiteCreated?:(site:Row)=>void;onBusyChange?:(busy:boolean)=>void;onSitesRefreshed?:(sites:Row[])=>void}) {
+  const[contactCustomerId,setContactCustomerId]=useState('');
   const[rows,setRows]=useState<Row[]|null>(null),[customers,setCustomers]=useState<Row[]>([]);
   const[form,setForm]=useState<Row|null>(null),[query,setQuery]=useState(''),[loading,setLoading]=useState(true);
   const[busy,setBusy]=useState(false),[error,setError]=useState(''),[saveError,setSaveError]=useState(''),[uncertain,setUncertain]=useState(false);
+  const contactsRef=useRef<HTMLElement>(null),contactTrigger=useRef<HTMLButtonElement|null>(null);
+  useEffect(()=>{setContactCustomerId('');},[kind]);
+  useEffect(()=>{if(contactCustomerId&&rows&&!rows.some(row=>row.id===contactCustomerId&&row.status==='active'))setContactCustomerId('');},[contactCustomerId,rows]);
+  useEffect(()=>{if(contactCustomerId)window.requestAnimationFrame(()=>{contactsRef.current?.scrollIntoView({block:'start'});contactsRef.current?.focus({preventScroll:true});});},[contactCustomerId]);
   const revision=useRef(0);
+  useEffect(()=>{onBusyChange?.(busy);return()=>onBusyChange?.(false);},[busy,onBusyChange]);
   const load=useCallback(async()=>{
     const request=++revision.current;setLoading(true);
     try {
@@ -22,13 +29,14 @@ export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:
       const next=records(result.data,kind);
       const people=kind==='Sites'?records((await api.get('/api/customers')).data,'Customers'):[];
       if(request!==revision.current)return;
-      setRows(next);setCustomers(people);setError('');return next;
+      if(createCustomerId&&!people.some(customer=>customer.id===createCustomerId&&customer.status==='active'))throw new Error('This customer is no longer active. Refresh the customer directory before adding a site.');
+      setRows(next);setCustomers(people);setError('');if(createCustomerId)setForm({...fresh('Sites'),customerId:createCustomerId});return next;
     }catch(cause){if(request===revision.current)setError(errorText(cause,kind+' could not be loaded.'));}
     finally{if(request===revision.current)setLoading(false);}
-  },[kind]);
+  },[kind,createCustomerId]);
   useEffect(()=>{setRows(null);setCustomers([]);setForm(null);setQuery('');setBusy(false);setSaveError('');setUncertain(false);void load();return()=>{revision.current+=1;};},[load]);
   const edit=(row:Row)=>{setForm({...row});setSaveError('');setUncertain(false);};
-  const reload=async()=>{const next=await load();if(next&&uncertain){setForm(null);setSaveError('');setUncertain(false);show('Fresh records loaded. Review the saved record before making another change.');}};
+  const reload=async()=>{const next=await load();if(next&&uncertain){setForm(null);setSaveError('');setUncertain(false);show('Fresh records loaded. Review the saved record before making another change.');if(createCustomerId){onSitesRefreshed?.(next);cancelCreate?.();}}};
   const save=async()=>{
     if(!form||busy||uncertain)return;
     const request=revision.current;setBusy(true);setSaveError('');
@@ -37,6 +45,7 @@ export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:
       if(request!==revision.current)return;
       setRows(records(result.data,kind));setForm(null);
       show(definition(kind).title+' saved and verified.');
+      if(createCustomerId)onSiteCreated?.(result.record);
     }catch(cause){
       if(request!==revision.current)return;
       setSaveError(errorText(cause,'The save could not be confirmed.'));
@@ -50,46 +59,48 @@ export default function DirectoryWorkspace({kind,show}:{kind:Kind;show:(message:
   const field=(key:string,label:string,large=false)=>large
     ?<label className='wide' key={key}>{label}<textarea aria-label={label} value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>
     :<label key={key}>{label}<input aria-label={label} value={form?.[key]||''} onChange={event=>set(key,event.target.value)}/></label>;
-  return <section className='panel module operations-directory' aria-label={kind+' Workspace'}>
-    <div className='panelhead'><h2>{kind} Workspace</h2><span>Live operational data</span></div>
-    <div className='purchase-actions'>
-      <button disabled={busy||!rows||uncertain} onClick={()=>edit(fresh(kind))}>+ NEW {kind.slice(0,-1).toUpperCase()}</button>
+  return <section className={'panel module operations-directory'+(createCustomerId?' ticket-site-editor':'')} aria-label={kind+' Workspace'}>
+    {!createCustomerId&&<div className='panelhead'><h2>{kind} Workspace</h2><span>Live operational data</span></div>}
+    {(!createCustomerId||error||uncertain)&&<div className='purchase-actions'>
+      {!createCustomerId&&<button disabled={busy||!rows||uncertain} onClick={()=>edit(fresh(kind))}>+ NEW {kind.slice(0,-1).toUpperCase()}</button>}
       <button className='secondary' disabled={loading||busy} onClick={()=>void reload()}>{loading?'REFRESHING…':'REFRESH RECORDS'}</button>
-      <input aria-label={'Search '+kind.toLowerCase()} value={query} onChange={event=>setQuery(event.target.value)} placeholder={kind==='Customers'?'Search customer, legal name, notes…':'Search customer, site, location, instructions…'}/>
+      {!createCustomerId&&<input aria-label={'Search '+kind.toLowerCase()} value={query} onChange={event=>setQuery(event.target.value)} placeholder={kind==='Customers'?'Search customer, legal name, notes…':'Search customer, site, location, instructions…'}/>}
       {rows&&<span>{rows.length} production record{rows.length===1?'':'s'}</span>}
-    </div>
+    </div>}
     {error&&<div className='operations-error' role='alert'>{error}{rows&&<p>Showing the last successful records.</p>}</div>}
+    {createCustomerId&&!form&&<button type='button' className='secondary' disabled={busy} onClick={cancelCreate}>Back to ticket</button>}
     {saveError&&!form&&<div className='operations-error' role='alert'>{saveError}</div>}
     {!rows&&!error&&<div className='loading' role='status'>Loading live {kind.toLowerCase()}…</div>}
     {form&&<section className='quote-card directory-editor' aria-label={(form.id?'Edit ':'New ')+kind.slice(0,-1)}>
       <div className='quote-section-head'>
         <div><h3>{form.id?'Edit':'New'} {kind.slice(0,-1)}</h3><small>Changes save to the COS production database.</small></div>
-        <div className='purchase-actions'><button className='secondary' disabled={busy} onClick={()=>{setForm(null);if(!uncertain)setSaveError('');}}>Cancel</button><button disabled={busy||uncertain} onClick={()=>void save()}>{busy?'SAVING…':'SAVE'}</button></div>
+        <div className='purchase-actions'><button className='secondary' disabled={busy||loading} onClick={()=>{if(createCustomerId&&uncertain){void reload();return;}setForm(null);if(!uncertain)setSaveError('');if(createCustomerId)cancelCreate?.();}}>{createCustomerId&&uncertain?'Refresh & return to ticket':'Cancel'}</button><button disabled={busy||uncertain} onClick={()=>void save()}>{busy?'SAVING…':'SAVE'}</button></div>
       </div>
       {saveError&&<div className='operations-error' role='alert'>{saveError}</div>}
       <fieldset disabled={busy||uncertain} style={{border:0,padding:0,margin:0,minWidth:0}}>
         {kind==='Customers'?<div className='quote-detail-grid'>
           {field('name','Customer Name *')}{field('legalName','Legal Name')}
-          <label>Status<select aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
+          <label>Status<select disabled={Boolean(createCustomerId)} aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
           {field('notes','Notes',true)}
         </div>:<div className='crm-form-section'>
           <h4>Customer & Site</h4><div className='quote-detail-grid'>
-            <label>Customer *<select aria-label='Customer *' value={form.customerId||''} onChange={event=>set('customerId',event.target.value)}><option value=''>Select customer</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+            <label>Customer *<select disabled={Boolean(createCustomerId)} aria-label='Customer *' value={form.customerId||''} onChange={event=>set('customerId',event.target.value)}><option value=''>Select customer</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
             {field('name','Site Name *')}
-            <label>Status<select aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
+            <label>Status<select disabled={Boolean(createCustomerId)} aria-label='Status' value={form.status||'active'} onChange={event=>set('status',event.target.value)}><option value='active'>Active</option><option value='inactive'>Inactive</option></select></label>
           </div>
           <h4>Location</h4><div className='quote-detail-grid'>{[['addressLine1','Address'],['addressLine2','Address 2'],['city','City'],['stateRegion','State'],['postalCode','ZIP'],['country','Country']].map(([key,label])=>field(key,label))}</div>
           <h4>Technician Instructions</h4><div className='quote-detail-grid'>{[['accessInstructions','Access Instructions'],['parkingInstructions','Parking Instructions'],['safetyNotes','Safety Notes'],['operationalNotes','Operational Notes']].map(([key,label])=>field(key,label,true))}</div>
         </div>}
       </fieldset>
     </section>}
-    {rows&&<div className='records'>{filtered.length?filtered.map(row=><div className='record op-record' key={row.id}>
+    {!createCustomerId&&kind==='Customers'&&contactCustomerId&&<section ref={contactsRef} tabIndex={-1} aria-label='Selected customer contacts'><div className='purchase-actions'><strong>{rows?.find(row=>row.id===contactCustomerId)?.name}</strong><button className='secondary' onClick={()=>{setContactCustomerId('');contactTrigger.current?.focus();}}>Close contacts</button></div><CustomerContactPicker key={contactCustomerId} customerId={contactCustomerId}/></section>}
+    {!createCustomerId&&rows&&<div className='records'>{filtered.length?filtered.map(row=><div className='record op-record' key={row.id}>
       <div><strong>{row.name}</strong><small>{kind==='Customers'
         ?[row.customerNumber,Number.isFinite(row.siteCount)?row.siteCount+' sites':null,Number.isFinite(row.jobCount)?row.jobCount+' jobs':null,Number.isFinite(row.quoteCount)?row.quoteCount+' quotes':null].filter(Boolean).join(' · ')
         :['Customer: '+(row.customer||'Unassigned'),'Site: '+row.name,'Location: '+([row.addressLine1,row.addressLine2,row.city,row.stateRegion,row.postalCode].filter(Boolean).join(', ')||'No address'),Number.isFinite(row.jobCount)?row.jobCount+' jobs':null].filter(Boolean).join(' · ')}</small>
         {kind==='Sites'&&(row.accessInstructions||row.parkingInstructions||row.safetyNotes)&&<div className='audit-mini'>{row.accessInstructions&&<span>Access: {row.accessInstructions}</span>}{row.parkingInstructions&&<span>Parking: {row.parkingInstructions}</span>}{row.safetyNotes&&<span>Safety: {row.safetyNotes}</span>}</div>}
       </div>
-      <div className='row-actions'><em>{String(row.status||'record').replaceAll('_',' ')}</em><button className='secondary' disabled={busy||uncertain} onClick={()=>edit(row)}>Edit</button></div>
+      <div className='row-actions'><em>{String(row.status||'record').replaceAll('_',' ')}</em>{kind==='Customers'&&<button className='secondary' disabled={busy||uncertain||row.status!=='active'} onClick={event=>{contactTrigger.current=event.currentTarget;setContactCustomerId(row.id);}}>View contacts</button>}<button className='secondary' disabled={busy||uncertain} onClick={()=>edit(row)}>Edit</button></div>
     </div>):<div className='loading'>{query?'No '+kind.toLowerCase()+' match this view.':'No '+kind.toLowerCase()+' records yet.'}</div>}</div>}
   </section>;
 }

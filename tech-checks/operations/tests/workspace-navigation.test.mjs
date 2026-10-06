@@ -27,3 +27,14 @@ test('job identity and mobile detail survive URL encoding without creating anoth
   assert.deepEqual(readWorkspaceRoute('#jobs?job=42&detail=1'),{workspace:'Jobs',jobId:'42',detail:false});
   assert.equal(workspaceHash({workspace:'Today',jobId:'',detail:true}),'#today');
 });
+
+test('ticket bookmarks use only existing job types on Dispatch Board without a job target',()=>{
+  for(const createType of ['SERVICE','PICKUP','DELIVERY','SWAP']){
+    const route={workspace:'Daily Board',jobId:'',detail:false,createType};
+    assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
+    assert.equal(workspaceHash(route),'#daily-board?create='+createType);
+  }
+  for(const hash of ['#daily-board?create=INSTALL','#jobs?create=SWAP','#today?create=SERVICE','#daily-board?job=42&create=PICKUP']){
+    assert.equal(readWorkspaceRoute(hash).createType,undefined);
+  }
+});

@@ -1,10 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
+import {ticketDescriptionWithContact} from './customerContacts';
+import TicketSitePicker from './TicketSitePicker';
+import {ticketTypes,type TicketType} from './ticketTypes';
 import {cosPrompt,cosConfirm} from './cosDialog';
 import {ownerJobSelection} from './ownerJobSelection';
 import {checkedOwnerSnapshot,createOwnerActionSaver,truckApprovalDetails,type OwnerAction,type OwnerSnapshot} from './ownerActionPersistence';
 const chicagoToday=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=(type:string)=>parts.find(p=>p.type===type)?.value||'';return get('year')+'-'+get('month')+'-'+get('day')};
-export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
+export default function OwnerBoardControls({show,createType,cancelCreate,openCreatedJob}:{show:(m:string)=>void;createType?:TicketType;cancelCreate?:()=>void;openCreatedJob?:(id:string)=>void}) {
   const [jobs,setJobs]=useState<any[]>([]);
   const [control,setControl]=useState<any>({sites:[],truckChecks:[],serviceTechnicians:[],itTechnicians:[]});
   const [busy,setBusy]=useState('');
@@ -14,7 +17,13 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
   const [loaded,setLoaded]=useState(false);
   const [selectedJobId,setSelectedJobId]=useState('');
   const [assignTech,setAssignTech]=useState('');
-  const [newJob,setNewJob]=useState<any>({siteId:'',jobType:'DELIVERY',title:'',description:'',priority:'normal',shopPrep:false});
+  const [newJob,setNewJob]=useState<any>({siteId:'',jobType:createType||'DELIVERY',title:'',description:'',priority:'normal',shopPrep:false});
+  const headingRef=useRef<HTMLHeadingElement>(null);
+  const [contactInstructions,setContactInstructions]=useState('');
+  const [siteSaving,setSiteSaving]=useState(false);
+  const [siteValid,setSiteValid]=useState(false);
+  const [created,setCreated]=useState<{id:string;number:string}|null>(null);
+  useEffect(()=>{if(createType){setNewJob((current:any)=>({...current,jobType:createType,shopPrep:false}));headingRef.current?.focus();}},[createType]);
   const [advance,setAdvance]=useState<any>({unitNumber:'',serviceTechnician:'',date:chicagoToday(),startTime:'08:00',endTime:'10:00',note:''});
   const loadRevision=useRef(0), activeReads=useRef(0), actionRunning=useRef(false), mounted=useRef(true);
   const snapshotRef=useRef<OwnerSnapshot>({jobs:[],control:{sites:[],truckChecks:[],serviceTechnicians:[],itTechnicians:[]}});
@@ -50,7 +59,7 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
   },[]);
   const selection=ownerJobSelection(jobs,selectedJobId), selected=selection.selected;
   useEffect(()=>{setAssignTech('');setAdvance((current:any)=>({...current,unitNumber:'',note:''}));},[selection.selectedId]);
-  const blocked=!!busy||refreshing||needsRefresh||!loaded;
+  const blocked=!!busy||siteSaving||refreshing||needsRefresh||!loaded;
   const run=async(key:string,prepare:()=>Promise<{action:OwnerAction;message:string}|null>)=>{
     if(actionRunning.current||saver.current!.needsRefresh||activeReads.current>0||!mounted.current)return;
     actionRunning.current=true;setBusy(key);setError('');
@@ -62,6 +71,7 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
       if(result.status==='confirmed'){
         if(prepared.action.kind==='create'){
           setSelectedJobId(result.response.job_id);
+          setCreated({id:result.response.job_id,number:result.response.job_number});
           setNewJob((current:any)=>({...current,title:'',description:''}));
         }
         show(prepared.action.kind==='create'?result.response.job_number+' created and found in current jobs.':prepared.message+' · saved and verified');
@@ -101,8 +111,8 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
     return()=>{window.removeEventListener('cos-owner-job-action',jobAction);window.removeEventListener('cos-owner-assign',boardAssign);};
   },[]);
   const createJob=()=>{
-    if(!newJob.siteId||!newJob.title.trim()){setError('Choose a site and enter a job title');return;}
-    const body={...newJob,title:newJob.title.trim()};
+    if(!newJob.siteId||!siteValid||!newJob.title.trim()){setError('Choose a site and enter a job title');return;}
+    const body={...newJob,title:newJob.title.trim(),description:ticketDescriptionWithContact(newJob.description,contactInstructions),shopPrep:newJob.jobType==='SERVICE'&&newJob.shopPrep};
     void run('create',async()=>({action:{kind:'create',body,previousIds:snapshotRef.current.jobs.map(job=>job.id)},message:'COS Job created by Owner'}));
   };
   const assign=()=>{if(selected&&assignTech)void run('assign',async()=>({action:{kind:'assign',job:selected,body:{technician:assignTech}},message:selected.jobNumber+' assigned to '+assignTech}));};
@@ -127,8 +137,9 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
   useEffect(()=>{const roster=control.serviceTechnicians||[];setAdvance((current:any)=>current.serviceTechnician&&!roster.includes(current.serviceTechnician)?{...current,serviceTechnician:''}:current);},[control.serviceTechnicians]);
   const jobTechs=selected?.department?.toLowerCase()==='it'?(control.itTechnicians||[]):selected?.department?.toLowerCase()==='service'?(control.serviceTechnicians||[]):[...(control.itTechnicians||[]),...(control.serviceTechnicians||[])];
   return <section className='panel module owner-board-controls'>
-    <div className='panelhead'><div><h2>Owner Controls</h2><span>Owner-only overrides are audit-marked in production.</span></div><button className='secondary' disabled={!!busy||refreshing} onClick={()=>void refresh()}>REFRESH</button></div>
+    <div className='panelhead'><div><h2 ref={headingRef} tabIndex={createType?-1:undefined}>{createType?'Create ticket':'Owner Controls'}</h2><span>{createType?'Choose the site and describe the work. Saving creates an Owner-marked COS job.':'Owner-only overrides are audit-marked in production.'}</span></div><button className='secondary' disabled={!!busy||siteSaving||refreshing} onClick={()=>void refresh()}>REFRESH</button>{createType&&<button type='button' className='secondary' disabled={!!busy||siteSaving} onClick={cancelCreate}>Back to dashboard</button>}</div>
     {error&&<div role='alert' className='operations-error'>{error}</div>}
+    {!createType&&<>
     <div className='quote-detail-grid'>
       <label>Selected COS Job
         <select value={selection.selectedId} disabled={blocked} onChange={e => setSelectedJobId(e.target.value)}>
@@ -157,21 +168,25 @@ export default function OwnerBoardControls({show}:{show:(m:string)=>void}) {
       </div>
       <button disabled={blocked} onClick={advanceIt}>{busy==='advance'?'ADVANCING…':'OWNER VERIFIED · SCHEDULE TO SERVICE'}</button>
     </section>}
-    <section className='quote-card'>
-      <div className='quote-section-head'><div><h3>Add COS Job</h3><small>Owner-created jobs bypass quote/MHelpDesk conversion but are explicitly audit-marked as Owner-created.</small></div></div>
-      <div className='quote-detail-grid'>
-        <label>Customer / Site<select disabled={!!busy} value={newJob.siteId} onChange={e=>setNewJob({...newJob,siteId:e.target.value})}><option value=''>Choose site</option>{(control.sites||[]).map((s:any)=><option key={s.id} value={s.id}>{s.customers?.name||'Customer'} · {s.name}</option>)}</select></label>
-        <label>Job type<select disabled={!!busy} value={newJob.jobType} onChange={e=>setNewJob({...newJob,jobType:e.target.value})}>{['DELIVERY','SWAP','PICKUP','SERVICE'].map(x=><option key={x}>{x}</option>)}</select></label>
-        <label>Title<input disabled={!!busy} value={newJob.title} onChange={e=>setNewJob({...newJob,title:e.target.value})}/></label>
+    </>}
+    {createType&&created&&<section className='ticket-create-result' aria-label='Ticket created'><p role='status'><b>{created.number}</b> created and found in current jobs.</p><p>Next, schedule and assign the current visit.</p><div className='purchase-actions'><button type='button' disabled={!!busy} onClick={()=>openCreatedJob?.(created.id)}>Schedule this ticket</button><button type='button' className='secondary' disabled={!!busy} onClick={()=>setCreated(null)}>Create another ticket</button></div></section>}
+    {(!createType||!created)&&<section className='quote-card ticket-create-form'>
+      <div className='quote-section-head'><div><h3>{createType?(ticketTypes.find(type=>type.value===newJob.jobType)?.label||'COS')+' ticket':'Add COS Job'}</h3><small>Owner-created jobs bypass quote/MHelpDesk conversion but are explicitly audit-marked as Owner-created.</small></div></div>
+      <TicketSitePicker siteId={newJob.siteId} setSiteId={siteId=>setNewJob((current:any)=>({...current,siteId}))} disabled={!!busy||siteSaving} onValidityChange={setSiteValid} onSiteBusyChange={setSiteSaving} contactInstructions={contactInstructions} onContactInstructionsChange={setContactInstructions} show={show}/>
+      <div className='ticket-form-step'><span aria-hidden='true'>2</span><div><h4>Ticket details</h4><p>Select the workflow and tell the team what needs to happen.</p></div></div>
+      <div className='quote-detail-grid ticket-detail-fields'>
+        <label>Job type<select disabled={!!busy} value={newJob.jobType} onChange={e=>setNewJob({...newJob,jobType:e.target.value,shopPrep:false})}>{ticketTypes.map(type=><option key={type.value} value={type.value}>{type.label} · {type.value}</option>)}</select></label>
         <label>Priority<select disabled={!!busy} value={newJob.priority} onChange={e=>setNewJob({...newJob,priority:e.target.value})}><option value='normal'>Normal</option><option value='high'>High</option><option value='urgent'>Urgent</option></select></label>
+        <label className='ticket-title-field'>Title<input disabled={!!busy} value={newJob.title} onChange={e=>setNewJob({...newJob,title:e.target.value})}/></label>
       </div>
+      {newJob.jobType==='DELIVERY'&&<p role='note'>Install / Delivery uses the existing DELIVERY job type: IT preparation, then the Service installation visit.</p>}
       <label>Description / instructions<textarea disabled={!!busy} rows={3} value={newJob.description} onChange={e=>setNewJob({...newJob,description:e.target.value})}/></label>
-      {newJob.jobType==='SERVICE'&&<label className='tc-primary'><input disabled={!!busy} type='checkbox' checked={newJob.shopPrep} onChange={e=>setNewJob({...newJob,shopPrep:e.target.checked})}/> SERVICE REQUIRES IT SHOP PREP</label>}
-      <button disabled={blocked} onClick={createJob}>{busy==='create'?'CREATING…':'ADD COS JOB'}</button>
-    </section>
-    <section className='quote-card'>
+      {newJob.jobType==='SERVICE'&&<label className='ticket-shop-prep'><input disabled={!!busy} type='checkbox' checked={newJob.shopPrep} onChange={e=>setNewJob({...newJob,shopPrep:e.target.checked})}/> SERVICE REQUIRES IT SHOP PREP</label>}
+      <button className='ticket-submit' disabled={blocked} onClick={createJob}>{busy==='create'?'CREATING…':createType?'CREATE TICKET':'ADD COS JOB'}</button>
+    </section>}
+    {!createType&&<section className='quote-card'>
       <div className='quote-section-head'><div><h3>Truck Stock / Check Approval</h3><small>Truck Check → Owner Approval / Override → Shortage → Purchasing → Receipt → AP. Approval never means inventory was received.</small></div></div>
       <div className='records'>{(control.truckChecks||[]).length?(control.truckChecks||[]).slice(0,8).map((c:any)=>{const {missing,override}=truckApprovalDetails(c);return <div className='record op-record' key={c.id}><div><strong>{c.technician||'Technician'} · {String(c.department||'').toUpperCase()}</strong><small>{c.vehicleRef||'Vehicle not named'} · {c.status} · {c.ownerApproved?'OWNER APPROVED':'Awaiting Owner approval'}</small>{c.ownerApproved&&override&&<span className='owner-techcheck'>OWNER OVERRIDE · {missing.length?missing.join(', ')+' missing':'Missing fields were override-approved'}</span>}{missing.length>0&&<div className='audit-mini'><b>SHORTAGE / IDENTIFIERS TO RESOLVE</b>{missing.map((item:string)=><small key={item}>{item}</small>)}<small>Approval does not mark these items received.</small></div>}</div><div className='row-actions'><em>{c.ownerApproved?(missing.length?'APPROVED · SHORT':'APPROVED'):'CHECK'}</em>{!c.ownerApproved&&<button disabled={blocked} onClick={()=>approveTruck(c)}>APPROVE / OVERRIDE</button>}</div></div>}):<div className='loading'>No truck checks recorded in the last 7 days.</div>}</div>
-    </section>
+    </section>}
   </section>;
 }
