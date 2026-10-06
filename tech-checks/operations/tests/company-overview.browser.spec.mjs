@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 const origin = 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const stamp = '2026-10-06T13:00:00.000Z';

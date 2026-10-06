@@ -49,8 +49,8 @@ test('old VISION links open only the approved workspace and keep native navigati
  await frame.getByRole('button',{name:'More',exact:true}).click();
  const nav=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('navigation',{name:'COS Operations',exact:true});
  const styles=await nav.locator('button').evaluateAll(buttons=>buttons.map(button=>({active:button.getAttribute('aria-current'),color:getComputedStyle(button).color})));
- expect(styles.find(button=>button.active).color).toBe('rgb(49, 95, 223)');
- expect(styles.filter(button=>!button.active).every(button=>button.color!=='rgb(49, 95, 223)')).toBe(true);
+ expect(styles.find(button=>button.active).color).toBe('rgb(145, 176, 255)');
+ expect(styles.filter(button=>!button.active).every(button=>button.color!=='rgb(145, 176, 255)')).toBe(true);
  await frame.getByRole('button',{name:'Close menu'}).press('Escape');
  await expect(frame.getByRole('button',{name:'More',exact:true})).toBeFocused();
  await frame.locator('.company-utility-bar').screenshot({path:testInfo.outputPath('approved-header.png')});

@@ -1,7 +1,7 @@
 # COS company overview and connected job presentation
 
-This release applies the approved white, pale-blue and blue COS presentation to
-the actual Operations platform. The company overview begins with Camera Health,
+The company layout now uses the requested dark presentation with restrained blue
+accents across the actual Operations platform. The company overview begins with Camera Health,
 stored InHand router records and the Victron monitoring entry point, followed by
 the eight-stage customer journey, review work and responsible teams.
 
@@ -67,3 +67,22 @@ The Pages verification script compares published bytes for the generated bundle,
 all new presentation styles and fonts, standalone pages, host bridges and the
 preserved technician scripts. The release can be rolled back by reverting its
 frontend commits; database rollback is not required.
+
+## Dark presentation correction
+
+The October 6 follow-up changes presentation only. Dark chrome is declared in
+the initial HTML before scripts/styles load. Company overview, connected job
+flow, native forms/dialogs, host authentication and technician tools, Camera
+Health/Detail, Vision and repair screens use dark surfaces with readable text.
+Green, amber and red states retain separate semantic colors and labels.
+
+The seven-area navigation, eight-stage lifecycle, dimensions, responsive
+breakpoints, backend contracts and existing workflow scripts are unchanged.
+Legacy light theme preferences do not override the requested dark default.
+Third-party vendor content keeps the vendor's presentation.
+
+Rendered browser checks cover contrast on every native destination, populated
+overview/lifecycle, forms, menus, errors and authentication states. Responsive
+screenshots cover mobile, tablet and desktop. A blocked-script/style test verifies
+that the initial document canvas is already dark. This is a presentation check,
+not certification of authenticated production writes.

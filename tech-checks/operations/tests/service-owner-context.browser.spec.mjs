@@ -97,11 +97,20 @@ test('shared VISION Service presentation keeps real readiness and job actions re
   const brand=page.locator('#appView > .mobileTop .cos-vision-brand');
   await expect(brand).toContainText('VISION');
   await expect(brand.locator('img')).toBeVisible();
-  for(const width of [320,390,1024,1440]){
+  for(const width of [320,390,768,1024,1440]){
     await page.setViewportSize({width,height:900});
     const layout=await home.evaluate(element=>({background:getComputedStyle(document.getElementById('appView')).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));
-    expect(layout.background).toBe('rgb(241, 244, 249)');
+    expect(layout.background).toBe('rgb(11, 17, 28)');
     expect(layout.scroll).toBeLessThanOrEqual(layout.width);
+    const samples=await home.locator('h1,.wl-service-help,.wl-service-action-pill b,.wl-service-action-pill small').evaluateAll(elements=>elements.filter(el=>el.getBoundingClientRect().height).map(el=>{
+      let surface=el,background=getComputedStyle(surface).backgroundColor;
+      while(surface.parentElement&&background==='rgba(0, 0, 0, 0)'){surface=surface.parentElement;background=getComputedStyle(surface).backgroundColor;}
+      const lum=color=>{const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722};
+      const a=lum(getComputedStyle(el).color),b=lum(background);
+      return {text:el.textContent,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+    }));
+    for(const sample of samples)expect(sample.ratio,JSON.stringify(sample)).toBeGreaterThanOrEqual(4.5);
+    if([390,768,1440].includes(width))await page.screenshot({path:testInfo.outputPath(`dark-service-${width}.png`),fullPage:true});
     for(const control of layout.controls){expect(control.height).toBeGreaterThanOrEqual(44);expect(control.left).toBeGreaterThanOrEqual(0);expect(control.right).toBeLessThanOrEqual(layout.width);}
   }
   await home.getByRole('button',{name:/Enter Ticket Number/}).click();

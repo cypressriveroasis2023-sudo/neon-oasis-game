@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import { workspaces, workspaceLabel } from '../src/workspaceNavigation.ts';
 
 const origin = 'http://127.0.0.1:4173';
@@ -34,7 +35,7 @@ async function mount(page, denied = false) {
   return { frame, requests };
 }
 
-test('every company destination remains reachable with a light responsive boundary', async ({page}, testInfo) => {
+test('every company destination remains reachable with a dark responsive boundary', async ({page}, testInfo) => {
   test.setTimeout(120000);
   const {frame, requests} = await mount(page);
   for (const workspace of workspaces.filter(name => !['Vision','Invoices'].includes(name))) {
@@ -52,8 +53,11 @@ test('every company destination remains reachable with a light responsive bounda
     }
     const measurements = await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,background:getComputedStyle(document.body).backgroundColor,text:getComputedStyle(document.body).color}));
     expect(measurements.scroll, workspace+' must fit').toBeLessThanOrEqual(measurements.width+1);
-    expect(measurements.background, workspace+' must use light presentation').not.toMatch(/rgb\((?:5|8|13|17),/);
+    expect(measurements.background, workspace+' must use dark presentation').toBe('rgb(11, 17, 28)');
     await expect(frame.locator('.operations-shell')).not.toBeEmpty();
+    const audit = await auditDarkPresentation(frame.locator('body'));
+    await testInfo.attach(workspace + '-dark-contrast', { body: JSON.stringify(audit, null, 2), contentType: 'application/json' });
+    expect.soft(audit.failures, workspace + ' readable text').toEqual([]);
   }
   expect(requests.every(request=>request.method==='GET')).toBe(true);
   await page.screenshot({path:testInfo.outputPath('company-route-sweep.png'),fullPage:true});

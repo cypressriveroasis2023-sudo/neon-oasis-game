@@ -58,7 +58,7 @@ test('IT technical navigation and forms fit with the real protected IT styleshee
   for(const width of [320,390,1024,1440,2560]){
     await page.setViewportSize({width,height:900});
     const layout=await page.locator('.wl-it-command-shell').evaluate(element=>({bg:getComputedStyle(element).backgroundColor,viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
-    expect(layout.bg).toBe('rgb(255, 255, 255)');expect(layout.scroll).toBeLessThanOrEqual(layout.viewport);
+    expect(layout.bg).toBe('rgb(17, 27, 42)');expect(layout.scroll).toBeLessThanOrEqual(layout.viewport);
   }
   await page.getByRole('textbox',{name:'MHelpDesk Ticket'}).fill('FIX-IT-01');
   await page.getByRole('button',{name:'Open ticket'}).click();

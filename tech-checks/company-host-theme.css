@@ -1,63 +1,99 @@
-/* Approved COS presentation for existing IT, Service, account and menu surfaces.
+/* Dark COS presentation for existing IT, Service, account and menu surfaces.
    Deliberately CSS-only: no workflow markup, checks, permissions or bridge changes. */
 @font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-regular.woff') format('woff');font-style:normal;font-weight:400 500;font-display:swap}
 @font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-semibold.woff') format('woff');font-style:normal;font-weight:600;font-display:swap}
 @font-face{font-family:'Open Sans';src:url('./resources/fonts/open-sans-bold.woff') format('woff');font-style:normal;font-weight:700 900;font-display:swap}
-:root,html,html[data-theme],body,body[data-theme]{color-scheme:light;--cos-vision-bg:#F1F4F9;--cos-vision-panel:#FFFFFF;--cos-vision-raised:#F8FAFD;--cos-vision-border:#DCE4EF;--cos-vision-text:#172C47;--cos-vision-muted:#60748F;--cos-vision-red:#315FDF;--bg:#F1F4F9;--panel:#FFFFFF;--border:#DCE4EF;--line:#DCE4EF;--muted:#60748F;--text:#172C47;--accent:#315FDF;--red:#315FDF;--good:#287451;--warn:#8A601E}
-html body{background:#F1F4F9!important;color:#172C47!important;font-family:'Open Sans',Arial,sans-serif!important;line-height:1.5}
+:root,html,html[data-theme],body,body[data-theme]{background:#0B111C;color-scheme:dark;--cos-vision-bg:#0B111C;--cos-vision-panel:#111B2A;--cos-vision-raised:#172337;--cos-vision-border:#2C3B51;--cos-vision-text:#E6EDF7;--cos-vision-muted:#A3B3CA;--cos-vision-red:#315FDF;--bg:#0B111C;--panel:#111B2A;--border:#2C3B51;--line:#2C3B51;--muted:#A3B3CA;--text:#E6EDF7;--accent:#91B0FF;--red:#315FDF;--good:#83D6AD;--warn:#EDC27B}
+html body{background:#0B111C!important;color:#E6EDF7!important;font-family:'Open Sans',Arial,sans-serif!important;line-height:1.5}
 html body :is(button,input,select,textarea){font-family:'Open Sans',Arial,sans-serif!important}
-html body :is(button,a,input,textarea,select,summary):focus-visible{outline:2px solid #315FDF!important;outline-offset:3px}
-html body #appView{background:#F1F4F9!important;color:#172C47!important}
-html body #appView>.mobileTop,html body #appView>.mobileTop>.hero,html body #appView>.mobileTop>.accountbar,html body #appView>.mobileTop>.techStatusRow{background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important}
-html body #appView>.mobileTop .techBrand h1,html body #appView>.mobileTop :is(#whoName,.brandTitle){color:#172C47!important;letter-spacing:normal!important}
-html body #appView>.mobileTop :is(.small,.pill,label,small),html body #appView>.mobileTop>.techStatusRow :is(b,span){color:#60748F!important}
-html body #appView>.mobileTop :is(button,.pill),html body #appView .mainRoleTabs button{background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important;box-shadow:none!important;border-radius:7px!important}
-html body #appView .mainRoleTabs button.active{background:#E7EEFF!important;color:#315FDF!important;border-color:#BCCCF4!important}
-html body #appView :is(#view-it,#view-svc,#view-service){color:#172C47!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(.card,.panel,.wl-it-command-panel,.wl-it-command-stat,.wl-it-dashboard-item,.wl-it-readiness-strip,.wl-it-ops-section,.wl-it-hero-greeting,.wl-it-clock-card,.wl-it-weather-card,.wl-service-simple-card,.wl-service-ticket-found,.wl-service-action-pill,.vision-ticket-entry){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;border-radius:10px!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(h1,h2,h3,h4,b,strong){color:#172C47!important;font-weight:600!important;letter-spacing:normal!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(p,small,label,.small,.muted,.wl-it-command-kicker,.wl-service-simple-kicker,.wl-service-help){color:#60748F!important;line-height:1.6!important;text-shadow:none!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important;font-size:16px!important;max-width:100%;min-width:0;box-sizing:border-box}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(input,textarea)::placeholder{color:#73849B!important;opacity:1}
+html body :is(button,a,input,textarea,select,summary):focus-visible{outline:2px solid #91B0FF!important;outline-offset:3px}
+html body #appView{background:#0B111C!important;color:#E6EDF7!important}
+html body #appView>.mobileTop,html body #appView>.mobileTop>.hero,html body #appView>.mobileTop>.accountbar,html body #appView>.mobileTop>.techStatusRow{background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important}
+html body #appView>.mobileTop .techBrand h1,html body #appView>.mobileTop :is(#whoName,.brandTitle){color:#E6EDF7!important;letter-spacing:normal!important}
+html body #appView>.mobileTop :is(.small,.pill,label,small),html body #appView>.mobileTop>.techStatusRow :is(b,span){color:#A3B3CA!important}
+html body #appView>.mobileTop :is(button,.pill),html body #appView .mainRoleTabs button{background:#172337!important;color:#C5D2E4!important;border-color:#2C3B51!important;box-shadow:none!important;border-radius:7px!important}
+html body #appView .mainRoleTabs button.active{background:#203456!important;color:#91B0FF!important;border-color:#355587!important}
+html body #appView :is(#view-it,#view-svc,#view-service){color:#E6EDF7!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.card,.panel,.wl-it-command-panel,.wl-it-command-stat,.wl-it-dashboard-item,.wl-it-readiness-strip,.wl-it-ops-section,.wl-it-hero-greeting,.wl-it-clock-card,.wl-it-weather-card,.wl-service-simple-card,.wl-service-ticket-found,.wl-service-action-pill,.vision-ticket-entry){background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important;border-radius:10px!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(h1,h2,h3,h4,b,strong){color:#E6EDF7!important;font-weight:600!important;letter-spacing:normal!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(p,small,label,.small,.muted,.wl-it-command-kicker,.wl-service-simple-kicker,.wl-service-help){color:#A3B3CA!important;line-height:1.6!important;text-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#111B2A!important;color:#E6EDF7!important;border:1px solid #617895!important;border-radius:7px!important;box-shadow:none!important;font-size:16px!important;max-width:100%;min-width:0;box-sizing:border-box}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(input,textarea)::placeholder{color:#A3B3CA!important;opacity:1}
 html body #appView :is(#view-it,#view-svc,#view-service) :is(input[type=checkbox],input[type=radio]){accent-color:#315FDF}
-html body #appView :is(#view-it,#view-svc,#view-service) button{background:#315FDF!important;color:#fff!important;border-color:#315FDF!important;box-shadow:none!important;border-radius:7px!important;text-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) button{background:#315FDF!important;color:#fff!important;border-color:#91B0FF!important;box-shadow:none!important;border-radius:7px!important;text-shadow:none!important}
 html body #appView :is(#view-it,#view-svc,#view-service) button :is(b,strong,small,span){color:inherit!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(button.secondary,button.wl-gray,button.mini,.wl-it-quick-grid button,.wl-it-quick-grid a,.wl-service-action-pill){background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important}
-html body #appView :is(#view-it,#view-svc,#view-service) :is(button.active,button.selected,[aria-selected=true]){background:#E7EEFF!important;color:#315FDF!important;border-color:#B5C7F4!important}
-html body #appView #view-it .wl-it-command-shell{background:#fff!important;border-color:#DCE4EF!important;border-radius:10px!important}
-html body #appView #view-it .wl-it-command-sidebar{background:#F8FAFD!important;border-color:#DCE4EF!important}
-html body #appView #view-it .wl-it-command-nav :is(button,a){background:transparent!important;color:#60748F!important;border-color:transparent!important;border-radius:7px!important;font-weight:400!important}
-html body #appView #view-it .wl-it-command-nav .active{background:#E7EEFF!important;color:#315FDF!important;border-color:transparent!important;border-left-color:#315FDF!important;box-shadow:none!important;font-weight:600!important}
-html body #appView #view-it .wl-it-command-stat.red{border-top-color:#315FDF!important}
-html body #appView #view-svc #wlSvcHome{background:transparent!important;border-color:#DCE4EF!important}
-html body #appView #view-svc .wl-service-action-pill[data-wl-service-open-job]{border-left-color:#315FDF!important}
-html body #appView #view-svc .wl-service-action-pill.complete{background:#E8F4EC!important;border-color:#CAE4D4!important;color:#287451!important}
-html body #appView #view-svc .wl-service-action-pill.complete :is(b,strong,small){color:#287451!important}
-html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-card,.wl-tech-menu-card,.card,.wl-menu-sheet,.wl-menu-head){background:#fff!important;color:#172C47!important;border-color:#DCE4EF!important;box-shadow:none!important;font-family:'Open Sans',Arial,sans-serif!important}
-html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-item,button){background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important;border-radius:8px!important}
-html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(h1,h2,b,strong){color:#172C47!important}html body :is(#wlTechMenuPanel,#wlAppMenuPanel) small{color:#60748F!important}
-html body :is(#cosOperationsTechReturn,#cosOperationsReturn,#cosProductionAssignmentsButton){background:#E7EEFF!important;color:#315FDF!important;border-color:#BCCCF4!important;border-radius:7px!important;box-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(button.secondary,button.wl-gray,button.mini,.wl-it-quick-grid button,.wl-it-quick-grid a,.wl-service-action-pill){background:#172337!important;color:#C5D2E4!important;border-color:#2C3B51!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(button.active,button.selected,[aria-selected=true]){background:#203456!important;color:#91B0FF!important;border-color:#355587!important}
+html body #appView #view-it .wl-it-command-shell{background:#111B2A!important;border-color:#2C3B51!important;border-radius:10px!important}
+html body #appView #view-it .wl-it-command-sidebar{background:#172337!important;border-color:#2C3B51!important}
+html body #appView #view-it .wl-it-command-nav :is(button,a){background:transparent!important;color:#A3B3CA!important;border-color:transparent!important;border-radius:7px!important;font-weight:400!important}
+html body #appView #view-it .wl-it-command-nav .active{background:#203456!important;color:#91B0FF!important;border-color:transparent!important;border-left-color:#91B0FF!important;box-shadow:none!important;font-weight:600!important}
+html body #appView #view-it .wl-it-command-stat.red{border-top-color:#91B0FF!important}
+html body #appView #view-svc #wlSvcHome{background:transparent!important;border-color:#2C3B51!important}
+html body #appView #view-svc .wl-service-action-pill[data-wl-service-open-job]{border-left-color:#91B0FF!important}
+html body #appView #view-svc .wl-service-action-pill.complete{background:#15352D!important;border-color:#2B5948!important;color:#83D6AD!important}
+html body #appView #view-svc .wl-service-action-pill.complete :is(b,strong,small){color:#83D6AD!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-card,.wl-tech-menu-card,.card,.wl-menu-sheet,.wl-menu-head){background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important;font-family:'Open Sans',Arial,sans-serif!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-app-menu-item,button){background:#172337!important;color:#C5D2E4!important;border-color:#2C3B51!important;border-radius:8px!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(h1,h2,b,strong){color:#E6EDF7!important}html body :is(#wlTechMenuPanel,#wlAppMenuPanel) small{color:#A3B3CA!important}
+html body :is(#cosOperationsTechReturn,#cosOperationsReturn,#cosProductionAssignmentsButton){background:#203456!important;color:#91B0FF!important;border-color:#355587!important;border-radius:7px!important;box-shadow:none!important}
 /* Real authentication roots from index.html. Reset requests live inside #authView.
    Do not set display: authentication/approval visibility stays with existing JS. */
-html body :is(#authView,#forcePasswordView,#sessionLoading,.visionLaunch){background:#F1F4F9!important;color:#172C47!important}
-html body :is(#authView,#forcePasswordView){width:100%;max-width:580px;min-width:0;padding:28px 20px 42px;box-sizing:border-box;--tc-text:#172C47;--tc-muted:#60748F;--tc-red:#315FDF}
-html body :is(#authView,#forcePasswordView) .hero{background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:10px!important;box-shadow:none!important;padding:20px!important;gap:16px!important;flex-wrap:wrap;min-width:0}
-html body :is(#authView,#forcePasswordView) .cos-vision-brand strong{color:#172C47!important;text-shadow:none!important}
-html body :is(#authView,#forcePasswordView) .cos-vision-brand small{color:#60748F!important;text-shadow:none!important}
-html body :is(#authView,#forcePasswordView) .techBrand h1{color:#60748F!important;font-size:18px!important;letter-spacing:normal!important;line-height:1.4}
-html body :is(#authView,#forcePasswordView) :is(.card,.panel){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:10px!important;box-shadow:none!important;min-width:0}
-html body :is(#authView,#forcePasswordView) :is(input,select,textarea){background:#fff!important;color:#172C47!important;border:1px solid #DCE4EF!important;border-radius:7px!important;box-shadow:none!important;min-width:0;max-width:100%;width:100%;font-size:16px!important;min-height:44px;box-sizing:border-box}
-html body :is(#authView,#forcePasswordView) :is(input,textarea)::placeholder{color:#60748F!important;opacity:1}
-html body :is(#authView,#forcePasswordView) :is(input,select,textarea):focus{outline:2px solid #315FDF!important;outline-offset:2px;border-color:#315FDF!important}
+html body :is(#authView,#forcePasswordView,#sessionLoading,.visionLaunch){background:#0B111C!important;color:#E6EDF7!important}
+html body :is(#authView,#forcePasswordView){width:100%;max-width:580px;min-width:0;padding:28px 20px 42px;box-sizing:border-box;--tc-text:#E6EDF7;--tc-muted:#A3B3CA;--tc-red:#315FDF}
+html body :is(#authView,#forcePasswordView) .hero{background:#111B2A!important;color:#E6EDF7!important;border:1px solid #2C3B51!important;border-radius:10px!important;box-shadow:none!important;padding:20px!important;gap:16px!important;flex-wrap:wrap;min-width:0}
+html body :is(#authView,#forcePasswordView) .cos-vision-brand strong{color:#E6EDF7!important;text-shadow:none!important}
+html body :is(#authView,#forcePasswordView) .cos-vision-brand small{color:#A3B3CA!important;text-shadow:none!important}
+html body :is(#authView,#forcePasswordView) .techBrand h1{color:#A3B3CA!important;font-size:18px!important;letter-spacing:normal!important;line-height:1.4}
+html body :is(#authView,#forcePasswordView) :is(.card,.panel){background:#111B2A!important;color:#E6EDF7!important;border:1px solid #2C3B51!important;border-radius:10px!important;box-shadow:none!important;min-width:0}
+html body :is(#authView,#forcePasswordView) :is(input,select,textarea){background:#111B2A!important;color:#E6EDF7!important;border:1px solid #617895!important;border-radius:7px!important;box-shadow:none!important;min-width:0;max-width:100%;width:100%;font-size:16px!important;min-height:44px;box-sizing:border-box}
+html body :is(#authView,#forcePasswordView) :is(input,textarea)::placeholder{color:#A3B3CA!important;opacity:1}
+html body :is(#authView,#forcePasswordView) :is(input,select,textarea):focus{outline:2px solid #91B0FF!important;outline-offset:2px;border-color:#91B0FF!important}
 html body :is(#authView,#forcePasswordView) :is(button,.primary){background:#315FDF!important;color:#fff!important;border:1px solid #315FDF!important;border-radius:7px!important;box-shadow:none!important;text-shadow:none!important;font-weight:600!important;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-html body :is(#authView,#forcePasswordView) button.mini{background:#F8FAFD!important;color:#46607E!important;border-color:#DCE4EF!important}
-html body :is(#authView,#forcePasswordView) button.danger{background:#FFF0F1!important;color:#9D3342!important;border-color:#EDC5CB!important}
-html body :is(#authView,#forcePasswordView) :is(h1,h2,h3,b,strong){color:#172C47!important;text-shadow:none!important;overflow-wrap:anywhere}
+html body :is(#authView,#forcePasswordView) button.mini{background:#172337!important;color:#C5D2E4!important;border-color:#2C3B51!important}
+html body :is(#authView,#forcePasswordView) button.danger{background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+html body :is(#authView,#forcePasswordView) :is(h1,h2,h3,b,strong){color:#E6EDF7!important;text-shadow:none!important;overflow-wrap:anywhere}
 html body :is(#authView,#forcePasswordView) :is(h2,h3){font-weight:600!important;line-height:1.4}
-html body :is(#authView,#forcePasswordView) :is(p,small,label,.small){color:#60748F!important;line-height:1.6;text-shadow:none!important;overflow-wrap:anywhere}
-html body :is(#authView,#forcePasswordView) .ok{background:#E8F4EC!important;color:#287451!important;border-color:#CAE4D4!important}
-html body :is(#authView,#forcePasswordView) .warn{background:#FFF1D9!important;color:#8A601E!important;border-color:#EED7AC!important}
-html body :is(#authView,#forcePasswordView) .bad{background:#FFF0F1!important;color:#9D3342!important;border-color:#EDC5CB!important}
+html body :is(#authView,#forcePasswordView) :is(p,small,label,.small){color:#A3B3CA!important;line-height:1.6;text-shadow:none!important;overflow-wrap:anywhere}
+html body :is(#authView,#forcePasswordView) .ok{background:#15352D!important;color:#83D6AD!important;border-color:#2B5948!important}
+html body :is(#authView,#forcePasswordView) .warn{background:#3B2D18!important;color:#EDC27B!important;border-color:#60492B!important}
+html body :is(#authView,#forcePasswordView) .bad{background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
 html body :is(#authView,#forcePasswordView) :is(.ok,.warn,.bad) :is(b,strong,.small){color:inherit!important}
 @media(max-width:380px){html body :is(#authView,#forcePasswordView){padding:18px 14px 30px}html body :is(#authView,#forcePasswordView) :is(.hero,.card){padding:16px!important}}
-html body .visionLaunchWord{color:#172C47!important;text-shadow:none!important}html body :is(.visionLaunchCompany,.visionLaunchStatus){color:#60748F!important}.cos-vision-brand{color:#172C47}
+html body .visionLaunchWord{color:#E6EDF7!important;text-shadow:none!important}html body :is(.visionLaunchCompany,.visionLaunchStatus){color:#A3B3CA!important}.cos-vision-brand{color:#E6EDF7}
+
+/* Dynamically inserted native menus, check steps and dialogs keep their original
+   geometry/visibility. Only painted surfaces and semantic state colors change. */
+html body :is(.wl-menu-overlay,.wl-modal-backdrop,dialog)::backdrop{background:rgba(3,8,16,.76)}
+html body :is(.wl-menu-sheet,.wl-tour-tip,.wl-help-simple-card,dialog,[role="dialog"]){background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:0 18px 60px #0008!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-menu-future,.wl-app-menu-icon,.wl-owner-menu-util-icon,.wl-owner-menu-ai-icon){background:#172337!important;color:#91B0FF!important;border-color:#2C3B51!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) :is(.wl-next-kicker,.wl-menu-section-label){color:#91B0FF!important}
+html body :is(#wlTechMenuPanel,#wlAppMenuPanel) .wl-menu-signout{background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.wl-it-permission,.wl-it-ops-flow,.wl-it-ops-ticket,.wl-it-ops-history-row,.wl-it-cal-day,.wl-it-ticket-next,.wl-it-ticket-command>div,.wl-it-audit-row,.wl-it-attn,.wl-it-attn-row,.wl-card,.wl-step,.wl-choice,.wl-help-simple-card){background:#172337!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.wl-it-command-stat span,.wl-it-readiness-strip span,.wl-it-empty,.wl-it-command-limit,.wl-it-dashboard-item span,.wl-it-clock-date,.wl-it-weather-main span,.wl-it-audit-row em){color:#A3B3CA!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.ok,.wl-it-ops-banner){background:#15352D!important;color:#83D6AD!important;border-color:#2B5948!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.warn,.connectionBanner){background:#3B2D18!important;color:#EDC27B!important;border-color:#60492B!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.bad,.error,.wl-it-owner-lock){background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+html body :is(#view-it,#view-svc,#view-service) :is(.ok,.warn,.bad,.error,.wl-it-ops-banner,.wl-it-owner-lock) :is(b,strong,small,.small){color:inherit!important}
+html body :is(#view-it,#view-svc,#view-service) :is(button.danger,.wl-danger){background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+html body .connectionBanner{background:#3B2D18!important;color:#EDC27B!important;border-color:#60492B!important}
+html body :is(#view-it,#view-svc,#view-service) a:not(.wl-service-action-pill){color:#91B0FF}
+/* Legacy question, proof, ticket and history surfaces are injected after load. */
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-head,.wl-ticket,.wl-question,.wl-proof,.wl-live-stage,.wl-assigned-inventory,.wl-svc-command-stat,.wl-svc-command-next,.wl-svc-command-section,.wl-svc-job,.wl-svc-command-close-row,.wl-service-quick,.wl-nav,.check,.unit){background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-count,.wl-assigned-inventory-list span,.wl-history summary,.pill){background:#172337!important;color:#C5D2E4!important;border-color:#2C3B51!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-title,.qtext,.wl-svc-command-stat b,.wl-svc-command-next b){color:#E6EDF7!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-sub,.wl-note,.wl-live-stage>span,.wl-svc-command-stat span,.wl-svc-job p){color:#A3B3CA!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.kicker,.qnum){color:#91B0FF!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-progress,.wl-live-track){background:#2C3B51!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-progress span,.wl-live-track i){background:#315FDF!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-options button,.wl-service-quick-pill){background:#172337!important;color:#E6EDF7!important;border-color:#415777!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-options .pass.on,.wl-finish,.wl-saved,.wl-review,.wl-status-complete summary,.wl-svc-command-next.clear){background:#15352D!important;color:#83D6AD!important;border-color:#2B5948!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-options .fail,.wl-stop,.wl-issue-link,.wl-status-pending summary,.wl-tech-load-error,.wl-svc-job-top span.attn,.wl-svc-command-close-row.issue){background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-status-waiting summary,.wl-tech-partial,.wl-svc-job-top span.wait,.wl-svc-command-close-row.pending,.wl-svc-command-next.wait){background:#3B2D18!important;color:#EDC27B!important;border-color:#60492B!important}
+html body #appView :is(#view-it,#view-svc,#view-service) :is(.wl-saved,.wl-review,.wl-stop,.wl-issue-link,.wl-tech-load-error,.wl-tech-partial) :is(b,strong,small,.small,span){color:inherit!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) :is(.wl-help-sheet,.wl-help-head,.wl-help-home-hero,.wl-help-card,.wl-help-flow-map,.wl-help-status-grid>div,.wl-help-topic-detail,.wl-help-howto,.wl-help-simple-card){background:#111B2A!important;color:#E6EDF7!important;border-color:#2C3B51!important;box-shadow:none!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) :is(h1,h2,h3,b,strong,.wl-help-simple-instruction){color:#E6EDF7!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) :is(p,small,label,.small){color:#A3B3CA!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) button{background:#172337!important;color:#E6EDF7!important;border-color:#2C3B51!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) :is(button.selected,.wl-next,.wl-help-topic-actions button:first-child){background:#315FDF!important;color:#fff!important;border-color:#315FDF!important}
+html body :is(#wlHelpOverlay,.wl-help-coach-toast) :is(.wl-help-rule-card,.wl-help-show-note){background:#3B2D18!important;color:#EDC27B!important;border-color:#60492B!important}
