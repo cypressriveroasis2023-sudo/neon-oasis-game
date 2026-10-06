@@ -15,10 +15,10 @@ function useModalDialog(ref:RefObject<HTMLDialogElement|null>,visible:unknown) {
     return()=>{if(dialog.open)dialog.close();if(previous instanceof HTMLElement&&previous.isConnected)previous.focus();};
   },[visible,ref]);
 }
-type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string};
+type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string;clearFocusedJob?:()=>void};
 type ScheduleDraft={date:string;startTime:string;endTime:string;technician:string;department:string};
 const message=(cause:unknown,fallback:string)=>cause instanceof Error?cause.message:fallback;
-export default function OperationsJobs({mode,show,initialJobId=''}:Props) {
+export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJob}:Props) {
   const [search,setSearch]=useState('');
   const [focusedId,setFocusedId]=useState(initialJobId);
   useEffect(()=>setFocusedId(initialJobId),[initialJobId]);
@@ -151,7 +151,7 @@ export default function OperationsJobs({mode,show,initialJobId=''}:Props) {
   const label=mode==='review'?'Owner Review':mode==='dispatch'?'Dispatch':mode==='unscheduled'?'Unscheduled COS Jobs':'COS Jobs';
   return <div className='ops-workflows' aria-label={label} aria-busy={loading}>
     <div className='purchase-actions'><span>{mode==='jobs'?'COS Jobs are the authoritative operational records.':mode==='review'?'Completed field work waiting for Owner closeout.':mode==='unscheduled'?'Schedule and assign work before dispatch.':'Only properly scheduled work can be dispatched.'}</span><span>{rows?visible.length+' '+(mode==='jobs'?'authoritative job records':'jobs'):'Counts unavailable'}</span><button className='secondary' disabled={loading||saving} onClick={refresh}>{loading?'Refreshing…':'Refresh jobs'}</button></div>
-    {focusedId&&<div className='purchase-actions'><span>Selected job</span><button className='secondary' onClick={()=>setFocusedId('')}>Show all jobs</button></div>}
+    {focusedId&&<div className='purchase-actions'><span>Selected job</span><button className='secondary' onClick={()=>{setFocusedId('');clearFocusedJob?.();}}>Show all jobs</button></div>}
     <div className='operations-job-filters'><label>Find a job<input type='search' placeholder='Job, customer, site, unit or technician' value={search} onChange={event=>setSearch(event.target.value)}/></label><label>Status<select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value=''>All statuses</option>{statuses.map(status=><option value={status} key={status}>{status}</option>)}</select></label></div>
     {rows&&!loading&&candidates.length>0&&visible.length===0&&<p role='status'>No jobs match these filters.</p>}
     {error&&<div className='daily-board-error' role='alert'>{error}{rows&&<p>Showing the last successful records.</p>}</div>}

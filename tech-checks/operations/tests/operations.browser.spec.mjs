@@ -96,11 +96,12 @@ async function fixturePage(page) {
   // intercepted cross-origin fetch directly, so no backend request is emitted.
   await page.goto('/harness');
   const frame = page.frameLocator('#operations');
-  await expect(frame.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   return { state, frame };
 }
 async function open(frame, name) {
-  await frame.getByRole('button', { name, exact: true }).first().click();
+  await frame.getByRole('button',{name:'More',exact:true}).click();
+  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:name==='Daily Board'?'Dispatch Board':name,exact:true}).click();
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());
@@ -151,7 +152,7 @@ test('Today preserves verified sources when one source fails and fits the viewpo
   await expect(frame.getByRole('heading', { name: 'Operational Timeline' })).toBeVisible();
   await noOverflow(page);
   state.failedPaths.add('/api/jobs');
-  await frame.getByRole('button', { name: 'Refresh Today' }).click();
+  await frame.getByRole('button', { name: 'Refresh Overview' }).click();
   await expect(frame.getByRole('alert', { name: 'Dashboard data unavailable' })).toBeVisible();
   await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.', { exact: true })).toBeVisible();
   await expect(frame.locator('.stats article').filter({ hasText: 'ACTIVE JOBS' }).locator('b')).toHaveText('—');
@@ -287,4 +288,55 @@ test('Field Map blocks another GPS write until a successful manual refresh', asy
   await save.click();
   await expect(frame.getByRole('status').filter({ hasText: 'GPS location saved and verified.' }).first()).toBeVisible();
   expect(state.writes).toHaveLength(2);
+});
+
+test('Overview mobile job detail preserves selection through Back, Forward, reload and resize',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const {frame,state}=await fixturePage(page);
+  const search=frame.getByRole('searchbox',{name:'Find an active job'});
+  await search.fill('East');
+  const selected=frame.getByRole('button',{name:/Delivery · FIX-102/});
+  await selected.click();
+  const detail=frame.getByRole('complementary',{name:'Selected job details'});
+  await expect(detail).toBeVisible();
+  await expect(frame.locator('.workspace-work')).toBeHidden();
+  await expect(detail).toContainText('East Entrance');
+  const hash=await frame.locator('body').evaluate(()=>location.hash);
+  expect(hash).toContain('job=55555555-5555-4555-8555-555555555555');
+  expect(hash).toContain('detail=1');
+  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
+  await expect(search).toHaveValue('East');
+  await expect(selected).toBeFocused();
+  await expect(selected).toHaveAttribute('aria-pressed','true');
+  await expect(detail).toBeHidden();
+  await frame.locator('body').evaluate(()=>history.forward());
+  await expect(detail).toBeVisible();
+  for(const width of [1024,390,1440,320]){
+    await page.setViewportSize({width,height:900});
+    await expect(detail).toBeVisible();
+    await expect(detail).toContainText('East Entrance');
+    await noOverflow(page);
+  }
+  await frame.locator('body').evaluate(()=>location.reload());
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('East Entrance');
+  await detail.getByRole('button',{name:'Open job & actions →'}).click();
+  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
+  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-102');
+  await frame.locator('body').evaluate(()=>history.back());
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('East Entrance');
+  expect(state.writes).toEqual([]);
+});
+test('a stale Overview job link never substitutes another record or action',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const {frame,state}=await fixturePage(page);
+  await frame.locator('body').evaluate(()=>{location.hash='today?job=missing-job&detail=1';});
+  const detail=frame.getByRole('complementary',{name:'Selected job details'});
+  await expect(detail.getByRole('heading',{name:'Selected job is unavailable'})).toBeVisible();
+  await expect(detail.getByRole('button',{name:'Open job & actions →'})).toHaveCount(0);
+  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
+  await expect(frame.locator('.workspace-work')).toBeVisible();
+  await expect(detail).toBeHidden();
+  expect(state.writes).toEqual([]);
 });

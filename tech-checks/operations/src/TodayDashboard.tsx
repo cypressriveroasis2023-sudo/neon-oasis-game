@@ -4,10 +4,10 @@ import { api } from './api';
 import { RouterOverview } from './RouterWorkspace';
 import { dashboardSources, loadTodayDashboard, summarizeTodayDashboard, type DashboardData } from './todayDashboardData';
 
-type Props = { setActive: (workspace: string) => void; openJob?: (id:string)=>void; openUnit?: (unit:number)=>void };
+type Props = { setActive: (workspace: string) => void; openJob?: (id:string)=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
 const metric = (count: number | null) => count === null ? '—' : count;
 
-export default function LiveTodayDashboard({ setActive, openJob, openUnit }: Props) {
+export default function LiveTodayDashboard({ setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const revision = useRef(0);
@@ -35,18 +35,18 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit }: Pro
     { title: 'Quote Approvals', count: summary.quoteApprovals.length, message: 'Sales quotes are waiting for Owner decision.', workspace: 'Quotes' },
     { title: 'Invoice Approvals', count: summary.invoiceApprovals.length, message: 'Customer invoices are waiting for Owner approval.', workspace: 'Invoices' },
   ];
-  return <div className='owner-command-home' aria-busy={loading}>
+  return <div className={'owner-command-home'+(detailOpen?' overview-detail-open':'')} aria-busy={loading}>
     <div className='purchase-actions'>
       <span>{loading ? 'Refreshing dashboard. Values below are from the previous response.' : complete ? 'Dashboard sources loaded.' : 'Dashboard partially unavailable. Missing values are not zero.'}</span>
-      <button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Today' : 'Retry dashboard'}</button>
+      <button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
     </div>
     {failed.length > 0 && <section className='panel' role='alert' aria-label='Dashboard data unavailable'>
       <div className='panelhead'><h2>Some dashboard information is unavailable</h2></div>
       <p>Available sections remain visible. A dash means unverified information, not no work.</p>
       {failed.map(([key]) => <p key={key}>{data.errors[key]}</p>)}
-      <button className='secondary' onClick={() => setActive('Daily Board')}>Open Daily Board</button>
+      <button className='secondary' onClick={() => setActive('Daily Board')}>Open Dispatch Board</button>
     </section>}
-    <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit}/>
+    <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit} selectedJobId={selectedJobId} detailOpen={detailOpen} selectJob={selectJob} backToJobs={backToJobs}/>
     <section className='stats'>
       <article><span>OWNER TASKS</span><b>{metric(summary.openTasks)}</b><i>{summary.openTasks === null ? 'Unavailable' : summary.highPriorityTasks + ' high priority'}</i><button onClick={() => setActive('Owner Tasks')}>MANAGE TASKS</button></article>
       <article><span>ACTIVE JOBS</span><b>{metric(summary.activeJobs)}</b><i>{summary.activeJobs === null ? 'Unavailable' : 'Scheduled + assigned + field'}</i></article>

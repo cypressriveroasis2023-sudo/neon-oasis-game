@@ -97,6 +97,7 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
 async function responsiveLayout(page, frame) {
   await expect(frame.getByText('OPERATIONS CONNECTED', { exact:true })).toBeVisible();
   await fillsViewport(page);
+  await expect(frame.getByRole('button',{name:'More',exact:true})).toBeVisible();
   const size = await frame.locator('.owner-it-topbar').evaluate(header => {
     const main=header.parentElement, style=getComputedStyle(main);
     return {width:innerWidth,content:document.documentElement.scrollWidth,
@@ -111,7 +112,7 @@ async function responsiveLayout(page, frame) {
     expect(size.menu.left).toBeGreaterThanOrEqual(size.header.left);
     expect(size.menu.right).toBeLessThanOrEqual(size.header.right);
   }else{
-    await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'More',exact:true})).toBeVisible();
+    await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Office',exact:true})).toBeVisible();
   }
   await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
 }
@@ -194,7 +195,7 @@ test('approved Today workspace uses the available screen width at normal browser
   }));
   expect(layout.zoom).toBe(1);
   expect(layout.today.width).toBeCloseTo(layout.header.width,0);
-  for(const section of [layout.work,layout.details]){
+  for(const section of page.viewportSize().width>700?[layout.work,layout.details]:[layout.work]){
     expect(section.left).toBeGreaterThanOrEqual(layout.today.left);
     expect(section.right).toBeLessThanOrEqual(layout.today.right+1);
   }

@@ -71,13 +71,13 @@ async function start(page) {
   });
   await page.goto('/finance-harness');
   const frame = page.frameLocator('#operations');
-  await expect(frame.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   return { frame, state };
 }
 async function navigate(frame, name) {
   const more = frame.getByRole('button', { name: 'More', exact: true });
   if (await more.isVisible()) await more.click();
-  await frame.getByRole('navigation', { name: 'COS Operations', exact: true }).getByRole('button', { name, exact: true }).click();
+  await frame.getByRole('navigation', { name: 'COS Operations', exact: true }).getByRole('button', { name:name==='Invoices'?'Billing & Invoices':name, exact: true }).click();
   await expect(frame.getByRole('region', { name: name + ' review', exact: true })).toBeVisible();
 }
 async function noOverflow(page) {
