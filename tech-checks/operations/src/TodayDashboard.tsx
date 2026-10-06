@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import WorkspaceOverview from './WorkspaceOverview';
 import { api } from './api';
 import { RouterOverview } from './RouterWorkspace';
 import { dashboardSources, loadTodayDashboard, summarizeTodayDashboard, type DashboardData } from './todayDashboardData';
 
-type Props = { setActive: (workspace: string) => void; vision?: boolean };
+type Props = { setActive: (workspace: string) => void; vision?: boolean; openJob?: (id:string)=>void; openUnit?: (unit:number)=>void };
 const metric = (count: number | null) => count === null ? '—' : count;
-const text = (value: unknown) => value == null ? '' : String(value);
 
-export default function LiveTodayDashboard({ setActive, vision = false }: Props) {
+export default function LiveTodayDashboard({ setActive, vision = false, openJob, openUnit }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const revision = useRef(0);
@@ -59,6 +59,7 @@ export default function LiveTodayDashboard({ setActive, vision = false }: Props)
       {failed.map(([key]) => <p key={key}>{data.errors[key]}</p>)}
       <button className='secondary' onClick={() => setActive('Daily Board')}>Open Daily Board</button>
     </section>}
+    <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit}/>
     <section className='stats'>
       <article><span>OWNER TASKS</span><b>{metric(summary.openTasks)}</b><i>{summary.openTasks === null ? 'Unavailable' : summary.highPriorityTasks + ' high priority'}</i><button onClick={() => setActive('Owner Tasks')}>MANAGE TASKS</button></article>
       <article><span>ACTIVE JOBS</span><b>{metric(summary.activeJobs)}</b><i>{summary.activeJobs === null ? 'Unavailable' : 'Scheduled + assigned + field'}</i></article>
@@ -68,15 +69,6 @@ export default function LiveTodayDashboard({ setActive, vision = false }: Props)
     </section>
     <RouterOverview openWorkspace={setActive}/>
     <section className='grid'>
-      <article className='panel'>
-        <div className='panelhead'><h2>Operational Timeline</h2><span>{data.jobs === null ? 'Unavailable' : loading ? 'Refreshing' : 'Live jobs'}</span></div>
-        {data.jobs === null ? <div className='loading'>Jobs could not be loaded. Retry before relying on this view.</div>
-          : summary.timeline.length ? summary.timeline.map((job, index) => <div className='job' key={text(job.id || job.jobNumber) + ':' + index}>
-            <b>{text(job.scheduled) || 'Not scheduled'}</b>
-            <div><strong>{text(job.jobNumber)} · {text(job.customer)}</strong><small>{text(job.site)} · {text(job.stage || job.status)}</small></div>
-            <em>{text(job.status)}</em>
-          </div>) : <div className='loading'>No active jobs in the loaded records.</div>}
-      </article>
       <article className='panel attention'>
         <div className='panelhead'><h2>Needs Attention</h2><span>{summary.attention === null ? 'Total unverified' : summary.attention + ' review items'}</span></div>
         {groups.filter(group => group.count > 0).map(group => <div className='alert' key={group.title}>

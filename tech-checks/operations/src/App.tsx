@@ -164,6 +164,8 @@ function TechCheckWorkspace() {
 }
 function OwnerApp() {
   const [mapUnitId, setMapUnitId] = useState('');
+  const [focusedJob,setFocusedJob]=useState('');
+  const [heliosUnit,setHeliosUnit]=useState(1);
   // One owner app link; CSS follows the live iframe viewport on every device.
   // The standard workspace opens by default; VISION is an explicit optional view.
   const [vision,setVision]=useState(()=>new URLSearchParams(location.search).get('theme')==='vision');
@@ -217,6 +219,7 @@ function OwnerApp() {
   },[]);
   const navigate=useCallback((name:string)=>{
     setMenu(false);
+    setFocusedJob('');
     if(legacy[name]){openLegacy(legacy[name]);return;}
     const next=nav.includes(name)?name:'Today';
     setActive(next);
@@ -247,11 +250,11 @@ function OwnerApp() {
       </>}
       {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{active}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
-        :active==='Today'?<TodayDashboard setActive={navigate} vision={vision}/>
+        :active==='Today'?<TodayDashboard setActive={navigate} vision={vision} openJob={id=>{navigate('Jobs');setFocusedJob(id);}} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}}/>
         :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={mapUnitId} openWorkspace={navigate}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
-        :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show}/>
+        :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} initialJobId={focusedJob}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show}/>
         :active==='Dispatch'?<OperationsJobs key='dispatch' mode='dispatch' show={show}/>
         :active==='Owner Review'?<OperationsJobs key='review' mode='review' show={show}/>
@@ -266,7 +269,7 @@ function OwnerApp() {
         :active==='Tech Check'?<TechCheckWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
         :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Field Map');}}/>
-        :active==='Victron VRM'?<VrmWorkspace/>
+        :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Today</button></section>}
     </main>
     <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation'><button className={active==='Today'?'active':''} onClick={()=>navigate('Today')}>Today</button><button aria-label='Daily Board' className={active==='Daily Board'?'active':''} onClick={()=>navigate('Daily Board')}>Board</button><button className={active==='Field Map'?'active':''} onClick={()=>navigate('Field Map')}>Field Map</button><button className={active==='Tech Check'?'active':''} onClick={()=>navigate('Tech Check')}>Tech Check</button><button aria-label='More' aria-expanded={menu} onClick={()=>setMenu(current=>!current)}>☰ Menu</button></nav>

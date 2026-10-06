@@ -3,9 +3,9 @@ import { api } from './api';
 import { heliosVrmUnits, readVrmPortalConfig, vrmPortalUrl, type VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import './vrm.css';
 
-export default function VrmWorkspace() {
+export default function VrmWorkspace({initialUnit=1}:{initialUnit?:number}) {
   const [units, setUnits] = useState<VrmUnit[]>(() => heliosVrmUnits.map(unit => ({ ...unit, portalUrl: vrmPortalUrl(unit.installationId), embedUrl: null })));
-  const [selected, setSelected] = useState(1);
+  const [selected, setSelected] = useState(initialUnit>=1&&initialUnit<=9?initialUnit:1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
