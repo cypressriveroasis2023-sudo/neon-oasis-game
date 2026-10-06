@@ -1,0 +1,32 @@
+/* The fleet overview is intentionally quiet. Detail controls live inside the unit dialog. */
+body.simple-health-overview .health-kpis{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.simple-health-overview .health-kpis .stat{min-height:95px!important}
+.simple-health-overview #unitCards{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))!important;gap:14px!important;padding:0!important;align-items:stretch!important}
+.simple-health-overview #unitCards .compact-unit{display:flex!important;flex-direction:column!important;gap:9px!important;height:100%!important;padding:18px!important;text-align:left!important;min-width:0!important;border-radius:15px!important;font-weight:400!important;transition:border-color .15s ease,background .15s ease}
+.compact-unit-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-width:0}
+.compact-unit-title{font-size:23px;font-weight:850;line-height:1.18;overflow-wrap:anywhere;color:#e6edf7}
+.simple-health-overview #unitCards .compact-unit .statuspill{position:static!important;font-size:10px!important;flex-shrink:0;max-width:120px;white-space:normal!important;text-align:right;line-height:1.35;padding:5px 7px!important}
+.compact-unit-site{font-size:14px;color:#b6c4d4;overflow-wrap:anywhere;line-height:1.4}
+.compact-unit-meta{font-size:12px;color:#8fa1b5;line-height:1.4}
+.compact-unit-summary{font-size:13px;color:#c8d4e3;border-top:1px solid #29384c;margin-top:4px;padding-top:12px;line-height:1.4}
+.compact-unit-open{display:flex;justify-content:space-between;align-items:center;color:#bcd7f6;font-size:12px;font-weight:750;margin-top:auto;padding-top:5px}
+.simple-health-overview button:focus-visible,.simple-health-overview a:focus-visible,.simple-health-overview summary:focus-visible{outline:3px solid #96c7fd!important;outline-offset:3px}
+#unitDetailDialog{color:#e6edf7;background:#0b111c;border:1px solid #36465e;border-radius:18px;width:min(1080px,calc(100% - 40px));max-height:calc(100dvh - 48px);padding:24px;overflow:auto;box-shadow:0 24px 100px #0009}
+#unitDetailDialog::backdrop{background:rgba(3,8,15,.8)}
+#unitDetailDialog:not([open]){display:none!important}
+.unit-detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-bottom:1px solid #29384c;padding-bottom:18px;margin-bottom:18px}
+.unit-detail-top h2{font-size:30px;margin:4px 0 6px;overflow-wrap:anywhere}
+.unit-detail-top p{margin:0;line-height:1.5}.unit-detail-top button{flex-shrink:0}
+.unit-components{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:12px}
+.unit-component{padding:16px;background:#111b2a;border:1px solid #29384c;border-radius:12px;min-width:0}
+.unit-component-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.unit-component h3{margin:0;font-size:17px;overflow-wrap:anywhere}.unit-component .btn{display:block;margin-top:12px;text-align:center;font-size:12px}
+.unit-component .unit-time-strip{display:grid;grid-template-columns:1fr;gap:0;border:1px solid #29384c;border-radius:9px;overflow:hidden;margin-top:12px}
+.unit-component .unit-time-strip>div{padding:12px}.unit-component .unit-time-strip span,.unit-component .unit-time-strip b,.unit-component .unit-time-strip small{display:block;line-height:1.5;overflow-wrap:anywhere}.unit-component .unit-time-strip span{font-size:11px;color:#9aacc1}.unit-component .unit-time-strip b{font-size:12px}.unit-component .unit-time-strip small{font-size:11px;color:#9aacc1;margin-top:5px}
+#unitDetailDialog .opspanel{margin-top:16px;background:#111b2a;border-color:#29384c}
+#unitDetailDialog #troubleArea,#unitDetailDialog #issuesArea,#unitDetailDialog #eventsArea{display:block!important}
+#unitDetailDialog .trouble-search[hidden]{display:none!important}
+#unitDetailDialog .diagnostic-tabs{margin-top:0}#unitDetailDialog .quick-actions{display:none}
+#unitDetailDialog .unit-events{padding:14px}.unit-events>summary,.unit-manage>summary{cursor:pointer;font-weight:750;min-height:24px}.unit-manage{margin-top:14px}.unit-manage button{margin-top:10px}
+#unitDetailDialog .eventrows{max-height:400px}.unit-event{display:grid;grid-template-columns:180px minmax(0,1fr) auto;gap:8px;padding:12px 0;border-bottom:1px solid #29384c;color:#e6edf7;text-decoration:none;font-size:12px}.unit-event .small{grid-column:1/-1;overflow-wrap:anywhere}.unit-event time{color:#a6b6ca}
+#unitDetailDialog #cameraIssues .eventrow{grid-template-columns:45px minmax(0,1fr) auto}.eventdetail{overflow-wrap:anywhere}#unitDetailDialog #cameraIssues .eventdetail{display:block!important;grid-column:1/-1;line-height:1.5}.unit-component p{line-height:1.5}.component-observations{padding:12px 16px;display:grid;gap:10px}.component-observation{border:1px solid #34425a;border-radius:10px;padding:12px}.component-observation h3{font-size:15px;margin:0 0 8px}.component-observation p{font-size:12px;line-height:1.6;margin:4px 0;overflow-wrap:anywhere}
+@media(max-width:768px){body.simple-health-overview .health-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}#unitDetailDialog{width:calc(100% - 16px);max-height:calc(100dvh - 16px);padding:15px;border-radius:14px}.unit-detail-top{flex-direction:column;gap:12px}.unit-detail-top button{width:100%}.unit-detail-top h2{font-size:25px}.unit-event{grid-template-columns:minmax(0,1fr) auto}.unit-event time{grid-column:1/-1}.simple-health-overview #unitCards .compact-unit{padding:16px!important}.compact-unit-title{font-size:22px}.simple-health-overview #unitCards{grid-template-columns:1fr!important}#unitDetailDialog .diagnostic-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.simple-health-overview .toolbar select{width:100%}}

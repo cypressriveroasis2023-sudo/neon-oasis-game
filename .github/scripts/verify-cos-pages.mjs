@@ -18,6 +18,8 @@ const files = [
   'tech-checks/camera-health.html',
   'tech-checks/camera-health-history.js',
   'tech-checks/camera-health-history.css',
+  'tech-checks/camera-health-overview.js',
+  'tech-checks/camera-health-overview.css',
   'tech-checks/camera-detail.html',
   'tech-checks/onsite-vision.html',
   'tech-checks/onsite-vision.js',
