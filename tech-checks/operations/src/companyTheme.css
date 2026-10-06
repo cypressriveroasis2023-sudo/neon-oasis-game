@@ -143,3 +143,7 @@ html body .cos-dialog-overlay{background:#172C4770;backdrop-filter:blur(3px)}htm
 /* Opening the fixed drawer must not shift the underlying grid column. */
 #root .company-shell>.owner-it-main{grid-column:2}
 @media(max-width:700px){#root .company-shell>.owner-it-main{grid-column:auto}}
+
+/* Access-boundary handoffs are primary actions: both text lines need contrast. */
+#root#root .operations-shell .operations-tool-grid>button:not(.secondary){background:#315FDF!important;color:#fff!important;border-color:#315FDF!important}
+#root#root .operations-shell .operations-tool-grid>button:not(.secondary) :is(b,span){color:#fff!important}
