@@ -9,6 +9,8 @@ import TodayDashboard from './TodayDashboard';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
+import TicketActions from './TicketActions';
+import type { TicketType } from './ticketTypes';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
 import VrmWorkspace from './VrmWorkspace';
@@ -240,6 +242,11 @@ function OwnerApp() {
     setRouteLocation({workspace:next,jobId:'',detail:false},active==='Operations');
     window.scrollTo({top:0,behavior:'instant'});
   },[setRouteLocation,active]);
+  const createTicket=useCallback((createType:TicketType)=>{
+    setMenu(false);
+    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType});
+    window.scrollTo({top:0,behavior:'instant'});
+  },[setRouteLocation]);
   const openJob=useCallback((id:string,workspace:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch'='Jobs')=>{
     setMenu(false);
     setRouteLocation({workspace,jobId:id,detail:false});
@@ -276,18 +283,18 @@ function OwnerApp() {
     </aside>
     <main className='owner-it-main' inert={menu}>
       <section className='company-utility-bar' aria-label='Workspace utilities'>
-        <div className='company-mobile-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div><span className='company-breadcrumb'>{workspaceLabel(active)}</span>
+        <div className='company-mobile-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div><span className='company-breadcrumb'>{route.createType?'Create ticket':workspaceLabel(active)}</span>
         <button type='button' className='company-search-trigger vision-nav-return' onClick={()=>navigate('Daily Board')}>Open dispatch board</button>
         <span className={'company-connection'+(!authorized?' company-connection-pending':'')} role='status'><i aria-hidden='true'/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</span>
         <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu <span aria-hidden='true'>☰</span></button>
       </section>
 
-      {active!=='Today'&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
+      {active!=='Today'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
-        :active==='Today'?<>{!route.detail&&<VisionAreas api={api} navigate={navigate}/>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :active==='Today'?<>{!route.detail&&<><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
-        :active==='Daily Board'?<><OwnerBoardControls show={show}/><DailyBoard api={api} openWorkspace={navigate}/></>
+        :active==='Daily Board'?<><OwnerBoardControls key={route.createType?'create-ticket':'board-controls'} show={show} createType={route.createType} cancelCreate={()=>navigate('Today')} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={mapUnitId} openWorkspace={navigate}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>

@@ -1,0 +1,7 @@
+.customer-contact-picker{margin:18px 0;padding:16px;border:1px solid var(--cos-border);border-radius:8px;min-width:0;background:var(--cos-sidebar)}
+#root .operations-shell .customer-contact-picker h4{margin:0 0 13px;font-size:15px;letter-spacing:0;color:var(--cos-text)}
+.customer-contact-picker p{font-size:12px;line-height:1.6;color:var(--cos-muted);margin:8px 0}
+.customer-contact-details{padding:13px 0;min-width:0;overflow-wrap:anywhere}.customer-contact-details>strong{display:block;font-size:14px;color:var(--cos-text)}.customer-contact-details>span{display:block;font-size:11px;color:var(--cos-muted);margin-top:5px}
+.customer-contact-details dl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0 0}.customer-contact-details dt{font-size:10px;color:var(--cos-muted);margin-bottom:4px}.customer-contact-details dd{font-size:13px;color:var(--cos-text);margin:0;overflow-wrap:anywhere}
+.customer-contact-picker .customer-contact-note{font-size:11px;margin-top:9px}.customer-contact-picker .operations-error button{margin-top:8px}
+@media(max-width:600px){.customer-contact-picker{padding:12px}.customer-contact-details dl{grid-template-columns:1fr}}

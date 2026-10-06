@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readCustomerContacts,customerContactInstructions,ticketDescriptionWithContact} from '../src/customerContacts.ts';
+const customerId='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222';
+const contact={id,customerId,name:'Fixture Contact',email:'contact@example.invalid',phone:'202-555-0101',title:'Coordinator',isPrimary:true,billingContact:false};
+test('contact snapshot retains saved fields without inventing on-site status',()=>{assert.deepEqual(readCustomerContacts({customerId,items:[contact]},customerId),[contact]);const text=customerContactInstructions(contact);assert.match(text,/Customer contact for this ticket/);assert.match(text,/contact@example.invalid/);assert.doesNotMatch(text,/on.site/i);});
+test('contact instructions are composed once, remain editable, and disappear on deselection',()=>{const note=customerContactInstructions(contact);assert.equal(ticketDescriptionWithContact('Owner instructions',note),'Owner instructions\n\n'+note);assert.equal(ticketDescriptionWithContact('Owner instructions',''),'Owner instructions');assert.equal(ticketDescriptionWithContact('','Edited contact details'),'Edited contact details');});
+for(const data of [{customerId:id,items:[contact]},{customerId,items:[{...contact,customerId:id}]},{customerId,items:[contact,contact]},{customerId,items:[{...contact,email:null}]},{customerId,items:[{...contact,isPrimary:undefined}]}])test('invalid or wrong-customer contact response fails closed '+JSON.stringify(data).slice(0,50),()=>assert.throws(()=>readCustomerContacts(data,customerId)));

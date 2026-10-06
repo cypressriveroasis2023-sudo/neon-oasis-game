@@ -1,0 +1,40 @@
+.dashboard-ticket-actions{margin:0 0 28px;padding:20px;border:1px solid var(--cos-border);border-radius:12px;background:var(--cos-vision-panel);min-width:0}
+.dashboard-ticket-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+#root .operations-shell .dashboard-ticket-heading h2{font-size:20px;font-weight:600;letter-spacing:0;color:var(--cos-text);margin:0 0 5px;text-align:left}
+.dashboard-ticket-heading p{margin:0;font-size:12px;line-height:1.6;color:var(--cos-muted)}
+.dashboard-ticket-heading>span{font-size:9px;letter-spacing:.12em;color:var(--cos-muted);flex:none}
+.dashboard-ticket-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#root .operations-shell .dashboard-ticket-grid>button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:7px;min-width:0;min-height:85px;padding:15px!important;border:1px solid var(--cos-border)!important;border-radius:8px!important;background:var(--cos-sidebar)!important;color:var(--cos-text)!important;white-space:normal;box-shadow:none!important;letter-spacing:0;line-height:1.5}
+#root .operations-shell .dashboard-ticket-grid>button:hover{border-color:var(--cos-blue)!important;background:var(--cos-selected)!important}
+#root .operations-shell .dashboard-ticket-grid>button:focus-visible{outline:3px solid var(--cos-blue);outline-offset:3px}
+.dashboard-ticket-grid strong{font-size:14px;font-weight:600}.dashboard-ticket-grid strong span{color:var(--cos-blue)}
+.dashboard-ticket-grid small{font-size:10px;color:var(--cos-muted);font-weight:400}
+.ticket-create-result{margin:18px 0;padding:16px;border:1px solid var(--cos-border);border-radius:8px;background:var(--cos-selected);color:var(--cos-text)}
+.ticket-create-result p{margin:0 0 8px}.ticket-create-result .purchase-actions{margin-bottom:0}
+@media(max-width:1100px){.dashboard-ticket-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.dashboard-ticket-actions{padding:16px;margin-bottom:22px}.dashboard-ticket-heading>span{display:none}.dashboard-ticket-grid{gap:9px}#root .operations-shell .dashboard-ticket-grid>button{padding:12px!important;min-height:94px}.dashboard-ticket-grid strong{font-size:13px}.dashboard-ticket-grid small{font-size:10px}}
+/* The ticket editor uses comfortable field sizes instead of a single cramped row. */
+#root .operations-shell .ticket-create-form{padding:22px;border-radius:10px}
+.ticket-create-form>.quote-section-head{margin-bottom:22px}
+.ticket-form-step{display:flex;align-items:flex-start;gap:12px;margin:22px 0 16px}
+.ticket-form-step>span{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--cos-selected);color:var(--cos-blue);font-weight:600}
+#root .operations-shell .ticket-form-step h4{font-size:16px;margin:1px 0 5px;color:var(--cos-text);letter-spacing:0}
+.ticket-form-step p,.ticket-directory-count,.ticket-search-help{font-size:12px;color:var(--cos-muted);line-height:1.6;margin:0}
+.ticket-directory-count{margin:0 0 12px}
+#root .operations-shell .ticket-create-form label{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.5;min-width:0}
+#root .operations-shell .ticket-create-form input:not([type=checkbox]),#root .operations-shell .ticket-create-form select,#root .operations-shell .ticket-create-form textarea{width:100%;max-width:100%;min-width:0;min-height:44px;font-size:14px;padding:10px 12px!important}
+.ticket-customer-search{position:relative;max-width:100%}
+.ticket-customer-results{display:flex;flex-direction:column;max-height:270px;overflow-y:auto;border:1px solid var(--cos-border);border-radius:8px;margin-top:6px;background:var(--cos-sidebar)}
+#root .operations-shell .ticket-customer-results>button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;white-space:normal;overflow-wrap:anywhere;border:0!important;border-bottom:1px solid var(--cos-border)!important;border-radius:0!important;background:transparent!important;color:var(--cos-text)!important;padding:12px!important;min-height:54px;box-shadow:none!important;letter-spacing:0}
+#root .operations-shell .ticket-customer-results>button:hover,#root .operations-shell .ticket-customer-results>button[aria-selected=true]{background:var(--cos-selected)!important}
+.ticket-customer-results strong{font-size:13px}.ticket-customer-results small{font-size:11px;color:var(--cos-muted);font-weight:400}
+.ticket-search-help{margin-top:6px}.ticket-customer-selected{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;margin:12px 0;color:var(--cos-text);overflow-wrap:anywhere}.ticket-customer-selected>span{font-size:11px;color:var(--cos-muted)}
+.ticket-site-choice{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}.ticket-site-address{grid-column:1/-1;font-size:13px;color:var(--cos-muted);margin:0;overflow-wrap:anywhere}.ticket-no-site{font-size:13px;line-height:1.6;color:var(--cos-muted);margin:16px 0}
+#root .operations-shell .ticket-detail-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+#root .operations-shell .ticket-create-form .ticket-shop-prep{display:flex;flex-direction:row;align-items:center;margin:18px 0}
+#root .operations-shell .ticket-site-editor{display:block;padding:18px;margin-top:18px;border:1px solid var(--cos-border);background:var(--cos-sidebar);min-width:0}
+@media(max-width:800px){.ticket-site-choice,#root .operations-shell .ticket-detail-fields{grid-template-columns:1fr}#root .operations-shell .ticket-create-form{padding:16px}#root .operations-shell .ticket-site-editor{padding:12px}.ticket-form-step{margin-top:18px}}
+
+#root .operations-shell .ticket-shop-prep input[type=checkbox]{display:inline-block;width:20px;height:20px;flex:none;accent-color:var(--cos-blue)}
+
+.ticket-title-field{grid-column:1/-1}#root .operations-shell .ticket-create-form .ticket-submit{margin-top:18px}

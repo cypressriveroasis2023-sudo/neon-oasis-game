@@ -266,6 +266,23 @@ export function createOperationsHandler(options) {
         return json(await readPrivateOwnerEvidence(context.actorId, documentId));
       }
       if (method === 'GET') {
+        const contactRoute = /^\/api\/customers\/([^/]+)\/contacts$/.exec(path);
+        if (contactRoute) {
+          const customerId = idValue(contactRoute[1], 'Customer');
+          // Reuse the existing actor-scoped customer.manage permission gate. No new grant or caller-supplied organization.
+          const directory = await rpc('appdeploy_customers_snapshot', actorPayload);
+          if (!Array.isArray(directory?.items) || directory.items.some(row => !row || typeof row !== 'object' || Array.isArray(row) || !UUID.test(String(row.id || '')) || !['active','inactive','archived'].includes(row.status))) fail('Customer access could not be verified.', 503);
+          const matches = directory.items.filter(row => row.id === customerId);
+          if (matches.length !== 1) fail('Customer contacts are not available for this customer.', 404);
+          if (matches[0].status !== 'active') fail('Contacts are unavailable for inactive or archived customers.', 409);
+          const rows = await platformAll('customer_contacts?select=id,customer_id,name,email,phone,title,is_primary,billing_contact,customers!inner(organization_id,status)&customer_id=eq.' + customerId + '&customers.organization_id=eq.' + ORGANIZATION_ID + '&customers.status=eq.active&order=is_primary.desc,name.asc,id.asc');
+          const seen = new Set();
+          for (const row of rows) {
+            if (!row || !UUID.test(String(row.id || '')) || seen.has(row.id) || row.customer_id !== customerId || row.customers?.organization_id !== ORGANIZATION_ID || row.customers?.status !== 'active' || !['name','email','phone','title'].every(key => row[key] == null || typeof row[key] === 'string')) fail('Customer contact records could not be verified.', 503);
+            seen.add(row.id);
+          }
+          return json({ customerId, items: rows.map(row => ({ id: row.id, customerId, name: row.name || '', email: row.email || '', phone: row.phone || '', title: row.title || '', isPrimary: row.is_primary === true, billingContact: row.billing_contact === true })) });
+        }
         if (path === '/api/vrm-portal') {
           try { return json(vrmPortalConfig(options.vrmEmbeds)); }
           catch { fail('VRM dashboard configuration is unavailable.', 503); }

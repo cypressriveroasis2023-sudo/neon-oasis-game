@@ -92,3 +92,39 @@ timezone labels. Missing values remain unrecorded; malformed or future values ar
 unknown. CSV inventory refreshes preserve existing success timestamps. Stale port
 results no longer display a current green response or latency. Tests exercise the
 actual card/detail presentation against synthetic data, without operational writes.
+
+### Dashboard ticket creation
+
+The owner dashboard now exposes Service, Pickup, Install / Delivery and Swap entry points.
+These open the existing Owner manual-job action with a preselected supported type; opening,
+searching, cancelling or changing navigation never submits a job. Install / Delivery is
+explicitly the existing DELIVERY workflow (IT preparation followed by Service delivery and
+installation), not a new backend type. Successful creation offers the existing scheduling view.
+
+Ticket entry searches the complete active customer directory returned by the existing
+customers JSON-snapshot RPC, then restricts sites to that customer's real active records.
+A customer with no site is shown with an explanation. The inline Add site editor reuses the
+existing explicit site-save and fresh-readback contract, preserving the ticket draft and type.
+No customer/site associations, production tickets, equipment or permissions are changed by
+this interface update. An uncertain site save requires refresh and review of existing sites
+rather than replaying the save. Tests cover a 1,506-customer directory, keyboard selection,
+customer/site isolation, no-site and failed-source states, navigation, duplicate clicks, site
+save recovery and owner-access restrictions using isolated synthetic fixtures only.
+
+### Uploaded customer contacts
+
+Customer records have a read-only View contacts action. Ticket entry can optionally include a
+selected customer's saved name, title, phone and email in a separate editable Contact instructions
+snapshot. Selecting a contact does not assume it is an on-site contact, send a message, or create a
+job-contact relationship. Changing/deselecting the customer/contact clears the snapshot while
+preserving general work instructions. The existing creation API stores it in the job description.
+
+The contact GET endpoint preserves the existing Owner identity and customer.manage RPC guard,
+requires the selected customer to remain active, scopes by customer and organization, paginates,
+and verifies every returned parent identity before exposing the minimum contact fields. This
+schema has no contact-level archive flag; inactive customer/owner and cross-organization access
+are blocked. All contact fixtures are synthetic.
+
+Deployment requires applying the reviewed contact route delta to the exact currently deployed
+Operations bridge to preserve existing routes. Do not deploy an older checkout as a full replacement. No deployment, contact mutation, outbound message or production job
+creation is part of local verification.
