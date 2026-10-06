@@ -22,6 +22,8 @@ const files = [
   'tech-checks/camera-health-overview.css',
   'tech-checks/camera-detail.html',
   'tech-checks/onsite-vision.html',
+  'tech-checks/onsite-vision.js',
+  'tech-checks/onsite-vision-composer.css',
   'tech-checks/it-send-repair.html',
   'tech-checks/app.js',
   'tech-checks/technician-wizard-owner-dashboard-v5.js',

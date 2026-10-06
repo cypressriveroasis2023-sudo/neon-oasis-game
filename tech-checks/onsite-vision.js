@@ -5,6 +5,7 @@ const state={session:null,profile:null,jobs:[],preps:[],techs:[],currentTicket:'
 let conversationSyncTimer=null;
 let persistenceReady=false;
 let visionVoiceInteraction=false;
+let visionSendBusy=false;
 let voiceRecorder=null,voiceStream=null,voiceChunks=[],voiceStopTimer=null,voiceBusy=false,voiceSilenceWatch=null,voiceAudioContext=null;
 const STORE='cos-onsite-vision-chats-v1';
 const $=id=>document.getElementById(id);
@@ -131,6 +132,13 @@ function agentHistory(currentText=''){
   if(rows.length&&rows[rows.length-1].role==='user'&&rows[rows.length-1].content===String(currentText||'').trim())rows.pop();
   return rows.slice(-10);
 }
+function renderAgentNotice(){
+  const notice=$('visionAgentNotice');if(!notice)return;
+  notice.textContent=state.agentStatus==='online'?'':state.agentStatus==='unavailable'
+    ?'AI is not configured. Basic answers from connected Tech Check data are still available.'
+    :'AI connection could not be verified. Basic Tech Check answers may still be available.';
+  notice.classList.toggle('hidden',state.agentStatus==='online');
+}
 async function checkAgentStatus(){
   if(!db)return null;
   try{
@@ -138,6 +146,7 @@ async function checkAgentStatus(){
     if(result.error||!result.data?.ok){
       state.agentStatus='unknown';
       if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
+      renderAgentNotice();
       return null;
     }
     state.agentStatus=result.data.model_configured?'online':'unavailable';
@@ -147,10 +156,12 @@ async function checkAgentStatus(){
         ?'OnSite Vision server AI '+String(result.data.model||'')+' is connected to live Tech Check data.'
         :'Live Tech Check data is connected. The server AI model credential is not configured, so Vision is using deterministic fallback behavior.';
     }
+    renderAgentNotice();
     return result.data;
   }catch(error){
     state.agentStatus='unknown';
     if($('visionLiveStatus')){$('visionLiveStatus').textContent='DATA LIVE';$('visionLiveStatus').title='Tech Check data is live. Server AI status could not be confirmed.';}
+    renderAgentNotice();
     return null;
   }
 }
@@ -166,11 +177,15 @@ async function callVisionAgent(text){
     if(result.error||!result.data?.ok){
       const code=result.data?.code||'';
       if(code==='OPENAI_API_KEY_MISSING')state.agentStatus='unavailable';
+      else state.agentStatus='unknown';
+      renderAgentNotice();
       return null;
     }
     state.agentStatus='online';
+    renderAgentNotice();
     return result.data;
   }catch(error){
+    state.agentStatus='unknown';renderAgentNotice();
     console.warn('OnSite Vision server agent fallback',error);
     return null;
   }
@@ -2147,8 +2162,12 @@ async function answer(text){
   return '<div class="vision-answer-title">I can work through the Tech Check record with you.</div><div class="vision-answer-copy">You can ask me to create a new Delivery, Pickup, Swap, or Service job, or work with an existing ticket or unit.</div>';
 }
 async function send(raw=null,source='text'){
+  if(visionSendBusy)return;
   if(source==='voice'){visionVoiceInteraction=true;document.body.classList.add('vision-voice-session');}
   const input=$('visionPrompt'),text=String(raw??input?.value??'').trim();if(!text)return;if(input){input.value='';grow(input);}
+  visionSendBusy=true;
+  if($('visionSendButton'))$('visionSendButton').disabled=true;
+  document.querySelector('.vision-composer')?.setAttribute('aria-busy','true');
   titleFrom(text);addMessage('user',text);renderThread();if(source!=='voice')($('visionThread').querySelector('.vision-results')||$('visionThread')).insertAdjacentHTML('beforeend',typing());bottom();
   setVisionRuntimeState('thinking','Thinking…');
   try{
@@ -2164,6 +2183,10 @@ async function send(raw=null,source='text'){
     $('visionTyping')?.remove();addMessage('assistant','', '<div class="vision-direct warn"><b>Vision could not finish that request.</b>'+esc(error?.message||'Please try again.')+'</div>');renderThread();
     const voiceStatus=$('visionVoiceStatus');if(source==='voice'&&voiceStatus){voiceStatus.textContent='';voiceStatus.className='vision-voice-status hidden';}
     setVisionRuntimeState('error','Vision needs attention');if(source==='voice'&&visionWakeArmed)setTimeout(startVisionWakeListener,1200);
+  }finally{
+    visionSendBusy=false;
+    if($('visionSendButton'))$('visionSendButton').disabled=false;
+    document.querySelector('.vision-composer')?.setAttribute('aria-busy','false');
   }
 }
 async function execute(actionId){
@@ -2622,7 +2645,7 @@ document.addEventListener('focusin',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!$('visionKnowledgeModal')?.classList.contains('hidden')){closeKnowledgeManager();return;}
-  if(e.target?.id==='visionPrompt'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
+  if(e.target?.id==='visionPrompt'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send();}
 });
 init().catch(error=>{$('visionLoading').innerHTML='<b>OnSite Vision could not open.</b><span>'+esc(error?.message||'Return to Tech Check and try again.')+'</span>';});
 })();

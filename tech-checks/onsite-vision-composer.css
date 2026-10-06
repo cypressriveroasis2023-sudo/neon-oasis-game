@@ -1,0 +1,74 @@
+/* Keep the question field in the viewport even with a full Recent list.
+   The legacy implicit grid row grew to the sidebar's min-content height. */
+html body #visionApp {
+  grid-template-rows: minmax(0, 1fr);
+  height: var(--vision-visual-height, 100dvh);
+  min-height: 0;
+}
+html body #visionApp .vision-sidebar { min-height: 0; overflow: hidden; }
+html body #visionApp .vision-main { min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; }
+html body #visionApp .vision-composer-wrap {
+  display: block !important;
+  position: relative !important;
+  inset: auto !important;
+  padding: 10px 18px max(12px, env(safe-area-inset-bottom)) !important;
+}
+html body #visionApp .vision-prompt-label,
+html body #visionApp .vision-prompt-help,
+html body #visionApp .vision-agent-notice {
+  display: block;
+  max-width: 700px;
+  margin: 0 auto 6px;
+  color: var(--cos-text, #e6edf7);
+  font-size: 13px;
+  line-height: 1.4;
+}
+html body #visionApp .vision-prompt-label { font-weight: 700; }
+html body #visionApp .vision-prompt-help { color: var(--cos-muted, #a3b3ca); font-size: 11px; margin-top: 6px; margin-bottom: 0; }
+html body #visionApp .vision-agent-notice { color: var(--cos-amber, #edc27b); font-size: 12px; margin-top: 6px; margin-bottom: 0; }
+html body #visionApp .vision-composer-v36 {
+  grid-template-columns: minmax(0, 1fr) 44px auto !important;
+  gap: 6px 10px;
+  min-height: 0 !important;
+  border-radius: 18px !important;
+  border-color: #617895 !important;
+  padding: 10px !important;
+}
+html body #visionApp #visionPrompt {
+  grid-column: 1 / -1;
+  min-height: 54px !important;
+  max-height: min(150px, 24dvh);
+  padding: 4px !important;
+  line-height: 1.45;
+}
+html body #visionApp .vision-add-v36 { grid-row: 2; grid-column: 1; width: 44px; height: 44px; }
+html body #visionApp .vision-voice-orb-v36 { grid-row: 2; grid-column: 2; width: 40px; height: 40px; }
+html body #visionApp #visionSendButton {
+  display: inline-flex !important;
+  grid-row: 2; grid-column: 3;
+  align-items: center; justify-content: center;
+  width: auto !important; min-width: 72px; height: 44px !important;
+  border-radius: 12px !important;
+  padding: 0 14px; font-size: 14px; font-weight: 700;
+}
+html body #visionApp #visionSendButton:disabled { opacity: .65; cursor: wait; }
+html body #visionApp .vision-composer button:focus-visible { outline: 2px solid var(--cos-blue, #91b0ff); outline-offset: 3px; }
+/* The welcome art stays inside the space above the composer, including when
+   the on-screen keyboard reduces the visual viewport. Branding owns its art. */
+html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-orb-v36,
+html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-rotating-prompt {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+}
+html body.vision-empty-chat:not(.vision-voice-session) #visionThread > .vision-welcome-v36 { gap: 12px !important; padding: 8px 0 !important; margin: 0 auto !important; container-type: size; }
+html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-orb-v36 { flex: 0 0 auto; width: min(var(--vision-hero-size), 60cqh) !important; height: min(var(--vision-hero-size), 60cqh) !important; aspect-ratio: 1; }
+@media (max-width: 900px) {
+  html body #visionApp { top: var(--vision-visual-top, 0px); bottom: auto; }
+  html body #visionApp .vision-composer-wrap { padding-left: 12px !important; padding-right: 12px !important; }
+}
+@media (max-height: 500px) {
+  html body #visionApp #visionPrompt { min-height: 42px !important; }
+  html body #visionApp .vision-prompt-help { display: none; }
+  html body.vision-empty-chat:not(.vision-voice-session) #visionThread .vision-rotating-prompt { display: none !important; }
+}
