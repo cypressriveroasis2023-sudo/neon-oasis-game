@@ -48,6 +48,7 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(inventory).not.toContainText(unknown.unitNumber);
   await expect(inventory).toContainText('1 registry units have no recorded placement');
   await openWorkspace(frame,'Field Map');
+  await frame.getByRole('button',{name:'Show all GPS pins',exact:true}).click();
   await frame.getByRole('button',{name:/FIELD-FIX-002/}).click();
   await expect(frame.getByRole('link',{name:/Open installed address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');
   await expect(frame.getByText('Installed address available. A map pin needs verified coordinates.')).toBeVisible();

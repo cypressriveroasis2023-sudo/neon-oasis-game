@@ -237,9 +237,9 @@ function OwnerApp() {
     setMenu(false);
     if(legacy[name]){openLegacy(legacy[name]);return;}
     const next=nav.includes(name)?name:'Today';
-    setRouteLocation({workspace:next,jobId:'',detail:false});
+    setRouteLocation({workspace:next,jobId:'',detail:false},active==='Operations');
     window.scrollTo({top:0,behavior:'instant'});
-  },[setRouteLocation]);
+  },[setRouteLocation,active]);
   const openJob=useCallback((id:string,workspace:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch'='Jobs')=>{
     setMenu(false);
     setRouteLocation({workspace,jobId:id,detail:false});

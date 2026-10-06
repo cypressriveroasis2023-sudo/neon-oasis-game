@@ -134,7 +134,7 @@ export function useCompanyRoute(workspaces: string[]) {
         workspace: workspaces.includes(workspace) ? workspace : 'Today',
         jobId: '',
         detail: false,
-      }),
+      }, route.workspace === 'Operations'),
     openJob: (
       jobId: string,
       workspace: 'Jobs' | 'Unscheduled' | 'Owner Review' | 'Dispatch' = 'Jobs',

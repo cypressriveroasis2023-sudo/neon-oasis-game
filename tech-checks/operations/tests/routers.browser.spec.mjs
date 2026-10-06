@@ -28,7 +28,7 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(frame.locator('.field-map-detail')).toContainText('Manual');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('30');
- await expect(frame.locator('.router-map-note')).toContainText('Router GPS feed not connected');
+ await expect(frame.locator('.router-map-note')).toContainText('Router checks do not supply live locations.');
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
  await frame.getByRole('button',{name:'View all InHand routers'}).click();

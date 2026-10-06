@@ -51,6 +51,7 @@ export default function FieldMap({show}:Props){
   const [search,setSearch]=useState('');
   const [status,setStatus]=useState('field');
   const [selectedId,setSelectedId]=useState('');
+  const [focusSelected,setFocusSelected]=useState(false);
   const [lat,setLat]=useState('');
   const [lon,setLon]=useState('');
   const [accuracy,setAccuracy]=useState('');
@@ -158,14 +159,22 @@ export default function FieldMap({show}:Props){
       marker.on('click',()=>{ if (!working.current) setSelectedId(unit.id); });
       marker.addTo(layer);
     }
-    if(selected&&hasCoords(selected)){
+    if(focusSelected&&selected&&hasCoords(selected)){
       map.setView([Number(selected.latitude),Number(selected.longitude)],Math.max(map.getZoom(),14));
     }else if(bounds.length===1){
       map.setView(bounds[0],14);
     }else if(bounds.length>1){
       map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14});
     }
-  },[filtered,selectedId,data?.generatedAt]);
+  },[filtered,selectedId,data?.generatedAt,focusSelected]);
+
+  const fitAllLocations=()=>{
+    setFocusSelected(false);
+    const map=mapRef.current, bounds=filtered.filter(hasCoords).map(unit=>[Number(unit.latitude),Number(unit.longitude)] as L.LatLngTuple);
+    if(!map||!bounds.length)return;
+    if(bounds.length===1)map.setView(bounds[0],14);
+    else map.fitBounds(bounds,{padding:[40,40],maxZoom:14});
+  };
 
   const captureGps=()=>{
     if(!selected || selected.readOnly || working.current)return;
@@ -236,6 +245,7 @@ export default function FieldMap({show}:Props){
         <option value='missing'>Missing GPS</option>
       </select>
       <button className='secondary' disabled={busy} onClick={()=>void load()}>Refresh</button>
+      <button className='secondary' disabled={busy||!filtered.some(hasCoords)} onClick={fitAllLocations}>Show all GPS pins</button>
     </div>
 
     {data?.trackerSnapshot?.importedAt && <p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Source verification dates appear on each tracker unit.</p>}
@@ -243,7 +253,7 @@ export default function FieldMap({show}:Props){
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
     {!data&&!error?<div className='loading'>Loading production field units…</div>:<div className='field-map-layout'>
       <aside className='field-map-list' aria-label='Field units'>
-        {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setSelectedId(unit.id)}}>
+        {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
           <span className={hasCoords(unit)?'mapped':'missing'}>{hasCoords(unit)?'MAP':unit.address?.trim()?'ADDRESS':'LOCATION?'}</span>
           <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small>
@@ -254,7 +264,7 @@ export default function FieldMap({show}:Props){
         <div ref={mapNode} className='field-map-canvas' aria-label='COS field unit map'/>
         <div className='field-map-legend'>
           <span><i style={{background:'#35d48a'}}/>Installed</span>
-          <span><i style={{background:'#56b8ff'}}/>Assigned</span>
+          <span><i style={{background:'#56b8ff'}}/>Assigned / tracker field</span>
           <span><i style={{background:'#f0bd57'}}/>In transit</span>
           <span><i style={{background:'#ff8b5c'}}/>Returning</span>
         </div>
@@ -303,4 +313,3 @@ export default function FieldMap({show}:Props){
     <footer className='field-map-footer'>Map tiles © OpenStreetMap contributors. Unit GPS is operational location data only and never changes equipment lifecycle placement automatically.</footer>
   </section>;
 }
-
