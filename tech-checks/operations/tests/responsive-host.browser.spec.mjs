@@ -87,18 +87,18 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   const sizes=await frame.locator('body').evaluate(()=>({viewport:innerWidth,content:document.documentElement.scrollWidth}));
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
   await frame.locator('.operations-shell').screenshot({path:testInfo.outputPath('unified-operations.png')});
-  await frame.getByRole('button',{name:'Switch to light mode'}).click();
+  await expect(frame.getByRole('button',{name:/Switch to (light|dark) mode/})).toHaveCount(0);
   const light=await frame.locator('.command-page-header').evaluate(element=>({background:getComputedStyle(element).backgroundColor,text:getComputedStyle(element.querySelector('h1')).color}));
-  expect(light.background).toBe('rgb(255, 255, 255)');expect(light.text).toBe('rgb(21, 36, 54)');
-  await frame.getByRole('button',{name:'Switch to dark mode'}).click();
+  expect(light.text).toBe('rgb(23, 44, 71)');
+  expect(await frame.locator('html').getAttribute('data-theme')).toBe('light');
   expect(requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 async function responsiveLayout(page, frame) {
-  await expect(frame.getByText('OPERATIONS CONNECTED', { exact:true })).toBeVisible();
+  await expect(frame.getByText('OPERATIONS CONNECTED', { exact:true })).toBeAttached();
   await fillsViewport(page);
   await expect(frame.getByRole('button',{name:'More',exact:true})).toBeVisible();
-  const size = await frame.locator('.owner-it-topbar').evaluate(header => {
+  const size = await frame.locator('.company-utility-bar').evaluate(header => {
     const main=header.parentElement, style=getComputedStyle(main);
     return {width:innerWidth,content:document.documentElement.scrollWidth,
       main:main.getBoundingClientRect().toJSON(),header:header.getBoundingClientRect().toJSON(),
@@ -106,13 +106,13 @@ async function responsiveLayout(page, frame) {
       menu:header.querySelector('.operations-open-menu').getBoundingClientRect().toJSON()};
   });
   expect(size.content).toBeLessThanOrEqual(size.width);
-  expect(size.main.width).toBeCloseTo(size.width-(size.width>700?104:0),0);
-  expect(size.header.width).toBeCloseTo(size.main.width-size.padding,0);
+  expect(size.main.width).toBeCloseTo(size.width-(size.width>700?184:0),0);
+  expect(size.header.width).toBeCloseTo(size.main.width,0);
   if(size.width>700){
     expect(size.menu.left).toBeGreaterThanOrEqual(size.header.left);
     expect(size.menu.right).toBeLessThanOrEqual(size.header.right);
   }else{
-    await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Office',exact:true})).toBeVisible();
+    await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'More',exact:true})).toBeVisible();
   }
   await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
 }
@@ -142,7 +142,7 @@ test('the same app link gives the embedded Operations app the full device viewpo
 test('rotation and desktop resizing preserve the same frame, route and in-progress input', async ({ page }) => {
   const { frame } = await mount(page);
   await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Jobs',exact:true}).click();
+  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Job flow',exact:true}).click();
   const search = frame.getByRole('searchbox', { name:'Find a job' });
   await search.fill('keep this filter');
   await frame.locator('body').evaluate(() => { window.responsiveFrameMarker = 'same-frame'; });
@@ -155,16 +155,16 @@ test('rotation and desktop resizing preserve the same frame, route and in-progre
   }
 });
 
-test('old VISION bookmarks preserve route, other query parameters and color preference', async ({ page }) => {
+test('old VISION bookmarks preserve route and query parameters under the approved light presentation', async ({ page }) => {
   const { frame, requests } = await mount(page);
-  await frame.getByRole('button',{name:'Switch to light mode'}).click();
+  await expect(frame.getByRole('button',{name:/Switch to (light|dark) mode/})).toHaveCount(0);
   await frame.locator('body').evaluate(()=>{location.href=location.pathname+'?theme=vision&source=saved-link#jobs';});
-  await expect(frame.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();
-  await expect(frame.getByRole('button',{name:'Switch to dark mode'})).toBeVisible();
+  await expect(frame.getByRole('heading',{name:'Job flow',exact:true})).toBeVisible();
+  expect(await frame.locator('html').getAttribute('data-theme')).toBe('light');
   await responsiveLayout(page,frame);
   expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
   await frame.locator('body').evaluate(()=>location.reload());
-  await expect(frame.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();
+  await expect(frame.getByRole('heading',{name:'Job flow',exact:true})).toBeVisible();
   await responsiveLayout(page,frame);
   expect(await frame.locator('body').evaluate(()=>location.search+location.hash)).toBe('?source=saved-link#jobs');
   expect(requests.every(request=>request.method==='GET')).toBe(true);
@@ -189,13 +189,14 @@ test('approved Today workspace uses the available screen width at normal browser
   await expect(frame.locator('.owner-command-home')).toHaveAttribute('aria-busy','false');
   const layout=await frame.locator('.workspace-overview').evaluate(today=>({
     zoom:visualViewport.scale, today:today.getBoundingClientRect().toJSON(),
-    header:document.querySelector('.owner-it-topbar').getBoundingClientRect().toJSON(),
+    header:document.querySelector('.company-utility-bar').getBoundingClientRect().toJSON(),
+    gutters:parseFloat(getComputedStyle(today.closest('main')).paddingLeft)+parseFloat(getComputedStyle(today.closest('main')).paddingRight),
     work:today.querySelector('.workspace-work').getBoundingClientRect().toJSON(),
-    details:today.querySelector('.workspace-detail').getBoundingClientRect().toJSON()
+    health:document.querySelector('.company-health-grid').getBoundingClientRect().toJSON()
   }));
   expect(layout.zoom).toBe(1);
-  expect(layout.today.width).toBeCloseTo(layout.header.width,0);
-  for(const section of page.viewportSize().width>700?[layout.work,layout.details]:[layout.work]){
+  expect(layout.today.width).toBeCloseTo(layout.header.width-layout.gutters,0);
+  for(const section of [layout.work,layout.health]){
     expect(section.left).toBeGreaterThanOrEqual(layout.today.left);
     expect(section.right).toBeLessThanOrEqual(layout.today.right+1);
   }

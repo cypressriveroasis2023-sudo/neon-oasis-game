@@ -21,6 +21,7 @@ async function mount(page,workspace='daily-board'){
    if(state.readGate&&['/api/jobs','/api/owner/control-data','/api/owner-tasks'].includes(path))await state.readGate;
    if(state.failRead&&['/api/jobs','/api/owner/control-data'].includes(path))return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic refresh unavailable'})});
    if(path==='/api/routers')return answer({ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() });
+   if(path==='/api/camera-health/summary')return answer({totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]});
    if(path==='/api/session')return answer({authorized:true,name:'Fixture Owner',role:'Owner'});
    if(path==='/api/jobs')return answer({items:state.jobs});
    if(path==='/api/owner/control-data')return answer(state.control);
@@ -58,7 +59,7 @@ async function selectJob(controls){await controls.getByLabel('Selected COS Job')
 async function prompt(frame,value){const dialog=frame.getByRole('dialog');await expect(dialog).toBeVisible();if(value!==undefined)await dialog.locator('input,textarea').fill(value);await dialog.getByRole('button',{name:'SAVE & CONTINUE',exact:true}).click();}
 async function confirm(frame){await frame.getByRole('dialog').getByRole('button',{name:'CONFIRM & CONTINUE',exact:true}).click();}
 async function navigate(page,frame,name){
- const button=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:new RegExp('^'+name+'(?:$| AppDeploy| ↗)')});
+ const button=frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:new RegExp('^'+(name==='Jobs'?'Job flow':name)+'(?:$| AppDeploy| ↗)')});
  if(!await button.isVisible())await frame.getByRole('button',{name:'More',exact:true}).click();
  await button.click();
 }
@@ -111,7 +112,7 @@ test('Every AppDeploy handoff is reachable and workspace Back, Forward and reloa
   await navigate(page,frame,name);await expect(frame.getByRole('heading',{name,exact:true}).first()).toBeVisible();await expect(frame.getByRole('link',{name:'Open AppDeploy COS Operations ↗'})).toHaveAttribute('href','https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/');
  }
  await navigate(page,frame,'Jobs');await navigate(page,frame,'Team');
- await frame.locator('body').evaluate(()=>history.back());await expect(frame.getByRole('heading',{name:'Jobs',exact:true}).first()).toBeVisible();
+ await frame.locator('body').evaluate(()=>history.back());await expect(frame.getByRole('heading',{name:'Job flow',exact:true}).first()).toBeVisible();
  await frame.locator('body').evaluate(()=>history.forward());await expect(frame.getByRole('heading',{name:'Team',exact:true}).first()).toBeVisible();
  await frame.locator('body').evaluate(()=>location.reload());await expect(frame.getByRole('heading',{name:'Team',exact:true}).first()).toBeVisible();expect(state.writes).toHaveLength(0);
 });

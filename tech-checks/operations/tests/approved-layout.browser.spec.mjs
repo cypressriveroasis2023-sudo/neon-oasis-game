@@ -26,7 +26,7 @@ test('old VISION links open only the approved workspace and keep native navigati
  await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
  await expect(frame.locator('.vision-header,.vision-shell')).toHaveCount(0);
  expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('theme'))).toBe(false);
- const expectedHash={Jobs:'#jobs',Team:'#team',Equipment:'#equipment','Billing & Invoices':'#billing',Overview:'#today'};
+ const expectedHash={'Job flow':'#jobs',Team:'#team',Equipment:'#equipment','Billing & Invoices':'#billing',Overview:'#today'};
  for(const [name,hash] of Object.entries(expectedHash)){
   await frame.getByRole('button',{name:'More',exact:true}).click();
   const menu=frame.getByRole('dialog',{name:'Operations navigation'});
@@ -38,7 +38,7 @@ test('old VISION links open only the approved workspace and keep native navigati
   const selected=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name,exact:true});
   await expect(selected).toHaveAttribute('aria-current','page');
   await frame.getByRole('button',{name:'Close menu'}).click();
-  if(name==='Jobs'){
+  if(name==='Job flow'){
    const search=frame.getByRole('searchbox',{name:'Find a job'});
    await search.fill('not-a-real-job');await expect(frame.getByText('No jobs match these filters.')).toBeVisible();
    await search.fill('FIX-101');await expect(frame.getByText('FIX-101 · Fixture customer',{exact:true})).toBeVisible();
@@ -49,11 +49,11 @@ test('old VISION links open only the approved workspace and keep native navigati
  await frame.getByRole('button',{name:'More',exact:true}).click();
  const nav=frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('navigation',{name:'COS Operations',exact:true});
  const styles=await nav.locator('button').evaluateAll(buttons=>buttons.map(button=>({active:button.getAttribute('aria-current'),color:getComputedStyle(button).color})));
- expect(styles.find(button=>button.active).color).toBe('rgb(255, 20, 44)');
- expect(styles.filter(button=>!button.active).every(button=>button.color!=='rgb(255, 20, 44)')).toBe(true);
+ expect(styles.find(button=>button.active).color).toBe('rgb(49, 95, 223)');
+ expect(styles.filter(button=>!button.active).every(button=>button.color!=='rgb(49, 95, 223)')).toBe(true);
  await frame.getByRole('button',{name:'Close menu'}).press('Escape');
  await expect(frame.getByRole('button',{name:'More',exact:true})).toBeFocused();
- await frame.locator('.owner-it-topbar').screenshot({path:testInfo.outputPath('approved-header.png')});
+ await frame.locator('.company-utility-bar').screenshot({path:testInfo.outputPath('approved-header.png')});
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('missing data remains unavailable in the single workspace',async({page})=>{

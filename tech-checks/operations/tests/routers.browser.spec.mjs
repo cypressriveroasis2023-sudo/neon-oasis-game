@@ -1,11 +1,14 @@
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
+const card=frame=>frame.locator('.company-health-card').filter({has:frame.getByRole('heading',{name:'InHand Routers',exact:true})});
+async function openMap(frame){await frame.getByRole('button',{name:'More',exact:true}).click();await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Field Map',exact:true}).click();}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
- await expect(frame.getByLabel('InHand router overview')).toBeVisible();
- await expect(frame.locator('.router-metrics b')).toHaveText(['4','1','1','2']);
- await frame.getByRole('button',{name:'View routers & IPs',exact:true}).click();
+ await expect(card(frame)).toBeVisible();
+ await expect(card(frame)).toContainText('4 stored router records');
+ await expect(card(frame)).toContainText('Live GPS setup pending');
+ await frame.getByRole('button',{name:'Open router inventory',exact:true}).click();
  await expect(frame.getByRole('heading',{name:'Router inventory & reachability'})).toBeVisible();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  await frame.getByRole('textbox',{name:'Search routers'}).fill('192.0.2.3');
@@ -35,11 +38,11 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
 });
 test('missing GPS remains unpinned and source failure can retry without fabricating healthy fleet',async({page})=>{
  const {frame,state}=await mountRouterFixture(page,{fail:true,gps:false});
- await expect(frame.getByLabel('InHand router overview')).toContainText('Router fixture unavailable');
- await expect(frame.locator('.router-metrics b')).toHaveText(['—','—','—','—']);
- state.fail=false;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
- await expect(frame.locator('.router-metrics b')).toHaveText(['4','1','1','2']);
- await frame.getByRole('button',{name:'Open location map'}).click();
+ await expect(card(frame)).toContainText('Router inventory could not be loaded.');
+ await expect(card(frame)).toContainText('Router count unavailable');
+ state.fail=false;await frame.getByRole('button',{name:'Retry dashboard',exact:true}).click();
+ await expect(card(frame)).toContainText('4 stored router records');
+ await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('No router GPS');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
  await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('');
@@ -47,7 +50,7 @@ test('missing GPS remains unpinned and source failure can retry without fabricat
 });
 test('refresh retains clearly marked old inventory on outage and clears it when authorization is denied',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
- await frame.getByRole('button',{name:'View routers & IPs',exact:true}).click();
+ await frame.getByRole('button',{name:'Open router inventory',exact:true}).click();
  await expect(records(frame).getByRole('button')).toHaveCount(4);
  state.fail=true;await frame.getByRole('button',{name:'Refresh routers',exact:true}).click();
  await expect(frame.getByRole('alert')).toContainText('Showing the last successful inventory');
@@ -61,7 +64,7 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
 test('router polling preserves an open map popup',async({page})=>{
  await page.clock.install({time:new Date()});
  const {frame,state}=await mountRouterFixture(page);
- await frame.getByRole('button',{name:'Open location map'}).click();
+ await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await frame.locator('.cos-field-pin-wrap').click();
  await expect(frame.locator('.leaflet-popup-content')).toContainText('Same-name router');

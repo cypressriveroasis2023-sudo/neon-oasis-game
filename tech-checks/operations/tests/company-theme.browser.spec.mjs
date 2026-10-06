@@ -1,0 +1,85 @@
+import { test, expect } from '@playwright/test';
+import {readFileSync} from 'node:fs';
+
+const origin = 'http://127.0.0.1:4173';
+const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+const external = ['Work Requests','CRM','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+// This complete navigation sweep uses synthetic empty source snapshots only.
+// Every non-local transport is intercepted; operational writes fail the test.
+async function mount(page, denied = false) {
+  const requests = [];
+  await page.route('**/*', async route => {
+    const url = route.request().url();
+    if (url === origin + '/company-platform-fixture') return route.fulfill({ contentType:'text/html', body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe title="COS fixture" src="/"></iframe><script>addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>` });
+    if (url.startsWith(origin + '/')) return route.continue();
+    if (url !== edge) return route.abort('blockedbyclient');
+    const headers = { 'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status:204, headers });
+    const request = route.request().postDataJSON();
+    requests.push(request);
+    expect(request.method).toBe('GET');
+    const stamp = new Date().toISOString();
+    const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', reason:denied?'Fixture access denied':'' }
+      : request.path === '/api/routers' ? { items:[], source:'camera_health', gpsAvailable:false, generatedAt:stamp }
+      : request.path === '/api/camera-health/summary' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
+      : request.path === '/api/daily-board' ? { jobs:[], tasks:[], readiness:[], asOf:stamp }
+      : request.path === '/api/field-map' ? { items:[], summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}, generatedAt:stamp }
+      : request.path === '/api/owner/control-data' ? { sites:[], truckChecks:[], serviceTechnicians:[], itTechnicians:[] }
+      : { items:[] };
+    return route.fulfill({ headers, contentType:'application/json', body:JSON.stringify(data) });
+  });
+  await page.addInitScript(()=>localStorage.setItem('cos-operations-pages-theme','dark'));
+  await page.goto('/company-platform-fixture');
+  const frame = page.frameLocator('iframe');
+  await expect(frame.getByText(denied?'ACCESS UNAVAILABLE':'OPERATIONS CONNECTED',{exact:true})).toBeVisible();
+  return { frame, requests };
+}
+
+test('approved shell is light with exact desktop proportions and a compact mobile bar', async ({page},testInfo)=>{
+  const {frame}=await mount(page);
+  await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
+  const facts=await frame.locator('.company-shell').evaluate(shell=>({theme:document.documentElement.dataset.theme,font:getComputedStyle(shell).fontFamily,bg:getComputedStyle(shell).backgroundColor,sidebar:getComputedStyle(shell.querySelector('.operations-sidebar')).backgroundColor,width:shell.querySelector('.operations-sidebar').getBoundingClientRect().width,bar:shell.querySelector('.company-utility-bar').getBoundingClientRect().height,scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
+  expect(facts.theme).toBe('light');expect(facts.font).toContain('Open Sans');expect(facts.bg).toBe('rgb(255, 255, 255)');expect(facts.sidebar).toBe('rgb(248, 250, 253)');expect(facts.scroll).toBeLessThanOrEqual(facts.viewport+1);
+  if(facts.viewport>700){expect(facts.width).toBe(184);expect(facts.bar).toBe(76);await expect(frame.getByRole('navigation',{name:'COS areas'}).getByRole('button')).toHaveCount(7);}else{await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button')).toHaveCount(4);}
+  await page.screenshot({path:testInfo.outputPath('company-approved-shell.png'),fullPage:true});
+});
+test('More search, focus trapping, Escape and return focus work without changing the active route',async({page})=>{
+  const {frame}=await mount(page);
+  const more=frame.getByRole('button',{name:'More',exact:true});
+  await more.click();
+  const menu=frame.getByRole('dialog',{name:'Operations navigation'});
+  const close=menu.getByRole('button',{name:'Close menu'});
+  await expect(close).toBeFocused();
+  await menu.getByRole('searchbox',{name:'Find a workspace'}).fill('routers');
+  await expect(menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'InHand Routers',exact:true})).toBeVisible();
+  await expect(menu.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Customers',exact:true})).toHaveCount(0);
+  await menu.getByRole('searchbox',{name:'Find a workspace'}).fill('no-match-fixture');
+  await expect(menu.getByText('No matching workspace. Try a different name.')).toBeVisible();
+  await close.focus();await close.press('Shift+Tab');
+  await expect(menu.getByRole('button',{name:/Local weather/})).toBeFocused();
+  await page.keyboard.press('Tab');await expect(close).toBeFocused();
+  await close.press('Escape');await expect(menu).toHaveCount(0);await expect(more).toBeFocused();
+  await expect(frame.getByRole('heading',{name:'Company overview',exact:true})).toBeVisible();
+});
+test('native records forms and load errors remain light and readable on narrow screens',async({page},testInfo)=>{
+  const {frame}=await mount(page);
+  await frame.getByRole('button',{name:'More',exact:true}).click();
+  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:'Owner Tasks',exact:true}).click();
+  await frame.getByRole('button',{name:'+ New Owner Task',exact:true}).click();
+  const input=frame.getByLabel('Task Title *');await expect(input).toBeVisible();
+  expect(await input.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}))).toEqual({bg:'rgb(255, 255, 255)',color:'rgb(23, 44, 71)'});
+  await frame.getByRole('button',{name:'Save task',exact:true}).click();
+  await expect(frame.getByRole('alert')).toContainText('Task title is required.');
+  expect(await frame.getByRole('alert').evaluate(el=>getComputedStyle(el).color)).toBe('rgb(147, 59, 66)');
+  for(const width of [320,390,768,1024,1440]){await page.setViewportSize({width,height:900});const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));expect(size.scroll,'form fits '+width).toBeLessThanOrEqual(size.width+1);}
+  await page.screenshot({path:testInfo.outputPath('company-native-form.png'),fullPage:true});
+});
+test('CSS-only host overlay keeps IT and Service fields readable and hidden workflow gates hidden',async({page})=>{
+  await page.route('**/*',route=>route.abort('blockedbyclient'));
+  const styles=['../../styles.css','../../vision-platform.css','../../company-host-theme.css'].map(path=>readFileSync(new URL(path,import.meta.url),'utf8')).join('\n');
+  await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>${styles}</style><div id="appView"><section id="view-it"><div class="wl-it-command-shell"><aside class="wl-it-command-sidebar"><nav class="wl-it-command-nav"><button class="active">Overview</button></nav></aside><main class="wl-it-command-workspace"><div class="card"><h2>IT preparation</h2><label>Equipment<input value="Fixture equipment"></label><button>Continue check</button></div></main></div><div id="hiddenGate" class="hidden">Unauthorized action</div></section><section id="view-svc"><div id="wlSvcHome"><div class="wl-service-simple-shell"><h1>Service Tech Check</h1><button class="wl-service-action-pill"><b>Truck inspection</b><small>Prepare for today's work</small></button><label>Ticket number<input value="FIX-001"></label></div></div></section></div>`);
+  for(const input of await page.locator('input').all()) expect(await input.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,color:getComputedStyle(el).color}))).toEqual({bg:'rgb(255, 255, 255)',color:'rgb(23, 44, 71)'});
+  await expect(page.locator('#hiddenGate')).toBeHidden();
+  expect(await page.locator('.wl-it-command-sidebar').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(248, 250, 253)');
+  expect(await page.locator('.wl-service-action-pill').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(248, 250, 253)');
+});

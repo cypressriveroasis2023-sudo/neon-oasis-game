@@ -2,12 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {workspaces,workspaceGroups,workspaceGroup,workspaceLabel,workspaceHash,readWorkspaceRoute} from '../src/workspaceNavigation.ts';
-test('five Owner areas cover every canonical destination with only the deliberate invoice alias',()=>{
-  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Jobs','Fleet & Map','Customers','Office']);
+test('seven company areas cover every canonical destination with only the deliberate invoice alias',()=>{
+  assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Job flow','Schedule','Equipment','Customers','Team','Finance']);
   const items=workspaceGroups.flatMap(group=>group.items);
   assert.equal(new Set(items).size,items.length);
   assert.deepEqual([...items,'Invoices','Vision'].sort(),[...workspaces].sort());
-  assert.equal(workspaceGroup('Invoices').label,'Office');
+  assert.equal(workspaceGroup('Invoices').label,'Finance');
   assert.equal(workspaceLabel('Today'),'Overview');
   assert.equal(workspaceLabel('Daily Board'),'Dispatch Board');
   assert.equal(workspaceLabel('Invoices'),workspaceLabel('Billing'));

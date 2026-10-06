@@ -15,10 +15,10 @@ function useModalDialog(ref:RefObject<HTMLDialogElement|null>,visible:unknown) {
     return()=>{if(dialog.open)dialog.close();if(previous instanceof HTMLElement&&previous.isConnected)previous.focus();};
   },[visible,ref]);
 }
-type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string;clearFocusedJob?:()=>void};
+type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string;clearFocusedJob?:()=>void;openLifecycle?:(id:string)=>void};
 type ScheduleDraft={date:string;startTime:string;endTime:string;technician:string;department:string};
 const message=(cause:unknown,fallback:string)=>cause instanceof Error?cause.message:fallback;
-export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJob}:Props) {
+export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJob,openLifecycle}:Props) {
   const [search,setSearch]=useState('');
   const [focusedId,setFocusedId]=useState(initialJobId);
   useEffect(()=>setFocusedId(initialJobId),[initialJobId]);
@@ -170,6 +170,7 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
           {mode==='review'&&<JobEvidence job={job}/>}
         </div>
         <div className='row-actions'><em>{job.status}</em>
+          {mode==='jobs'&&openLifecycle&&!['closed','cancelled','canceled','deleted'].includes(statusKey(job.status))&&<button className='secondary' onClick={()=>openLifecycle(String(job.id))}>View lifecycle</button>}
           {mode==='unscheduled'&&<button disabled={disabled} onClick={()=>openSchedule(job)}>Schedule + Assign</button>}
           {mode==='dispatch'&&canDispatch(job)&&<button disabled={disabled} onClick={()=>void dispatch(job)}>{statusKey(job.status)==='assigned'?'Dispatch Handoff':'Dispatch'}</button>}
           {mode==='dispatch'&&['scheduled','assigned'].includes(statusKey(job.status))&&!canDispatch(job)&&<small>Awaiting physical-unit identification by the assigned {jobDepartment(job)==='it'?'IT':'Service'} technician before dispatch.</small>}

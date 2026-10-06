@@ -61,6 +61,7 @@ async function fixturePage(page) {
     if (method === 'GET') {
       if (path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
       else if (path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
+      else if (path === '/api/camera-health/summary') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:now,rows:[]};
       else if (path === '/api/jobs') data = { items: state.jobs };
       else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
@@ -96,12 +97,12 @@ async function fixturePage(page) {
   // intercepted cross-origin fetch directly, so no backend request is emitted.
   await page.goto('/harness');
   const frame = page.frameLocator('#operations');
-  await expect(frame.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   return { state, frame };
 }
 async function open(frame, name) {
   await frame.getByRole('button',{name:'More',exact:true}).click();
-  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:name==='Daily Board'?'Dispatch Board':name,exact:true}).click();
+  await frame.getByRole('navigation',{name:'COS Operations',exact:true}).getByRole('button',{name:name==='Daily Board'?'Dispatch Board':name==='Jobs'?'Job flow':name,exact:true}).click();
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());
@@ -148,16 +149,35 @@ test('approved workspace selects real job details and opens only that job withou
 
 test('Today preserves verified sources when one source fails and fits the viewport', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
-  await expect(frame.getByText('Dashboard sources loaded.', { exact: true })).toBeVisible();
+  await expect(frame.getByText('Connected sources loaded. Agreement and signature tracking is not connected.', { exact: true })).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Operational Timeline' })).toBeVisible();
   await noOverflow(page);
   state.failedPaths.add('/api/jobs');
   await frame.getByRole('button', { name: 'Refresh Overview' }).click();
   await expect(frame.getByRole('alert', { name: 'Dashboard data unavailable' })).toBeVisible();
   await expect(frame.getByText('Jobs could not be loaded. Retry before relying on this view.', { exact: true })).toBeVisible();
-  await expect(frame.locator('.stats article').filter({ hasText: 'ACTIVE JOBS' }).locator('b')).toHaveText('—');
-  await expect(frame.locator('.stats article').filter({ hasText: 'OWNER TASKS' }).locator('b')).toHaveText('1');
+  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Schedule & Parts: Unavailable',exact:true})).toBeVisible();
+  await expect(frame.getByRole('navigation',{name:'Company job lifecycle'}).getByRole('button',{name:'Quote: 0 quotes',exact:true})).toBeVisible();
   await noOverflow(page);
+});
+
+test('Job flow opens the exact lifecycle and returns to its source before scheduling the same job', async ({page}) => {
+  const {frame,state}=await fixturePage(page);
+  await open(frame,'Jobs');
+  const job=frame.locator('.ops-workflows .record').filter({hasText:'FIX-101'});
+  await job.getByRole('button',{name:'View lifecycle',exact:true}).click();
+  const detail=frame.getByRole('complementary',{name:'Selected job details'});
+  await expect(detail).toContainText('FIX-101');
+  await expect(detail).not.toContainText('FIX-102');
+  await detail.getByRole('button',{name:'← Back to jobs',exact:true}).click();
+  expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#jobs');
+  await job.getByRole('button',{name:'View lifecycle',exact:true}).click();
+  await detail.getByRole('button',{name:'Schedule this job →',exact:true}).click();
+  expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#unscheduled?job='+jobId);
+  await expect(frame.locator('.ops-workflows .record')).toHaveCount(1);
+  await expect(frame.locator('.ops-workflows .record')).toContainText('FIX-101');
+  await expect(frame.locator('.ops-workflows .record').getByRole('button',{name:'Schedule + Assign',exact:true})).toBeVisible();
+  expect(state.writes).toEqual([]);
 });
 
 test('Daily Board filters, validates scheduling and confirms persisted assignment after reload', async ({ page }) => {
