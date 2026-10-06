@@ -26,7 +26,7 @@ test('old VISION links open only the approved workspace and keep native navigati
  await expect(frame.getByRole('button',{name:/Use (classic|Vision) layout/i})).toHaveCount(0);
  await expect(frame.locator('.vision-header,.vision-shell')).toHaveCount(0);
  expect(await frame.locator('body').evaluate(()=>new URLSearchParams(location.search).has('theme'))).toBe(false);
- const expectedHash={Jobs:'#jobs',Team:'#team',Equipment:'#equipment',Invoices:'#invoices',Today:'#today'};
+ const expectedHash={Jobs:'#jobs',Team:'#team',Equipment:'#equipment','Billing & Invoices':'#billing',Overview:'#today'};
  for(const [name,hash] of Object.entries(expectedHash)){
   await frame.getByRole('button',{name:'More',exact:true}).click();
   const menu=frame.getByRole('dialog',{name:'Operations navigation'});
