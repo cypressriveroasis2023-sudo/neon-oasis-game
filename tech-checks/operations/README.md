@@ -13,12 +13,13 @@ IT Tech Check and Service Tech Check retain their original source modules, accou
 
 ## Current scope
 
-The same `tech-checks/` link now opens responsive VISION for authorized owners.
+The same `tech-checks/` link now opens the approved VISION-branded Operations workspace for authorized owners.
 The parent gives Operations the full viewport: phone, landscape and desktop
 layouts follow its current width automatically, including after rotation or
 window resizing. No device-specific URL or saved device setting is needed.
-Options → Use classic layout remains an explicit fallback (`?theme=classic`
-inside the Operations frame); Use Vision layout restores automatic VISION.
+This is the only layout. Older `?theme=vision` bookmarks open it and retain
+their workspace route. Desktop uses its sidebar; mobile uses bottom navigation.
+The Menu opens the full tool list. Light/dark preferences are preserved.
 IT/Service applications and the owner authentication bridge are unchanged.
 
 Native owner views now include the shell/navigation, Today, Daily Board, Field Map, Owner Tasks, Jobs, Unscheduled, Dispatch, Owner Review, Calendar, Handoffs, Camera Health, Customers, Sites, Equipment, Team, Quotes, Invoices/Billing review and Purchasing review. Directory and equipment editors use existing native save functions. Finance reviews issue one decision and confirm it from independent list and detail reads.

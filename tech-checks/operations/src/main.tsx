@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import './shell.css';
-import './vision.css';
 import '../../vision-platform.css';
 import './workspace.css';
 const root = document.getElementById('root');
