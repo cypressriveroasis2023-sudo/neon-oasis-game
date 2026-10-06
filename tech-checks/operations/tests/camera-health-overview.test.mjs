@@ -31,3 +31,14 @@ test('equal-time type or identity disagreement, invalid newer records and generi
  for(const time of ['1970-01-01T00:00:00Z',null,'bad','2030-01-01T00:00:00Z']){const value=api.component([event,{...event,id:2,observed_at:time,event_type:'RP'}],event.component_area,now);assert.equal(value.state,'unknown')}
  for(const type of ['BA','CL','OP','Movement detected','unrecognized'])assert.equal(api.eventStatus(type),'unknown');
 });
+
+test('detector movement or area rename invalidates its prior inventory area until reconciled',()=>{
+ assert.equal(api.mappedArea('RII-028',[{...device,source_metadata:{area:'Exact vendor area',reconeyez_area:'New provider area'}}]),null);
+ assert.equal(api.mappedArea('RII-028',[{...device,source_metadata:{area:'Exact vendor area',reconeyez_area:'Exact vendor area'}}]),'Exact vendor area');
+});
+
+test('conflicting observed or inventory area on another unit keeps the join ambiguous',()=>{
+ for(const metadata of [{area:'Old area',reconeyez_area:'Exact vendor area'},{area:'Exact vendor area',reconeyez_area:'New area'}]){
+  assert.equal(api.mappedArea('RII-028',[device,{...device,unit_key:'RII-029',source_metadata:metadata}]),null);
+ }
+});
