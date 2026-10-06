@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 const actualHostSource=readFileSync(new URL('../../production-assignments-host.js',import.meta.url),'utf8');
-const origin='http://127.0.0.1:4173';
+const origin=process.env.COS_TEST_ORIGIN||'http://127.0.0.1:4173';
 const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const visitId='11111111-1111-4111-8111-111111111111';
 const host='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;overflow:hidden}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe id="queue" src="/?mode=production-assignments"></iframe><script>window.addEventListener("message",e=>{const f=document.getElementById("queue");if(e.origin!==location.origin||e.source!==f.contentWindow||e.data.type!=="COS_OPERATIONS_TOKEN_REQUEST")return;e.source.postMessage({type:"COS_OPERATIONS_TOKEN_RESPONSE",requestId:e.data.requestId,accessToken:"synthetic-it-token",role:"it"},location.origin)})</script></body></html>';
 const actualHarness="<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{margin:0}#cosProductionAssignmentsOverlay[hidden],#cosProductionAssignmentsButton[hidden]{display:none}#cosProductionAssignmentsOverlay{position:fixed;inset:0;z-index:30000;background:#07121f}#cosProductionAssignmentsFrame{width:100%;height:100dvh;border:0;display:block}#cosProductionAssignmentsClose{position:absolute;right:8px;top:8px;z-index:1;width:36px;height:44px}#cosProductionAssignmentsButton{position:fixed;right:12px;bottom:148px}</style></head><body><div id=\"appView\"><section id=\"view-it\"><label>Existing check value<input id=\"nativeValue\" value=\"preserved check\"></label></section></div><div id=\"authView\" class=\"hidden\"></div><script>window.TechCheckContext={getRole:()=> 'it',getEffectiveRole:()=> 'it',getSession:()=>({user:{id:'legacy-tech'}}),getProfile:()=>({user_id:'legacy-tech',active:true}),db:{auth:{onAuthStateChange:fn=>{window.authChangeHook=fn;return{}},getSession:async()=>({data:{session:{user:{id:'legacy-tech'},access_token:'synthetic-it-token'}}})}}};</script><script src=\"/actual-queue-host.js\"></script></body></html>";
 async function setup(page,{actualHost=false}={}){
-  const state={requests:[],failTasks:false,assigned:true};
+  const state={requests:[],failTasks:false,assigned:true,pending:false};
   await page.route('**/*',async route=>{
     const url=route.request().url();
     if(url===origin+'/queue-harness')return route.fulfill({status:200,contentType:'text/html',body:actualHost?actualHarness:host});
@@ -22,7 +22,7 @@ async function setup(page,{actualHost=false}={}){
     if(envelope.path==='/api/tech/session')value={authorized:true,legacyTechnician:true,name:'Fixture IT',department:'it',role:'IT'};
     else if(envelope.path==='/api/tech/assignments'){if(state.assignmentGate)await state.assignmentGate;value={profile:{display_name:'Fixture IT',department:'it'},visits:state.assigned?[{visit_id:visitId,job_id:'job',job_number:'FIX-501',customer_name:'Fixture customer',site_name:'Fixture site',visit_type:'IT_PREP',dispatch_status:'ready',scheduled_start:'2026-10-05T13:00:00Z'}]:[]};}
     else if(envelope.path==='/api/tech/tasks'){if(state.failTasks)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Fixture task source unavailable'})});value={items:[{id:'task',title:'Fixture preparation',instructions:'Use existing check procedure',status:'assigned',priority:'high'}]};}
-    else if(envelope.path==='/api/tech/visits/'+visitId)value={visit:{id:visitId,visit_type:'IT_PREP',dispatch_status:'ready'},job:{id:'job',job_number:'FIX-501',customer_name:'Fixture customer'},site:{name:'Fixture site'},execution:{status:'not_started'},current_step:{title:'Inspect physical unit'}};
+    else if(envelope.path==='/api/tech/visits/'+visitId)value={pendingWorkflow:state.pending,visit:{id:visitId,visit_type:'IT_PREP',dispatch_status:'ready'},job:{id:'job',job_number:'FIX-501',customer_name:'Fixture customer'},site:{name:'Fixture site'},execution:state.pending?null:{status:'not_started'},current_step:state.pending?null:{title:'Inspect physical unit'}};
     else throw new Error('Unexpected queue path '+envelope.path);
     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value),headers:{'access-control-allow-origin':origin}});
   });
@@ -85,4 +85,14 @@ test('old assignment details cannot reopen while a revoked queue refresh is pend
   state.assigned=false;release();
   await expect(frame.getByText('No assigned Operations visits.',{exact:true})).toBeVisible();
   await expect(frame.getByRole('region',{name:'Assigned visit details'})).toHaveCount(0);
+});
+
+test('scheduled assigned prep opens pending details without inventing a workflow or start action',async({page})=>{
+  const{frame,state}=await setup(page);state.pending=true;
+  await frame.getByRole('button',{name:/FIX-501/}).click();
+  const detail=frame.getByRole('region',{name:'Assigned visit details'});
+  await expect(detail).toBeVisible();await expect(detail).toContainText('Assigned · Tech Check setup pending');
+  await expect(detail).toContainText('Not dispatched. Operations must finish any required physical-unit setup and dispatch this visit before work can start.');
+  await expect(detail.getByRole('button',{name:/start|complete|dispatch/i})).toHaveCount(0);
+  expect(state.requests.every(request=>request.method==='GET')).toBe(true);
 });

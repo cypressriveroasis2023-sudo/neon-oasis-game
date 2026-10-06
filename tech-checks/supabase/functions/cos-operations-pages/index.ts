@@ -246,7 +246,29 @@ export function createOperationsHandler(options) {
           const assigned = await platformRead('visit_assignments?select=visit_id,user_id,assignment_role,status&visit_id=eq.' + id + '&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&limit=1');
           if (!Array.isArray(assigned) || !assigned.some(row => row.visit_id === id && row.user_id === context.actorId && row.assignment_role === 'technician' && ['assigned','accepted'].includes(row.status))) fail('This visit is not assigned to your technician account.', 404);
           const detail = await rpc('appdeploy_technician_visit_snapshot', { ...payload, p_visit_id: id });
-          if (!detail?.visit || detail.visit.id !== id) fail('The assigned visit workflow is not available yet.', 404);
+          if (!detail?.visit) {
+            // An assigned, scheduled visit can precede physical-unit identification.
+            // Do not create an execution or treat a broken existing snapshot as pending.
+            if (!detail || typeof detail !== 'object' || Array.isArray(detail) || Object.keys(detail).length) fail('The assigned visit workflow could not be verified.', 503);
+            const executions = await platformRead('workflow_executions?select=id&visit_id=eq.' + id + '&organization_id=eq.' + ORGANIZATION_ID + '&status=neq.cancelled&limit=1');
+            if (!Array.isArray(executions) || executions.length) fail('The assigned visit workflow could not be verified. Refresh your assignments.', 503);
+            // Read the current assignment and its authorized records together. Every
+            // relationship is checked again rather than trusting a prior assignment.
+            const rows = await platformRead('visit_assignments?select=visit_id,user_id,assignment_role,status,job_visits!inner(id,organization_id,job_id,visit_number,visit_type,department,status,dispatch_status,scheduled_start,scheduled_end,instructions,jobs!inner(id,organization_id,job_number,title,job_type,description,priority,customer_id,site_id,operational_status,customers!inner(id,organization_id,name),sites!inner(id,organization_id,customer_id,name,address_line1,address_line2,city,state_region,postal_code)))&visit_id=eq.' + id + '&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&job_visits.organization_id=eq.' + ORGANIZATION_ID + '&job_visits.department=eq.' + context.department + '&job_visits.status=not.in.(completed,cancelled,closed)&limit=2');
+            if (!Array.isArray(rows) || rows.length !== 1) fail('This visit is no longer assigned to your technician account. Refresh your assignments.', 404);
+            const assignment = rows[0], visit = assignment.job_visits, job = visit?.jobs, site = job?.sites, customer = job?.customers;
+            if (assignment.visit_id !== id || assignment.user_id !== context.actorId || assignment.assignment_role !== 'technician' || !['assigned','accepted'].includes(assignment.status) ||
+                visit?.id !== id || visit.organization_id !== ORGANIZATION_ID || visit.department !== context.department || ['completed','cancelled','canceled','closed'].includes(visit.status) ||
+                !UUID.test(String(visit.job_id || '')) || job?.id !== visit.job_id || job.organization_id !== ORGANIZATION_ID || ['closed','cancelled','canceled'].includes(job.operational_status) ||
+                !UUID.test(String(job.site_id || '')) || site?.id !== job.site_id || site.organization_id !== ORGANIZATION_ID || site.customer_id !== job.customer_id ||
+                !UUID.test(String(job.customer_id || '')) || customer?.id !== job.customer_id || customer.organization_id !== ORGANIZATION_ID) fail('The assigned visit records do not match your active assignment.', 503);
+            return json({ execution: null, current_step: null, pendingWorkflow: true,
+              visit: { id, visit_number: visit.visit_number, visit_type: visit.visit_type, department: visit.department, status: visit.status, dispatch_status: visit.dispatch_status, scheduled_start: visit.scheduled_start, scheduled_end: visit.scheduled_end, instructions: visit.instructions },
+              job: { id: job.id, job_number: job.job_number, title: job.title, job_type: job.job_type, description: job.description, priority: job.priority, customer_name: customer.name },
+              site: { name: site.name, address_line1: site.address_line1, address_line2: site.address_line2, city: site.city, state_region: site.state_region, postal_code: site.postal_code },
+            });
+          }
+          if (detail.visit.id !== id) fail('The assigned visit workflow could not be verified.', 503);
           const step = detail.current_step;
           return json({ execution: detail.execution, visit: detail.visit, job: detail.job, site: detail.site, current_step: step ? { id: step.id, step_key: step.step_key, sequence_number: step.sequence_number, title: step.title, instruction: step.instruction, step_type: step.step_type, required: step.required } : null });
         }
