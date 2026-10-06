@@ -228,3 +228,13 @@ test('red eye uses exact horizontal-only timing, static reduced motion and hidde
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await expect.poll(() => eye.locator('.company-eye-gaze').evaluate(el => getComputedStyle(el).animationName)).toBe('cos-eye-glance');
 });
+
+
+test('enlarged eye never overlaps sidebar labels at short desktop heights',async({page},info)=>{
+  for(const [width,height] of [[1180,757],[1024,600],[1440,600],[768,600]]){
+    await page.setViewportSize({width,height});const{frame}=await mount(page);
+    const facts=await frame.locator('.company-brand').evaluate(el=>{const eye=el.querySelector('.company-eye').getBoundingClientRect();const copy=el.querySelector('.company-brand-copy').getBoundingClientRect();const label=document.querySelector('.company-nav-heading').getBoundingClientRect();return{eyeBottom:eye.bottom,copyTop:copy.top,copyBottom:copy.bottom,labelTop:label.top,brandHeight:el.getBoundingClientRect().height};});
+    expect(facts.copyTop).toBeGreaterThanOrEqual(facts.eyeBottom);expect(facts.labelTop).toBeGreaterThan(facts.copyBottom);expect(facts.brandHeight).toBeGreaterThan(140);
+    await page.screenshot({path:info.outputPath('short-sidebar-'+width+'x'+height+'.png')});
+  }
+});

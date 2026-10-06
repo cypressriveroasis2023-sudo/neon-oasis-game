@@ -27,7 +27,7 @@
 
 /* The approved glance is readable at normal dashboard viewing distance. */
 svg.company-eye { display:block; flex:none; border-radius:50%; overflow:hidden; background:#080b12; object-fit:contain; }
-#root .company-brand { flex-direction:column; align-items:flex-start; gap:10px; margin-bottom:28px; }
+#root .company-brand { flex:none; height:auto; min-height:0; flex-direction:column; align-items:flex-start; gap:10px; margin-bottom:28px; }
 #root .company-brand .company-eye { width:104px !important; height:104px !important; }
 #root .company-mobile-brand .company-eye { width:64px !important; height:64px !important; }
 #root .company-mobile-brand { align-items:center; }
