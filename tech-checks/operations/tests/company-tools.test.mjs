@@ -10,13 +10,13 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "d37aed1756f8680ac500602a81a672f0a468c88e15ff3f89495739bf018e50c5",
+  "camera-health": "b72c87149b77a5c400db63987c2c706c67b1d2c91715c5fe5aac1fc0ca6ece26",
   "camera-detail": "faf3e804d74932e3adb1e096e4b6f6cca3dc703000eedca673cf76665a3ec219",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "45efefa445ccb850244cf901e286f238fa47421591483b79d57cf2fec8792c31",
+  "camera-health": "e0f150cfbbca57a6b17f6d015291df1567c66a0edb280a90c0b0d6bbe7dcfc29",
   "camera-detail": "9368d545ec84c6cd46bc51257381b116c3b3d8478e6474c91f36e8e1b6187de4",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
