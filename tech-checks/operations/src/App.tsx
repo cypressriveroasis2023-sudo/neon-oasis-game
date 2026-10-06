@@ -1,3 +1,4 @@
+import AnimatedEye from './AnimatedEye';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 import TodayDashboard from './TodayDashboard';
@@ -263,7 +264,7 @@ function OwnerApp() {
   return <div className='shell operations-shell company-shell'>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
     <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
-      <div className='company-brand'><img className='company-brand-mark' src={asset('cameras-on-site-logo.webp')} width='38' height='38' alt=''/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
+      <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
       <div className='company-menu-search'><label htmlFor='company-menu-search'>Find a workspace</label><input id='company-menu-search' type='search' value={menuSearch} onChange={event=>setMenuSearch(event.target.value)} placeholder='Jobs, equipment, customers…'/></div>
       <p className='company-nav-heading'>Company</p>
@@ -274,7 +275,7 @@ function OwnerApp() {
     </aside>
     <main className='owner-it-main' inert={menu}>
       <section className='company-utility-bar' aria-label='Workspace utilities'>
-        <div className='company-mobile-brand'><img className='company-brand-mark' src={asset('cameras-on-site-logo.webp')} width='34' height='34' alt=''/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div><span className='company-breadcrumb'>{workspaceLabel(active)}</span>
+        <div className='company-mobile-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div><span className='company-breadcrumb'>{workspaceLabel(active)}</span>
         <button type='button' className='company-search-trigger' onClick={openMenu}><svg aria-hidden='true' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='10.5' cy='10.5' r='6.5'/><path d='m16 16 4 4'/></svg><span>Search company workspaces</span></button>
         <span className={'company-connection'+(!authorized?' company-connection-pending':'')} role='status'><i aria-hidden='true'/>{authorized?'OPERATIONS CONNECTED':checking?'VERIFYING ACCESS':'ACCESS UNAVAILABLE'}</span>
         <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>More <span aria-hidden='true'>☰</span></button>

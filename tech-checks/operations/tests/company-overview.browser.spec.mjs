@@ -133,7 +133,7 @@ test('intermediate-width stage cards preserve all labels, counts and arrows', as
   }
 });
 
-test('round original VISION branding stays readable through responsive navigation and menu dismissal', async ({ page }, testInfo) => {
+test('approved red eye branding stays readable through responsive navigation and menu dismissal', async ({ page }, testInfo) => {
   for (const width of [320, 375, 390, 700, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: width <= 700 ? 844 : 1000 });
     const { frame } = await mount(page);
@@ -142,21 +142,21 @@ test('round original VISION branding stays readable through responsive navigatio
     await expect(brand.locator('strong')).toHaveText('VISION');
     await expect(brand.locator('small')).toHaveText('COS Operations');
     const geometry = await brand.evaluate(el => {
-      const image = el.querySelector('img');
+      const image = el.querySelector('.company-eye');
       const style = getComputedStyle(image);
       const rect = image.getBoundingClientRect();
       const box = el.getBoundingClientRect();
       return {
-        loaded: image.complete && image.naturalWidth === 1254 && image.naturalHeight === 1254,
-        src: image.getAttribute('src'), width: rect.width, height: rect.height,
+        layers: image.querySelectorAll('image').length,
+        label: image.getAttribute('aria-label'), width: rect.width, height: rect.height,
         radius: style.borderRadius, fit: style.objectFit,
         textFits: [...el.querySelectorAll('strong,small')].every(text => text.scrollWidth <= text.clientWidth),
         fits: box.left >= 0 && box.right <= innerWidth,
         background: getComputedStyle(document.body).backgroundColor,
       };
     });
-    expect(geometry).toMatchObject({ loaded: true, radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
-    expect(geometry.src).toContain('resources/cameras-on-site-logo.webp');
+    expect(geometry).toMatchObject({ layers: 2, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
+    await brand.locator('image').evaluateAll(async layers => { await Promise.all(layers.map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })); });
     expect(geometry.width).toBe(width <= 700 ? 34 : 38);
     expect(geometry.height).toBe(geometry.width);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
@@ -179,4 +179,51 @@ test('round original VISION branding stays readable through responsive navigatio
     await frame.locator('body').evaluate(() => history.back());
     await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();
   }
+});
+
+
+test('red eye uses exact horizontal-only timing, static reduced motion and hidden pause', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { frame } = await mount(page);
+  const eye = frame.locator('.company-mobile-brand .company-eye');
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+  const samples = await eye.evaluate(el => {
+    const gaze = el.querySelector('.company-eye-gaze');
+    const animation = gaze.getAnimations()[0];
+    animation.pause();
+    const sample = time => {
+      animation.currentTime = time;
+      const matrix = new DOMMatrix(getComputedStyle(gaze).transform);
+      return { time, x: matrix.e, y: matrix.f, scaleX: matrix.a, scaleY: matrix.d, housing: getComputedStyle(el.querySelector('.company-eye-housing')).transform };
+    };
+    return { duration: animation.effect.getTiming().duration, samples: [0, 1400, 2000, 3000, 4200, 5300, 7000, 8600, 9300, 10000, 11999].map(sample) };
+  });
+  expect(samples.duration).toBe(12000);
+  for (const sample of samples.samples) {
+    expect(sample.y).toBe(0);
+    expect(sample.scaleX).toBe(1);
+    expect(sample.scaleY).toBe(1);
+    expect(sample.housing).toBe('none');
+    expect(Math.abs(sample.x)).toBeLessThanOrEqual(42.01);
+  }
+  expect(samples.samples.find(s => s.time === 3000).x).toBeCloseTo(-42, 3);
+  expect(samples.samples.find(s => s.time === 7000).x).toBeCloseTo(42, 3);
+  expect(samples.samples.find(s => s.time === 2000).x).toBeCloseTo(-21, 2);
+  expect(samples.samples.find(s => s.time === 9300).x).toBeCloseTo(21, 2);
+  await eye.evaluate(el => el.querySelector('.company-eye-gaze').getAnimations()[0].play());
+  await frame.locator('body').evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(eye).toHaveAttribute('data-motion-paused', 'true');
+  expect(await eye.locator('.company-eye-gaze').evaluate(el => getComputedStyle(el).animationPlayState)).toBe('paused');
+  await frame.locator('body').evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(eye).toHaveAttribute('data-motion-paused', 'false');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await eye.locator('.company-eye-gaze').evaluate(el => ({ animation: getComputedStyle(el).animationName, matrix: getComputedStyle(el).transform }))).toEqual({ animation: 'none', matrix: 'matrix(1, 0, 0, 1, 0, 0)' });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect.poll(() => eye.locator('.company-eye-gaze').evaluate(el => getComputedStyle(el).animationName)).toBe('cos-eye-glance');
 });

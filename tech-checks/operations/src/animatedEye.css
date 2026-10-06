@@ -1,0 +1,26 @@
+/* Only the lens moves. User-space offsets match the approved 12-second preview. */
+.company-eye .company-eye-gaze {
+  transform: translateX(0);
+  animation: cos-eye-glance 12s cubic-bezier(0.333333, 0, 0.666667, 1) infinite;
+}
+.company-eye[data-motion-paused='true'] .company-eye-gaze {
+  animation-play-state: paused;
+}
+@keyframes cos-eye-glance {
+  0%, 11.666667% { transform: translateX(0); }
+  21.666667%, 35% { transform: translateX(-42px); }
+  53.333333%, 71.666667% { transform: translateX(42px); }
+  83.333333%, 100% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .company-eye .company-eye-gaze {
+    animation: none !important;
+    transform: translateX(0) !important;
+  }
+}
+@media print {
+  .company-eye .company-eye-gaze {
+    animation: none !important;
+    transform: translateX(0) !important;
+  }
+}
