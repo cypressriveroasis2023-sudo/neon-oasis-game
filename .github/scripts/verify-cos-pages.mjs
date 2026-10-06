@@ -15,6 +15,8 @@ const files = [
   'tech-checks/vision-workspace.js',
   'tech-checks/company-host-theme.css',
   'tech-checks/company-tools-theme.css',
+  'tech-checks/cos-eye-branding.js',
+  'tech-checks/cos-eye-branding.css',
   'tech-checks/camera-health.html',
   'tech-checks/camera-health-history.js',
   'tech-checks/camera-health-history.css',

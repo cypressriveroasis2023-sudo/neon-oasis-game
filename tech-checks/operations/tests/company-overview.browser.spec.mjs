@@ -157,7 +157,7 @@ test('approved red eye branding stays readable through responsive navigation and
     });
     expect(geometry).toMatchObject({ layers: 2, label: 'Cameras Onsite', radius: '50%', fit: 'contain', textFits: true, fits: true, background: 'rgb(11, 17, 28)' });
     await brand.locator('image').evaluateAll(async layers => { await Promise.all(layers.map(layer => { const image = new Image(); image.src = layer.getAttribute('href'); return image.decode(); })); });
-    expect(geometry.width).toBe(width <= 700 ? 34 : 38);
+    expect(geometry.width).toBe(width <= 700 ? 64 : 104);
     expect(geometry.height).toBe(geometry.width);
     expect(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if ([375, 768, 1440].includes(width)) await page.screenshot({ path: testInfo.outputPath('round-header-' + width + '.png') });

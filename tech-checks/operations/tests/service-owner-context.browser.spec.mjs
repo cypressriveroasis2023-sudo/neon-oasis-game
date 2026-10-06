@@ -72,7 +72,7 @@ const fixtureScript = `
   });
   setIdentity('owner');show('svc');renderServiceHome();
 `;
-const html = sourceHtml.replace('</body>', `<script>${fixtureScript}</script><script type="module" src="./operations-host.js"></script></body>`);
+const html = sourceHtml.replace('</body>', `<script>${fixtureScript}</script><script src="./cos-eye-branding.js"></script><script type="module" src="./operations-host.js"></script></body>`);
 
 async function mount(page) {
   await page.route('**/*', async route => {
@@ -96,7 +96,7 @@ test('shared VISION Service presentation keeps real readiness and job actions re
   await expect(home.getByRole('button',{name:/Truck Inspection/})).toContainText('Completed Today');
   const brand=page.locator('#appView > .mobileTop .cos-vision-brand');
   await expect(brand).toContainText('VISION');
-  await expect(brand.locator('img')).toBeVisible();
+  await expect(brand.locator('.cos-static-eye')).toBeVisible();
   for(const width of [320,390,768,1024,1440]){
     await page.setViewportSize({width,height:900});
     const layout=await home.evaluate(element=>({background:getComputedStyle(document.getElementById('appView')).backgroundColor,width:innerWidth,scroll:document.documentElement.scrollWidth,controls:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height};})}));

@@ -24,9 +24,11 @@ const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.u
 for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
     const html=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
-    const scripts=[...html.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
+    assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
+    const preserved=html.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
+    const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
-    const originalMarkup=html.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')
+    const originalMarkup=preserved.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')
       .replace(/<link rel="stylesheet" href="\.\/company-tools-theme\.css\?v=company-dark-20261006c">\n?/g,'').trim();
     assert.equal(createHash('sha256').update(originalMarkup).digest('hex'),markupHashes[name]);
     assert.equal((html.match(/href="\.\/company-tools-theme\.css\?v=company-dark-20261006c"/g)||[]).length,1);

@@ -1,0 +1,52 @@
+/* Shared COS on-screen branding. Operational data and document output are untouched. */
+.cos-static-eye { display:block; flex:none; width:72px; height:72px; overflow:hidden; border-radius:50%; background:#080b12; }
+.cos-static-eye .cos-eye-gaze { transform:translateX(0); animation:cos-shared-eye-glance 12s cubic-bezier(.333333,0,.666667,1) infinite; }
+.cos-static-eye[data-motion-paused='true'] .cos-eye-gaze { animation-play-state:paused; }
+@keyframes cos-shared-eye-glance {
+  0%,11.666667% { transform:translateX(0); }
+  21.666667%,35% { transform:translateX(-42px); }
+  53.333333%,71.666667% { transform:translateX(42px); }
+  83.333333%,100% { transform:translateX(0); }
+}
+/* Hide superseded artwork before deferred branding runs, retaining its layout. */
+:where(.vision-eye-stage,.vision-assistant-head,.health-eye,.cos-vision-brand,.visionLaunchOrb,.ownerAppBrand,.ownerAppSidebarUtility,.authcard .brand)>img { visibility:hidden; }
+html body .cos-vision-brand { align-items:center; gap:12px; }
+html body .cos-vision-brand>.cos-static-eye { width:72px!important; height:72px!important; }
+html body .vision-brand-v36 { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+html body .vision-brand-v36>.cos-static-eye { width:104px; height:104px; }
+html body .vision-top-title>.cos-static-eye { display:none; }
+html body .vision-eye-stage { display:grid; place-items:center; overflow:visible; }
+html body .vision-eye-stage>.cos-static-eye { width:100%; height:100%; max-width:none; }
+html body .vision-assistant-head>.cos-static-eye { width:32px; height:32px; }
+html body .visionLaunchOrb>.cos-static-eye { width:100%; height:100%; position:relative; z-index:3; }
+html body .health-eye { flex:none; width:88px; height:88px; }
+html body .health-eye>.cos-static-eye { width:100%; height:100%; }
+html body .authcard .brand { flex-wrap:wrap; }
+html body .authcard .brand>.cos-static-eye { width:64px; height:64px; }
+html body .ownerAppBrand>.cos-static-eye { width:64px; height:64px; }
+html body .ownerAppSidebarUtility .cos-static-eye { width:40px; height:40px; }
+html body .cos-added-brand { display:flex; align-items:center; gap:12px; color:#e6edf7; text-decoration:none; margin:0 0 14px; }
+html body .cos-added-brand strong, html body .cos-added-brand small { display:block; }
+html body .cos-added-brand strong { font-size:18px; letter-spacing:.05em; }
+html body .cos-added-brand small { font-size:11px; color:#a3b3ca; }
+/* Legacy pulse/float effects must not move the approved fixed housing. */
+html body :is(.vision-orb,.vision-orb-stage,.visionLaunchOrb,.vision-eye-stage) { animation:none!important; transform:none!important; }
+html body :is(.vision-orb-glow,.vision-scan-ring,.vision-ring,.visionLaunchHalo,.vision-behind-word) { display:none!important; }
+html body .vision-orb { background:transparent!important; box-shadow:none!important; filter:none!important; }
+@media(max-width:700px) {
+  html body .cos-vision-brand>.cos-static-eye { width:64px!important; height:64px!important; }
+  html body .health-eye { width:64px; height:64px; }
+  html body .vision-top-title { display:flex; align-items:center; gap:8px; min-width:0; }
+  html body .vision-top-title>.cos-static-eye { display:block; width:56px; height:56px; }
+  html body .cos-added-brand>.cos-static-eye { width:64px; height:64px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .cos-static-eye .cos-eye-gaze { animation:none!important; transform:translateX(0)!important; }
+}
+@media print {
+  .cos-static-eye .cos-eye-gaze { animation:none!important; transform:translateX(0)!important; }
+}
+
+html body .vision-orb-v36 { width:min(192px,var(--vision-hero-size,192px),60cqh)!important; height:min(192px,var(--vision-hero-size,192px),60cqh)!important; }
+html body .vision-orb-v36 .vision-eye-stage { width:100%!important; height:100%!important; inset:0!important; position:relative!important; }
+html body .vision-orb::before, html body .vision-orb::after, html body .vision-eye-stage::before, html body .vision-eye-stage::after { display:none!important; }

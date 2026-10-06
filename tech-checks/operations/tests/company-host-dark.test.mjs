@@ -6,7 +6,8 @@ import { createHash } from 'node:crypto';
 const html=readFileSync(new URL('../../index.html',import.meta.url),'utf8');
 const css=readFileSync(new URL('../../company-host-theme.css',import.meta.url),'utf8');
 test('dark host preserves all eight original script tags byte for byte',()=>{
-  const scripts=[...html.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
+  assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
+  const scripts=[...html.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
   assert.equal(scripts.length,8);
   // Baseline main 9af5916e: includes full inline bodies and external module URLs.
   assert.equal(createHash('sha256').update(scripts.join('\n')).digest('hex'),'3794b35dcb29cf38aeacc107c543259c5b53ccde8e454e4b3aa294463319682d');
