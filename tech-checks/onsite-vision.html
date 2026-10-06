@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://goqrnolcvqnirjmzaeyk.supabase.co" crossorigin>
   <link rel="stylesheet" href="./onsite-vision.css?v=vision-integrated-20260927">
 <link rel="stylesheet" href="./company-tools-theme.css?v=company-dark-20261006c">
+  <link rel="stylesheet" href="./onsite-vision-composer.css?v=20261006a">
 </head>
 <body>
   <div id="visionLoading" class="vision-loading">
@@ -52,7 +53,15 @@
       </header>
       <section id="visionThread" class="vision-thread"></section>
       <footer class="vision-composer-wrap">
-        <div class="vision-composer vision-composer-v36"><button id="visionAddButton" class="vision-add-v36" type="button" aria-label="New conversation">＋</button><textarea id="visionPrompt" rows="1" placeholder="Ask Vision…" enterkeyhint="send"></textarea><button id="visionKeyboardButton" class="vision-keyboard-v36" type="button" aria-label="Type to Vision">⌨</button><button id="visionVoiceButton" class="vision-voice-orb-v36" type="button" aria-label="Speak to Vision" aria-pressed="false"><span></span></button><button id="visionSendButton" class="vision-send vision-send-v36" type="button" aria-label="Send">➜</button></div>
+        <label class="vision-prompt-label" for="visionPrompt">Ask Vision</label>
+        <div class="vision-composer vision-composer-v36">
+          <textarea id="visionPrompt" rows="2" placeholder="Type your question here…" enterkeyhint="send" aria-describedby="visionPromptHelp visionAgentNotice"></textarea>
+          <button id="visionAddButton" class="vision-add-v36" type="button" aria-label="New conversation" title="New conversation">＋</button>
+          <button id="visionVoiceButton" class="vision-voice-orb-v36" type="button" aria-label="Speak to Vision" aria-pressed="false"><span></span></button>
+          <button id="visionSendButton" class="vision-send vision-send-v36" type="button">Send</button>
+        </div>
+        <div id="visionPromptHelp" class="vision-prompt-help">Enter to send · Shift+Enter for a new line</div>
+        <div id="visionAgentNotice" class="vision-agent-notice" role="status">Checking AI connection…</div>
         <div id="visionVoiceStatus" class="vision-voice-status hidden" aria-live="polite"></div>
         <div class="vision-compose-note">MHelpDesk remains separate. OnSite Vision reads and changes Tech Check only after you confirm an action.</div>
       </footer>
@@ -181,7 +190,7 @@
   <script src="./onsite-vision-actions.js?v=action-layer-v1" defer></script>
   <script src="./onsite-vision-persistence.js?v=persistence-v2" defer></script>
   <script src="./onsite-vision-knowledge-admin.js?v=knowledge-admin-v1" defer></script>
-  <script src="./onsite-vision.js?v=vision-integrated-20260927" defer></script>
+  <script src="./onsite-vision.js?v=vision-composer-20261006a" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=vision-integrated-20260927', { scope: './', updateViaCache: 'none' }).catch(console.warn));

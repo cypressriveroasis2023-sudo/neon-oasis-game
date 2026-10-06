@@ -4,19 +4,20 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 // Camera pages: reviewed 2026-10-06 check-history correction, covered by source-aware tests.
+// Vision includes the reviewed visible-composer repair (behavior covered by vision-composer.browser.spec.mjs).
 // Other tools retain origin/main 276c6d5e2c98c41a8ba71e78c560b04d6f9b998b hashes.
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
   "camera-health": "23cefa922e9cf0eb76bac9fa3607fa36da0ae0ad0a09dbec74a3998e6358c37a",
   "camera-detail": "faf3e804d74932e3adb1e096e4b6f6cca3dc703000eedca673cf76665a3ec219",
-  "onsite-vision": "1024b0cfd45738b1a39661b7ec9946c459034899b2db6a32aaedfd0044b487a4",
+  "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
   "camera-health": "1367ce2c0846dfc29b16b7dabf76a43cfab5c36f69e852eea860ed3491c033e7",
   "camera-detail": "9368d545ec84c6cd46bc51257381b116c3b3d8478e6474c91f36e8e1b6187de4",
-  "onsite-vision": "1ca7830dc31d34bb56184dcbe4cc4aacc71ff403dc6c7cadb3f2c061aea2b08f",
+  "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
 const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.url),'utf8');
