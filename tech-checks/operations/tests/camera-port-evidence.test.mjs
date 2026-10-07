@@ -65,3 +65,15 @@ test('each configured direct port is classified using only its own result',()=>{
  const health={checked_at:fresh,port_status:{80:{online:true},443:{online:false},38880:{online:'false'},38881:{online:true,checked_at:stale}}};
  assert.deepEqual([80,443,8443,38880,38881].map(p=>port(health,p,now).state),['responding','failed','unchecked','unchecked','unverified']);
 });
+
+test('direct port observation never borrows a newer provider timestamp',()=>{
+ const h={checked_at:'2026-10-06T18:00:00Z',overall_status:'online',detail:'Star4Live live API reports ONLINE',port_status:{443:{online:true},_connection:{checkedAt:'2026-10-06T16:00:00+00',status:'online',reachable:true}}};
+ const row=port(h,'443',Date.parse('2026-10-06T18:00:00Z'));assert.equal(row.state,'unverified');assert.equal(row.at,'2026-10-06T16:00:00.000Z');
+});
+
+test('loaded new endpoint rejects old proof from a concurrent health snapshot',()=>{
+ const h={checked_at:fresh,overall_status:'online',port_status:{443:{online:true},_connection:{checkedAt:fresh,status:'online',reachable:true,revision:'1',ip:'203.0.113.10'}}};
+ assert.equal(port(h,'443',now,{connection_revision:2,public_ip:'203.0.113.11'}).state,'unchecked');
+ assert.equal(port(h,'443',now,{connection_revision:1,public_ip:'203.0.113.10'}).state,'responding');
+ assert.equal(port(snapshot({online:true}),'443',now,{connection_revision:2,public_ip:'203.0.113.11'}).state,'unchecked');
+});

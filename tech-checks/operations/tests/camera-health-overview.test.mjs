@@ -23,8 +23,8 @@ test('sirens stay distinct, detector rows are not used and absent battery is not
  assert.equal(api.component([{...event,component_type:'siren_v1'}],event.component_area,now).type,'Siren');
  assert.equal(api.component([{...event,component_type:'detector_hdr_xrl'}],event.component_area,now),null);
 });
-test('unit cards contain basic info only and escape provider text',()=>{
- const html=api.card({k:'UNIT <ONE>',state:'online',ds:[{organization:'Site <X>'}]},{effectiveHealth:()=> 'online',cameraGroup:()=> 'Reconeyez',isShop:()=>false});assert.match(html,/UNIT &lt;ONE&gt;/);assert.doesNotMatch(html,/time-history|send-root|Recent Status|Live Event|diagnostic-tabs/);assert.match(html,/View unit details/);
+test('unit cards expose quick actions and history without event feeds and escape provider text',()=>{
+ const html=api.card({k:'UNIT <ONE>',state:'online',ds:[{organization:'Site <X>'}]},{effectiveHealth:()=> 'online',cameraGroup:()=> 'Reconeyez',isShop:()=>false});assert.match(html,/UNIT &lt;ONE&gt;/);assert.doesNotMatch(html,/send-root|Recent Status|Live Event|diagnostic-tabs/);assert.match(html,/View unit details/);
 });
 test('equal-time type or identity disagreement, invalid newer records and generic activity fail closed',()=>{
  for(const change of [{component_type:'siren_v1'},{component_guid:'WRONG'},{component_area:'Moved'}]){const value=api.component([event,{...event,id:2,...change}],event.component_area,now);assert.ok(value===null||value.state==='unknown')}

@@ -41,7 +41,7 @@
   }
   function serviceState(d,health={},now=Date.now()){
     if(normalized(d.activation_state)!=='ACTIVE')return 'verifying';
-    const h=d.__trackerOnly&&d.__providerLabel==='Witness'?d.__evidence:health[d.id];
+    const h=d.__trackerOnly&&d.__providerLabel==='Witness'?d.__evidence:root.CameraHealthHistory.connectionSnapshot(health[d.id]||{},d);
     if(!h||root.CameraHealthHistory.timestamp(h.checked_at,now).state!=='fresh')return 'verifying';
     const state=d.__trackerOnly?h.status:h.overall_status;
     if(state==='online'&&(d.__trackerOnly?h.reachable===true:h.ip_reachable===true))return 'online';
@@ -71,7 +71,7 @@
     const online=count('providerState','online'),offline=count('providerState','offline');
     return {total:active.length,online,offline,review:active.length-online-offline,degraded:count('providerState','degraded'),serviceReachable:active.filter(g=>g.providerState==='verifying'&&g.serviceState==='online').length,cameraOnline:count('cameraState','online'),cameraOffline:count('cameraState','offline'),cameraMixed:active.filter(g=>['degraded','verifying'].includes(g.cameraState)).length,cameraUnavailable:count('cameraState','mapping')};
   }
-  function card(g,{effectiveHealth,cameraGroup,isShop,canManage=false,movePending=false,moveMessage=''}){
+  function card(g,{effectiveHealth,cameraGroup,isShop,canManage=false,canEditConnection=false,health={},movePending=false,moveMessage=''}){
     const active=g.ds.filter(d=>placement(d)!=='inactive'),cameras=active.filter(cameraRecord),states=cameras.map(effectiveHealth);
     const online=states.filter(s=>s==='online').length,offline=states.filter(s=>s==='offline').length,count=cameras.length;
     const sources=[...new Set(active.map(cameraGroup))].join(' / ')||cameraGroup(g.ds[0]);
@@ -82,11 +82,19 @@
     const displayState=direct?g.serviceState:g.state;
     const primary=direct?'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED',verifying:'UNVERIFIED'}[g.serviceState]||'UNVERIFIED'):(g.systemKind==='recorder'?'RECORDER ':g.systemKind==='detector'?'DETECTOR ':'')+statusLabel(g.state);
     const frontAction=canManage&&['field','unknown'].includes(g.scope)&&g.ds.some(d=>!d.__trackerOnly)?'<button type="button" class="mini send-root-unit front-shop-action" data-unit="'+esc(g.k)+'" '+(movePending?'disabled':'')+'>Move to ROOT / SHOP</button><span class="unit-move-status" role="status">'+esc(moveMessage)+'</span>':'';
+    const real=g.ds.filter(d=>!d.__trackerOnly),destinations=new Map();
+    for(const d of real){
+      if(cameraGroup(d)==='Reconeyez'){destinations.set('https://na.reconeyez.com',{url:'https://na.reconeyez.com',label:'Open Reconeyez cameras'});continue;}
+      for(const link of root.CameraHealthHistory.connections(d,{},d.public_ip).filter(link=>link.url))destinations.set(link.url,{url:link.url,label:link.port===null?'Open public IP (HTTP default) · '+link.address:'Open '+link.address});
+    }
+    const access=[...destinations.values()].map(link=>'<a class="mini" target="_blank" rel="noopener noreferrer" href="'+esc(link.url)+'">'+esc(link.label)+' ↗</a>').join('');
+    const edits=canEditConnection?real.filter(d=>cameraGroup(d)!=='Reconeyez').map(d=>'<a class="mini" href="./camera-detail.html?id='+encodeURIComponent(d.id)+'&action=edit-ip">Edit IP · '+esc(d.device_name||g.k)+'</a>').join(''):'';
+    const quick='<div class="unit-card-quick-actions" aria-label="'+esc(g.k)+' quick actions">'+access+'<button type="button" class="mini unit-troubleshoot" data-unit="'+esc(g.k)+'">Troubleshoot</button><a class="mini unit-field-map-link" href="./?fieldUnit='+encodeURIComponent(g.k)+'">Field View →</a>'+(canManage&&real.length&&g.scope==='field'?'<button type="button" class="mini move-field-unit" data-unit="'+esc(g.k)+'">Edit field information</button>':'')+edits+'</div>';
     return '<article class="unitcard compact-unit '+esc(displayState)+'" data-unit="'+esc(g.k)+'"><button type="button" class="unit-card-open" aria-label="Open '+esc(g.k)+' unit details">'+
       '<span class="compact-unit-top"><span class="compact-unit-title">'+esc(g.k)+'</span><span class="statuspill '+esc(displayState)+'">'+esc(primary)+'</span></span>'+
       (g.scope==='unknown'?'<span class="placement-warning">LOCATION REVIEW · Field or shop not verified</span>':'')+
       '<span class="compact-unit-site">'+esc(site)+'</span><span class="compact-unit-meta">'+esc(sources)+' · '+esc(g.systemKind==='recorder'?'Provider recorder observation':count?count+' camera/detector resource'+(count===1?'':'s'):g.state==='service'?'Service-port observation':'Provider status not verified')+'</span>'+
-      '<span class="compact-unit-summary">'+(providerSummary?'<span class="system-evidence-summary">'+esc(providerSummary)+'</span>':'')+'<span class="camera-evidence-badge">'+esc(g.state==='shop'?'Active shop inventory; excluded from operational outage totals':g.state==='inactive'?'Deactivated or retired; excluded from operational outage totals':cameraSummary)+'</span><span class="compact-unit-open">View unit details <span aria-hidden="true">→</span></span></span></button>'+frontAction+(canManage&&['shop','inactive'].includes(g.scope)&&g.ds.some(d=>!d.__trackerOnly)?'<button type="button" class="mini move-field-unit" data-unit="'+esc(g.k)+'">Move to Field</button>':'')+'<a class="mini unit-field-map-link" href="./?fieldUnit='+encodeURIComponent(g.k)+'">Field Map →</a></article>';
+      '<span class="compact-unit-summary">'+(providerSummary?'<span class="system-evidence-summary">'+esc(providerSummary)+'</span>':'')+'<span class="camera-evidence-badge">'+esc(g.state==='shop'?'Active shop inventory; excluded from operational outage totals':g.state==='inactive'?'Deactivated or retired; excluded from operational outage totals':cameraSummary)+'</span><span class="compact-unit-open">View unit details <span aria-hidden="true">→</span></span></span></button>'+root.CameraHealthHistory.strip(real,health,cameraGroup)+quick+frontAction+(canManage&&['shop','inactive'].includes(g.scope)&&g.ds.some(d=>!d.__trackerOnly)?'<button type="button" class="mini move-field-unit" data-unit="'+esc(g.k)+'">Move to Field</button>':'')+'</article>';
   }
   function details(g,{health,cameraGroup,effectiveHealth,reconBatteryBadge,canManage=false}){
     const ds=g.ds.filter(d=>!d.__trackerOnly);

@@ -25,7 +25,7 @@ function requestParentToken(): Promise<ParentSession> {
       if (!message || message.type !== 'COS_OPERATIONS_TOKEN_RESPONSE' || message.requestId !== requestId) return;
       cleanup();
       const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
-      if (!(queueMode ? ['it','service'].includes(message.role) : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
+      if (!(queueMode ? ['it','service'].includes(message.role) : new URLSearchParams(location.search).get('mode') === 'fleet' ? message.role === 'it' : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
         reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
       } else resolve({ token: message.accessToken, role: message.role });
     };
