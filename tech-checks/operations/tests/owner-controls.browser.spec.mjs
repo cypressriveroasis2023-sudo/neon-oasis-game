@@ -4,9 +4,11 @@ import { test, expect } from '@playwright/test';
 const origin='http://127.0.0.1:4173', edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const jobId='11111111-1111-4111-8111-111111111111',visitId='22222222-2222-4222-8222-222222222222',siteId='33333333-3333-4333-8333-333333333333',checkId='44444444-4444-4444-8444-444444444444',createdId='55555555-5555-4555-8555-555555555555',nextVisit='66666666-6666-4666-8666-666666666666';
 const now='2026-10-05T15:00:00Z';
-async function mount(page,workspace='daily-board',authorized=true){
+const equipmentId='77777777-7777-4777-8777-777777777777',trackerId='88888888-8888-4888-8888-888888888888';
+async function mount(page,workspace='daily-board',authorized=true,overrides={}){
  const state={customers:[{id:checkId,name:'Fixture Customer',legalName:'Fixture Customer LLC',customerNumber:'FX-01',status:'active'},{id:nextVisit,name:'Imported Customer Without Site',customerNumber:'FX-02',status:'active'}],jobs:[{id:jobId,jobNumber:'TEST-101',jobType:'DELIVERY',visitId,status:'Unscheduled',department:'it',stage:'IT Prep',technician:'Jordan IT',customer:'Fixture Customer',site:'Fixture Site',equipmentUnitTag:'TEST-SN-1'}],tasks:[],writes:[],requests:[],unchanged:false,failRead:false,taskMismatch:false,
  control:{sites:[{id:siteId,name:'Fixture Site',customerId:checkId,customer_id:checkId,customer:'Fixture Customer',status:'active',addressLine1:'100 Fixture Street',city:'Katy',stateRegion:'TX',customers:{name:'Fixture Customer'}}],truckChecks:[{id:checkId,technician:'Casey Service',department:'service',status:'pending',ownerApproved:false,result:{}}],itTechnicians:['Jordan IT','Morgan IT'],serviceTechnicians:['Casey Service']}};
+ state.equipment=[{id:equipmentId,unitNumber:'FIX-UNIT-77',modelName:'Fixture model',status:'installed',currentLocationType:'site',installedSiteId:siteId}];state.fieldUnits=[...state.equipment];Object.assign(state,overrides);
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const request=route.request(),url=request.url();
@@ -19,11 +21,14 @@ async function mount(page,workspace='daily-board',authorized=true){
   const envelope=request.postDataJSON();state.requests.push(envelope);const {path,method,body}=envelope;
   const answer=data=>route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
   if(method==='GET'){
+   if(state.contextGate&&['/api/equipment','/api/field-map'].includes(path))await state.contextGate;
+   if(path==='/api/equipment')return answer({items:state.equipment,models:[]});
+   if(path==='/api/field-map')return answer({items:state.fieldUnits,summary:{fieldUnits:state.fieldUnits.length,mappedUnits:0,unitGps:0,missingGps:state.fieldUnits.length},generatedAt:now});
    if(state.directoryFailure===path||(state.siteReadFailAfterWrite&&state.siteWritten&&path==='/api/sites'))return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic directory unavailable'})});
    if(state.readGate&&['/api/jobs','/api/owner/control-data','/api/owner-tasks'].includes(path))await state.readGate;
    if(state.failRead&&['/api/jobs','/api/owner/control-data'].includes(path))return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic refresh unavailable'})});
    if(path==='/api/routers')return answer({ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() });
-   if(path==='/api/camera-health/summary')return answer({totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]});
+   if(path==='/api/camera-health/summary-v2')return answer({totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]});
    if(path==='/api/session')return answer({authorized,name:'Fixture Owner',role:'Owner'});
    if(path==='/api/jobs')return answer({items:state.jobs});
    if(path==='/api/owner/control-data')return answer(state.control);
@@ -345,6 +350,50 @@ test('leaving an uncertain inline site save refreshes first and exposes the save
  await expect(editor).toHaveCount(0);await expect(controls.getByLabel('Customer / Site',{exact:true}).locator('option[value="99999999-9999-4999-8999-999999999999"]')).toHaveCount(1);
  await controls.getByRole('button',{name:'+ Add site for this customer',exact:true}).click();
  await expect(editor.getByRole('button',{name:'SAVE',exact:true})).toBeEnabled();expect(state.writes).toHaveLength(1);
+});
+
+test('unit ticket context prefills exact customer/site and persists an editable reference without assigning equipment',async({page})=>{
+ const {controls,state,frame}=await mount(page,'daily-board?create=SERVICE&unit='+equipmentId);
+ await expect(controls.getByRole('region',{name:'Selected unit context'})).toContainText('FIX-UNIT-77');
+ await expect(controls.getByLabel('Customer / Site',{exact:true})).toHaveValue(siteId);
+ await expect(controls.getByRole('combobox',{name:'Search customers'})).toHaveValue('Fixture Customer');
+ await expect(controls.getByLabel('Title',{exact:true})).toHaveValue('Service · FIX-UNIT-77');
+ await expect(controls.getByLabel('Description / instructions')).toContainText('This reference does not assign equipment');
+ expect(state.writes).toHaveLength(0);
+ await controls.getByLabel('Job type').selectOption('PICKUP');await expect(controls.getByLabel('Title',{exact:true})).toHaveValue('Pickup · FIX-UNIT-77');
+ await controls.getByLabel('Title',{exact:true}).fill('Owner edited pickup title');await controls.getByLabel('Description / instructions').fill('Owner instructions for FIX-UNIT-77');
+ await controls.getByLabel('Job type').selectOption('SWAP');await expect(controls.getByLabel('Title',{exact:true})).toHaveValue('Owner edited pickup title');
+ await controls.getByRole('button',{name:'CREATE TICKET',exact:true}).click();await expect(controls.getByRole('region',{name:'Ticket created'})).toBeVisible();
+ expect(state.writes).toHaveLength(1);expect(state.writes[0].body).toEqual({siteId,jobType:'SWAP',title:'Owner edited pickup title',description:'Owner instructions for FIX-UNIT-77',priority:'normal',shopPrep:false});
+ await controls.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?unit='+equipmentId);
+});
+
+test('late unit context cannot overwrite title, instructions or a manually chosen customer',async({page})=>{
+ let release;const gate=new Promise(resolve=>release=resolve);
+ const {controls,state}=await mount(page,'daily-board?create=PICKUP&unit='+equipmentId,true,{contextGate:gate});
+ await expect(controls.getByRole('status').filter({hasText:'Verifying the selected unit'})).toBeVisible();
+ await controls.getByLabel('Title',{exact:true}).fill('Typed while loading');await controls.getByLabel('Description / instructions').fill('These instructions belong to the owner');
+ await controls.getByRole('combobox',{name:'Search customers'}).fill('Imported Customer');await controls.getByRole('option',{name:/Imported Customer Without Site/}).click();
+ release();await expect(controls.getByRole('region',{name:'Selected unit context'})).toContainText('FIX-UNIT-77');
+ await expect(controls.getByLabel('Title',{exact:true})).toHaveValue('Typed while loading');await expect(controls.getByLabel('Description / instructions')).toHaveValue('These instructions belong to the owner');
+ await expect(controls.getByRole('combobox',{name:'Search customers'})).toHaveValue('Imported Customer Without Site');await expect(controls.getByLabel('Customer / Site',{exact:true})).toHaveCount(0);expect(state.writes).toHaveLength(0);
+});
+
+test('tracker-only unit context does not infer a customer/site from an identical equipment name',async({page})=>{
+ const {controls,state}=await mount(page,'daily-board?create=SERVICE&unit='+trackerId,true,{fieldUnits:[{id:trackerId,unitNumber:'FIX-UNIT-77',modelName:'Fixture model',status:'field',readOnly:true,recordSource:'Fixture tracker'}]});
+ await expect(controls.getByRole('region',{name:'Selected unit context'})).toContainText('read-only tracker reference');
+ await expect(controls.getByRole('combobox',{name:'Search customers'})).toHaveValue('');await expect(controls.getByLabel('Customer / Site',{exact:true})).toHaveCount(0);
+ await expect(controls.getByLabel('Description / instructions')).toContainText('Read-only tracker record: '+trackerId);
+ await chooseSite(controls);await expect(controls.getByLabel('Customer / Site',{exact:true})).toHaveValue(siteId);expect(state.writes).toHaveLength(0);
+});
+
+test('deleted unit context blocks creation, retry does not duplicate a reference, and Back sends no write',async({page})=>{
+ const {controls,state,frame}=await mount(page,'daily-board?create=SWAP&unit='+equipmentId,true,{equipment:[],fieldUnits:[]});
+ await expect(controls.getByRole('alert')).toContainText('selected unit is no longer available');await expect(controls.getByRole('button',{name:'CREATE TICKET',exact:true})).toBeDisabled();
+ state.equipment=[{id:equipmentId,unitNumber:'FIX-UNIT-77',status:'installed',currentLocationType:'site',installedSiteId:siteId}];state.fieldUnits=[...state.equipment];
+ await controls.getByRole('button',{name:'Retry unit context',exact:true}).click();await expect(controls.getByLabel('Customer / Site',{exact:true})).toHaveValue(siteId);
+ const instructions=await controls.getByLabel('Description / instructions').inputValue();expect(instructions.match(/Unit reference:/g)).toHaveLength(1);
+ await controls.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?unit='+equipmentId);expect(state.writes).toHaveLength(0);
 });
 
 const fixtureContactId='77777777-7777-4777-8777-777777777777';

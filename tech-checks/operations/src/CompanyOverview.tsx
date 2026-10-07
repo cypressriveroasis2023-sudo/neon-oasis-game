@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect,useState } from 'react';
+import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { COMPANY_STAGES, companyStageCounts, type CompanyStageId } from './companyLifecycle';
 import { summarizeTodayDashboard, type CompanyEquipmentData, type DashboardData, type DashboardRow } from './todayDashboardData';
 import './CompanyOverview.css';
@@ -41,9 +42,9 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
   const counts = companyStageCounts(data.jobs);
   const summary = summarizeTodayDashboard(data);
   const attention = attentionItems(data);
-  const camera = equipment?.camera;
-  const cameraAttention = camera ? camera.offline + camera.review : null;
-  const cameraMetric = camera ? camera.fieldDevices === 0 ? 'No field devices recorded' : cameraAttention === 0 ? 'No flagged field devices' : countLabel(cameraAttention!, 'field device') + ' need' + (cameraAttention === 1 ? 's' : '') + ' attention' : 'Health unavailable';
+  const [healthNow,setHealthNow]=useState(Date.now());
+  useEffect(()=>{const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[]);
+  const camera = cameraDashboardSummary(equipment?.camera,healthNow);
   const teams: { label: string; count: number | null; note?: string }[] = [
     { label: 'Sales & agreements', count: null, note: 'Not connected' },
     { label: 'Operations planning', count: counts.schedule },
@@ -67,9 +68,11 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
     <div className='company-health-grid' aria-label='Equipment health'>
       <article className='company-health-card'>
         <h2>Camera Health</h2>
-        <strong>{cameraMetric}</strong>
-        <p>{camera ? countLabel(camera.fieldDevices, 'field device') + ' · ' + camera.online + ' online' : 'Open Camera Health to review the source'}</p>
-        <small className={cameraAttention && cameraAttention > 0 ? 'company-attention-note' : ''}>{camera ? 'Source refreshed ' + new Date(camera.refreshedAt).toLocaleString() : 'SUMMARY NOT VERIFIED'}</small>
+        <strong>{camera.headline}</strong>
+        <p>{camera.systems}</p>
+        {camera.available&&<><p>{camera.cameraCoverage}</p><p>{camera.serviceCoverage}</p><p>{camera.placement}</p></>}
+        <small className={camera.attention && camera.attention > 0 ? 'company-attention-note' : ''}>{camera.available?'Source refreshed '+new Date(camera.refreshedAt!).toLocaleString():'SUMMARY NOT VERIFIED'}</small>
+        <small>{camera.note}</small>
         {equipment?.errors.camera && <p className='company-card-error' role='alert'>{equipment.errors.camera}</p>}
         <button onClick={() => openWorkspace('Camera Health')}>Open Camera Health <span aria-hidden='true'>→</span></button>
       </article>

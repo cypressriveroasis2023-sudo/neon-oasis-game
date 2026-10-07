@@ -1,22 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCompanyEquipment } from '../src/todayDashboardData.ts';
+import {resource,snapshot,withStatus} from './fixtures/camera-evidence-fixtures.mjs';
+import {cameraDashboardSummary} from '../src/cameraDashboardSummary.ts';
 const stamp = '2026-10-06T13:00:00.000Z';
-const camera = { totalDevices: 3, online: 1, offline: 1, review: 1, shopRoot: 0, healthRows: 3, fieldDevices: 3, refreshedAt: stamp, rows: [{ id: 'c1', name: 'Fixture camera 1', status: 'online' }, { id: 'c2', name: 'Fixture camera 2', status: 'offline' }, { id: 'c3', name: 'Fixture camera 3', status: 'review' }] };
+const camera = snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),withStatus(resource(3,'Helios 3'),'unknown')]);
 const routers = { items: [], generatedAt: stamp, source: 'camera_health', gpsAvailable: false };
 
 test('company equipment reads only validated camera and stored router sources', async () => {
   const paths = [];
   const result = await loadCompanyEquipment({ get: async path => { paths.push(path); return { data: path.includes('camera-health') ? camera : routers }; } });
-  assert.deepEqual(paths.sort(), ['/api/camera-health/summary', '/api/routers']);
-  assert.equal(result.camera.offline + result.camera.review, 2);
+  assert.deepEqual(paths.sort(), ['/api/camera-health/summary-v2', '/api/routers']);
+  assert.equal(cameraDashboardSummary(result.camera,Date.parse('2026-10-06T18:00:00Z')).attention,2);
   assert.equal(result.routers.items.length, 0);
   assert.equal(result.routers.gpsAvailable, false);
   assert.deepEqual(result.errors, {});
 });
 
 test('company equipment never substitutes an empty collection or healthy zero after failure', async () => {
-  for (const failedPath of ['/api/camera-health/summary', '/api/routers']) {
+  for (const failedPath of ['/api/camera-health/summary-v2', '/api/routers']) {
     const result = await loadCompanyEquipment({ get: async path => { if (path === failedPath) throw new Error('Fixture unavailable'); return { data: path.includes('camera-health') ? camera : routers }; } });
     const key = failedPath.includes('camera-health') ? 'camera' : 'routers';
     assert.equal(result[key], null);

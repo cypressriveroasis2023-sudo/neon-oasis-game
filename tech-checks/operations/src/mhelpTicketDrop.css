@@ -1,0 +1,16 @@
+.mhelp-ticket-drop{border:2px dashed var(--cos-border,#375168);border-radius:10px;padding:20px;background:var(--cos-panel,#12212d);color:var(--cos-text,#eef4f7);min-width:0;overflow-wrap:anywhere}
+.mhelp-ticket-drop h3{margin:0 0 8px;font-size:17px}
+.mhelp-ticket-drop p{line-height:1.5}
+.mhelp-ticket-drop-active{border-color:var(--cos-blue,#60a5fa);background:var(--cos-selected,#182f46)}
+.mhelp-ticket-drop-note{font-size:12px;color:var(--cos-muted,#b4c4d0);margin-bottom:0}
+.mhelp-ticket-drop button{min-height:44px;max-width:100%;white-space:normal}
+.mhelp-ticket-drop [role=alert]{color:#ffbbbb}
+.mhelp-import-panel .mhelp-customer-matches{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 18px;max-height:240px;overflow:auto}
+.mhelp-import-panel .mhelp-customer-matches button[aria-pressed=true]{outline:2px solid var(--cos-blue,#60a5fa);outline-offset:2px}
+.mhelp-source-summary{background:var(--cos-sidebar,#14212d);padding:12px;border-radius:8px;margin-bottom:16px;overflow-wrap:anywhere}
+.mhelp-source-summary p{margin:5px 0}
+.mhelp-original-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;font-family:inherit;font-size:13px}
+.mhelp-history-row{border-top:1px solid var(--cos-border,#375168);padding:14px 0;overflow-wrap:anywhere}
+.mhelp-import-panel input[type=checkbox]{width:auto!important;min-height:20px}
+.mhelp-import-panel details{margin:16px 0}
+@media(max-width:600px){.mhelp-ticket-drop{padding:16px}}

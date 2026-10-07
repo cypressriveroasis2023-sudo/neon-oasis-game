@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { productionDay, productionTasks, productionVisit, queueTime, queueStatus } from '../src/productionQueueData.ts';
 import { validateCameraHealth } from '../src/CameraHealthWorkspace.tsx';
+import { snapshot as cameraSnapshot, resource as cameraResource } from './fixtures/camera-evidence-fixtures.mjs';
 test('native queue accepts a real empty snapshot and rejects malformed visits',()=>{
   assert.deepEqual(productionDay({profile:{department:'it'},visits:[]}).visits,[]);
   for(const data of [null,{}, {profile:{},visits:[null]}, {profile:{},visits:[{}]}, {profile:[],visits:[]}]) assert.throws(()=>productionDay(data),/incomplete/);
@@ -22,10 +23,10 @@ test('unavailable schedule and status stay explicit',()=>{
   assert.equal(queueStatus(null),'UNAVAILABLE');
   assert.equal(queueStatus('owner_review'),'OWNER REVIEW');
 });
-test('camera health counts require fresh coherent real rows',()=>{
-  const value={totalDevices:2,online:1,offline:0,review:0,shopRoot:1,healthRows:1,fieldDevices:1,refreshedAt:'2026-10-04T10:00:00Z',rows:[{id:'camera',name:'Unit camera',status:'online'}]};
+test('camera health counts require coherent source-separated inventory rows',()=>{
+  const value=cameraSnapshot([cameraResource(1,'Synthetic Unit 1'),cameraResource(2,'Synthetic Unit 2',{scope:'shop'})]);
   assert.equal(validateCameraHealth(value),value);
-  for(const bad of [{...value,offline:1},{...value,rows:[null]},{...value,rows:[]},{...value,online:-1},{...value,refreshedAt:'invalid'}]) assert.throws(()=>validateCameraHealth(bad),/incomplete/);
+  for(const bad of [{...value,offline:1},{...value,rows:[null]},{...value,rows:[]},{...value,online:-1},{...value,refreshedAt:'invalid'}]) assert.throws(()=>validateCameraHealth(bad),/incomplete|reconciled/);
 });
 
 import { confirmedItClaim, productionItQueue } from '../src/productionQueueData.ts';

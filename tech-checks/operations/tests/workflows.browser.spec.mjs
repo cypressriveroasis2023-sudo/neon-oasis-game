@@ -41,7 +41,7 @@ async function openFixture(page,workspace,configure=()=>{}) {
     let data;
     if(method==='GET') {
       if(path==='/api/routers')data={ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
-      else if(path==='/api/camera-health/summary')data={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
+      else if(path==='/api/camera-health/summary-v2')data={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
       else if(path==='/api/session')data={authorized:true,role:'Owner',name:'Fixture Owner'};
       else if(path==='/api/jobs'){
         data={items:structuredClone(state.readbackMismatch?state.jobs.map(row=>row.id===jobId?{...row,status:'Scheduled'}:row):state.jobs)};

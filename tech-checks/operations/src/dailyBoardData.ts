@@ -71,7 +71,7 @@ export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now =
       const day = chicagoDay(date);
       if (done ? completedDay !== today : scope==='day' ? Boolean(day && day > today) : Boolean(day && day > horizon)) continue;
       const overdue = !done && Boolean(day && day < today);
-      const needsAttention = overdue || Boolean(record.needsAttention) || ['blocked','needs correction','correction required','owner review','on hold'].includes(status);
+      const needsAttention = overdue || record.goBack?.required === true || Boolean(record.needsAttention) || ['blocked','needs correction','correction required','owner review','on hold'].includes(status);
       const lane: BoardLane = done ? 'complete' : needsAttention ? 'attention' : ['in progress','dispatched','en route','on site','working','accepted'].includes(status) ? 'progress' : 'todo';
       const rawAssignee = String(kind === 'job' ? record.technician || 'Unassigned' : record.assignedTo || (record.assignedDepartment ? String(record.assignedDepartment).toUpperCase()+' team' : 'Unassigned'));
       const assignee=status==='owner review'?'Owner Review':rawAssignee;

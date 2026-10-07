@@ -35,7 +35,7 @@ async function setup(page){
     let data;
     if(method==='GET'){
       if(path==='/api/routers')data={ items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
-      else if(path==='/api/camera-health/summary')data={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
+      else if(path==='/api/camera-health/summary-v2')data={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
       else if(path==='/api/session')data={authorized:true,name:'Fixture Owner',role:'Owner'};
       else if(path==='/api/customers')data={items:state.mismatch?state.customers.map(row=>({...row,notes:'Old note'})):state.customers};
       else if(path==='/api/sites')data={items:state.sites};

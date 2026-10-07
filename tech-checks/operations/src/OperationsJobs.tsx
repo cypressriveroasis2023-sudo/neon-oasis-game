@@ -3,6 +3,8 @@ import { api } from './api';
 import { chicagoDay } from './dailyBoardData';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import JobEvidence from './JobEvidence';
+import { DeliveryGoBackDialog, DeliveryGoBackSummary } from './DeliveryGoBack';
+import { canRequestGoBack, confirmedGoBack, emptyGoBackDraft, goBackBlockedReason, hasOpenGoBack, validGoBackDraft, type GoBackDraft } from './deliveryGoBackData';
 import { assignmentTechnicians, canDispatch, confirmedDispatch, confirmedQueueRelease, confirmedReview, confirmedSchedule, createJobActionSaver, jobDepartment, isItQueue, jobItems, recordItems, statusKey, technicianLocationUrl, visibleJobs, type JobsMode, type OperationsRecord } from './operationsWorkflowData';
 import './operationsWorkflows.css';
 
@@ -35,6 +37,10 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
   const [refreshRequired,setRefreshRequired]=useState(false);
   const [scheduleJob,setScheduleJob]=useState<OperationsRecord|null>(null);
   const [scheduleForm,setScheduleForm]=useState<ScheduleDraft>({date:'',startTime:'08:00',endTime:'10:00',technician:'',department:'service',assignmentMode:'technician'});
+
+  const [goBackJob,setGoBackJob]=useState<OperationsRecord|null>(null);
+  const [goBackDraft,setGoBackDraft]=useState<GoBackDraft|null>(null);
+  const goBackDialog=useRef<HTMLDialogElement|null>(null);
   const [correctionJob,setCorrectionJob]=useState<OperationsRecord|null>(null);
   const [correctionReason,setCorrectionReason]=useState('');
   const [lifecycleJob,setLifecycleJob]=useState<OperationsRecord|null>(null);
@@ -74,6 +80,7 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
     return()=>{mounted.current=false;revision.current+=1;window.removeEventListener('focus',focus);};
   },[load,loadTeam]);
   useModalDialog(scheduleDialog,scheduleJob);
+  useModalDialog(goBackDialog,goBackJob);
   useModalDialog(correctionDialog,correctionJob);
   useModalDialog(lifecycleDialog,lifecycleJob);
   const available=assignmentTechnicians(team,scheduleForm.department);
@@ -139,6 +146,12 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
     const saved=await perform('/api/jobs/'+job.id+'/remove',{confirmation},items=>!items.some(item=>item.id===job.id),'Test job removed and verified.');
     if(saved){setLifecycleJob(null);setLifecycleAction(null);setLifecycleInput('');}
   };
+  const saveGoBack=async()=>{
+    if(!goBackJob||!goBackDraft||!validGoBackDraft(goBackDraft))return;
+    const job=goBackJob,draft=goBackDraft;
+    const saved=await perform('/api/jobs/'+job.id+'/go-back',draft,items=>confirmedGoBack(items,job.id,draft),'Go-back saved and verified. Ticket open · return visit ready to schedule.');
+    if(saved){setGoBackJob(null);setGoBackDraft(null);}
+  };
   const returnCorrection=async()=>{
     if(!correctionJob||!correctionReason.trim()){setActionError('A correction reason is required.');return;}
     const job=correctionJob;
@@ -168,6 +181,7 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
       return <div className='record op-record' key={job.id}>
         <div><strong>{job.jobNumber} · {job.customer}</strong><small>{job.site} · {job.jobType} · {job.equipment||'Equipment not assigned'}{job.equipmentUnitTag?' · '+(String(job.jobType).toUpperCase()==='SWAP'?'Site / returned ':'Unit ')+job.equipmentUnitTag:' · UNIT TAG REQUIRED'}{String(job.jobType).toUpperCase()==='SERVICE'?' · '+(job.shopPrep?'Shop prep required':'Direct Service'):''} · Stage: {job.stage||'Legacy workflow'} · {job.scheduled||'Not scheduled'} · {isItQueue(job)?'IT shared queue · '+(job.queueStatus==='claimed'?'Claimed by '+job.technician:job.queueStatus==='ready'?'Ready to take':'Scheduled · not sent'):job.technician||'Unassigned'}{statusKey(job.status)==='en route'?' · LIVE GPS':''}</small>
           {statusKey(job.status)==='unscheduled'&&correction&&<span className='owner-techcheck'>OWNER CORRECTION · {String(correction).replace('Returned by Owner: ','')}</span>}
+          <DeliveryGoBackSummary job={job}/>
           {location&&<a className='owner-location' href={location} target='_blank' rel='noopener noreferrer'>View technician location · {Number(job.lastLocation.latitude).toFixed(4)}, {Number(job.lastLocation.longitude).toFixed(4)}</a>}
           {job.techCheck&&<span className='owner-techcheck'>Tech Check · {job.techCheck.complete?'Complete':'Step '+(Number(job.techCheck.step||0)+1)}</span>}
           {mode==='review'&&reviewBlockers.length>0&&<div className='daily-board-error owner-review-blockers' role='status'><b>Review before approval</b>{reviewBlockers.map(blocker=><small key={blocker}>{blocker}</small>)}<small>The backend remains the final billing-readiness authority.</small></div>}
@@ -175,15 +189,18 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
         </div>
         <div className='row-actions'><em>{job.status}</em>
           {mode==='jobs'&&openLifecycle&&!['closed','cancelled','canceled','deleted'].includes(statusKey(job.status))&&<button className='secondary' onClick={()=>openLifecycle(String(job.id))}>View lifecycle</button>}
-          {mode==='unscheduled'&&<button disabled={disabled} onClick={()=>openSchedule(job)}>Schedule + Assign</button>}
+          {(mode==='unscheduled'||mode==='dispatch'&&hasOpenGoBack(job)&&statusKey(job.status)==='unscheduled')&&<button disabled={disabled} onClick={()=>openSchedule(job)}>Schedule + Assign</button>}
+          {(mode==='jobs'||mode==='review')&&canRequestGoBack(job)&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setGoBackDraft(emptyGoBackDraft());setGoBackJob(job);}}>Go-back required</button>}
+          {mode==='jobs'&&goBackBlockedReason(job)&&<small className='go-back-blocked'>{goBackBlockedReason(job)}</small>}
+          {mode==='jobs'&&statusKey(job.status)!=='closed'&&!hasOpenGoBack(job)&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setLifecycleJob(job);setLifecycleAction('close');setLifecycleInput('');}}>Close Job</button>}
           {mode==='dispatch'&&canDispatch(job)&&<button disabled={disabled} onClick={()=>void dispatch(job)}>{isItQueue(job)&&job.queueStatus==='scheduled'?'Send to IT queue':statusKey(job.status)==='assigned'?'Dispatch Handoff':'Dispatch'}</button>}
           {mode==='dispatch'&&['scheduled','assigned'].includes(statusKey(job.status))&&!canDispatch(job)&&<small>{isItQueue(job)?job.queueStatus==='ready'?'Shared IT queue · waiting for an IT technician to take ownership.':job.queueStatus==='claimed'?'Claimed · finish physical-unit and Tech Check setup before dispatch.':'A complete schedule is required before sending to the IT queue.':'Awaiting physical-unit identification by the assigned '+(jobDepartment(job)==='it'?'IT':'Service')+' technician before dispatch.'}</small>}
-          {mode==='jobs'&&statusKey(job.status)!=='closed'&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setLifecycleJob(job);setLifecycleAction('close');setLifecycleInput('');}}>Close Job</button>}
           {mode==='jobs'&&/test|e2e/i.test(String(job.jobNumber)+' '+String(job.customer)+' '+String(job.site))&&<button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setLifecycleJob(job);setLifecycleAction('remove');setLifecycleInput('');}}>Delete Test Job</button>}
-          {mode==='review'&&<><button disabled={disabled} onClick={()=>void approve(job)}>Approve + Release to Billing</button><button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setCorrectionJob(job);setCorrectionReason('');}}>Return for Correction</button></>}
+          {mode==='review'&&<><button disabled={disabled||hasOpenGoBack(job)} onClick={()=>void approve(job)}>Approve + Release to Billing</button><button className='secondary' disabled={disabled} onClick={()=>{setActionError('');setCorrectionJob(job);setCorrectionReason('');}}>Return for Correction</button></>}
         </div>
       </div>;
     })}{rows&&visible.length===0&&<div className='loading'>No {mode==='review'?'completed jobs are waiting for Owner Review':mode==='unscheduled'?'jobs are currently waiting to be scheduled':mode==='dispatch'?'jobs are currently in the dispatch queue':'COS Jobs are in the current records'}.</div>}</div>}
+    {goBackJob&&goBackDraft&&<DeliveryGoBackDialog job={goBackJob} draft={goBackDraft} setDraft={setGoBackDraft} dialogRef={goBackDialog} saving={saving} disabled={disabled} error={actionError} refreshRequired={refreshRequired} refresh={refresh} close={()=>{setGoBackJob(null);setGoBackDraft(null);}} save={()=>void saveGoBack()}/>}
     {scheduleJob&&<dialog ref={scheduleDialog} className='schedule-overlay' aria-label='Schedule and assign job' onCancel={event=>{if(saving)event.preventDefault();else setScheduleJob(null);}}><section className='schedule-card'><div className='schedule-head'><div><small>SCHEDULE & ASSIGN</small><h2>{scheduleJob.jobNumber}</h2><p>{scheduleJob.customer} · {scheduleJob.site}</p></div><button aria-label='Close scheduling' disabled={saving} onClick={()=>setScheduleJob(null)}>×</button></div><div className='schedule-context'><span><b>JOB TYPE</b>{scheduleJob.jobType}</span><span><b>WORKFLOW STAGE</b>{scheduleJob.stage||scheduleForm.department.toUpperCase()}</span><span><b>EQUIPMENT</b>{scheduleJob.equipment||'Not assigned yet'}</span><span><b>DEPARTMENT</b>{scheduleForm.department.toUpperCase()}</span></div>
       {teamError&&<div className='daily-board-error' role='alert'>{teamError}<button className='secondary' onClick={()=>void loadTeam()}>Retry technician roster</button></div>}
       {actionError&&<div className='daily-board-error' role='alert'>{actionError}{refreshRequired&&<button className='secondary' disabled={loading||saving} onClick={refresh}>Refresh jobs</button>}</div>}

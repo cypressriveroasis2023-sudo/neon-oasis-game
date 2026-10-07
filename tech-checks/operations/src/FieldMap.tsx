@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { locationLink } from './visionAreas';
+import { locationTag, locationExplanation, installationAddressLink, locationVerificationNote, locationHistoryNote, isCurrentFieldPin, historicalFieldCoordinates, parseLocationCoordinates } from './fieldLocations';
+import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
+import { useCameraHealth } from './useCameraHealth';
+import { fieldCameraHealth, cameraColors, cameraLabels, cameraTime } from './fieldCameraHealth';
+import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
 import { routerLabels, routerStatus } from '../../supabase/functions/cos-operations-pages/routers';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
+import './fieldLocationVerification.css';
 import { gpsWrite, hasGpsCoordinates } from '../shared/gpsValidation';
 import { checkedFieldMap, createGpsSaver, gpsPopup } from './gpsPersistence';
 
@@ -33,6 +39,10 @@ type FieldUnit = {
   sourceVerifiedAt?:string|null;
   snapshotImportedAt?:string|null;
   locationNote?:string|null;
+  addressSource?:string|null;
+  addressUpdatedAt?:string|null;
+  locationVerification?:string|null;
+  locationVerifiedAt?:string|null;
 };
 
 type Snapshot = {
@@ -42,25 +52,36 @@ type Snapshot = {
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; openWorkspace?:(name:string)=>void };
+type Props = { show:(message:string)=>void; initialUnitId?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; locationWritesEnabled?:boolean };
 
-const hasCoords = (unit: FieldUnit) => hasGpsCoordinates(unit);
-const statusColor=(status:string)=>status==='installed'?'#35d48a':status==='in_transit'?'#f0bd57':status==='returning'?'#ff8b5c':'#56b8ff';
+const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
+export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHealth,locationWritesEnabled=false}:Props){
+  const restored=useRef(readFieldMapView(window.history.state));
+  const restoreViewport=useRef(Boolean(restored.current.center&&restored.current.zoom));
   const routers=useRouters();
+  const cameras=useCameraHealth();
   const [data,setData]=useState<Snapshot|null>(null);
   const [error,setError]=useState('');
-  const [search,setSearch]=useState('');
-  const [status,setStatus]=useState('field');
-  const [selectedId,setSelectedId]=useState('');
+  const [search,setSearch]=useState(restored.current.search||'');
+  const [status,setStatus]=useState(restored.current.status||'field');
+  const [selectedId,setSelectedId]=useState(initialUnitId||restored.current.selectedId||'');
   const [focusSelected,setFocusSelected]=useState(Boolean(initialUnitId));
   const [lat,setLat]=useState('');
   const [lon,setLon]=useState('');
   const [accuracy,setAccuracy]=useState('');
   const [source,setSource]=useState('manual');
   const [note,setNote]=useState('');
+  const [confirmedLocation,setConfirmedLocation]=useState(false);
+  const [health,setHealth]=useState(restored.current.health||'all');
+  const [nearbyId,setNearbyId]=useState(restored.current.nearbyId||'');
+  const [showHistorical,setShowHistorical]=useState(restored.current.showHistorical||false);
+  const [radius,setRadius]=useState(restored.current.radius||10);
+  const [coordinatePaste,setCoordinatePaste]=useState('');
+  const [pickingPin,setPickingPin]=useState(false);
+  const pickingRef=useRef(false);
+  useEffect(()=>{if(!locationWritesEnabled){pickingRef.current=false;setPickingPin(false);setConfirmedLocation(false);}},[locationWritesEnabled]);
   const [busy,setBusy]=useState(false);
   const [refreshRequired,setRefreshRequired]=useState(false);
   const [history,setHistory]=useState<any[]>([]);
@@ -86,8 +107,8 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
       setData(snapshot);
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
-      const first = snapshot.items.find(unit => unit.id === initialUnitId) || snapshot.items.find(hasCoords) || snapshot.items[0];
-      if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('The same-name COS unit is not in the field map records. No router GPS is available.');
+      const first = initialUnitId ? snapshot.items.find(unit => unit.id === initialUnitId) : snapshot.items.find(hasCoords) || snapshot.items[0];
+      if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
       setSelectedId(current => snapshot.items.some(unit => unit.id === current) ? current : first?.id || '');
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
@@ -99,17 +120,27 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
 
   useEffect(()=>{void load()},[]);
 
+  useEffect(()=>{if(initialUnitId&&data){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}},[initialUnitId,Boolean(data)]);
+
+  useEffect(()=>{if(data)saveFieldMapView({search,status,health,selectedId,nearbyId,radius,showHistorical});},[search,status,health,selectedId,nearbyId,radius,showHistorical,Boolean(data)]);
+
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
+  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
+  const selectedHealth=selected?healthById.get(selected.id):null;
+  const nearby=items.find(unit=>unit.id===nearbyId&&hasCoords(unit));
+  const distance=(unit:FieldUnit)=>nearby&&hasCoords(unit)?L.latLng(Number(nearby.latitude),Number(nearby.longitude)).distanceTo(L.latLng(Number(unit.latitude),Number(unit.longitude)))/1609.344:null;
   const selectedRouters=routers.data?.items.filter(row=>row.match==='exact_name' && row.candidateUnit?.id===selectedId)||[];
   const filtered=useMemo(()=>{
     const q=search.trim().toLowerCase();
     return items.filter(unit=>{
       const text=[unit.unitNumber,unit.modelName,unit.customer,unit.site,unit.activeJobNumber,unit.address].filter(Boolean).join(' ').toLowerCase();
       const statusOk=status==='all'||(status==='field'&&['field','assigned','in_transit','installed','returning'].includes(unit.status))||status==='tracker'&&unit.readOnly===true||status===unit.status||status==='missing'&&!hasCoords(unit);
-      return statusOk&&(!q||text.includes(q));
+      const healthOk=health==='all'||healthById.get(unit.id)?.state===health;
+      const miles=distance(unit);
+      return statusOk&&healthOk&&(!nearby||miles!==null&&miles<=radius)&&(!q||text.includes(q));
     });
-  },[items,search,status]);
+  },[items,search,status,health,health==='all'?null:healthById,nearbyId,radius]);
 
   useEffect(()=>{
     if(!selected)return;
@@ -118,6 +149,10 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
     setAccuracy(selected.gpsAccuracyM == null ? '' : String(selected.gpsAccuracyM));
     setSource(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual');
     setNote('');
+    setConfirmedLocation(false);
+    setPickingPin(false);
+    pickingRef.current=false;
+    setCoordinatePaste('');
     setHistory([]);
     setHistoryError('');
     setHistoryLoading(Boolean(selected.hasUnitGps));
@@ -135,7 +170,8 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
 
   useEffect(()=>{
     if(!mapNode.current||mapRef.current)return;
-    const map=L.map(mapNode.current,{zoomControl:true}).setView([29.7604,-95.3698],8);
+    const map=L.map(mapNode.current,{zoomControl:true}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
+    map.on('moveend',()=>{const center=map.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:map.getZoom()});});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       maxZoom:19,
       attribution:'&copy; OpenStreetMap contributors'
@@ -158,25 +194,28 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
     if(!map||!layer)return;
     layer.clearLayers();
     markersRef.current.clear();
-    const mapped=filtered.filter(hasCoords);
+    const mapped=filtered.filter(unit=>hasCoords(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
     for(const unit of mapped){
-      const latitude=Number(unit.latitude);
-      const longitude=Number(unit.longitude);
+      const historic=!hasCoords(unit)?historicalFieldCoordinates(unit):null;
+      const latitude=historic?.latitude??Number(unit.latitude);
+      const longitude=historic?.longitude??Number(unit.longitude);
       bounds.push([latitude,longitude]);
       const marker=L.marker([latitude,longitude],{
+        title:unit.unitNumber+(historic?' · Unverified historical location':' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
-          html:'<span class="cos-field-pin" style="--pin:'+statusColor(unit.status)+'"><b>'+unit.unitNumber.replace(/[<>&"']/g,'')+'</b></span>',
+          html:'<span class="cos-field-pin'+(historic?' cos-field-pin-historical':'')+'" style="--pin:'+cameraColors[healthById.get(unit.id)?.state||'unknown']+'"><b>'+(historic?'OLD · ':'')+unit.unitNumber.replace(/[<>&"']/g,'')+'</b></span>',
           iconSize:[54,38],
           iconAnchor:[27,34]
         })
       });
       marker.bindPopup(gpsPopup(document, unit));
       markersRef.current.set(unit.id,marker);
-      marker.on('click',()=>{ if (!working.current) setSelectedId(unit.id); });
+      marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});openUnitHealth?.(unit.id);} });
       marker.addTo(layer);
     }
+    if(restoreViewport.current){restoreViewport.current=false;return;}
     if(focusSelected&&selected&&hasCoords(selected)){
       map.setView([Number(selected.latitude),Number(selected.longitude)],Math.max(map.getZoom(),14));
     }else if(bounds.length===1){
@@ -184,7 +223,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
     }else if(bounds.length>1){
       map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14});
     }
-  },[filtered,selectedId,data?.generatedAt,focusSelected]);
+  },[filtered,selectedId,data?.generatedAt,focusSelected,showHistorical]);
 
   const fitAllLocations=()=>{
     setFocusSelected(false);
@@ -194,13 +233,18 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
     else map.fitBounds(bounds,{padding:[40,40],maxZoom:14});
   };
 
-  // Updating router observations must not clear an open popup or recenter a map the owner panned.
+  // Updating health observations must not clear an open popup or recenter a map the owner panned.
   useEffect(()=>{
     for(const unit of filtered){
       const marker=markersRef.current.get(unit.id);
       if(!marker)continue;
+      const element=marker.getElement();if(element)element.title=unit.unitNumber+(!hasCoords(unit)?' · Unverified historical location':' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']);
       const popup=gpsPopup(document,unit);
+      popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(locationTag(unit)+' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']));
+      marker.getElement()?.querySelector<HTMLElement>('.cos-field-pin')?.style.setProperty('--pin',cameraColors[healthById.get(unit.id)?.state||'unknown']);
       popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
+      if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
+      popup.append(document.createElement('br'),document.createTextNode('Latest camera observation: '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)));
       const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
       if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
       const openPopup=marker.getPopup();
@@ -210,10 +254,33 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
         try{openPopup.setContent(popup);}finally{openPopup.options.autoPan=autoPan;}
       }
     }
-  },[filtered,selectedId,data?.generatedAt,routers.data,routers.now]);
+  },[filtered,selectedId,data?.generatedAt,routers.data,routers.now,healthById]);
+
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!locationWritesEnabled||!map||!pickingPin||!selected||selected.readOnly)return;
+    const pick=(event:L.LeafletMouseEvent)=>{
+      if(working.current)return;
+      setLat(event.latlng.lat.toFixed(6));setLon(event.latlng.lng.toFixed(6));setSource('site');setAccuracy('');setConfirmedLocation(false);
+      setPickingPin(false);pickingRef.current=false;setGpsMessage('Candidate pin selected. Review it against the installation address and confirm before saving.');
+    };
+    map.on('click',pick);map.getContainer().style.cursor='crosshair';
+    return()=>{map.off('click',pick);map.getContainer().style.cursor='';};
+  },[pickingPin,selectedId,locationWritesEnabled]);
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!locationWritesEnabled||!map||!hasGpsCoordinates({latitude:lat,longitude:lon})||!selected||selected.readOnly)return;
+    const marker=L.circleMarker([Number(lat),Number(lon)],{radius:10,color:'#f0bd57',fillOpacity:0.25,dashArray:'4 4'}).addTo(map).bindTooltip('Unsaved location candidate');
+    return()=>{marker.remove();};
+  },[lat,lon,selectedId,hasMapContainer]);
+  const usePastedCoordinates=()=>{
+    if(!locationWritesEnabled)return;
+    try{const point=parseLocationCoordinates(coordinatePaste);setLat(String(point.latitude));setLon(String(point.longitude));setSource('site');setAccuracy('');setConfirmedLocation(false);setGpsMessage('Candidate coordinates loaded. Confirm the recorded installation address before saving.');mapRef.current?.setView([point.latitude,point.longitude],16);}
+    catch(cause){setGpsMessage(cause instanceof Error?cause.message:'Coordinates could not be read.');}
+  };
 
   const captureGps=()=>{
-    if(!selected || selected.readOnly || working.current)return;
+    if(!locationWritesEnabled || !selected || selected.readOnly || working.current)return;
     if(!('geolocation' in navigator)){show('This device does not provide browser GPS. Enter coordinates manually.');return}
     working.current=true;
     setBusy(true);
@@ -224,6 +291,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
         setLon(position.coords.longitude.toFixed(6));
         setAccuracy(Number(position.coords.accuracy||0).toFixed(1));
         setSource('phone_gps');
+        setConfirmedLocation(false);
         working.current=false;
         setBusy(false);
         show('Current device GPS captured. Review and save it to '+selected.unitNumber+'.');
@@ -238,16 +306,17 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
   };
 
   const saveGps = async () => {
-    if (!selected || selected.readOnly || working.current || gpsSaver.current.needsRefresh) return;
+    if (!locationWritesEnabled || !selected || selected.readOnly || working.current || gpsSaver.current.needsRefresh || !confirmedLocation) return;
     working.current = true;
     setBusy(true);
     setGpsMessage('');
     setError('');
     try {
-      const payload = gpsWrite({ latitude: lat, longitude: lon, accuracyM: accuracy, source, note }, 'owner', true);
+      const verificationNote=await locationVerificationNote(selected.address,note);
+      const payload = gpsWrite({ latitude: lat, longitude: lon, accuracyM: accuracy, source, note:verificationNote }, 'owner', true);
       const saved = await gpsSaver.current.owner(selected.id, payload);
       setData(saved as unknown as Snapshot);
-      const message = selected.unitNumber + ' GPS location saved and verified.';
+      const message = selected.unitNumber + ' location saved and read back successfully.';
       setGpsMessage(message);
       show(message);
     } catch (cause) {
@@ -264,9 +333,9 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
   return <section className='field-map-workspace'>
     <section className='field-map-kpis'>
       <article><b>{data?.summary?.fieldUnits??'—'}</b><span>FIELD UNITS</span></article>
-      <article><b className='green'>{data?.summary?.mappedUnits??'—'}</b><span>ON MAP</span></article>
-      <article><b>{data?.summary?.unitGps??'—'}</b><span>UNIT GPS</span></article>
-      <article className={(data?.summary?.missingGps||0)>0?'attention':''}><b>{data?.summary?.missingGps??'—'}</b><span>MISSING GPS</span></article>
+      <article><b className='green'>{data?items.filter(hasCoords).length:'—'}</b><span>VERIFIED MAP PINS</span></article>
+      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='online').length:'—'}</b><span>ONLINE</span></article>
+      <article className={items.some(unit=>healthById.get(unit.id)?.state==='offline')?'attention':''}><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='offline').length:'—'}</b><span>OFFLINE</span></article>
     </section>
 
     <div className='field-map-toolbar'>
@@ -279,13 +348,19 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
         <option value='assigned'>Assigned</option>
         <option value='in_transit'>In transit</option>
         <option value='returning'>Returning</option>
-        <option value='missing'>Missing GPS</option>
+        <option value='missing'>Coordinates pending</option>
       </select>
-      <button className='secondary' disabled={busy} onClick={()=>void load()}>Refresh</button>
-      <button className='secondary' disabled={busy||!filtered.some(hasCoords)} onClick={fitAllLocations}>Show all GPS pins</button>
+      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='all'>All camera states</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option></select>
+      <button className='secondary' disabled={busy} onClick={()=>{void load();void routers.refresh();void cameras.refresh()}}>Refresh</button>
+      <button className='secondary' disabled={busy||!filtered.some(hasCoords)} onClick={fitAllLocations}>Show all verified pins</button>
     </div>
 
-    <div className='router-map-note'><b>Field locations</b><p>Map pins show recorded coordinates. Units without GPS remain in the list with their installed address. Router checks do not supply live locations.</p>{data?.trackerSnapshot?.importedAt && <p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Source verification dates appear on each tracker unit.</p>}{routers.error&&<p role='alert'>Router information unavailable: {routers.error}</p>}{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}</div>
+    <div className='field-map-nearby'>
+      <label>Nearby a job / unit<select aria-label='Nearby unit center' value={nearbyId} onChange={e=>{setNearbyId(e.target.value);setFocusSelected(false)}}><option value=''>Entire field fleet</option>{items.filter(hasCoords).map(unit=><option key={unit.id} value={unit.id}>{unit.activeJobNumber?unit.activeJobNumber+' · ':''}{unit.unitNumber} · {unit.site||unit.address}</option>)}</select></label>
+      <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>historicalFieldCoordinates(unit)).length})</label>
+      {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
+    </div>
+    <div className='router-map-note'><b>Reported camera/detector observations · independently verified locations</b><p>Green: reported camera/detector records recently online. Red: at least one camera/detector recently reported offline. Gray: older, missing, unmatched or channel evidence unavailable. Recorder status and service ports never set camera colors. The 15-minute presentation window is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
@@ -293,28 +368,31 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
       <aside className='field-map-list' aria-label='Field units'>
         {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
-          <span className={hasCoords(unit)?'mapped':'missing'}>{hasCoords(unit)?'MAP':unit.address?.trim()?'ADDRESS':'LOCATION?'}</span>
-          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small>
+          <span className={hasCoords(unit)?'mapped':'missing'}>{locationTag(unit)}</span>
+          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small>{cameraLabels[healthById.get(unit.id)?.state||'unknown']} · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
         </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>
 
       <section className='field-map-center'>
         <div ref={mapNode} className='field-map-canvas' aria-label='COS field unit map'/>
         <div className='field-map-legend'>
-          <span><i style={{background:'#35d48a'}}/>Installed</span>
-          <span><i style={{background:'#56b8ff'}}/>Assigned / tracker field</span>
-          <span><i style={{background:'#f0bd57'}}/>In transit</span>
-          <span><i style={{background:'#ff8b5c'}}/>Returning</span>
+          <span><i style={{background:cameraColors.online}}/>Camera records online</span>
+          <span><i style={{background:cameraColors.offline}}/>Camera outage observed</span>
+          <span><i style={{background:cameraColors.unknown}}/>Camera status unverified</span>{showHistorical&&!nearby&&<span>Dashed OLD pin: unverified historical location</span>}
         </div>
       </section>
 
       <aside className='field-map-detail'>
         {selected?<><small>FIELD UNIT</small><h2>{selected.unitNumber}</h2>
           <p>{selected.modelName||'Equipment'} · <b>{selected.status.replaceAll('_',' ')}</b></p>
+          <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[selectedHealth?.state||'unknown']}}>{cameraLabels[selectedHealth?.state||'unknown']}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>{openUnitHealth&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
           <dl>
             <div><dt>Customer</dt><dd>{selected.customer||'—'}</dd></div>
             <div><dt>Site</dt><dd>{selected.site||'—'}</dd></div>
-            <div><dt>Address</dt><dd>{selected.address||'—'}</dd></div>
+            <div><dt>Installation address</dt><dd>{selected.address||'Not recorded'}</dd></div>
+            <div><dt>Location status</dt><dd>{locationTag(selected)}<br/>{locationExplanation(selected)}</dd></div>
+            <div><dt>Address source</dt><dd>{selected.addressSource||selected.recordSource||(selected.installedSiteId?'Installed site record':'Not recorded')}</dd></div>
+            <div><dt>Location verified</dt><dd>{selected.locationVerifiedAt?routerTime(selected.locationVerifiedAt):'Not yet verified for this address'}</dd></div>
             <div><dt>Active job</dt><dd>{selected.activeJobNumber||'—'}</dd></div>
             <div><dt>Map source</dt><dd>{sourceLabel(selected.coordinateSource)}</dd></div>
             <div><dt>Last unit GPS</dt><dd>{selected.gpsRecordedAt?new Date(selected.gpsRecordedAt).toLocaleString():'Not recorded'}</dd></div>
@@ -322,31 +400,35 @@ export default function FieldMap({show,initialUnitId='',openWorkspace}:Props){
             {selected.readOnly && <div><dt>Placement verified</dt><dd>{selected.sourceVerifiedAt?new Date(selected.sourceVerifiedAt).toLocaleString():'Not recorded'}</dd></div>}
           </dl>
 
-          <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3>
+          <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3><p>Router checks do not supply live locations.</p>{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
+          {historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}
           <div className='field-map-coordinate-form'>
-            {selected.readOnly ? <><h3>Tracker location</h3><p>This location comes from the unit tracker. Correct it in the source tracker; native unit GPS can be updated on registered field units.</p>{selected.locationNote && <p role='alert'>{selected.locationNote}</p>}{hasCoords(selected) && <p>Imported coordinates retain their original source. Their GPS observation date is not recorded.</p>}</> : <>
-            <h3>Update unit GPS</h3>
-            <p>Coordinates only. This does not change site, unit status, FIELD/ROOT/shop placement, or job assignment.</p>
+            {selected.readOnly ? <><h3>Tracker location</h3><p>This tracker record does not have a unique registered equipment match. Correct its address in the source tracker; register or resolve the unit identity before saving a pin here.</p>{selected.locationNote && <p role='alert'>{selected.locationNote}</p>}{hasCoords(selected) && <p>Imported coordinates retain their original source. Their GPS observation date is not recorded.</p>}</> : !locationWritesEnabled ? <><h3>Location verification</h3><p role='status'>Verified location editing is not enabled for this backend yet. Existing addresses and location history remain available; no GPS save can be submitted from this view.</p></> : <>
+            <h3>Verify or update location</h3>
+            <p>Check the installation address above, look it up if needed, then enter the pin coordinates or capture your device GPS while on site. Saving records your verification time and location history.</p>
+            <label>Paste coordinates or a Google Maps point link<input disabled={busy} value={coordinatePaste} onChange={e=>setCoordinatePaste(e.target.value)} placeholder='Latitude, longitude'/></label><div className='field-map-actions'><button className='secondary' disabled={busy||!coordinatePaste.trim()} onClick={usePastedCoordinates}>Use pasted coordinates</button><button className='secondary' disabled={busy} aria-pressed={pickingPin} onClick={()=>{pickingRef.current=!pickingPin;setPickingPin(!pickingPin)}}>{pickingPin?'Cancel pin selection':'Choose pin on map'}</button></div>{pickingPin&&<p role='status'>Click the map at the verified installation address. This selects an unsaved candidate only.</p>}
             <div className='field-map-coordinate-grid'>
-              <label>Latitude<input disabled={busy} inputMode='decimal' value={lat} onChange={e=>setLat(e.target.value)} placeholder='29.760400'/></label>
-              <label>Longitude<input disabled={busy} inputMode='decimal' value={lon} onChange={e=>setLon(e.target.value)} placeholder='-95.369800'/></label>
+              <label>Latitude<input disabled={busy} inputMode='decimal' value={lat} onChange={e=>{setLat(e.target.value);setConfirmedLocation(false)}} placeholder='29.760400'/></label>
+              <label>Longitude<input disabled={busy} inputMode='decimal' value={lon} onChange={e=>{setLon(e.target.value);setConfirmedLocation(false)}} placeholder='-95.369800'/></label>
               <label>Accuracy (meters)<input disabled={busy} inputMode='decimal' value={accuracy} onChange={e=>setAccuracy(e.target.value)} placeholder='Optional'/></label>
-              <label>Source<select disabled={busy} value={source} onChange={e=>setSource(e.target.value)}><option value='manual'>Manual</option><option value='phone_gps'>Phone GPS</option><option value='device_gps'>Device GPS</option><option value='router'>Router</option><option value='import'>Import</option></select></label>
+              <label>Source<select aria-label='Location source' disabled={busy} value={source} onChange={e=>{setSource(e.target.value);setConfirmedLocation(false)}}><option value='manual'>Manual</option><option value='site'>Verified address pin</option><option value='phone_gps'>Phone GPS</option><option value='device_gps'>Device GPS</option><option value='router'>Router</option><option value='import'>Import</option></select></label>
             </div>
-            <label>Note<input disabled={busy} value={note} onChange={e=>setNote(e.target.value)} placeholder='Pole, gate, entrance, move reason…'/></label>
+            <label>Verification note<input disabled={busy} value={note} onChange={e=>setNote(e.target.value)} placeholder='Pole, gate, entrance, move reason…'/></label>
+            <label className='field-map-confirm'><input type='checkbox' disabled={busy||!selected.address?.trim()} checked={confirmedLocation} onChange={e=>setConfirmedLocation(e.target.checked)}/>I checked that these coordinates match {selected.unitNumber}{selected.address?.trim()?' at the recorded installation address':''}.</label>
             <div className='field-map-actions'>
               <button className='secondary' disabled={busy} onClick={captureGps}>Use My Current GPS</button>
-              <button disabled={busy||refreshRequired} onClick={()=>void saveGps()}>{busy?'Saving…':'Save Unit GPS'}</button>
+              <button disabled={busy||refreshRequired||!confirmedLocation||!selected.address?.trim()} onClick={()=>void saveGps()}>{busy?'Saving…':'Save verified location'}</button>
             </div>
             </>}
-            {locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open this unit GPS in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
+            {installationAddressLink(selected)&&<a className='field-map-open' href={installationAddressLink(selected)!} target='_blank' rel='noopener noreferrer'>Look up recorded installation address ↗</a>}
+            {hasCoords(selected)&&locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open verified installation pin in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
           </div>
 
           {!selected.readOnly && <div className='field-map-history'>
             <h3>GPS history</h3>
-            {historyError ? <p role='alert'>{historyError}</p> : historyLoading ? <p role='status'>Loading GPS history…</p> : history.length?history.slice(0,8).map(row=><div key={row.id}><b>{Number(row.latitude).toFixed(6)}, {Number(row.longitude).toFixed(6)}</b><small>{sourceLabel(row.source)} · {new Date(row.recordedAt).toLocaleString()}{row.recordedBy?' · '+row.recordedBy:''}</small>{row.note&&<span>{row.note}</span>}</div>):<p>No unit-level GPS history yet.</p>}
+            {historyError ? <p role='alert'>{historyError}</p> : historyLoading ? <p role='status'>Loading GPS history…</p> : history.length?history.slice(0,8).map(row=><div key={row.id}><b>{Number(row.latitude).toFixed(6)}, {Number(row.longitude).toFixed(6)}</b><small>{sourceLabel(row.source)} · {new Date(row.recordedAt).toLocaleString()}{row.recordedBy?' · '+row.recordedBy:''}</small>{row.note&&<span>{locationHistoryNote(row.note)}</span>}</div>):<p>No unit-level GPS history yet.</p>}
           </div>}
         </>:<div className='field-map-empty'>Select a field unit.</div>}
       </aside>

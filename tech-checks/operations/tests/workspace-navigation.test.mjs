@@ -38,3 +38,12 @@ test('ticket bookmarks use only existing job types on Dispatch Board without a j
     assert.equal(readWorkspaceRoute(hash).createType,undefined);
   }
 });
+
+test('map, unit health and ticket routes retain a validated stable unit identifier',()=>{
+ const unitId='11111111-1111-4111-8111-111111111111';
+ for(const workspace of ['Field Map','Camera Health','Daily Board']){
+  const route={workspace,jobId:'',detail:false,unitId,...(workspace==='Daily Board'?{createType:'SWAP'}:{})};
+  assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
+ }
+ for(const hash of ['#today?unit='+unitId,'#jobs?unit='+unitId,'#camera-health?unit=Some%20unit','#daily-board?unit='+unitId,'#camera-health?job=42&unit='+unitId])assert.equal(readWorkspaceRoute(hash).unitId,undefined);
+});

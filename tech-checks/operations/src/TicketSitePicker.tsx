@@ -28,6 +28,7 @@ export default function TicketSitePicker({siteId,setSiteId,disabled,onValidityCh
     finally{if(request===revision.current)setLoading(false);}
   };
   useEffect(()=>{void load();return()=>{revision.current++;};},[]);
+  useEffect(()=>{if(!siteId||!customers||!sites)return;const site=sites.find(row=>row.id===siteId&&active(row)),person=customers.find(row=>row.id===site?.customerId);if(site&&person){setCustomerId(person.id);setQuery(person.name);}},[siteId,customers,sites]);
   const customer=customers?.find(item=>item.id===customerId);
   const matched=(customers||[]).filter(item=>[item.name,item.legalName,item.customerNumber].some(value=>String(value||'').toLowerCase().includes(query.trim().toLowerCase())));
   const options=matched.slice(0,30);

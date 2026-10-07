@@ -23,7 +23,7 @@ async function mount(page, denied = false) {
     const stamp = new Date().toISOString();
     const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', reason:denied?'Fixture access denied':'' }
       : request.path === '/api/routers' ? { items:[], source:'camera_health', gpsAvailable:false, generatedAt:stamp }
-      : request.path === '/api/camera-health/summary' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
+      : request.path === '/api/camera-health/summary-v2' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
       : request.path === '/api/daily-board' ? { jobs:[], tasks:[], readiness:[], asOf:stamp }
       : request.path === '/api/field-map' ? { items:[], summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}, generatedAt:stamp }
       : request.path === '/api/owner/control-data' ? { sites:[], truckChecks:[], serviceTechnicians:[], itTechnicians:[] }

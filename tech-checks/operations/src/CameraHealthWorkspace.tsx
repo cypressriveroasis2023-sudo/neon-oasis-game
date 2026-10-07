@@ -1,28 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, openLegacy } from './api';
-type Health = { totalDevices:number;online:number;offline:number;review:number;shopRoot:number;healthRows:number;fieldDevices:number;refreshedAt:string;rows:any[] };
-export function validateCameraHealth(value: any): Health {
-  if (!value || ['totalDevices','online','offline','review','shopRoot','healthRows','fieldDevices'].some(key => !Number.isInteger(value[key]) || value[key] < 0) || !Array.isArray(value.rows) || value.rows.some((row:any) => !row || (typeof row.id !== 'string' && typeof row.id !== 'number') || typeof row.name !== 'string' || !['online','offline','review'].includes(row.status)) || value.rows.length !== value.fieldDevices || value.online + value.offline + value.review !== value.fieldDevices || !Number.isFinite(Date.parse(value.refreshedAt)))
-    throw new Error('Camera Health returned an incomplete summary.');
-  return value;
-}
-export default function CameraHealthWorkspace() {
-  const [health,setHealth] = useState<Health|null>(null), [error,setError] = useState(''), [loading,setLoading] = useState(false);
-  const revision = useRef(0);
-  const refresh = useCallback(async () => {
-    const request = ++revision.current; setLoading(true);
-    try { const fresh = validateCameraHealth((await api.get('/api/camera-health/summary')).data); if(request===revision.current){setHealth(fresh);setError('');} }
-    catch(cause){if(request===revision.current)setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}
-    finally{if(request===revision.current)setLoading(false);}
-  },[]);
-  useEffect(()=>{void refresh();return()=>{revision.current++;};},[refresh]);
+import { useCallback,useEffect,useRef,useState } from 'react';
+import { api,openLegacy } from './api';
+import { checkedFieldMap } from './gpsPersistence';
+import { fieldCameraHealth,cameraColors,cameraLabels,cameraTime,type FieldHealthUnit } from './fieldCameraHealth';
+import { useCameraHealth } from './useCameraHealth';
+import CameraHealthOverview,{CameraResourceObservations,UnitEvidenceDetails} from './CameraHealthOverview';
+export { validateCameraHealth } from './fieldCameraHealth';
+type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void};
+export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket}:Props){
+  const {data:health,error,loading,refresh,now}=useCameraHealth();
+  const [units,setUnits]=useState<FieldHealthUnit[]|null>(null),[unitError,setUnitError]=useState(''),[ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
+  const revision=useRef(0);
+  const loadUnits=useCallback(async()=>{
+    const request=++revision.current;setUnits(null);setUnitError('');
+    try{const snapshot=checkedFieldMap((await api.get('/api/field-map')).data);if(request===revision.current)setUnits(snapshot.items as unknown as FieldHealthUnit[]);}
+    catch(cause){if(request===revision.current)setUnitError(cause instanceof Error?cause.message:'Field unit could not be verified.');}
+  },[initialUnitId]);
+  useEffect(()=>{void loadUnits();setTicketType('SERVICE');return()=>{revision.current++;};},[loadUnits]);
+  const selected=units?.find(unit=>unit.id===initialUnitId);
+  const detail=selected?fieldCameraHealth(selected,units||[],health,now):null;
+  const rows=initialUnitId?detail?.rows||[]:health?.rows||[];
   return <section className='panel module camera-health-native' aria-label='Camera Health'>
-    <div className='panelhead'><div><h2>Camera Health</h2><span>Live Camera Health source</span></div><div className='purchase-actions'><button disabled={loading} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh Camera Health'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
-    {error&&<div className='operations-error' role='alert'>{error}{health&&<p>Showing the last successful summary.</p>}</div>}
+    <div className='panelhead'><div><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Field Map</button>}<button disabled={loading} onClick={()=>{void refresh();void loadUnits();}}>{loading?'Refreshing…':'Refresh Camera Health'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
+    {error&&<div className='operations-error' role='alert'>{error} Current camera state cannot be verified.</div>}
+    {unitError&&<div className='operations-error' role='alert'>{unitError}</div>}
+    {initialUnitId&&<section className='camera-unit-detail' aria-label='Selected field unit Camera Health'>
+      {!units&&!unitError?<p role='status'>Verifying the selected field unit…</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
+        <h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
+        <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{cameraLabels[detail?.state||'unknown']}</b><p>{detail?.reason}</p>
+        <UnitEvidenceDetails classification={detail?.classification||null}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
+        {detail?.identity==='matched'&&<p>Matched by unique equipment family and unit number. Camera Health unit: <b>{detail.unitKey}</b>. No persistent cross-system association is created.</p>}
+        {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}
+      </>}
+    </section>}
     {!health&&!error?<p role='status'>Loading Camera Health…</p>:health&&<>
-      <div className='stats camera-health-summary'>{[['CAMERAS / DEVICES',health.totalDevices,''],['ONLINE',health.online,'green'],['CONFIRMED OFFLINE',health.offline,'red'],['NEEDS REVIEW',health.review,'yellow'],['SHOP / ROOT',health.shopRoot,'']].map(([label,count,color])=><div className='stat' key={label}><b className={String(color)}>{count}</b><span>{label}</span></div>)}</div>
-      <p>SHOP / ROOT is excluded from field counts. Camera Health remains the health engine of record.</p><p>Health records: <b>{health.healthRows}</b> · Field devices: <b>{health.fieldDevices}</b> · Refreshed: <b>{new Date(health.refreshedAt).toLocaleString()}</b></p>
-      <div className='records'>{health.rows.map(row=><article className='record' key={row.id}><div><strong>{row.name}</strong><small>{[row.unit,row.type,row.organization].filter(Boolean).join(' · ')} · {row.checkedAt?new Date(row.checkedAt).toLocaleString():'Last seen unavailable'}</small></div><em>{String(row.status).toUpperCase()}</em></article>)}</div>
+      {!initialUnitId&&<CameraHealthOverview health={health} now={now} units={units} createTicket={createTicket}/>}
+      {initialUnitId&&<>
+      <p>The 15-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Source refresh every minute</p>
+      <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2}/>
+      </>}
+      {initialUnitId&&selected&&!rows.length&&<p>No verified matching camera device group is available for this field unit. Ticket creation still uses the selected field record and requires Operations identity verification.</p>}
     </>}
   </section>;
 }
