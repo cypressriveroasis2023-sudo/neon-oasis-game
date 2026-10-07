@@ -22,7 +22,7 @@ test('wrong identity, changed address, arbitrary old coordinates and confirmed l
  assert.equal(isCurrentFieldPin(verified),true);assert.equal(await checkedAddressEstimate(verified,now),null);
 });
 test('unsupported, incomplete, ambiguous and future provider evidence fails closed',async()=>{
- for(const patch of [{schemaVersion:2},{provider:'ip_geolocation'},{providerMatchQuality:'Non_Exact'},{benchmark:'unsupported'},{confidence:'gps'},{verified:true},{liveGps:true},{requiresOwnerConfirmation:false},{approvalReference:''},{batchId:''},{appliedByDatabaseRole:''},{latitude:'30'},{longitude:181},{addressSha256:'0'.repeat(64)},{geocodedAt:'invalid'},{geocodedAt:'2026-10-08T00:00:00Z'},{appliedAt:'2026-10-06T00:00:00Z'},{matchedAddress:'100 EXAMPLE RD, OTHER CITY, TX, 77001'},{matchedAddress:'100 EXAMPLE RD, TEST CITY, CA, 77001'},{matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77002'},{matchedAddress:'100 OTHER RD, TEST CITY, TX, 77001'},{matchedAddress:'101 EXAMPLE RD, TEST CITY, TX, 77001'}])assert.equal(await checkedAddressEstimate(fixture(patch),now),null,JSON.stringify(patch));
+ for(const patch of [{schemaVersion:2},{provider:'ip_geolocation'},{providerMatchQuality:'Unknown'},{benchmark:'unsupported'},{confidence:'gps'},{verified:true},{liveGps:true},{requiresOwnerConfirmation:false},{approvalReference:''},{batchId:''},{appliedByDatabaseRole:''},{latitude:'30'},{longitude:181},{addressSha256:'0'.repeat(64)},{geocodedAt:'invalid'},{geocodedAt:'2026-10-08T00:00:00Z'},{appliedAt:'2026-10-06T00:00:00Z'},{matchedAddress:'100 EXAMPLE RD, OTHER CITY, TX, 77001'},{matchedAddress:'100 EXAMPLE RD, TEST CITY, CA, 77001'},{matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77002'},{matchedAddress:'100 OTHER RD, TEST CITY, TX, 77001'},{matchedAddress:'101 EXAMPLE RD, TEST CITY, TX, 77001'}])assert.equal(await checkedAddressEstimate(fixture(patch),now),null,JSON.stringify(patch));
  for(const note of [addressEstimatePrefix+'{',addressEstimatePrefix+'null',addressEstimatePrefix+'[]',addressEstimatePrefix+'x'.repeat(5000)])assert.equal(await checkedAddressEstimate(fixture({}, {locationNote:note}),now),null);
 });
 test('older projection can expose the same trusted estimate fields without becoming verified GPS',async()=>{
@@ -39,4 +39,22 @@ test('machine provenance does not suppress human warnings; impossible calendar d
  assert.equal(addressEstimateHumanNote(addressEstimatePrefix+'invalid\nWarning\nSecond line'),'Warning\nSecond line');
  assert.equal(addressEstimateHumanNote('Ordinary warning'),'Ordinary warning');
  assert.equal(await checkedAddressEstimate(fixture({geocodedAt:'2026-02-30T12:00:00Z'}),now),null);
+});
+
+test('registered FIELD equipment uses explicit tracker binding without replacing equipment identity',async()=>{
+ const equipmentId='99999999-9999-4999-8999-999999999999';
+ const row=fixture({}, {id:equipmentId,unitNumber:'SNIPER 901',readOnly:false,currentLocationType:null,addressEstimateTrackerId:id,addressEstimateUnitNumber:'Sniper 901'});
+ assert.ok(await checkedAddressEstimate(row,now));assert.equal(row.id,equipmentId);assert.equal(isCurrentFieldPin(row),false);
+ for(const patch of [{addressEstimateTrackerId:null},{addressEstimateUnitNumber:null},{addressEstimateTrackerId:equipmentId},{addressEstimateUnitNumber:'Ranger 901'},{currentLocationType:'shop'},{currentLocationType:'site'},{currentLocationType:'truck'},{status:'installed'},{hasUnitGps:true},{address:'101 Example Road, Test City, TX 77001'}])assert.equal(await checkedAddressEstimate({...row,...patch},now),null,JSON.stringify(patch));
+ const verified={...row,latitude:30.5,longitude:-95.5,hasUnitGps:true,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:at,locationVerifiedAt:at};
+ assert.equal(isCurrentFieldPin(verified),true);assert.equal(await checkedAddressEstimate(verified,now),null);
+});
+
+test('provider Non_Exact is retained only with full street/city/state/ZIP5 equality',async()=>{
+ const row=fixture({providerMatchQuality:'Non_Exact'}, {address:'100 Example Road, Test City, TX 77001-1234'});
+ const marker=JSON.parse(row.locationNote.split('\n')[0].slice(addressEstimatePrefix.length));
+ marker.addressSha256=createHash('sha256').update(row.address.toLowerCase()).digest('hex');row.locationNote=addressEstimatePrefix+JSON.stringify(marker);
+ assert.equal(await checkedAddressEstimate(fixture({providerMatchQuality:'Non_Exact'}),now),null);
+ const estimate=await checkedAddressEstimate(row,now);assert.ok(estimate);assert.equal(estimate.providerMatchQuality,'Non_Exact');assert.equal(isCurrentFieldPin(row),false);
+ for(const matchedAddress of ['101 EXAMPLE RD, TEST CITY, TX, 77001','100 N EXAMPLE RD, TEST CITY, TX, 77001','100 OTHER RD, TEST CITY, TX, 77001','100 EXAMPLE RD, OTHER CITY, TX, 77001','100 EXAMPLE RD, TEST CITY, OK, 77001','100 EXAMPLE RD, TEST CITY, TX, 77002'])assert.equal(await checkedAddressEstimate({...row,locationNote:addressEstimatePrefix+JSON.stringify({...marker,matchedAddress})},now),null,matchedAddress);
 });

@@ -8,8 +8,9 @@ function estimate(id,number,patch={}){
  const marker={schemaVersion:1,trackerId:id,unitNumber:'Sniper '+number,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex'),latitude:30,longitude:-95,provider:'us_census_address_range',benchmark:'Public_AR_Current',providerMatchQuality:'Exact',matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:fresh,confidence:'address_range_interpolation',verified:false,liveGps:false,requiresOwnerConfirmation:true,batchId:'synthetic-batch',approvalReference:'synthetic-approval',appliedByDatabaseRole:'synthetic-role',appliedAt:fresh};
  return {id,unitNumber:'Sniper '+number,modelName:'SNIPERS',status:'field',currentLocationType:'field',address,readOnly:true,hasUnitGps:false,locationVerification:'coordinates_unverified',latitude:null,longitude:null,historicalLatitude:30,historicalLongitude:-95,historicalCoordinateSource:source,locationNote:prefix+JSON.stringify(marker),...patch};
 }
-async function mount(page,{holdHashes=false,restored=false,noEstimates=false}={}){
+async function mount(page,{holdHashes=false,restored=false,noEstimates=false,registered=false}={}){
  const state={units:[estimate(ids[0],901),estimate(ids[1],902),estimate(ids[2],903,{latitude:30.1,longitude:-95.1,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh}),estimate(ids[3],904,{historicalLatitude:31,historicalCoordinateSource:'legacy_tracker',locationNote:'Old location only'})],writes:[],reads:0,offline:false};
+ if(registered)state.units[0]={...state.units[0],id:'99999999-9999-4999-8999-999999999999',readOnly:false,currentLocationType:null,addressEstimateTrackerId:ids[0],addressEstimateUnitNumber:'Sniper 901'};
  await page.clock.install({time:new Date(now)});
  if(noEstimates)state.units=state.units.map((u,i)=>i<2?{...u,locationNote:'No approved estimate'}:u);
  if(restored)await page.addInitScript(()=>history.replaceState({...history.state,cosFieldMapView:{status:'field',health:'all',center:[28,-94],zoom:6}},''));
@@ -72,4 +73,16 @@ test('user viewport changes while hashes are pending are not replaced by late es
  await frame.locator('body').evaluate(()=>window.__hashResolvers.splice(0).forEach(resolve=>resolve()));
  await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);await page.clock.runFor(1000);
  const after=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);expect(after.center).toEqual(before.center);expect(after.zoom).toBe(before.zoom);
+});
+
+test('registered unit renders its bound estimate and removes it after the installation address changes',async({page})=>{
+ const {frame,state}=await mount(page,{registered:true});
+ await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);
+ await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
+ await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');
+ await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(1);
+ state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001'};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(1);
+ expect(state.writes).toHaveLength(0);
 });
