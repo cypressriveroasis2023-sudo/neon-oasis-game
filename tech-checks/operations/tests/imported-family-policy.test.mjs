@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canonicalCameraUnit,fieldCameraHealth} from '../src/fieldCameraHealth.ts';
+import {canonicalCameraUnit,fieldCameraHealth,isSupportEquipment} from '../src/fieldCameraHealth.ts';
 import {resource,port,snapshot,now} from './fixtures/camera-evidence-fixtures.mjs';
 import {importedFamilyPolicy} from './fixtures/imported-family-policy.mjs';
 const direct=key=>['SNIPER','SNIPER2','SNIPER4','CAMV'].includes(key?.split('|')[0]);
@@ -25,9 +25,9 @@ for(const row of importedFamilyPolicy)test('imported labels: '+row.equipmentType
   assert.equal(fieldCameraHealth(unit,[unit],snapshot([{...record,unit:other}]),now).identity,'missing');
   assert.equal(fieldCameraHealth({...unit,modelName:'Unverified equipment'},[{...unit,modelName:'Unverified equipment'}],health,now).identity,'missing');
  }else{
-  assert.equal(result.identity,'missing');assert.equal(result.state,'unknown');assert.equal(result.classification,null);
+  assert.equal(result.identity,'missing');assert.equal(result.state,isSupportEquipment(unit)?'support':'unknown');assert.equal(result.classification,null);
   // A camera, responding router/service port, or matching numeric tag cannot make this family supported.
-  for(const label of [row.unit,'Ranger 901','Spotter 901','Solar Spotter 901','CAM V 901'])assert.equal(fieldCameraHealth(unit,[unit],snapshot([resource(1,label,{serviceEvidence:port()})]),now).state,'unknown');
+  for(const label of [row.unit,'Ranger 901','Spotter 901','Solar Spotter 901','CAM V 901'])assert.equal(fieldCameraHealth(unit,[unit],snapshot([resource(1,label,{serviceEvidence:port()})]),now).state,isSupportEquipment(unit)?'support':'unknown');
  }
 });
 test('known intrinsic family names remain valid separately from ambiguous source-tab grouping',()=>{

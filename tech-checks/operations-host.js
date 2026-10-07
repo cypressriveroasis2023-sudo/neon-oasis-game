@@ -1,3 +1,4 @@
+import {setFieldMapDisplay} from './field-map-display-host.js';
 // Isolate the Operations UI while retaining the existing Tech Check session and views.
 const ownerView = document.getElementById('view-owner');
 const mount = document.getElementById('cosOperationsMount');
@@ -137,7 +138,7 @@ function present() {
   const effectiveOwner = context()?.getEffectiveRole() === 'owner';
   const appVisible = !document.getElementById('appView')?.classList.contains('hidden');
   if (frame && (frameUser !== user || !effectiveOwner || !appVisible)) {
-    frame.remove(); frame = null; frameUser = null; legacyOpen = false; activeTool = null; initialRouteApplied = false; openedTechViews.clear(); nativeWorkspace = null; techHomePending = false;
+    setFieldMapDisplay(frame,false);frame.remove(); frame = null; frameUser = null; legacyOpen = false; activeTool = null; initialRouteApplied = false; openedTechViews.clear(); nativeWorkspace = null; techHomePending = false;
   }
   const visible = Boolean(user && effectiveOwner && appVisible && !ownerView?.classList.contains('hidden'));
   document.body.classList.toggle('cos-operations-host', visible && !legacyOpen);
@@ -153,14 +154,14 @@ function present() {
     const fieldUnit = mapParams.get('fieldUnit');
     const fieldRoute = fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#field-map?unitLabel=' + encodeURIComponent(fieldUnit) : mapParams.get('fieldView') === '1' ? '#field-map' : '';
     frame.src = './operations/dist/index.html?v=operations-v100-phase2-20261004' + fieldRoute;
-    frame.allow = 'geolocation';
+    frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
     frame.referrerPolicy = 'same-origin';
-    frame.addEventListener('load', () => { if (toolFromHash()) showTechCheckHome(); });
+    frame.addEventListener('load', () => {setFieldMapDisplay(frame,false); if (toolFromHash()) showTechCheckHome(); });
     mount.replaceChildren(frame);
     frameUser = user;
   }
   if (frame && (!visible || legacyOpen)) {
-    frame.contentWindow?.postMessage({ type: 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' }, window.location.origin);
+    setFieldMapDisplay(frame,false);frame.contentWindow?.postMessage({ type: 'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE' }, window.location.origin);
   }
   mount.hidden = legacyOpen;
   legacy.hidden = !legacyOpen;
@@ -225,6 +226,7 @@ window.addEventListener('hashchange', restoreToolRoute);
 window.addEventListener('message', async event => {
   if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || !owner()) return;
   const data = event.data;
+  if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof data.active==='boolean'){setFieldMapDisplay(frame,data.active);return;}
   if (!data || typeof data !== 'object') return;
   if (data.type === 'COS_OPERATIONS_TOKEN_REQUEST' && typeof data.requestId === 'string' && data.requestId.length <= 100) {
     const requestedUser = owner();

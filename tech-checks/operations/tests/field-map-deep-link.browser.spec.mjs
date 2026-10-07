@@ -158,7 +158,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   } = await mount(page, 'RII-022');
   await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await expect(frame.locator('.cos-field-pin')).toContainText('Recon II 022');
+  await expect(frame.locator('.field-pin-label')).toContainText('Recon II 022');
   expect(state.writes).toHaveLength(0);
   expect(errors).toEqual([]);
 }], ['Unknown or shop label never picks unrelated field unit', async page => {
