@@ -11,7 +11,7 @@ export const workspaceGroups = [
   { label:'Team', home:'Team', items:['Team','Owner Tasks'] },
   { label:'Finance', home:'Billing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },
 ];
-export const workspaceLabel = (name:string) => ({Today:'Overview','Daily Board':'Dispatch Board','Field Map':'Field View','Victron VRM':'Victron Power',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
+export const workspaceLabel = (name:string) => ({'Tech Check':'Tech Checks',Today:'Overview','Daily Board':'Dispatch Board','Field Map':'Field View','Victron VRM':'Victron Power',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
 export const workspaceGroup = (name:string) => workspaceGroups.find(group=>group.items.includes(name==='Invoices'?'Billing':name)) || workspaceGroups[0];
 export type WorkspaceRoute = { workspace:string; jobId:string; detail:boolean; createType?:TicketType };
 export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {

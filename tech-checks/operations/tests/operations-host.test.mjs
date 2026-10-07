@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const hostSource = readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8');
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
-const ownerId = 'e4abc521-1ef3-45a6-9829-b87faff78210';
+const ownerId = '00000000-0000-4000-8000-000000000001';
 const secondOwnerId = '11111111-2222-4333-8444-555555555555';
 
 function deferred() {
@@ -63,6 +63,11 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
       super(); this.id = id; this.classList = new ClassList(this, classes);
       this.children = []; this.hidden = false; this.parentElement = null; this.removed = false;
     }
+    set id(value) { this._id=value; if(value) nodes.set(value,this); }
+    get id() { return this._id; }
+    setAttribute(name,value) { (this.attributes ||= new Map()).set(name,String(value)); }
+    append(...children) { for(const child of children) { if(child.parentElement) child.parentElement.children=child.parentElement.children.filter(item=>item!==child); child.parentElement=this; this.children.push(child); } }
+    prepend(...children) { const current=this.children.slice(); this.children=[]; this.append(...children,...current); }
     replaceChildren(...children) {
       for (const child of this.children) child.parentElement = null;
       this.children = children;
@@ -88,7 +93,9 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
   const accountControl = new Element('existingAccountControl');
   nodes.get('cosOperationsLegacy').replaceChildren(accountControl);
   const window = new Events();
-  window.location = { origin, assign: value => calls.locations.push(value) };
+  window.location = { origin, pathname:'/tech-checks/', search:'', hash:'', assign: value => calls.locations.push(value) };
+  calls.history = [];
+  window.history = { pushState:(state,_title,hash)=>{calls.history.push({state,hash});window.location.hash=hash;}, replaceState:(state,_title,url)=>{window.location.hash=url.includes('#')?url.slice(url.indexOf('#')):'';} };
   window.TechCheckContext = {
     db: { auth: { onAuthStateChange: listener => { state.authListener = listener; return {}; }, getSession: () => { calls.auth++; return state.getFreshSession(); } } },
     getSession: () => state.session,
@@ -122,8 +129,9 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
     body,
     getElementById: id => nodes.get(id) || null,
     createElement: type => {
-      assert.equal(type, 'iframe');
+      assert.ok(['iframe','header','div','span','b','button','p'].includes(type));
       const element = new Element();
+      if(type!=='iframe')return element;
       element.contentWindow = {
         messages: [],
         postMessage(value, targetOrigin) { this.messages.push({ value, targetOrigin }); },
@@ -443,4 +451,93 @@ test('cross-tab signout or subject change destroys owner iframe despite stale le
 });
 test('same-subject token refresh retains owner frame',()=>{
   const h=harness(),frame=h.frame();h.state.authListener('TOKEN_REFRESHED',{user:{id:ownerId}});h.flushMutations();assert.equal(h.frame(),frame);
+});
+
+
+test('one Tech Checks route replaces the older Dashboard and More entry points', async () => {
+  const h = harness();
+  for (const route of ['today','more']) {
+    await h.navigate(route); h.flushMutations();
+    assert.equal(h.nodes.get('cosOperationsLegacy').hidden, true);
+    assert.equal(h.window.location.hash, '#tech-checks');
+    assert.equal(h.frame().contentWindow.messages.at(-1).value.type, 'COS_OPERATIONS_TECH_CHECK_HOME');
+  }
+  assert.deepEqual(h.calls.routes, []);
+});
+
+test('tool navigation is idempotent and Browser Back/Forward restores the checks destination', async () => {
+  const h = harness();
+  await h.navigate('accounts'); h.flushMutations();
+  await h.navigate('accounts'); h.flushMutations();
+  assert.deepEqual(h.calls.routes, ['accounts']);
+  assert.equal(h.calls.history.length, 1);
+  assert.equal(h.window.location.hash, '#tech-checks/accounts');
+  h.window.location.hash = '';
+  await h.window.emit('popstate'); h.flushMutations();
+  assert.equal(h.nodes.get('cosOperationsLegacy').hidden, true);
+  h.window.location.hash = '#tech-checks/accounts';
+  await h.window.emit('popstate'); h.flushMutations();
+  assert.equal(h.nodes.get('cosOperationsLegacy').hidden, false);
+  assert.deepEqual(h.calls.routes, ['accounts', 'accounts']);
+  assert.equal(h.calls.history.length, 1);
+});
+
+test('hidden sessions and role previews cannot navigate tools through the return control', async () => {
+  for (const blocked of ['hidden','preview']) {
+    const h = harness();
+    await h.navigate('it'); h.flushMutations();
+    if (blocked === 'hidden') h.nodes.get('appView').classList.add('hidden');
+    else h.preview('it');
+    h.flushMutations();
+    const calls = h.calls.tabs.length;
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+    assert.equal(h.calls.tabs.length, calls);
+    assert.equal(h.frame(), null);
+  }
+});
+
+
+test('resuming a technician tool reveals its existing checklist without repeating the home-tab handler', async () => {
+  const h = harness();
+  for (const route of ['it','service']) {
+    await h.navigate(route); h.flushMutations();
+    const calls = h.calls.technicianHomes.length;
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+    await h.navigate(route); h.flushMutations();
+    assert.equal(h.calls.technicianHomes.length, calls);
+    assert.equal(h.calls.shows.at(-1), route === 'it' ? 'it' : 'svc');
+    h.nodes.get('cosOperationsTechReturn').click(); h.flushMutations();
+  }
+});
+
+test('only the active owner frame can clear a Tech Checks bookmark when navigating elsewhere', async () => {
+  const h = harness();
+  await h.navigate('more'); h.flushMutations();
+  const event = {type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:'Today'};
+  await h.message(event,{}); assert.equal(h.window.location.hash,'#tech-checks');
+  await h.message({...event,workspace:'Tech Check'}); assert.equal(h.window.location.hash,'#tech-checks');
+  await h.message(event); assert.equal(h.window.location.hash,'');
+  await h.navigate('accounts'); h.flushMutations();
+  await h.message(event); assert.equal(h.window.location.hash,'#tech-checks/accounts');
+});
+
+
+test('an iframe startup update cannot erase a requested Tech Checks home before it opens', async () => {
+  const h = harness();
+  await h.navigate('more'); h.flushMutations();
+  await h.message({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:'Today'});
+  assert.equal(h.window.location.hash,'#tech-checks');
+  assert.equal(h.frame().contentWindow.messages.at(-1).value.type,'COS_OPERATIONS_TECH_CHECK_HOME');
+  await h.message({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:'Tech Check'});
+  await h.message({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:'Today'});
+  assert.equal(h.window.location.hash,'');
+});
+
+test('Tech Check header is assembled around existing controls without a host HTML rewrite',async()=>{
+ const h=harness();
+ assert.equal(h.nodes.get('cosOperationsReturn').textContent,'← Tech Checks');
+ assert.equal(h.accountControl.parentElement,h.nodes.get('cosOperationsLegacy'));
+ assert.equal(h.nodes.get('cosOperationsLegacy').children[0].className,'cos-tech-check-header');
+ await h.navigate('accounts');
+ assert.equal(h.nodes.get('cosTechCheckToolTitle').textContent,'Technician accounts');
 });

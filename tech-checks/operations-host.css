@@ -26,3 +26,31 @@ body.cos-production-assignments-open{overflow:hidden!important}
 .cos-native-assignments>p{margin:8px 0 12px;color:#aec0ce;font-size:13px}.cos-native-assignment-content{display:grid;gap:8px}.cos-native-assignment-content>p{margin:8px 0;color:#bfd0dd}
 .cos-native-assignment-row{display:grid;gap:5px;text-align:left;width:100%;min-width:0;padding:12px;border:1px solid #3d6179;border-radius:9px;background:#081927;color:#e6edf7;overflow-wrap:anywhere}.cos-native-assignment-row strong{font-size:15px}.cos-native-assignment-row span{font-size:13px;color:#bbccda}.cos-native-assignment-row small{color:#f3c56b;font-weight:700}.cos-native-assignment-row:hover{border-color:#64c9e5;background:#122e40}
 @media(max-width:700px){.cos-native-assignments{padding:12px}.cos-native-assignment-head h2{flex-basis:100%;font-size:18px}}
+/* Tech Checks has one front door in VISION. Retain the original tool mounts,
+   but do not expose the older, competing full owner dashboard around them. */
+body.cos-operations-legacy #appView:has(#view-owner:not(.hidden))>.mobileTop,
+body.cos-operations-legacy #ownerPrimaryNav,
+body.cos-operations-legacy #ownerApp>.ownerAppWorkspace>.ownerItTopbar,
+body.cos-operations-legacy #ownerApp>.ownerAppWorkspace>.ownerWorkspaceTools{display:none!important}
+body.cos-operations-legacy #view-owner:not(.hidden),
+body.cos-operations-legacy #ownerApp{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;min-height:0!important}
+body.cos-operations-legacy #ownerApp>.ownerAppWorkspace{width:100%!important;max-width:none!important;margin:0!important;min-height:0!important;padding:16px!important}
+body.cos-operations-legacy #appView{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+.cos-tech-check-header{display:flex;align-items:center;gap:16px;padding:16px;border-bottom:1px solid #2C3B51;background:#111B2A;color:#E6EDF7}
+.cos-tech-check-header>div{display:grid;gap:4px;flex:1;min-width:0}
+.cos-tech-check-header span{font-size:11px;letter-spacing:.08em;color:#A3B3CA}
+.cos-tech-check-header b{font-size:20px}
+.cos-tech-check-header #cosOperationsReturn{position:static;margin:0;box-shadow:none;background:#172337;border-color:#617895;color:#E6EDF7;white-space:nowrap}
+.cos-tech-check-source{margin:0;padding:12px 16px;border-bottom:1px solid #2C3B51;background:#0B111C;color:#A3B3CA;font-size:13px}
+@media(max-width:700px){.cos-tech-check-header{gap:10px;padding:12px;flex-wrap:wrap}.cos-tech-check-header b{font-size:17px}.cos-tech-check-header>div{min-width:130px}.cos-tech-check-header>.mini:last-child{margin-left:auto}}
+/* The protected owner CSS also fixes the old workspace to the whole screen.
+   Scoped tools now flow below their Tech Checks header at every viewport. */
+html:has(body.cos-operations-legacy #view-owner:not(.hidden)),
+html body.cos-operations-legacy:has(#view-owner:not(.hidden)){background:#0B111C!important;color:#E6EDF7!important}
+html body.cos-operations-legacy #appView #view-owner:not(.hidden),
+html body.cos-operations-legacy #appView #view-owner #ownerApp,
+html body.cos-operations-legacy #appView #view-owner #ownerApp>.ownerAppWorkspace{position:relative!important;inset:auto!important;height:auto!important;max-height:none!important;overflow:visible!important;background:#0B111C!important;color:#E6EDF7!important}
+html body.cos-operations-legacy #appView #view-owner #ownerApp>.ownerAppWorkspace{min-height:calc(100dvh - 150px)!important}
+html body.cos-operations-legacy #cosOperationsLegacy>.cos-tech-check-header{position:relative;z-index:1;margin:0;background:#111B2A!important;color:#E6EDF7!important}
+html body.cos-operations-legacy .cos-tech-check-header .mini{width:auto;min-height:44px;background:#172337!important;color:#C5D2E4!important;border:1px solid #617895!important;border-radius:7px}
+html body.cos-operations-legacy #appView #view-owner :is(#ownerAppPage,#ownerRouteView,#ownerPersistentControls,#ownerPersistentAccounts){background:#0B111C!important;color:#E6EDF7!important}

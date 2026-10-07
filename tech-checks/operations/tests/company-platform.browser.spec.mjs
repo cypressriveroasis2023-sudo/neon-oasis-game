@@ -64,7 +64,7 @@ test('every company destination remains reachable with a dark responsive boundar
 test('denied company access retains readable legacy exits without loading company records', async ({page}) => {
   const {frame,requests}=await mount(page,true);
   await expect(frame.getByRole('heading',{name:'Operations access needs attention'})).toBeVisible();
-  await expect(frame.getByRole('region',{name:'Tech Check workspaces'}).getByRole('button',{name:/IT Tech Check/})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Tech Check workspaces'}).getByRole('button',{name:/^IT Preparation/})).toBeVisible();
   expect(requests.map(request=>request.path)).toEqual(['/api/session']);
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);

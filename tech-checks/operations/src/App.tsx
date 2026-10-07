@@ -6,6 +6,7 @@ import { primaryAreas } from './visionAreas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
 import TodayDashboard from './TodayDashboard';
+import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
@@ -53,7 +54,7 @@ const descriptions: Record<string,string> = {
   'Camera Health':'Live camera status and existing diagnostics.',
   'InHand Routers':'Router inventory, IP addresses and timestamped management-port observations.',
   'Victron VRM':'Battery, solar and power dashboards for Helios units 1–9.',
-  'Tech Check':'Open the existing IT and Service workspaces using your current platform account.',
+  'Tech Check':'IT and Service checklists, check assignments and technician access in one place.',
 };
 const errorMessage = (cause:unknown, fallback:string) => cause instanceof Error ? cause.message : fallback;
 const collection = (data:any) => {
@@ -161,9 +162,6 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
     {!items&&!error?<p role='status'>Loading Owner Tasks…</p>:<div className='records'>{(items||[]).map(row=><button disabled={saving} type='button' className='record op-record' key={row.id} onClick={()=>edit(row)}><div><strong>{row.title}</strong><small>{String(row.priority||'').toUpperCase()} · {row.assignedTo||String(row.assignedDepartment||'').toUpperCase()} · {row.jobNumber||row.siteName||'General'}{row.dueAt?' · Due '+new Date(row.dueAt).toLocaleString():''}</small></div><em>{String(row.status||'').replaceAll('_',' ').toUpperCase()}</em></button>)}{items?.length===0&&<p>No Owner Tasks in the current records. Create a daily assignment for IT or Service.</p>}</div>}
   </section>;
 }
-function TechCheckWorkspace() {
-  return <section className='panel module operations-tools' aria-label='Tech Check workspaces'><div className='panelhead'><h2>Tech Check</h2><span>Existing platform workspaces</span></div><div className='operations-tool-grid'><button onClick={()=>openLegacy('it')}><b>IT Tech Check</b><span>IT readiness, preparation, assignments and checks</span></button><button onClick={()=>openLegacy('service')}><b>Service Tech Check</b><span>Service readiness, field assignments and checks</span></button><button className='secondary' onClick={()=>openLegacy('team')}><b>Team / Truck Readiness</b><span>Open the existing Owner team board</span></button><button className='secondary' onClick={()=>openLegacy('accounts')}><b>Accounts & Permissions</b><span>Open the existing account controls</span></button></div></section>;
-}
 function OwnerApp() {
   const [mapUnitId, setMapUnitId] = useState('');
   const [heliosUnit,setHeliosUnit]=useState(1);
@@ -177,6 +175,10 @@ function OwnerApp() {
   },[]);
   const [route,setRoute]=useState(readWorkspaceRoute);
   const active=route.workspace;
+  useEffect(()=>{
+    if(window.parent!==window)window.parent.postMessage({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:active},location.origin);
+  },[active]);
+
   const group=workspaceGroup(active);
   const focusedJob=route.jobId;
   const setRouteLocation=useCallback((next:WorkspaceRoute,replace=false,state:unknown=null)=>{
@@ -187,6 +189,15 @@ function OwnerApp() {
     }
     setRoute(next);
   },[]);
+  useEffect(()=>{
+    const returnToChecks=(event:MessageEvent)=>{
+      if(window.parent===window||event.origin!==location.origin||event.source!==window.parent||event.data?.type!=='COS_OPERATIONS_TECH_CHECK_HOME')return;
+      setMenu(false);
+      setRouteLocation({workspace:'Tech Check',jobId:'',detail:false},true);
+    };
+    window.addEventListener('message',returnToChecks);
+    return()=>window.removeEventListener('message',returnToChecks);
+  },[setRouteLocation]);
   const [session,setSession]=useState<Row|null>(null);
   const [sessionError,setSessionError]=useState('');
   const [checking,setChecking]=useState(true);
@@ -279,7 +290,7 @@ function OwnerApp() {
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
       <p className='company-nav-heading'>Your workspace</p>
       <nav className='operations-area-nav' aria-label='COS Operations'>{primaryAreas.map(area=><button type='button' key={area.workspace} className={selectedArea===area.workspace?'active':''} onClick={()=>navigate(area.workspace)} aria-current={selectedArea===area.workspace?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
-      <div className='company-sidebar-footer'><div className='company-sidebar-actions'><button type='button' onClick={()=>navigate('Tech Check')}>IT &amp; Service Tech Checks</button><button type='button' onClick={()=>navigate('Vision')}>Vision assistant</button><button type='button' onClick={()=>{setMenu(false);openLegacy('accounts');}}>Accounts &amp; Permissions</button><button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
+      <div className='company-sidebar-footer'><div className='company-sidebar-actions'><button type='button' onClick={()=>navigate('Tech Check')}>Tech Checks</button><button type='button' onClick={()=>navigate('Vision')}>Vision assistant</button><button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
     </aside>
     <main className='owner-it-main' inert={menu}>
       <section className='company-utility-bar' aria-label='Workspace utilities'>
@@ -290,7 +301,7 @@ function OwnerApp() {
       </section>
 
       {active!=='Today'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
-      {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button><button className='secondary' onClick={()=>openLegacy('more')}>Existing Owner Tools</button><button className='secondary' onClick={()=>openLegacy('accounts')}>Accounts & Permissions</button></div><TechCheckWorkspace/></section>
+      {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div><TechChecksWorkspace/></section>
         :active==='Today'?<>{!route.detail&&<><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
@@ -309,7 +320,7 @@ function OwnerApp() {
         :active==='Quotes'?<QuotesWorkspace show={show}/>
         :active==='Invoices'||active==='Billing'?<InvoicesWorkspace show={show}/>
         :active==='Purchasing'?<PurchasingWorkspace show={show}/>
-        :active==='Tech Check'?<TechCheckWorkspace/>
+        :active==='Tech Check'?<TechChecksWorkspace/>
         :active==='Camera Health'?<CameraHealthWorkspace/>
         :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Field Map');}}/>
         :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit}/>

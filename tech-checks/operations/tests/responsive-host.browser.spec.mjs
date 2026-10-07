@@ -75,7 +75,7 @@ test('shared Operations menu opens tools, loads a workspace and closes with Esca
   await expect(menu).toBeVisible();
   await responsiveLayout(page,frame);
   await expect(menu.getByRole('button',{name:'Close menu'})).toBeFocused();
-  await menu.getByRole('button',{name:'IT & Service Tech Checks',exact:true}).click();
+  await menu.getByRole('button',{name:'Tech Checks',exact:true}).click();
   await expect(menu).toHaveCount(0);
   await expect(frame.getByRole('region',{name:'Tech Check workspaces'})).toBeVisible();
   expect(await frame.locator('body').evaluate(()=>location.hash)).toBe('#tech-check');
@@ -173,7 +173,8 @@ test('old VISION bookmarks preserve route and query parameters under the approve
 test('existing Owner Tools restore their legacy layout and return to full-width Operations', async ({ page }) => {
   const { frame } = await mount(page);
   await frame.getByRole('button', { name:'More', exact:true }).click();
-  await frame.getByRole('button', { name:'Accounts & Permissions', exact:true }).click();
+  await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+  await frame.getByRole('button',{name:/Technician accounts/}).click();
   await expect(page.locator('body')).toHaveClass(/cos-operations-legacy/);
   await expect(page.locator('#cosOperationsMount')).toBeHidden();
   await expect(page.locator('#cosOperationsLegacy')).toBeVisible();
