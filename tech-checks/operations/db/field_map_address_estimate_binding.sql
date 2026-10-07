@@ -1,5 +1,6 @@
 -- Add exact tracker provenance to the existing field-map read projection.
 -- No placement, GPS, history, authorization, permission or health writes.
+-- Only SOLAR SPOTTER numeric labels allow an optional family/unit separator hyphen.
 CREATE OR REPLACE FUNCTION public.appdeploy_field_map_snapshot(p_actor_user_id uuid, p_organization_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -28,8 +29,8 @@ begin
       case when u.installed_site_id is not null then s.latitude else t.latitude end as address_latitude,
       case when u.installed_site_id is not null then s.longitude else t.longitude end as address_longitude,
       case when u.installed_site_id is not null then 'site' else t.coordinate_source end as address_coordinate_source,
-      case when u.installed_site_id is null and lower(btrim(regexp_replace(u.unit_number,'\s+',' ','g')))=lower(btrim(regexp_replace(t.unit_number,'\s+',' ','g'))) then t.id else null end as estimate_tracker_id,
-      case when u.installed_site_id is null and lower(btrim(regexp_replace(u.unit_number,'\s+',' ','g')))=lower(btrim(regexp_replace(t.unit_number,'\s+',' ','g'))) then t.unit_number else null end as estimate_unit_number,
+      case when u.installed_site_id is null and lower(btrim(regexp_replace(regexp_replace(u.unit_number,'^(solar[[:space:]]+spotter)[[:space:]]*-[[:space:]]*([0-9]+)$','\1 \2','i'),'\s+',' ','g')))=lower(btrim(regexp_replace(regexp_replace(t.unit_number,'^(solar[[:space:]]+spotter)[[:space:]]*-[[:space:]]*([0-9]+)$','\1 \2','i'),'\s+',' ','g'))) then t.id else null end as estimate_tracker_id,
+      case when u.installed_site_id is null and lower(btrim(regexp_replace(regexp_replace(u.unit_number,'^(solar[[:space:]]+spotter)[[:space:]]*-[[:space:]]*([0-9]+)$','\1 \2','i'),'\s+',' ','g')))=lower(btrim(regexp_replace(regexp_replace(t.unit_number,'^(solar[[:space:]]+spotter)[[:space:]]*-[[:space:]]*([0-9]+)$','\1 \2','i'),'\s+',' ','g'))) then t.unit_number else null end as estimate_unit_number,
       false as read_only,t.source_name,t.source_verified_at,t.imported_at,t.location_note,
       (select split_part(h.note,E'\n',1) from public.equipment_unit_location_history h
        where h.equipment_unit_id=u.id and h.organization_id=p_organization_id
@@ -98,4 +99,3 @@ begin
       'fieldRows',(select count(*) from app_private.vision_tracker_locations where organization_id=p_organization_id and placement='FIELD')));
 end;
 $function$
-
