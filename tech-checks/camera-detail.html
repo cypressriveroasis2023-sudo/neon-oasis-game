@@ -148,6 +148,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
         </div>
         <div id="siteEditWrap" class="setupbox hidden" style="margin-top:12px"><strong>Site / customer name</strong><div class="small">Owner and IT can set the site manually. This is saved to every camera component on this unit. Avigilon site data can replace it automatically when an Avigilon sync is connected.</div><input id="siteNameInput" autocomplete="off" placeholder="Example: AT&T Magnum"><button class="action" id="saveSiteBtn">Save site to this unit</button></div>
         <div class="actions" id="interfaceActions"></div>
+        <p class="small" id="connectionNote"></p>
       </div>
 
       <div class="card full section-card">
@@ -178,7 +179,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   </main>
 </div>
 
-<script src="./camera-health-history.js?v=20261007"></script>
+<script src="./camera-health-history.js?v=20261007-access"></script>
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -225,7 +226,7 @@ function sourceDetailText(){const group=cameraGroup(device),st=effectiveHealth(d
 
 function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),vig=(sourceFresh(device)?String(device?.source_status||'unknown'):'stale').toLowerCase();if(st==='online')return'';if(st==='degraded')return group==='Vigilant'?(vig==='online'?'Vigilant reports ONLINE, but the direct public-IP/port check is NOT RESPONDING. Overall status is DEGRADED.':'The direct connection is responding, but Vigilant reports OFFLINE. Overall status is DEGRADED because the sources disagree.'):'Health sources disagree. Verify this camera.';if(st==='offline')return group==='Vigilant'?'Star4Live reports this resource OFFLINE.':group==='Reconeyez'?'Reconeyez cloud currently reports this detector OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return group==='Reconeyez'?'Waiting for a definitive Reconeyez cloud health event.':'No definitive ONLINE/OFFLINE result is available yet.';return''}
 function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
-function interfaceLinks(){const out=[];const ip=effectivePublicIP();if(!ip)return out;const ps=current?.port_status||{},labels=device?.port_labels||{};for(const [p0,v] of Object.entries(ps)){if(!v?.online)continue;const p=Number(p0),proto=(p===443||p===8443)?'https':'http';const url=proto+'://'+ip+(p===80||p===443?'':':'+p);out.push([url,labels[p0]||('Port '+p)])}if(!out.length)out.push(['http://'+ip,'Open public IP']);return [...new Map(out.map(x=>[x[0],x])).values()]}
+function interfaceLinks(){return CameraHealthHistory.connections(device,current,effectivePublicIP())}
 function render(){
   const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
   $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
@@ -304,8 +305,9 @@ function render(){
     $('routerIpInput').value=cleanIP(r.router_public_ip||r.unit_ip)||'';
     $('routerPortInput').value=r.web_port||'';
   }else routerSetup.classList.add('hidden');
-  const actionLinks=isRecon?[[reconCloudUrl(device),reconMetadata(device).cloud_url?'Open Reconeyez event':'Open Reconeyez Cloud']]:interfaceLinks();
-  $('interfaceActions').innerHTML=actionLinks.map(([url,label])=>'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>').join('');
+  const actionLinks=isRecon?[{url:reconCloudUrl(device),label:reconMetadata(device).cloud_url?'Open Reconeyez event':'Open Reconeyez Cloud'}]:interfaceLinks();
+  $('interfaceActions').innerHTML=actionLinks.map(({url,label,address})=>url?'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+(address?' · '+esc(address):'')+' ↗</a>':'<span class="linkbtn">'+esc(label)+' · '+esc(address)+' (client/service endpoint)</span>').join('');
+  $('connectionNote').textContent=isRecon?'':actionLinks.length?'Saved IP and configured / previously checked ports stay available even when a health result is missing or failed. Use client/service endpoints in the matching application, including Unity where configured. Links do not verify video.':'No saved public IP is available for this device or its linked router.';
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){

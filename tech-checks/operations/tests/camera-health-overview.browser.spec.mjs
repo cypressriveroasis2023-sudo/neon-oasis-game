@@ -82,10 +82,26 @@ test('provider recorders restore system health and ports stay separate with mixe
  });
  await expect(page.locator('#allOnline')).toHaveText('1');await expect(page.locator('#allOffline')).toHaveText('0');await expect(page.locator('#allPending')).toHaveText('2');await expect(page.locator('#serviceTotal')).toHaveText('1');
  await expect(page.locator('[data-unit="RECORDER 901"] .statuspill')).toHaveText('RECORDER ONLINE');await expect(page.locator('[data-unit="RECORDER 901"]')).toContainText('Camera channel status unavailable');
- await expect(page.locator('[data-unit="SERVICE 902"] .statuspill')).toHaveText('SERVICE REACHABLE');await expect(page.locator('[data-unit="SERVICE 902"]')).not.toHaveClass(/\bonline\b/);
+ await expect(page.locator('[data-unit="SERVICE 902"] .statuspill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('[data-unit="SERVICE 902"]')).toHaveClass(/\bonline\b/);
  await expect(page.locator('[data-unit="MIXED 903"]')).toContainText('Mixed provider status');await expect(page.locator('#cameraCoverage')).toContainText('1 online · 0 offline · 0 mixed/unverified · 2');
  await page.screenshot({path:info.outputPath('system-camera-evidence-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:info.outputPath('system-camera-evidence-mobile.png'),fullPage:true});
  await page.locator('[data-unit="MIXED 903"]').click();await expect(page.locator('#unitDetailMain')).toContainText('RECORDER OFFLINE');await expect(page.locator('#cameraIssues')).toContainText('recorder OFFLINE');await expect(page.locator('#cameraIssues .eventstatus')).toContainText(['OFFLINE']);
 });
 
 test('missing Recon receiver-test metadata does not assert a failed or stopped feed',async({page})=>{await mount(page);await expect(page.locator('#providerOtherHealth')).toContainText('Receiver test not recorded in current metadata');await expect(page.locator('#reconLiveStatus')).toContainText('RECEIVER TEST NOT RECORDED');await expect(page.locator('#reconLiveStatus')).toContainText('does not establish that live events stopped');});
+
+
+test('legacy Sniper and CAM V cards preserve online offline unknown service states and resource ports flow',async({page},info)=>{
+ await mount(page);await page.evaluate(async()=>{
+  const base={activation_state:'active',organization:'Synthetic customer',source:'2026_unit_tracker',source_status:null,source_last_seen_at:null,monitoring_profile:'sniper',public_ip:'192.0.2.20',expected_ports:[80,443,8443,38880,38881]};
+  fixtureDevices=[{...base,id:101,unit_key:'SNIPER 2 005',device_type:'Sniper 2'},{...base,id:102,unit_key:'CAM V 002',device_type:'CAMV'},{...base,id:103,unit_key:'CAM V 003',device_type:'CAMV'}];
+  fixtureHealth=[{camera_device_id:101,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:102,overall_status:'offline',ip_reachable:false,confirmed_outage:true,consecutive_failures:3,checked_at:'2026-10-06T12:29:00Z'}];await load();
+ });
+ await expect(page.locator('#allOnline')).toHaveText('0');await expect(page.locator('#allOffline')).toHaveText('0');
+ await page.getByLabel('Filter units').selectOption('SniperOnline');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('.compact-unit')).toHaveClass(/\bonline\b/);await page.locator('.compact-unit').screenshot({path:info.outputPath('legacy-sniper-online-card.png')});
+ await page.locator('.compact-unit').click();await expect(page.locator('#unitDetailSubtitle')).toContainText('IP / port status: ONLINE');await expect(page.locator('#unitDetailMain').getByRole('link',{name:'Open resource & ports'})).toHaveAttribute('href','./camera-detail.html?id=101');await page.keyboard.press('Escape');
+ await page.getByLabel('Filter units').selectOption('CamVOffline');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('IP / PORT OFFLINE');await expect(page.locator('.compact-unit')).toHaveClass(/\boffline\b/);
+ await page.getByLabel('Filter units').selectOption('CAM V');await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="CAM V 003"] .statuspill')).toHaveText('IP / PORT UNVERIFIED');
+ await page.getByLabel('Filter units').selectOption('Avigilon');await expect(page.locator('.compact-unit')).toHaveCount(3);
+ await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck();});await expect(page.locator('.compact-unit .statuspill')).toHaveText(['IP / PORT UNVERIFIED','IP / PORT UNVERIFIED','IP / PORT UNVERIFIED']);
+});

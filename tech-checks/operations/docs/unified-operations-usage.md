@@ -35,3 +35,10 @@ that feature is enabled. The original completed visit and evidence are preserved
 Schedule the return normally; its own assigned technician must complete its Tech
 Check before the job can proceed through closeout. Closing the dialog never saves
 a return request.
+
+
+## Camera access restoration checks
+
+Sniper and CAM V cards show IP / PORT ONLINE or OFFLINE only from recent saved service evidence. Camera channel coverage remains separate. Resource details link to the existing authenticated Camera Health record by exact device ID, where saved IP addresses and configured ports remain available after a failed, stale, or missing check. Only known web ports receive HTTP(S) links; other ports, including Unity client/service ports, stay explicit IP:port values.
+
+The default unit and browser suites use synthetic data. The three production auth/CORS smoke checks in `tests/backend-live.test.mjs` are visibly skipped unless `COS_RUN_LIVE_SMOKE=1` is explicitly set. Do not set this flag in normal CI or restoration testing. After separate authorization for production checks, the opt-in command is `COS_RUN_LIVE_SMOKE=1 node --test tests/backend-live.test.mjs`. It does not certify any camera or video stream. The default/opt-in gate itself is tested with mocked requests.
