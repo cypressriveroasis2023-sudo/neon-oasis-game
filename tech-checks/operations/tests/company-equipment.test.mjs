@@ -10,7 +10,7 @@ const routers = { items: [], generatedAt: stamp, source: 'camera_health', gpsAva
 test('company equipment reads only validated camera and stored router sources', async () => {
   const paths = [];
   const result = await loadCompanyEquipment({ get: async path => { paths.push(path); return { data: path.includes('camera-health') ? camera : routers }; } });
-  assert.deepEqual(paths.sort(), ['/api/camera-health/summary-v2', '/api/routers']);
+  assert.deepEqual(paths.sort(), ['/api/camera-health/summary-v3', '/api/routers']);
   assert.equal(cameraDashboardSummary(result.camera,Date.parse('2026-10-06T18:00:00Z')).attention,2);
   assert.equal(result.routers.items.length, 0);
   assert.equal(result.routers.gpsAvailable, false);
@@ -18,7 +18,7 @@ test('company equipment reads only validated camera and stored router sources', 
 });
 
 test('company equipment never substitutes an empty collection or healthy zero after failure', async () => {
-  for (const failedPath of ['/api/camera-health/summary-v2', '/api/routers']) {
+  for (const failedPath of ['/api/camera-health/summary-v3', '/api/routers']) {
     const result = await loadCompanyEquipment({ get: async path => { if (path === failedPath) throw new Error('Fixture unavailable'); return { data: path.includes('camera-health') ? camera : routers }; } });
     const key = failedPath.includes('camera-health') ? 'camera' : 'routers';
     assert.equal(result[key], null);

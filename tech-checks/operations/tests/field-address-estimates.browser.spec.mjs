@@ -29,7 +29,7 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
   const health=snapshot(state.units.map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
   const data=request.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:4,mappedUnits:1,unitGps:0,missingGps:3},generatedAt:now}
-   :request.path==='/api/camera-health/summary-v2'?health
+   :request.path==='/api/camera-health/summary-v3'?health
    :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
    :request.path==='/api/equipment'?{items:[],models:[],trackerUnits:state.units}
    :request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:now}:{items:[]};

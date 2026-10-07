@@ -8,7 +8,7 @@ export function useCameraHealth(){
   const refresh=useCallback(async()=>{
     if(running.current)return;
     running.current=true;lastAttemptAt.current=Date.now(); const request=++revision.current;setLoading(true);
-    try {const next=validateCameraHealth((await api.get('/api/camera-health/summary-v2')).data);if(request===revision.current){setData(next);setError('');setNow(Date.now());}}
+    try {const next=validateCameraHealth((await api.get('/api/camera-health/summary-v3')).data);if(request===revision.current){setData(next);setError('');setNow(Date.now());}}
     catch(cause){if(request===revision.current){setData(null);setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
     finally{if(request===revision.current){running.current=false;setLoading(false);}}
   },[]);

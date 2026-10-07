@@ -38,7 +38,7 @@ async function start(page) {
     if (state.failed.has(path)) return route.fulfill({ status: 503, contentType: 'application/json', headers, body: JSON.stringify({ error: 'Synthetic financial source unavailable' }) });
     let data;
     if (method === 'GET' && path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
-    else if (method === 'GET' && path === '/api/camera-health/summary-v2') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
+    else if (method === 'GET' && path === '/api/camera-health/summary-v3') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]};
     else if (method === 'GET' && path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
     else if (method === 'GET' && ['/api/jobs', '/api/owner-tasks', '/api/vrm-portal', '/api/equipment', '/api/field-map', '/api/team-production'].includes(path)) data = { items: [] };
     else {

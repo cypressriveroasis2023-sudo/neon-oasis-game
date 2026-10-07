@@ -42,9 +42,19 @@ test('source mismatches and inventory records can never supply provider camera e
 });
 test('duplicates, malformed evidence and invalid inventory cannot certify the snapshot',()=>{
  const row=resource(1);for(const rows of [[row,row],[row,{...row,id:'1',unit:'Different'}]]){assert.throws(()=>validateCameraHealth(snapshot(rows)),/duplicate/);assert.equal(cameraOverview(snapshot(rows),now).scopeVerified,false);}
- for(const change of [{scope:'nonsense'},{scope:'field',activationState:''},{evidence:{...row.evidence,reachable:'true'}}])assert.throws(()=>validateCameraHealth(snapshot([{...row,...change}])));
+ for(const change of [{scope:'nonsense'},{scope:'field',activationState:null},{evidence:{...row.evidence,reachable:'true'}}])assert.throws(()=>validateCameraHealth(snapshot([{...row,...change}])));
  const wrong=snapshot([row]);wrong.inventory.activeFieldRecords=0;assert.throws(()=>validateCameraHealth(wrong),/reconciled/);
 });
 test('old API versions fail safely, even when old provider fields claim all online',()=>{
  for(const evidenceVersion of [undefined,1]){const health={...snapshot([resource(1)]),evidenceVersion};const overview=cameraOverview(health,now);assert.equal(overview.scopeVerified,false);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].scope,'unknown');}
 });
+
+test('stored Shop placement never invalidates healthy field camera evidence',()=>{
+ const online=resource(901,'Ranger 901');const rawShop=resource(902,'Sniper 312',{scope:'shop',activationState:'deactivated',organization:'ROOT'});rawShop.evidence={...rawShop.evidence,active:false};
+ const data=snapshot([online,rawShop]);assert.doesNotThrow(()=>validateCameraHealth(data));const view=cameraOverview(data,now);assert.equal(view.summary.online,1);assert.equal(view.groups.find(g=>g.name==='Sniper 312').scope,'shop');assert.equal(rawShop.activationState,'deactivated');
+});
+test('physical Field placement can coexist with deactivated observations without creating online proof',()=>{
+ const row=resource(903,'Ranger 903',{scope:'field',activationState:'deactivated'});row.evidence={...row.evidence,active:false};const data=snapshot([row]);assert.doesNotThrow(()=>validateCameraHealth(data));assert.notEqual(classifyCameraUnit(data.rows,now).providerState,'online');
+});
+
+test('missing activation does not erase known physical placement or invalidate other field cameras',()=>{const healthy=resource(910,'Ranger 910');for(const scope of ['field','shop']){const missing=resource(911,'Ranger 911',{scope,activationState:''});missing.evidence={...missing.evidence,active:false};const data=snapshot([healthy,missing]);assert.doesNotThrow(()=>validateCameraHealth(data));assert.equal(cameraOverview(data,now).summary.online,1);assert.notEqual(classifyCameraUnit([missing],now).providerState,'online');}});

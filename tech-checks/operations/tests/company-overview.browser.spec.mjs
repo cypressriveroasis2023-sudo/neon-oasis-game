@@ -29,7 +29,7 @@ async function mount(page,{cameraData=camera}={}) {
     if (state.failures.has(request.path)) return route.fulfill({ status: 503, headers, contentType: 'application/json', body: JSON.stringify({ error: 'Fixture unavailable' }) });
     const data = request.path === '/api/session' ? { authorized: true, name: 'Fixture Owner', role: 'Owner' }
       : request.path === '/api/jobs' ? { items: jobs }
-      : request.path === '/api/camera-health/summary-v2' ? state.camera
+      : request.path === '/api/camera-health/summary-v3' ? state.camera
       : request.path === '/api/routers' ? { items: [router], generatedAt: stamp, source: 'camera_health', gpsAvailable: false }
       : request.path === '/api/quotes' ? { items: [{ id: 'q1', quoteNumber: 'FIX-Q1', status: 'Draft' }, { id: 'q2', quoteNumber: 'FIX-Q2', status: 'Pending Owner Approval' }] }
       : { items: [] };
@@ -74,7 +74,7 @@ test('company overview orders real health sources before the eight-stage custome
 test('refresh replaces failed sources with unavailable values and recovers verified zero separately', async ({ page }) => {
   const { frame, state } = await mount(page);
   state.failures.add('/api/jobs');
-  state.failures.add('/api/camera-health/summary-v2');
+  state.failures.add('/api/camera-health/summary-v3');
   state.failures.add('/api/routers');
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
   await expect(frame.getByText('Health unavailable', { exact: true })).toBeVisible();

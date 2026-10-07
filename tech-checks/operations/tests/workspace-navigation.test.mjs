@@ -47,3 +47,5 @@ test('map, unit health and ticket routes retain a validated stable unit identifi
  }
  for(const hash of ['#today?unit='+unitId,'#jobs?unit='+unitId,'#camera-health?unit=Some%20unit','#daily-board?unit='+unitId,'#camera-health?job=42&unit='+unitId])assert.equal(readWorkspaceRoute(hash).unitId,undefined);
 });
+
+test('legacy camera field links preserve full unit labels without treating numbers as IDs',()=>{const route=readWorkspaceRoute('#field-map?unitLabel=SNIPER%20312');assert.equal(route.unitLabel,'SNIPER 312');assert.equal(workspaceHash(route),'#field-map?unitLabel=SNIPER+312');assert.equal(readWorkspaceRoute('#camera-health?unitLabel=312').unitLabel,undefined);});

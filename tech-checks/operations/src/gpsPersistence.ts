@@ -20,6 +20,7 @@ const sameStamp=(a: unknown,b: unknown) => preciseStamp(a)!==null && preciseStam
 
 export function checkedFieldMap(value: unknown): Row {
   if (!object(value) || !Array.isArray(value.items) || !object(value.summary) || !Number.isFinite(stamp(value.generatedAt))) throw new Error('Field Map returned an incomplete response.');
+  if(value.placementReviews!==undefined&&(!Array.isArray(value.placementReviews)||value.placementReviews.some((row:unknown)=>!object(row)||typeof row.unitNumber!=='string'||typeof row.reason!=='string'||!(row.placementAuditId===null||typeof row.placementAuditId==='string'))))throw new Error('Field placement review list is incomplete.');
   const seen = new Set<string>();
   for (const item of value.items) {
     if (!object(item) || !uuid(item.id) || seen.has(item.id) || typeof item.unitNumber !== 'string' || typeof item.status !== 'string') throw new Error('Field Map returned inconsistent unit records.');

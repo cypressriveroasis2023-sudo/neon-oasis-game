@@ -1,3 +1,4 @@
+// Reviewed placement dialogs, global inventory search and Field Map links; covered by scoped browser tests.
 // Reviewed 2026-10-07: 15-minute visible-only routine reads and 20-minute evidence presentation allowance.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,14 +16,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "832d629b7dda23640541b50e756b672b17eb2646ceb6be3b575c8cc78e361374",
-  "camera-detail": "a1e353b10363b415209ef584a217185b99cc03b0d5de19bd216a3c966d6058da",
+  "camera-health": "041aaa978478a09b986d6c91f33f07b02643a6c5419ff71c44ed2935759c7787",
+  "camera-detail": "b363d33b3f8fa1d350193c79ee77f551f96053cd2b4ee33cc0edd95b9af7d5b4",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "7d9a32817780f140e9bd7d050422b39af8586a38e7d3021fe4ab5dfaca41e042",
-  "camera-detail": "7cce2ba1f581dfc6d4e9b41c7b5d7809f2bb072f56015f154e775cc8ef66b223",
+  "camera-health": "20ebda2fdbbbc0bde82f1d37199b04a5f0038a63b28c1ce80c21443f3e2cfd73",
+  "camera-detail": "eec3381df8c615aab57276db3156c51e4ddc46de4f00a928a6a06d77eddec7c1",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
