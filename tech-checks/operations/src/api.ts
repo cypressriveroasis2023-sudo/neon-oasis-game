@@ -8,14 +8,15 @@ export class OperationsApiError extends Error {
   }
 }
 const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
-let tokenRequest: Promise<string> | null = null;
-function requestParentToken(): Promise<string> {
+type ParentSession = { token: string; role: string };
+let tokenRequest: Promise<ParentSession> | null = null;
+function requestParentToken(): Promise<ParentSession> {
   if (window.parent === window || location.origin === 'null') {
     return Promise.reject(new OperationsApiError('Open Operations from the Tech Check platform to use your existing account.', 401));
   }
   if (tokenRequest) return tokenRequest;
   const requestId = crypto.randomUUID();
-  const request = new Promise<string>((resolve, reject) => {
+  const request = new Promise<ParentSession>((resolve, reject) => {
     let timer = 0;
     const cleanup = () => { window.removeEventListener('message', receive); window.clearTimeout(timer); };
     const receive = (event: MessageEvent) => {
@@ -26,7 +27,7 @@ function requestParentToken(): Promise<string> {
       const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
       if (!(queueMode ? ['it','service'].includes(message.role) : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
         reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
-      } else resolve(message.accessToken);
+      } else resolve({ token: message.accessToken, role: message.role });
     };
     window.addEventListener('message', receive);
     timer = window.setTimeout(() => {
@@ -39,10 +40,17 @@ function requestParentToken(): Promise<string> {
   void request.then(() => { if (tokenRequest === request) tokenRequest = null; }, () => { if (tokenRequest === request) tokenRequest = null; });
   return request;
 }
+export function permitsTechnicianRequest(method: string, path: string, body?: unknown): boolean {
+  if (method === 'GET') return path.startsWith('/api/tech/');
+  return method === 'POST' && /^\/api\/tech\/it-queue\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/i.test(path) &&
+    (body == null || typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
+}
 async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResponse<T>> {
   if (!/^\/api\/[a-zA-Z0-9_\-\/]+$/.test(path)) throw new OperationsApiError('This Operations request is unavailable.', 400);
-  if (new URLSearchParams(location.search).get('mode') === 'production-assignments' && (method !== 'GET' || !path.startsWith('/api/tech/'))) throw new OperationsApiError('This assignment view permits only technician record reads.', 403);
-  const token = await requestParentToken();
+  if (new URLSearchParams(location.search).get('mode') === 'production-assignments' && !permitsTechnicianRequest(method, path, body)) throw new OperationsApiError('This assignment view permits technician reads and taking an available IT queue visit only.', 403);
+  const session = await requestParentToken();
+  if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
+  const token = session.token;
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 30000);
   try {

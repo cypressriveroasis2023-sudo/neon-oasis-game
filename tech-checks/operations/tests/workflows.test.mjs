@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assignmentTechnicians, calendarDays, canDispatch, confirmedDispatch, confirmedReview, confirmedSchedule, createJobActionSaver, jobDepartment, jobItems, moveCalendar, safeEvidenceUrl, scheduledDay, technicianLocationUrl, visibleJobs } from '../src/operationsWorkflowData.ts';
+import { assignmentTechnicians, calendarDays, canDispatch, confirmedDispatch, confirmedQueueRelease, confirmedReview, confirmedSchedule, createJobActionSaver, jobDepartment, jobItems, moveCalendar, safeEvidenceUrl, scheduledDay, technicianLocationUrl, visibleJobs } from '../src/operationsWorkflowData.ts';
 
 const id='6f1c0dc0-e52b-4fd8-b6b1-692715089ae4';
 const visit='9d2aa1ca-097e-46ec-89c0-c860ab3d90a2';
@@ -132,4 +132,30 @@ test('concurrent user actions cannot submit duplicate writes',async()=>{
   release();
   assert.equal((await first).status,'confirmed');
   assert.equal(writes,1);
+});
+
+test('IT queue schedule and release readback do not masquerade as named assignment',()=>{
+  const queued=job({department:'it',technician:'Unassigned',assignmentMode:'it_queue',queueStatus:'scheduled'});
+  const expected={id,visitId:visit,assignmentMode:'it_queue',start:queued.scheduled,end:queued.scheduledEnd};
+  assert.equal(confirmedSchedule([queued],expected),true);
+  assert.equal(confirmedSchedule([job()],expected),false);
+  assert.equal(confirmedSchedule([{...queued,technician:'Existing IT'}],expected),false);
+  assert.equal(canDispatch(queued),true);
+  assert.equal(canDispatch({...queued,equipmentUnitTag:null}),true);
+  assert.equal(canDispatch({...queued,queueStatus:'ready',equipmentUnitTag:null}),false);
+  assert.equal(canDispatch({...queued,queueStatus:'claimed',equipmentUnitTag:null}),false);
+  assert.equal(canDispatch({...queued,queueStatus:'claimed'}),true);
+  assert.equal(canDispatch(job({equipmentUnitTag:null})),false);
+  assert.equal(confirmedQueueRelease([{...queued,queueStatus:'ready',equipmentUnitTag:null}],id,visit),true);
+  assert.equal(confirmedQueueRelease([queued],id,visit),false);
+  assert.equal(confirmedDispatch([{...queued,queueStatus:'claimed'}],id,'',visit,'it_queue'),false);
+  assert.equal(canDispatch({...queued,scheduledEnd:null}),false);
+  assert.equal(confirmedDispatch([{...queued,status:'Dispatched',queueStatus:'ready',claimOwnerId:'it-owner',technicianUserId:'it-owner',technician:'Fixture IT'}],id,'Fixture IT',visit,'it_queue'),false);
+  const dispatched={...queued,status:'Dispatched',queueStatus:'claimed',claimOwnerId:'it-owner',technicianUserId:'it-owner',technician:'Fixture IT'};
+  assert.equal(confirmedDispatch([dispatched],id,'Fixture IT',visit,'it_queue'),true);
+  assert.equal(confirmedDispatch([{...dispatched,technicianUserId:'other-it'}],id,'Fixture IT',visit,'it_queue'),false);
+  assert.equal(confirmedDispatch([{...dispatched,claimOwnerId:null}],id,'Fixture IT',visit,'it_queue'),false);
+  assert.equal(confirmedDispatch([dispatched],id,'Other IT',visit,'it_queue'),false);
+  assert.equal(confirmedDispatch([{...queued,status:'Dispatched',queueStatus:'scheduled'}],id,'',visit,'it_queue'),false);
+  assert.equal(confirmedDispatch([job({status:'Dispatched'})],id,'Actual Service Technician',visit,'it_queue'),false);
 });

@@ -37,8 +37,17 @@ export function assignmentTechnicians(team: OperationsRecord[], department: stri
     .map(person => ({ ...person, userId: typeof person.userId === 'string' && person.userId.trim() ? person.userId : undefined, name: String(person.displayName || person.name).trim() }))
     .sort((a,b) => a.name.localeCompare(b.name));
 }
+export function isItQueue(job: OperationsRecord): boolean {
+  return job.assignmentMode === 'it_queue' && jobDepartment(job) === 'it';
+}
 export function canDispatch(job: OperationsRecord): boolean {
-  return ['scheduled', 'assigned'].includes(statusKey(job.status)) && typeof job.equipmentUnitTag === 'string' && Boolean(job.equipmentUnitTag.trim());
+  if (!['scheduled', 'assigned'].includes(statusKey(job.status))) return false;
+  if (isItQueue(job)) {
+    if (!job.scheduled || !job.scheduledEnd) return false;
+    if (job.queueStatus === 'scheduled') return true;
+    if (job.queueStatus !== 'claimed') return false;
+  }
+  return typeof job.equipmentUnitTag === 'string' && Boolean(job.equipmentUnitTag.trim());
 }
 export function safeEvidenceUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -120,16 +129,21 @@ export function matchingJob(rows: OperationsRecord[], id: string) {
   const matches = rows.filter(row => row.id === id && row.completionKind !== 'visit');
   return matches.length === 1 ? matches[0] : null;
 }
-export function confirmedSchedule(rows: OperationsRecord[], expected: { id: string; visitId?: string; technician: string; start: string; end: string }) {
+export function confirmedSchedule(rows: OperationsRecord[], expected: { id: string; visitId?: string; technician?: string; assignmentMode?: 'it_queue' | 'technician'; start: string; end: string }) {
   const job = matchingJob(rows, expected.id);
   const local = (value: unknown) => typeof value === 'string' ? value.trim().replace('T', ' ') : '';
   return Boolean(job && ['scheduled', 'assigned', 'dispatched', 'accepted', 'en route', 'on site', 'in progress', 'working'].includes(statusKey(job.status)) &&
-    String(job.technician || '').trim() === expected.technician.trim() &&
+    (expected.assignmentMode === 'it_queue' ? isItQueue(job) && job.queueStatus === 'scheduled' && !job.technicianUserId && !job.technicianId && ['', 'unassigned', 'it shared queue', 'it queue'].includes(statusKey(job.technician)) : !isItQueue(job) && String(job.technician || '').trim() === (expected.technician || '').trim()) &&
     (!expected.visitId || job.visitId === expected.visitId) && local(job.scheduled) === expected.start && local(job.scheduledEnd) === expected.end);
 }
-export function confirmedDispatch(rows: OperationsRecord[], id: string, technician: string, visitId?: string) {
+export function confirmedDispatch(rows: OperationsRecord[], id: string, technician: string, visitId?: string, assignmentMode?: 'it_queue' | 'technician') {
   const job = matchingJob(rows, id);
-  return Boolean(job && ['dispatched', 'accepted', 'en route', 'on site', 'in progress', 'working'].includes(statusKey(job.status)) && String(job.technician || '').trim() === technician.trim() && (!visitId || job.visitId === visitId));
+  return Boolean(job && ['dispatched', 'accepted', 'en route', 'on site', 'in progress', 'working'].includes(statusKey(job.status)) && (assignmentMode === 'it_queue' ? isItQueue(job) && job.queueStatus === 'claimed' && typeof job.claimOwnerId === 'string' && Boolean(job.claimOwnerId) && job.claimOwnerId === job.technicianUserId && Boolean(technician.trim()) && String(job.technician || '').trim() === technician.trim() : !isItQueue(job) && String(job.technician || '').trim() === technician.trim()) && (!visitId || job.visitId === visitId));
+}
+export function confirmedQueueRelease(rows: OperationsRecord[], id: string, visitId?: string) {
+  const job = matchingJob(rows, id);
+  return Boolean(job && isItQueue(job) && ['ready','claimed'].includes(job.queueStatus) &&
+    ['scheduled','assigned','dispatched','accepted','en route','on site','in progress','working'].includes(statusKey(job.status)) && (!visitId || job.visitId === visitId));
 }
 export function confirmedReview(rows: OperationsRecord[], id: string, action: 'approve' | 'return') {
   const job = matchingJob(rows, id);
