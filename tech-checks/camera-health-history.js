@@ -48,6 +48,25 @@
     return { state: result.online ? 'responding' : 'failed',
       label: result.online ? 'Responding' : 'No response', at: checked.at, latencyMs };
   }
+  // Saved destinations remain available regardless of diagnostic state. A port
+  // number is not proof of HTTP: Unity client/service ports stay plain endpoints.
+  function connections(device = {}, health = {}, address) {
+    const ip = String(address || '').trim().replace(/\/32$/, '');
+    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(part => Number(part) > 255 || part.length > 1 && part.startsWith('0'))) return [];
+    const validPort = value => /^(?:[1-9]\d{0,4})$/.test(String(value)) && Number(value) <= 65535;
+    const expected = Array.isArray(device.expected_ports) ? device.expected_ports : [];
+    const observed = health.port_status && typeof health.port_status === 'object' && !Array.isArray(health.port_status) ? Object.keys(health.port_status) : [];
+    const ports = [...new Set([...expected, ...observed].filter(validPort).map(Number))].sort((a, b) => a - b);
+    const labels = device.port_labels && typeof device.port_labels === 'object' ? device.port_labels : {};
+    const result = [{address: ip, url: 'http://' + ip, label: 'Open public IP', port: null}];
+    for (const value of ports) {
+      const endpoint = ip + ':' + value;
+      const protocol = value === 80 ? 'http' : value === 443 || value === 8443 ? 'https' : null;
+      const label = typeof labels[value] === 'string' && labels[value].trim() ? labels[value] : 'Port ' + value;
+      result.push({address: endpoint, url: protocol ? protocol + '://' + ip + (value === 80 || value === 443 ? '' : ':' + value) : null, label, port: value});
+    }
+    return result;
+  }
   function record(device = {}, health = {}, group, now = Date.now()) {
     const provider = group === 'Vigilant' || group === 'Reconeyez';
     const source = group === 'Vigilant' ? 'Star4Live provider' : group === 'Reconeyez' ? 'Reconeyez cloud' : 'Direct service-port check';
@@ -85,5 +104,5 @@
     };
     return '<div class="unit-time-strip" aria-label="Connection check history">' + cell(attemptRow, 'attempt') + cell(successRow, 'success') + '</div>';
   }
-  root.CameraHealthHistory = { timestamp, format, port, record, strip };
+  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip };
 })(globalThis);

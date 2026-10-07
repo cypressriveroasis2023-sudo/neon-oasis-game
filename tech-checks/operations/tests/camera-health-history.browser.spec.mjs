@@ -13,6 +13,8 @@ const listRender=section(list,'function renderUnits()','\nfunction ');
 const detailRender=section(detail,'function render(){','  const liveNow=')+'}';
 const portRender=section(detail,"  $('ports').innerHTML=",'\n');
 const portSetup=section(detail,'  const ps=current?.port_status||{},expected=','\n');
+const connectionFunction=section(detail,'function interfaceLinks()','\n');
+const connectionRender=section(detail,'  const actionLinks=',"\n  $('history')");
 const detailEffective=section(detail,'function effectiveHealth(d,h)','\n\nfunction sourceStatusText');
 const sourceFresh=section(detail,'function sourceFresh(d','\nfunction checkFresh');
 const freshCheck=section(detail,'function checkFresh(h','\nfunction hasDirectLiveProof');
@@ -41,9 +43,12 @@ const detailScript=`${shared}
  let device=fixture.device,current=fixture.current;const issueReason=()=>'',sourceStatusText=()=> 'Vigilant: '+String(device.source_status).toUpperCase(),sourceDetailText=()=> 'Provider observation; direct diagnostic is separate';
  ${detailRender}
  ${freshCheck}
+ const effectivePublicIP=()=>fixture.device.public_ip;
+ ${connectionFunction}
+ function renderConnections(){const isRecon=false;${connectionRender}}
  function renderPorts(){${portSetup}
 ${portRender}}
- window.repaint=()=>{device=fixture.device;current=fixture.current;render();renderPorts();};$('loading').classList.add('hidden');$('content').classList.remove('hidden');repaint();
+ window.repaint=()=>{device=fixture.device;current=fixture.current;render();renderPorts();renderConnections();};$('loading').classList.add('hidden');$('content').classList.remove('hidden');repaint();
 `;
 async function mount(page,name){
  await page.emulateMedia({colorScheme:'dark'});
@@ -117,4 +122,21 @@ test('actual direct-port detail distinguishes unchecked, failed and stale eviden
  await page.evaluate(()=>{fixture.current.port_status={};fixture.current.checked_at='2026-10-06T12:29:10Z';repaint();});
  for(const p of [80,443,8443,38880,38881])await expect(row(p)).toContainText('Not checked');
  expect(errors).toEqual([]);
+});
+
+
+test('saved IP and Unity endpoints remain visible through failed, stale and missing observations',async({page})=>{
+ await mount(page,'camera-detail');
+ await page.evaluate(()=>{fixture.device={...fixture.device,public_ip:'192.0.2.20',expected_ports:[80,443,8443,38880,38881],port_labels:{38880:'Unity client',38881:'Unity service'}};fixture.current={checked_at:'2026-10-06T12:29:10Z',port_status:{443:{online:false}}};repaint();});
+ const actions=page.locator('#interfaceActions');
+ for(const stage of ['failed','stale','missing']){
+  if(stage==='stale')await page.evaluate(()=>{fixture.current.checked_at='2020-01-01T00:00:00Z';repaint();});
+  if(stage==='missing')await page.evaluate(()=>{fixture.current={};repaint();});
+  await expect(actions.locator('a[href="https://192.0.2.20"]')).toBeVisible();
+  await expect(actions.locator('a[href="https://192.0.2.20:8443"]')).toBeVisible();
+  await expect(actions).toContainText('Unity client · 192.0.2.20:38880');await expect(actions).toContainText('Unity service · 192.0.2.20:38881');
+  await expect(actions.locator('a[href*="38880"],a[href*="38881"]')).toHaveCount(0);
+  await expect(page.locator('#connectionNote')).toContainText('Links do not verify video');
+ }
+ await page.evaluate(()=>{fixture.device.public_ip=null;repaint();});await expect(actions.locator('a')).toHaveCount(0);await expect(page.locator('#connectionNote')).toContainText('No saved public IP');
 });

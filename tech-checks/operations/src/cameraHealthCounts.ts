@@ -1,4 +1,4 @@
-import { cameraTimestamp,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
+import { cameraTimestamp,unitEvidenceLabel,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
 import {validateCameraHealth,type Health} from './fieldCameraHealth';
 export {resourceKind};export type {ResourceKind};
 export type CameraUnitGroup=UnitEvidence&{key:string;name:string;site:string;rows:CameraRow[];online:number;offline:number;unknown:number;lastObservedAt:string|null;linkedIdentity:boolean};
@@ -24,3 +24,23 @@ export function cameraOverview(health:Health,now=Date.now()){
   return {groups,summary,coverage,scopes,kinds,cameras,records:records.size,duplicates,unlinked:groups.filter(g=>!g.linkedIdentity).length,scopeVerified};
 }
 export function resourceBreakdown(rows:CameraRow[]){const counts:Partial<Record<ResourceKind,number>>={};for(const row of rows){const kind=resourceKind(row);counts[kind]=(counts[kind]||0)+1;}return Object.entries(counts).map(([kind,count])=>count+' '+(count===1?({cameras:'camera record',detectors:'detector',recorders:'recorder',unitInventory:'unit inventory record',other:'other resource'} as Record<string,string>)[kind]:({cameras:'camera records',detectors:'detectors',recorders:'recorders',unitInventory:'unit inventory records',other:'other resources'} as Record<string,string>)[kind])).join(' · ');}
+
+/** Presentation filter only; never establishes a cross-system asset association. */
+export function cameraFamily(rows:CameraRow[],family:string) {
+  if(family==='all')return true;
+  return rows.some(row=>[row.unit,row.type].some(value=>family==='sniper'?/\bSNIPER\b/i.test(value||''):/\bCAM[\s-]*V\b/i.test(value||'')));
+}
+/** Source-device IDs are the existing authenticated diagnostics identity. */
+export function cameraResourcePath(row:CameraRow) {
+  return !row.trackerOnly&&/^[1-9]\d*$/.test(String(row.id))&&Number.isSafeInteger(Number(row.id))?'../../camera-detail.html?id='+encodeURIComponent(row.id):null;
+}
+
+export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[]}) {
+  const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));
+  return direct&&['field','unknown'].includes(group.scope)&&group.providerState==='verifying'?group.serviceState:group.state;
+}
+export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[]}) {
+  const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));
+  if(direct&&['field','unknown'].includes(group.scope)&&group.providerState==='verifying')return 'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED',verifying:'UNVERIFIED'}[group.serviceState]);
+  return unitEvidenceLabel(group);
+}
