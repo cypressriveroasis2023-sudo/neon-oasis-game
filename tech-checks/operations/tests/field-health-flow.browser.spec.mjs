@@ -3,7 +3,7 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin='http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,unclassifiedCase=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
@@ -11,6 +11,11 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
  if(ambiguous)state.units[1].unitNumber='SOLAR SPOTTER 051';
  let rows=state.units.map((u,i)=>resource(i+1,'SOLARSPOTTER '+(51+i),{name:'Fixture camera '+(i+1),status:i===1?'offline':'online',checkedAt:fresh,...(!oldApi?{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:i===1?'offline':'online',observedAt:i===2?'2026-10-06T16:00:00Z':fresh,lastOnlineAt:fresh}}:{evidence:undefined})}));
  if(evidenceCase)rows=[resource(1,'SOLARSPOTTER 51',{name:'Fixture recorder',type:'NVR'}),resource(2,'SOLARSPOTTER 52',{name:'Fixture service unit',type:'Sniper',serviceEvidence:port()}),resource(3,'SOLARSPOTTER 53',{name:'Fixture Recon detector',type:'detector',evidence:{kind:'provider',source:'Reconeyez',resource:'detector',active:true,status:'offline',observedAt:'2026-10-06T16:00:00Z',lastOnlineAt:'2026-10-05T12:00:00Z'}})];
+ if(unclassifiedCase){
+  state.units=state.units.map((unit,i)=>({...unit,unitNumber:'Helios '+(8701+i),modelName:'Helios'}));
+  rows=state.units.map((unit,i)=>resource(901+i,unit.unitNumber,{name:'Synthetic resource '+(901+i),type:'Unknown',evidence:{kind:'unknown',source:i===1?'Unsupported source':'Star4Live',resource:'unknown',active:true,status:'offline',observedAt:fresh,lastOnlineAt:null}}));
+  rows[2]={...rows[2],evidence:port({status:'offline',reachable:false,confirmedOutage:true})};
+ }
  if(scopeCase)rows=rows.map((row,i)=>({...row,scope:['unknown','shop','inactive'][i],activationState:i===2?'deactivated':'active'}));
  const health={...snapshot(rows),...(oldApi?{evidenceVersion:1,inventory:undefined}:{})};
 
@@ -118,4 +123,43 @@ test('native location review stays visible while shop and inactive scopes reconc
  await frame.getByLabel('Camera Health unit filter').selectOption('shop');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('SHOP / ROOT');
  await frame.getByLabel('Camera Health unit filter').selectOption('inactive');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('INACTIVE');
  await frame.locator('.camera-record-breakdown summary').click();await expect(frame.locator('.camera-record-breakdown')).toContainText('0 confirmed-field records + 1 shop/root records + 1 inactive records + 1 location-review records');expect(state.writes).toHaveLength(0);
+});
+
+test('unclassified provider resource reports stay historical, neutral and separate from ports across navigation and aging',async({page},testInfo)=>{
+ const {frame,state}=await mount(page,{nativeOverview:true,unclassifiedCase:true});
+ await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','0','0','3']);
+ await expect(frame.locator('.camera-actual-count>b')).toHaveText('0');
+ const first=frame.locator('.camera-overview-card').filter({hasText:'Helios 8701'});
+ await first.click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
+ await expect(detail).toContainText('Star4Live resource last reported OFFLINE at');
+ await expect(detail).toContainText('5 min ago · within 15-minute presentation window');
+ await expect(detail).toContainText('Hardware type and camera/channel status remain unverified');
+ await expect(detail).toContainText('This saved report does not verify live video');
+ await expect(detail.locator('.camera-device-cards article>div>b')).toHaveText('PROVIDER NOT VERIFIED');
+ await expect(detail.locator('.camera-device-cards article>div>b')).not.toHaveCSS('color','rgb(53, 212, 138)');
+ await expect(detail.locator('.camera-device-cards article>div>b')).not.toHaveCSS('color','rgb(255, 115, 125)');
+ await expect(detail.locator('.camera-unit-evidence')).toContainText('SYSTEM STATUS UNVERIFIED');
+ await expect(detail.locator('.camera-unit-evidence')).toContainText('Camera channel status unavailable');
+ await page.clock.fastForward(16*60*1000);
+ await expect(detail).toContainText('Star4Live resource last reported OFFLINE at');
+ await expect(detail).toContainText('21 min ago · older observation; current status unverified');
+ await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','0','0','3']);
+ await page.screenshot({path:testInfo.outputPath('unclassified-provider-resource.png')});
+ await page.keyboard.press('Escape');await expect(detail).toHaveCount(0);await expect(first).toBeFocused();
+ await first.click();await expect(detail).toContainText('older observation; current status unverified');
+ await detail.getByRole('button',{name:'Back to units',exact:true}).click();
+ await frame.locator('.camera-overview-card').filter({hasText:'Helios 8702'}).click();
+ await expect(detail).not.toContainText('resource last reported');await expect(detail).toContainText('No verified provider camera/recorder observation');
+ await detail.getByRole('button',{name:'Back to units',exact:true}).click();
+ await frame.locator('.camera-overview-card').filter({hasText:'Helios 8703'}).click();
+ await expect(detail).not.toContainText('resource last reported');await expect(detail).toContainText('Last reported service result: OFFLINE');
+ await detail.getByRole('button',{name:'Back to units',exact:true}).click();
+ const child=page.frames().find(child=>child.parentFrame());await child.evaluate(()=>{location.hash='field-map';});
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
+ for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveCSS('background-color','rgb(148, 163, 184)');
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').first().click();
+ await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Helios 8701');
+ await expect(frame.locator('.camera-unit-state')).toHaveText('Camera status unverified');
+ await expect(frame.locator('.camera-device-cards')).toContainText('Star4Live resource last reported OFFLINE at');
+ expect(state.writes).toHaveLength(0);
 });

@@ -35,6 +35,11 @@ export function resourceKind(row:Pick<CameraRow,'type'|'trackerOnly'>):ResourceK
 }
 export const cameraRecord=(row:CameraRow)=>!row.trackerOnly&&['cameras','detectors'].includes(resourceKind(row));
 const providerSource=(value:unknown)=>['Star4Live','Reconeyez'].includes(String(value));
+/** Historical provider resource report only; never establishes hardware type or current camera state. */
+export function unclassifiedProviderReport(row:CameraRow):CameraEvidence|undefined {
+  const evidence=row.evidence;
+  return !row.trackerOnly&&evidence?.kind==='unknown'&&evidence.resource==='unknown'&&providerSource(evidence.source)?evidence:undefined;
+}
 export function providerRecord(row:CameraRow) {
   const kind=resourceKind(row),resource=kind==='cameras'?'camera':kind==='detectors'?'detector':kind==='recorders'?'recorder':null;
   return !row.trackerOnly&&resource!==null&&row.evidence?.kind==='provider'&&row.evidence.resource===resource&&providerSource(row.evidence.source);
