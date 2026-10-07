@@ -10,10 +10,16 @@ export type CameraEvidence = {
   status:'online'|'offline'|'degraded'|'unknown'; observedAt:string|null; lastOnlineAt:string|null;
   reachable?:boolean|null; confirmedOutage?:boolean; consecutiveFailures?:number|null;
 };
+export type ReconBatteryEvidence = {source:'Reconeyez';percent:number|null;percentObservedAt:string|null;status:'normal'|'low'|'critical'|null;statusObservedAt:string|null};
+/** Percent and warning observations keep their own source times. Refresh never renews them. */
+export function reconBatteryEvidence(percent:unknown,percentAt:unknown,status:unknown,statusAt:unknown):ReconBatteryEvidence {
+  const numeric=typeof percent==='number'?percent:typeof percent==='string'&&/^\d+(?:\.\d+)?$/.test(percent.trim())?Number(percent):NaN;
+  return {source:'Reconeyez',percent:Number.isFinite(numeric)&&numeric>=0&&numeric<=100?numeric:null,percentObservedAt:typeof percentAt==='string'?percentAt:null,status:typeof status==='string'&&['normal','low','critical'].includes(status)?status as 'normal'|'low'|'critical':null,statusObservedAt:typeof statusAt==='string'?statusAt:null};
+}
 export type CameraRow = {
   id:string|number; name:string; unit:string; type?:string; organization?:string; status:string;
   activationState?:string; scope?:PlacementScope; trackerOnly?:boolean;
-  checkedAt?:string|null; evidence?:CameraEvidence; serviceEvidence?:CameraEvidence;
+  checkedAt?:string|null; evidence?:CameraEvidence; serviceEvidence?:CameraEvidence; batteryEvidence?:ReconBatteryEvidence;
 };
 export type UnitEvidence = {
   scope:PlacementScope; state:EvidenceState|'service'|'mapping'|'shop'|'inactive';

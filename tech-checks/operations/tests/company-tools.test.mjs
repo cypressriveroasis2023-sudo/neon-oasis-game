@@ -6,20 +6,22 @@ import test from 'node:test';
 // Camera Health: reviewed offline/shop source-classification hotfix; exact area mapping and all writes preserved.
 // Camera pages: reviewed 2026-10-06 check-history and unit-overview changes, covered by source-aware and navigation tests.
 // Camera access: reviewed 2026-10-07 family service filters and saved endpoint presentation.
+// Recon battery: reviewed scalar-only readings, zero/null handling, source-time labels, and inventory-only sync copy.
+// Battery tests cover freshness without queries or resetting edits; no polling frequency changes.
 // Access regression tests cover links independent of observations; probes, settings and auth unchanged.
 // Vision includes the reviewed visible-composer repair (behavior covered by vision-composer.browser.spec.mjs).
 // Other tools retain origin/main 276c6d5e2c98c41a8ba71e78c560b04d6f9b998b hashes.
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "b70e76bb9a384548e3e8f55aafb31da59c7fc6a530196fb2bdfbe8840d1b29e4",
-  "camera-detail": "341298e15339553cd36d39d03f21799092a7c31868259e1b555d6ceb4f1784bd",
+  "camera-health": "093ebdf3ee43a7f1a50ad1f83a1bbb36c37db0b91171b5bfcdc1edb59894cdea",
+  "camera-detail": "9702417ac2bf22015eda0beb33b6f53cfbd2a011ea27833cec6ac818f7784449",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "cd40e6f03fe08bef188593ac6746026afe474d8fefe955cf905105f364ebf1c5",
-  "camera-detail": "791151c4aebf49ff4de622ce246be503329aa59c8a589ea3e2179da7a853b5ea",
+  "camera-health": "889c75f41a55ed9e67ae07196523bfae733462b3fa938ef51947d40201119948",
+  "camera-detail": "31bf7b6e189f68bea71a0522db99543cef1cafda2b07d49786af55b71908360c",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };

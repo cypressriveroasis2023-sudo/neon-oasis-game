@@ -180,6 +180,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 </div>
 
 <script src="./camera-health-history.js?v=20261007-access"></script>
+<script src="./recon-battery.js?v=20261007-battery"></script>
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -195,8 +196,8 @@ function routerFreshStatus(r){const when=r?.last_checked_at||r?.status_observed_
 function routerSummaryHTML(){if(!unitRouters.length)return '<div class="small">No router is linked to this unit yet. Camera Health can show InHand, MOFI, or any other router once it is mapped to '+esc(device?.unit_key||'this unit')+'.</div>';return unitRouters.map(r=>{const st=routerFreshStatus(r),ip=cleanIP(r.router_public_ip||r.unit_ip),name=r.router_name||'Router',model=r.router_model||name,when=r.last_checked_at||r.status_observed_at;return '<div class="routeritem"><div class="routertop"><b>'+esc(model)+'</b><span class="routerstatus '+(st==='online'?'green':st==='offline'?'red':'yellow')+'">'+esc(st.toUpperCase())+'</span></div><div class="small">'+esc(name)+(ip?' · '+esc(ip):'')+(r.reported_status?' · Reported '+esc(String(r.reported_status).toUpperCase()):'')+(when?' · Checked '+esc(fmt(when)):'')+(st==='stale'?' · RESULT EXPIRED':'')+'</div></div>'}).join('')}
 async function edgeErrorMessage(error){try{const ctx=error?.context;if(ctx&&typeof ctx.clone==='function'){const body=await ctx.clone().json().catch(()=>null);if(body?.error)return String(body.error);if(body?.message)return String(body.message)}}catch{}return String(error?.message||error||'Verification failed')}
 function reconMetadata(d=device){return d?.source_metadata&&typeof d.source_metadata==='object'?d.source_metadata:{}}
-function reconCloudUrl(d=device){const m=reconMetadata(d),u=String(m.cloud_url||m.event_url||'').trim();return /^https:\/\//i.test(u)?u:'https://na.reconeyez.com'}
-function reconBatteryText(d=device){const m=reconMetadata(d),pct=Number(m.battery_percent),status=String(m.battery_status||'').toLowerCase();if(Number.isFinite(pct)&&pct>=0&&pct<=100)return Math.round(pct)+'%'+(status?' · '+status.toUpperCase():'');if(status)return status.toUpperCase();return 'Waiting for Reconeyez status'}
+function reconCloudUrl(d=device){return ReconBattery.cloudUrl(reconMetadata(d))}
+function reconBatteryText(d=device){return ReconBattery.text(reconMetadata(d))}
 
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase(),model=String(d?.device_model||'').toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),source=String(d?.source||'').toLowerCase();if(source==='reconeyez'||prof==='reconeyez'||s.includes('reconeyez'))return'Reconeyez';if(model.startsWith('ALI-')||['helios','nvr','ranger','solar_spotter','spotter'].includes(prof)||s.includes('alibi'))return'Vigilant';if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
@@ -291,10 +292,10 @@ function render(){
     $('saveIpBtn').textContent=effectiveIp?'Update public IP':'Save public IP to this unit';
   }else ipSetup.classList.add('hidden');
 
-  const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
+  const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=cameraGroup(device)==='Reconeyez'?[]:[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
   $('ports').innerHTML=portKeys.map(p=>{const result=CameraHealthHistory.port(current,p),online=result.state==='responding',cls=online?'':result.state==='failed'?' off':' pending',suffix=online?' ✓'+(result.latencyMs!==null?' · '+result.latencyMs+'ms':''):' · '+result.label+(result.state==='unverified'&&result.at?' · previous result; not current':'');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
-  $('portEmpty').textContent=portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
-  $('portEmpty').classList.toggle('hidden',portKeys.length>0);
+  $('portEmpty').textContent=isRecon?'Cloud-managed detector. This integration does not provide direct camera IP / ports. Status and battery come from Reconeyez events.':portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
+  $('portEmpty').classList.toggle('hidden',!isRecon&&portKeys.length>0);
   $('routerInfo').innerHTML=routerSummaryHTML();
   const routerSetup=$('routerSetupWrap');
   if(ownerCanEdit){
@@ -307,7 +308,7 @@ function render(){
   }else routerSetup.classList.add('hidden');
   const actionLinks=isRecon?[{url:reconCloudUrl(device),label:reconMetadata(device).cloud_url?'Open Reconeyez event':'Open Reconeyez Cloud'}]:interfaceLinks();
   $('interfaceActions').innerHTML=actionLinks.map(({url,label,address})=>url?'<a class="linkbtn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+(address?' · '+esc(address):'')+' ↗</a>':'<span class="linkbtn">'+esc(label)+' · '+esc(address)+' (client/service endpoint)</span>').join('');
-  $('connectionNote').textContent=isRecon?'':actionLinks.length?'Saved IP and configured / previously checked ports stay available even when a health result is missing or failed. Use client/service endpoints in the matching application, including Unity where configured. Links do not verify video.':'No saved public IP is available for this device or its linked router.';
+  $('connectionNote').textContent=isRecon?'Syncing inventory does not request a new status or battery reading. Reconeyez events supply those observations. Open Reconeyez Cloud to access the provider account.':actionLinks.length?'Saved IP and configured / previously checked ports stay available even when a health result is missing or failed. Use client/service endpoints in the matching application, including Unity where configured. Links do not verify video.':'No saved public IP is available for this device or its linked router.';
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){
@@ -322,17 +323,17 @@ async function load(){
   ]);
   if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
   device=d;current=h||{};events=hist||[];unitRouters=rs||[];
-  $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Refresh Reconeyez':'Verify now';
+  $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
   $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();
 }
 async function verifyNow(){
   if(!device)return;const b=$('verifyBtn');b.disabled=true;
   try{
     if(cameraGroup(device)==='Reconeyez'){
-      b.textContent='Refreshing Reconeyez…';
+      b.textContent='Syncing Recon inventory…';
       const {data,error}=await db.functions.invoke('reconeyez-connect',{body:{action:'sync'}});
       if(error)throw new Error(await edgeErrorMessage(error));if(data?.error)throw new Error(data.error);
-      await load();b.textContent='Reconeyez refreshed';return;
+      await load();b.textContent='Inventory synced';return;
     }
     if(device.monitoring_enabled===false)throw new Error('Monitoring is disabled for this camera/device.');
     if(cameraGroup(device)!=='Vigilant'&&!effectivePublicIP())throw new Error('No public IP is configured for this device or its linked router.');
@@ -362,7 +363,7 @@ async function verifyNow(){
       $('issueNotice').className='notice yellow';$('issueNotice').classList.remove('hidden');
     }
     b.textContent='Verification incomplete';
-  }finally{setTimeout(()=>{b.disabled=false;b.textContent=cameraGroup(device)==='Reconeyez'?'Refresh Reconeyez':'Verify now'},2200)}
+  }finally{setTimeout(()=>{b.disabled=false;b.textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now'},2200)}
 }
 async function saveUnitRouter(){
   if(!device||String(profile?.role||'')!=='owner'||!device.unit_key)return;
@@ -435,6 +436,10 @@ async function boot(){
     await load();
   }catch(e){$('loading').classList.add('hidden');$('error').textContent=e?.message||String(e);$('error').classList.remove('hidden')}
 }
+// Age the displayed battery observation without refreshing inventory or resetting edit fields.
+function refreshReconBatteryPresentation(){if(device&&cameraGroup(device)==='Reconeyez'&&!document.hidden)$('batteryHealth').textContent=reconBatteryText(device)}
+window.setInterval(refreshReconBatteryPresentation,60000);
+document.addEventListener('visibilitychange',refreshReconBatteryPresentation);
 $('backBtn').onclick=()=>{try{sessionStorage.setItem('cameraHealthReturnRequested','1')}catch{}location.href='./camera-health.html'};
 $('verifyBtn').onclick=verifyNow;
 $('saveSiteBtn').onclick=saveUnitSite;

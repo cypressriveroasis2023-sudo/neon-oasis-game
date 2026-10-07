@@ -3,7 +3,7 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin='http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
@@ -11,7 +11,8 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
  if(ambiguous)state.units[1].unitNumber='SOLAR SPOTTER 051';
  let rows=state.units.map((u,i)=>resource(i+1,'SOLARSPOTTER '+(51+i),{name:'Fixture camera '+(i+1),status:i===1?'offline':'online',checkedAt:fresh,...(!oldApi?{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:i===1?'offline':'online',observedAt:i===2?'2026-10-06T16:00:00Z':fresh,lastOnlineAt:fresh}}:{evidence:undefined})}));
  if(evidenceCase)rows=[resource(1,'SOLARSPOTTER 51',{name:'Fixture recorder',type:'NVR'}),resource(2,'SOLARSPOTTER 52',{name:'Fixture service unit',type:'Sniper',serviceEvidence:port()}),resource(3,'SOLARSPOTTER 53',{name:'Fixture Recon detector',type:'detector',evidence:{kind:'provider',source:'Reconeyez',resource:'detector',active:true,status:'offline',observedAt:'2026-10-06T16:00:00Z',lastOnlineAt:'2026-10-05T12:00:00Z'}})];
- if(accessCase)rows=[resource(101,'SNIPER 2 005',{type:'Sniper 2',evidence:undefined,serviceEvidence:port()}),resource(102,'CAM V 002',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})}),resource(103,'CAM V 003',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'unknown',reachable:null})})];
+ if(accessCase){state.units=state.units.map((unit,i)=>({...unit,unitNumber:['SNIPER 2 005','CAM V 002','CAM V 003'][i],modelName:i?'CAM V & RSU':'SNIPERS'}));rows=[resource(101,'SNIPER 2 005',{type:'Sniper 2',evidence:undefined,serviceEvidence:port()}),resource(102,'CAM V 002',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})}),resource(103,'CAM V 003',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'unknown',reachable:null})})];}
+ if(trackerCase){state.units=[{...state.units[0],unitNumber:'Sniper 2 344',modelName:'SNIPERS',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false},{...state.units[1],unitNumber:'CAMV 010',modelName:'CAM V & RSU',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false},{...state.units[2],unitNumber:'Sniper 334',modelName:'SNIPERS',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false}];rows=[resource(101,'Sniper 2 344',{type:'Sniper 2',evidence:undefined,scope:'unknown',serviceEvidence:port()}),resource(102,'CAMV 010',{type:'CAMV',evidence:undefined,scope:'unknown',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})})];}
  if(scopeCase)rows=rows.map((row,i)=>({...row,scope:['unknown','shop','inactive'][i],activationState:i===2?'deactivated':'active'}));
  const health={...snapshot(rows),...(oldApi?{evidenceVersion:1,inventory:undefined}:{})};
 
@@ -27,7 +28,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   const request=route.request().postDataJSON();state.requests.push(request);if(request.method!=='GET'){state.writes.push(request);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic writes disabled'})});}
   if(request.path==='/api/camera-health/summary-v2'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic provider unavailable'})});
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{mhelpTicketImport:true,fieldLocationVerification:true}}
-    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:3,mappedUnits:3,unitGps:3,missingGps:0},generatedAt:now}
+    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:3,mappedUnits:trackerCase?0:3,unitGps:trackerCase?0:3,missingGps:trackerCase?3:0},generatedAt:now}
     :request.path==='/api/camera-health/summary-v2'?health
     :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
     :request.path==='/api/equipment'?{items:state.units,models:[]}
@@ -134,4 +135,15 @@ test('Sniper and CAM V family navigation restores service views and exact saved-
  await frame.locator('.camera-overview-card').click();await expect(dialog.getByRole('link',{name:'Open saved IP / ports'})).toHaveAttribute('href','../../camera-detail.html?id=102');await dialog.getByRole('button',{name:'Back to units'}).click();
  await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.getByLabel('Search Camera Health units').fill('003');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Service status unverified');await frame.locator('.camera-overview-card').click();await expect(dialog.getByRole('link',{name:'Open saved IP / ports'})).toHaveAttribute('href','../../camera-detail.html?id=103');
  expect(state.writes).toHaveLength(0);
+});
+
+
+test('imported tracker families stay visible and colored without inventing map coordinates',async({page})=>{
+ const {frame,state}=await mount(page,{trackerCase:true});
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
+ await expect(frame.locator('.field-map-list>button').filter({hasText:'Sniper 2 344'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-map-list>button').filter({hasText:'CAMV 010'})).toContainText('IP / PORT OFFLINE');
+ await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.getByLabel('Field health filter').selectOption('all');
+ const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>location.hash='camera-health');await expect(frame.locator('.camera-overview-card')).toHaveCount(3);
+ await frame.getByLabel('Camera Health equipment family').selectOption('sniper');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await frame.locator('.camera-overview-card').filter({hasText:'Sniper 334'}).click();
+ const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('IP / PORT UNVERIFIED');await expect(detail.getByRole('link',{name:'Find unit in Camera Health diagnostics'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20334');expect(state.writes).toHaveLength(0);
 });

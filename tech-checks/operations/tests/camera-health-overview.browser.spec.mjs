@@ -70,7 +70,7 @@ test('current evidence expires in both overview and open details without fresh r
 });
 test('duplicate source refresh clears totals and cannot be revived by freshness timer',async({page})=>{
  await mount(page);await page.evaluate(async()=>{window.fixtureDevices.push(window.fixtureDevices[0]);await load()});
- await expect(page.locator('#allOffline')).toHaveText('—');await expect(page.locator('#empty')).toContainText('duplicate identities');
+ await expect(page.locator('#allOffline')).toHaveText('—');await expect(page.locator('#empty')).toContainText('duplicate identities');await expect(page.locator('.provider-breakdown b')).toHaveText(Array(8).fill('—'));
  await page.evaluate(()=>window.freshnessCheck());await expect(page.locator('#allOffline')).toHaveText('—');await expect(page.locator('#unitCards')).not.toBeVisible();
 });
 
@@ -104,4 +104,15 @@ test('legacy Sniper and CAM V cards preserve online offline unknown service stat
  await page.getByLabel('Filter units').selectOption('CAM V');await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="CAM V 003"] .statuspill')).toHaveText('IP / PORT UNVERIFIED');
  await page.getByLabel('Filter units').selectOption('Avigilon');await expect(page.locator('.compact-unit')).toHaveCount(3);
  await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck();});await expect(page.locator('.compact-unit .statuspill')).toHaveText(['IP / PORT UNVERIFIED','IP / PORT UNVERIFIED','IP / PORT UNVERIFIED']);
+});
+
+test('fleet breakdown counts each unit once and exposes familiar provider groups',async({page})=>{
+ await mount(page);await page.evaluate(async()=>{
+  const base={activation_state:'active',organization:'Synthetic site',source:'vigilant_control_center',source_status:'online',source_last_seen_at:'2026-10-06T12:29:00Z'};
+  fixtureDevices=[{...base,id:91,unit_key:'RANGER 091',device_type:'NVR',monitoring_profile:'ranger'},{...base,id:92,unit_key:'SNIPER 092',device_type:'Sniper',source:'2026_unit_tracker',source_status:null,monitoring_profile:'sniper'},{...base,id:93,unit_key:'CAMV 093',device_type:'CAMV',source:'2026_unit_tracker',source_status:null,monitoring_profile:'sniper'},{...base,id:94,unit_key:'RII-094',device_type:'detector',source:'reconeyez',source_status:'offline',monitoring_profile:'reconeyez'}];
+  fixtureHealth=[{camera_device_id:91,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:92,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'},{camera_device_id:93,overall_status:'offline',ip_reachable:false,confirmed_outage:true,consecutive_failures:3,checked_at:'2026-10-06T12:29:00Z'}];await load();
+ });
+ await expect(page.locator('#fleetConnectedOnline')).toHaveText('2');await expect(page.locator('#fleetConnectedOffline')).toHaveText('2');await expect(page.locator('#vigilantOnline')).toHaveText('1');await expect(page.locator('#avigilonOnline')).toHaveText('1');await expect(page.locator('#avigilonOffline')).toHaveText('1');await expect(page.locator('#reconOffline')).toHaveText('1');
+ await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
+ await page.locator('[data-scope-filter="FleetOffline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);
 });

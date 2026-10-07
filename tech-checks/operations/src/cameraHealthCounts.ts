@@ -1,5 +1,5 @@
 import { cameraTimestamp,unitEvidenceLabel,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
-import {validateCameraHealth,type Health} from './fieldCameraHealth';
+import {validateCameraHealth,canonicalCameraUnit,type FieldHealthUnit,type Health} from './fieldCameraHealth';
 export {resourceKind};export type {ResourceKind};
 export type CameraUnitGroup=UnitEvidence&{key:string;name:string;site:string;rows:CameraRow[];online:number;offline:number;unknown:number;lastObservedAt:string|null;linkedIdentity:boolean};
 export function cameraOverview(health:Health,now=Date.now()){
@@ -28,6 +28,7 @@ export function resourceBreakdown(rows:CameraRow[]){const counts:Partial<Record<
 /** Presentation filter only; never establishes a cross-system asset association. */
 export function cameraFamily(rows:CameraRow[],family:string) {
   if(family==='all')return true;
+  if(family==='recon')return rows.some(row=>row.evidence?.source==='Reconeyez'||['RECON','RECON2'].includes(canonicalCameraUnit(row.unit||'')?.split('|')[0]||''));
   return rows.some(row=>[row.unit,row.type].some(value=>family==='sniper'?/\bSNIPER\b/i.test(value||''):/\bCAM[\s-]*V\b/i.test(value||'')));
 }
 /** Source-device IDs are the existing authenticated diagnostics identity. */
@@ -43,4 +44,21 @@ export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[]}) {
   const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));
   if(direct&&['field','unknown'].includes(group.scope)&&group.providerState==='verifying')return 'IP / PORT '+({online:'ONLINE',offline:'OFFLINE',degraded:'MIXED',verifying:'UNVERIFIED'}[group.serviceState]);
   return unitEvidenceLabel(group);
+}
+
+/** Existing field inventory remains visible when the camera feed has no matching resource. */
+export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[]){
+  if(health.evidenceVersion!==2||!health.inventory)return health;
+  const represented=new Set(health.rows.map(row=>canonicalCameraUnit(row.unit)).filter(Boolean));
+  const additions:CameraRow[]=[];
+  for(const unit of units){
+    const key=canonicalCameraUnit(unit.unitNumber);
+    if(!key||represented.has(key)||units.filter(peer=>canonicalCameraUnit(peer.unitNumber)===key).length!==1)continue;
+    represented.add(key);
+    additions.push({id:'field:'+unit.id,name:unit.unitNumber,unit:unit.unitNumber,type:'tracker_unit',organization:[unit.customer,unit.site,unit.address].filter(Boolean).join(' · '),status:'review',activationState:'',scope:'unknown',trackerOnly:true});
+  }
+  if(!additions.length)return health;
+  return {...health,rows:[...health.rows,...additions],totalDevices:health.totalDevices+additions.length,
+    inventory:{...health.inventory,allRecords:health.inventory.allRecords+additions.length,unknownScopeRecords:(health.inventory.unknownScopeRecords||0)+additions.length},
+    coverageNote:[health.coverageNote,additions.length+' existing field inventory units have no matched camera resource. Their connection status is unknown; no check or location is invented.'].filter(Boolean).join(' ')};
 }
