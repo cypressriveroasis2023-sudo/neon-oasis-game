@@ -1,12 +1,13 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {savedConnectionObservation} from './savedConnectionObservation';
 import {cameraOverview,resourceBreakdown,cameraFamily,cameraResourcePath,cameraUnitStatusLabel,cameraUnitDisplayState,healthWithFieldInventory,type CameraUnitGroup} from './cameraHealthCounts';
 import {cameraColors,cameraTime,fieldCameraHealth,unitDiagnosticsPath,type Health,type FieldHealthUnit} from './fieldCameraHealth';
-import {providerState,serviceState,resourceKind,cameraEvidenceLabel,serviceEvidenceLabel,observationAge,type CameraRow,type UnitEvidence,type ReconBatteryEvidence} from './cameraEvidence';
+import {providerState,resourceKind,cameraEvidenceLabel,serviceEvidenceLabel,observationAge,type CameraRow,type UnitEvidence,type ReconBatteryEvidence} from './cameraEvidence';
 type Props={health:Health;now:number;units:FieldHealthUnit[]|null;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',id:string)=>void};
 const statusColor=(state:string)=>state==='online'?cameraColors.online:state==='offline'?cameraColors.offline:state==='degraded'||state==='service'?'#f1c36d':cameraColors.unknown;
 export function UnitEvidenceDetails({classification}:{classification:(UnitEvidence&{rows?:CameraRow[]})|null}){
   if(!classification)return null;
-  return <div className='camera-unit-evidence'><p className={'camera-status-pill camera-status-'+cameraUnitDisplayState(classification)} style={{color:statusColor(cameraUnitDisplayState(classification))}}>{cameraUnitStatusLabel(classification)}</p>{classification.scope==='unknown'&&<p className='placement-warning'>LOCATION REVIEW · Field or shop placement is not verified.</p>}<p>{cameraEvidenceLabel(classification.cameraState)}. Expected channel coverage is not established.</p><p>{serviceEvidenceLabel(classification.serviceState)}. Service ports do not verify camera video.</p>{classification.recorderOffline&&<p role='note'>Recorder OFFLINE observation. Review the recorder separately from camera channel evidence.</p>}</div>;
+  return <div className='camera-unit-evidence'><p className={'camera-status-pill camera-status-'+cameraUnitDisplayState(classification)} style={{color:statusColor(cameraUnitDisplayState(classification))}}>{cameraUnitStatusLabel(classification)}</p>{classification.scope==='unknown'&&<p className='placement-warning'>LOCATION REVIEW · Field or shop placement is not verified.</p>}<p>{cameraEvidenceLabel(classification.cameraState)}. Expected channel coverage is not established.</p><p>{['shop','inactive'].includes(classification.scope)?'Excluded from field operational totals. Saved connection observations remain available below.':serviceEvidenceLabel(classification.serviceState)+'. Service ports do not verify camera video.'}</p>{classification.recorderOffline&&<p role='note'>Recorder OFFLINE observation. Review the recorder separately from camera channel evidence.</p>}</div>;
 }
 export function ReconBatteryDetails({battery,now}:{battery?:ReconBatteryEvidence;now:number}){
   return <section className='recon-battery-evidence' aria-label='Recon battery health'><strong>Last reported battery</strong>
@@ -19,7 +20,7 @@ export function ReconBatteryDetails({battery,now}:{battery?:ReconBatteryEvidence
 }
 export function CameraResourceObservations({rows,now,trusted=true}:{rows:CameraRow[];now:number;trusted?:boolean}){
   return <div className='camera-device-cards'>{rows.map(row=>{
-    const evidence=row.evidence,service=row.serviceEvidence||(evidence?.kind==='service_port'?evidence:undefined),provider=trusted?providerState(row,now):'verifying',port=trusted?serviceState(row,now):'verifying';
+    const evidence=row.evidence,service=row.serviceEvidence||(evidence?.kind==='service_port'?evidence:undefined),provider=trusted?providerState(row,now):'verifying',port=trusted?savedConnectionObservation(row,now):'verifying';
     const resourcePath=cameraResourcePath(row),diagnosticsPath=unitDiagnosticsPath({id:String(row.id),unitNumber:row.unit});
     const kind=resourceKind(row),resource=kind==='recorders'?'RECORDER':kind==='detectors'?'DETECTOR':kind==='cameras'?'CAMERA':'PROVIDER';
     return <article key={row.id}><div><strong>{row.name}</strong><b style={{color:statusColor(provider)}}>{resource} {provider==='verifying'?'NOT VERIFIED':provider.toUpperCase()}</b></div><p>{[row.type,row.organization].filter(Boolean).join(' · ')||'Resource type not verified'}</p>

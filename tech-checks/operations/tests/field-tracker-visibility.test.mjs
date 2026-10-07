@@ -10,12 +10,12 @@ test('imported SNIPERS and CAM V & RSU families retain exact identity and direct
   const result=fieldCameraHealth(unit,[unit],snapshot([row]),now);assert.equal(result.identity,'matched');assert.equal(result.state,status);assert.equal(unitHealthLabel(result),'IP / PORT '+status.toUpperCase());assert.match(result.reason,/video is not verified/);assert.equal(unit.latitude,undefined);
  }
 });
-test('missing stale inactive or ambiguous evidence never creates a green or red connection result',()=>{
+test('missing stale or ambiguous evidence stays unknown; inactive placement retains a fresh observation warning',()=>{
  const unit={id:'fixture',unitNumber:'Sniper 2 344',modelName:'SNIPERS'};
  for(const evidence of [undefined,port({observedAt:'2020-01-01T00:00:00Z'}),port({status:'unknown',reachable:null}),port({observedAt:'2030-01-01T00:00:00Z'})]){
   const row=resource(1,unit.unitNumber,{type:'Sniper 2',evidence:undefined,serviceEvidence:evidence});assert.equal(fieldCameraHealth(unit,[unit],snapshot([row]),now).state,'unknown');
  }
- const row=resource(1,unit.unitNumber,{type:'Sniper 2',scope:'inactive',activationState:'deactivated',evidence:undefined,serviceEvidence:port()});assert.equal(fieldCameraHealth(unit,[unit],snapshot([row]),now).state,'unknown');
+ const row=resource(1,unit.unitNumber,{type:'Sniper 2',scope:'inactive',activationState:'deactivated',evidence:undefined,serviceEvidence:port()});const observation=fieldCameraHealth(unit,[unit],snapshot([row]),now);assert.equal(observation.state,'online');assert.match(observation.reason,/PLACEMENT CONFLICT/);assert.equal(cameraOverview(snapshot([row]),now).summary.monitored,0);
  assert.equal(fieldCameraHealth(unit,[unit,{...unit,id:'duplicate'}],snapshot([]),now).identity,'ambiguous');
 });
 test('36 existing field identities remain visible in overview without importing or fabricating health',()=>{
