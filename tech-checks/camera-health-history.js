@@ -23,6 +23,31 @@
       year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
     }).format(new Date(time.at));
   }
+  function port(health = {}, key, now = Date.now()) {
+    const results = health?.port_status;
+    const result = results && typeof results === 'object' && !Array.isArray(results)
+      && Object.prototype.hasOwnProperty.call(results, key) ? results[key] : null;
+    // A configured/displayed port is not an attempted check. Do not turn absent,
+    // malformed, or skipped evidence into a failed connection (or a success).
+    if (!result || typeof result !== 'object' || Array.isArray(result)
+      || !Object.prototype.hasOwnProperty.call(result, 'online')
+      || typeof result.online !== 'boolean' || result.attempted === false) {
+      return { state: 'unchecked', label: 'Not checked', at: null, latencyMs: null };
+    }
+    // Direct sweeps replace port_status and checked_at together. That timestamp
+    // applies only to explicit results present in the snapshot. A per-port time,
+    // when supplied, must be valid itself; an aggregate time cannot freshen it.
+    const checked = timestamp(Object.prototype.hasOwnProperty.call(result, 'checked_at')
+      ? result.checked_at : health.checked_at, now);
+    const providerOnly = /Star4Live live API|Control Center live API|^Reconeyez cloud event:/i.test(String(health.detail || ''));
+    if (checked.state !== 'fresh' || providerOnly) {
+      return { state: 'unverified', label: 'No recent result', at: checked.at, latencyMs: null };
+    }
+    const latencyMs = result.online && typeof result.latency_ms === 'number'
+      && Number.isFinite(result.latency_ms) && result.latency_ms >= 0 ? result.latency_ms : null;
+    return { state: result.online ? 'responding' : 'failed',
+      label: result.online ? 'Responding' : 'No response', at: checked.at, latencyMs };
+  }
   function record(device = {}, health = {}, group, now = Date.now()) {
     const provider = group === 'Vigilant' || group === 'Reconeyez';
     const source = group === 'Vigilant' ? 'Star4Live provider' : group === 'Reconeyez' ? 'Reconeyez cloud' : 'Direct service-port check';
@@ -60,5 +85,5 @@
     };
     return '<div class="unit-time-strip" aria-label="Connection check history">' + cell(attemptRow, 'attempt') + cell(successRow, 'success') + '</div>';
   }
-  root.CameraHealthHistory = { timestamp, format, record, strip };
+  root.CameraHealthHistory = { timestamp, format, port, record, strip };
 })(globalThis);

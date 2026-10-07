@@ -178,7 +178,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
   </main>
 </div>
 
-<script src="./camera-health-history.js?v=20261006"></script>
+<script src="./camera-health-history.js?v=20261007"></script>
 <script>
 const SUPABASE_URL='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -291,7 +291,7 @@ function render(){
   }else ipSetup.classList.add('hidden');
 
   const ps=current?.port_status||{},expected=[...new Set((device.expected_ports||[]).map(Number).filter(Number.isFinite))],labels=device.port_labels||{},identity=[device?.unit_key,device?.device_name,device?.device_model,device?.device_type,device?.tech_check_unit_type,device?.monitoring_profile].join(' ').toLowerCase(),avigilon=String(device?.monitoring_profile||'').toLowerCase()==='sniper'||identity.includes('avigilon')||identity.includes('sniper')||identity.includes('cam v')||identity.includes('camv'),displayPorts=avigilon?[...expected,443,8443,38880,38881]:expected,portKeys=[...new Set([...displayPorts,...Object.keys(ps).map(Number).filter(Number.isFinite)])].sort((a,b)=>a-b);
-  $('ports').innerHTML=portKeys.map(p=>{const v=ps[String(p)]||ps[p],checked=Boolean(current?.checked_at),fresh=checkFresh(current),online=fresh&&Boolean(v?.online),cls=online?'':(fresh&&checked?' off':' pending'),suffix=online?' ✓'+(v?.latency_ms?' · '+v.latency_ms+'ms':''):(!fresh&&checked?' · previous result; not current':checked?' · no response':' · not checked');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
+  $('ports').innerHTML=portKeys.map(p=>{const result=CameraHealthHistory.port(current,p),online=result.state==='responding',cls=online?'':result.state==='failed'?' off':' pending',suffix=online?' ✓'+(result.latencyMs!==null?' · '+result.latencyMs+'ms':''):' · '+result.label+(result.state==='unverified'&&result.at?' · previous result; not current':'');const configuredLabel=labels[String(p)]||('Port '+p),displayLabel=(p===443&&avigilon)?'Port 443 / HTTPS':((p===8443&&avigilon)?'Port 8443 / Avigilon Web Endpoint':configuredLabel);return '<span class="port'+cls+'">'+esc(displayLabel)+esc(suffix)+'</span>'}).join('');
   $('portEmpty').textContent=portKeys.length?'':(!effectiveIp?'No public IP is configured, so Camera Health cannot test this device yet.':'No explicit ports are configured. Camera Health will use the family/public-IP rules for this device.');
   $('portEmpty').classList.toggle('hidden',portKeys.length>0);
   $('routerInfo').innerHTML=routerSummaryHTML();
