@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { primaryAreas, visionAreas, onHandInventory } from './visionAreas';
+import { cameraDashboardSummary } from './cameraDashboardSummary';
 import './visionAreas.css';
 
 type Api = { get(path: string): Promise<{ data: any }> };
@@ -24,14 +25,14 @@ const records = (data: any) => {
   return data.items as Record<string, any>[];
 };
 const sources: Record<string, string> = {
-  'Camera Health': '/api/camera-health/summary', 'InHand Routers': '/api/routers',
+  'Camera Health': '/api/camera-health/summary-v2', 'InHand Routers': '/api/routers',
   'Victron VRM': '/api/vrm-portal', 'Units On Hand': '/api/equipment',
   'Field Map': '/api/field-map', Team: '/api/team-production',
 };
-function summary(workspace: string, data: any): string {
+function summary(workspace: string, data: any,now=Date.now()): string {
   if (workspace === 'Camera Health') {
-    if (!['online', 'offline', 'review', 'fieldDevices'].every(key => Number.isInteger(data?.[key]) && data[key] >= 0) || data.online + data.offline + data.review !== data.fieldDevices) throw new Error('Health unavailable');
-    return `${data.online} online · ${data.offline} offline · ${data.review} to review`;
+    const health=cameraDashboardSummary(data,now);
+    return health.available?health.systems+' · '+health.serviceCoverage+' · '+health.placement:'Health unavailable · source-separated inventory not verified';
   }
   const rows = records(data);
   if (workspace === 'Units On Hand') {
@@ -48,26 +49,27 @@ function summary(workspace: string, data: any): string {
   return `${rows.length} routers · view connection checks`;
 }
 export default function VisionAreas({ api, navigate }: { api: Api; navigate(workspace: string): void }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const [healthNow,setHealthNow]=useState(Date.now());
   const [loading, setLoading] = useState(true);
   const revision = useRef(0);
   const refresh = async () => {
     const request = ++revision.current;
     setLoading(true);
     const entries = await Promise.all(visionAreas.map(async area => {
-      try { return [area.workspace, summary(area.workspace, (await api.get(sources[area.workspace])).data)]; }
-      catch { return [area.workspace, 'Status unavailable · open to check']; }
+      try { const data=(await api.get(sources[area.workspace])).data;summary(area.workspace,data);return [area.workspace,data]; }
+      catch { return [area.workspace,null]; }
     }));
     if (request !== revision.current) return;
     setValues(Object.fromEntries(entries));
     setLoading(false);
   };
-  useEffect(() => { void refresh(); return () => { revision.current += 1; }; }, []);
+  useEffect(() => { void refresh();const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return () => { revision.current += 1;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible); }; }, []);
   return <section className='vision-areas' aria-label='VISION dashboard'>
     <header className='vision-areas-heading'><div><small>CAMERAS ONSITE</small><h1>VISION Operations</h1><p>Your fleet, power, locations and team in one place.</p></div><button className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Checking fleet…' : 'Refresh fleet'}</button></header>
     <div className='vision-area-grid'>{visionAreas.map(area => <button type='button' className='vision-area-card' key={area.workspace} onClick={() => navigate(area.workspace)}>
       <span className='vision-area-icon'><AreaIcon name={area.icon}/></span><span className='vision-area-arrow' aria-hidden='true'>↗</span>
-      <strong>{area.label}</strong><span>{area.description}</span><small role='status'>{loading ? 'Checking connected records…' : values[area.workspace]}</small>
+      <strong>{area.label}</strong><span>{area.description}</span><small role='status'>{loading ? 'Checking connected records…' : values[area.workspace]?summary(area.workspace,values[area.workspace],healthNow):'Status unavailable · open to check'}</small>
     </button>)}</div>
   </section>;
 }

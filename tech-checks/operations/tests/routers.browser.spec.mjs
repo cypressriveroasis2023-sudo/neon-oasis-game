@@ -28,7 +28,7 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(frame.locator('.field-map-detail')).toContainText('Manual');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
  await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('30');
- await expect(frame.locator('.router-map-note')).toContainText('Router checks do not supply live locations.');
+ await expect(frame.getByLabel('Router context for selected unit')).toContainText('Router checks do not supply live locations.');
  const size=await frame.locator('body').evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));expect(size.content).toBeLessThanOrEqual(size.width);
  expect(state.requests.every(r=>r.method==='GET')).toBeTruthy();
  await frame.getByRole('button',{name:'View all InHand routers'}).click();
@@ -62,13 +62,14 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
  await expect(frame.getByText('192.0.2.1/32',{exact:true})).toHaveCount(0);
 });
 
-test('router polling preserves an open map popup',async({page})=>{
+test('router polling preserves the map viewport and cannot supply camera colors',async({page})=>{
  await page.clock.install({time:new Date()});
  const {frame,state}=await mountRouterFixture(page);
  await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
- await frame.locator('.cos-field-pin-wrap').click();
- await expect(frame.locator('.leaflet-popup-content')).toContainText('Same-name router');
+ await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveCSS('background-color','rgb(148, 163, 184)');
+ await frame.getByLabel('COS field unit map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('COS field unit map').boundingBox();
  await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
  await page.mouse.down();await page.mouse.move(canvas.x+canvas.width/2+120,canvas.y+canvas.height/2,{steps:8});await page.mouse.up();
@@ -77,6 +78,7 @@ test('router polling preserves an open map popup',async({page})=>{
  const readsBefore=state.requests.filter(r=>r.path==='/api/routers').length;
  await page.clock.fastForward(61000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
- await expect(frame.locator('.leaflet-popup-content')).toContainText('Stored COS coordinates');
+ await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
+ await expect(frame.locator('.cos-field-pin')).toHaveCSS('background-color','rgb(148, 163, 184)');
  expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
 });

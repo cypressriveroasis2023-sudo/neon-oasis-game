@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
+import {resource,snapshot,withStatus,now} from './fixtures/camera-evidence-fixtures.mjs';
 const origin = 'http://127.0.0.1:4173';
-const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const stamp = '2026-10-06T13:00:00.000Z';
 const jobs = [
   { id: '11111111-1111-4111-8111-111111111111', jobNumber: 'FIX-101', jobType: 'Delivery', customer: 'Fixture customer', site: 'Fixture site', status: 'Unscheduled', stage: 'IT Prep' },
@@ -11,15 +11,16 @@ const jobs = [
   { id: '44444444-4444-4444-8444-444444444444', jobNumber: 'FIX-104', jobType: 'Delivery', customer: 'Fixture customer', site: 'Fixture site', status: 'Owner Review', stage: 'Owner Review' },
   { id: '55555555-5555-4555-8555-555555555555', jobNumber: 'FIX-105', jobType: 'Delivery', customer: 'Fixture customer', site: 'Fixture site', status: 'Billing Ready', stage: 'Billing' },
 ];
-const camera = { totalDevices: 3, online: 1, offline: 1, review: 1, shopRoot: 0, healthRows: 3, fieldDevices: 3, refreshedAt: stamp, rows: [{ id: 'c1', name: 'Fixture camera 1', status: 'online' }, { id: 'c2', name: 'Fixture camera 2', status: 'offline' }, { id: 'c3', name: 'Fixture camera 3', status: 'review' }] };
+const camera = snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),withStatus(resource(3,'Helios 3'),'unknown')]);
 const router = { id: 'r1', unitKey: 'Fixture Unit', name: 'Fixture router', model: 'Fixture', publicIp: null, unitIp: null, port: null, protocol: null, probeStatus: 'unknown', checkedAt: null, lastRecoveredAt: null, reportedStatus: 'Unknown', reportedAt: null, reportedSource: 'Fixture', savedLatencyMs: null, match: 'unmatched', candidateUnit: null, gps: null };
-async function mount(page) {
-  const state = { failures: new Set(), requests: [] };
+async function mount(page,{cameraData=camera}={}) {
+  const state = { failures: new Set(), requests: [],camera:cameraData };
+  await page.clock.setFixedTime(new Date(now));
   await page.route('**/*', async route => {
     const url = route.request().url();
     if (url === origin + '/company-overview-test') return route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{border:0;width:100%;height:100vh}</style></head><body><iframe title="Company overview test" src="/"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,accessToken:'synthetic-only',role:'owner'},location.origin)});</script></body></html>` });
     if (url.startsWith(origin + '/')) return route.continue();
-    if (url !== edge) return route.abort('blockedbyclient');
+    if (!url.endsWith('/functions/v1/cos-operations-pages')) return route.abort('blockedbyclient');
     const headers = { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type' };
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     const request = route.request().postDataJSON();
@@ -28,7 +29,7 @@ async function mount(page) {
     if (state.failures.has(request.path)) return route.fulfill({ status: 503, headers, contentType: 'application/json', body: JSON.stringify({ error: 'Fixture unavailable' }) });
     const data = request.path === '/api/session' ? { authorized: true, name: 'Fixture Owner', role: 'Owner' }
       : request.path === '/api/jobs' ? { items: jobs }
-      : request.path === '/api/camera-health/summary' ? camera
+      : request.path === '/api/camera-health/summary-v2' ? state.camera
       : request.path === '/api/routers' ? { items: [router], generatedAt: stamp, source: 'camera_health', gpsAvailable: false }
       : request.path === '/api/quotes' ? { items: [{ id: 'q1', quoteNumber: 'FIX-Q1', status: 'Draft' }, { id: 'q2', quoteNumber: 'FIX-Q2', status: 'Pending Owner Approval' }] }
       : { items: [] };
@@ -44,7 +45,7 @@ test('company overview orders real health sources before the eight-stage custome
   const { frame, state } = await mount(page);
   const overview = frame.getByRole('region', { name: 'Company overview', exact: true });
   expect(await overview.locator('.company-health-card h2').allTextContents()).toEqual(['Camera Health', 'InHand Routers', 'Victron power']);
-  await expect(overview.getByText('2 field devices need attention', { exact: true })).toBeVisible();
+  await expect(overview.getByText('2 provider systems need review', { exact: true })).toBeVisible();
   await expect(overview.getByText('1 stored router record', { exact: true })).toBeVisible();
   await expect(overview.getByText('Live GPS setup pending', { exact: true })).toBeVisible();
   await expect(overview.getByText('POWER STATUS NOT AVAILABLE IN THIS VIEW', { exact: true })).toBeVisible();
@@ -73,7 +74,7 @@ test('company overview orders real health sources before the eight-stage custome
 test('refresh replaces failed sources with unavailable values and recovers verified zero separately', async ({ page }) => {
   const { frame, state } = await mount(page);
   state.failures.add('/api/jobs');
-  state.failures.add('/api/camera-health/summary');
+  state.failures.add('/api/camera-health/summary-v2');
   state.failures.add('/api/routers');
   await frame.getByRole('button', { name: 'Refresh Overview', exact: true }).click();
   await expect(frame.getByText('Health unavailable', { exact: true })).toBeVisible();
@@ -83,7 +84,7 @@ test('refresh replaces failed sources with unavailable values and recovers verif
   await expect(frame.getByRole('button', { name: 'Quote: 2 quotes', exact: true })).toBeVisible();
   state.failures.clear();
   await frame.getByRole('button', { name: 'Retry dashboard', exact: true }).click();
-  await expect(frame.getByText('2 field devices need attention', { exact: true })).toBeVisible();
+  await expect(frame.getByText('2 provider systems need review', { exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'IT Prep: 0 jobs', exact: true })).toBeVisible();
   await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
   expect(state.requests.every(item => item.method === 'GET')).toBe(true);
@@ -237,4 +238,26 @@ test('enlarged eye never overlaps sidebar labels at short desktop heights',async
     expect(facts.copyTop).toBeGreaterThanOrEqual(facts.eyeBottom);expect(facts.labelTop).toBeGreaterThan(facts.copyBottom);expect(facts.brandHeight).toBeGreaterThan(140);
     await page.screenshot({path:info.outputPath('short-sidebar-'+width+'x'+height+'.png')});
   }
+});
+
+
+test('dashboard cards and native Camera Health share source-separated unit totals',async({page})=>{
+ const {frame,state}=await mount(page);
+ const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
+ const systems='3 active / unresolved units · Provider systems: 1 online · 1 offline · 1 review';
+ await expect(company).toContainText(systems);await expect(area).toContainText(systems);await expect(company).toContainText('Camera/detector evidence by unit: 1 online · 1 offline · 1 mixed/unverified · 0 channel status unavailable');await expect(company).toContainText('3 confirmed-field units · 0 location review');
+ await area.click();await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['3','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
+});
+
+test('legacy health stays unavailable on both dashboards while other metrics remain useful',async({page})=>{
+ const {frame}=await mount(page,{cameraData:{...camera,evidenceVersion:1}});
+ const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
+ await expect(company).toContainText('Health unavailable');await expect(area).toContainText('Health unavailable');await expect(company).not.toContainText('1 online');await expect(area).not.toContainText('1 online');await expect(frame.getByText('1 stored router record',{exact:true})).toBeVisible();await expect(frame.getByRole('button',{name:'Quote: 2 quotes',exact:true})).toBeVisible();
+});
+
+test('dashboard provider counts age without issuing fresh reads or inferring offline status',async({page})=>{
+ const {frame,state}=await mount(page);
+ const area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});await expect(area).toContainText('Provider systems: 1 online · 1 offline · 1 review');const reads=state.requests.length;
+ await page.clock.setFixedTime(new Date(now+16*60000));await frame.locator('body').evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await expect(area).toContainText('Provider systems: 0 online · 0 offline · 3 review');await expect(frame.getByRole('region',{name:'Company overview',exact:true})).toContainText('3 provider systems need review');expect(state.requests.length).toBe(reads);
 });

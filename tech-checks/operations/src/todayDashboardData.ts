@@ -1,4 +1,4 @@
-import { validateCameraHealth } from './CameraHealthWorkspace';
+import { validateCameraHealth } from './fieldCameraHealth';
 import { readRouterSnapshot, type RouterSnapshot } from '../../supabase/functions/cos-operations-pages/routers';
 
 export type DashboardRow = Record<string, unknown>;
@@ -71,7 +71,7 @@ export async function loadCompanyEquipment(api: DashboardApi): Promise<CompanyEq
   const result: CompanyEquipmentData = { camera: null, routers: null, errors: {} };
   await Promise.all([
     (async () => {
-      try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary')).data); }
+      try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary-v2')).data); }
       catch (cause) { result.errors.camera = equipmentError(cause, 'Camera Health'); }
     })(),
     (async () => {

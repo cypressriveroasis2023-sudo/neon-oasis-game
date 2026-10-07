@@ -19,7 +19,7 @@ export function jobItems(payload: unknown): OperationsRecord[] {
 }
 export function visibleJobs(rows: OperationsRecord[], mode: JobsMode): OperationsRecord[] {
   return mode === 'unscheduled' ? rows.filter(row => statusKey(row.status) === 'unscheduled') :
-    mode === 'dispatch' ? rows.filter(row => ['scheduled', 'assigned', 'dispatched'].includes(statusKey(row.status))) :
+    mode === 'dispatch' ? rows.filter(row => ['scheduled', 'assigned', 'dispatched'].includes(statusKey(row.status)) || row.goBack?.required === true) :
     mode === 'review' ? rows.filter(row => statusKey(row.status) === 'owner review') : rows;
 }
 export function jobDepartment(job: OperationsRecord): string {

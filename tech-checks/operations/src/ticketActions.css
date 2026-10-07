@@ -38,3 +38,5 @@
 #root .operations-shell .ticket-shop-prep input[type=checkbox]{display:inline-block;width:20px;height:20px;flex:none;accent-color:var(--cos-blue)}
 
 .ticket-title-field{grid-column:1/-1}#root .operations-shell .ticket-create-form .ticket-submit{margin-top:18px}
+.ticket-unit-context{margin:18px 0;padding:16px;border:1px solid var(--cos-border);border-radius:8px;background:var(--cos-selected);overflow-wrap:anywhere}
+#root .operations-shell .ticket-unit-context h4{font-size:14px;margin:0 0 9px;color:var(--cos-text);letter-spacing:0}.ticket-unit-context>strong{font-size:15px}.ticket-unit-context p{font-size:12px;line-height:1.6;color:var(--cos-muted);margin:8px 0 0}.ticket-unit-context .ticket-context-limit{color:var(--cos-text)}.ticket-unit-context .ticket-context-warning{color:#EDC27B}

@@ -11,6 +11,7 @@ import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
+import MhelpTicketImport from './MhelpTicketImport';
 import type { TicketType } from './ticketTypes';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
@@ -178,7 +179,6 @@ function OwnerApp() {
   useEffect(()=>{
     if(window.parent!==window)window.parent.postMessage({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:active},location.origin);
   },[active]);
-
   const group=workspaceGroup(active);
   const focusedJob=route.jobId;
   const setRouteLocation=useCallback((next:WorkspaceRoute,replace=false,state:unknown=null)=>{
@@ -253,11 +253,26 @@ function OwnerApp() {
     setRouteLocation({workspace:next,jobId:'',detail:false},active==='Operations');
     window.scrollTo({top:0,behavior:'instant'});
   },[setRouteLocation,active]);
-  const createTicket=useCallback((createType:TicketType)=>{
+  const openUnitHealth=useCallback((unitId:string)=>{
     setMenu(false);
-    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType});
+    if(active==='Field Map')setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId},true,history.state);
+    setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,unitId},false,active==='Field Map'?{cosUnitHealthFromMap:unitId}:null);
     window.scrollTo({top:0,behavior:'instant'});
+  },[active,setRouteLocation]);
+  const returnToMap=useCallback((unitId:string)=>{
+    setMenu(false);
+    if(history.state?.cosUnitHealthFromMap===unitId)history.back();
+    else{setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId});window.scrollTo({top:0,behavior:'instant'});}
   },[setRouteLocation]);
+  const createTicket=useCallback((createType:TicketType,unitId?:string)=>{
+    setMenu(false);
+    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType,...(unitId?{unitId}:{})},false,unitId&&active==='Camera Health'&&route.unitId===unitId?{cosTicketFromUnitHealth:unitId}:null);
+    window.scrollTo({top:0,behavior:'instant'});
+  },[setRouteLocation,active,route.unitId]);
+  const cancelCreateTicket=useCallback(()=>{
+    if(route.unitId){if(history.state?.cosTicketFromUnitHealth===route.unitId)history.back();else openUnitHealth(route.unitId);}
+    else navigate('Today');
+  },[route.unitId,openUnitHealth,navigate]);
   const openJob=useCallback((id:string,workspace:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch'='Jobs')=>{
     setMenu(false);
     setRouteLocation({workspace,jobId:id,detail:false});
@@ -305,8 +320,8 @@ function OwnerApp() {
         :active==='Today'?<>{!route.detail&&<><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
-        :active==='Daily Board'?<><OwnerBoardControls key={route.createType?'create-ticket':'board-controls'} show={show} createType={route.createType} cancelCreate={()=>navigate('Today')} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
-        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={mapUnitId} openWorkspace={navigate}/></section>
+        :active==='Daily Board'?<>{!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
+        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} openWorkspace={navigate} openUnitHealth={openUnitHealth} locationWritesEnabled={session?.features?.fieldLocationVerification===true}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Unscheduled',jobId:'',detail:false},true)}/>
@@ -321,7 +336,7 @@ function OwnerApp() {
         :active==='Invoices'||active==='Billing'?<InvoicesWorkspace show={show}/>
         :active==='Purchasing'?<PurchasingWorkspace show={show}/>
         :active==='Tech Check'?<TechChecksWorkspace/>
-        :active==='Camera Health'?<CameraHealthWorkspace/>
+        :active==='Camera Health'?<CameraHealthWorkspace initialUnitId={route.unitId} backToMap={returnToMap} createTicket={createTicket}/>
         :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Field Map');}}/>
         :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}

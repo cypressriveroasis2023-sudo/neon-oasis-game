@@ -45,6 +45,8 @@ async function visibleComposer(page) {
   const prompt=page.getByRole('textbox',{name:'Ask Vision',exact:true});
   await expect(prompt).toBeVisible();
   await expect(page.getByRole('button',{name:'Send',exact:true})).toBeVisible();
+  // The visualViewport resize handler schedules layout; assert the same bounds after it settles.
+  await expect.poll(()=>page.evaluate(()=>['#visionPrompt','#visionSendButton','.vision-composer-wrap'].every(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return r.top>=0&&r.bottom<=(window.visualViewport?.height||innerHeight)+1&&r.left>=0&&r.right<=innerWidth+1;}))).toBe(true);
   const bounds=await page.evaluate(()=>{
     const viewport=window.visualViewport;
     return ['#visionPrompt','#visionSendButton','.vision-composer-wrap'].map(selector=>{

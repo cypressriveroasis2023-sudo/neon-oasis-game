@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import './shell.css';
 import './companyTheme.css';
+import './cameraHealthOverview.css';
 import './visionAreas.css';
 // The approved company workspace is dark, including technician assignment mode.
 document.documentElement.dataset.theme = 'dark';

@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
+import {loadTicketUnitContext,ticketContextTitle,ticketContextInstructions,type TicketUnitContext} from './ticketContext';
 import {ticketDescriptionWithContact} from './customerContacts';
 import TicketSitePicker from './TicketSitePicker';
 import {ticketTypes,type TicketType} from './ticketTypes';
@@ -7,7 +8,7 @@ import {cosPrompt,cosConfirm} from './cosDialog';
 import {ownerJobSelection} from './ownerJobSelection';
 import {checkedOwnerSnapshot,createOwnerActionSaver,truckApprovalDetails,type OwnerAction,type OwnerSnapshot} from './ownerActionPersistence';
 const chicagoToday=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=(type:string)=>parts.find(p=>p.type===type)?.value||'';return get('year')+'-'+get('month')+'-'+get('day')};
-export default function OwnerBoardControls({show,createType,cancelCreate,openCreatedJob}:{show:(m:string)=>void;createType?:TicketType;cancelCreate?:()=>void;openCreatedJob?:(id:string)=>void}) {
+export default function OwnerBoardControls({show,createType,unitId,cancelCreate,cancelCreateLabel='Back to dashboard',openCreatedJob}:{show:(m:string)=>void;createType?:TicketType;unitId?:string;cancelCreateLabel?:string;cancelCreate?:()=>void;openCreatedJob?:(id:string)=>void}) {
   const [jobs,setJobs]=useState<any[]>([]);
   const [control,setControl]=useState<any>({sites:[],truckChecks:[],serviceTechnicians:[],itTechnicians:[]});
   const [busy,setBusy]=useState('');
@@ -18,6 +19,19 @@ export default function OwnerBoardControls({show,createType,cancelCreate,openCre
   const [selectedJobId,setSelectedJobId]=useState('');
   const [assignTech,setAssignTech]=useState('');
   const [newJob,setNewJob]=useState<any>({siteId:'',jobType:createType||'DELIVERY',title:'',description:'',priority:'normal',shopPrep:false});
+  const [unitContext,setUnitContext]=useState<TicketUnitContext|null>(null),[contextError,setContextError]=useState(''),[contextLoading,setContextLoading]=useState(Boolean(unitId));
+  const contextRevision=useRef(0),contextApplied=useRef(false),editedTicketFields=useRef(new Set<string>());
+  const loadContext=async()=>{
+    if(!unitId)return;const request=++contextRevision.current;setContextLoading(true);setContextError('');
+    try{const fresh=await loadTicketUnitContext(api,unitId);if(request!==contextRevision.current)return;setUnitContext(fresh);
+      if(!contextApplied.current){contextApplied.current=true;setNewJob((current:any)=>({...current,
+        ...(!editedTicketFields.current.has('siteId')&&fresh.siteId?{siteId:fresh.siteId}:{}),
+        ...(!editedTicketFields.current.has('title')?{title:ticketContextTitle(current.jobType,fresh)}:{}),
+        ...(!editedTicketFields.current.has('description')?{description:ticketContextInstructions(fresh)}:{})}));}
+    }catch(cause){if(request===contextRevision.current)setContextError(cause instanceof Error?cause.message:'The selected unit context could not be verified.');}
+    finally{if(request===contextRevision.current)setContextLoading(false);}
+  };
+  useEffect(()=>{void loadContext();return()=>{contextRevision.current++;};},[unitId]);
   const headingRef=useRef<HTMLHeadingElement>(null);
   const [contactInstructions,setContactInstructions]=useState('');
   const [siteSaving,setSiteSaving]=useState(false);
@@ -59,7 +73,7 @@ export default function OwnerBoardControls({show,createType,cancelCreate,openCre
   },[]);
   const selection=ownerJobSelection(jobs,selectedJobId), selected=selection.selected;
   useEffect(()=>{setAssignTech('');setAdvance((current:any)=>({...current,unitNumber:'',note:''}));},[selection.selectedId]);
-  const blocked=!!busy||siteSaving||refreshing||needsRefresh||!loaded;
+  const blocked=!!busy||siteSaving||contextLoading||Boolean(contextError)||refreshing||needsRefresh||!loaded;
   const run=async(key:string,prepare:()=>Promise<{action:OwnerAction;message:string}|null>)=>{
     if(actionRunning.current||saver.current!.needsRefresh||activeReads.current>0||!mounted.current)return;
     actionRunning.current=true;setBusy(key);setError('');
@@ -137,7 +151,7 @@ export default function OwnerBoardControls({show,createType,cancelCreate,openCre
   useEffect(()=>{const roster=control.serviceTechnicians||[];setAdvance((current:any)=>current.serviceTechnician&&!roster.includes(current.serviceTechnician)?{...current,serviceTechnician:''}:current);},[control.serviceTechnicians]);
   const jobTechs=selected?.department?.toLowerCase()==='it'?(control.itTechnicians||[]):selected?.department?.toLowerCase()==='service'?(control.serviceTechnicians||[]):[...(control.itTechnicians||[]),...(control.serviceTechnicians||[])];
   return <section className='panel module owner-board-controls'>
-    <div className='panelhead'><div><h2 ref={headingRef} tabIndex={createType?-1:undefined}>{createType?'Create ticket':'Owner Controls'}</h2><span>{createType?'Choose the site and describe the work. Saving creates an Owner-marked COS job.':'Owner-only overrides are audit-marked in production.'}</span></div><button className='secondary' disabled={!!busy||siteSaving||refreshing} onClick={()=>void refresh()}>REFRESH</button>{createType&&<button type='button' className='secondary' disabled={!!busy||siteSaving} onClick={cancelCreate}>Back to dashboard</button>}</div>
+    <div className='panelhead'><div><h2 ref={headingRef} tabIndex={createType?-1:undefined}>{createType?'Create ticket':'Owner Controls'}</h2><span>{createType?'Choose the site and describe the work. Saving creates an Owner-marked COS job.':'Owner-only overrides are audit-marked in production.'}</span></div><button className='secondary' disabled={!!busy||siteSaving||refreshing} onClick={()=>void refresh()}>REFRESH</button>{createType&&<button type='button' className='secondary' disabled={!!busy||siteSaving} onClick={cancelCreate}>{cancelCreateLabel}</button>}</div>
     {error&&<div role='alert' className='operations-error'>{error}</div>}
     {!createType&&<>
     <div className='quote-detail-grid'>
@@ -172,15 +186,21 @@ export default function OwnerBoardControls({show,createType,cancelCreate,openCre
     {createType&&created&&<section className='ticket-create-result' aria-label='Ticket created'><p role='status'><b>{created.number}</b> created and found in current jobs.</p><p>Next, schedule and assign the current visit.</p><div className='purchase-actions'><button type='button' disabled={!!busy} onClick={()=>openCreatedJob?.(created.id)}>Schedule this ticket</button><button type='button' className='secondary' disabled={!!busy} onClick={()=>setCreated(null)}>Create another ticket</button></div></section>}
     {(!createType||!created)&&<section className='quote-card ticket-create-form'>
       <div className='quote-section-head'><div><h3>{createType?(ticketTypes.find(type=>type.value===newJob.jobType)?.label||'COS')+' ticket':'Add COS Job'}</h3><small>Owner-created jobs bypass quote/MHelpDesk conversion but are explicitly audit-marked as Owner-created.</small></div></div>
-      <TicketSitePicker siteId={newJob.siteId} setSiteId={siteId=>setNewJob((current:any)=>({...current,siteId}))} disabled={!!busy||siteSaving} onValidityChange={setSiteValid} onSiteBusyChange={setSiteSaving} contactInstructions={contactInstructions} onContactInstructionsChange={setContactInstructions} show={show}/>
+      {unitId&&<section className='ticket-unit-context' aria-label='Selected unit context'>
+        <h4>Unit from Camera Health</h4>
+        {contextLoading&&<p role='status'>Verifying the selected unit, customer and site…</p>}
+        {contextError&&<div role='alert' className='operations-error'>{contextError}<button type='button' className='secondary' disabled={contextLoading||!!busy} onClick={()=>void loadContext()}>Retry unit context</button></div>}
+        {unitContext&&!contextError&&<><strong>{unitContext.unitNumber}{unitContext.modelName?' · '+unitContext.modelName:''}</strong><p>{unitContext.message}</p>{unitContext.state==='linked'&&<p>Recorded location: {unitContext.customerName} · {unitContext.siteName}</p>}<p className='ticket-context-limit'>The unit reference is included in the editable title and instructions. Creating this ticket does not assign equipment; any replacement unit is selected in the existing workflow.</p>{unitContext.siteId&&newJob.siteId&&newJob.siteId!==unitContext.siteId&&<p role='status' className='ticket-context-warning'>You selected a different ticket site from this unit’s recorded installed site. Review the work instructions and destination before creating the ticket.</p>}</>}
+      </section>}
+      <TicketSitePicker siteId={newJob.siteId} setSiteId={siteId=>{editedTicketFields.current.add('siteId');setNewJob((current:any)=>({...current,siteId}));}} disabled={!!busy||siteSaving} onValidityChange={setSiteValid} onSiteBusyChange={setSiteSaving} contactInstructions={contactInstructions} onContactInstructionsChange={setContactInstructions} show={show}/>
       <div className='ticket-form-step'><span aria-hidden='true'>2</span><div><h4>Ticket details</h4><p>Select the workflow and tell the team what needs to happen.</p></div></div>
       <div className='quote-detail-grid ticket-detail-fields'>
-        <label>Job type<select disabled={!!busy} value={newJob.jobType} onChange={e=>setNewJob({...newJob,jobType:e.target.value,shopPrep:false})}>{ticketTypes.map(type=><option key={type.value} value={type.value}>{type.label} · {type.value}</option>)}</select></label>
+        <label>Job type<select disabled={!!busy} value={newJob.jobType} onChange={e=>setNewJob({...newJob,jobType:e.target.value,shopPrep:false,...(unitContext&&!editedTicketFields.current.has('title')?{title:ticketContextTitle(e.target.value as TicketType,unitContext)}:{})})}>{ticketTypes.map(type=><option key={type.value} value={type.value}>{type.label} · {type.value}</option>)}</select></label>
         <label>Priority<select disabled={!!busy} value={newJob.priority} onChange={e=>setNewJob({...newJob,priority:e.target.value})}><option value='normal'>Normal</option><option value='high'>High</option><option value='urgent'>Urgent</option></select></label>
-        <label className='ticket-title-field'>Title<input disabled={!!busy} value={newJob.title} onChange={e=>setNewJob({...newJob,title:e.target.value})}/></label>
+        <label className='ticket-title-field'>Title<input disabled={!!busy} value={newJob.title} onChange={e=>{editedTicketFields.current.add('title');setNewJob({...newJob,title:e.target.value});}}/></label>
       </div>
       {newJob.jobType==='DELIVERY'&&<p role='note'>Install / Delivery uses the existing DELIVERY job type: IT preparation, then the Service installation visit.</p>}
-      <label>Description / instructions<textarea disabled={!!busy} rows={3} value={newJob.description} onChange={e=>setNewJob({...newJob,description:e.target.value})}/></label>
+      <label>Description / instructions<textarea disabled={!!busy} rows={3} value={newJob.description} onChange={e=>{editedTicketFields.current.add('description');setNewJob({...newJob,description:e.target.value});}}/></label>
       {newJob.jobType==='SERVICE'&&<label className='ticket-shop-prep'><input disabled={!!busy} type='checkbox' checked={newJob.shopPrep} onChange={e=>setNewJob({...newJob,shopPrep:e.target.checked})}/> SERVICE REQUIRES IT SHOP PREP</label>}
       <button className='ticket-submit' disabled={blocked} onClick={createJob}>{busy==='create'?'CREATING…':createType?'CREATE TICKET':'ADD COS JOB'}</button>
     </section>}

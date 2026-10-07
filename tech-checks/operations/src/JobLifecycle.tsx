@@ -1,3 +1,4 @@
+import { DeliveryGoBackSummary } from './DeliveryGoBack';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import type { DashboardRow } from './todayDashboardData';
 import { COMPANY_STAGES, deriveJobLifecycle, lifecycleText, type CompanyStageId, type LifecycleFact } from './companyLifecycle';
@@ -47,6 +48,7 @@ export default function JobLifecycle({ job, openJob, openWorkspace, headingRef }
       <div><p className='lifecycle-eyebrow'>ONE CONNECTED JOB</p><h2 ref={headingRef} tabIndex={-1}>{value(job.site, value(job.customer, 'Job details'))}</h2><p>{value(job.jobNumber, 'Job number unavailable')} · {value(job.jobType, 'Job type unavailable')} · {value(job.customer, 'Customer unavailable')}</p></div>
       <span className='lifecycle-current-badge'>{model.currentStageLabel}</span>
     </header>
+    <DeliveryGoBackSummary job={job}/>
     <div className='lifecycle-mobile-summary'><span>Current view</span><strong>{model.currentStageLabel}</strong><small>Backend: {model.backendStage} · {model.backendStatus}</small></div>
     <div className='lifecycle-layout'>
       <nav className='lifecycle-rail' aria-label='Job lifecycle stages'><p>JOB LIFECYCLE</p><ol>{model.stages.map((item, index) => <li key={item.id} data-current={item.id === model.currentStageId ? 'true' : 'false'}><button type='button' aria-pressed={selectedStage === item.id} onClick={() => { setSelectedStage(item.id); setTab('Stage details'); }}><span className='lifecycle-stage-number'>{index + 1}</span><span><strong>{item.label}</strong><small>{item.detail}</small></span></button></li>)}</ol><small className='lifecycle-rail-note'>Stages are a company view. Each job keeps its existing workflow.</small></nav>

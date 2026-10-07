@@ -11,7 +11,7 @@ const units = Array.from({ length: 815 }, (_, index) => ({
   site: `Fixture installation ${index + 1}`, address: `${index + 1} Fixture St, Houston, TX`,
   latitude: index < 3 ? 29.70 + index * 0.1 : null, longitude: index < 3 ? -95.40 + index * 0.1 : null,
   hasUnitGps: false, readOnly: true, coordinateSource: index < 3 ? 'import' : null,
-  recordSource: 'Synthetic tracker', sourceVerifiedAt: stamp,
+  recordSource: 'Synthetic tracker', sourceVerifiedAt: stamp, locationVerification:index<3?'owner_verified':null, gpsRecordedAt:index<3?stamp:null, locationVerifiedAt:index<3?stamp:null,
 }));
 async function mount(page) {
   const requests = [];
@@ -28,7 +28,7 @@ async function mount(page) {
     const data = request.path === '/api/session' ? { authorized: true, name: 'Fixture owner', role: 'Owner' }
       : request.path === '/api/field-map' ? { items: units, summary: { fieldUnits: 815, mappedUnits: 3, unitGps: 0, missingGps: 812 }, generatedAt: stamp }
       : request.path === '/api/routers' ? { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: stamp }
-      : request.path === '/api/camera-health/summary' ? { totalDevices: 0, online: 0, offline: 0, review: 0, fieldDevices: 0, shopRoot: 0, healthRows: 0, refreshedAt: stamp, rows: [] }
+      : request.path === '/api/camera-health/summary-v2' ? { totalDevices: 0, online: 0, offline: 0, review: 0, fieldDevices: 0, shopRoot: 0, healthRows: 0, refreshedAt: stamp, rows: [] }
       : request.path === '/api/daily-board' ? { jobs: [], tasks: [], readiness: [], asOf: stamp } : { items: [] };
     return route.fulfill({ headers, contentType: 'application/json', body: JSON.stringify(data) });
   });
@@ -72,7 +72,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await expect(frame.locator('.field-map-list > button')).toHaveCount(1);
   await frame.locator('.field-map-list > button').click();
   await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-001');
-  await frame.getByRole('button', { name: 'Show all GPS pins', exact: true }).click();
+  await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await expect(frame.locator('.leaflet-marker-icon')).toHaveCount(1);
   await expect.poll(async () => frame.locator('.leaflet-marker-icon').evaluate(marker => {
@@ -86,7 +86,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
   await frame.getByLabel('Search field units').fill('');
   await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
-  await frame.getByRole('button', { name: 'Show all GPS pins', exact: true }).click();
+  await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
   await openWorkspace(frame, 'Today');

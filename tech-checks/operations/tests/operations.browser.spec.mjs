@@ -27,8 +27,8 @@ function makeFixture() {
       { userId: '99999999-9999-4999-8999-999999999999', name: 'Jordan IT', department: 'it', status: 'not started', result: {} },
     ],
     units: [
-      { id: unitId, unitNumber: 'FIX-SN-001', modelName: 'Sniper', status: 'installed', customer: 'Fixture North Yard', site: 'North Gate', latitude: 29.7604, longitude: -95.3698, gpsAccuracyM: null, coordinateSource: 'manual', gpsRecordedAt: now, hasUnitGps: true },
-      { id: missingUnitId, unitNumber: 'FIX-RG-002', modelName: 'Ranger', status: 'assigned', customer: 'Fixture East Gate', site: 'East Entrance', latitude: null, longitude: null, gpsAccuracyM: null, coordinateSource: null, gpsRecordedAt: null, hasUnitGps: false },
+      { id: unitId, unitNumber: 'FIX-SN-001', modelName: 'Sniper', status: 'installed', customer: 'Fixture North Yard', site: 'North Gate', address:'1 Fixture St, Test City', latitude: 29.7604, longitude: -95.3698, gpsAccuracyM: null, coordinateSource: 'manual', gpsRecordedAt: now, hasUnitGps: true },
+      { id: missingUnitId, unitNumber: 'FIX-RG-002', modelName: 'Ranger', status: 'assigned', customer: 'Fixture East Gate', site: 'East Entrance', address:'2 Fixture St, Test City', latitude: null, longitude: null, gpsAccuracyM: null, coordinateSource: null, gpsRecordedAt: null, hasUnitGps: false },
     ],
     histories: new Map(),
     requests: [],
@@ -42,7 +42,7 @@ function mapSnapshot(state) {
   const mapped = state.units.filter(unit => Number.isFinite(unit.latitude) && Number.isFinite(unit.longitude)).length;
   return { items: state.units, summary: { fieldUnits: state.units.length, mappedUnits: mapped, unitGps: state.units.filter(unit => unit.hasUnitGps).length, missingGps: state.units.length - mapped }, generatedAt: new Date(Date.parse(now) + state.generation).toISOString() };
 }
-async function fixturePage(page) {
+async function fixturePage(page,{locationWritesEnabled=true}={}) {
   const state = makeFixture();
   await page.clock.install({ time: new Date(now) });
   await page.route('**/*', async route => {
@@ -60,9 +60,9 @@ async function fixturePage(page) {
     if (state.failedPaths.has(path)) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic source unavailable' }) });
     let data;
     if (method === 'GET') {
-      if (path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner' };
+      if (path === '/api/session') data = { authorized: true, name: 'Fixture Owner', role: 'Owner', features:{fieldLocationVerification:locationWritesEnabled} };
       else if (path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
-      else if (path === '/api/camera-health/summary') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:now,rows:[]};
+      else if (path === '/api/camera-health/summary-v2') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:now,rows:[]};
       else if (path === '/api/jobs') data = { items: state.jobs };
       else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
@@ -86,8 +86,9 @@ async function fixturePage(page) {
         if (!unit) throw new Error('Unknown fixture unit');
         state.generation++;
         const recordedAt = new Date(Date.parse(now) + state.generation).toISOString();
-        Object.assign(unit, { latitude: body.latitude, longitude: body.longitude, gpsAccuracyM: body.accuracyM, coordinateSource: body.source, gpsRecordedAt: recordedAt, hasUnitGps: true });
-        const record = { id: 'fixture-gps-' + state.generation, latitude: body.latitude, longitude: body.longitude, accuracyM: body.accuracyM, source: body.source, note: body.note, recordedAt, recordedBy: 'Fixture Owner' };
+        Object.assign(unit, { latitude: body.latitude, longitude: body.longitude, gpsAccuracyM: body.accuracyM, coordinateSource: body.source, gpsRecordedAt: recordedAt, hasUnitGps: true, locationVerification:'owner_verified',locationVerifiedAt:recordedAt });
+        const record = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-'+String(state.generation).padStart(12,'0'), latitude: body.latitude, longitude: body.longitude, accuracyM: body.accuracyM, source: body.source, note: body.note, recordedAt, recordedBy: 'Fixture Owner' };
+        unit.locationHistoryId=record.id;
         state.histories.set(unit.id, [record, ...(state.histories.get(unit.id) || [])]);
         data = { ...record, id: unit.id };
       } else throw new Error('Unexpected fixture POST: ' + path);
@@ -256,23 +257,26 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   await noOverflow(page);
   await units.getByRole('button').filter({ hasText: 'FIX-RG-002' }).click();
   await expect(frame.locator('.field-map-detail h2')).toHaveText('FIX-RG-002');
-  await frame.locator('.cos-field-pin-wrap').filter({ hasText: 'FIX-SN-001' }).click();
+  await units.getByRole('button').filter({ hasText: 'FIX-SN-001' }).click();
   await expect(frame.locator('.field-map-detail h2')).toHaveText('FIX-SN-001');
   await units.getByRole('button').filter({ hasText: 'FIX-RG-002' }).click();
   await frame.getByLabel('Latitude', { exact: true }).fill('91');
   await frame.getByLabel('Longitude', { exact: true }).fill('-95.400000');
-  await frame.getByRole('button', { name: 'Save Unit GPS' }).click();
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
+  await frame.getByRole('button', { name: 'Save verified location' }).click();
   await expect(frame.getByRole('alert')).toContainText('Latitude must be between -90 and 90.');
   expect(state.writes).toHaveLength(0);
   await frame.getByLabel('Latitude', { exact: true }).fill('29.800000');
   await frame.getByLabel('Accuracy (meters)', { exact: true }).fill('');
   await frame.getByLabel('Source').selectOption('manual');
-  await frame.getByLabel('Note', { exact: true }).fill('Synthetic gate location');
-  await frame.getByRole('button', { name: 'Save Unit GPS' }).click();
-  await expect(frame.getByRole('status').filter({ hasText: 'FIX-RG-002 GPS location saved and verified.' }).first()).toBeVisible();
+  await frame.getByLabel('Verification note', { exact: true }).fill('Synthetic gate location');
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
+  await frame.getByRole('button', { name: 'Save verified location' }).click();
+  await expect(frame.getByRole('status').filter({ hasText: 'FIX-RG-002 location saved and read back successfully.' }).first()).toBeVisible();
   expect(state.writes).toHaveLength(1);
   expect(state.writes[0].path).toBe('/api/field-map/' + missingUnitId + '/gps');
-  expect(state.writes[0].body).toEqual({ latitude: 29.8, longitude: -95.4, accuracyM: null, source: 'manual', note: 'Synthetic gate location' });
+  expect(state.writes[0].body).toMatchObject({ latitude: 29.8, longitude: -95.4, accuracyM: null, source: 'manual' });
+  expect(state.writes[0].body.note).toMatch(/^COS_FIELD_LOCATION_V1\|address_sha256=[a-f0-9]{64}\|confirmed=true\nSynthetic gate location$/);
   await page.reload();
   await open(frame, 'Field Map');
   await frame.getByRole('complementary', { name: 'Field units' }).getByRole('button').filter({ hasText: 'FIX-RG-002' }).click();
@@ -287,10 +291,14 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
 test('Field Map blocks another GPS write until a successful manual refresh', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Field Map');
-  const save = frame.getByRole('button', { name: 'Save Unit GPS' });
+  const save = frame.getByRole('button', { name: 'Save verified location' });
+  await expect(save).toBeDisabled();
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await expect(save).toBeEnabled();
   await frame.getByLabel('Latitude', { exact: true }).fill('29.81');
+  await frame.getByLabel('Longitude', { exact: true }).fill('-95.3698');
   state.failedPaths.add('/api/field-map');
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await save.click();
   await expect(frame.getByRole('alert').first()).toContainText('GPS may have been saved');
   await expect(save).toBeDisabled();
@@ -301,11 +309,14 @@ test('Field Map blocks another GPS write until a successful manual refresh', asy
   expect(state.writes).toHaveLength(1);
   state.failedPaths.delete('/api/field-map');
   await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(save).toBeDisabled();
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await expect(save).toBeEnabled();
   await expect(frame.getByLabel('Latitude', { exact: true })).toHaveValue('29.81');
   await frame.getByLabel('Latitude', { exact: true }).fill('29.82');
+  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
   await save.click();
-  await expect(frame.getByRole('status').filter({ hasText: 'GPS location saved and verified.' }).first()).toBeVisible();
+  await expect(frame.getByRole('status').filter({ hasText: 'location saved and read back successfully.' }).first()).toBeVisible();
   expect(state.writes).toHaveLength(2);
 });
 
@@ -358,4 +369,52 @@ test('a stale Overview job link never substitutes another record or action',asyn
   await expect(frame.locator('.workspace-work')).toBeVisible();
   await expect(detail).toBeHidden();
   expect(state.writes).toEqual([]);
+});
+
+test('Field View keeps address verification explicit and hides changed-address pins',async({page},info)=>{
+ const {state,frame}=await fixturePage(page);
+ state.units[0].address='1 Fixture St, Test City';
+ state.units[1].address='2 Fixture St, Test City';
+ await open(frame,'Field Map');
+ const units=frame.getByRole('complementary',{name:'Field units'});
+ await expect(units).toContainText('HISTORICAL PIN');
+ await expect(units).toContainText('ADDRESS ONLY');
+ await expect(units).toContainText('Camera status unverified');
+ const save=frame.getByRole('button',{name:'Save verified location'});
+ await expect(save).toBeDisabled();
+ await expect(frame.getByRole('link',{name:'Look up recorded installation address ↗'})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=1%20Fixture%20St%2C%20Test%20City');
+ await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
+ await frame.getByLabel('Latitude',{exact:true}).fill('29.8001');
+ await frame.getByLabel('Longitude',{exact:true}).fill('-95.3698');
+ await expect(save).toBeDisabled();
+ await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
+ await save.click();
+ await expect(frame.locator('.field-map-detail')).toContainText('VERIFIED PIN');
+ expect(state.writes).toHaveLength(1);
+ Object.assign(state.units[0],{address:'3 New Fixture St, Test City',latitude:null,longitude:null,locationVerification:'address_changed',locationVerifiedAt:null});state.generation++;
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(units).toContainText('ADDRESS CHANGED');
+ await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(0);
+ await expect(frame.locator('.field-map-detail')).toContainText('3 New Fixture St');
+ await expect(frame.locator('.field-map-detail')).toContainText('Verify the new location');
+ expect(state.writes).toHaveLength(1);
+ state.units[0].address='';state.generation++;
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(save).toBeDisabled();
+ await expect(frame.getByRole('checkbox',{name:/I checked that these coordinates match/})).toBeDisabled();
+ await units.getByRole('button').filter({hasText:'FIX-RG-002'}).click();
+ await frame.locator('.field-map-detail').scrollIntoViewIfNeeded();
+ await page.screenshot({path:info.outputPath('field-location-verification.png'),fullPage:true});
+ await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:info.outputPath('field-location-verification-form.png'),fullPage:true});
+});
+
+test('Field View never offers GPS writes before verified projection capability is enabled',async({page})=>{
+ const {frame,state}=await fixturePage(page,{locationWritesEnabled:false});
+ await open(frame,'Field Map');
+ await expect(frame.getByText('Verified location editing is not enabled for this backend yet.',{exact:false})).toBeVisible();
+ await expect(frame.getByRole('button',{name:'Save verified location'})).toHaveCount(0);
+ await expect(frame.getByRole('button',{name:'Use My Current GPS'})).toHaveCount(0);
+ await expect(frame.getByLabel('Latitude',{exact:true})).toHaveCount(0);
+ expect(state.writes).toEqual([]);
 });

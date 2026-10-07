@@ -1,3 +1,5 @@
+import { DeliveryGoBackSummary } from './DeliveryGoBack';
+import { hasOpenGoBack } from './deliveryGoBackData';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { boardDateLabel, chicagoDay, dailyBoardCards, isTestRecord, readinessSummary, type BoardCard, type BoardScope } from './dailyBoardData';
 import './dailyBoard.css';
@@ -219,6 +221,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
         {shown.map(card=><button type='button' className={'daily-board-card daily-board-'+card.lane+(statusKey(card.status)==='scheduled'&&card.assignee!=='Unassigned'?' daily-board-scheduled':'')} key={card.id} disabled={saving} draggable={!tv&&!busy&&!saving&&!refreshRequired&&canManage(card)} onDragStart={()=>setDragged(card)} onDragEnd={()=>setDragged(null)} onClick={()=>setSelected(card)}>
           <div className='daily-board-card-meta'><span>{isTestRecord(card.record)?'TEST · ':''}{card.kind==='job'?(card.record.completionKind==='visit'?'COMPLETED VISIT':'COS JOB'):'ASSIGNED TASK'}</span><b>{card.overdue?'OVERDUE':card.priority==='high'?'HIGH PRIORITY':card.status}</b></div>
           <strong>{card.title}</strong>
+          {hasOpenGoBack(card.record)&&<b className='daily-board-card-note'>GO-BACK REQUIRED · Ticket open</b>}
           <span>{[card.reference,card.site].filter(Boolean).join(' · ')||'General work'}</span>
           <span>{card.kind==='job'?[card.record.jobType,card.record.equipment,card.record.equipmentUnitTag].filter(Boolean).join(' · '):card.record.instructions||''}</span>
           {jobNotes(card)&&<span className='daily-board-card-note'>{jobNotes(card)}</span>}
@@ -238,8 +241,9 @@ export default function DailyBoard({api,openWorkspace}:Props) {
       <p>{[selected.reference,selected.site].filter(Boolean).join(' · ')}</p>
       <p>{selected.assignee} · {selected.status} · {boardDateLabel(selected.date)}</p>
       <p>{selected.kind==='job'?[selected.record.jobType,selected.record.equipment,selected.record.equipmentUnitTag].filter(Boolean).join(' · '):selected.record.instructions||''}</p>
+      {selected.record.completionKind!=='visit'&&<DeliveryGoBackSummary job={selected.record}/>}
       {jobNotes(selected)&&<p className='daily-board-detail-note'>{jobNotes(selected)}</p>}
-      <div className='daily-board-actions'>{canManage(selected)&&<button disabled={busy||refreshRequired} onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></div>
+      <div className='daily-board-actions'>{canManage(selected)&&<button disabled={busy||refreshRequired} onClick={()=>startAssignment(selected)}>Schedule / Reassign</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&!hasOpenGoBack(selected.record)&&<button className='secondary' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'close'}}))}}>Close Job</button>}{selected.kind==='job'&&selected.record.completionKind!=='visit'&&<button className='danger' onClick={()=>{const card=selected;setSelected(null);window.dispatchEvent(new CustomEvent('cos-owner-job-action',{detail:{jobId:card.record.id,jobNumber:card.reference,action:'remove'}}))}}>Delete Job</button>}<button className='secondary' onClick={()=>open(selected.kind==='job'?'Jobs':'Owner Tasks')}>Open {selected.kind==='job'?'Jobs':'Owner Tasks'} workspace</button></div>
     </section></dialog>}
 
     {assigning&&<dialog ref={assignDialog} className='daily-board-detail daily-board-assignment' aria-label='Schedule and reassign job' onCancel={event=>{if(saving)event.preventDefault();else setAssigning(null);}}><section>

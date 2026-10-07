@@ -1,0 +1,8 @@
+.delivery-go-back-summary{border:1px solid var(--border,#a0a8b0);border-radius:10px;padding:12px;margin:10px 0;max-width:100%;overflow-wrap:anywhere}
+.delivery-go-back-summary.is-required{border-color:#bf8518;background:color-mix(in srgb,#b78218 10%,transparent)}
+.delivery-go-back-summary>strong{display:block;font-size:12px;letter-spacing:.06em}
+.delivery-go-back-summary p{margin:7px 0;font-size:13px;white-space:pre-wrap}
+.delivery-go-back-summary>small{display:block;margin-top:6px;line-height:1.5}
+.delivery-go-back-dialog .schedule-form{grid-template-columns:minmax(0,1fr)}
+.delivery-go-back-dialog textarea{resize:vertical;max-width:100%;box-sizing:border-box}
+.go-back-blocked{display:block;max-width:300px;font-size:12px;line-height:1.5}
