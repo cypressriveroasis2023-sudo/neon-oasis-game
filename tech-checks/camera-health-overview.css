@@ -41,3 +41,12 @@ body.simple-health-overview .health-kpis{grid-template-columns:repeat(4,minmax(0
 .evidence-breakdown{font-size:12px;line-height:1.6;color:#b6c4d4;margin:12px 0;padding:10px 14px;border:1px solid #34425a;border-radius:9px}.evidence-breakdown p{margin:2px 0}.system-evidence-summary{display:block;margin-bottom:6px}.simple-health-overview #unitCards .compact-unit.service{border-color:#50708b!important}.statuspill.service{color:#b8d7ed!important;background:#203548!important}
 
 .camera-evidence-badge{display:block;color:#c1cbd8;font-size:12px}.compact-unit.online .camera-evidence-badge{color:#c1cbd8}
+
+/* Card actions remain separate accessible buttons; status never depends on selection. */
+body.simple-health-overview #unitCards .compact-unit .unit-card-open{display:flex!important;flex-direction:column!important;gap:9px!important;width:100%!important;min-width:0!important;flex:1;border:0!important;border-radius:0!important;padding:0!important;margin:0!important;text-align:left!important;background:transparent!important;box-shadow:none!important;color:inherit!important;font-weight:400!important;white-space:normal!important}
+body.simple-health-overview #unitCards .compact-unit .front-shop-action{display:block!important;width:100%!important;min-height:44px;margin:4px 0 0!important;padding:11px 12px!important;position:static!important}
+body.simple-health-overview #unitCards .compact-unit.online{border:3px solid #20e78c!important;box-shadow:0 0 0 1px #20e78c33 inset,0 0 16px #20e78c22!important}
+body.simple-health-overview #unitCards .compact-unit.offline{border:3px solid #ff4656!important;box-shadow:0 0 0 1px #ff465633 inset,0 0 16px #ff465622!important}
+body.simple-health-overview #unitCards .compact-unit:is(.mapping,.placement,.verifying,.shop,.inactive){border:2px solid #536174!important;box-shadow:none!important}
+
+.unit-move-status{display:block;font-size:12px;line-height:1.5;color:#f2c451;overflow-wrap:anywhere}.unit-move-status:empty{display:none}
