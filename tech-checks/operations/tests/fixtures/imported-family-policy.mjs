@@ -1,0 +1,22 @@
+/** All observed family-label combinations; synthetic asset tags only, never live identities. */
+export const importedFamilyPolicy = [
+ {equipmentType:'SOLAR SPOTTERS',family:'SOLAR SPOTTER',unit:'Solar Spotter 901',key:'SOLARSPOTTER|901',policy:'supported'},
+ {equipmentType:'SOLAR SPOTTERS',family:'SPOTTER',unit:'Spotter 901',key:'SPOTTER|901',policy:'source_model_mismatch'},
+ {equipmentType:'SOLAR SPOTTERS',family:'SS HYBRID',unit:'SS Hybrid 901',key:'SSHYBRID|901',policy:'source_model_mismatch'},
+ {equipmentType:'SPOTTERS',family:'SPOTTER',unit:'Spotter 901',key:'SPOTTER|901',policy:'supported'},
+ {equipmentType:'SPOTTERS',family:'AXIS SPOTTER',unit:'AXIS Spotter 901',key:null,policy:'unsupported_family'},
+ {equipmentType:'SPOTTERS',family:'AXIS SOLARSPOTTER',unit:'Axis SolarSpotter 901',key:null,policy:'unsupported_family'},
+ {equipmentType:'HELIOS',family:'HELIOS',unit:'Helios 901',key:'HELIOS|901',policy:'supported'},
+ {equipmentType:'HELIOS',family:'ALPHA',unit:'ALPHA 901',key:null,policy:'unsupported_family'},
+ {equipmentType:'RANGERS',family:'RANGER',unit:'Ranger 901',key:'RANGER|901',policy:'supported'},
+ {equipmentType:'SNIPERS',family:'SNIPER',unit:'Sniper 901',key:'SNIPER|901',policy:'supported'},
+ {equipmentType:'SNIPERS',family:'SNIPER 2',unit:'Sniper 2 901',key:'SNIPER2|901',policy:'supported'},
+ {equipmentType:'SNIPERS',family:'SNIPER 4',unit:'Sniper 4 901',key:'SNIPER4|901',policy:'supported'},
+ {equipmentType:'CAM V & RSU',family:'CAMV',unit:'CAMV 901',key:'CAMV|901',policy:'supported'},
+ {equipmentType:'CAM V & RSU',family:'RSU',unit:'RSU 901',key:null,policy:'unsupported_family'},
+ {equipmentType:'RECONS',family:'RECON',unit:'Recon 901',key:'RECON|901',policy:'supported'},
+ {equipmentType:'RECON II',family:'RECON II',unit:'Recon II 901',key:'RECON2|901',policy:'supported'},
+ {equipmentType:'SOLAR STANDS 72',family:'SOLAR STAND 72',unit:'Solar Stand 72 901',key:null,policy:'non_camera'},
+ {equipmentType:'SOLAR POLES & SKIDS',family:'SOLAR POLE 72',unit:'Solar Pole 72 901',key:null,policy:'non_camera'},
+ {equipmentType:'SOLAR POLES & SKIDS',family:'SOLAR SKID 144',unit:'Solar Skid 144 901',key:null,policy:'non_camera'},
+];

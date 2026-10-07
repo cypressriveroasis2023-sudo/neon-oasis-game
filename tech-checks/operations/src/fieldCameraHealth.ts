@@ -1,4 +1,5 @@
-import { cameraTimestamp, cameraRecord, cameraState, serviceState, combinedState, classifyCameraUnit, type CameraRow, type UnitEvidence } from './cameraEvidence';
+import { cameraTimestamp, cameraRecord, cameraState, combinedState, classifyCameraUnit, type CameraRow, type UnitEvidence } from './cameraEvidence';
+import {savedConnectionObservation} from './savedConnectionObservation';
 export type { CameraRow } from './cameraEvidence';
 export type Health = {totalDevices:number;online:number;offline:number;review:number;shopRoot:number;healthRows:number;fieldDevices:number;refreshedAt:string;rows:CameraRow[];evidenceVersion?:number;inventory?:{allRecords:number;activeFieldRecords:number;activeShopRecords:number;inactiveRecords:number;unknownScopeRecords?:number};coverageNote?:string};
 export type FieldHealthUnit = {id:string;unitNumber:string;modelName?:string;category?:string;readOnly?:boolean;address?:string;site?:string;customer?:string};
@@ -27,7 +28,9 @@ export function validateCameraHealth(value:any):Health {
 const plain=(value:string)=>value.trim().replace(/\s+/g,' ').toUpperCase();
 /** Fully anchored family + numeric asset tag; never device/site-name substring matching. */
 export function canonicalCameraUnit(value:string):string|null {
-  const match=/^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER(?:\s+[24])?|CAM\s*V|RECON(?:\s+(?:2|II))?|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
+  // A variant discriminator must end before the asset tag: Sniper 201 is not Sniper 2 01.
+  const match=/^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim())
+    || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
   if(!match)return null;
   let family=plain(match[1]).replace(/\s/g,'');
   family=({RI:'RECON',RII:'RECON2',RECONII:'RECON2'} as Record<string,string>)[family]||family;
@@ -38,7 +41,7 @@ export function canonicalCameraUnit(value:string):string|null {
 function scopedFieldIdentity(unit:FieldHealthUnit) {
   const key=canonicalCameraUnit(unit.unitNumber); if(!key)return null;
   const family=key.split('|')[0],model=plain(unit.modelName||'').replace(/[\s&]/g,'');
-  const aliases:Record<string,string[]>={HELIOS:['HELIOS'],RANGER:['RANGER','RANGERS'],SOLARSPOTTER:['SOLARSPOTTER','SOLARSPOTTERS'],SPOTTER:['SPOTTER','SPOTTERS'],SSHYBRID:['SSHYBRID','SSHYBRIDS'],RECON:['RECON'],RECON2:['RECON2','RECONII'],SNIPER:['SNIPER','SNIPERS'],SNIPER2:['SNIPER2','SNIPERS'],SNIPER4:['SNIPER4','SNIPERS'],CAMV:['CAMV','CAMVRSU']};
+  const aliases:Record<string,string[]>={HELIOS:['HELIOS'],RANGER:['RANGER','RANGERS'],SOLARSPOTTER:['SOLARSPOTTER','SOLARSPOTTERS'],SPOTTER:['SPOTTER','SPOTTERS'],SSHYBRID:['SSHYBRID','SSHYBRIDS'],RECON:['RECON','RECONS'],RECON2:['RECON2','RECONII'],SNIPER:['SNIPER','SNIPERS'],SNIPER2:['SNIPER2','SNIPERS'],SNIPER4:['SNIPER4','SNIPERS'],CAMV:['CAMV','CAMVRSU']};
   return aliases[family]?.includes(model)?key:null;
 }
 export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],health:Health|null,now=Date.now()):UnitCameraHealth {
@@ -55,11 +58,11 @@ export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],h
   const states=cameras.map(row=>cameraState(row,now));
   // Sniper/CAM-V expose direct connection evidence; location confidence is independent.
   const direct=['SNIPER','SNIPER2','SNIPER4','CAMV'].includes(key.split('|')[0]);
-  const connection=combinedState(active.map(row=>serviceState(row,now)));
+  const connection=combinedState(safeRows.map(row=>savedConnectionObservation(row,now)));
   const operational=['field','unknown'].includes(classification.scope);
   const state=direct?connection==='online'?'online':connection==='offline'?'offline':'unknown':operational&&states.includes('offline')?'offline':operational&&states.length>0&&states.every(s=>s==='online')?'online':'unknown';
   const dates=rows.flatMap(row=>direct?[row.serviceEvidence?.observedAt]:[row.evidence?.observedAt,row.serviceEvidence?.observedAt]).map(value=>cameraTimestamp(value,now).at).filter((v):v is string=>Boolean(v)).sort();
-  const location=classification.scope==='unknown'?' LOCATION REVIEW: saved placement is unresolved.':'';
+  const location=classification.scope==='unknown'?' LOCATION REVIEW: saved placement is unresolved.':['shop','inactive'].includes(classification.scope)?' PLACEMENT CONFLICT: camera inventory says '+(classification.scope==='shop'?'SHOP / ROOT':'INACTIVE')+' while this unit remains in the field tracker. Confirm its physical placement; a connection result does not move the unit.':'';
   const reason=health.evidenceVersion!==2?'Source-separated observations are not available in this response.':!operational?'Shop/root or inactive inventory is excluded from operational camera colors.':state==='offline'?'At least one matched camera/detector has a recent provider OFFLINE observation.':state==='online'?'Reported camera/detector records are recently ONLINE. Expected channel coverage is unknown; this does not verify every camera.':cameras.length?'Camera/detector observations are older, missing, or unverified. Silence is not a confirmed outage.':'Camera channel status unavailable. Recorder and service observations remain separate.';
   return {state,identity:'matched',rows,unitKey:rows[0].unit,checkedAt:dates.at(-1)||null,classification,basis:direct?'connection':'camera',reason:(direct?(state==='online'?'The saved IP / port check responded.':state==='offline'?'The saved IP / port checks confirmed no response.':'No recent definitive IP / port result is available.')+' This is connection status; camera video is not verified. Location confidence does not change this connection result.':reason)+location};
 }
