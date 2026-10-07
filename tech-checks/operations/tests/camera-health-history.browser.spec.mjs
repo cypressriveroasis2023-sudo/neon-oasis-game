@@ -12,6 +12,7 @@ function section(source,start,end){const a=source.indexOf(start),b=source.indexO
 const listRender=section(list,'function renderUnits()','\nfunction ');
 const detailRender=section(detail,'function render(){','  const liveNow=')+'}';
 const portRender=section(detail,"  $('ports').innerHTML=",'\n');
+const portSetup=section(detail,'  const ps=current?.port_status||{},expected=','\n');
 const detailEffective=section(detail,'function effectiveHealth(d,h)','\n\nfunction sourceStatusText');
 const sourceFresh=section(detail,'function sourceFresh(d','\nfunction checkFresh');
 const freshCheck=section(detail,'function checkFresh(h','\nfunction hasDirectLiveProof');
@@ -40,7 +41,8 @@ const detailScript=`${shared}
  let device=fixture.device,current=fixture.current;const issueReason=()=>'',sourceStatusText=()=> 'Vigilant: '+String(device.source_status).toUpperCase(),sourceDetailText=()=> 'Provider observation; direct diagnostic is separate';
  ${detailRender}
  ${freshCheck}
- function renderPorts(){const ps=current.port_status||{},portKeys=Object.keys(ps).map(Number),labels={},avigilon=true;${portRender}}
+ function renderPorts(){${portSetup}
+${portRender}}
  window.repaint=()=>{device=fixture.device;current=fixture.current;render();renderPorts();};$('loading').classList.add('hidden');$('content').classList.remove('hidden');repaint();
 `;
 async function mount(page,name){
@@ -81,4 +83,38 @@ test('actual detail preserves offline success, rejects offline Reconeyez events 
  await expect(page.locator('#lastCheckedLabel')).toHaveText('Last cloud status update');await expect(page.locator('#lastPing')).toHaveText('Never recorded');
  await page.evaluate(()=>{fixture.device.last_online_at='2030-01-01T00:00:00Z';fixture.device.source_last_seen_at='invalid';repaint();});
  await expect(page.locator('#lastPing')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#lastChecked')).toHaveText('Unknown (invalid timestamp)');await expect(page.locator('#sourceStatusCard')).toHaveClass('card warn');
+});
+
+test('actual direct-port detail distinguishes unchecked, failed and stale evidence',async({page},info)=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await mount(page,'camera-detail');
+ await page.evaluate(()=>{
+  fixture.device={...fixture.device,device_name:'Synthetic direct unit',group:'Sniper',monitoring_profile:'sniper',expected_ports:[80,443,8443,38880,38881]};
+  fixture.current={overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:10Z',port_status:{
+   80:{online:true,latency_ms:5},443:{online:false,error:'timeout'},
+   38880:{online:'false'},38881:{online:true,latency_ms:4,checked_at:'2026-10-06T10:55:10Z'}
+  }};repaint();
+ });
+ const row=p=>page.locator('#ports .port').filter({hasText:new RegExp('^Port '+p+'(?: /| ·| ✓)')});
+ await expect(page.locator('#ports .port')).toHaveCount(5);
+ await expect(row(80)).toHaveClass('port');await expect(row(80)).toContainText('✓ · 5ms');
+ await expect(row(443)).toHaveClass('port off');await expect(row(443)).toContainText('No response');await expect(row(443)).not.toContainText('previous result');
+ for(const p of [8443,38880]){await expect(row(p)).toHaveClass('port pending');await expect(row(p)).toContainText('Not checked');await expect(row(p)).not.toContainText('No response');}
+ await expect(row(38881)).toHaveClass('port pending');await expect(row(38881)).toContainText('No recent result');await expect(row(38881)).not.toContainText('4ms');
+ await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:900});
+  const bounds=await page.locator('#ports').evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth,page:document.documentElement.scrollWidth,view:innerWidth}));
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.width+1);expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);
+  if(width===390)await page.locator('#ports').screenshot({path:info.outputPath('direct-port-evidence-mobile.png')});
+ }
+ await page.evaluate(()=>{fixture.current.port_status[8443]={online:false};repaint();});
+ await expect(row(8443)).toHaveClass('port off');await expect(row(8443)).toContainText('No response');
+ await page.evaluate(()=>{fixture.current.checked_at='2026-10-06T10:55:10Z';repaint();});
+ for(const p of [80,443,8443,38881]){await expect(row(p)).toHaveClass('port pending');await expect(row(p)).toContainText('No recent result');}
+ await expect(row(38880)).toContainText('Not checked');
+ await expect(page.locator('#ports')).not.toContainText('✓');await expect(page.locator('#ports')).not.toContainText('No response');
+ await page.evaluate(()=>{fixture.current.port_status={};fixture.current.checked_at='2026-10-06T12:29:10Z';repaint();});
+ for(const p of [80,443,8443,38880,38881])await expect(row(p)).toContainText('Not checked');
+ expect(errors).toEqual([]);
 });
