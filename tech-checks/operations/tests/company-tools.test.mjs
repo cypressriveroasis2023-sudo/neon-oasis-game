@@ -1,3 +1,4 @@
+// Reviewed 2026-10-07: 15-minute visible-only routine reads and 20-minute evidence presentation allowance.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -14,14 +15,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "36dd85fbc7ab136216279004a8506c946497498d1a9b51fe5a41ff7ae9f8e5e6",
-  "camera-detail": "9702417ac2bf22015eda0beb33b6f53cfbd2a011ea27833cec6ac818f7784449",
+  "camera-health": "832d629b7dda23640541b50e756b672b17eb2646ceb6be3b575c8cc78e361374",
+  "camera-detail": "a1e353b10363b415209ef584a217185b99cc03b0d5de19bd216a3c966d6058da",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "e0df9a6088820d8209cd70d20712093250e966a13b2997feca9bb490765f958d",
-  "camera-detail": "31bf7b6e189f68bea71a0522db99543cef1cafda2b07d49786af55b71908360c",
+  "camera-health": "7d9a32817780f140e9bd7d050422b39af8586a38e7d3021fe4ab5dfaca41e042",
+  "camera-detail": "7cce2ba1f581dfc6d4e9b41c7b5d7809f2bb072f56015f154e775cc8ef66b223",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };

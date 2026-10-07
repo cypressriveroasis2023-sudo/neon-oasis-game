@@ -4,7 +4,7 @@
  */
 (function (root) {
   'use strict';
-  const ttl = 15 * 60 * 1000;
+  const ttl = 20 * 60 * 1000;
   function timestamp(value, now = Date.now()) {
     if (value == null || value === '') return { at: null, state: 'missing' };
     // Stored timestamptz values must identify a real calendar date and timezone.

@@ -104,7 +104,7 @@ test('service success is visible but cannot override current provider failure or
  const checks={1:{overall_status:'online',ip_reachable:true,checked_at:current.source_last_seen_at}};
  const g=api.classifyUnit([d],[],now,checks);assert.equal(g.state,'service');assert.equal(g.providerState,'verifying');assert.equal(g.cameraState,'mapping');
  assert.equal(api.classifyUnit([current],[],now,checks).state,'offline');
- assert.equal(api.classifyUnit([d],[],now+16*60000,checks).state,'mapping');
+ assert.equal(api.classifyUnit([d],[],now+21*60000,checks).state,'mapping');
  assert.equal(api.serviceState(d,{1:{...checks[1],ip_reachable:false}},now),'verifying');
 });
 test('one synthetic244-unit dataset partitions provider systems, service-only evidence and camera coverage',()=>{

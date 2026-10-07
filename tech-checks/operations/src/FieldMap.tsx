@@ -1,3 +1,4 @@
+import {automaticRefreshDue} from './refreshCadence';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { locationLink } from './visionAreas';
@@ -106,6 +107,8 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
   const [historyLoading,setHistoryLoading]=useState(false);
   const [gpsMessage,setGpsMessage]=useState('');
   const working = useRef(false);
+  const lastAttemptAt = useRef(0);
+  const automaticReadPaused = useRef(false);
   const gpsSaver = useRef(createGpsSaver(api));
   const hasMapContainer = Boolean(data || error);
   const mapNode=useRef<HTMLDivElement|null>(null);
@@ -116,6 +119,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
   const load=async()=>{
     if (working.current) return;
     working.current = true;
+    lastAttemptAt.current = Date.now();
     setBusy(true);
     setError('');
     try{
@@ -135,7 +139,13 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     }
   };
 
-  useEffect(()=>{void load()},[]);
+  const loadRef=useRef(load);loadRef.current=load;
+  useEffect(()=>{
+    void loadRef.current();
+    const check=()=>{if(!automaticReadPaused.current&&automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden))void loadRef.current();};
+    const timer=window.setInterval(check,60000);document.addEventListener('visibilitychange',check);
+    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};
+  },[]);
 
   useEffect(()=>{if(initialUnitId&&data){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}},[initialUnitId,Boolean(data)]);
 
@@ -144,6 +154,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
   const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
+  automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const selectedHealth=selected?healthById.get(selected.id):null;
   const estimateFor=(unit:FieldUnit)=>estimates.get(unit.id)||null;
   const mapPoint=(unit:FieldUnit)=>hasCoords(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:estimateFor(unit);
@@ -390,7 +401,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
     </div>
     {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as dashed EST pins outside nearby mode. Each exact address match is a Census address-range estimate that needs verification. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
-    <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 15-minute presentation window is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
+    <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}

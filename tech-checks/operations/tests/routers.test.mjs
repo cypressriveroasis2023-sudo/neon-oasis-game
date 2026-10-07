@@ -12,12 +12,12 @@ test('fresh probe is reachable, failed probe is unreachable, imported online is 
  assert.equal(routerStatus(row({current_status:'offline',reported_status:'online'}),+now),'unreachable');
 });
 test('stale, absent, malformed and future probe timestamps cannot manufacture online',()=>{
- assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:49:59Z'}),+now),'stale');
- assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:50:00Z'}),+now),'reachable');
+ assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:39:59Z'}),+now),'stale');
+ assert.equal(routerStatus(row({last_checked_at:'2026-10-05T20:40:00Z'}),+now),'reachable');
  for(const value of [null,'nonsense','2026-10-05T21:00:01Z'])assert.equal(routerStatus(row({last_checked_at:value}),+now),'unknown');
 });
 test('freshness ages without another API response',()=>{
- const value=row();assert.equal(routerStatus(value,+now),'reachable');assert.equal(routerStatus(value,+now+11*60*1000),'stale');
+ const value=row();assert.equal(routerStatus(value,+now),'reachable');assert.equal(routerStatus(value,+now+21*60*1000),'stale');
 });
 test('summary keeps stale, unknown, reachability distinct',()=>{
  assert.deepEqual(summarizeRouters([row(),row({current_status:'offline'}),row({last_checked_at:null}),row({last_checked_at:'2026-09-22T00:00:00Z'})],+now),{reachable:1,unreachable:1,stale:1,unknown:1});

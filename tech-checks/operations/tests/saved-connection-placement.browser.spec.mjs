@@ -25,7 +25,7 @@ test('fresh connection survives inactive inventory; refresh and aging never chan
  await expect(frame.locator('.camera-unit-detail')).toContainText('PLACEMENT CONFLICT');
  await expect(frame.locator('.camera-unit-detail')).toContainText('INACTIVE');
  await expect(frame.locator('.camera-health-native')).toContainText('Last reported service result: ONLINE');
- await frame.getByRole('button',{name:'Refresh Camera Health',exact:true}).click();await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT ONLINE');
+ await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT ONLINE');
  await page.screenshot({path:testInfo.outputPath('saved-online-placement-conflict.png')});
  await page.clock.fastForward(16*60*1000);await expect(frame.locator('.camera-unit-state')).toHaveText('IP / PORT UNKNOWN');
  await expect(frame.locator('.camera-health-native')).toContainText('Last reported service result: ONLINE');expect(writes).toHaveLength(0);expect(row.activationState).toBe('deactivated');expect(row.serviceEvidence.observedAt).toBe(fresh);

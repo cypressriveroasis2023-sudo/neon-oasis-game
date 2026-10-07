@@ -62,7 +62,7 @@ test('refresh retains clearly marked old inventory on outage and clears it when 
  await expect(frame.getByText('192.0.2.1/32',{exact:true})).toHaveCount(0);
 });
 
-test('router polling preserves the map viewport and cannot supply camera colors',async({page})=>{
+test('fifteen-minute router polling preserves the map viewport and cannot supply camera colors',async({page})=>{
  await page.clock.install({time:new Date()});
  const {frame,state}=await mountRouterFixture(page);
  await openMap(frame);
@@ -77,6 +77,8 @@ test('router polling preserves the map viewport and cannot supply camera colors'
  const transform=await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform);
  const readsBefore=state.requests.filter(r=>r.path==='/api/routers').length;
  await page.clock.fastForward(61000);
+ expect(state.requests.filter(r=>r.path==='/api/routers').length).toBe(readsBefore);
+ await page.clock.fastForward(15*60*1000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin')).toHaveCSS('background-color','rgb(148, 163, 184)');
