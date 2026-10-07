@@ -74,7 +74,7 @@ test('offline totals exclude shop, inactive, port-only and unmapped records whil
  await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('LOCATION REVIEW');
  await page.locator('.compact-unit[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
  await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="SPOTTER 904"]')).toContainText('STATUS UNVERIFIED');await expect(page.locator('[data-unit="SPOTTER 904"] .statuspill')).not.toContainText('OFFLINE');await expect(page.locator('.compact-unit[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
- await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('.compact-unit .statuspill')).toHaveText(['SHOP / ROOT','INACTIVE']);
+ await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="SHOP 001"] .statuspill')).toHaveText('SHOP / ROOT');await expect(page.locator('[data-unit="INACTIVE 001"] .statuspill')).toHaveText('INACTIVE');
  await page.locator('[data-scope-filter="Deactivated"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('INACTIVE');
 });
 test('current evidence expires in both overview and open details without fresh reads',async({page})=>{
