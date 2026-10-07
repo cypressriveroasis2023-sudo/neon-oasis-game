@@ -86,3 +86,14 @@ test('registered unit renders its bound estimate and removes it after the instal
  await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(1);
  expect(state.writes).toHaveLength(0);
 });
+test('automatic address lookup displays pending, approximate pin, new address invalidation and actionable failure',async({page})=>{
+ const {frame,state}=await mount(page,{registered:true});
+ state.units[0]={...state.units[0],currentLocationType:'field',locationVerification:'address_changed',placementAuditId:'41',placementUnitKey:'SNIPER 901',locationGeocode:{status:'pending'}};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
+ await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('lookup is pending');
+ const geocode={status:'success',auditId:'41',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:fresh,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex')};
+ state.units[0]={...state.units[0],locationGeocode:geocode};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30, -95');await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);
+ state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001',placementAuditId:'42',locationGeocode:{status:'invalid_address'}};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(1);await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('complete installation street, city, state and ZIP');expect(state.writes).toHaveLength(0);
+});

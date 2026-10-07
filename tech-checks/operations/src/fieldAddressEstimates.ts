@@ -25,13 +25,22 @@ export function addressEstimateHumanNote(note:string|null|undefined) {
 function addressParts(value:string) {
   const m=/^(.+),\s*([^,]+),\s*([A-Z]{2})(?:\s*,\s*|\s+)(\d{5})(?:-\d{4})?\s*$/i.exec(value.trim());
   if (!m||!/^\d+[A-Z]?\s/i.test(m[1])) return null;
-  const aliases:Record<string,string>={COUNTY:'CO',ROAD:'RD',STREET:'ST',AVENUE:'AVE',BOULEVARD:'BLVD',DRIVE:'DR',NORTH:'N',SOUTH:'S',EAST:'E',WEST:'W'};
+  const aliases:Record<string,string>={COUNTY:'CO',ROAD:'RD',STREET:'ST',AVENUE:'AVE',BOULEVARD:'BLVD',DRIVE:'DR',LANE:'LN',COURT:'CT',PLACE:'PL',PARKWAY:'PKWY',HIGHWAY:'HWY',TERRACE:'TER',CIRCLE:'CIR',TRAIL:'TRL',NORTH:'N',SOUTH:'S',EAST:'E',WEST:'W'};
   const street=m[1].toUpperCase().replace(/\./g,'').replace(/\b[A-Z]+\b/g,word=>aliases[word]||word).replace(/\s+/g,' ').trim();
   return {street,city:m[2].trim().toUpperCase(),state:m[3].toUpperCase(),zip:m[4]};
 }
 
 /** An address estimate is a separate, unverified presentation; it never passes isCurrentFieldPin. */
 export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Promise<AddressEstimate|null> {
+  const automatic=unit.locationGeocode;
+  if(automatic?.status==='success'&&!isCurrentFieldPin(unit)&&unit.status==='field'&&unit.currentLocationType==='field'&&unit.address?.trim()){
+    if(automatic.auditId!==unit.placementAuditId||automatic.unitKey!==unit.placementUnitKey||automatic.provider!=='us_census_address_range'||automatic.benchmark!=='Public_AR_Current'||!text(automatic.matchedAddress,300)||!date(automatic.geocodedAt,now)||!hasGpsCoordinates(automatic)||typeof automatic.latitude!=='number'||typeof automatic.longitude!=='number')return null;
+    const original=addressParts(unit.address),matched=addressParts(automatic.matchedAddress);
+    if(!original||!matched||JSON.stringify(original)!==JSON.stringify(matched))return null;
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalizeLocationAddress(unit.address)))),x=>x.toString(16).padStart(2,'0')).join('');
+    if(digest!==automatic.addressSha256)return null;
+    return {latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'address_range_interpolation',source:addressEstimateSource,providerMatchQuality:'Exact'};
+  }
   if (isCurrentFieldPin(unit)||unit.hasUnitGps===true||unit.status!=='field'||!unit.address?.trim()||unit.locationVerification==='address_changed') return null;
   // Registered units use their equipment ID. Only the server's exact, unique FIELD tracker
   // join can bind that ID to an estimate; never infer a binding from a label or an IP.
