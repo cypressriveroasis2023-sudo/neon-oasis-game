@@ -1,4 +1,4 @@
-// A separate read-only Operations queue; existing IT/Service views stay mounted.
+// A separate Operations assignments and shared IT queue; existing IT/Service views stay mounted.
 const queueContext = () => window.TechCheckContext;
 const queueApp = document.getElementById('appView');
 const queueButton = document.createElement('button');
@@ -55,13 +55,18 @@ async function refreshQueueSummary() {
     const read = async path => {
       const response = await fetch(queueEndpoint, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ path, method: 'GET', body: null }), cache: 'no-store', signal: controller.signal });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || 'Operations assignments could not be loaded.');
+      if (!response.ok) { const error = new Error(data?.error || 'Operations assignments could not be loaded.'); error.status = response.status; throw error; }
       return data;
     };
     const session = await read('/api/tech/session');
     if (!current()) return;
     if (session?.legacyTechnician !== true || session.department !== identity.role || session.authorized !== true) throw new Error(session?.reason || 'Your Operations identity could not be verified.');
-    const day = await read('/api/tech/assignments');
+    const [assigned, shared] = await Promise.allSettled([read('/api/tech/assignments'), read('/api/tech/it-queue')]);
+    if (!current()) return;
+    const denied = [assigned, shared].find(result => result.status === 'rejected' && [401,403].includes(result.reason?.status));
+    if (denied) throw denied.reason;
+    if (assigned.status === 'rejected') throw assigned.reason;
+    const day = assigned.value;
     if (!current()) return;
     if (!day || !Array.isArray(day.visits) || day.profile?.department !== identity.role || day.visits.some(visit => !visit || typeof visit.visit_id !== 'string' || !visit.visit_id || visit.department !== identity.role)) throw new Error('Operations returned an incomplete assignment list. Refresh to retry.');
     content.replaceChildren();
@@ -75,6 +80,29 @@ async function refreshQueueSummary() {
       row.addEventListener('click', () => { if (current()) openQueue(); });
       content.appendChild(row);
     }
+    const sharedHeading = queueText('h3', 'Shared IT queue'); content.appendChild(sharedHeading);
+    try {
+      if (shared.status === 'rejected') throw shared.reason;
+      const queue = shared.value, ids = new Set();
+      if (!session.productionTechnicianUserId || queue?.actorId !== session.productionTechnicianUserId || !Array.isArray(queue.items) || queue.items.some(item => {
+        if (!item || typeof item.visitId !== 'string' || !item.visitId || ids.has(item.visitId) ||
+          !['ready','claimed'].includes(item.queueStatus) || typeof item.claimable !== 'boolean' || typeof item.setupNeeded !== 'boolean' || typeof item.readinessNote !== 'string' || typeof item.nativeDispatchStatus !== 'string' ||
+          (item.queueStatus === 'ready' && item.claimOwnerId !== null) || (item.queueStatus === 'claimed' && (!item.claimOwnerId || item.claimable))) return true;
+        ids.add(item.visitId); return false;
+      })) throw new Error('The shared IT queue could not be verified. Refresh to retry.');
+      if (!queue.items.length) content.appendChild(queueText('p', 'No work waiting in the shared IT queue.'));
+      for (const item of queue.items) {
+        const row = queueText('button', '', 'cos-native-assignment-row'); row.type = 'button';
+        row.appendChild(queueText('strong', [item.jobNumber, item.customer].filter(Boolean).join(' · ')));
+        row.appendChild(queueText('span', [item.site, String(item.visitType || '').replaceAll('_', ' '), item.scheduledStart ? new Date(item.scheduledStart).toLocaleString() : 'Not scheduled'].filter(Boolean).join(' · ')));
+        row.appendChild(queueText('small', item.queueStatus === 'claimed' ? item.claimOwnerId === queue.actorId ? 'TAKEN BY YOU' : 'TAKEN BY ' + (item.claimOwner || 'ANOTHER IT TECHNICIAN') : item.claimable ? 'READY · OPEN QUEUE TO TAKE JOB' : 'CURRENTLY UNAVAILABLE'));
+        if (item.setupNeeded) row.appendChild(queueText('span', 'SETUP NEEDED · ' + (item.readinessNote || 'Ownership can be taken now; setup is required before work starts.')));
+        row.addEventListener('click', () => { if (current()) openQueue(); }); content.appendChild(row);
+      }
+    } catch (error) {
+      const notice = queueText('p', error?.message || 'Shared IT queue unavailable. Refresh to retry.'); notice.setAttribute('role', 'alert'); content.appendChild(notice);
+    }
+
   } catch (error) {
     if (current()) { const message = queueText('p', error?.name === 'AbortError' ? 'Operations assignments could not be verified in time. Refresh to retry.' : error?.message || 'Operations assignments could not be verified. Refresh to retry.'); message.setAttribute('role', 'alert'); content.replaceChildren(message); }
   } finally {
@@ -94,9 +122,9 @@ function presentQueueSummary(identity) {
     const head = document.createElement('div'); head.className = 'cos-native-assignment-head';
     head.appendChild(queueText('h2', 'Operations assigned jobs'));
     const refresh = queueText('button', 'Refresh'); refresh.type = 'button'; refresh.setAttribute('data-native-queue-refresh', ''); refresh.addEventListener('click', refreshQueueSummary); head.appendChild(refresh);
-    const open = queueText('button', 'Open assignments'); open.type = 'button'; open.addEventListener('click', openQueue); head.appendChild(open);
+    const open = queueText('button', 'Open assignments / IT queue'); open.type = 'button'; open.addEventListener('click', openQueue); head.appendChild(open);
     queueSummary.appendChild(head);
-    queueSummary.appendChild(queueText('p', 'Jobs assigned by Operations appear here. Open a job to review its saved assignment and next step.'));
+    queueSummary.appendChild(queueText('p', 'Your assigned jobs and the shared IT queue appear here. Open the queue to take available work; one IT technician owns each claimed visit.'));
     const content = document.createElement('div'); content.className = 'cos-native-assignment-content'; queueSummary.appendChild(content);
     const heading = landing.querySelector('.wl-it-command-head');
     if (heading) heading.after(queueSummary); else landing.prepend(queueSummary);
@@ -119,10 +147,11 @@ function queueIdentity() {
   return { id, role };
 }
 function sameQueueIdentity(a, b) { return Boolean(a && b && a.id === b.id && a.role === b.role); }
-function closeQueue() {
+function closeQueue(refresh = false) {
   queueFrame?.remove();
   queueFrame = null; queueFrameIdentity = null; queueOverlay.hidden = true;
   document.body.classList.remove('cos-production-assignments-open');
+  if (refresh) void refreshQueueSummary();
 }
 function presentQueue() {
   observeQueueAuth();
@@ -138,7 +167,7 @@ function openQueue() {
   queueFrame = document.createElement('iframe');
   queueFrame.id = 'cosProductionAssignmentsFrame';
   queueFrame.title = 'Your Operations assignments';
-  queueFrame.src = './operations/dist/index.html?mode=production-assignments&v=operations-assigned-prep-20261006';
+  queueFrame.src = './operations/dist/index.html?mode=production-assignments&v=operations-shared-it-queue-20261006';
   queueFrame.referrerPolicy = 'same-origin';
   queueFrameIdentity = identity;
   queueOverlay.appendChild(queueFrame);
@@ -146,7 +175,7 @@ function openQueue() {
   document.body.classList.add('cos-production-assignments-open');
 }
 queueButton.addEventListener('click', openQueue);
-queueClose.addEventListener('click', closeQueue);
+queueClose.addEventListener('click', () => closeQueue(true));
 window.addEventListener('message', async event => {
   if (event.origin !== window.location.origin || event.source !== queueFrame?.contentWindow || !sameQueueIdentity(queueIdentity(), queueFrameIdentity)) return;
   const data = event.data;
@@ -167,12 +196,12 @@ window.addEventListener('message', async event => {
     if (requestedFrame === queueFrame && event.source === queueFrame?.contentWindow)
       event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:data.requestId,accessToken:token,role:token?identity.role:null}, event.origin);
   }
-  if (data.type === 'COS_OPERATIONS_NAVIGATE' && data.route === 'production-return') closeQueue();
+  if (data.type === 'COS_OPERATIONS_NAVIGATE' && data.route === 'production-return') closeQueue(true);
 });
 window.addEventListener('techcheck:view-changed', presentQueue);
 window.addEventListener('techcheck:data-refreshed', () => { presentQueue(); void refreshQueueSummary(); });
 window.addEventListener('focus', () => { presentQueue(); void refreshQueueSummary(); });
-window.addEventListener('keydown', event => { if (event.key === 'Escape') closeQueue(); });
+window.addEventListener('keydown', event => { if (event.key === 'Escape') closeQueue(true); });
 const queueObserver = new MutationObserver(presentQueue);
 if (queueApp) queueObserver.observe(queueApp, {attributes:true,attributeFilter:['class'],childList:true,subtree:true});
 const queueAuth = document.getElementById('authView');

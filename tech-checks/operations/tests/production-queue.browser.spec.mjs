@@ -19,10 +19,11 @@ async function setup(page,{actualHost=false}={}){
     const envelope=route.request().postDataJSON();state.requests.push(envelope);
     expect(envelope.method).toBe('GET');expect(await route.request().headerValue('authorization')).toBe('Bearer synthetic-it-token');
     let value;
-    if(envelope.path==='/api/tech/session')value={authorized:true,legacyTechnician:true,name:'Fixture IT',department:'it',role:'IT'};
+    if(envelope.path==='/api/tech/session')value={authorized:true,legacyTechnician:true,name:'Fixture IT',department:'it',role:'IT',productionTechnicianUserId:'fixture-actor'};
+    else if(envelope.path==='/api/tech/it-queue')value={actorId:'fixture-actor',items:[]};
     else if(envelope.path==='/api/tech/assignments'){if(state.assignmentGate)await state.assignmentGate;value={profile:{display_name:'Fixture IT',department:'it'},visits:state.assigned?[{visit_id:visitId,job_id:'job',job_number:'FIX-501',customer_name:'Fixture customer',site_name:'Fixture site',visit_type:'IT_PREP',dispatch_status:'ready',scheduled_start:'2026-10-05T13:00:00Z'}]:[]};}
     else if(envelope.path==='/api/tech/tasks'){if(state.failTasks)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Fixture task source unavailable'})});value={items:[{id:'task',title:'Fixture preparation',instructions:'Use existing check procedure',status:'assigned',priority:'high'}]};}
-    else if(envelope.path==='/api/tech/visits/'+visitId)value={pendingWorkflow:state.pending,visit:{id:visitId,visit_type:'IT_PREP',dispatch_status:'ready'},job:{id:'job',job_number:'FIX-501',customer_name:'Fixture customer'},site:{name:'Fixture site'},execution:state.pending?null:{status:'not_started'},current_step:state.pending?null:{title:'Inspect physical unit'}};
+    else if(envelope.path==='/api/tech/visits/'+visitId){if(state.deniedVisit)return route.fulfill({status:403,headers:{'access-control-allow-origin':origin},contentType:'application/json',body:JSON.stringify({error:'Technician access revoked'})});value={pendingWorkflow:state.pending,visit:{id:visitId,visit_type:'IT_PREP',dispatch_status:'ready'},job:{id:'job',job_number:'FIX-501',customer_name:'Fixture customer'},site:{name:'Fixture site'},execution:state.pending?null:{status:'not_started'},current_step:state.pending?null:{title:'Inspect physical unit'}};}
     else throw new Error('Unexpected queue path '+envelope.path);
     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value),headers:{'access-control-allow-origin':origin}});
   });
@@ -96,3 +97,5 @@ test('scheduled assigned prep opens pending details without inventing a workflow
   await expect(detail.getByRole('button',{name:/start|complete|dispatch/i})).toHaveCount(0);
   expect(state.requests.every(request=>request.method==='GET')).toBe(true);
 });
+
+test('a visit access denial immediately clears previous technician records',async({page})=>{const{frame,state}=await setup(page);state.deniedVisit=true;await frame.getByRole('button',{name:/FIX-501/}).click();await expect(frame.getByRole('alert')).toContainText('Technician access revoked');await expect(frame.getByRole('region',{name:'Operations job assignments'})).toHaveCount(0);await expect(frame.getByRole('region',{name:'Shared IT queue'})).toHaveCount(0);expect(state.requests.every(request=>request.method==='GET')).toBe(true);});

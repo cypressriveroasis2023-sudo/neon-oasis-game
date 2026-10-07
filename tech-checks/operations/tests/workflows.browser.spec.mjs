@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Synthetic records and bearer token are confined to this test. External traffic
 // is blocked, and bridge responses are intercepted before any production call.
-const origin='http://127.0.0.1:4173';
+const origin=process.env.COS_TEST_ORIGIN||'http://127.0.0.1:4173';
 const edge='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const day='2026-10-04';
 const now=day+'T15:00:00.000Z';
@@ -23,8 +23,8 @@ function fixture() {
     failedPaths:new Set(),writes:[],requests:[],readbackMismatch:false,
   };
 }
-async function openFixture(page,workspace) {
-  const state=fixture();
+async function openFixture(page,workspace,configure=()=>{}) {
+  const state=fixture();configure(state);
   await page.clock.install({time:new Date(now)});
   await page.route('**/*',async route=>{
     const request=route.request(),url=request.url();
@@ -54,11 +54,12 @@ async function openFixture(page,workspace) {
       else throw new Error('Unexpected fixture GET '+path);
     } else if(method==='POST') {
       state.writes.push(envelope);
-      const action=/^\/api\/jobs\/([^/]+)\/(schedule|dispatch|owner-review)$/.exec(path);
+      const action=/^\/api\/jobs\/([^/]+)\/(schedule|dispatch|release-it|owner-review)$/.exec(path);
       if(!action)throw new Error('Unexpected fixture POST '+path);
       const job=state.jobs.find(row=>row.id===action[1]);
       if(!job)throw new Error('Unknown fixture job');
-      if(action[2]==='schedule')Object.assign(job,{scheduled:body.start,scheduledEnd:body.end,technician:body.technician,status:'Scheduled'});
+      if(action[2]==='schedule')Object.assign(job,{scheduled:body.start,scheduledEnd:body.end,technician:body.assignmentMode==='it_queue'?'Unassigned':body.technician,status:'Scheduled',assignmentMode:body.assignmentMode||'technician',queueStatus:body.assignmentMode==='it_queue'?'scheduled':null});
+      else if(action[2]==='release-it'){expect(job.assignmentMode).toBe('it_queue');job.queueStatus='ready';}
       else if(action[2]==='dispatch')job.status='Dispatched';
       else if(body.action==='approve')Object.assign(job,{status:'Billing Ready',stage:'Billing',billingReady:true});
       else Object.assign(job,{status:'Unscheduled',stage:'Service',billingReady:false,activity:['Returned by Owner: '+body.reason]});
@@ -223,4 +224,44 @@ test('native Owner Review preserves failed check, photo, signature and note evid
   expect(state.jobs[1].signatures).toHaveLength(1);
   expect(state.jobs[1].photos).toHaveLength(1);
   await noOverflow(page);
+});
+
+
+test('unassigned IT can save and send to the shared queue before physical setup',async({page})=>{
+  const {frame,state}=await openFixture(page,'unscheduled',state=>Object.assign(state.jobs[0],{department:'it',stage:'IT',jobType:'Delivery',equipmentUnitTag:null}));
+  await frame.getByRole('button',{name:'Schedule + Assign',exact:true}).click();
+  let dialog=frame.getByRole('dialog',{name:'Schedule and assign job'});
+  await expect(dialog.getByLabel('Assignment destination')).toHaveValue('it_queue');
+  await expect(dialog.getByLabel('Assign technician',{exact:false})).toHaveCount(0);
+  await expect(dialog).toContainText('Saving records the schedule only.');
+  await dialog.getByRole('button',{name:'CANCEL',exact:true}).click();expect(state.writes).toHaveLength(0);
+  await frame.getByRole('button',{name:'Schedule + Assign',exact:true}).click();
+  dialog=frame.getByRole('dialog',{name:'Schedule and assign job'});
+  await dialog.locator('input[type=date]').fill(day);
+  await dialog.getByRole('button',{name:'SAVE QUEUE SCHEDULE',exact:true}).click();
+  await expect(dialog).toBeHidden();expect(state.writes).toHaveLength(1);
+  expect(state.writes[0].body).toEqual({start:day+' 08:00',end:day+' 10:00',assignmentMode:'it_queue'});
+  await routeTo(page,'dispatch');await expect(frame.getByRole('button',{name:'Send to IT queue',exact:true})).toBeVisible();
+  await frame.getByRole('button',{name:'Send to IT queue',exact:true}).click();
+  await expect(frame.locator('.daily-board-notice')).toContainText('Job sent to the shared IT queue and verified.');
+  expect(state.writes).toHaveLength(2);expect(state.writes[1].path).toBe('/api/jobs/'+jobId+'/release-it');expect(state.jobs[0].status).toBe('Scheduled');expect(state.jobs[0].equipmentUnitTag).toBeNull();
+  await page.reload();await routeTo(page,'jobs');await expect(frame.locator('.record.op-record').filter({hasText:'FIX-101'})).toContainText('IT shared queue · Ready to take');await noOverflow(page);
+});
+
+test('named IT stays named and claimed shared work needs setup before actual dispatch',async({page})=>{
+  const {frame,state}=await openFixture(page,'unscheduled',state=>Object.assign(state.jobs[0],{department:'it',stage:'IT',jobType:'Delivery',technician:'Jordan IT',assignmentMode:'technician'}));
+  await frame.getByRole('button',{name:'Schedule + Assign',exact:true}).click();
+  const dialog=frame.getByRole('dialog',{name:'Schedule and assign job'});
+  await expect(dialog.getByLabel('Assignment destination')).toHaveValue('technician');
+  await expect(dialog.getByLabel('Assign technician',{exact:false})).toHaveValue('Jordan IT');
+  await dialog.getByRole('button',{name:'CANCEL',exact:true}).click();expect(state.writes).toHaveLength(0);
+  Object.assign(state.jobs[0],{assignmentMode:'it_queue',technician:'Unassigned',status:'Scheduled',queueStatus:'scheduled',scheduled:day+' 08:00',scheduledEnd:day+' 10:00',equipmentUnitTag:null});
+  await routeTo(page,'dispatch');await expect(frame.getByRole('button',{name:'Send to IT queue',exact:true})).toBeEnabled();
+  Object.assign(state.jobs[0],{queueStatus:'claimed',technician:'Jordan IT',claimOwnerId:'66666666-6666-4666-8666-666666666666',technicianUserId:'66666666-6666-4666-8666-666666666666'});await frame.getByRole('button',{name:'Refresh jobs',exact:true}).click();
+  await expect(frame.getByRole('button',{name:'Dispatch',exact:true})).toHaveCount(0);
+  await expect(frame.locator('.record.op-record').filter({hasText:'FIX-101'})).toContainText('finish physical-unit and Tech Check setup before dispatch.');
+  state.jobs[0].equipmentUnitTag='FIX-UNIT';await frame.getByRole('button',{name:'Refresh jobs',exact:true}).click();
+  await expect(frame.locator('.row-actions').getByRole('button',{name:'Dispatch',exact:true})).toBeEnabled();
+  await frame.locator('.row-actions').getByRole('button',{name:'Dispatch',exact:true}).click();
+  await expect(frame.locator('.daily-board-notice')).toContainText('Job dispatched to Jordan IT and verified.');expect(state.writes).toHaveLength(1);
 });
