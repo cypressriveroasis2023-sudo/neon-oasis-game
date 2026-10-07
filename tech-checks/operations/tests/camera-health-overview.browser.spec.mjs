@@ -56,9 +56,9 @@ test('offline totals exclude shop, inactive, port-only and unmapped records whil
   await load();
  });
  await expect(page.locator('#allOffline')).toHaveText('3');await expect(page.locator('#shopTotal')).toHaveText('1');await expect(page.locator('#inactiveTotal')).toHaveText('1');await expect(page.locator('#mappingTotal')).toHaveText('3');await page.screenshot({path:info.outputPath('camera-classification-hotfix.png'),fullPage:true});
- await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('[data-unit="RANGER 901"]')).toContainText('LOCATION REVIEW');
- await page.locator('[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
- await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('[data-unit="SPOTTER 904"]')).toContainText('STATUS UNVERIFIED');await expect(page.locator('[data-unit="SPOTTER 904"] .statuspill')).not.toContainText('OFFLINE');await expect(page.locator('[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
+ await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('LOCATION REVIEW');
+ await page.locator('.compact-unit[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
+ await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="SPOTTER 904"]')).toContainText('STATUS UNVERIFIED');await expect(page.locator('[data-unit="SPOTTER 904"] .statuspill')).not.toContainText('OFFLINE');await expect(page.locator('.compact-unit[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
  await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('SHOP / ROOT');
  await page.locator('[data-scope-filter="Deactivated"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('INACTIVE');
 });
@@ -81,11 +81,11 @@ test('provider recorders restore system health and ports stay separate with mixe
   fixtureHealth=[{camera_device_id:92,overall_status:'online',ip_reachable:true,checked_at:'2026-10-06T12:29:00Z'}];await load();
  });
  await expect(page.locator('#allOnline')).toHaveText('1');await expect(page.locator('#allOffline')).toHaveText('0');await expect(page.locator('#allPending')).toHaveText('2');await expect(page.locator('#serviceTotal')).toHaveText('1');
- await expect(page.locator('[data-unit="RECORDER 901"] .statuspill')).toHaveText('RECORDER ONLINE');await expect(page.locator('[data-unit="RECORDER 901"]')).toContainText('Camera channel status unavailable');
- await expect(page.locator('[data-unit="SERVICE 902"] .statuspill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('[data-unit="SERVICE 902"]')).toHaveClass(/\bonline\b/);
- await expect(page.locator('[data-unit="MIXED 903"]')).toContainText('Mixed provider status');await expect(page.locator('#cameraCoverage')).toContainText('1 online · 0 offline · 0 mixed/unverified · 2');
+ await expect(page.locator('[data-unit="RECORDER 901"] .statuspill')).toHaveText('RECORDER ONLINE');await expect(page.locator('.compact-unit[data-unit="RECORDER 901"]')).toContainText('Camera channel status unavailable');
+ await expect(page.locator('[data-unit="SERVICE 902"] .statuspill')).toHaveText('IP / PORT ONLINE');await expect(page.locator('.compact-unit[data-unit="SERVICE 902"]')).toHaveClass(/\bonline\b/);
+ await expect(page.locator('.compact-unit[data-unit="MIXED 903"]')).toContainText('Mixed provider status');await expect(page.locator('#cameraCoverage')).toContainText('1 online · 0 offline · 0 mixed/unverified · 2');
  await page.screenshot({path:info.outputPath('system-camera-evidence-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:info.outputPath('system-camera-evidence-mobile.png'),fullPage:true});
- await page.locator('[data-unit="MIXED 903"]').click();await expect(page.locator('#unitDetailMain')).toContainText('RECORDER OFFLINE');await expect(page.locator('#cameraIssues')).toContainText('recorder OFFLINE');await expect(page.locator('#cameraIssues .eventstatus')).toContainText(['OFFLINE']);
+ await page.locator('.compact-unit[data-unit="MIXED 903"]').click();await expect(page.locator('#unitDetailMain')).toContainText('RECORDER OFFLINE');await expect(page.locator('#cameraIssues')).toContainText('recorder OFFLINE');await expect(page.locator('#cameraIssues .eventstatus')).toContainText(['OFFLINE']);
 });
 
 test('missing Recon receiver-test metadata does not assert a failed or stopped feed',async({page})=>{await mount(page);await expect(page.locator('#providerOtherHealth')).toContainText('Receiver test not recorded in current metadata');await expect(page.locator('#reconLiveStatus')).toContainText('RECEIVER TEST NOT RECORDED');await expect(page.locator('#reconLiveStatus')).toContainText('does not establish that live events stopped');});
@@ -115,4 +115,38 @@ test('fleet breakdown counts each unit once and exposes familiar provider groups
  await expect(page.locator('#fleetConnectedOnline')).toHaveText('2');await expect(page.locator('#fleetConnectedOffline')).toHaveText('2');await expect(page.locator('#vigilantOnline')).toHaveText('1');await expect(page.locator('#avigilonOnline')).toHaveText('1');await expect(page.locator('#avigilonOffline')).toHaveText('1');await expect(page.locator('#reconOffline')).toHaveText('1');
  await page.locator('[data-scope-filter="AvigilonOnline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 092');
  await page.locator('[data-scope-filter="FleetOffline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);
+});
+
+test('front shop action preserves confirmation, exact unit, single submission and separate details navigation',async({page},info)=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);
+ await page.evaluate(()=>{window.moves=[];db.rpc=async(name,args)=>{moves.push({name,args});await new Promise(resolve=>window.releaseMove=resolve);fixtureDevices=fixtureDevices.map(d=>d.unit_key===args.p_unit_key?{...d,organization:'ROOT'}:d);return {data:{},error:null};};});
+ const card=page.locator('[data-unit="RANGER 022"].compact-unit'),move=card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}),details=card.getByRole('button',{name:'Open RANGER 022 unit details'});
+ await expect(move).toBeVisible();await expect(card.locator('button button')).toHaveCount(0);
+ page.once('dialog',d=>d.dismiss());await move.click();await expect(page.getByRole('dialog')).not.toBeVisible();expect(await page.evaluate(()=>moves.length)).toBe(0);await expect(move).toBeEnabled();
+ await details.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(details).toBeFocused();
+ page.once('dialog',async d=>{expect(d.message()).toContain('RANGER 022');await d.accept();});await move.click();await expect(move).toBeDisabled();await expect(page.getByRole('dialog')).not.toBeVisible();await page.evaluate(()=>window.freshnessCheck());await expect(move).toBeDisabled();
+ await move.evaluate(button=>button.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(await page.evaluate(()=>moves)).toEqual([{name:'owner_set_camera_unit_location_v1',args:{p_unit_key:'RANGER 022',p_location:'ROOT',p_reason:'Moved to ROOT / shop from Camera Health'}}]);
+ await page.evaluate(()=>releaseMove());await expect(card).toHaveCount(0);await expect(page.locator('#shopTotal')).toHaveText('1');
+ await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toContainText('RANGER 022');await expect(page.locator('.front-shop-action')).toHaveCount(0);expect(errors).toEqual([]);
+ await page.screenshot({path:info.outputPath('shop-confirmed-synthetic.png'),fullPage:true});
+});
+
+test('online and offline edges stay bright without selection while stale and shop stay neutral',async({page},info)=>{
+ await mount(page);const online=page.locator('[data-unit="RANGER 023"].compact-unit'),offline=page.locator('[data-unit="RANGER 022"].compact-unit');
+ for(const [card,color] of [[online,'rgb(32, 231, 140)'],[offline,'rgb(255, 70, 86)']]){await expect(card).toHaveCSS('border-top-color',color);await expect(card).toHaveCSS('border-top-width','3px');}
+ await page.locator('#unitCards').screenshot({path:info.outputPath('bright-card-edges-and-front-actions.png')});
+ for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});const bounds=await page.locator('#unitCards').evaluate(el=>({page:document.documentElement.scrollWidth,view:innerWidth}));expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);}
+ await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck();});await expect(online).toHaveCSS('border-top-color','rgb(83, 97, 116)');await expect(offline).toHaveCSS('border-top-color','rgb(83, 97, 116)');
+ await page.evaluate(async()=>{fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
+});
+
+
+test('failed front moves show visible errors while management panel stays closed',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);const card=page.locator('.compact-unit[data-unit="RANGER 022"]');
+ await expect(page.locator('#manageUnitsPanel')).not.toBeVisible();
+ for(const thrown of [false,true]){
+  await page.evaluate(({thrown})=>{db.rpc=async()=>{if(thrown)throw new Error('Synthetic network failure');return {error:{message:'Synthetic move denied'}};};},{thrown});
+  page.once('dialog',d=>d.accept());await card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();await expect(card.locator('.unit-move-status')).toBeVisible();await expect(card.locator('.unit-move-status')).toContainText(thrown?'Refresh Camera Health before retrying':'Synthetic move denied');await expect(card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true})).toBeEnabled();await expect(page.getByRole('dialog')).not.toBeVisible();
+ }
+ expect(errors).toEqual([]);
 });
