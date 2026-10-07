@@ -16,6 +16,21 @@ async function mount(page){
  await page.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==origin)return route.abort('blockedbyclient');if(url.pathname==='/tech-checks/camera-health.html')return route.fulfill({contentType:'text/html',body:html.replace('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>','<script>'+mock+'</script>')});const path=resolve(repo,'.'+decodeURIComponent(url.pathname));if(path.startsWith(repo+'/')&&existsSync(path))return route.fulfill({path,contentType:{'.js':'text/javascript','.css':'text/css','.woff':'font/woff','.png':'image/png','.jpg':'image/jpeg'}[extname(path)]||'application/octet-stream'});return route.abort('blockedbyclient')});
  await page.goto('/tech-checks/camera-health.html');await expect(page.locator('.compact-unit')).toHaveCount(3);
 }
+test('automatic reloads wait fifteen minutes, skip hidden tabs and share in-flight inventory loads',async({page})=>{
+ await mount(page);const initial=await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length);
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:44:59Z');await liveRefresh(true)});
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
+ await page.evaluate(async()=>{Date.now=()=>Date.parse('2026-10-06T12:45:00Z');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});await liveRefresh(true)});
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial);
+ await page.evaluate(async()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});await liveRefresh(true)});
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
+ await page.evaluate(async()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'));await liveRefresh(true)});
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+1);
+ const same=await page.evaluate(()=>{const one=load();const two=load();window.reloadPair=Promise.all([one,two]);return one===two});expect(same).toBe(true);await page.evaluate(()=>window.reloadPair);
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+2);
+ await page.evaluate(async()=>{const before=load();const after=loadAfterWrite();await Promise.all([before,after])});
+ expect(await page.evaluate(()=>reads.filter(x=>x.table==='camera_devices').length)).toBe(initial+4);
+});
 test('overview is quiet; unit cards open scoped history and preserve Back and keyboard navigation',async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);
  await expect(page.locator('.health-kpis>.stat')).toHaveCount(4);await expect(page.locator('#diag')).not.toBeVisible();await expect(page.locator('#statAllOnline')).toContainText('SYSTEMS ONLINE');
@@ -65,7 +80,7 @@ test('offline totals exclude shop, inactive, port-only and unmapped records whil
 test('current evidence expires in both overview and open details without fresh reads',async({page})=>{
  await mount(page);await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await expect(page.locator('#unitDetailSubtitle')).toContainText('OFFLINE');
  const reads=await page.evaluate(()=>window.reads.length);
- await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck()});
+ await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:51:00Z');window.freshnessCheck()});
  await expect(page.locator('#allOffline')).toHaveText('0');await expect(page.locator('#unitDetailSubtitle')).toContainText('NOT VERIFIED');expect(await page.evaluate(()=>window.reads.length)).toBe(reads);
 });
 test('duplicate source refresh clears totals and cannot be revived by freshness timer',async({page})=>{
@@ -103,7 +118,7 @@ test('legacy Sniper and CAM V cards preserve online offline unknown service stat
  await page.getByLabel('Filter units').selectOption('CamVOffline');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('IP / PORT OFFLINE');await expect(page.locator('.compact-unit')).toHaveClass(/\boffline\b/);
  await page.getByLabel('Filter units').selectOption('CAM V');await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('[data-unit="CAM V 003"] .statuspill')).toHaveText('IP / PORT UNVERIFIED');
  await page.getByLabel('Filter units').selectOption('Avigilon');await expect(page.locator('.compact-unit')).toHaveCount(3);
- await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck();});await expect(page.locator('.compact-unit .statuspill')).toHaveText(['IP / PORT UNVERIFIED','IP / PORT UNVERIFIED','IP / PORT UNVERIFIED']);
+ await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:51:00Z');window.freshnessCheck();});await expect(page.locator('.compact-unit .statuspill')).toHaveText(['IP / PORT UNVERIFIED','IP / PORT UNVERIFIED','IP / PORT UNVERIFIED']);
 });
 
 test('fleet breakdown counts each unit once and exposes familiar provider groups',async({page})=>{
@@ -136,7 +151,7 @@ test('online and offline edges stay bright without selection while stale and sho
  for(const [card,color] of [[online,'rgb(32, 231, 140)'],[offline,'rgb(255, 70, 86)']]){await expect(card).toHaveCSS('border-top-color',color);await expect(card).toHaveCSS('border-top-width','3px');}
  await page.locator('#unitCards').screenshot({path:info.outputPath('bright-card-edges-and-front-actions.png')});
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});const bounds=await page.locator('#unitCards').evaluate(el=>({page:document.documentElement.scrollWidth,view:innerWidth}));expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);}
- await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:46:00Z');window.freshnessCheck();});await expect(online).toHaveCSS('border-top-color','rgb(83, 97, 116)');await expect(offline).toHaveCSS('border-top-color','rgb(83, 97, 116)');
+ await page.evaluate(()=>{Date.now=()=>Date.parse('2026-10-06T12:51:00Z');window.freshnessCheck();});await expect(online).toHaveCSS('border-top-color','rgb(83, 97, 116)');await expect(offline).toHaveCSS('border-top-color','rgb(83, 97, 116)');
  await page.evaluate(async()=>{fixtureDevices=fixtureDevices.map(d=>d.unit_key==='RANGER 023'?{...d,organization:'ROOT'}:d);await load();});await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCSS('border-top-color','rgb(83, 97, 116)');
 });
 

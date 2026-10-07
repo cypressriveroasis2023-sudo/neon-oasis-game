@@ -1,5 +1,5 @@
 /** Public, pure presentation semantics. A saved observation is not a live probe. */
-export const CAMERA_FRESH_MS = 15 * 60 * 1000;
+export const CAMERA_FRESH_MS = 20 * 60 * 1000;
 export type EvidenceState = 'online'|'offline'|'degraded'|'verifying';
 export type CameraState = EvidenceState|'mapping';
 export type PlacementScope = 'field'|'shop'|'inactive'|'unknown';
@@ -100,5 +100,5 @@ export function serviceEvidenceLabel(state:EvidenceState) {
 export function observationAge(value:unknown,now=Date.now()) {
   const stamp=cameraTimestamp(value,now);if(!stamp.at)return 'Time not recorded / invalid';
   const minutes=Math.floor((now-Date.parse(stamp.at))/60000);
-  return (minutes<1?'less than a minute':minutes<60?minutes+' min':minutes<1440?Math.floor(minutes/60)+' hr':Math.floor(minutes/1440)+' days')+' ago'+(stamp.fresh?' · within 15-minute presentation window':' · older observation; current status unverified');
+  return (minutes<1?'less than a minute':minutes<60?minutes+' min':minutes<1440?Math.floor(minutes/60)+' hr':Math.floor(minutes/1440)+' days')+' ago'+(stamp.fresh?' · within 20-minute presentation window':' · older observation; current status unverified');
 }
