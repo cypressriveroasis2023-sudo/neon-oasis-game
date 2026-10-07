@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {cameraOverview,resourceBreakdown,type CameraUnitGroup} from './cameraHealthCounts';
 import {cameraColors,cameraTime,fieldCameraHealth,type Health,type FieldHealthUnit} from './fieldCameraHealth';
-import {providerState,serviceState,resourceKind,unitEvidenceLabel,cameraEvidenceLabel,serviceEvidenceLabel,observationAge,type CameraRow,type UnitEvidence} from './cameraEvidence';
+import {providerRecord,providerState,unclassifiedProviderReport,serviceState,resourceKind,unitEvidenceLabel,cameraEvidenceLabel,serviceEvidenceLabel,observationAge,type CameraRow,type UnitEvidence} from './cameraEvidence';
 type Props={health:Health;now:number;units:FieldHealthUnit[]|null;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',id:string)=>void};
 const statusColor=(state:string)=>state==='online'?cameraColors.online:state==='offline'?cameraColors.offline:state==='degraded'||state==='service'?'#f1c36d':cameraColors.unknown;
 export function UnitEvidenceDetails({classification}:{classification:UnitEvidence|null}){
@@ -11,9 +11,10 @@ export function UnitEvidenceDetails({classification}:{classification:UnitEvidenc
 export function CameraResourceObservations({rows,now,trusted=true}:{rows:CameraRow[];now:number;trusted?:boolean}){
   return <div className='camera-device-cards'>{rows.map(row=>{
     const evidence=row.evidence,service=row.serviceEvidence||(evidence?.kind==='service_port'?evidence:undefined),provider=trusted?providerState(row,now):'verifying',port=trusted?serviceState(row,now):'verifying';
+    const unclassified=trusted?unclassifiedProviderReport(row):undefined;
     const kind=resourceKind(row),resource=kind==='recorders'?'RECORDER':kind==='detectors'?'DETECTOR':kind==='cameras'?'CAMERA':'PROVIDER';
     return <article key={row.id}><div><strong>{row.name}</strong><b style={{color:statusColor(provider)}}>{resource} {provider==='verifying'?'NOT VERIFIED':provider.toUpperCase()}</b></div><p>{[row.type,row.organization].filter(Boolean).join(' · ')||'Resource type not verified'}</p>
-      {evidence?.kind==='provider'?<><p>{evidence.source} · Last reported {resource.toLowerCase()} state: <b>{String(evidence.status||'unknown').toUpperCase()}</b></p><p>{cameraTime(evidence.observedAt,now)} · {observationAge(evidence.observedAt,now)}</p><small>Last recorded successful provider connection: {cameraTime(evidence.lastOnlineAt,now)}</small></>:<p>No verified provider camera/recorder observation.</p>}
+      {trusted&&providerRecord(row)&&evidence?<><p>{evidence.source} · Last reported {resource.toLowerCase()} state: <b>{String(evidence.status||'unknown').toUpperCase()}</b></p><p>{cameraTime(evidence.observedAt,now)} · {observationAge(evidence.observedAt,now)}</p><small>Last recorded successful provider connection: {cameraTime(evidence.lastOnlineAt,now)}</small></>:unclassified?<><p>{unclassified.source} resource last reported <b>{unclassified.status.toUpperCase()}</b> at {cameraTime(unclassified.observedAt,now)}.</p><p>{observationAge(unclassified.observedAt,now)}</p><p>Hardware type and camera/channel status remain unverified. This saved report does not verify live video.</p><small>Last recorded successful provider connection: {cameraTime(unclassified.lastOnlineAt,now)}</small></>:<p>No verified provider camera/recorder observation.</p>}
       {kind==='recorders'&&<p>Camera channel status unavailable from this recorder observation.</p>}
       <p>{serviceEvidenceLabel(port)}{service?' · '+service.source:''}</p>{service&&<><p>Last reported service result: {service.status.toUpperCase()} · {cameraTime(service.observedAt,now)} · {observationAge(service.observedAt,now)}</p><small>Last recorded service-port success: {cameraTime(service.lastOnlineAt,now)}. Service reachability is not camera-status proof.</small></>}
     </article>;
