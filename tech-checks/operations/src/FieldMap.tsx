@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { locationLink } from './visionAreas';
 import { locationTag, locationExplanation, installationAddressLink, locationVerificationNote, locationHistoryNote, isCurrentFieldPin, historicalFieldCoordinates, parseLocationCoordinates } from './fieldLocations';
+import { checkedAddressEstimate, addressEstimateHumanNote, type AddressEstimate } from './fieldAddressEstimates';
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useCameraHealth } from './useCameraHealth';
 import { fieldCameraHealth, cameraColors, unitHealthLabel, cameraTime } from './fieldCameraHealth';
@@ -43,6 +44,9 @@ type FieldUnit = {
   addressUpdatedAt?:string|null;
   locationVerification?:string|null;
   locationVerifiedAt?:string|null;
+  historicalLatitude?:number|string|null;
+  historicalLongitude?:number|string|null;
+  historicalCoordinateSource?:string|null;
 };
 
 type Snapshot = {
@@ -55,15 +59,28 @@ type Snapshot = {
 type Props = { show:(message:string)=>void; initialUnitId?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; locationWritesEnabled?:boolean };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
+const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
 export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHealth,locationWritesEnabled=false}:Props){
   const restored=useRef(readFieldMapView(window.history.state));
   const restoreViewport=useRef(Boolean(restored.current.center&&restored.current.zoom));
+  const programmaticViewport=useRef(false);
+  const moveViewport=(move:()=>void)=>{programmaticViewport.current=true;try{move();}finally{programmaticViewport.current=false;}};
   const routers=useRouters();
   const cameras=useCameraHealth();
   const [data,setData]=useState<Snapshot|null>(null);
   const [error,setError]=useState('');
+  const [estimateState,setEstimateState]=useState<{snapshot:Snapshot;points:Map<string,AddressEstimate>}|null>(null);
+  const estimates=estimateState?.snapshot===data?estimateState.points:noEstimates;
+  useEffect(()=>{
+    if(!data)return;
+    let current=true;
+    void Promise.all(data.items.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)}))).then(rows=>{
+      if(current)setEstimateState({snapshot:data,points:new Map(rows.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))});
+    });
+    return()=>{current=false;};
+  },[data]);
   const [search,setSearch]=useState(restored.current.search||'');
   const [status,setStatus]=useState(restored.current.status||'field');
   const [selectedId,setSelectedId]=useState(initialUnitId||restored.current.selectedId||'');
@@ -128,6 +145,10 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
   const selected=items.find(x=>x.id===selectedId)||null;
   const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
   const selectedHealth=selected?healthById.get(selected.id):null;
+  const estimateFor=(unit:FieldUnit)=>estimates.get(unit.id)||null;
+  const mapPoint=(unit:FieldUnit)=>hasCoords(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:estimateFor(unit);
+  const tag=(unit:FieldUnit)=>estimateFor(unit)?'ADDRESS ESTIMATE':locationTag(unit);
+  const selectedEstimate=selected?estimateFor(selected):null;
   const nearby=items.find(unit=>unit.id===nearbyId&&hasCoords(unit));
   const distance=(unit:FieldUnit)=>nearby&&hasCoords(unit)?L.latLng(Number(nearby.latitude),Number(nearby.longitude)).distanceTo(L.latLng(Number(unit.latitude),Number(unit.longitude)))/1609.344:null;
   const selectedRouters=routers.data?.items.filter(row=>row.match==='exact_name' && row.candidateUnit?.id===selectedId)||[];
@@ -172,6 +193,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     if(!mapNode.current||mapRef.current)return;
     const map=L.map(mapNode.current,{zoomControl:true}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
     map.on('moveend',()=>{const center=map.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:map.getZoom()});});
+    map.on('dragstart zoomstart',()=>{if(!programmaticViewport.current)restoreViewport.current=true;});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       maxZoom:19,
       attribution:'&copy; OpenStreetMap contributors'
@@ -194,18 +216,20 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     if(!map||!layer)return;
     layer.clearLayers();
     markersRef.current.clear();
-    const mapped=filtered.filter(unit=>hasCoords(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
+    const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
     for(const unit of mapped){
-      const historic=!hasCoords(unit)?historicalFieldCoordinates(unit):null;
-      const latitude=historic?.latitude??Number(unit.latitude);
-      const longitude=historic?.longitude??Number(unit.longitude);
+      const estimate=estimateFor(unit);
+      const historic=!hasCoords(unit)&&!estimate?historicalFieldCoordinates(unit):null;
+      const latitude=estimate?.latitude??historic?.latitude??Number(unit.latitude);
+      const longitude=estimate?.longitude??historic?.longitude??Number(unit.longitude);
       bounds.push([latitude,longitude]);
       const marker=L.marker([latitude,longitude],{
-        title:unit.unitNumber+(historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
+        zIndexOffset:unit.id===selectedId?1000:0,
+        title:unit.unitNumber+(estimate?' · Address estimate - needs verification':historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
-          html:'<span class="cos-field-pin'+(historic?' cos-field-pin-historical':'')+'" style="--pin:'+cameraColors[healthById.get(unit.id)?.state||'unknown']+'"><b>'+(historic?'OLD · ':'')+unit.unitNumber.replace(/[<>&"']/g,'')+'</b></span>',
+          html:'<span class="cos-field-pin'+(estimate?' cos-field-pin-estimate':historic?' cos-field-pin-historical':'')+'" style="--pin:'+cameraColors[healthById.get(unit.id)?.state||'unknown']+'"><b>'+(estimate?'EST · ':historic?'OLD · ':'')+unit.unitNumber.replace(/[<>&"']/g,'')+'</b></span>',
           iconSize:[54,38],
           iconAnchor:[27,34]
         })
@@ -215,22 +239,25 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});openUnitHealth?.(unit.id);} });
       marker.addTo(layer);
     }
+    // Do not consume restored/user viewport intent before this snapshot's asynchronous validation settles.
+    if(estimateState?.snapshot!==data)return;
     if(restoreViewport.current){restoreViewport.current=false;return;}
-    if(focusSelected&&selected&&hasCoords(selected)){
-      map.setView([Number(selected.latitude),Number(selected.longitude)],Math.max(map.getZoom(),14));
+    if(focusSelected&&selected&&mapPoint(selected)){
+      const point=mapPoint(selected)!;moveViewport(()=>map.setView([point.latitude,point.longitude],Math.max(map.getZoom(),14),{animate:false}));
     }else if(bounds.length===1){
-      map.setView(bounds[0],14);
+      moveViewport(()=>map.setView(bounds[0],14,{animate:false}));
     }else if(bounds.length>1){
-      map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14});
+      moveViewport(()=>map.fitBounds(bounds as L.LatLngBoundsExpression,{padding:[40,40],maxZoom:14,animate:false}));
     }
-  },[filtered,selectedId,data?.generatedAt,focusSelected,showHistorical]);
+  },[filtered,selectedId,data?.generatedAt,focusSelected,showHistorical,estimates]);
 
   const fitAllLocations=()=>{
+    restoreViewport.current=false;
     setFocusSelected(false);
-    const map=mapRef.current, bounds=filtered.filter(hasCoords).map(unit=>[Number(unit.latitude),Number(unit.longitude)] as L.LatLngTuple);
+    const map=mapRef.current, bounds=filtered.map(mapPoint).filter(point=>point!==null).map(point=>[point!.latitude,point!.longitude] as L.LatLngTuple);
     if(!map||!bounds.length)return;
-    if(bounds.length===1)map.setView(bounds[0],14);
-    else map.fitBounds(bounds,{padding:[40,40],maxZoom:14});
+    if(bounds.length===1)moveViewport(()=>map.setView(bounds[0],14,{animate:false}));
+    else moveViewport(()=>map.fitBounds(bounds,{padding:[40,40],maxZoom:14,animate:false}));
   };
 
   // Updating health observations must not clear an open popup or recenter a map the owner panned.
@@ -238,12 +265,14 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     for(const unit of filtered){
       const marker=markersRef.current.get(unit.id);
       if(!marker)continue;
-      const element=marker.getElement();if(element)element.title=unit.unitNumber+(!hasCoords(unit)?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id)));
+      const estimate=estimateFor(unit);
+      const element=marker.getElement();if(element)element.title=unit.unitNumber+(estimate?' · Address estimate - needs verification':!hasCoords(unit)?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id)));
       const popup=gpsPopup(document,unit);
-      popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(locationTag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
+      popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(tag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
       marker.getElement()?.querySelector<HTMLElement>('.cos-field-pin')?.style.setProperty('--pin',cameraColors[healthById.get(unit.id)?.state||'unknown']);
-      popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
-      if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
+      popup.append(document.createElement('br'),document.createTextNode(estimate?'Census address estimate · '+routerTime(estimate.geocodedAt)+' · '+estimate.matchedAddress:'Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
+      if(estimate)popup.append(document.createElement('br'),document.createTextNode('ADDRESS ESTIMATE - needs verification. Approximate site location, not live GPS; excluded from nearby results.'));
+      else if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
       popup.append(document.createElement('br'),document.createTextNode('Latest camera observation: '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)));
       const router=routers.data?.items.find(row=>row.match==='exact_name'&&row.candidateUnit?.id===unit.id);
       if(router)popup.append(document.createElement('br'),document.createTextNode('Same-name router: '+routerLabels[routerStatus(router,routers.now)]+' · '+(router.publicIp||router.unitIp||'IP not recorded')+' · checked '+routerTime(router.checkedAt)+' · link unconfirmed, no router GPS'));
@@ -254,7 +283,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
         try{openPopup.setContent(popup);}finally{openPopup.options.autoPan=autoPan;}
       }
     }
-  },[filtered,selectedId,data?.generatedAt,routers.data,routers.now,healthById]);
+  },[filtered,selectedId,data?.generatedAt,routers.data,routers.now,healthById,estimates]);
 
   useEffect(()=>{
     const map=mapRef.current;
@@ -352,23 +381,24 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       </select>
       <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='all'>All connection / camera states</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option></select>
       <button className='secondary' disabled={busy} onClick={()=>{void load();void routers.refresh();void cameras.refresh()}}>Refresh</button>
-      <button className='secondary' disabled={busy||!filtered.some(hasCoords)} onClick={fitAllLocations}>Show all verified pins</button>
+      <button className='secondary' disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations}>{estimates.size?'Show all map pins':'Show all verified pins'}</button>
     </div>
 
     <div className='field-map-nearby'>
       <label>Nearby a job / unit<select aria-label='Nearby unit center' value={nearbyId} onChange={e=>{setNearbyId(e.target.value);setFocusSelected(false)}}><option value=''>Entire field fleet</option>{items.filter(hasCoords).map(unit=><option key={unit.id} value={unit.id}>{unit.activeJobNumber?unit.activeJobNumber+' · ':''}{unit.unitNumber} · {unit.site||unit.address}</option>)}</select></label>
-      <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>historicalFieldCoordinates(unit)).length})</label>
+      <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length})</label>
       {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
     </div>
+    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as dashed EST pins outside nearby mode. Each exact address match is a Census address-range estimate that needs verification. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
     <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 15-minute presentation window is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
     {!data&&!error?<div className='loading'>Loading production field units…</div>:<div className='field-map-layout'>
       <aside className='field-map-list' aria-label='Field units'>
-        {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
+        {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
-          <span className={hasCoords(unit)?'mapped':'missing'}>{locationTag(unit)}</span>
+          <span className={hasCoords(unit)?'mapped':'missing'}>{tag(unit)}</span>
           <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))} · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
         </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>
@@ -378,7 +408,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
         <div className='field-map-legend'>
           <span><i style={{background:cameraColors.online}}/>Camera records online</span>
           <span><i style={{background:cameraColors.offline}}/>Camera outage observed</span>
-          <span><i style={{background:cameraColors.unknown}}/>Camera status unverified</span>{showHistorical&&!nearby&&<span>Dashed OLD pin: unverified historical location</span>}
+          <span><i style={{background:cameraColors.unknown}}/>Camera status unverified</span>{estimates.size>0&&!nearby&&<span>Dashed EST pin: address estimate</span>}{showHistorical&&!nearby&&<span>Dashed OLD pin: unverified historical location</span>}
         </div>
       </section>
 
@@ -390,11 +420,11 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
             <div><dt>Customer</dt><dd>{selected.customer||'—'}</dd></div>
             <div><dt>Site</dt><dd>{selected.site||'—'}</dd></div>
             <div><dt>Installation address</dt><dd>{selected.address||'Not recorded'}</dd></div>
-            <div><dt>Location status</dt><dd>{locationTag(selected)}<br/>{locationExplanation(selected)}</dd></div>
+            <div><dt>Location status</dt><dd>{tag(selected)}<br/>{selectedEstimate?'Exact matched address; approximate site location, not live GPS. Needs verification.':locationExplanation(selected)}</dd></div>
             <div><dt>Address source</dt><dd>{selected.addressSource||selected.recordSource||(selected.installedSiteId?'Installed site record':'Not recorded')}</dd></div>
             <div><dt>Location verified</dt><dd>{selected.locationVerifiedAt?routerTime(selected.locationVerifiedAt):'Not yet verified for this address'}</dd></div>
             <div><dt>Active job</dt><dd>{selected.activeJobNumber||'—'}</dd></div>
-            <div><dt>Map source</dt><dd>{sourceLabel(selected.coordinateSource)}</dd></div>
+            <div><dt>Map source</dt><dd>{selectedEstimate?'U.S. Census address-range estimate':sourceLabel(selected.coordinateSource)}</dd></div>
             <div><dt>Last unit GPS</dt><dd>{selected.gpsRecordedAt?new Date(selected.gpsRecordedAt).toLocaleString():'Not recorded'}</dd></div>
             {selected.recordSource && <div><dt>Location record</dt><dd>{selected.recordSource}</dd></div>}
             {selected.readOnly && <div><dt>Placement verified</dt><dd>{selected.sourceVerifiedAt?new Date(selected.sourceVerifiedAt).toLocaleString():'Not recorded'}</dd></div>}
@@ -403,9 +433,10 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
           <section className='field-router-context' aria-label='Router context for selected unit'><h3>InHand router context</h3><p>Router checks do not supply live locations.</p>{openWorkspace&&<button className='secondary' onClick={()=>openWorkspace('InHand Routers')}>View all InHand routers</button>}
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
-          {historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}
+          {selectedEstimate&&<section className='field-map-estimate-detail' aria-label='Address estimate'><h3>Address estimate - needs verification</h3><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></section>}
+          {!selectedEstimate&&historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}
           <div className='field-map-coordinate-form'>
-            {selected.readOnly ? <><h3>Tracker location</h3><p>This tracker record does not have a unique registered equipment match. Correct its address in the source tracker; register or resolve the unit identity before saving a pin here.</p>{selected.locationNote && <p role='alert'>{selected.locationNote}</p>}{hasCoords(selected) && <p>Imported coordinates retain their original source. Their GPS observation date is not recorded.</p>}</> : !locationWritesEnabled ? <><h3>Location verification</h3><p role='status'>Verified location editing is not enabled for this backend yet. Existing addresses and location history remain available; no GPS save can be submitted from this view.</p></> : <>
+            {selected.readOnly ? <><h3>Tracker location</h3><p>This tracker record does not have a unique registered equipment match. Correct its address in the source tracker; register or resolve the unit identity before saving a pin here.</p>{addressEstimateHumanNote(selected.locationNote) && <p role='alert'>{addressEstimateHumanNote(selected.locationNote)}</p>}{hasCoords(selected) && <p>Imported coordinates retain their original source. Their GPS observation date is not recorded.</p>}</> : !locationWritesEnabled ? <><h3>Location verification</h3><p role='status'>Verified location editing is not enabled for this backend yet. Existing addresses and location history remain available; no GPS save can be submitted from this view.</p></> : <>
             <h3>Verify or update location</h3>
             <p>Check the installation address above, look it up if needed, then enter the pin coordinates or capture your device GPS while on site. Saving records your verification time and location history.</p>
             <label>Paste coordinates or a Google Maps point link<input disabled={busy} value={coordinatePaste} onChange={e=>setCoordinatePaste(e.target.value)} placeholder='Latitude, longitude'/></label><div className='field-map-actions'><button className='secondary' disabled={busy||!coordinatePaste.trim()} onClick={usePastedCoordinates}>Use pasted coordinates</button><button className='secondary' disabled={busy} aria-pressed={pickingPin} onClick={()=>{pickingRef.current=!pickingPin;setPickingPin(!pickingPin)}}>{pickingPin?'Cancel pin selection':'Choose pin on map'}</button></div>{pickingPin&&<p role='status'>Click the map at the verified installation address. This selects an unsaved candidate only.</p>}
@@ -423,7 +454,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
             </div>
             </>}
             {installationAddressLink(selected)&&<a className='field-map-open' href={installationAddressLink(selected)!} target='_blank' rel='noopener noreferrer'>Look up recorded installation address ↗</a>}
-            {hasCoords(selected)&&locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open verified installation pin in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
+            {hasCoords(selected)&&locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open verified installation pin in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&!selectedEstimate&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
           </div>
 
           {!selected.readOnly && <div className='field-map-history'>

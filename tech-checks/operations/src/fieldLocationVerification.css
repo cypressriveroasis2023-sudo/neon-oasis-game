@@ -1,1 +1,5 @@
 .field-map-coordinate-form .field-map-confirm{display:flex;align-items:flex-start;gap:8px;line-height:1.5;margin:12px 0}.field-map-coordinate-form .field-map-confirm input{width:auto;flex:0 0 auto;margin-top:2px}.field-map-list .mapped,.field-map-list .missing{max-width:105px;text-align:center;white-space:normal}.field-map-detail dd{overflow-wrap:anywhere}
+.cos-field-pin-estimate{width:max-content;min-width:78px;max-width:150px;left:50%;transform:translateX(-50%);border:2px dashed #f0bd57;box-shadow:0 0 0 2px #07121f,0 4px 10px #0008}
+.cos-field-pin-estimate b{max-width:138px;overflow:hidden;text-overflow:ellipsis}
+.field-map-estimate-notice,.field-map-estimate-detail{border:1px dashed #f0bd57;border-radius:8px;padding:12px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.field-map-estimate-detail h3{font-size:14px}
