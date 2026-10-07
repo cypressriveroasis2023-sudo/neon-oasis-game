@@ -52,7 +52,7 @@ test('saved endpoints survive failed, stale and missing checks; Unity ports are 
 });
 
 test('connection destinations reject malformed IPs and ports, and diagnostics never guess tracker IDs',()=>{
- for(const ip of ['',null,'https://192.0.2.1','192.0.2.1@evil.test','192.0.2.999','192.0.2.1/24','javascript:alert(1)'])assert.equal(connections({}, {},ip).length,0);
+ for(const ip of ['',null,'https://192.0.2.1','192.0.2.1@evil.test','192.0.2.999','192.0.2.1/24','192.0.2.020','192.0.2.008','0192.0.2.1','javascript:alert(1)'])assert.equal(connections({}, {},ip).length,0);
  assert.equal(connections({expected_ports:[null,0,-1,65536,'443/path','443@host',{},false]}, {},'192.0.2.1').length,1);
  assert.equal(cameraResourcePath(resource(127,'SNIPER 2 005')),'../../camera-detail.html?id=127');
  for(const id of [null,0,-1,'tracker:camv|001','1?next=evil','1/../../other',1.2,Number.MAX_SAFE_INTEGER+1])assert.equal(cameraResourcePath({...resource(id)}),null);

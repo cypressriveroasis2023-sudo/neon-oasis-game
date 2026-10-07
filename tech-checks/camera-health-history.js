@@ -52,7 +52,7 @@
   // number is not proof of HTTP: Unity client/service ports stay plain endpoints.
   function connections(device = {}, health = {}, address) {
     const ip = String(address || '').trim().replace(/\/32$/, '');
-    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(part => Number(part) > 255)) return [];
+    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(part => Number(part) > 255 || part.length > 1 && part.startsWith('0'))) return [];
     const validPort = value => /^(?:[1-9]\d{0,4})$/.test(String(value)) && Number(value) <= 65535;
     const expected = Array.isArray(device.expected_ports) ? device.expected_ports : [];
     const observed = health.port_status && typeof health.port_status === 'object' && !Array.isArray(health.port_status) ? Object.keys(health.port_status) : [];
