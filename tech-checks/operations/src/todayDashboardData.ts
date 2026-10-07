@@ -71,7 +71,7 @@ export async function loadCompanyEquipment(api: DashboardApi): Promise<CompanyEq
   const result: CompanyEquipmentData = { camera: null, routers: null, errors: {} };
   await Promise.all([
     (async () => {
-      try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary-v2')).data); }
+      try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary-v3')).data); }
       catch (cause) { result.errors.camera = equipmentError(cause, 'Camera Health'); }
     })(),
     (async () => {

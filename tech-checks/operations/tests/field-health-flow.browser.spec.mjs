@@ -26,10 +26,10 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();state.requests.push(request);if(request.method!=='GET'){state.writes.push(request);return route.fulfill({status:400,headers,body:JSON.stringify({error:'Synthetic writes disabled'})});}
-  if(request.path==='/api/camera-health/summary-v2'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic provider unavailable'})});
+  if(request.path==='/api/camera-health/summary-v3'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic provider unavailable'})});
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{mhelpTicketImport:true,fieldLocationVerification:true}}
     :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:3,mappedUnits:trackerCase?0:3,unitGps:trackerCase?0:3,missingGps:trackerCase?3:0},generatedAt:now}
-    :request.path==='/api/camera-health/summary-v2'?health
+    :request.path==='/api/camera-health/summary-v3'?health
     :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}
     :request.path==='/api/equipment'?{items:state.units,models:[]}
     :request.path==='/api/customers'?{items:[{id:customer,name:'Synthetic customer',status:'active'}]}

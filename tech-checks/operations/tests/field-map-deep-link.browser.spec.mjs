@@ -42,7 +42,7 @@ const defaultUnits = [{
   latitude: 31
 }];
 async function mount(page, label, units = defaultUnits, {
-  restored, placementReviews=[]
+  restored, placementReviews=[], storedShop=false
 } = {}) {
   const state = {
     units,
@@ -121,7 +121,7 @@ async function mount(page, label, units = defaultUnits, {
         missingGps: 0
       },
       generatedAt: now
-    } : request.path === '/api/camera-health/summary-v2' ? snapshot(state.units.map((u, i) => resource(i + 1, u.unitNumber))) : request.path === '/api/routers' ? {
+    } : request.path === '/api/camera-health/summary-v3' ? snapshot([...state.units.map((u, i) => resource(i + 1, u.unitNumber)),...(storedShop?[resource(999,'Sniper 312',{scope:'shop',activationState:'deactivated',organization:'ROOT',evidence:{...resource(999).evidence,active:false}})]:[])]) : request.path === '/api/routers' ? {
       items: [],
       source: 'camera_health',
       gpsAvailable: false,
@@ -236,3 +236,5 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-ma
 });
 
 test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
+
+test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveCSS('background-color','rgb(53, 212, 138)');await expect(frame.locator('.field-map-workspace')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.field-map-detail')).toContainText(/online/i);});

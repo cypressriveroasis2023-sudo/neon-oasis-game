@@ -48,3 +48,11 @@ test('duplicates, malformed evidence and invalid inventory cannot certify the sn
 test('old API versions fail safely, even when old provider fields claim all online',()=>{
  for(const evidenceVersion of [undefined,1]){const health={...snapshot([resource(1)]),evidenceVersion};const overview=cameraOverview(health,now);assert.equal(overview.scopeVerified,false);assert.equal(overview.summary.online,0);assert.equal(overview.summary.offline,0);assert.equal(overview.groups[0].scope,'unknown');}
 });
+
+test('stored Shop placement never invalidates healthy field camera evidence',()=>{
+ const online=resource(901,'Ranger 901');const rawShop=resource(902,'Sniper 312',{scope:'shop',activationState:'deactivated',organization:'ROOT'});rawShop.evidence={...rawShop.evidence,active:false};
+ const data=snapshot([online,rawShop]);assert.doesNotThrow(()=>validateCameraHealth(data));const view=cameraOverview(data,now);assert.equal(view.summary.online,1);assert.equal(view.groups.find(g=>g.name==='Sniper 312').scope,'shop');assert.equal(rawShop.activationState,'deactivated');
+});
+test('physical Field placement can coexist with deactivated observations without creating online proof',()=>{
+ const row=resource(903,'Ranger 903',{scope:'field',activationState:'deactivated'});row.evidence={...row.evidence,active:false};const data=snapshot([row]);assert.doesNotThrow(()=>validateCameraHealth(data));assert.notEqual(classifyCameraUnit(data.rows,now).providerState,'online');
+});

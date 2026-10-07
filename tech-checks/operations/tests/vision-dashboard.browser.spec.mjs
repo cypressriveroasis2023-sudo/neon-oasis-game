@@ -24,7 +24,7 @@ async function mount(page) {
       :request.path==='/api/equipment'?{items:[shop,gps,address,unknown],models:[]}
       :request.path==='/api/field-map'?{items:[gps,address],summary:{fieldUnits:2,mappedUnits:1,unitGps:0,missingGps:1},generatedAt:stamp}
       :request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}
-      :request.path==='/api/camera-health/summary-v2'?snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline')])
+      :request.path==='/api/camera-health/summary-v3'?snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline')])
       :request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}
       :{items:[]};
     return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});

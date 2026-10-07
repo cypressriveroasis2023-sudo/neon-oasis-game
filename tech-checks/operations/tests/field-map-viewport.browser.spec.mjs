@@ -28,7 +28,7 @@ async function mount(page) {
     const data = request.path === '/api/session' ? { authorized: true, name: 'Fixture owner', role: 'Owner' }
       : request.path === '/api/field-map' ? { items: units, summary: { fieldUnits: 815, mappedUnits: 3, unitGps: 0, missingGps: 812 }, generatedAt: stamp }
       : request.path === '/api/routers' ? { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: stamp }
-      : request.path === '/api/camera-health/summary-v2' ? { totalDevices: 0, online: 0, offline: 0, review: 0, fieldDevices: 0, shopRoot: 0, healthRows: 0, refreshedAt: stamp, rows: [] }
+      : request.path === '/api/camera-health/summary-v3' ? { totalDevices: 0, online: 0, offline: 0, review: 0, fieldDevices: 0, shopRoot: 0, healthRows: 0, refreshedAt: stamp, rows: [] }
       : request.path === '/api/daily-board' ? { jobs: [], tasks: [], readiness: [], asOf: stamp } : { items: [] };
     return route.fulfill({ headers, contentType: 'application/json', body: JSON.stringify(data) });
   });

@@ -15,7 +15,7 @@ test('fresh connection survives inactive inventory; refresh and aging never chan
   const request=route.request().postDataJSON();if(request.method!=='GET'){writes.push(request);return route.fulfill({status:400,headers,body:JSON.stringify({error:'No synthetic writes'})});}
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:[unit],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:new Date(now).toISOString()}
-   :request.path==='/api/camera-health/summary-v2'?snapshot([row])
+   :request.path==='/api/camera-health/summary-v3'?snapshot([row])
    :request.path==='/api/equipment'?{items:[unit],models:[]}
    :request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:new Date(now).toISOString()}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});

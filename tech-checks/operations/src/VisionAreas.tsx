@@ -25,7 +25,7 @@ const records = (data: any) => {
   return data.items as Record<string, any>[];
 };
 const sources: Record<string, string> = {
-  'Camera Health': '/api/camera-health/summary-v2', 'InHand Routers': '/api/routers',
+  'Camera Health': '/api/camera-health/summary-v3', 'InHand Routers': '/api/routers',
   'Victron VRM': '/api/vrm-portal', 'Units On Hand': '/api/equipment',
   'Field Map': '/api/field-map', Team: '/api/team-production',
 };
