@@ -4,7 +4,7 @@ import { locationLink } from './visionAreas';
 import { locationTag, locationExplanation, installationAddressLink, locationVerificationNote, locationHistoryNote, isCurrentFieldPin, historicalFieldCoordinates, parseLocationCoordinates } from './fieldLocations';
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useCameraHealth } from './useCameraHealth';
-import { fieldCameraHealth, cameraColors, cameraLabels, cameraTime } from './fieldCameraHealth';
+import { fieldCameraHealth, cameraColors, unitHealthLabel, cameraTime } from './fieldCameraHealth';
 import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
@@ -202,7 +202,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       const longitude=historic?.longitude??Number(unit.longitude);
       bounds.push([latitude,longitude]);
       const marker=L.marker([latitude,longitude],{
-        title:unit.unitNumber+(historic?' · Unverified historical location':' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']),
+        title:unit.unitNumber+(historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
           html:'<span class="cos-field-pin'+(historic?' cos-field-pin-historical':'')+'" style="--pin:'+cameraColors[healthById.get(unit.id)?.state||'unknown']+'"><b>'+(historic?'OLD · ':'')+unit.unitNumber.replace(/[<>&"']/g,'')+'</b></span>',
@@ -238,9 +238,9 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     for(const unit of filtered){
       const marker=markersRef.current.get(unit.id);
       if(!marker)continue;
-      const element=marker.getElement();if(element)element.title=unit.unitNumber+(!hasCoords(unit)?' · Unverified historical location':' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']);
+      const element=marker.getElement();if(element)element.title=unit.unitNumber+(!hasCoords(unit)?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id)));
       const popup=gpsPopup(document,unit);
-      popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(locationTag(unit)+' · '+cameraLabels[healthById.get(unit.id)?.state||'unknown']));
+      popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(locationTag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
       marker.getElement()?.querySelector<HTMLElement>('.cos-field-pin')?.style.setProperty('--pin',cameraColors[healthById.get(unit.id)?.state||'unknown']);
       popup.append(document.createElement('br'),document.createTextNode('Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
       if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
@@ -350,7 +350,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
         <option value='returning'>Returning</option>
         <option value='missing'>Coordinates pending</option>
       </select>
-      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='all'>All camera states</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option></select>
+      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='all'>All connection / camera states</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option></select>
       <button className='secondary' disabled={busy} onClick={()=>{void load();void routers.refresh();void cameras.refresh()}}>Refresh</button>
       <button className='secondary' disabled={busy||!filtered.some(hasCoords)} onClick={fitAllLocations}>Show all verified pins</button>
     </div>
@@ -360,7 +360,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>historicalFieldCoordinates(unit)).length})</label>
       {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
     </div>
-    <div className='router-map-note'><b>Reported camera/detector observations · independently verified locations</b><p>Green: reported camera/detector records recently online. Red: at least one camera/detector recently reported offline. Gray: older, missing, unmatched or channel evidence unavailable. Recorder status and service ports never set camera colors. The 15-minute presentation window is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
+    <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 15-minute presentation window is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} units without verified current camera status.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
@@ -369,7 +369,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
         {filtered.length?filtered.map(unit=><button key={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
           <span className={hasCoords(unit)?'mapped':'missing'}>{locationTag(unit)}</span>
-          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small>{cameraLabels[healthById.get(unit.id)?.state||'unknown']} · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
+          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))} · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
         </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>
 
@@ -385,7 +385,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       <aside className='field-map-detail'>
         {selected?<><small>FIELD UNIT</small><h2>{selected.unitNumber}</h2>
           <p>{selected.modelName||'Equipment'} · <b>{selected.status.replaceAll('_',' ')}</b></p>
-          <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[selectedHealth?.state||'unknown']}}>{cameraLabels[selectedHealth?.state||'unknown']}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>{openUnitHealth&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
+          <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[selectedHealth?.state||'unknown']}}>{unitHealthLabel(selectedHealth)}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>{openUnitHealth&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
           <dl>
             <div><dt>Customer</dt><dd>{selected.customer||'—'}</dd></div>
             <div><dt>Site</dt><dd>{selected.site||'—'}</dd></div>
