@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+const c=vm.createContext({});vm.runInContext(fs.readFileSync(new URL('../../camera-connection-editor.js',import.meta.url),'utf8'),c);const api=c.CameraConnectionEditor;
+const snapshot={device_id:10,unit_key:'SNIPER 312',public_ip:'203.0.113.12',expected_ports:[443,8443],connection_revision:4,unit_etag:'synthetic-unit-etag'};
+test('connection editor validates identity, unit etag, saved ports and revision together',()=>{assert.equal(api.state(snapshot,10,'SNIPER 312'),true);for(const patch of [{device_id:11},{unit_key:'SPOTTER 312'},{unit_etag:null},{connection_revision:null},{connection_revision:4.5},{expected_ports:[443,443]},{expected_ports:[0]},{expected_ports:['443']}])assert.equal(api.state({...snapshot,...patch},10,'SNIPER 312'),false);});
+test('save receipt cannot confirm a different endpoint, unit or stale revision',()=>{assert.equal(api.receipt({...snapshot,ok:true},10,'SNIPER 312','203.0.113.12',4),true);for(const patch of [{ok:false},{public_ip:'203.0.113.13'},{connection_revision:3},{unit_etag:''}])assert.equal(api.receipt({...snapshot,ok:true,...patch},10,'SNIPER 312','203.0.113.12',4),false);});
+
+test('a missing endpoint is editable without inventing an IP',()=>{assert.equal(api.state({...snapshot,public_ip:null},10,'SNIPER 312'),true);assert.equal(api.state({...snapshot,public_ip:undefined},10,'SNIPER 312'),false);});

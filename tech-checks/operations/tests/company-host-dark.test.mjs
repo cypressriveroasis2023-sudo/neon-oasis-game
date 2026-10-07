@@ -8,7 +8,8 @@ const css=readFileSync(new URL('../../company-host-theme.css',import.meta.url),'
 test('dark host preserves script bodies and URLs except the reviewed queue cache version',()=>{
   assert.equal(html.split('production-assignments-host.js?v=operations-assigned-prep-20261006').length-1,1);
   assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
-  const scripts=[...html.replace('production-assignments-host.js?v=operations-assigned-prep-20261006','production-assignments-host.js?v=operations-v100-phase2-20261004').replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
+  assert.equal(html.split('verified-it-fleet-host.js?v=verified-it-fleet-20261007').length-1,1);
+  const scripts=[...html.replace('<script type="module" src="./verified-it-fleet-host.js?v=verified-it-fleet-20261007"></script>','').replace('production-assignments-host.js?v=operations-assigned-prep-20261006','production-assignments-host.js?v=operations-v100-phase2-20261004').replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
   assert.equal(scripts.length,8);
   // Baseline main 9af5916e: includes full inline bodies and external module URLs.
   assert.equal(createHash('sha256').update(scripts.join('\n')).digest('hex'),'3794b35dcb29cf38aeacc107c543259c5b53ccde8e454e4b3aa294463319682d');

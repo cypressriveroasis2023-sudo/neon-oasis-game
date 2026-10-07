@@ -60,13 +60,13 @@ type Snapshot = {
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; locationWritesEnabled?:boolean };
+type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,locationWritesEnabled=false}:Props){
+export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false}:Props){
   const restored=useRef(readFieldMapView(window.history.state));
   const restoreViewport=useRef(Boolean(restored.current.center&&restored.current.zoom));
   const programmaticViewport=useRef(false);
@@ -193,9 +193,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     setCoordinatePaste('');
     setHistory([]);
     setHistoryError('');
-    setHistoryLoading(Boolean(selected.hasUnitGps));
+    setHistoryLoading(Boolean(historyReadEnabled&&selected.hasUnitGps));
     let current = true;
-    if (selected.hasUnitGps) {
+    if (historyReadEnabled&&selected.hasUnitGps) {
       api.get('/api/field-map/' + selected.id + '/history').then(response => {
         if (!Array.isArray(response.data?.items)) throw new Error('GPS history returned an incomplete response.');
         if (current) setHistory(response.data.items);
@@ -204,7 +204,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       }).finally(() => { if (current) setHistoryLoading(false); });
     }
     return () => { current = false; };
-  },[selectedId,data?.generatedAt]);
+  },[selectedId,data?.generatedAt,historyReadEnabled]);
 
   useEffect(()=>{
     if(!mapNode.current||mapRef.current)return;
@@ -476,7 +476,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {hasCoords(selected)&&locationLink(selected)&&<a className='field-map-open' href={locationLink(selected)!} target='_blank' rel='noopener noreferrer'>{hasCoords(selected)?'Open verified installation pin in Google Maps':'Open installed address in Google Maps'} ↗</a>}{!hasCoords(selected)&&!selectedEstimate&&<p role='status'>{selected.address?.trim()?'Installed address available. A map pin needs verified coordinates.':'GPS and installed address are missing. Add the unit location for follow-up.'}</p>}
           </div>
 
-          {!selected.readOnly && <div className='field-map-history'>
+          {historyReadEnabled&&!selected.readOnly && <div className='field-map-history'>
             <h3>GPS history</h3>
             {historyError ? <p role='alert'>{historyError}</p> : historyLoading ? <p role='status'>Loading GPS history…</p> : history.length?history.slice(0,8).map(row=><div key={row.id}><b>{Number(row.latitude).toFixed(6)}, {Number(row.longitude).toFixed(6)}</b><small>{sourceLabel(row.source)} · {new Date(row.recordedAt).toLocaleString()}{row.recordedBy?' · '+row.recordedBy:''}</small>{row.note&&<span>{locationHistoryNote(row.note)}</span>}</div>):<p>No unit-level GPS history yet.</p>}
           </div>}

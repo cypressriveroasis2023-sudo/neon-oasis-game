@@ -9,10 +9,10 @@
     if (value == null || value === '') return { at: null, state: 'missing' };
     // Stored timestamptz values must identify a real calendar date and timezone.
     // Date.parse alone silently normalizes impossible dates such as February 30.
-    const parts = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.exec(value) : null;
+    const parts = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::\d{2})?)$/.exec(value) : null;
     const calendar = parts ? new Date(Date.UTC(+parts[1], +parts[2] - 1, +parts[3])) : null;
     const valid = parts && calendar.getUTCFullYear() === +parts[1] && calendar.getUTCMonth() === +parts[2] - 1 && calendar.getUTCDate() === +parts[3] && +parts[4] < 24 && +parts[5] < 60 && +parts[6] < 60;
-    const at = valid ? Date.parse(value) : NaN;
+    const at = valid ? Date.parse(value.replace(/([+-]\d{2})$/, '$1:00')) : NaN;
     if (!Number.isFinite(at) || at <= 0 || at > now) return { at: null, state: 'invalid' };
     return { at: new Date(at).toISOString(), state: now - at > ttl ? 'stale' : 'fresh' };
   }
@@ -23,7 +23,19 @@
       year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
     }).format(new Date(time.at));
   }
-  function port(health = {}, key, now = Date.now()) {
+  function connectionSnapshot(health={},device) {
+    const meta=health.port_status?._connection;
+    const empty={...health,checked_at:null,overall_status:'unknown',ip_reachable:null,confirmed_outage:false,consecutive_failures:0,port_status:{}};
+    if(device){const revision=device.connection_revision??0;if(meta){if(String(meta.revision)!==String(revision)||String(meta.ip||'')!==String(device.public_ip||'').replace(/\/32$/,''))return empty;}else if(revision!==0)return empty;}
+    if(!meta||typeof meta!=='object'||Array.isArray(meta)){
+      if(device&&/Star4Live live API|Control Center live API|^Reconeyez cloud event:/i.test(String(health.detail||'')))return empty;
+      if(device&&['vigilant_control_center','reconeyez'].includes(device.source)&&!Object.entries(health.port_status||{}).some(([key,value])=>/^[1-9]\d{0,4}$/.test(key)&&typeof value?.online==='boolean'))return empty;
+      return health;
+    }
+    return {...health,checked_at:typeof meta.checkedAt==='string'?meta.checkedAt:null,overall_status:['online','offline','unknown','verifying'].includes(meta.status)?meta.status:'unknown',ip_reachable:typeof meta.reachable==='boolean'?meta.reachable:null,confirmed_outage:meta.confirmedOutage===true,consecutive_failures:Number.isInteger(meta.consecutiveFailures)?meta.consecutiveFailures:0,detail:'Saved direct service-port observation'};
+  }
+  function port(health = {}, key, now = Date.now(), device) {
+    health=connectionSnapshot(health,device);
     const results = health?.port_status;
     const result = results && typeof results === 'object' && !Array.isArray(results)
       && Object.prototype.hasOwnProperty.call(results, key) ? results[key] : null;
@@ -69,6 +81,7 @@
   }
   function record(device = {}, health = {}, group, now = Date.now()) {
     const provider = group === 'Vigilant' || group === 'Reconeyez';
+    if(!provider)health=connectionSnapshot(health,device);
     const source = group === 'Vigilant' ? 'Star4Live provider' : group === 'Reconeyez' ? 'Reconeyez cloud' : 'Direct service-port check';
     const attempt = timestamp(provider ? device.source_last_seen_at : health.checked_at || device.last_health_checked_at, now);
     const success = timestamp(provider ? device.last_online_at : device.last_probe_online_at, now);
@@ -104,5 +117,5 @@
     };
     return '<div class="unit-time-strip" aria-label="Connection check history">' + cell(attemptRow, 'attempt') + cell(successRow, 'success') + '</div>';
   }
-  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip };
+  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip, connectionSnapshot };
 })(globalThis);

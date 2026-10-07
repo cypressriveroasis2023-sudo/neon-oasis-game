@@ -52,7 +52,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
     name: 'Save placement'
   }).click();
   expect(await page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(0);
-  await page.getByLabel('Current installation street address').fill('100 Synthetic Road');
+  await page.getByLabel('Current installation address (street, city, state and ZIP)').fill('100 Synthetic Road');
   await page.getByRole('button', {
     name: 'Save placement'
   }).click();
@@ -173,7 +173,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
   await expect(page.locator('.cos-placement-dialog h2')).toHaveText('Move to Field');
   expect(await page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(0);
   await page.getByLabel('Current job / site').fill('Current synthetic job');
-  await page.getByLabel('Current installation street address').fill('100 Synthetic Road');
+  await page.getByLabel('Current installation address (street, city, state and ZIP)').fill('100 Synthetic Road');
   await page.getByLabel('Reason for move').fill('Owner confirmed physical deployment');
   await page.getByLabel('I confirm').check();
   await page.getByRole('button', {name: 'Save placement'}).click();
