@@ -70,11 +70,11 @@ test('offline totals exclude shop, inactive, port-only and unmapped records whil
   window.fixtureIntegrations=[{provider:'witness',metadata:{units:{'spotter|904':{status:'offline',checked_at:'2026-10-06T12:29:00Z'}}}}];
   await load();
  });
- await expect(page.locator('#allOffline')).toHaveText('3');await expect(page.locator('#shopTotal')).toHaveText('1');await expect(page.locator('#inactiveTotal')).toHaveText('1');await expect(page.locator('#mappingTotal')).toHaveText('3');await page.screenshot({path:info.outputPath('camera-classification-hotfix.png'),fullPage:true});
+ await expect(page.locator('#allOffline')).toHaveText('3');await expect(page.locator('#shopTotal')).toHaveText('2');await expect(page.locator('#inactiveTotal')).toHaveText('1');await expect(page.locator('#mappingTotal')).toHaveText('3');await page.screenshot({path:info.outputPath('camera-classification-hotfix.png'),fullPage:true});
  await page.locator('#statAllOffline').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="RANGER 901"]')).toContainText('LOCATION REVIEW');
  await page.locator('.compact-unit[data-unit="RANGER 901"]').click();await expect(page.locator('#cameraIssues')).toContainText('OFFLINE');await page.keyboard.press('Escape');
  await page.locator('[data-scope-filter="Mapping"]').click();await expect(page.locator('.compact-unit')).toHaveCount(3);await expect(page.locator('.compact-unit[data-unit="SPOTTER 904"]')).toContainText('STATUS UNVERIFIED');await expect(page.locator('[data-unit="SPOTTER 904"] .statuspill')).not.toContainText('OFFLINE');await expect(page.locator('.compact-unit[data-unit="SPOTTER 902"]')).toContainText('RECORDER OFFLINE');
- await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('SHOP / ROOT');
+ await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toHaveCount(2);await expect(page.locator('.compact-unit .statuspill')).toHaveText(['SHOP / ROOT','INACTIVE']);
  await page.locator('[data-scope-filter="Deactivated"]').click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit .statuspill')).toHaveText('INACTIVE');
 });
 test('current evidence expires in both overview and open details without fresh reads',async({page})=>{
@@ -132,18 +132,27 @@ test('fleet breakdown counts each unit once and exposes familiar provider groups
  await page.locator('[data-scope-filter="FleetOffline"]').click();await expect(page.locator('.compact-unit')).toHaveCount(2);
 });
 
-test('front shop action preserves confirmation, exact unit, single submission and separate details navigation',async({page},info)=>{
- const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);
- await page.evaluate(()=>{window.moves=[];db.rpc=async(name,args)=>{moves.push({name,args});await new Promise(resolve=>window.releaseMove=resolve);fixtureDevices=fixtureDevices.map(d=>d.unit_key===args.p_unit_key?{...d,organization:'ROOT'}:d);return {data:{},error:null};};});
- const card=page.locator('[data-unit="RANGER 022"].compact-unit'),move=card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}),details=card.getByRole('button',{name:'Open RANGER 022 unit details'});
- await expect(move).toBeVisible();await expect(card.locator('button button')).toHaveCount(0);
- page.once('dialog',d=>d.dismiss());await move.click();await expect(page.getByRole('dialog')).not.toBeVisible();expect(await page.evaluate(()=>moves.length)).toBe(0);await expect(move).toBeEnabled();
- await details.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(details).toBeFocused();
- page.once('dialog',async d=>{expect(d.message()).toContain('RANGER 022');await d.accept();});await move.click();await expect(move).toBeDisabled();await expect(page.getByRole('dialog')).not.toBeVisible();await page.evaluate(()=>window.freshnessCheck());await expect(move).toBeDisabled();
- await move.evaluate(button=>button.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(await page.evaluate(()=>moves)).toEqual([{name:'owner_set_camera_unit_location_v1',args:{p_unit_key:'RANGER 022',p_location:'ROOT',p_reason:'Moved to ROOT / shop from Camera Health'}}]);
- await page.evaluate(()=>releaseMove());await expect(card).toHaveCount(0);await expect(page.locator('#shopTotal')).toHaveText('1');
- await page.locator('#statShop').click();await expect(page.locator('.compact-unit')).toContainText('RANGER 022');await expect(page.locator('.front-shop-action')).toHaveCount(0);expect(errors).toEqual([]);
- await page.screenshot({path:info.outputPath('shop-confirmed-synthetic.png'),fullPage:true});
+test('front placement confirmation moves shop and field without changing health',async({page},info)=>{
+ await mount(page);
+ await page.evaluate(()=>{window.moves=[];window.placementState={unitKey:'RANGER 022',placement:'FIELD',siteLabel:'Synthetic site',streetAddress:'10 Synthetic Road',auditId:null,canMove:true};db.rpc=async(name,args)=>{
+  if(name==='owner_camera_unit_placement_state_v2')return {data:placementState,error:null};
+  moves.push({name,args});await new Promise(resolve=>window.releaseMove=resolve);
+  placementState={...placementState,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:String(moves.length)};
+  fixtureDevices=fixtureDevices.map(d=>d.unit_key===args.p_unit_key?{...d,organization:args.p_placement==='SHOP'?'ROOT':args.p_site_label,activation_state:args.p_placement==='SHOP'?'deactivated':'active'}:d);
+  return {data:{ok:true,unit_key:args.p_unit_key,placement:args.p_placement,request_id:args.p_request_id,audit_id:placementState.auditId},error:null};};});
+ const card=page.locator('[data-unit="RANGER 022"].compact-unit');await card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();
+ const dialog=page.locator('.cos-placement-dialog');await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'Cancel'}).click();await expect(dialog).toHaveCount(0);expect(await page.evaluate(()=>moves.length)).toBe(0);
+ await card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();await dialog.getByLabel('Reason for move').fill('Returned to shop');await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Save placement'}).click();await expect(dialog.getByRole('button',{name:'Save placement'})).toBeDisabled();await page.keyboard.press('Escape');await expect(dialog).toBeVisible();expect(await page.evaluate(()=>moves.length)).toBe(1);
+ await page.evaluate(()=>releaseMove());await expect(dialog).toHaveCount(0);await page.getByRole('button',{name:'Shop / ROOT folder',exact:true}).click();await expect(card).toBeVisible();await expect(card.getByRole('button',{name:'Move to Field',exact:true})).toBeVisible();await expect(card.getByRole('link',{name:'Field Map'})).toHaveAttribute('href','./?fieldUnit=RANGER%20022');
+ await card.getByRole('button',{name:'Move to Field',exact:true}).click();await dialog.getByLabel('Current job / site').fill('New synthetic site');await dialog.getByLabel('Current installation street address').fill('20 Test Road');await dialog.getByLabel('Reason for move').fill('Installed');await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Save placement'}).click();expect(await page.evaluate(()=>moves.length)).toBe(2);await page.evaluate(()=>releaseMove());await expect(dialog).toHaveCount(0);
+ await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await expect(card).toContainText('New synthetic site');await expect(card).toContainText('OFFLINE');
+ await page.screenshot({path:info.outputPath('shop-field-synthetic.png'),fullPage:true});
+});
+
+test('visible folders and global search include deactivated ROOT units without family collisions',async({page})=>{
+ await mount(page);await page.evaluate(async()=>{fixtureDevices.push({id:999,unit_key:'SNIPER 312',device_name:'Shop camera 312',organization:'ROOT',activation_state:'deactivated',device_type:'Sniper',source:'2026_unit_tracker'});await load();});
+ await page.getByRole('button',{name:'Shop / ROOT folder',exact:true}).click();await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('.compact-unit')).toContainText('SNIPER 312');
+ await page.getByRole('button',{name:'Field / Job Sites',exact:true}).click();await page.getByLabel('Search units').fill('312');await expect(page.locator('.compact-unit')).toHaveCount(1);await expect(page.locator('#boardTitle')).toContainText('Search all inventory');await expect(page.locator('.compact-unit')).toContainText('SHOP / ROOT');
 });
 
 test('online and offline edges stay bright without selection while stale and shop stay neutral',async({page},info)=>{
@@ -156,12 +165,7 @@ test('online and offline edges stay bright without selection while stale and sho
 });
 
 
-test('failed front moves show visible errors while management panel stays closed',async({page})=>{
- const errors=[];page.on('pageerror',e=>errors.push(e.message));await mount(page);const card=page.locator('.compact-unit[data-unit="RANGER 022"]');
- await expect(page.locator('#manageUnitsPanel')).not.toBeVisible();
- for(const thrown of [false,true]){
-  await page.evaluate(({thrown})=>{db.rpc=async()=>{if(thrown)throw new Error('Synthetic network failure');return {error:{message:'Synthetic move denied'}};};},{thrown});
-  page.once('dialog',d=>d.accept());await card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();await expect(card.locator('.unit-move-status')).toBeVisible();await expect(card.locator('.unit-move-status')).toContainText(thrown?'Refresh Camera Health before retrying':'Synthetic move denied');await expect(card.getByRole('button',{name:'Move to ROOT / SHOP',exact:true})).toBeEnabled();await expect(page.getByRole('dialog')).not.toBeVisible();
- }
- expect(errors).toEqual([]);
+test('unavailable placement reads show an error without submitting changes',async({page})=>{
+ await mount(page);await page.evaluate(()=>{window.writes=0;db.rpc=async name=>{if(name==='owner_set_camera_unit_placement_v2')writes++;return {error:{message:'Synthetic denied'}};};});
+ await page.locator('.compact-unit[data-unit="RANGER 022"]').getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toContainText('Synthetic denied');await expect(page.locator('.cos-placement-dialog [type=submit]')).toBeDisabled();expect(await page.evaluate(()=>writes)).toBe(0);await page.locator('.cos-placement-dialog').getByRole('button',{name:'Cancel'}).click();
 });

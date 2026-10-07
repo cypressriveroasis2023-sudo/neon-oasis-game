@@ -139,7 +139,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
       return element;
     },
   };
-  vm.runInNewContext(hostSource, { window, document, MutationObserver }, { filename: 'operations-host.js' });
+  vm.runInNewContext(hostSource, { window, document, MutationObserver, URLSearchParams }, { filename: 'operations-host.js' });
   const flushMutations = () => {
     for (let round = 0; round < 20; round++) {
       const pending = observers.filter(observer => observer.pending);

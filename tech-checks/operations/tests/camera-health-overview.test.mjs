@@ -122,3 +122,8 @@ test('one synthetic244-unit dataset partitions provider systems, service-only ev
 });
 
 test('Witness service success requires matching positive reachability',()=>{const d={...current,__trackerOnly:true,__providerLabel:'Witness',source:'tracker_evidence',__evidence:{status:'online',checked_at:current.source_last_seen_at,reachable:true}};assert.equal(api.serviceState(d,{},now),'online');for(const reachable of [false,null,undefined])assert.equal(api.serviceState({...d,__evidence:{...d.__evidence,reachable}}, {},now),'verifying')});
+
+test('new backend-protected Owner FIELD placement overrides stale tracker SHOP without changing observed health',()=>{
+ const d={id:999,unit_key:'SNIPER 312',organization:'Current job',activation_state:'active',activation_source:'owner_location_override_v2',source_status:'offline'};
+ const tracker=[{source_label:'SNIPER 312',tracker_state:'shop'}];assert.equal(api.placement(d,tracker),'field');assert.equal(d.source_status,'offline');assert.equal(api.placement({...d,activation_source:'owner_location_override'},tracker),'unknown');assert.equal(api.placement({...d,organization:'ROOT',activation_state:'deactivated'},tracker),'shop');
+});

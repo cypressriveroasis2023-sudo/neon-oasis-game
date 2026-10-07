@@ -70,13 +70,13 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">
 <script defer src="./cos-eye-branding.js?v=20261006b"></script>
-</head>
+<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261007"></script></head>
 <body>
 <div class="shell">
   <div class="topbar">
     <div class="toprow">
       <button class="back" id="backBtn">← Camera Health</button>
-      <button class="action primary" id="verifyBtn">Verify now</button>
+      <a class="action" href="./camera-health.html?folder=Shop">Shop / ROOT folder</a><a class="action" id="fieldMapLink" href="./?fieldView=1">Field Map →</a><button class="action primary" id="verifyBtn">Verify now</button>
     </div>
   </div>
 
@@ -201,7 +201,7 @@ function reconBatteryText(d=device){return ReconBattery.text(reconMetadata(d))}
 
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase(),model=String(d?.device_model||'').toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),source=String(d?.source||'').toLowerCase();if(source==='reconeyez'||prof==='reconeyez'||s.includes('reconeyez'))return'Reconeyez';if(model.startsWith('ALI-')||['helios','nvr','ranger','solar_spotter','spotter'].includes(prof)||s.includes('alibi'))return'Vigilant';if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
-function isShopDevice(d){const org=String(d?.organization||'').trim().toLowerCase();return org==='root'||String(d?.activation_state||'').toLowerCase()==='deactivated'||(cameraGroup(d)==='Reconeyez'&&org.includes('shop'))}
+function isShopDevice(d){const org=String(d?.organization||'').trim().toLowerCase();return ['root','shop','shop equipment','shop/root','root/shop'].includes(org)||(cameraGroup(d)==='Reconeyez'&&/\bshop\b/.test(org))}
 function sourceFresh(d,ttlMs=20*60*1000){const t=d?.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
 function checkFresh(h,ttlMs=20*60*1000){if(/Star4Live live API reports|Control Center live API reports/.test(String(h?.detail||'')))return false;const t=h?.checked_at?new Date(h.checked_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
 function hasDirectLiveProof(){
@@ -262,17 +262,18 @@ function render(){
   }
   $('firstFailed').textContent=current?.first_failed_at?fmt(current.first_failed_at):'—';$('lastRecovered').textContent=current?.last_recovered_at?fmt(current.last_recovered_at):'—';
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
+  $('fieldMapLink').href='./?fieldUnit='+encodeURIComponent(device.unit_key||device.device_name||'');
   const shopWrap=$('shopActionWrap'),shopBtn=$('moveShopBtn'),shopTitle=$('shopActionTitle'),shopText=$('shopActionText');
-  const owner=String(profile?.role||'')==='owner',atShop=isShopDevice(device),liveProof=hasDirectLiveProof();
+  const owner=String(profile?.role||'')==='owner',atShop=isShopDevice(device)||String(device.activation_state||'').toLowerCase()==='deactivated',liveProof=hasDirectLiveProof();
   shopWrap.classList.add('hidden');shopWrap.classList.remove('at-shop');
   if(owner&&atShop){
     shopWrap.classList.remove('hidden');shopWrap.classList.add('at-shop');
-    shopTitle.textContent='✓ Unit is at Shop / ROOT';
+    shopTitle.textContent=isShopDevice(device)?'Unit is at Shop / ROOT':'Unit is stored / inactive';
     shopText.textContent='Shop / ROOT cameras stay out of field-offline and issue counts. If this camera is responding, it can still count as online inventory.';
-    shopBtn.classList.add('hidden');
-  }else if(owner&&liveProof){
+    shopBtn.textContent='Move to Field';shopBtn.disabled=false;shopBtn.classList.remove('hidden');
+  }else if(owner){
     shopWrap.classList.remove('hidden');
-    shopTitle.textContent='Camera is responding live';
+    shopTitle.textContent='Unit placement';
     shopText.textContent='Move the entire '+(device.unit_key||'camera unit')+' to Shop / ROOT. This removes it from field-offline and field-issue lists without deleting its health history.';
     shopBtn.textContent='Move unit to Shop / ROOT';
     shopBtn.disabled=false;shopBtn.classList.remove('hidden');
@@ -280,7 +281,8 @@ function render(){
     shopBtn.classList.add('hidden');
   }
   const ipSetup=$('ipSetupWrap'),ownerCanEdit=['owner','it'].includes(String(profile?.role||'').toLowerCase());
-  const siteBtn=$('editSiteBtn');if(siteBtn){siteBtn.classList.toggle('hidden',!ownerCanEdit);siteBtn.onclick=()=>{const w=$('siteEditWrap');w.classList.toggle('hidden');$('siteNameInput').value=device.organization||'';if(!w.classList.contains('hidden'))$('siteNameInput').focus()}};
+  if(device.activation_source==='owner_location_override_v2')$('siteEditWrap').classList.add('hidden');
+  const siteBtn=$('editSiteBtn');if(siteBtn){siteBtn.classList.toggle('hidden',!ownerCanEdit||device.activation_source==='owner_location_override_v2');siteBtn.onclick=()=>{const w=$('siteEditWrap');w.classList.toggle('hidden');$('siteNameInput').value=device.organization||'';if(!w.classList.contains('hidden'))$('siteNameInput').focus()}};
 
   if(ownerCanEdit&&!isRecon){
     ipSetup.classList.remove('hidden');
@@ -384,6 +386,7 @@ async function saveUnitRouter(){
   }catch(e){console.error(e);alert('Could not save router: '+(e?.message||e));b.disabled=false;b.textContent='Save router to this unit'}
 }
 async function saveUnitSite(){
+  if(device?.activation_source==='owner_location_override_v2'){ $('siteEditWrap').classList.add('hidden');return; }
   if(!device||!['owner','it'].includes(String(profile?.role||'').toLowerCase()))return;
   const site=String($('siteNameInput').value||'').trim();if(!site){alert('Enter the site or customer name.');return}
   const b=$('saveSiteBtn');b.disabled=true;b.textContent='Saving site…';
@@ -404,27 +407,9 @@ async function saveUnitPublicIP(){
 }
 async function moveUnitToShop(){
   if(!device||String(profile?.role||'')!=='owner')return;
-  if(!hasDirectLiveProof()){
-    alert('Verify this camera first. Move to Shop / ROOT is available only after the live check proves the camera is responding.');
-    return;
-  }
-  const unit=device.unit_key||device.device_name||'this camera';
-  if(!confirm('Move '+unit+' to Shop / ROOT?\n\nEvery Camera Health component assigned to this unit will be moved to ROOT and removed from field-offline / field-issue lists.'))return;
-  const b=$('moveShopBtn');b.disabled=true;b.textContent='Moving to Shop / ROOT…';
-  const patch={organization:'root',activation_source:'owner_manual_shop',updated_at:new Date().toISOString()};
-  let q=db.from('camera_devices').update(patch);
-  if(device.unit_key)q=q.eq('unit_key',device.unit_key);else q=q.eq('id',device.id);
-  const {data,error}=await q.select('id,unit_key,device_name,organization');
-  if(error){
-    console.error(error);
-    b.disabled=false;b.textContent='Move unit to Shop / ROOT';
-    alert('Could not move this unit to Shop / ROOT: '+error.message);
-    return;
-  }
-  await load();
-  const moved=Array.isArray(data)?data.length:1;
-  $('shopActionText').textContent=(moved||1)+' camera component'+((moved||1)===1?'':'s')+' moved to ROOT. A later Vigilant organization sync can replace ROOT with the real job/site name when the unit is deployed again.';
+  await CameraPlacementControls.open({db,key:device.unit_key,placement:isShopDevice(device)||String(device.activation_state||'').toLowerCase()==='deactivated'?'FIELD':'SHOP',onSaved:load});
 }
+
 async function boot(){
   try{
     if(!window.supabase?.createClient){await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://unpkg.com/@supabase/supabase-js@2';s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}

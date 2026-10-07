@@ -149,7 +149,10 @@ function present() {
     frame = document.createElement('iframe');
     frame.id = 'cosOperationsFrame';
     frame.title = 'COS Operations';
-    frame.src = './operations/dist/index.html?v=operations-v100-phase2-20261004';
+    const mapParams = new URLSearchParams(window.location.search);
+    const fieldUnit = mapParams.get('fieldUnit');
+    const fieldRoute = fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#field-map?unitLabel=' + encodeURIComponent(fieldUnit) : mapParams.get('fieldView') === '1' ? '#field-map' : '';
+    frame.src = './operations/dist/index.html?v=operations-v100-phase2-20261004' + fieldRoute;
     frame.allow = 'geolocation';
     frame.referrerPolicy = 'same-origin';
     frame.addEventListener('load', () => { if (toolFromHash()) showTechCheckHome(); });

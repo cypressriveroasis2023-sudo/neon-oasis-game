@@ -1,3 +1,4 @@
+import {fieldMapLabelMatches} from './fieldMapNavigation';
 import {automaticRefreshDue} from './refreshCadence';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
@@ -52,18 +53,19 @@ type FieldUnit = {
 
 type Snapshot = {
   items:FieldUnit[];
+  placementReviews?:{unitNumber:string;reason:string;placementAuditId:string|null}[];
   summary:{fieldUnits:number;mappedUnits:number;unitGps:number;missingGps:number};
   generatedAt:string;
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; locationWritesEnabled?:boolean };
+type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; locationWritesEnabled?:boolean };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHealth,locationWritesEnabled=false}:Props){
+export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,locationWritesEnabled=false}:Props){
   const restored=useRef(readFieldMapView(window.history.state));
   const restoreViewport=useRef(Boolean(restored.current.center&&restored.current.zoom));
   const programmaticViewport=useRef(false);
@@ -85,7 +87,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
   const [search,setSearch]=useState(restored.current.search||'');
   const [status,setStatus]=useState(restored.current.status||'field');
   const [selectedId,setSelectedId]=useState(initialUnitId||restored.current.selectedId||'');
-  const [focusSelected,setFocusSelected]=useState(Boolean(initialUnitId));
+  const [focusSelected,setFocusSelected]=useState(Boolean(initialUnitId||initialUnitLabel));
   const [lat,setLat]=useState('');
   const [lon,setLon]=useState('');
   const [accuracy,setAccuracy]=useState('');
@@ -128,9 +130,12 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       setData(snapshot);
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
-      const first = initialUnitId ? snapshot.items.find(unit => unit.id === initialUnitId) : snapshot.items.find(hasCoords) || snapshot.items[0];
+      const matches = initialUnitLabel ? fieldMapLabelMatches(snapshot.items,initialUnitLabel) : [];
+      const first = initialUnitId ? snapshot.items.find(unit => unit.id === initialUnitId) : initialUnitLabel ? matches.length===1?matches[0]:undefined : snapshot.items.find(hasCoords) || snapshot.items[0];
+      if(initialUnitLabel && matches.length!==1)show(matches.length>1?'This unit has conflicting field records. Select the verified installation.':'This unit is not currently in the field map. Shop units stay off the installed field map.');
       if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
-      setSelectedId(current => snapshot.items.some(unit => unit.id === current) ? current : first?.id || '');
+      setSelectedId(current => (initialUnitId||initialUnitLabel)?first?.id||'':snapshot.items.some(unit => unit.id === current) ? current : first?.id || '');
+      if(initialUnitLabel){setSearch(first?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');}
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
     } finally {
@@ -147,7 +152,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
     return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};
   },[]);
 
-  useEffect(()=>{if(initialUnitId&&data){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}},[initialUnitId,Boolean(data)]);
+  useEffect(()=>{if(!data)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
 
   useEffect(()=>{if(data)saveFieldMapView({search,status,health,selectedId,nearbyId,radius,showHistorical});},[search,status,health,selectedId,nearbyId,radius,showHistorical,Boolean(data)]);
 
@@ -378,6 +383,7 @@ export default function FieldMap({show,initialUnitId='',openWorkspace,openUnitHe
       <article className={items.some(unit=>healthById.get(unit.id)?.state==='offline')?'attention':''}><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='offline').length:'—'}</b><span>OFFLINE</span></article>
     </section>
 
+    {!!data?.placementReviews?.length&&<section className='panel' aria-label='Placement records needing review'><h3>Placement needs review ({data.placementReviews.length})</h3><p>These units remain in inventory. Their map pins are held until the unit mapping is resolved.</p><ul>{data.placementReviews.filter(row=>!search||[row.unitNumber,row.reason].some(value=>value.toLowerCase().includes(search.toLowerCase()))).map((row,index)=><li key={row.unitNumber+'-'+index}><strong>{row.unitNumber}</strong> · {row.reason} <a href={'../../camera-health.html?q='+encodeURIComponent(row.unitNumber)} target='_top'>Open Camera Health →</a></li>)}</ul></section>}
     <div className='field-map-toolbar'>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search unit, customer, site, job…' aria-label='Search field units'/>
       <select value={status} onChange={e=>setStatus(e.target.value)} aria-label='Field map filter'>
