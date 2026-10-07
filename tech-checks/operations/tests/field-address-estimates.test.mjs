@@ -58,3 +58,10 @@ test('provider Non_Exact is retained only with full street/city/state/ZIP5 equal
  const estimate=await checkedAddressEstimate(row,now);assert.ok(estimate);assert.equal(estimate.providerMatchQuality,'Non_Exact');assert.equal(isCurrentFieldPin(row),false);
  for(const matchedAddress of ['101 EXAMPLE RD, TEST CITY, TX, 77001','100 N EXAMPLE RD, TEST CITY, TX, 77001','100 OTHER RD, TEST CITY, TX, 77001','100 EXAMPLE RD, OTHER CITY, TX, 77001','100 EXAMPLE RD, TEST CITY, OK, 77001','100 EXAMPLE RD, TEST CITY, TX, 77002'])assert.equal(await checkedAddressEstimate({...row,locationNote:addressEstimatePrefix+JSON.stringify({...marker,matchedAddress})},now),null,matchedAddress);
 });
+test('automatic Owner address results bind exact saved audit and address without inventing verification',async()=>{
+ const geocode={status:'success',auditId:'41',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:at,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex')};
+ const row={...fixture(),locationVerification:'address_changed',placementAuditId:'41',placementUnitKey:'SNIPER 901',locationGeocode:geocode};
+ assert.ok(await checkedAddressEstimate(row,now));assert.equal(isCurrentFieldPin(row),false);
+ for(const patch of [{auditId:'40'},{unitKey:'SPOTTER 901'},{addressSha256:'0'.repeat(64)},{status:'pending'},{status:'no_match'}])assert.equal(await checkedAddressEstimate({...row,locationGeocode:{...geocode,...patch}},now),null);
+ assert.equal(await checkedAddressEstimate({...row,address:'101 Example Road, Test City, TX 77001'},now),null);
+});

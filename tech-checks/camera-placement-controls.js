@@ -10,11 +10,11 @@
     dialog.innerHTML='<form><h2 id="cosPlacementTitle"></h2><p class="placement-explanation">This changes the unit’s physical location. Camera online/offline status still comes from its health checks.</p><p class="placement-unit"></p><label class="placement-site-label">Current job / site<input name="site" maxlength="250" autocomplete="off"></label><label class="placement-address-label">Current installation street address<input name="address" maxlength="600" autocomplete="street-address"></label><label>Reason for move<input name="reason" maxlength="1000" required autocomplete="off"></label><label class="placement-confirm"><input name="confirmed" type="checkbox" required> I confirm this is the unit’s current physical placement.</label><p class="placement-pin-note"></p><p class="placement-feedback" role="status">Reading the current unit…</p><div class="placement-buttons"><button type="button" class="placement-cancel">Cancel</button><button type="submit" disabled>Save placement</button></div></form>';
     document.body.append(dialog);active={dialog,pending:false};const context=active,form=dialog.querySelector('form'),input=name=>form.elements.namedItem(name),feedback=dialog.querySelector('.placement-feedback'),submit=form.querySelector('[type=submit]'),cancel=form.querySelector('.placement-cancel');
     dialog.querySelector('h2').textContent=placement==='FIELD'?'Move to Field':'Move to Shop / ROOT';dialog.querySelector('.placement-unit').textContent=key;
-    dialog.querySelector('.placement-pin-note').textContent=placement==='FIELD'?'The unit returns to the field list. Confirm its installation pin on the Field Map after the move.':'The unit leaves the installed field map and stays searchable in Shop / ROOT. Its location history is kept.';
+    dialog.querySelector('.placement-pin-note').textContent=placement==='FIELD'?'The unit returns to the field list. COS will locate the saved street, city, state and ZIP automatically. Address pins are approximate until verified on site.':'The unit leaves the installed field map and stays searchable in Shop / ROOT. Its location history is kept.';
     for(const name of ['site','address']){input(name).required=placement==='FIELD';input(name).closest('label').hidden=placement!=='FIELD';}
     const close=()=>{if(context.pending)return;dialog.close();dialog.remove();if(active===context)active=null;};cancel.onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
     dialog.showModal();let state,requestId=crypto.randomUUID(),uncertain=false;
-    try{const result=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});if(result.error)throw result.error;if(!stateMatches(result.data,key))throw new Error('Current placement could not be verified.');state=result.data;input('site').value=state.siteLabel;input('address').value=state.streetAddress;feedback.textContent='';submit.disabled=false;input(placement==='FIELD'?'site':'reason').focus();}catch(error){feedback.textContent='Placement controls are unavailable: '+(error?.message||error)+'. No change was made.';}
+    try{const result=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});if(result.error)throw result.error;if(!stateMatches(result.data,key))throw new Error('Current placement could not be verified.');state=result.data;input('site').value=state.siteLabel;input('address').value=state.streetAddress;feedback.textContent='';submit.disabled=false;if(placement==='FIELD'&&state.placement==='FIELD')dialog.querySelector('h2').textContent='Update field address';input(placement==='FIELD'?'site':'reason').focus();}catch(error){feedback.textContent='Placement controls are unavailable: '+(error?.message||error)+'. No change was made.';}
     form.onsubmit=async event=>{
       event.preventDefault();if(context.pending||uncertain||!state||!form.reportValidity())return;
       const site=placement==='FIELD'?input('site').value.trim():'',address=placement==='FIELD'?input('address').value.trim():'',reason=input('reason').value.trim();
@@ -27,6 +27,16 @@
         if(!saved||saved.ok!==true||saved.unit_key!==key||saved.placement!==placement||saved.request_id!==requestId||typeof saved.audit_id!=='string')throw new Error('The save receipt was incomplete.');
         const fresh=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});
         if(fresh.error||!stateMatches(fresh.data,key)||fresh.data.auditId!==saved.audit_id||fresh.data.placement!==placement||(placement==='FIELD'&&(fresh.data.streetAddress!==address||fresh.data.siteLabel!==site)))throw new Error('Saved placement could not be verified after reload.');
+        // Placement is already committed. Geocoding failure must never be reported as a failed move.
+        if(placement==='FIELD'){
+          feedback.textContent='Placement saved. Locating the installation address…';
+          try{
+            const session=await db.auth.getSession(),token=session.data?.session?.access_token;
+            if(!token)throw new Error('Sign in again to check the address lookup.');
+            const response=await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-field-geocode',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({unitKey:key,auditId:saved.audit_id}),signal:AbortSignal.timeout(15000),cache:'no-store'});
+            if(!response.ok)throw new Error('The address lookup is queued for background processing.');
+          }catch{ /* Durable queue survives navigation or a failed immediate lookup. */ }
+        }
         await onSaved?.(saved);context.pending=false;close();
       }catch(error){uncertain=true;feedback.textContent='The move could not be confirmed: '+(error?.message||error)+'. Close and refresh this unit before trying again.';}
       finally{context.pending=false;cancel.disabled=false;}
