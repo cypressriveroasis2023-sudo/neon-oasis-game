@@ -150,6 +150,7 @@ test('imported tracker families stay visible and colored without inventing map c
 
 test('native card quick actions expose safe endpoints, exact field identity and separate timestamps',async({page},info)=>{
  const {frame,state}=await mount(page,{nativeOverview:true,accessCase:true});const card=frame.locator('.camera-overview-card').filter({hasText:'SNIPER 2 005'});
+ await expect(card.locator('.camera-card-main')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
  await expect(card.getByRole('link',{name:'Open 203.0.113.12 ↗',exact:true})).toHaveAttribute('href','http://203.0.113.12');
  await expect(card.getByRole('link',{name:'Open 203.0.113.12:443 ↗',exact:true})).toHaveAttribute('href','https://203.0.113.12');
  await expect(card.locator('a[href*="554"],a[href*="38880"]')).toHaveCount(0);

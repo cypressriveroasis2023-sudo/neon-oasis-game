@@ -31,6 +31,7 @@ const listScript=`${shared}
  ${overview}
  let boardDataReady=true;let devices=[fixture.device],health={159:fixture.current},history=[],unitPage=1;const UNITS_PER_PAGE=25;
  const fleetGroups=()=>[{k:'RANGER 022',state:effectiveHealth(fixture.device),ds:[fixture.device]}];
+ const canEditSavedConnection=()=>false,canEditFieldPlacement=()=>false;
  const fleetMatches=()=>true,syncMobileCameraLayout=()=>{},isShop=()=>false,isCountedCamera=()=>true;
  const isCameraIssue=d=>effectiveHealth(d)!=='online',isReconAwaitingStatus=()=>false,cameraIssueReason=()=> 'Provider reports offline';
  const healthAssessment=()=>({reason:'Provider reports offline'}),cameraPlatform=cameraGroup,reconBatteryBadge=()=> 'Unknown',fmtDown=()=> '',outageSummary=()=>({events:[]}),reconMeta=()=>({}),reconCloudLink=()=> '#';

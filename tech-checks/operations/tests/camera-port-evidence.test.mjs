@@ -77,3 +77,4 @@ test('loaded new endpoint rejects old proof from a concurrent health snapshot',(
  assert.equal(port(h,'443',now,{connection_revision:1,public_ip:'203.0.113.10'}).state,'responding');
  assert.equal(port(snapshot({online:true}),'443',now,{connection_revision:2,public_ip:'203.0.113.11'}).state,'unchecked');
 });
+test('provider-only health never supplies a direct service observation',()=>{const h={overall_status:'online',ip_reachable:true,checked_at:fresh,port_status:{}};const value=context.CameraHealthHistory.connectionSnapshot(h,{source:'reconeyez',connection_revision:0});assert.equal(value.checked_at,null);assert.equal(value.ip_reachable,null);});

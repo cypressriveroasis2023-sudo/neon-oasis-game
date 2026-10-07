@@ -27,7 +27,11 @@
     const meta=health.port_status?._connection;
     const empty={...health,checked_at:null,overall_status:'unknown',ip_reachable:null,confirmed_outage:false,consecutive_failures:0,port_status:{}};
     if(device){const revision=device.connection_revision??0;if(meta){if(String(meta.revision)!==String(revision)||String(meta.ip||'')!==String(device.public_ip||'').replace(/\/32$/,''))return empty;}else if(revision!==0)return empty;}
-    if(!meta||typeof meta!=='object'||Array.isArray(meta))return health;
+    if(!meta||typeof meta!=='object'||Array.isArray(meta)){
+      if(device&&/Star4Live live API|Control Center live API|^Reconeyez cloud event:/i.test(String(health.detail||'')))return empty;
+      if(device&&['vigilant_control_center','reconeyez'].includes(device.source)&&!Object.entries(health.port_status||{}).some(([key,value])=>/^[1-9]\d{0,4}$/.test(key)&&typeof value?.online==='boolean'))return empty;
+      return health;
+    }
     return {...health,checked_at:typeof meta.checkedAt==='string'?meta.checkedAt:null,overall_status:['online','offline','unknown','verifying'].includes(meta.status)?meta.status:'unknown',ip_reachable:typeof meta.reachable==='boolean'?meta.reachable:null,confirmed_outage:meta.confirmedOutage===true,consecutive_failures:Number.isInteger(meta.consecutiveFailures)?meta.consecutiveFailures:0,detail:'Saved direct service-port observation'};
   }
   function port(health = {}, key, now = Date.now(), device) {
