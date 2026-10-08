@@ -129,6 +129,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const viewportSignature=useRef('');
   const pendingPopup=useRef('');
   const popupSelection=useRef('');
+  const popupPanView=useRef<{center:L.LatLng;zoom:number}|null>(null);
+  const rebuildingMarkers=useRef(false);
   const clusterMarkers=useRef<{marker:L.Marker;ids:string[]}[]>([]);
   const clusterButtons=useRef(new Map<string,HTMLButtonElement>());
   const markersRef=useRef(new Map<string,L.Marker>());
@@ -225,7 +227,13 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     const map=L.map(mapNode.current,{zoomControl:true,fadeAnimation:false}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
     map.on('zoomend resize',()=>setMapRevision(value=>value+1));
     map.on('moveend',()=>{const center=map.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:map.getZoom()});});
-    map.on('dragstart zoomstart',()=>{if(!programmaticViewport.current)restoreViewport.current=true;});
+    map.on('dragstart zoomstart',()=>{popupPanView.current=null;if(!programmaticViewport.current)restoreViewport.current=true;});
+    map.on('autopanstart',()=>{if(!popupPanView.current)popupPanView.current={center:map.getCenter(),zoom:map.getZoom()};});
+    map.on('popupclose',()=>{
+      if(rebuildingMarkers.current)return;
+      const view=popupPanView.current;popupPanView.current=null;
+      if(view&&view.zoom===map.getZoom())moveViewport(()=>map.panTo(view.center,{animate:false}));
+    });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       maxZoom:19,
       attribution:'&copy; OpenStreetMap contributors'
@@ -238,7 +246,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return () => {
       window.cancelAnimationFrame(frame);
       resize?.disconnect();
-      map.remove();mapRef.current=null;layerRef.current=null;
+      popupPanView.current=null;map.remove();mapRef.current=null;layerRef.current=null;
     };
   },[hasMapContainer]);
 
@@ -248,6 +256,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     if(!map||!layer)return;
     const openGroup=clusterMarkers.current.find(entry=>entry.marker.isPopupOpen());
     const reopenId=pendingPopup.current||(openGroup?(openGroup.ids.includes(popupSelection.current)?popupSelection.current:openGroup.ids[0]):[...markersRef.current].find(([,marker])=>marker.isPopupOpen())?.[0]);pendingPopup.current='';
+    rebuildingMarkers.current=true;
     layer.clearLayers();
     markersRef.current.clear();clusterButtons.current.clear();clusterMarkers.current=[];
     const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
@@ -296,6 +305,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       marker.addTo(layer);if(reopenId===unit.id&&!offsets.length)marker.openPopup();
       }
     }
+    rebuildingMarkers.current=false;
+    if(!clusterMarkers.current.some(({marker})=>marker.isPopupOpen())&&![...markersRef.current.values()].some(marker=>marker.isPopupOpen()))popupPanView.current=null;
     // Do not consume restored/user viewport intent before this snapshot's asynchronous validation settles.
     if(estimateState?.snapshot!==data)return;
     const signature=JSON.stringify([filtered.map(unit=>[unit.id,mapPoint(unit)]),selectedId,focusSelected,showHistorical]);
@@ -318,6 +329,18 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     if(bounds.length===1)moveViewport(()=>map.setView(bounds[0],14,{animate:false}));
     else moveViewport(()=>map.fitBounds(bounds,{padding:[40,40],maxZoom:14,animate:false}));
   };
+
+  // Close presentation-obscuring popups while retaining the user's chosen map view.
+  useEffect(()=>{
+    if(!tvMode)return;
+    const frame=window.requestAnimationFrame(()=>{
+      const map=mapRef.current;if(!map)return;
+      const center=popupPanView.current?.center||map.getCenter();
+      pendingPopup.current='';map.closePopup();map.invalidateSize({pan:false});
+      moveViewport(()=>map.panTo(center,{animate:false}));
+    });
+    return()=>window.cancelAnimationFrame(frame);
+  },[tvMode]);
 
   // Updating health observations must not clear an open popup or recenter a map the owner panned.
   useEffect(()=>{

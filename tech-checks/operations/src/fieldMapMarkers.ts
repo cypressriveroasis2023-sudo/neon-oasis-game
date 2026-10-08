@@ -38,7 +38,7 @@ export function expandedGroupOffsets(count:number):{x:number;y:number}[] {
   for(let ring=0;offsets.length<count;ring++){
     const radius=68+ring*56,slots=Math.min(count-offsets.length,Math.floor(2*Math.PI*radius/52));
     for(let index=0;index<slots;index++){
-      const angle=-Math.PI/2+index*2*Math.PI/slots+(ring%2?Math.PI/slots:0);
+      const angle=-Math.PI/2+index*2*Math.PI/slots+(ring%2&&slots>1?Math.PI/slots:0);
       offsets.push({x:Math.round(Math.cos(angle)*radius),y:Math.round(Math.sin(angle)*radius)});
     }
   }

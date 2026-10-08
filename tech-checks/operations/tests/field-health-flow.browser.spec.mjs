@@ -221,6 +221,7 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await frame.locator('.leaflet-popup-close-button').click();
  await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
  await expect(frame.locator('.field-map-workspace')).toHaveClass(/field-map-tv/);
+ await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect();const map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect();return box.top>=map.top&&box.bottom<legend.top&&box.left>=map.left&&box.right<=map.right;});})).toBe(true);
  await page.screenshot({path:info.outputPath('approved-reticles-tv.png')});
  await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
  await page.clock.fastForward(16*60*1000);
@@ -242,11 +243,39 @@ test('larger shared sites keep all nine unit markers and the stand selectable',a
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
  await expect(frame.locator('.cos-field-pin')).toHaveCount(9);await expect(frame.locator('.cos-site-leader')).toHaveCount(9);
- await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button')).toHaveCount(10);
+ await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button')).toHaveCount(10);
  await frame.locator('.leaflet-popup-close-button').click();await frame.locator('.cos-field-pin-support').click();
  await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('0 cameras');
  await frame.locator('.leaflet-popup-close-button').click();
+ await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect();return box.top>=map.top&&box.bottom<legend.top&&box.left>=map.left&&box.right<=map.right;});})).toBe(true);
  await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});
  expect(state.writes).toHaveLength(0);
+});
+
+test('closing a shared-site popup restores its auto-pan but preserves a subsequent user pan',async({page})=>{
+ const {frame,state}=await mount(page,{crowded:true});
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
+ const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
+ const before=await center();await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list')).toBeVisible();
+ await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(before);
+ await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list')).toBeVisible();
+ await page.clock.runFor(600);const afterPopup=await center();
+ const box=await frame.locator('.field-map-center').boundingBox();
+ await page.mouse.move(box.x+box.width-10,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width-55,box.y+box.height/2+25,{steps:8});await page.mouse.up();await page.clock.runFor(600);
+ const panned=await center();expect(panned).not.toEqual(afterPopup);
+ await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(panned);
+ expect(state.writes).toHaveLength(0);
+});
+
+
+test('filtering away an open cluster discards its old popup-pan snapshot',async({page})=>{
+ const {frame,state}=await mount(page,{crowded:true});
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await expect(frame.locator('.field-cluster-list')).toBeVisible();
+ await frame.getByLabel('Field health filter').selectOption('support');await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
+ const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
+ const before=await center();await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.leaflet-popup')).toBeVisible();
+ await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(before);expect(state.writes).toHaveLength(0);
 });
