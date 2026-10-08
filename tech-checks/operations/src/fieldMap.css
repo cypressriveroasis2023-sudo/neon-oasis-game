@@ -50,3 +50,15 @@
 .cos-field-pin-wrap:focus-visible,.cos-field-cluster-wrap:focus-visible{outline-offset:1px;border-radius:4px}
 
 .field-pin-label{width:max-content;max-width:min(220px,calc(100vw - 100px))}
+
+/* Approved lens/panel refinement: same reticle footprint, with the number below. */
+.cos-field-pin:before,.cos-field-pin:after{display:none}
+.cos-field-pin>.cos-reticle-artwork{position:absolute;inset:0;width:44px;height:44px;color:var(--pin);overflow:visible;filter:drop-shadow(0 0 1px color-mix(in srgb,var(--pin) 70%,transparent))}
+.cos-field-pin>b.cos-pin-unit-number{position:absolute;top:43px;left:50%;transform:translateX(-50%);display:block;min-width:22px;max-width:44px;box-sizing:border-box;padding:1px 4px;border:1px solid #526477;border-radius:3px;background:#071421;color:#fff;font-size:10px;line-height:12px;text-align:center;letter-spacing:.2px;text-shadow:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cos-field-pin>b.cos-pin-unit-number.cos-reticle-long-id{font-size:9px;letter-spacing:0}
+.cos-field-pin>.cos-pin-location-tag{top:-8px;color:#ffd38b}
+
+/* Expanded peers already expose each stand; hide the duplicate badge to keep labels clear. */
+.cos-field-cluster-expanded .cos-cluster-support{display:none}
+
+@media(max-width:700px){.field-map-tv .cos-field-pin{scale:1}}
