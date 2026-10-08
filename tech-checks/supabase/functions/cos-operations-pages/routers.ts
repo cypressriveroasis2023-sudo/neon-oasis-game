@@ -1,5 +1,5 @@
 /** Read-only Camera Health observations. This module never probes or writes a router. */
-export const ROUTER_FRESHNESS_MS = 20 * 60 * 1000;
+export const ROUTER_FRESHNESS_MS = 10 * 60 * 1000;
 export type RouterStatus = 'reachable' | 'unreachable' | 'stale' | 'unknown';
 export type RouterRow = {
   id: string; unitKey: string; name: string; model: string; publicIp: string | null;
@@ -73,3 +73,4 @@ export const routerLabels: Record<RouterStatus, string> = { reachable: 'Port rea
 export function summarizeRouters(rows: RouterRow[], now = Date.now()) {
   return rows.reduce((counts, row) => { counts[routerStatus(row, now)]++; return counts; }, { reachable: 0, unreachable: 0, stale: 0, unknown: 0 });
 }
+

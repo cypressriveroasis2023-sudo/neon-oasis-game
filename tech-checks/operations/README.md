@@ -153,3 +153,35 @@ label content. Raw integration payloads/errors and contact records are not expor
 Regressions cover IP/revision mismatch, stale direct proof despite fresh provider
 timestamps, malformed/false/zero/skipped port values, metadata keys, inventory-only
 Recon updates, hostile labels, failure/navigation races and safe export.
+
+### Verified equipment/resource identities
+
+Field Map and native Camera Health share an additive authenticated identity DTO.
+The initial reviewed scope links 65 existing native equipment records through
+110 existing provider-resource mappings and exact external device IDs, plus one
+explicit Owner placement with four camera records. Opaque commitments guard the
+complete association; the public source does not contain the provider serial
+roster. Missing, added, duplicated or reassigned resources invalidate the link.
+An approved label is not permission to strip model suffixes or match another
+asset by its number, site, address or IP. The 39 unresolved map records remain
+unlinked (37 equipment records and two tracker-only records).
+
+Source cards preserve raw observations when an equipment association is invalid,
+but visibly mark the equipment link unverified and exclude it from verified unit
+rollups. A legacy name match cannot claim resources belonging to another proved
+identity. An Owner-created map row uses its validated control/audit resource set,
+so a generic display model does not hide valid camera observations. Distinct
+unproven native and Owner rows are not silently merged or deleted.
+
+NVR observations are labelled RECORDER; IPC observations are labelled CAMERA
+RECORDS; saved endpoint responses are labelled IP / PORT. None verifies live
+video or complete camera-channel coverage. The placement-aware v3 endpoint now
+uses the same current IP/revision/actual-port-bound service projector as the
+other saved-evidence endpoint. Source times use a consistent 20-minute freshness
+grace; scheduled synchronization and visible saved-data refresh remain 15 minutes.
+Auth failure, incomplete identity evidence and old observations fail closed.
+
+The deployment baseline is the actual 15-file v23 bridge. Unrelated authentication,
+IT permissions, Owner placement, reviewed address estimates and reticle styling
+are preserved. Verification uses read-only production snapshots and isolated
+fixtures; no physical unit probes, moves, endpoint edits or test records are used.

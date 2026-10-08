@@ -1,7 +1,17 @@
+import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
+import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
+import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';
+import { projectOwnerPlacement, projectCameraOwnerPlacement, placementMatchKey } from './placementProjection.ts';
+import { withDeliveryGoBacks } from './deliveryGoBack.ts';
+import { createMhelpImportHandler, readMhelpAwareJson, readMhelpAwareJsonWithSize, MHELP_JSON_LIMIT, MhelpImportError } from './mhelpImport.ts';
+import { cameraSummary } from './cameraEvidence.ts';
+import { cameraSummary as placementCameraSummary } from './cameraPlacementEvidence.ts';
+import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
 import { routerSnapshot } from './routers.ts';
+import { createInhandPilotReader, InhandPilotError, readPilotClaimBoolean } from './inhandPilot.ts';
 import { vrmPortalConfig } from './vrm.ts';
 import { createPrivateEvidenceReader, PrivateEvidenceError } from './privateEvidence.ts';
-// COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or read-only technician.
+// COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or scoped technician access.
 // No browser-supplied actor, organization, table, RPC name, service key, or identity provisioning.
 const LEGACY_URL = 'https://goqrnolcvqnirjmzaeyk.supabase.co';
 const LEGACY_PUBLISHABLE_KEY = 'sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
@@ -67,15 +77,9 @@ function schedule(body, optional = false) {
   return { start, end };
 }
 async function requestBody(request) {
-  if (!/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) fail('Use an application/json request body.', 415);
-  if (Number(request.headers.get('Content-Length')) > 65536) fail('Request body is too large.', 413);
-  const raw = await request.text();
-  if (raw.length > 65536) fail('Request body is too large.', 413);
-  let body;
-  try { body = JSON.parse(raw); } catch { fail('A valid JSON request body is required.'); }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) fail('A JSON object is required.');
-  return body;
+  return readMhelpAwareJson(request, 65536);
 }
+
 function gps(body) {
   const allowed = new Set(['latitude', 'longitude', 'accuracyM', 'source', 'note']);
   if (Object.keys(body).some(k => !allowed.has(k))) fail('GPS request contains unsupported fields.');
@@ -105,6 +109,8 @@ export function createOperationsHandler(options) {
     let data;
     try { data = await response.json(); } catch { data = {}; }
     if (!response.ok) {
+      if (url.endsWith('/rest/v1/rpc/appdeploy_request_delivery_go_back') && ['55P03','40001','40P01'].includes(data.code)) fail('This delivery is being updated. Refresh the job before trying again.', 409);
+      if (url.endsWith('/rest/v1/rpc/appdeploy_mhelp_import') && data.code === '40001') fail(typeof data.message === 'string' ? data.message : 'Another mHelpDesk import is in progress. Review import history before retrying.', 409);
       if (response.status >= 500) fail(fallback, 503);
       const message = typeof data.message === 'string' ? data.message : fallback;
       fail(message, response.status === 401 || response.status === 403 ? response.status : 409);
@@ -139,6 +145,29 @@ export function createOperationsHandler(options) {
   const rpc = (name, payload) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload),
   }, 'COS workflow could not be completed. Please retry.');
+  const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
+  // This isolated control RPC is claimed once before the provider secret can be read.
+  const readInhandPilot = createInhandPilotReader({
+    ...options.inhandPilot,
+    fetch: requestFetch,
+    claimAttempt: async actorId => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const attemptId = crypto.randomUUID(); // Correlation only, never a credential or caller authorization.
+      const payload = { p_actor_user_id: actorId, p_attempt_id: attemptId };
+      const control = async name => readPilotClaimBoolean(await requestFetch(platformUrl + '/rest/v1/rpc/' + name, {
+        method: 'POST', headers: { ...platformHeaders(), Prefer: 'tx=commit' }, body: JSON.stringify(payload),
+        redirect: 'error', cache: 'no-store', signal: controller.signal,
+      }), controller.signal);
+      try {
+        if (!await control('cos_claim_inhand_pilot')) return false;
+        // Separate transaction readback; a rolled-back claim or mismatched attempt cannot use the token.
+        if (!await control('cos_verify_inhand_pilot_claim')) throw new Error('Pilot claim not durable.');
+        return true;
+      } finally { clearTimeout(timer); controller.abort(); }
+    },
+  });
+
   const authenticate = async request => {
     const authorization = request.headers.get('Authorization') || '';
     if (!/^Bearer [^\s]+$/i.test(authorization) || authorization.length > 8192) fail('Sign in to Tech Check to continue.', 401);
@@ -171,6 +200,26 @@ export function createOperationsHandler(options) {
     if (!Array.isArray(roles) || !roles.some(row => row.roles?.code === roleCode && row.roles?.organization_id === ORGANIZATION_ID)) fail('Your linked COS production role is not active.', 403);
     return context;
   };
+  const fleetPlacementAudits = async (context) => {
+    const rows=[]; let cursor=null;
+    for(let page=0;page<200;page++) {
+      const result=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_fleet_placement_evidence_v1', {
+        method:'POST', headers:{...context.headers,'Content-Type':'application/json'},
+        body:JSON.stringify({p_before_id:cursor,p_limit:500}),
+      },'Fleet placement evidence is unavailable.');
+      if(!Array.isArray(result)||result.length>500)fail('Fleet placement page is invalid.',503);
+      let previous=cursor;
+      for(const row of result){
+        const id=String(row?.id||'');
+        if(!/^[1-9][0-9]{0,18}$/.test(id)||BigInt(id)>9223372036854775807n||(previous!==null&&BigInt(id)>=BigInt(previous)))fail('Fleet placement page order is invalid.',503);
+        previous=id;
+      }
+      rows.push(...result);
+      if(result.length<500)return rows;
+      cursor=previous;
+    }
+    fail('Fleet placement evidence exceeds the safe page limit.',503);
+  };
   const assertRecord = async (table, id, fields = 'id') => {
     const records = await platformRead(table + '?select=' + fields + '&organization_id=eq.' + ORGANIZATION_ID + '&id=eq.' + id + '&limit=1');
     if (!Array.isArray(records) || !records.length) fail('COS record not found.', 404);
@@ -186,7 +235,21 @@ export function createOperationsHandler(options) {
     }
     fail('Camera Health collection exceeds the supported page limit.', 503);
   };
+  // Share one large-transfer slot across imports, original PDF downloads, and private evidence.
+  // Binary responses retain their slot until drained/canceled; small requests remain usable.
+  let activeLargeBodies = 0;
   return async request => {
+    let ownsLargeBodyPermit = false;
+    let keepPermitForResponse = false, responseOwnsPermit = false;
+    const releaseLargeBody = () => {
+      if (ownsLargeBodyPermit) { activeLargeBodies -= 1; ownsLargeBodyPermit = false; }
+    };
+    const admitLargeBody = () => {
+      if (ownsLargeBodyPermit) return;
+      if (activeLargeBodies >= 1) fail('Another large file transfer is in progress. Wait for it to finish before retrying.', 429);
+      activeLargeBodies += 1;
+      ownsLargeBodyPermit = true;
+    };
     const origin = request.headers.get('Origin');
     const allowedOrigin = !origin || ALLOWED_ORIGINS.has(origin);
     const cors = {
@@ -199,7 +262,31 @@ export function createOperationsHandler(options) {
       'Content-Type': 'application/json',
       'X-Content-Type-Options': 'nosniff',
     };
-    const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
+    const json = (body, status = 200) => {
+      const response = new Response(JSON.stringify(body), { status, headers: cors });
+      if (!keepPermitForResponse || !ownsLargeBodyPermit || !response.body) return response;
+      const reader = response.body.getReader();
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        reader.releaseLock();
+        releaseLargeBody();
+      };
+      const stream = new ReadableStream({
+        async pull(controller) {
+          try {
+            const chunk = await reader.read();
+            if (chunk.done) { finish(); controller.close(); }
+            else controller.enqueue(chunk.value);
+          } catch (error) { finish(); controller.error(error); }
+        },
+        async cancel(reason) { try { await reader.cancel(reason); } finally { finish(); } },
+      }, { highWaterMark: 0 });
+      const guarded = new Response(stream, { status, headers: response.headers });
+      responseOwnsPermit = true;
+      return guarded;
+    };
     if (!allowedOrigin) return json({ error: 'This origin is not allowed.' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     try {
@@ -208,7 +295,9 @@ export function createOperationsHandler(options) {
       let method = request.method, body = null;
       const context = await authenticate(request);
       if (!path && request.method === 'POST') {
-        const envelope = await requestBody(request);
+        const { body: envelope, byteLength: envelopeBytes } = await readMhelpAwareJsonWithSize(request, context.legacyOwner && context.actorId ? MHELP_JSON_LIMIT : 65536, admitLargeBody);
+        const envelopeLimit = envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
+        if (envelopeBytes > envelopeLimit) fail('Request body is too large.', 413);
         if (Object.keys(envelope).some(k => !['path', 'method', 'body'].includes(k))) fail('Unsupported transport fields.');
         if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path)) fail('COS endpoint not found.', 404);
         if (!['GET', 'POST'].includes(envelope.method)) fail('Method not supported.', 405);
@@ -221,7 +310,8 @@ export function createOperationsHandler(options) {
       if (!path.startsWith('/api/')) fail('COS endpoint not found.', 404);
       if (path.startsWith('/api/tech/')) {
         if (context.legacyOwner || !['it', 'service'].includes(context.department)) fail('A signed-in technician account is required for the production queue.', 403);
-        if (method !== 'GET') fail('The production technician queue currently supports read-only access.', 405);
+        const claimRoute = /^\/api\/tech\/it-queue\/([^/]+)\/claim$/.exec(path);
+        if (method !== 'GET' && !(method === 'POST' && claimRoute && context.department === 'it')) fail('This technician action is not supported.', 405);
         if (path === '/api/tech/session') return json({
           authorized: Boolean(context.actorId), legacyTechnician: true, role: context.department === 'it' ? 'IT' : 'Service',
           name: context.name, department: context.department, productionTechnicianUserId: context.actorId || null,
@@ -229,12 +319,37 @@ export function createOperationsHandler(options) {
         });
         if (!context.actorId) fail('This technician account is not linked to COS production.', 403);
         const payload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+        const visibleVisitIds = async ids => {
+          if (!ids.length) return new Set();
+          const visible = await rpc('cos_technician_visible_visits', { ...payload, p_visit_ids: ids });
+          if (!Array.isArray(visible) || visible.some(id => !UUID.test(String(id || '')) || !ids.includes(id))) fail('Current technician visit access could not be verified.', 503);
+          return new Set(visible);
+        };
+        if (path === '/api/tech/it-queue') {
+          if (context.department !== 'it') fail('An active IT account is required for the shared queue.', 403);
+          const snapshot = await rpc('cos_it_queue_snapshot', payload);
+          if (!snapshot || snapshot.actorId !== context.actorId || !Array.isArray(snapshot.items) || snapshot.items.some(row => !UUID.test(String(row.visitId || '')) || !UUID.test(String(row.jobId || '')) || !['ready','claimed'].includes(row.queueStatus) || typeof row.claimable !== 'boolean' || typeof row.setupNeeded !== 'boolean' || typeof row.readinessNote !== 'string' || typeof row.nativeDispatchStatus !== 'string' || (row.queueStatus === 'ready' ? row.claimOwnerId != null : !UUID.test(String(row.claimOwnerId || ''))))) fail('Shared IT queue could not be verified.', 503);
+          return json(snapshot);
+        }
+        if (claimRoute) {
+          if (method !== 'POST' || context.department !== 'it') fail('A shared IT claim requires an IT technician POST.', 405);
+          const claimBody = body || await requestBody(request);
+          allowedFields(claimBody, [], 'Shared IT claim');
+          const id = idValue(claimRoute[1], 'Visit');
+          // Organization is fixed by the verified bridge. The RPC rechecks active
+          // role/permission, lifecycle and claim ownership under the database lock.
+          await assertRecord('job_visits', id);
+          const claimed = await rpc('cos_claim_shared_it_visit', { p_actor_user_id: context.actorId, p_visit_id: id });
+          if (!claimed || claimed.visit_id !== id || claimed.claimed_by !== context.actorId || claimed.status !== 'accepted' || typeof claimed.already_claimed !== 'boolean') fail('Claim response could not be verified. Refresh the IT queue.', 503);
+          return json(claimed);
+        }
         if (path === '/api/tech/my-day') return json(await rpc('appdeploy_technician_my_day', payload));
         if (path === '/api/tech/tasks') return json(await rpc('appdeploy_technician_tasks_snapshot', payload));
         if (path === '/api/tech/assignments') {
           const rows = await platformAll('visit_assignments?select=user_id,visit_id,status,assigned_at,job_visits!inner(id,job_id,visit_number,visit_type,department,status,dispatch_status,scheduled_start,scheduled_end,instructions,jobs(job_number,title,job_type,priority,customers(name),sites(name)))&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&job_visits.organization_id=eq.' + ORGANIZATION_ID + '&job_visits.status=not.in.(completed,cancelled)&order=assigned_at.asc');
           if (rows.some(row => row.user_id !== context.actorId || !row.job_visits || row.job_visits.id !== row.visit_id || row.job_visits.department?.toLowerCase() !== context.department)) fail('COS returned an inconsistent technician assignment collection.',503);
-          return json({ profile: { display_name: context.name, department: context.department }, visits: rows.map(row => {
+          const visible = await visibleVisitIds(rows.map(row => row.visit_id));
+          return json({ profile: { display_name: context.name, department: context.department }, visits: rows.filter(row => visible.has(row.visit_id)).map(row => {
             const v = row.job_visits, j = v?.jobs;
             return { visit_id: row.visit_id, visit_number: v?.visit_number, visit_type: v?.visit_type, department: v?.department, status: v?.status, dispatch_status: v?.dispatch_status, scheduled_start: v?.scheduled_start, scheduled_end: v?.scheduled_end, instructions: v?.instructions, assignment_status: row.status, job_id: v?.job_id, job_number: j?.job_number, job_title: j?.title, job_type: j?.job_type, priority: j?.priority, customer_name: j?.customers?.name, site_name: j?.sites?.name };
           }) });
@@ -243,6 +358,7 @@ export function createOperationsHandler(options) {
         if (visitRoute) {
           const id = idValue(visitRoute[1], 'Visit');
           await assertRecord('job_visits', id);
+          if (!(await visibleVisitIds([id])).has(id)) fail('This visit is no longer available to your technician account.', 404);
           const assigned = await platformRead('visit_assignments?select=visit_id,user_id,assignment_role,status&visit_id=eq.' + id + '&user_id=eq.' + context.actorId + '&assignment_role=eq.technician&status=in.(assigned,accepted)&limit=1');
           if (!Array.isArray(assigned) || !assigned.some(row => row.visit_id === id && row.user_id === context.actorId && row.assignment_role === 'technician' && ['assigned','accepted'].includes(row.status))) fail('This visit is not assigned to your technician account.', 404);
           const detail = await rpc('appdeploy_technician_visit_snapshot', { ...payload, p_visit_id: id });
@@ -274,17 +390,42 @@ export function createOperationsHandler(options) {
         }
         fail('COS technician endpoint not found.', 404);
       }
-      if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
+      // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
+      const verifiedFleetIt = verifiedItFleet(context);
+      if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
+      if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
+        authorized:true, legacyOwner:false, role:'IT', name:context.name,
+        features:fleetFeatures(), productionOwnerUserId:null, provisioningNeeded:null, reason:null,
+      });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
+        features: { fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if (path.startsWith('/api/mhelpdesk/imports')) {
+        if (method === 'GET' && /^\/api\/mhelpdesk\/imports\/attachments\/[^/]+\/download$/.test(path)) {
+          idValue(path.split('/')[5], 'Import record');
+          admitLargeBody();
+          keepPermitForResponse = true;
+        }
+        if (method === 'POST' && body === null) body = await readMhelpAwareJson(request, path.endsWith('/stage') ? MHELP_JSON_LIMIT : 524288, admitLargeBody);
+        return json(await mhelpImport(path, method, body, context.actorId));
+      }
+      if (path === '/api/inhand-pilot/run') {
+        if (method !== 'POST') fail('The one-use pilot requires an explicit POST.', 405);
+        if (new URL(request.url).search) fail('The one-use pilot does not accept query parameters.');
+        const pilotBody = body || await requestBody(request);
+        allowedFields(pilotBody, []);
+        return json(await readInhandPilot(context.actorId));
+      }
       if (method === 'GET' && /^\/api\/evidence\/[^/]+$/.test(path)) {
         const documentId = idValue(path.split('/').pop(), 'Evidence');
+        admitLargeBody();
+        keepPermitForResponse = true;
         return json(await readPrivateOwnerEvidence(context.actorId, documentId));
       }
       if (method === 'GET') {
@@ -325,14 +466,43 @@ export function createOperationsHandler(options) {
           '/api/owner-review': 'appdeploy_owner_review_snapshot',
           '/api/owner-review/signatures': 'appdeploy_owner_review_signatures_snapshot',
         };
+        if (path === '/api/daily-board') {
+          const board = await rpc(snapshots[path], actorPayload);
+          const jobs = withDeliveryGoBacks({ items: board.jobs }, await rpc('appdeploy_delivery_go_back_snapshot', actorPayload)).items;
+          return json({ ...board, jobs });
+        }
+        if (path === '/api/owner-review') return json(withDeliveryGoBacks(await rpc(snapshots[path], actorPayload), await rpc('appdeploy_delivery_go_back_snapshot', actorPayload)));
+        if (path === '/api/field-map') {
+          const [snapshot,audits,devices] = await Promise.all([
+            rpc(snapshots[path],actorPayload),
+            fleetPlacementAudits(context),
+            legacyAll('camera_devices?select=id,unit_key&order=id.asc',context.headers),
+          ]);
+          const projected=await projectOwnerPlacement(snapshot,audits,devices);
+          const ids=[...new Set(projected.items.filter(row=>row.placementSource==='owner'&&row.placementAuditId).map(row=>row.placementAuditId))];
+          const geocodes=[];
+          try{
+          for(let offset=0;offset<ids.length;offset+=250){
+            const page=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_field_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_audit_ids:ids.slice(offset,offset+250)})},'Saved address lookup results are unavailable.');
+            if(!Array.isArray(page))fail('Address lookup returned invalid results.',503);geocodes.push(...page);
+          }
+          return json(await projectReviewedAddressEstimates(await projectFieldGeocodes(projected,geocodes),audits,devices,placementMatchKey));
+          }catch{return json(await projectReviewedAddressEstimates(await projectFieldGeocodes(projected,[],true),audits,devices,placementMatchKey));}
+        }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {
-          const snapshot = await rpc('appdeploy_owner_jobs_snapshot', actorPayload);
+          const snapshot = withDeliveryGoBacks(await rpc('appdeploy_owner_jobs_snapshot', actorPayload), await rpc('appdeploy_delivery_go_back_snapshot', actorPayload));
           const visits = [...new Set((snapshot.items || []).map(item => item.visitId).filter(id => typeof id === 'string' && UUID.test(id)))];
           const assignments = visits.length ? await platformAll('visit_assignments?select=visit_id,user_id,assigned_at,job_visits!inner(organization_id)&assignment_role=eq.technician&status=in.(assigned,accepted)&visit_id=in.(' + visits.join(',') + ')&job_visits.organization_id=eq.' + ORGANIZATION_ID + '&order=assigned_at.desc') : [];
           const byVisit = new Map();
           for (const assignment of assignments) if (!byVisit.has(assignment.visit_id)) byVisit.set(assignment.visit_id, assignment.user_id);
-          return json({ ...snapshot, items: (snapshot.items || []).map(item => ({ ...item, technicianUserId: byVisit.get(item.visitId) || null })) });
+          const queue = await rpc('cos_it_queue_owner_snapshot', actorPayload);
+          if (!Array.isArray(queue?.items) || queue.items.some(row => !UUID.test(String(row.visitId || '')) || row.assignmentMode !== 'it_queue' || !['scheduled','ready','claimed'].includes(row.queueStatus) || (row.queueStatus === 'claimed' ? !UUID.test(String(row.claimOwnerId || '')) : row.claimOwnerId != null))) fail('Shared IT scheduling state could not be verified.', 503);
+          const queueByVisit = new Map(queue.items.map(row => [row.visitId, row]));
+          return json({ ...snapshot, items: (snapshot.items || []).map(item => {
+            const shared = queueByVisit.get(item.visitId);
+            return { ...item, technicianUserId: byVisit.get(item.visitId) || null, assignmentMode: shared ? 'it_queue' : 'technician', queueStatus: shared?.queueStatus || null, claimOwnerId: shared?.claimOwnerId || null };
+          }) });
         }
         const detailRoute = /^\/api\/(quotes|ar|purchasing)\/([^/]+)$/.exec(path);
         if (detailRoute) {
@@ -362,6 +532,7 @@ export function createOperationsHandler(options) {
             return { id: r.id, quoteNumber: r.quote_number, customer: r.customers?.name || '', site: r.sites?.name || '', title: v?.title || '', description: v?.scope || v?.notes || '', amount: Number(v?.total || 0), discountTotal: Number(v?.discount_total || 0), taxTotal: Number(v?.tax_total || 0), issueDate: r.issue_date, validUntil: r.valid_until, status: statuses[r.status] || r.status, locked: r.status !== 'draft', revision: Number(r.current_version) || 1, jobNumber: job?.job_number, activity: ['Production record · Supabase system of record'] };
           }) });
         }
+
         if (path === '/api/routers') {
           const [routers, units] = await Promise.all([
             legacyAll('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,current_status,last_checked_at,last_online_at,reported_status,reported_latency_ms,status_source,status_observed_at&order=id.asc', context.headers),
@@ -369,10 +540,34 @@ export function createOperationsHandler(options) {
           ]);
           return json(routerSnapshot(routers, units));
         }
+        // V2 is additive so currently released clients retain their exact v1 contract.
+        if (path === '/api/camera-health/summary-v2') {
+          const [devices, health, tracker, witnessIntegrations] = await Promise.all([
+            legacyAll('camera_devices?select=id,device_name,device_type,organization,unit_key,public_ip,expected_ports,connection_revision,source,source_status,source_last_seen_at,last_online_at,last_probe_online_at,activation_state,recon_battery_percent:source_metadata->battery_percent,recon_battery_updated_at:source_metadata->>battery_updated_at,recon_battery_status:source_metadata->>battery_status,recon_battery_status_updated_at:source_metadata->>battery_status_updated_at&order=id.asc', context.headers),
+            legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,checked_at,ip_reachable,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers),
+            legacyAll('equipment_master?select=canonical_family,unit_tag,source_label,tracker_state,health_provider&canonical_family=in.(Helios,Ranger,Solar Spotter,Spotter,SS Hybrid,CAMV,Sniper,Sniper 2,Sniper 4,Recon,Recon 2)&order=canonical_family.asc,unit_tag.asc,source_label.asc', context.headers),
+            legacyAll('camera_integrations?select=provider,units:metadata->units&provider=eq.witness&order=provider.asc', context.headers),
+          ]);
+          return json(cameraSummary(devices, health, Date.now(), tracker, witnessIntegrations));
+        }
+        if (path === '/api/camera-health/summary-v3') {
+          const [devices, health, tracker, witnessIntegrations, placementAudits, units, matches, providers] = await Promise.all([
+            legacyAll('camera_devices?select=id,external_device_id,device_serial,device_name,device_type,organization,unit_key,public_ip,expected_ports,connection_revision,source,source_status,source_last_seen_at,last_online_at,last_probe_online_at,activation_state,recon_battery_percent:source_metadata->battery_percent,recon_battery_updated_at:source_metadata->>battery_updated_at,recon_battery_status:source_metadata->>battery_status,recon_battery_status_updated_at:source_metadata->>battery_status_updated_at&order=id.asc', context.headers),
+            legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,checked_at,ip_reachable,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers),
+            legacyAll('equipment_master?select=canonical_family,unit_tag,source_label,tracker_state,health_provider&canonical_family=in.(Helios,Ranger,Solar Spotter,Spotter,SS Hybrid,CAMV,Sniper,Sniper 2,Sniper 4,Recon,Recon 2)&order=canonical_family.asc,unit_tag.asc,source_label.asc', context.headers),
+            legacyAll('camera_integrations?select=provider,units:metadata->units&provider=eq.witness&order=provider.asc', context.headers),
+            fleetPlacementAudits(context),
+            platformAll('equipment_units?select=id,organization_id,unit_number&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+            platformAll('vision_vigilant_unit_matches?select=id,organization_id,equipment_unit_id,vigilant_device_id,camera_key,match_method,confidence&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+            platformAll('vision_vigilant_devices?select=id,organization_id,external_device_id,device_name,device_type,source&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+          ]);
+          const identity=await verifiedHealthIdentities({units,matches,providers,devices,audits:placementAudits});
+          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...identity});
+        }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,device_type,organization,unit_key,source_status,source_last_seen_at,last_health_checked_at,activation_state&order=id.asc', context.headers),
-            legacyAll('camera_health_current?select=camera_device_id,overall_status,confirmed_outage&order=camera_device_id.asc', context.headers),
+            legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,confirmed_outage&order=camera_device_id.asc', context.headers),
           ]);
           const shopIds = new Set(devices.filter(d => ['root', 'shop'].includes(String(d.organization || '').trim().toLowerCase())).map(d => d.id));
           const byId = new Map(health.map(h => [h.camera_device_id, h]));
@@ -493,18 +688,35 @@ export function createOperationsHandler(options) {
         await assertRecord('jobs', id);
         return json(await rpc('appdeploy_owner_advance_it_to_service', { p_actor_user_id: context.actorId, p_job_id: id, p_note: textValue(body.note, 'Owner note'), p_unit_number: textValue(body.unitNumber, 'Unit number'), p_service_technician_name: textValue(body.serviceTechnician, 'Technician'), p_start_local: s.start, p_end_local: s.end }));
       }
-      const job = /^\/api\/jobs\/([^/]+)\/(schedule|assign|dispatch|close|remove|owner-review)$/.exec(path);
+      const goBack = /^\/api\/jobs\/([^/]+)\/go-back$/.exec(path);
+      if (goBack) {
+        allowedFields(body,['requestId','reason','remainingWork','partsNeeded','returnNotes'],'Go-back request');
+        const id = idValue(goBack[1], 'Job'), requestId = idValue(body.requestId, 'Request');
+        const reason = textValue(body.reason, 'Reason'), remainingWork = textValue(body.remainingWork, 'Remaining work');
+        const partsNeeded = textValue(body.partsNeeded, 'Parts needed'), returnNotes = textValue(body.returnNotes, 'Return visit notes');
+        if (!reason && !remainingWork) fail('Add a reason or remaining work before saving a go-back.');
+        await assertRecord('jobs', id);
+        return json(await rpc('appdeploy_request_delivery_go_back', { ...actorPayload, p_job_id: id, p_request_id: requestId,
+          p_reason: reason, p_remaining_work: remainingWork, p_parts_needed: partsNeeded, p_return_notes: returnNotes }));
+      }
+      const job = /^\/api\/jobs\/([^/]+)\/(schedule|assign|release-it|dispatch|close|remove|owner-review)$/.exec(path);
       if (job) {
-        const fields = { schedule:['start','end','technician'], assign:['technician'], dispatch:[], close:['reason'], remove:['confirmation'], 'owner-review':['action','reason'] };
+        const fields = { schedule:['start','end','technician','assignmentMode'], assign:['technician'], 'release-it':[], dispatch:[], close:['reason'], remove:['confirmation'], 'owner-review':['action','reason'] };
         allowedFields(body,fields[job[2]],'Job request');
         const id = idValue(job[1], 'Job'), payload = { p_actor_user_id: context.actorId, p_job_id: id };
         const record = await assertRecord('jobs', id, job[2] === 'remove' ? 'id,job_number' : 'id');
         if (job[2] === 'schedule') {
           const s = schedule(body);
-          return json(await rpc('appdeploy_schedule_current_visit', { ...payload, p_start_local: s.start, p_end_local: s.end, p_technician_name: textValue(body.technician, 'Technician', true, 160) }));
+          const mode = enumValue(body.assignmentMode, 'Assignment mode', ['technician','it_queue'], 'technician');
+          if (mode === 'it_queue') {
+            if (body.technician != null && body.technician !== '') fail('Choose the shared IT queue or one technician.');
+            return json(await rpc('cos_schedule_shared_it_visit', { ...payload, p_start_local: s.start, p_end_local: s.end }));
+          }
+          return json(await rpc(body.assignmentMode === 'technician' ? 'cos_schedule_named_visit' : 'appdeploy_schedule_current_visit', { ...payload, p_start_local: s.start, p_end_local: s.end, p_technician_name: textValue(body.technician, 'Technician', true, 160) }));
         }
         if (job[2] === 'assign') return json(await rpc('appdeploy_assign_current_visit', { ...payload, p_technician_name: textValue(body.technician, 'Technician', true, 160) }));
-        if (job[2] === 'dispatch') return json(await rpc('appdeploy_dispatch_current_visit', payload));
+        if (job[2] === 'release-it') return json(await rpc('cos_release_shared_it_visit', payload));
+        if (job[2] === 'dispatch') return json(await rpc('cos_dispatch_shared_it_visit', payload));
         if (job[2] === 'remove') {
           const confirmation = textValue(body.confirmation, 'Removal confirmation', true, 160);
           if (confirmation !== 'DELETE ' + record.job_number) fail('Type DELETE followed by the exact COS Job number.');
@@ -517,8 +729,10 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof HttpError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof HttpError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+    } finally {
+      if (!responseOwnsPermit) releaseLargeBody();
     }
   };
 }
@@ -528,5 +742,8 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     platformUrl: Deno.env.get('SUPABASE_URL'),
     serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
     vrmEmbeds: Deno.env.get('COS_VRM_EMBEDS'),
+    inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
   }));
 }
+
+

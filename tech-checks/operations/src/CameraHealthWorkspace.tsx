@@ -30,7 +30,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
         <h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
         <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p>
         <UnitEvidenceDetails classification={detail?.classification||null}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
-        {detail?.identity==='matched'&&<p>Matched by unique equipment family and unit number. Camera Health unit: <b>{detail.unitKey}</b>. No persistent cross-system association is created.</p>}
+        {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         <UnitDiagnosticReport key={selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}
       </>}
@@ -41,7 +41,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
       <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 15 minutes while visible</p>
       <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2}/>
       </>}
-      {initialUnitId&&selected&&!rows.length&&<p>No matching saved camera record is available for this field unit. {unitDiagnosticsPath(selected)&&<a href={unitDiagnosticsPath(selected)!} target='_blank' rel='noopener noreferrer'>Find this unit in Camera Health diagnostics ↗</a>}</p>}
+      {initialUnitId&&selected&&!rows.length&&<p>No matching saved camera record is available for this field unit. {unitDiagnosticsPath(selected,rows)&&<a href={unitDiagnosticsPath(selected,rows)!} target='_blank' rel='noopener noreferrer'>Find this unit in Camera Health diagnostics ↗</a>}</p>}
     </>}
   </section>;
 }
