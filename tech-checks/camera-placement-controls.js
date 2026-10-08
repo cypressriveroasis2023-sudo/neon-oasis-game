@@ -22,7 +22,7 @@
     return 'typed:'+family+'|'+Number(whole)+(fraction===undefined?'':'.'+fraction)+(m[3]?'|'+m[3].toUpperCase():'');
   }
   function stateMatches(state,key){return object(state)&&state.unitKey===key&&['SHOP','FIELD','UNKNOWN'].includes(state.placement)&&(state.auditId===null||resourceId(state.auditId)===state.auditId)&&typeof state.siteLabel==='string'&&typeof state.streetAddress==='string'&&state.canMove===true;}
-  const revisionFields=['id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
+  const revisionFields=['id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','snapshotImportedAt','activeJobNumber','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
   const rowRevision=row=>JSON.stringify(revisionFields.map(key=>row[key]??null));
   const legacyRevision=state=>JSON.stringify([state.unitKey,state.placement,state.siteLabel,state.streetAddress,state.auditId,state.canMove]);
   function resolvePlacement(snapshot,health,state,key){
@@ -53,7 +53,7 @@
     if(reviews.some(review=>placementMatchKey(review.unitNumber)===matchKey))fail('The unit’s physical placement needs identity review.');
     const identityRevision=JSON.stringify([group.map(item=>[String(item.id),item.unit]).sort((a,b)=>a[0].localeCompare(b[0])),proofs.map(proof=>[proof.unitId,proof.unitNumber,proof.kind,[...proof.deviceIds].sort(),[...proof.unitKeys].sort(),proof.proof,proof.placementAuditId??null])]);
     // A camera-only SHOP control is intentionally absent from the field projection. Keep its existing explicit move path without inventing a native UUID or an address.
-    if(!proofs.length&&!candidates.length&&state.placement==='SHOP'&&!state.streetAddress.trim())return {row:null,field:false,writerCompatible:true,site:'',address:'',revision:JSON.stringify(['camera_only_shop',key,identityRevision,legacyRevision(state)])};
+    if(!proofs.length&&!candidates.length&&state.placement==='SHOP'&&!state.streetAddress.trim())return {row:null,field:false,newInstallation:true,writerCompatible:true,site:'',address:'',revision:JSON.stringify(['camera_only_shop',key,identityRevision,legacyRevision(state)])};
     let row;
     if(proofs.length){
       const proof=proofs[0],matches=inventory.filter(item=>item.id===proof.unitId);
@@ -67,18 +67,34 @@
     }
     if(warnings.some(warning=>warning.unitId===row.id))fail('The current equipment identity needs review.');
     if(row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||reviews.some(review=>placementMatchKey(review.unitNumber)===matchKey||placementMatchKey(review.unitNumber)===placementMatchKey(row.unitNumber)))fail('The unit’s physical placement needs identity review.');
+    if(row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string')fail('The current placement source is malformed.');
+    const ownerFields=['placement','placementUnitKey','placementAuditId','placementUpdatedAt'].some(name=>row[name]!=null);
+    if((ownerFields||row.placementSource!=null)&&row.placementSource!=='owner')fail('Owner placement evidence is incomplete. Reload the unit.');
     const fieldRows=items.filter(item=>item.id===row.id),field=fieldRows.length===1;
     if(field&&rowRevision(fieldRows[0])!==rowRevision(row))fail('The field and equipment address records disagree.');
     const declaredField=row.placement==='FIELD'||row.placement!=='SHOP'&&(['field','site'].includes(normal(row.currentLocationType))||['assigned','in_transit','installed','returning'].includes(row.status));
     const declaredShop=row.placement==='SHOP'||normal(row.currentLocationType)==='shop';
     if(field&&declaredShop||!field&&(declaredField||!declaredShop&&state.placement!=='SHOP'))fail('The current field placement is incomplete or unresolved. Review the Field Map record first.');
-    if(field&&(!text(row.site)||!text(row.address))||row.site!=null&&typeof row.site!=='string'||row.address!=null&&typeof row.address!=='string')fail('The current installation address is missing or incomplete. Review the Field Map record first.');
+    // Imported FIELD membership is not a native installation. A confirmed SHOP unit
+    // may be deployed even when that historical tracker entry has no site/address.
+    // Keep the complete old row in the revision fingerprint; never rewrite it here.
+    const unassignedTrackerField=field&&row.status==='field'&&row.placement==null&&row.placementSource==null&&row.installedSiteId==null&&row.activeJobNumber==null
+      &&text(row.recordSource)&&row.addressSource===row.recordSource
+      &&(row.readOnly===true?normal(row.currentLocationType)==='field':!normal(row.currentLocationType))
+      &&row.locationVerification!=='owner_verified'&&row.locationVerifiedAt==null&&row.locationHistoryId==null;
+    const explicitOwnerShop=row.placementSource==='owner'&&row.placement==='SHOP';
+    if(!field&&!explicitOwnerShop&&(row.installedSiteId!=null||row.locationVerification==='owner_verified'||row.locationVerifiedAt!=null||row.locationHistoryId!=null))fail('The saved installation or verified location needs placement review before deployment.');
+    const newInstallation=state.placement==='SHOP'&&(!field||unassignedTrackerField);
+    if(newInstallation&&row.placementSource!=='owner'&&row.activeJobNumber!=null)fail('The current equipment has an active job. Review its placement before deploying it.');
+    // Empty recorded details can be repaired. Missing fields/types indicate a broken
+    // source contract and must never masquerade as an empty editable installation.
+    if(!Object.prototype.hasOwnProperty.call(row,'site')||!Object.prototype.hasOwnProperty.call(row,'address')||row.site!=null&&typeof row.site!=='string'||row.address!=null&&typeof row.address!=='string')fail('The current installation address response is incomplete or malformed. Reload the unit.');
     if((row.site||'').length>250||(row.address||'').length>600)fail('The current installation address cannot be edited in this form.');
     if(row.placementSource==='owner'){
       if(!resourceId(row.placementAuditId)||row.placementAuditId!==state.auditId||auditKey(row.placementUnitKey)!==auditKey(key)||row.placement!==state.placement||row.placement==='FIELD'&&(row.address!==state.streetAddress||row.site!==state.siteLabel))fail('Camera placement changed while the address was loading. Reload the unit.');
     }else if(state.streetAddress.trim())fail('Camera and Field Map placement revisions disagree. Reload the unit.');
-    if(row.locationVerification==='owner_verified'&&(!uuid(row.locationHistoryId)||!Number.isFinite(Date.parse(row.locationVerifiedAt))||typeof row.latitude!=='number'||Math.abs(row.latitude)>90||!Number.isFinite(row.latitude)||typeof row.longitude!=='number'||Math.abs(row.longitude)>180||!Number.isFinite(row.longitude)))fail('The verified location record is incomplete.');
-    return {row,field,writerCompatible:placementMatchKey(row.unitNumber)===matchKey,site:row.site||'',address:row.address||'',revision:JSON.stringify([rowRevision(row),field,identityRevision,legacyRevision(state)])};
+    if(row.locationVerification==='owner_verified'&&(!text(row.address)||!uuid(row.locationHistoryId)||!Number.isFinite(Date.parse(row.locationVerifiedAt))||typeof row.latitude!=='number'||Math.abs(row.latitude)>90||!Number.isFinite(row.latitude)||typeof row.longitude!=='number'||Math.abs(row.longitude)>180||!Number.isFinite(row.longitude)))fail('The verified location record is incomplete.');
+    return {row,field:field&&!newInstallation,newInstallation,writerCompatible:placementMatchKey(row.unitNumber)===matchKey,site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state)])};
   }
   async function readCurrentData(db,key,signal){
     const sessionResult=await db.auth.getSession(),session=sessionResult.data?.session;
@@ -124,14 +140,14 @@
       input('site').value=baseline.site;input('address').value=baseline.address;feedback.textContent='';disableInputs(!baseline.writerCompatible);submit.disabled=!baseline.writerCompatible;
       if(placement==='FIELD'){
         if(baseline.field)dialog.querySelector('h2').textContent='Update field address';
-        note.textContent=baseline.field?(baseline.row.locationVerification==='owner_verified'?'The current Field Map address and verified pin are loaded. An unchanged address will not create a move.':'The current Field Map address is loaded. An unchanged address will not create a move.'):'Enter the new installation address. A confirmed move will locate the saved address automatically; address pins remain approximate until verified on site.';
+        note.textContent=baseline.field?(!text(baseline.site)||!text(baseline.address)?'The saved installation details are incomplete. Enter the current site and complete address, then confirm the correction.':baseline.row.locationVerification==='owner_verified'?'The current Field Map address and verified pin are loaded. An unchanged address will not create a move.':'The current Field Map address is loaded. An unchanged address will not create a move.'):'Enter the new installation address. A confirmed move will locate the saved address automatically; address pins remain approximate until verified on site.';
       }
       if(!baseline.writerCompatible){feedback.textContent='The verified address is shown, but this equipment alias needs a placement-link review before a move can be saved.';}else input(placement==='FIELD'?'site':'reason').focus();
     }catch(error){if(alive())feedback.textContent='Placement controls are unavailable: '+(error?.message||error)+'. No change was made.';}
     form.onsubmit=async event=>{
       event.preventDefault();if(!alive()||context.pending||uncertain||!baseline||!baseline.writerCompatible)return;
       const site=placement==='FIELD'?input('site').value.trim():'',address=placement==='FIELD'?input('address').value.trim():'',reason=input('reason').value.trim();
-      if(placement==='FIELD'&&baseline.field&&normal(address)===normal(baseline.address)){
+      if(placement==='FIELD'&&baseline.field&&text(baseline.address)&&(text(baseline.site)||baseline.row.locationVerification==='owner_verified')&&normal(address)===normal(baseline.address)){
         feedback.textContent=normal(site)===normal(baseline.site)?'The installation address is unchanged. No move was saved; the existing location and verified pin are kept.':'The installation address is unchanged. No move or site-name edit was saved; update the site record to change only its name.';return;
       }
       if(!form.reportValidity()||!reason||(placement==='FIELD'&&(!site||!address)))return;
