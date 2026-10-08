@@ -51,7 +51,8 @@ export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:numbe
       candidates.push({x,y,visible,preferred});
     };
     if(count<=9)expandedGroupOffsets(count,scale).forEach(({x,y})=>add(x,y,true));
-    for(let row=-rows;row<=rows;row++)for(let column=0;column<columns;column++)add(Math.round((column-(columns-1)/2)*56*scale),Math.round((row*70-12)*scale));
+    const gridShift=anchorVisible?viewport.width/2-viewport.anchorX:0;
+    for(let row=-rows;row<=rows;row++)for(let column=0;column<columns;column++)add(Math.round(gridShift+(column-(columns-1)/2)*56*scale),Math.round((row*70-12)*scale));
     candidates.sort((a,b)=>Number(b.visible)-Number(a.visible)||Number(b.preferred)-Number(a.preferred)||Math.hypot(a.x,a.y)-Math.hypot(b.x,b.y)||a.y-b.y||a.x-b.x);
     const blocked=(x:number,y:number)=>viewport.blocked?.some(box=>viewport.anchorX+x+22*scale>box.left&&viewport.anchorX+x-22*scale<box.right&&viewport.anchorY+y+37*scale>box.top&&viewport.anchorY+y-30*scale<box.bottom);
     const selected:{x:number;y:number}[]=[],occupied=[{x:0,y:0},...(viewport.occupied||[])];
@@ -61,7 +62,7 @@ export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:numbe
     }
     // Dense adjacent sites may exhaust the visible grid. Continue clear rows for map panning.
     for(let row=rows+1;selected.length<count;row++)for(let column=0;column<columns&&selected.length<count;column++){
-      const x=Math.round((column-(columns-1)/2)*56*scale),y=Math.round((row*70-12)*scale);
+      const x=Math.round(gridShift+(column-(columns-1)/2)*56*scale),y=Math.round((row*70-12)*scale);
       if(blocked(x,y)||[...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
       selected.push({x,y});
     }

@@ -265,7 +265,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     const bounds:L.LatLngExpression[]=[];
     const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44,16);
     const mapBox=map.getContainer().getBoundingClientRect();
-    const blocked=[...map.getContainer().querySelectorAll('.leaflet-control')].map(control=>{const box=control.getBoundingClientRect();return {left:box.left-mapBox.left,right:box.right-mapBox.left,top:box.top-mapBox.top,bottom:box.bottom-mapBox.top};});
+    const blocked=[...map.getContainer().querySelectorAll('.leaflet-control'),...map.getContainer().parentElement?.querySelectorAll('.field-map-legend')||[]].map(control=>{const box=control.getBoundingClientRect();return {left:box.left-mapBox.left,right:box.right-mapBox.left,top:box.top-mapBox.top,bottom:box.bottom-mapBox.top};});
     const occupied=groups.map(group=>{const point=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;return map.latLngToContainerPoint([point.latitude,point.longitude]);});
     for(const group of groups){
       const site=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;
