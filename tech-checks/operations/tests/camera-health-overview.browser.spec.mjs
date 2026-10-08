@@ -169,3 +169,37 @@ test('unavailable placement reads show an error without submitting changes',asyn
  await mount(page);await page.evaluate(()=>{window.writes=0;db.rpc=async name=>{if(name==='owner_set_camera_unit_placement_v2')writes++;return {error:{message:'Synthetic denied'}};};});
  await page.locator('.compact-unit[data-unit="RANGER 022"]').getByRole('button',{name:'Move to ROOT / SHOP',exact:true}).click();await expect(page.locator('.cos-placement-dialog')).toContainText('Synthetic denied');await expect(page.locator('.cos-placement-dialog [type=submit]')).toBeDisabled();expect(await page.evaluate(()=>writes)).toBe(0);await page.locator('.cos-placement-dialog').getByRole('button',{name:'Cancel'}).click();
 });
+
+test('bound diagnostics export safe per-unit evidence without probes or metadata pseudo-ports',async({page},info)=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));await mount(page);
+ await page.evaluate(async()=>{
+  Object.assign(window.fixtureDevices[0],{public_ip:'203.0.113.9',connection_revision:2,expected_ports:[443,80,554],last_probe_online_at:'2026-10-06T10:00:00Z'});
+  window.fixtureHealth=[{camera_device_id:11,checked_at:'2026-10-06T12:29:00Z',ip_reachable:true,port_status:{443:{online:true,latency_ms:0},80:{online:false,error:'Connection refused'},554:{online:false,error:'timeout'},_connection:{revision:2,ip:'203.0.113.9',checkedAt:'2026-10-06T12:29:00Z',status:'online',reachable:true}}}];
+  await load();window.diagnosticCalls=[];const invoke=db.functions.invoke;db.functions.invoke=async(...args)=>{window.diagnosticCalls.push(args[0]);return invoke(...args)};
+  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedReport=text}}});
+ });
+ await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await page.locator('[data-diag="report"]').click();
+ const report=page.getByRole('textbox',{name:'Unit diagnostic report'});
+ await expect(report).toHaveCSS('white-space','pre-wrap');expect((await report.inputValue()).split('\n').length).toBeGreaterThan(15);await expect(report).toHaveValue(/Current bound direct result: RESPONDING/);await expect(report).toHaveValue(/Port 80: Connection refused/);await expect(report).toHaveValue(/Port 554: Timed out/);await expect(report).not.toHaveValue(/_connection/);
+ expect(await page.evaluate(()=>diagnosticCalls)).toEqual([]);
+ await page.getByRole('button',{name:'Copy report',exact:true}).click();expect(await page.evaluate(()=>window.copiedReport)).toContain('No ticket has been created or sent.');
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download text',exact:true}).click();const download=await downloadPromise;
+ expect(download.suggestedFilename()).toBe('cos-diagnostic-RANGER-022.txt');const stream=await download.createReadStream();let exported='';for await(const chunk of stream)exported+=chunk.toString();expect(exported).toContain('0 ms');expect(exported).not.toContain('_connection');
+ for(const width of [390,1440]){await page.setViewportSize({width,height:900});await report.scrollIntoViewIfNeeded();expect(await report.evaluate(el=>el.getBoundingClientRect().right<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('saved-diagnostic-report-'+width+'.png')});}
+ await page.locator('[data-diag="ports"]').click();await expect(page.locator('#troubleResult')).toContainText('CONNECTION REFUSED');await expect(page.locator('#troubleResult')).not.toContainText('_connection');
+ await page.evaluate(()=>{window.fixtureDevices[0].connection_revision=3});await page.locator('[data-diag="report"]').click();await expect(report).toHaveValue(/Current bound direct result: NOT CHECKED/);await expect(report).not.toHaveValue(/Port 443: Responding/);
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Open RANGER 023 unit details'}).click();await page.locator('[data-diag="report"]').click();await expect(report).toHaveValue(/Unit: RANGER 023/);await expect(report).not.toHaveValue(/Unit: RANGER 022/);expect(errors).toEqual([]);
+});
+
+test('inventory-only Recon and interrupted diagnostics keep reports unknown and isolated',async({page})=>{
+ await mount(page);await page.evaluate(async()=>{Object.assign(window.fixtureDevices[2],{source_status:null,source_last_seen_at:null,source_imported_at:'2026-10-06T12:29:00Z'});await load()});
+ await page.getByRole('button',{name:'Open RII-028 unit details'}).click();await page.locator('[data-diag="report"]').click();const report=page.getByRole('textbox',{name:'Unit diagnostic report'});await expect(report).toHaveValue(/Current provider result: UNKNOWN \/ REVIEW/);await expect(report).toHaveValue(/Inventory sync is not detector health/);
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await page.evaluate(()=>{db.functions.invoke=async()=>({error:{message:'secret https://user:password@example.invalid/token'}})});await page.locator('[data-diag="connectivity"]').click();await expect(report).toHaveValue(/Current provider result: UNKNOWN \/ REVIEW/);await expect(report).not.toHaveValue(/user:password|example.invalid/);await page.locator('[data-diag="report"]').click();await expect(report).toHaveValue(/Current provider result: UNKNOWN \/ REVIEW/);await page.evaluate(()=>{boardDataReady=false});await page.locator('[data-diag="report"]').click();await expect(report).toHaveValue(/Current bound direct result: UNKNOWN \/ REVIEW/);
+});
+
+test('report navigation during a failed verification cannot revive older provider evidence',async({page})=>{
+ await mount(page);await page.evaluate(()=>{db.functions.invoke=()=>new Promise(resolve=>window.rejectDiagnostic=()=>resolve({error:{message:'Synthetic authentication denied'}}))});
+ await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await page.locator('[data-diag="connectivity"]').click();await expect.poll(()=>page.evaluate(()=>Boolean(window.rejectDiagnostic))).toBe(true);
+ await page.locator('[data-diag="report"]').click();await expect(page.getByRole('textbox',{name:'Unit diagnostic report'})).toHaveValue(/UNKNOWN \/ REVIEW/);
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Open RANGER 023 unit details'}).click();await page.evaluate(()=>window.rejectDiagnostic());await page.keyboard.press('Escape');await page.getByRole('button',{name:'Open RANGER 022 unit details'}).click();await page.locator('[data-diag="report"]').click();await expect(page.getByRole('textbox',{name:'Unit diagnostic report'})).toHaveValue(/Current provider result: UNKNOWN \/ REVIEW/);
+});

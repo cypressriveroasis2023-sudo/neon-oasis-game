@@ -128,3 +128,28 @@ are blocked. All contact fixtures are synthetic.
 Deployment requires applying the reviewed contact route delta to the exact currently deployed
 Operations bridge to preserve existing routes. Do not deploy an older checkout as a full replacement. No deployment, contact mutation, outbound message or production job
 creation is part of local verification.
+
+### Per-unit diagnostic reports
+
+Camera Health unit details expose a saved diagnostic report with copy and plain-text
+download. Legacy diagnostics bind direct evidence to the saved IP/revision, exclude
+metadata from numeric port results, and distinguish refused, timeout, unchecked and
+stale evidence. Provider observation time, last check attempted, historical success,
+and service reachability stay separate; none proves camera video or recording.
+A pending or failed unit verification keeps reports unknown until a newer supported
+verification succeeds, including when a user leaves and reopens the unit.
+
+Native reports use the released version-2 source-separated DTO. Observed per-port
+results are not in that summary and are explicitly unavailable there; existing unit
+diagnostics remain the verification route. Owner ticket entry appends a bounded
+sanitized report through the existing current-unit context only while instructions
+are untouched. The owner reviews and saves the existing ticket workflow. Copying,
+downloading, opening a draft and generating a report do not create or send tickets,
+call mHelpDesk, run probes or grant IT dispatch rights. Solar stands, poles and skids
+remain zero-camera support equipment. Automatic saved-data refresh stays 15 minutes.
+
+Exports allowlist presentation fields and redact URL, credential and contact-like
+label content. Raw integration payloads/errors and contact records are not exported.
+Regressions cover IP/revision mismatch, stale direct proof despite fresh provider
+timestamps, malformed/false/zero/skipped port values, metadata keys, inventory-only
+Recon updates, hostile labels, failure/navigation races and safe export.

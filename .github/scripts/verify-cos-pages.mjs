@@ -19,6 +19,7 @@ const files = [
   'tech-checks/cos-eye-branding.css',
   'tech-checks/camera-health.html',
   'tech-checks/camera-health-history.js',
+  'tech-checks/camera-diagnostic-report.js',
   'tech-checks/camera-health-history.css',
   'tech-checks/camera-health-overview.js',
   'tech-checks/camera-health-overview.css',

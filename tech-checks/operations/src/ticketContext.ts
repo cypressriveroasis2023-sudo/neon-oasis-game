@@ -2,9 +2,11 @@ import { records, type Row } from './directoryData.js';
 import { checkedFieldMap } from './gpsPersistence';
 import { readTicketDirectory } from './ticketDirectoryData';
 import { ticketTypes, type TicketType } from './ticketTypes';
+import {fieldCameraHealth,validateCameraHealth,canonicalCameraUnit,scopedFieldIdentity,isSupportEquipment,type FieldHealthUnit} from './fieldCameraHealth';
+import {unitDiagnosticReport,unitDiagnosticDraft} from './unitDiagnosticReport';
 export type TicketUnitContext = {
   unitId:string; unitNumber:string; modelName:string; source:'native'|'tracker';
-  state:'linked'|'unresolved'; message:string; siteId?:string; siteName?:string; customerId?:string; customerName?:string;
+  state:'linked'|'unresolved'; message:string; siteId?:string; siteName?:string; customerId?:string; customerName?:string; diagnosticReport?:string;
 };
 export const isTicketUnitId=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 /** Use saved identifiers only. Labels, similar names and tracker rows never establish a site/customer relationship. */
@@ -31,7 +33,18 @@ export function resolveTicketUnitContext(unitId:string,equipmentData:unknown,map
 }
 export async function loadTicketUnitContext(client:{get:(path:string)=>Promise<{data:unknown}>},unitId:string) {
   const [equipment,map,customers,sites]=await Promise.all(['/api/equipment','/api/field-map','/api/customers','/api/sites'].map(path=>client.get(path)));
-  return resolveTicketUnitContext(unitId,equipment.data,map.data,customers.data,sites.data);
+  const context=resolveTicketUnitContext(unitId,equipment.data,map.data,customers.data,sites.data);
+  // Read through the existing owner route. The caller's untouched-field guard owns draft application.
+  const units=checkedFieldMap(map.data).items as unknown as FieldHealthUnit[];
+  const unit:FieldHealthUnit={id:context.unitId,unitNumber:context.unitNumber,modelName:context.modelName};
+  let health=null;
+  try{health=validateCameraHealth((await client.get('/api/camera-health/summary-v3')).data);}catch{/* Optional evidence failure never changes the verified customer/site context. */}
+  const now=Date.now(),current=units.find(candidate=>candidate.id===unitId);
+  const sameUnit=current&&canonicalCameraUnit(current.unitNumber)===canonicalCameraUnit(unit.unitNumber)&&canonicalCameraUnit(unit.unitNumber)!==null;
+  // Compare capability without relying on an available health feed.
+  const sameCapability=current&&(isSupportEquipment(current)&&isSupportEquipment(unit)||!isSupportEquipment(current)&&!isSupportEquipment(unit)&&scopedFieldIdentity(current)!==null&&scopedFieldIdentity(current)===scopedFieldIdentity(unit));
+  const detail=current&&!sameCapability?{rows:[],identity:'ambiguous' as const}:sameUnit?fieldCameraHealth(unit,units,health,now):{rows:[],identity:'missing' as const};
+  return {...context,diagnosticReport:unitDiagnosticReport({unit,rows:detail.rows,trusted:health?.evidenceVersion===2,now,refreshedAt:health?.refreshedAt,identity:detail.identity})};
 }
 export function ticketContextTitle(type:TicketType,context:TicketUnitContext) {
   return (ticketTypes.find(item=>item.value===type)?.label||type)+' · '+context.unitNumber;
@@ -39,5 +52,6 @@ export function ticketContextTitle(type:TicketType,context:TicketUnitContext) {
 export function ticketContextInstructions(context:TicketUnitContext) {
   return 'Unit reference: '+context.unitNumber+(context.modelName?' ('+context.modelName+')':'')+'.\n'+
     (context.source==='tracker'?'Read-only tracker record: ':'Equipment record: ')+context.unitId+'.\n'+
-    'Opened from Camera Health. This reference does not assign equipment or select a replacement unit.';
+    'Opened from Camera Health. This reference does not assign equipment or select a replacement unit.'+
+    (context.diagnosticReport?'\n\n'+unitDiagnosticDraft(context.diagnosticReport):'');
 }

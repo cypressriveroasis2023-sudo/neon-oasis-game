@@ -5,6 +5,7 @@ import { checkedFieldMap } from './gpsPersistence';
 import { fieldCameraHealth,cameraColors,unitHealthLabel,unitDiagnosticsPath,cameraTime,type FieldHealthUnit } from './fieldCameraHealth';
 import { useCameraHealth } from './useCameraHealth';
 import CameraHealthOverview,{CameraResourceObservations,UnitEvidenceDetails} from './CameraHealthOverview';
+import UnitDiagnosticReport from './UnitDiagnosticReport';
 export { validateCameraHealth } from './fieldCameraHealth';
 type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean};
 export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false}:Props){
@@ -30,6 +31,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
         <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p>
         <UnitEvidenceDetails classification={detail?.classification||null}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
         {detail?.identity==='matched'&&<p>Matched by unique equipment family and unit number. Camera Health unit: <b>{detail.unitKey}</b>. No persistent cross-system association is created.</p>}
+        <UnitDiagnosticReport key={selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}
       </>}
     </section>}
