@@ -1,5 +1,6 @@
 import {addressDigest} from './censusAddress.ts';
 import {placementMatchKey} from './placementProjection.ts';
+import {checkedReviewedAddressEstimate,reviewedLegacyEvidenceSha256,reviewedEstimatePrefix,reviewedEstimateSource} from './reviewedAddressEstimates.ts';
 import {validInstallation,installationAddress,suppliedComponents,matchesInstallation,type Installation} from './importedAddressContract.ts';
 type Row=Record<string,any>;
 const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
@@ -44,8 +45,20 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
    return {...raw,site:'SHOP / ROOT',_sourceField:false,status:'readiness_unverified',currentLocationType:'shop',placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:'SHOP',importedInstallation:{entityKind:s.entityKind,nativeUnitId:s.nativeUnitId,productId:s.productId,sourceRevision:s.sourceRevision,eventId:s.eventId,nativeGuardSha256:s.nativeGuardSha256,sourceFileSha256:s.sourceFileSha256,sourceRowSha256:s.sourceRowSha256,placement:'SHOP'},latitude:null,longitude:null,coordinateSource:null};
   }
   const binding=await checkedImportedBinding(s);if(s.placement!=='FIELD'||!binding)return raw;
+  // A current approved property estimate outranks a new automatic lookup. Validate
+  // BEFORE changing any placement/address guards; an old address_changed/SHOP
+  // marker must never become eligible merely because an import says FIELD.
+  const reviewedCandidate=(raw.locationNote?.startsWith?.(reviewedEstimatePrefix)||raw.coordinateSource===reviewedEstimateSource||raw.historicalCoordinateSource===reviewedEstimateSource)
+   &&typeof raw.address==='string'&&await addressDigest(raw.address)===binding.addressSha256
+   ?{...raw,addressEstimateLegacyEvidenceSha256:await reviewedLegacyEvidenceSha256(raw.unitNumber,audits,devices,placementMatchKey)}:null;
+  const preserveReviewed=reviewedCandidate&&await checkedReviewedAddressEstimate(reviewedCandidate);
+  const reviewedDirect=preserveReviewed&&raw.historicalCoordinateSource!==reviewedEstimateSource&&raw.coordinateSource===reviewedEstimateSource;
+  const coordinates=preserveReviewed?{address:raw.address,latitude:reviewedDirect?raw.latitude:null,longitude:reviewedDirect?raw.longitude:null,coordinateSource:reviewedDirect?raw.coordinateSource:null,
+   locationVerification:raw.locationVerification,locationVerifiedAt:raw.locationVerifiedAt,locationHistoryId:raw.locationHistoryId,addressEstimateLegacyEvidenceSha256:reviewedCandidate.addressEstimateLegacyEvidenceSha256}
+   :{latitude:null,longitude:null,coordinateSource:null,locationVerification:'address_only',locationVerifiedAt:null,locationHistoryId:null,
+    ...(raw.historicalCoordinateSource===reviewedEstimateSource?{historicalLatitude:null,historicalLongitude:null,historicalCoordinateSource:null}:{})};
   return {...raw,site:typeof s.siteLabel==='string'&&s.siteLabel.trim()?s.siteLabel:'Installation site',_sourceField:true,placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:'FIELD',status:['assigned','in_transit','installed','returning'].includes(raw.status)?raw.status:'field',currentLocationType:'field',address:installationAddress(binding.installation),addressSource:'mHelpDesk imported installation address',recordSource:'mHelpDesk imported installation address',
-   importedInstallation:binding,latitude:null,longitude:null,coordinateSource:null,locationVerification:'address_only',locationVerifiedAt:null,locationHistoryId:null};
+   importedInstallation:binding,...coordinates};
  }));
  const items=inventoryItems.filter((r:Row)=>r._sourceField===true);
  return {...snapshot,items,inventoryItems,summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length}};
