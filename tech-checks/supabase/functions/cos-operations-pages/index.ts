@@ -473,12 +473,16 @@ export function createOperationsHandler(options) {
         }
         if (path === '/api/owner-review') return json(withDeliveryGoBacks(await rpc(snapshots[path], actorPayload), await rpc('appdeploy_delivery_go_back_snapshot', actorPayload)));
         if (path === '/api/field-map') {
-          const [snapshot,audits,devices] = await Promise.all([
+          const [snapshot,audits,devices,units,matches,providers] = await Promise.all([
             rpc(snapshots[path],actorPayload),
             fleetPlacementAudits(context),
-            legacyAll('camera_devices?select=id,unit_key&order=id.asc',context.headers),
+            legacyAll('camera_devices?select=id,external_device_id,device_serial,device_name,device_type,organization,unit_key,public_ip,expected_ports,connection_revision,source,source_status,source_last_seen_at,last_online_at,last_probe_online_at,activation_state,recon_battery_percent:source_metadata->battery_percent,recon_battery_updated_at:source_metadata->>battery_updated_at,recon_battery_status:source_metadata->>battery_status,recon_battery_status_updated_at:source_metadata->>battery_status_updated_at&order=id.asc', context.headers),
+            platformAll('equipment_units?select=id,organization_id,unit_number&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+            platformAll('vision_vigilant_unit_matches?select=id,organization_id,equipment_unit_id,vigilant_device_id,camera_key,match_method,confidence&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+            platformAll('vision_vigilant_devices?select=id,organization_id,external_device_id,device_name,device_type,source&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
           ]);
-          const projected=await projectOwnerPlacement(snapshot,audits,devices);
+          const identity=await verifiedHealthIdentities({units,matches,providers,devices,audits});
+          const projected=await projectOwnerPlacement(snapshot,audits,devices,identity,units);
           const ids=[...new Set(projected.items.filter(row=>row.placementSource==='owner'&&row.placementAuditId).map(row=>row.placementAuditId))];
           const geocodes=[];
           try{

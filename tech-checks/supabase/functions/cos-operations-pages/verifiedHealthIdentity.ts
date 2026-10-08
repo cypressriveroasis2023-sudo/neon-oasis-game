@@ -79,9 +79,13 @@ export async function verifiedHealthIdentities(sources:IdentitySources,review:Id
  const presentNativeKeys=new Set<string>();
  for(const unit of units){
   if(!uuid(unit.id))continue;
-  const reviewKey=await nativeIdentityKey(unit.id),expected=review.native[reviewKey];if(!expected)continue;
+  const reviewKey=await nativeIdentityKey(unit.id),expected=review.native[reviewKey],resources=review.nativeResources[reviewKey];
+  if(!expected&&!resources)continue;
   presentNativeKeys.add(reviewKey);
-  bindWarning(unit.id,review.nativeResources[reviewKey]);
+  bindWarning(unit.id,resources);
+  // Retained resource commitments are deny-only tombstones when a positive review is revoked.
+  // They cannot prove a replacement association or silently revive name-only placement.
+  if(!expected){reject(unit.id,'The reviewed native association has been revoked and requires identity review.');continue;}
   if(unit.organization_id!==organizationId||unitIds.get(unit.id)?.length!==1||!text(unit.unit_number)){reject(unit.id,'Native equipment identity changed or is duplicated.');continue;}
   const links=byNative.get(unit.id)||[];
   if(!links.length){reject(unit.id,'Reviewed provider-resource mappings are missing.');continue;}
@@ -103,7 +107,7 @@ export async function verifiedHealthIdentities(sources:IdentitySources,review:Id
   if(proof!==expected){reject(unit.id,'The complete reviewed native/provider association has changed.');continue;}
   identities.push({unitId:unit.id,unitNumber:unit.unit_number,kind:'native_provider',deviceIds:sortIds(boundIds),unitKeys,proof});
  }
- for(const [key,resources] of Object.entries(review.nativeResources))if(review.native[key]&&!presentNativeKeys.has(key))rejectUnavailable(key,resources,'Reviewed native equipment identity is missing from the current inventory.');
+ for(const [key,resources] of Object.entries(review.nativeResources))if(!presentNativeKeys.has(key))rejectUnavailable(key,resources,'Reviewed native equipment identity is missing from the current inventory.');
  // A newer audit can replace the reviewed control, key or resource set. Keep the
  // prior control visible as untrusted even when it disappears from current moves.
  const knownOwners=new Set<string>(),presentOwnerKeys=new Set<string>();

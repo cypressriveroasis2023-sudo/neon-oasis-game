@@ -61,18 +61,86 @@ async function movedRow(raw:Row,a:Row):Promise<Row>{
   addressEstimateTrackerId:null,addressEstimateUnitNumber:null,
   locationNote:row.locationNote};
 }
-/** Existing unmarked rows and pins are unchanged. Only explicitly moved rows receive effective fields. */
-export async function projectOwnerPlacement(snapshot:unknown,audits:unknown,devices:unknown):Promise<Row>{
+/** Structural input only: the caller must supply the result of verifiedHealthIdentities.
+ * Keep this module independent of that verifier (which uses currentOwnerPlacements).
+ * No provider matching, serial access, review-scope changes or persistent identity writes here.
+ */
+export type ReviewedPlacementIdentity={identityVersion:1;unitIdentities:Row[];identityWarnings:Row[]};
+const sameIds=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(id=>b.includes(id));
+function nativePlacementAliases(inventory:Row[],audits:Row[],devices:Row[],overrides:Row[],identity:ReviewedPlacementIdentity){
+ if(!object(identity)||identity.identityVersion!==1||!Array.isArray(identity.unitIdentities)||!Array.isArray(identity.identityWarnings))fail('Reviewed placement identities are unavailable.');
+ if(new Set(audits.map(a=>idString(a.id))).size!==audits.length)fail('Placement history returned duplicate audit identities.');
+ const proofs=identity.unitIdentities,warnings=identity.identityWarnings;
+ if(proofs.some(p=>!object(p)||!uuid(p.unitId)||!text(p.unitNumber,250)||!['native_provider','owner_placement'].includes(p.kind)||!Array.isArray(p.deviceIds)||!p.deviceIds.length||p.deviceIds.some((id:unknown)=>typeof id!=='string'||idString(id)!==id)||!Array.isArray(p.unitKeys)||!p.unitKeys.length||p.unitKeys.some((key:unknown)=>!text(key,250))||!/^[a-f0-9]{64}$/.test(p.proof))
+  ||warnings.some(w=>!object(w)||(!uuid(w.unitId)&&!/^unavailable:[a-f0-9]{64}$/.test(w.unitId))||!text(w.reason,1000)||!Array.isArray(w.deviceIds)||w.deviceIds.some((id:unknown)=>typeof id!=='string'||idString(id)!==id)||new Set(w.deviceIds).size!==w.deviceIds.length||!Array.isArray(w.unitKeys)||w.unitKeys.some((key:unknown)=>!text(key,250))||new Set(w.unitKeys).size!==w.unitKeys.length))fail('Reviewed placement identities are malformed.');
+ const related=(claim:Row,key:string,ids:string[])=>claim.unitKeys.some((k:string)=>auditKey(k)===auditKey(key))||claim.deviceIds.some((id:string)=>ids.includes(id));
+ const targets:Row[]=[],blocked=new Map<string,Set<string>>();
+ const block=(key:string,ids:string[])=>blocked.set(auditKey(key),new Set([...(blocked.get(auditKey(key))||[]),...ids]));
+ // A warning never becomes a fallback name match or a camera-only generated row.
+ for(const warning of warnings){
+  for(const key of warning.unitKeys)block(key,[warning.unitId]);
+  for(const a of overrides)if(related(warning,a.unit_key,a.device_ids.map(idString)))block(a.unit_key,[warning.unitId]);
+ }
+ for(const proof of proofs.filter(p=>p.kind==='native_provider')){
+  const keys=proof.unitKeys,rawKey=keys[0],rawMatch=placementMatchKey(rawKey),nativeMatch=placementMatchKey(proof.unitNumber);
+  const rows=inventory.filter(row=>row.id===proof.unitId),group=devices.filter(d=>auditKey(d.unit_key)===auditKey(rawKey));
+  const ids=group.map(d=>idString(d.id)),latest=audits.filter(a=>auditKey(a.unit_key)===auditKey(rawKey)).sort((a,b)=>BigInt(idString(a.id)!)>BigInt(idString(b.id)!)?-1:1)[0];
+  const current=overrides.find(a=>auditKey(a.unit_key)===auditKey(rawKey));
+  const relatedProofs=proofs.filter(p=>p.unitId===proof.unitId||keys.some((key:string)=>related(p,key,proof.deviceIds)));
+  const competingRows=inventory.filter(row=>row.id!==proof.unitId&&[rawMatch,nativeMatch].includes(placementMatchKey(row.unitNumber)));
+  const auditConflict=audits.some(a=>auditKey(a.unit_key)!==auditKey(rawKey)&&(
+   [rawMatch,nativeMatch].includes(placementMatchKey(a.unit_key))||Array.isArray(a.device_ids)&&a.device_ids.map(idString).some((id:string|null)=>id!==null&&proof.deviceIds.includes(id))
+   ||current&&a.control_id===current.control_id));
+  const valid=keys.length===1&&rawKey===rawKey.trim()&&rows.length===1&&rows[0].readOnly===false&&rows[0].unitNumber===proof.unitNumber
+   &&group.length>0&&group.every(d=>d.unit_key===rawKey)&&sameIds(proof.deviceIds,ids)&&relatedProofs.length===1&&!competingRows.length
+   &&!warnings.some(w=>w.unitId===proof.unitId||related(w,rawKey,proof.deviceIds))
+   &&!devices.some(d=>[rawMatch,nativeMatch].includes(placementMatchKey(d.unit_key))&&d.unit_key!==rawKey)
+   &&!auditConflict&&(!current||!current.conflictReason&&current.unit_key===rawKey&&sameIds(current.device_ids.map(idString),proof.deviceIds)
+    &&latest&&idString(latest.id)===idString(current.id)&&(!inventory.some(row=>row.id===current.control_id)))
+   &&(!latest||latest.unit_key===rawKey);
+  if(!valid){for(const key of keys)block(key,[proof.unitId,...competingRows.map(r=>r.id)]);continue;}
+  targets.push({contract:'COS_NATIVE_PLACEMENT_ALIAS_V1',writerContract:'COS_CAMERA_PLACEMENT_V2',unitId:proof.unitId,unitNumber:proof.unitNumber,
+   unitKey:rawKey,deviceIds:[...proof.deviceIds].sort(),proof:proof.proof,auditId:latest?idString(latest.id):null});
+ }
+ // A reused control UUID cannot create one order-dependent shadow for competing moves.
+ for(const a of overrides)if(overrides.some(other=>other!==a&&other.control_id===a.control_id))block(a.unit_key,proofs.filter(p=>related(p,a.unit_key,a.device_ids.map(idString))).map(p=>p.unitId));
+ // Protected native identities cannot be claimed by an unrelated name-only move.
+ for(const a of overrides){
+  const rows=inventory.filter(row=>placementMatchKey(row.unitNumber)===a.matchKey);
+  for(const row of rows)if(proofs.some(p=>p.kind==='native_provider'&&p.unitId===row.id&&!related(p,a.unit_key,a.device_ids.map(idString)))||warnings.some(w=>w.unitId===row.id))block(a.unit_key,[row.id]);
+ }
+ return {targets:targets.filter(t=>!blocked.has(auditKey(t.unitKey))),blocked};
+}
+
+/** Healthy unmarked rows and pins are unchanged. Explicit identity warnings are deny-only quarantines. */
+export async function projectOwnerPlacement(snapshot:unknown,audits:unknown,devices:unknown,identity?:ReviewedPlacementIdentity,nativeUnits?:unknown):Promise<Row>{
  if(!object(snapshot)||!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!object(snapshot.summary))fail('Field placement is unavailable. Reload the Field Map.');
+ // The map RPC and identity-source reads are independent snapshots. A vanished, duplicated
+ // or renamed native row must not fall back to its earlier map address/pin, even if all
+ // resource bindings disappeared too. This agreement is a denial guard, never identity proof.
+ if(identity){
+  if(!Array.isArray(nativeUnits)||nativeUnits.length>100000||nativeUnits.some(row=>!object(row)||!uuid(row.id)||!text(row.unit_number,250))||new Set(nativeUnits.map(row=>row.id)).size!==nativeUnits.length)fail('Native inventory identity membership is unavailable or duplicated.');
+  const byNativeId=new Map(nativeUnits.map(row=>[row.id,row]));
+  if(snapshot.inventoryItems.some((row:Row)=>row?.readOnly===false&&(!byNativeId.has(row.id)||byNativeId.get(row.id)!.unit_number!==row.unitNumber)))fail('Native inventory changed while Field Map was loading. Reload before using its placement.');
+ }
  const overrides=currentOwnerPlacements(audits,devices),byKey=new Map<string,Row[]>(),seen=new Set<string>();
  for(const row of snapshot.inventoryItems){
   if(!object(row)||!uuid(row.id)||seen.has(row.id)||typeof row.unitNumber!=='string'||typeof row._sourceField!=='boolean')fail('Field inventory returned inconsistent identities.');
   seen.add(row.id);const key=placementMatchKey(row.unitNumber);byKey.set(key,[...(byKey.get(key)||[]),row]);
  }
+ const aliases=identity?nativePlacementAliases(snapshot.inventoryItems,audits as Row[],devices as Row[],overrides,identity):null;
  const replacements=new Map<string,Row>(),extra:Row[]=[],placementReviews:Row[]=[];
  const hold=(a:Row,matches:Row[],reason:string)=>{placementReviews.push({unitNumber:a.unit_key,reason,placementAuditId:idString(a.id)});for(const raw of matches){const {_sourceField:_source,_placementProof:_proof,...row}=raw;replacements.set(row.id,{...row,placement:'UNKNOWN',placementStatus:'needs_identity_review',placementReviewReason:reason,latitude:null,longitude:null,coordinateSource:null,locationVerification:'address_changed',locationVerifiedAt:null,locationHistoryId:null,addressEstimateTrackerId:null,addressEstimateUnitNumber:null});}};
+ // A verified negative native UUID remains meaningful when every current camera binding
+ // is gone. Keep the record/history in inventory, but never its stale current field pin.
+ if(identity)for(const warning of identity.identityWarnings){
+  const rows=snapshot.inventoryItems.filter((row:Row)=>row.id===warning.unitId);
+  if(rows.length)hold({unit_key:rows[0].unitNumber,id:null},rows,warning.reason||'The reviewed native identity is unavailable. Review this unit before using its location.');
+ }
  for(const a of overrides){
-  const matches=byKey.get(a.matchKey)||[];
+  const target=aliases?.targets.find(t=>t.unitKey===a.unit_key),blocked=aliases?.blocked.get(auditKey(a.unit_key));
+  const matches=target?snapshot.inventoryItems.filter((row:Row)=>row.id===target.unitId):byKey.get(a.matchKey)||[];
+  if(blocked){hold(a,[...new Set([...matches,...snapshot.inventoryItems.filter((row:Row)=>blocked.has(row.id))])],'The reviewed native placement association changed or is ambiguous. Review this unit’s identity.');continue;}
   if(a.conflictReason||matches.length>1){hold(a,matches,a.conflictReason||'The moved camera matches more than one field record. Review its identity.');continue;}
   if(matches.length===1)replacements.set(matches[0].id,await movedRow(matches[0],a));
   else if(a.placement==='FIELD'){
@@ -87,7 +155,7 @@ export async function projectOwnerPlacement(snapshot:unknown,audits:unknown,devi
  }
  const inventory=snapshot.inventoryItems.map((raw:Row)=>{const {_sourceField:_source,_placementProof:_proof,...row}=raw;return replacements.get(raw.id)||row;});
  const items=snapshot.inventoryItems.filter((row:Row)=>replacements.has(row.id)?replacements.get(row.id)!.placement==='FIELD':row._sourceField===true).map((raw:Row)=>{const {_sourceField:_source,_placementProof:_proof,...row}=raw;return replacements.get(raw.id)||row;}).concat(extra);
- return {...snapshot,items,inventoryItems:inventory.concat(extra),placementReviews,summary:{...snapshot.summary,fieldUnits:items.length,
+ return {...snapshot,items,inventoryItems:inventory.concat(extra),placementReviews,...(aliases?{placementProjectionVersion:2,nativePlacementAliases:aliases.targets}:{}),summary:{...snapshot.summary,fieldUnits:items.length,
   mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,unitGps:items.filter((r:Row)=>r.hasUnitGps===true).length,
   missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length}};
 }
