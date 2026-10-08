@@ -50,7 +50,9 @@ export function scopedFieldIdentity(unit:FieldHealthUnit) {
 export function isSupportEquipment(unit:FieldHealthUnit):boolean {
   const name=unit.unitNumber.trim().toUpperCase();
   const model=(unit.modelName||'').trim().toUpperCase().replace(/[_-]/g,' ').replace(/\s+/g,' ');
-  return /^(?:SOLAR\s*STANDS?(?:\s*72)?|SOLAR\s*POLES?|SKIDS?)(?:\s|[-#])\s*\d+$/i.test(name)
+  return /^(?:ST|STAND)\s*[-#]?\s*\d{1,6}$/i.test(name)
+    || ['STAND','STANDS'].includes(model)
+    || /^(?:SOLAR\s*STANDS?(?:\s*72)?|SOLAR\s*POLES?|SKIDS?)(?:\s|[-#])\s*\d+$/i.test(name)
     || ['SOLAR STAND','SOLAR STANDS','SOLAR STANDS 72','SOLAR STAND 72','SOLAR POLES & SKIDS','SOLAR POLE','SOLAR POLES','SKID','SKIDS'].includes(model);
 }
 export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],health:Health|null,now=Date.now()):UnitCameraHealth {

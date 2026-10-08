@@ -15,7 +15,7 @@ export type ReticleState = 'online'|'offline'|'unknown'|'support';
 export const fieldReticleColors = {online:'#2bff35',offline:'#ff2734',unknown:'#d8dfe9',support:'#15a8ff'};
 export function mapUnitIdentifier(unitNumber:string):string {
   // Only numeric characters reach the HTML template. Full imported labels stay text nodes.
-  return /(?:^|\s|[-#])(\d{1,6}(?:\.\d+)?)$/.exec(unitNumber.trim())?.[1] || '';
+  return /^ST\s*[-#]?\s*(\d{1,6})$/i.exec(unitNumber.trim())?.[1] || /(?:^|\s|[-#])(\d{1,6}(?:\.\d+)?)$/.exec(unitNumber.trim())?.[1] || '';
 }
 function individualReticleArtwork(support:boolean) {
   // Inline vector paths use only controlled markup/currentColor: no shared filter IDs.
