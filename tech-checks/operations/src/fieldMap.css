@@ -21,3 +21,32 @@
 .field-cluster-list{min-width:0;overflow-wrap:anywhere}.field-cluster-list button{overflow-wrap:anywhere;box-sizing:border-box}.field-map-workspace .leaflet-popup-content{max-width:calc(100vw - 100px)}
 .field-map-display-bar{min-width:0;box-sizing:border-box}.field-map-display-bar>div{min-width:0;overflow-wrap:anywhere}
 .field-map-workspace{min-width:0;grid-template-columns:minmax(0,1fr)}.field-map-toolbar>input,.field-map-toolbar>select{min-width:0;max-width:100%;box-sizing:border-box}
+
+/* Approved targeting-reticle style. Only the tile pane is darkened; markers,
+   attribution, controls and status evidence remain independent of the map art. */
+.field-map-canvas .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.85) contrast(.75) sepia(.6) hue-rotate(165deg) saturate(1.5)}
+.field-map-workspace .cos-field-pin,.field-map-workspace .cos-field-cluster,
+.field-map-workspace .cos-field-pin.cos-field-pin-estimate,.field-map-workspace .cos-field-pin.cos-field-pin-historical{
+  position:relative;display:grid;place-items:center;width:44px;min-width:44px;max-width:44px;height:44px;padding:0;left:auto;transform:none;
+  border:0!important;border-radius:0;background:transparent!important;color:#fff!important;box-shadow:none;box-sizing:border-box;font-size:13px;font-weight:800;white-space:nowrap;
+}
+.cos-field-pin:before,.cos-field-pin:after,.cos-field-cluster:before,.cos-field-cluster:after{content:'';display:block;position:absolute;background:var(--pin);opacity:.8;z-index:0;border:0;border-radius:0;inset:auto;box-shadow:none}
+.cos-field-pin:before,.cos-field-cluster:before{width:44px;height:1px;top:21.5px;left:0}
+.cos-field-pin:after,.cos-field-cluster:after{height:44px;width:1px;left:21.5px;top:0}
+.cos-reticle-ring{position:absolute;inset:6px;border:1.7px solid var(--pin);border-radius:50%;background:#071421;box-shadow:0 0 7px color-mix(in srgb,var(--pin) 70%,transparent),inset 0 0 3px color-mix(in srgb,var(--pin) 28%,transparent);z-index:1}
+.cos-field-pin>b,.cos-field-cluster>b{z-index:2;position:relative;display:grid;place-items:center;font-size:13px;line-height:1;color:#fff;text-shadow:0 1px 2px #000}
+.cos-field-pin>b.cos-reticle-long-id{font-size:9px;letter-spacing:-.5px}
+.cos-field-pin-support>b{color:#d9f3ff}.cos-field-pin-support svg{width:21px;height:21px}
+.cos-reticle-dot{width:8px;height:8px;background:#f2f5f9;border-radius:50%;display:block}
+.cos-pin-location-tag,.cos-cluster-caption,.cos-cluster-location{position:absolute;z-index:3;font-size:7px;font-style:normal;line-height:10px;letter-spacing:.25px;background:#071421;color:#e4edf5;padding:0 3px;border-radius:2px;white-space:nowrap}
+.cos-pin-location-tag,.cos-cluster-caption{top:37px;left:50%;transform:translateX(-50%)}
+.cos-cluster-location{top:-7px;left:50%;transform:translateX(-50%);color:#ffd38b}
+.cos-field-cluster[data-health=mixed] .cos-cluster-caption{color:#fff;border:1px solid #91a2b6;line-height:9px}
+.cos-cluster-support{position:absolute;top:-6px;right:-20px;display:flex;align-items:center;gap:1px;height:23px;padding:1px 3px;z-index:4;border:1px solid #15a8ff;border-radius:5px;background:#061829;color:#bce7ff;box-shadow:0 0 4px #15a8ff80;font-style:normal}
+.cos-cluster-support svg{width:15px;height:17px}.cos-cluster-support small{font-size:10px;color:#fff;font-weight:700}
+.field-cluster-list button[data-health]{border-left:3px solid var(--unit-status)}
+.field-map-tv .cos-field-pin,.field-map-tv .cos-field-cluster{scale:1.18;transform-origin:center}
+.field-map-legend i{width:13px;height:13px;background:#071421!important;border:1.4px solid currentColor;box-shadow:0 0 4px currentColor;box-sizing:border-box}
+.cos-field-pin-wrap:focus-visible,.cos-field-cluster-wrap:focus-visible{outline-offset:1px;border-radius:4px}
+
+.field-pin-label{width:max-content;max-width:min(220px,calc(100vw - 100px))}
