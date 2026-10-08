@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { locationLink } from './visionAreas';
 import { locationTag, locationExplanation, installationAddressLink, locationVerificationNote, locationHistoryNote, isCurrentFieldPin, historicalFieldCoordinates, parseLocationCoordinates } from './fieldLocations';
-import { checkedAddressEstimate, addressEstimateHumanNote, type AddressEstimate } from './fieldAddressEstimates';
+import { checkedAddressEstimate, addressEstimateHumanNote, addressEstimateLabel, addressEstimateTimestamp, reviewedDifferenceExplanation, type AddressEstimate } from './fieldAddressEstimates';
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useCameraHealth } from './useCameraHealth';
 import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime } from './fieldCameraHealth';
@@ -22,6 +22,8 @@ import { checkedFieldMap, createGpsSaver, gpsPopup } from './gpsPersistence';
 
 type FieldUnit = {
   id:string;
+  addressEstimateTrackerId?:string|null; addressEstimateUnitNumber?:string|null;
+  addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
   placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>;
   unitNumber:string;
   modelName?:string;
@@ -358,7 +360,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const popup=gpsPopup(document,unit);
       popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(tag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
       if(element){element.setAttribute('aria-label',element.title);element.innerHTML=mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?'estimate':!hasCoords(unit)?'historical':'current');}
-      popup.append(document.createElement('br'),document.createTextNode(estimate?'Census address estimate · '+routerTime(estimate.geocodedAt)+' · '+estimate.matchedAddress:'Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
+      popup.append(document.createElement('br'),document.createTextNode(estimate?addressEstimateLabel(estimate)+' · '+routerTime(addressEstimateTimestamp(estimate))+' · '+estimate.matchedAddress:'Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
       if(estimate)popup.append(document.createElement('br'),document.createTextNode('ADDRESS ESTIMATE - needs verification. Approximate site location, not live GPS; excluded from nearby results.'));
       else if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
       popup.append(document.createElement('br'),document.createTextNode('Latest camera observation: '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)));
@@ -479,7 +481,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length})</label>
       {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
     </div>
-    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as EST-tagged pins outside nearby mode. Each exact address match is a Census address-range estimate that needs verification. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
+    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as EST-tagged pins outside nearby mode. Each estimate needs verification. Sources include Census address-range results and explicitly reviewed Geocodio property points. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
     <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
@@ -510,11 +512,11 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             <div><dt>Customer</dt><dd>{selected.customer||'—'}</dd></div>
             <div><dt>Site</dt><dd>{selected.site||'—'}</dd></div>
             <div><dt>Installation address</dt><dd>{selected.address||'Not recorded'}</dd></div>
-            <div><dt>Location status</dt><dd>{tag(selected)}<br/>{selectedEstimate?'Exact matched address; approximate site location, not live GPS. Needs verification.':locationExplanation(selected)}</dd></div>
+            <div><dt>Location status</dt><dd>{tag(selected)}<br/>{selectedEstimate?'Approximate site location, not live GPS. Needs verification.':locationExplanation(selected)}</dd></div>
             <div><dt>Address source</dt><dd>{selected.addressSource||selected.recordSource||(selected.installedSiteId?'Installed site record':'Not recorded')}</dd></div>
             <div><dt>Location verified</dt><dd>{selected.locationVerifiedAt?routerTime(selected.locationVerifiedAt):'Not yet verified for this address'}</dd></div>
             <div><dt>Active job</dt><dd>{selected.activeJobNumber||'—'}</dd></div>
-            <div><dt>Map source</dt><dd>{selectedEstimate?'U.S. Census address-range estimate':sourceLabel(selected.coordinateSource)}</dd></div>
+            <div><dt>Map source</dt><dd>{selectedEstimate?addressEstimateLabel(selectedEstimate):sourceLabel(selected.coordinateSource)}</dd></div>
             <div><dt>Last unit GPS</dt><dd>{selected.gpsRecordedAt?new Date(selected.gpsRecordedAt).toLocaleString():'Not recorded'}</dd></div>
             {selected.recordSource && <div><dt>Location record</dt><dd>{selected.recordSource}</dd></div>}
             {selected.readOnly && <div><dt>Placement verified</dt><dd>{selected.sourceVerifiedAt?new Date(selected.sourceVerifiedAt).toLocaleString():'Not recorded'}</dd></div>}
@@ -524,7 +526,10 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
           {selected.locationGeocode&&!selectedEstimate&&<section aria-label='Automatic address lookup'><h3>Automatic address lookup</h3><p role='status'>{locationExplanation(selected)}</p>{openUnitHealth&&<button className='secondary' onClick={()=>openUnitHealth(selected.id)}>Open Camera Health to correct address</button>}</section>}
-          {selectedEstimate&&<section className='field-map-estimate-detail' aria-label='Address estimate'><h3>Address estimate - needs verification</h3><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></section>}
+          {selectedEstimate&&<section className='field-map-estimate-detail' aria-label='Address estimate'><h3>Address estimate - needs verification</h3>
+            {selectedEstimate.confidence==='approximate_property_location'?<><p>Original address: {selectedEstimate.originalAddress}</p><p>Provider-normalized address: {selectedEstimate.matchedAddress}</p><p>{reviewedDifferenceExplanation(selectedEstimate)}</p><p>Geocodio · {selectedEstimate.providerDataSource} · Provider accuracy {selectedEstimate.providerAccuracy} · {selectedEstimate.providerAccuracyType}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Result retrieved {routerTime(selectedEstimate.retrievedAt)}</p><p>This is an approximate property point. The installed unit position still needs verification. Units sharing this address share this approximate location.</p></>:<><p>{selectedEstimate.matchedAddress}</p><p>{selectedEstimate.latitude}, {selectedEstimate.longitude} · Source result {routerTime(selectedEstimate.geocodedAt)}</p><p>This is an interpolated address point, not a verified unit position. Units sharing this address share this approximate location.</p></>}
+          </section>}
+          {!selected.readOnly&&selected.locationNote?.startsWith('COS_ADDRESS_ESTIMATE_')&&addressEstimateHumanNote(selected.locationNote)&&<p role='alert'>{addressEstimateHumanNote(selected.locationNote)}</p>}
           {!selectedEstimate&&historicalFieldCoordinates(selected)&&<details className='field-map-historical'><summary>Historical coordinates (excluded from current map)</summary><p>{historicalFieldCoordinates(selected)!.latitude}, {historicalFieldCoordinates(selected)!.longitude} · {historicalFieldCoordinates(selected)!.source}</p><p>Do not use for routing until the current installation address has been verified.</p></details>}
           <div className='field-map-coordinate-form'>
             {selected.readOnly ? <><h3>Tracker location</h3><p>This tracker record does not have a unique registered equipment match. Correct its address in the source tracker; register or resolve the unit identity before saving a pin here.</p>{addressEstimateHumanNote(selected.locationNote) && <p role='alert'>{addressEstimateHumanNote(selected.locationNote)}</p>}{hasCoords(selected) && <p>Imported coordinates retain their original source. Their GPS observation date is not recorded.</p>}</> : !locationWritesEnabled ? <><h3>Location verification</h3><p role='status'>Verified location editing is not enabled for this backend yet. Existing addresses and location history remain available; no GPS save can be submitted from this view.</p></> : <>
