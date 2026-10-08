@@ -1,12 +1,14 @@
 import {test,expect} from '@playwright/test';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
-const origin='http://127.0.0.1:4173';
+const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,htmlLabel=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
+ if(crowded)state.units=state.units.map((u,i)=>({...u,latitude:29.76,longitude:-95.37,...(i===2?{unitNumber:'Solar Stand 72 044',modelName:'SOLAR STANDS 72'}:{})}));
+ if(htmlLabel)state.units[0]={...state.units[0],unitNumber:'Ranger <img src=x onerror="window.mapLabelExecuted=true">',site:'Site <b>literal</b>',address:'100 <img src=x onerror="window.mapAddressExecuted=true"> Fixture Road'};
  if(historical)state.units[0]={...state.units[0],locationVerification:undefined,readOnly:true};
  if(ambiguous)state.units[1].unitNumber='SOLAR SPOTTER 051';
  let rows=state.units.map((u,i)=>resource(i+1,'SOLARSPOTTER '+(51+i),{name:'Fixture camera '+(i+1),status:i===1?'offline':'online',checkedAt:fresh,...(!oldApi?{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:i===1?'offline':'online',observedAt:i===2?'2026-10-06T16:00:00Z':fresh,lastOnlineAt:fresh}}:{evidence:undefined})}));
@@ -160,4 +162,41 @@ test('native card quick actions expose safe endpoints, exact field identity and 
  await expect(card.locator('.camera-card-times')).toContainText('Last successful connection');await expect(card.locator('.camera-card-times')).toContainText('No successful connection recorded');await expect(card.locator('.camera-card-times')).toContainText('Last check attempted');
  await card.locator('.camera-card-main').focus();await page.keyboard.press('Enter');await expect(frame.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(card.locator('.camera-card-main')).toBeFocused();
  expect(state.writes).toHaveLength(0);const overflow=await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1);expect(overflow).toBe(false);await page.screenshot({path:info.outputPath('camera-card-quick-actions.png'),fullPage:true});
+});
+
+test('compact clusters expose every colocated unit and support equipment has no false camera outage',async({page},testInfo)=>{
+ const {frame,state}=await mount(page,{crowded:true});
+ await expect(frame.locator('.cos-field-cluster')).toHaveText('3');
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-field-cluster-wrap').focus();await page.keyboard.press('Enter');
+ await expect(frame.locator('.field-cluster-list button')).toHaveCount(4);
+ await expect(frame.locator('.field-cluster-list')).toContainText('Solar Stand 72 044 · SUPPORT EQUIPMENT · 0 CAMERAS');
+ await frame.locator('.field-cluster-list button').filter({hasText:'Zoom into'}).click();
+ await expect(frame.locator('.cos-field-cluster')).toHaveText('3');
+ await expect(frame.locator('.field-cluster-list')).toHaveCount(1);
+ await expect(frame.locator('.field-cluster-list')).toBeVisible();
+ await expect(frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'})).toHaveCount(1);
+ await frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'}).click();
+ await expect(frame.locator('.field-cluster-support-detail')).toContainText('100 Fixture Road');
+ await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
+ await frame.getByLabel('Field health filter').selectOption('support');
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
+ await expect(frame.locator('.field-map-list')).not.toContainText('Camera status unverified');
+ await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await expect(frame.locator('.field-map-workspace')).toHaveClass(/field-map-tv/);
+ await expect(frame.getByRole('button',{name:'Exit TV view',exact:true})).toBeVisible();
+ await expect(frame.locator('.field-map-display-bar')).toContainText('Saved status refreshes every 15 minutes');
+ await expect(frame.locator('.field-map-list')).not.toBeVisible();
+ const canvas=await frame.locator('.field-map-center').boundingBox();expect(canvas.height).toBeGreaterThan(200);expect(canvas.y+canvas.height).toBeLessThanOrEqual(page.viewportSize().height+1);
+ await page.screenshot({path:testInfo.outputPath('map-tv-support.png'),fullPage:true});
+ await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
+ await expect(frame.locator('.field-map-workspace')).not.toHaveClass(/field-map-tv/);
+ expect(state.writes).toHaveLength(0);
+});
+
+test('HTML-like imported unit and site names stay literal text in map labels',async({page})=>{
+ const {frame,state}=await mount(page,{htmlLabel:true});await expect(frame.locator('.field-pin-label')).toContainText('<img src=x');
+ await expect(frame.locator('.field-map-list')).toContainText('Site <b>literal</b>');await expect(frame.locator('.field-map-detail')).toContainText('100 <img src=x');
+ await expect(frame.locator('img[src="x"]')).toHaveCount(0);expect(await frame.locator('body').evaluate(()=>Boolean(window.mapLabelExecuted||window.mapAddressExecuted))).toBe(false);expect(state.writes).toHaveLength(0);
 });

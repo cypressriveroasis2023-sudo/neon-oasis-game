@@ -3,8 +3,8 @@ import {savedConnectionObservation} from './savedConnectionObservation';
 export type { CameraRow } from './cameraEvidence';
 export type Health = {totalDevices:number;online:number;offline:number;review:number;shopRoot:number;healthRows:number;fieldDevices:number;refreshedAt:string;rows:CameraRow[];evidenceVersion?:number;inventory?:{allRecords:number;activeFieldRecords:number;activeShopRecords:number;inactiveRecords:number;unknownScopeRecords?:number};coverageNote?:string};
 export type FieldHealthUnit = {id:string;unitNumber:string;modelName?:string;category?:string;readOnly?:boolean;address?:string;site?:string;customer?:string};
-export type UnitCameraHealth = {state:'online'|'offline'|'unknown';reason:string;rows:CameraRow[];unitKey:string|null;checkedAt:string|null;identity:'matched'|'missing'|'ambiguous';classification:UnitEvidence|null;basis?:'camera'|'connection'};
-export const cameraColors={online:'#35d48a',offline:'#ff737d',unknown:'#94a3b8'};
+export type UnitCameraHealth = {state:'online'|'offline'|'unknown'|'support';reason:string;rows:CameraRow[];unitKey:string|null;checkedAt:string|null;identity:'matched'|'missing'|'ambiguous';classification:UnitEvidence|null;basis?:'camera'|'connection'};
+export const cameraColors={online:'#35d48a',offline:'#ff737d',unknown:'#94a3b8',support:'#67c8ed'};
 export const cameraLabels={online:'Camera records online',offline:'Camera outage observed',unknown:'Camera status unverified'};
 export function validateCameraHealth(value:any):Health {
   const object=(v:any)=>v&&typeof v==='object'&&!Array.isArray(v);
@@ -44,8 +44,16 @@ function scopedFieldIdentity(unit:FieldHealthUnit) {
   const aliases:Record<string,string[]>={HELIOS:['HELIOS'],RANGER:['RANGER','RANGERS'],SOLARSPOTTER:['SOLARSPOTTER','SOLARSPOTTERS'],SPOTTER:['SPOTTER','SPOTTERS'],SSHYBRID:['SSHYBRID','SSHYBRIDS'],RECON:['RECON','RECONS'],RECON2:['RECON2','RECONII'],SNIPER:['SNIPER','SNIPERS'],SNIPER2:['SNIPER2','SNIPERS'],SNIPER4:['SNIPER4','SNIPERS'],CAMV:['CAMV','CAMVRSU']};
   return aliases[family]?.includes(model)?key:null;
 }
+/** Equipment families with no camera channels. Do not infer capability from a site name. */
+export function isSupportEquipment(unit:FieldHealthUnit):boolean {
+  const name=unit.unitNumber.trim().toUpperCase();
+  const model=(unit.modelName||'').trim().toUpperCase().replace(/[_-]/g,' ').replace(/\s+/g,' ');
+  return /^(?:SOLAR\s*STANDS?(?:\s*72)?|SOLAR\s*POLES?|SKIDS?)(?:\s|[-#])\s*\d+$/i.test(name)
+    || ['SOLAR STAND','SOLAR STANDS','SOLAR STANDS 72','SOLAR STAND 72','SOLAR POLES & SKIDS','SOLAR POLE','SOLAR POLES','SKID','SKIDS'].includes(model);
+}
 export function fieldCameraHealth(unit:FieldHealthUnit,units:FieldHealthUnit[],health:Health|null,now=Date.now()):UnitCameraHealth {
   const unknown=(reason:string,identity:UnitCameraHealth['identity']='missing',rows:CameraRow[]=[]):UnitCameraHealth=>({state:'unknown',reason,identity,rows,unitKey:null,checkedAt:null,classification:null});
+  if(isSupportEquipment(unit))return {state:'support',reason:'Support equipment · 0 cameras. Camera online/offline status does not apply. Power health is shown only when a verified power source is linked.',identity:'missing',rows:[],unitKey:null,checkedAt:null,classification:null};
   if(!health)return unknown('Camera Health is unavailable.');
   const key=scopedFieldIdentity(unit);
   if(!key)return unknown('Unit identifier or equipment family needs verification.');
@@ -72,6 +80,7 @@ export function cameraTime(value?:string|null,now=Date.now()) {
 }
 
 export function unitHealthLabel(info:UnitCameraHealth|null|undefined){
+  if(info?.state==='support')return 'SUPPORT EQUIPMENT · 0 CAMERAS';
   return info?.basis==='connection'?({online:'IP / PORT ONLINE',offline:'IP / PORT OFFLINE',unknown:'IP / PORT UNKNOWN'}[info.state]):cameraLabels[info?.state||'unknown'];
 }
 export function unitDiagnosticsPath(unit:FieldHealthUnit){

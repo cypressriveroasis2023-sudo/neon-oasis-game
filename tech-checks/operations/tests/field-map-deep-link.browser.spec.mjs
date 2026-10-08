@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { snapshot, resource } from './fixtures/camera-evidence-fixtures.mjs';
 const repo = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
-const origin = 'http://127.0.0.1:4173';
+const origin = process.env.COS_MAP_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333'];
 const now = '2026-10-06T18:00:00Z',
   fresh = '2026-10-06T17:55:00Z';
@@ -158,7 +158,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   } = await mount(page, 'RII-022');
   await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
-  await expect(frame.locator('.cos-field-pin')).toContainText('Recon II 022');
+  await expect(frame.locator('.field-pin-label')).toContainText('Recon II 022');
   expect(state.writes).toHaveLength(0);
   expect(errors).toEqual([]);
 }], ['Unknown or shop label never picks unrelated field unit', async page => {

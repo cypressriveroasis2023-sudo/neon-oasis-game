@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {clusterMapPoints} from '../src/fieldMapMarkers.ts';
+import {isSupportEquipment,fieldCameraHealth,unitHealthLabel} from '../src/fieldCameraHealth.ts';
+test('screen groups retain all identities including identical coordinates',()=>{const rows=[{item:'a',x:0,y:0},{item:'b',x:0,y:0},{item:'c',x:30,y:0},{item:'d',x:80,y:0}];const groups=clusterMapPoints(rows);assert.deepEqual(groups.map(x=>x.map(p=>p.item)),[['a','b','c'],['d']]);});
+test('support units have zero camera health even without provider data',()=>{for(const unitNumber of ['Solar Stand 72 044','Solar Stand 044','Solar Pole 003','Skid 012']){const unit={id:unitNumber,unitNumber};assert.equal(isSupportEquipment(unit),true);assert.equal(fieldCameraHealth(unit,[unit],null).state,'support');assert.equal(unitHealthLabel(fieldCameraHealth(unit,[unit],null)),'SUPPORT EQUIPMENT · 0 CAMERAS');}for(const unitNumber of ['Solar Spotter 044','Sniper 312','Helios 003'])assert.equal(isSupportEquipment({id:unitNumber,unitNumber}),false);});
+
+// Tooltip labels must remain text, just like cluster and address popup content.
+import fs from 'node:fs';
+test('imported map labels are assigned as text instead of Leaflet HTML strings',()=>{const source=fs.readFileSync(new URL('../src/FieldMap.tsx',import.meta.url),'utf8');assert.match(source,/label.textContent=unit.unitNumber/);assert.match(source,/marker.bindTooltip\(label,/);assert.doesNotMatch(source,/bindTooltip\(unit.unitNumber/);});

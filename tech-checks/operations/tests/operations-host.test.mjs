@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const hostSource = readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8');
+const displaySource = readFileSync(new URL('../../field-map-display-host.js', import.meta.url), 'utf8').replace('export function','function');
+const hostSource = displaySource+'\n'+readFileSync(new URL('../../operations-host.js', import.meta.url), 'utf8').replace(/import \{setFieldMapDisplay\} from .*;\n/,'');
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
 const ownerId = '00000000-0000-4000-8000-000000000001';
 const secondOwnerId = '11111111-2222-4333-8444-555555555555';
@@ -165,7 +166,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
   assert.equal(h.frame().src, './operations/dist/index.html?v=operations-v100-phase2-20261004');
-  assert.equal(h.frame().allow, 'geolocation');
+  assert.equal(h.frame().allow, 'geolocation; fullscreen');assert.equal(h.frame().allowFullscreen,true);
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);
   assert.equal(h.nodes.get('cosOperationsMount').hidden, false);
@@ -540,4 +541,14 @@ test('Tech Check header is assembled around existing controls without a host HTM
  assert.equal(h.nodes.get('cosOperationsLegacy').children[0].className,'cos-tech-check-header');
  await h.navigate('accounts');
  assert.equal(h.nodes.get('cosTechCheckToolTitle').textContent,'Technician accounts');
+});
+
+test('TV presentation is origin/source checked and restores frame styling on exit and reload',async()=>{
+ const h=harness(),frame=h.frame();frame.style={cssText:'height:70vh'};h.body.style={overflow:'auto'};
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true},{},origin);assert.equal(h.body.style.overflow,'auto');
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true},frame.contentWindow,'https://untrusted.example');assert.equal(h.body.style.overflow,'auto');
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});assert.equal(h.body.style.overflow,'hidden');assert.equal(frame.style.position,'fixed');
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:false});assert.equal(frame.style.cssText,'height:70vh');assert.equal(h.body.style.overflow,'auto');
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});frame.emit('load');assert.equal(h.body.style.overflow,'auto');assert.equal(frame.style.cssText,'height:70vh');
+ await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});h.state.role='service';h.state.effectiveRole='service';h.nodes.get('appView').classList.add('hidden');h.flushMutations();assert.equal(h.body.style.overflow,'auto');
 });
