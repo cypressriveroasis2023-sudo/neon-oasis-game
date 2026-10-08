@@ -1,5 +1,16 @@
 import {addressDigest} from './censusAddress.ts';
 import {validInstallation,installationAddress,suppliedComponents,type Installation} from './importedAddress.ts';
+const dependencyCodes=['rpc_transport','rpc_http','rpc_json','source_transport','source_http','source_body','source_json','source_shape'] as const;
+type DependencyCode=typeof dependencyCodes[number];
+/** Carries only a fixed code. Never retain the underlying error, body, URL, or credentials. */
+export class GeocodeDependencyError extends Error{
+ readonly code:DependencyCode;
+ constructor(code:DependencyCode){super('Geocode dependency unavailable');this.code=code;}
+}
+export function geocodeDependencyCode(error:unknown):DependencyCode|null{
+ try{if(error instanceof GeocodeDependencyError){const code=error.code;return dependencyCodes.find(allowed=>allowed===code)??null;}}catch{}
+ return null;
+}
 export const SOURCE_ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 export type ImportedIdentity={entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId:string;sourceRevision:string};
 export type ImportedSource=ImportedIdentity&{schemaVersion:1;organizationId:string;sourceSystem:'mhelpdesk_product_import';unitNumber:string;family:string|null;variant:string|null;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:true;city:boolean;state:true;zip:boolean};eligibility:'FIELD';eventId:string};
@@ -31,32 +42,32 @@ export function createSourceReader(key:string|undefined,requestFetch:typeof fetc
  key=key?.trim();
  const configured=typeof key==='string'&&/^[a-f0-9]{64}$/i.test(key);
  const request=async(body:Record<string,unknown>):Promise<any>=>{
-  if(!configured)throw Error('Source bridge unavailable');
+  if(!configured)throw new GeocodeDependencyError('source_shape');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
   try{
    const response=await requestFetch('https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-geocode-sources',{method:'POST',headers:{'x-cos-geocode-source-key':key!,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),redirect:'error',cache:'no-store',signal:controller.signal});
-   if(!response.ok)throw Error('Source bridge unavailable');
-   const reader=response.body?.getReader();if(!reader)throw Error('Source bridge unavailable');let size=0;const chunks:Uint8Array[]=[];
-   while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>524288){await reader.cancel();throw Error('Source bridge unavailable');}chunks.push(value);}
+   if(!response.ok)throw new GeocodeDependencyError('source_http');
+   const reader=response.body?.getReader();if(!reader)throw new GeocodeDependencyError('source_body');let size=0;const chunks:Uint8Array[]=[];
+   while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>524288){await reader.cancel();throw new GeocodeDependencyError('source_body');}chunks.push(value);}
    const joined=new Uint8Array(size);let offset=0;for(const chunk of chunks){joined.set(chunk,offset);offset+=chunk.length;}
-   return JSON.parse(new TextDecoder().decode(joined));
-  }catch{throw Error('Source bridge unavailable');}finally{clearTimeout(timer);controller.abort();}
+   try{return JSON.parse(new TextDecoder().decode(joined));}catch{throw new GeocodeDependencyError('source_json');}
+  }catch(error){throw new GeocodeDependencyError(geocodeDependencyCode(error)??'source_transport');}finally{clearTimeout(timer);controller.abort();}
  };
  return {configured,
   async changes(afterEventId:string,limit=100):Promise<{events:SourceEvent[];nextEventId:string}>{
-   if(!decimal(afterEventId,true)||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid source cursor');
+   if(!decimal(afterEventId,true)||!Number.isInteger(limit)||limit<1||limit>100)throw new GeocodeDependencyError('source_shape');
    const data=await request({action:'list_changes',afterEventId,limit});
-   if(!object(data)||!Array.isArray(data.events)||data.events.length>limit||!decimal(data.nextEventId,true)||BigInt(data.nextEventId)<BigInt(afterEventId))throw Error('Invalid source changes');
+   if(!object(data)||!Array.isArray(data.events)||data.events.length>limit||!decimal(data.nextEventId,true)||BigInt(data.nextEventId)<BigInt(afterEventId))throw new GeocodeDependencyError('source_shape');
    let previous=BigInt(afterEventId);const events:SourceEvent[]=[];
-   for(const raw of data.events){if(!validIdentity(raw)||!decimal(raw.eventId)||BigInt(raw.eventId)<=previous||!['upsert','tombstone'].includes(raw.kind))throw Error('Invalid source changes');previous=BigInt(raw.eventId);events.push({...sourceIdentity(raw),eventId:raw.eventId,kind:raw.kind});}
-   if(events.length?data.nextEventId!==events.at(-1)!.eventId:data.nextEventId!==afterEventId)throw Error('Invalid source cursor');
+   for(const raw of data.events){if(!validIdentity(raw)||!decimal(raw.eventId)||BigInt(raw.eventId)<=previous||!['upsert','tombstone'].includes(raw.kind))throw new GeocodeDependencyError('source_shape');previous=BigInt(raw.eventId);events.push({...sourceIdentity(raw),eventId:raw.eventId,kind:raw.kind});}
+   if(events.length?data.nextEventId!==events.at(-1)!.eventId:data.nextEventId!==afterEventId)throw new GeocodeDependencyError('source_shape');
    return {events,nextEventId:data.nextEventId};
   },
   async currentMany(identities:ImportedIdentity[]):Promise<(ImportedSource|null)[]>{
-   if(!Array.isArray(identities)||!identities.length||identities.length>100||identities.some(i=>!validIdentity(i)))throw Error('Invalid source identities');
+   if(!Array.isArray(identities)||!identities.length||identities.length>100||identities.some(i=>!validIdentity(i)))throw new GeocodeDependencyError('source_shape');
    const data=await request({action:'read_current',sources:identities.map(sourceIdentity)});
-   if(!object(data)||!Array.isArray(data.sources)||data.sources.length!==identities.length)throw Error('Invalid current sources');
-   return Promise.all(data.sources.map(async(s:unknown,i:number)=>{if(s===null)return null;if(object(s)&&s.eligibility==='tombstone'&&s.schemaVersion===1&&s.organizationId===SOURCE_ORG&&s.sourceSystem==='mhelpdesk_product_import'&&validIdentity(s)&&JSON.stringify(sourceIdentity(s))===JSON.stringify(sourceIdentity(identities[i])))return null;const checked=await checkedImportedSource(s,identities[i]);if(!checked)throw Error('Invalid current source');return checked;}));
+   if(!object(data)||!Array.isArray(data.sources)||data.sources.length!==identities.length)throw new GeocodeDependencyError('source_shape');
+   return Promise.all(data.sources.map(async(s:unknown,i:number)=>{if(s===null)return null;if(object(s)&&s.eligibility==='tombstone'&&s.schemaVersion===1&&s.organizationId===SOURCE_ORG&&s.sourceSystem==='mhelpdesk_product_import'&&validIdentity(s)&&JSON.stringify(sourceIdentity(s))===JSON.stringify(sourceIdentity(identities[i])))return null;const checked=await checkedImportedSource(s,identities[i]);if(!checked)throw new GeocodeDependencyError('source_shape');return checked;}));
   },
  };
 }

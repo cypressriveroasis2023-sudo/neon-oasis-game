@@ -1,4 +1,4 @@
-import {processImportedGeocodes} from './importedGeocodeSweep.ts';
+import {processImportedGeocodes,importedGeocodeFailure} from './importedGeocodeSweep.ts';
 import {processGeocodioFallback} from './geocodioFallback.ts';
 import {censusAddress} from './censusAddress.ts';
 const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
@@ -38,7 +38,7 @@ export function createGeocodeHandler(options:Options){return async(req:Request)=
   // Existing Census results remain authoritative; fallback only sees current Census no_match rows.
   const fallbackResults=await processGeocodioFallback({...options,deadlineMs},!isCron?{p_audit_id:body.auditId,p_unit_key:body.unitKey}:{});
   let importedResults:unknown=null;
-  if(isCron){try{importedResults=await processImportedGeocodes({...options,deadlineMs});}catch{importedResults={status:'unavailable'};}}
+  if(isCron){try{importedResults=await processImportedGeocodes({...options,deadlineMs});}catch(error){importedResults=importedGeocodeFailure(error);}}
   return reply({ok:true,results,fallbackResults,importedResults});
  }catch{return reply({error:'Address lookup could not finish. The saved placement is unchanged; scheduled processing will retry.'},503);}
 };}
