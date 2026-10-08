@@ -185,3 +185,32 @@ The deployment baseline is the actual 15-file v23 bridge. Unrelated authenticati
 IT permissions, Owner placement, reviewed address estimates and reticle styling
 are preserved. Verification uses read-only production snapshots and isolated
 fixtures; no physical unit probes, moves, endpoint edits or test records are used.
+
+
+### Effective installation address in the legacy editor
+
+Camera Health's placement editor reads the existing authenticated Field Map and
+version-3 health-identity endpoints with the current Owner or approved IT session.
+The backend's effective installation address remains authoritative: reviewed
+Owner placement overrides take precedence over linked native sites and eligible
+tracker fallback. Billing addresses and provider labels do not fill the address.
+The frontend requires a complete, consistent inventory and a unique full-family
+placement identity, honors current durable resource proofs, and refuses competing
+aliases, missing source records, or identity-review warnings. A proved alias that
+cannot be targeted by the existing placement writer is displayed read-only.
+
+Opening or cancelling never writes. Saving the same effective FIELD address,
+including a site-name-only edit or a stale legacy placement label, is a no-op.
+Known camera-only SHOP records retain their explicit new-installation workflow;
+no fabricated equipment UUID or default street address is used. Missing or failed
+reads stay visibly unavailable with inputs disabled. Reads and late dialog results
+are bounded; a cancelled unit cannot populate the next unit's form.
+
+Before an intentional move, the editor reads the effective address, identity,
+location history/pin revision, and legacy audit again. A change requires refresh.
+The existing placement writer still checks its audit revision and retains its
+confirmation, reason, idempotency, and uncertain-save handling. This frontend
+preflight is not an atomic cross-database lock. It does not rewrite GPS, import
+records, alter permission gates, or change the deployed backend. Regression tests
+use synthetic data only, including no-op, source disagreement, interrupted reads,
+Owner/approved IT/Service boundaries, and genuine move confirmation.

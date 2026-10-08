@@ -1,3 +1,4 @@
+// 2026-10-08 reviewed address-editor cache version; authenticated prefill/no-op/race coverage is in camera-placement-prefill tests.
 // 2026-10-08 scoped IP/revision-bound diagnostics and sanitized reports; source/port/export/browser regressions added.
 // Reviewed placement dialogs, global inventory search and Field Map links; covered by scoped browser tests.
 // Reviewed 2026-10-07: 15-minute visible-only routine reads and 20-minute evidence presentation allowance.
@@ -17,14 +18,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "eced628c0eea2c4aff17077d2b0d821c6e00137e801b24c6a0c02d5d299b7d97",
-  "camera-detail": "9ee1186e01bec096a90c21e11dc42727fc9b7d71b76fffb4d498374a57258987",
+  "camera-health": "8ebe044e1511be2c4bf6bd8c96355774bfadf2f0159d6cee8c912307f9c4ea44",
+  "camera-detail": "1bfeec60705772952c0fe5740b58dac603ed80d75a600bce6b59540725c9586b",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "8fac4f1456a1607dac8027388fcb1ade93ede28edc39df7c2dd4af122b36e4a3",
-  "camera-detail": "afdffb463d3fac7aa3051ee8f3d03fcb22163b3f5f744727a0cbb8764a020788",
+  "camera-health": "45f0e8741b60d2f3f23ad69fa510394187fd058c2bba4f5c91205f99cb7d9734",
+  "camera-detail": "cdec6123b58fe63583c1b2ba1f885e0f7adb5b72733b9293781212019ce735e3",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
