@@ -222,7 +222,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
 
   useEffect(()=>{
     if(!mapNode.current||mapRef.current)return;
-    const map=L.map(mapNode.current,{zoomControl:true}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
+    const map=L.map(mapNode.current,{zoomControl:true,fadeAnimation:false}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
     map.on('zoomend resize',()=>setMapRevision(value=>value+1));
     map.on('moveend',()=>{const center=map.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:map.getZoom()});});
     map.on('dragstart zoomstart',()=>{if(!programmaticViewport.current)restoreViewport.current=true;});
@@ -283,7 +283,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
           iconAnchor:[16,16]
         })
       });
-      marker.bindTooltip(unit.unitNumber,{direction:'top',permanent:unit.id===selectedId,className:'field-pin-label'});
+      const label=document.createElement('span');label.textContent=unit.unitNumber;
+      marker.bindTooltip(label,{direction:'top',permanent:unit.id===selectedId,className:'field-pin-label'});
       marker.bindPopup(gpsPopup(document, unit));
       markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {if(isSupportEquipment(unit))pendingPopup.current=unit.id;restoreViewport.current=true;setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});if(!isSupportEquipment(unit))openUnitHealth?.(unit.id);} });

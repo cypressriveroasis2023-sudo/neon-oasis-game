@@ -3,11 +3,12 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,htmlLabel=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
  if(crowded)state.units=state.units.map((u,i)=>({...u,latitude:29.76,longitude:-95.37,...(i===2?{unitNumber:'Solar Stand 72 044',modelName:'SOLAR STANDS 72'}:{})}));
+ if(htmlLabel)state.units[0]={...state.units[0],unitNumber:'Ranger <img src=x onerror="window.mapLabelExecuted=true">',site:'Site <b>literal</b>',address:'100 <img src=x onerror="window.mapAddressExecuted=true"> Fixture Road'};
  if(historical)state.units[0]={...state.units[0],locationVerification:undefined,readOnly:true};
  if(ambiguous)state.units[1].unitNumber='SOLAR SPOTTER 051';
  let rows=state.units.map((u,i)=>resource(i+1,'SOLARSPOTTER '+(51+i),{name:'Fixture camera '+(i+1),status:i===1?'offline':'online',checkedAt:fresh,...(!oldApi?{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:i===1?'offline':'online',observedAt:i===2?'2026-10-06T16:00:00Z':fresh,lastOnlineAt:fresh}}:{evidence:undefined})}));
@@ -190,4 +191,10 @@ test('compact clusters expose every colocated unit and support equipment has no 
  await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
  await expect(frame.locator('.field-map-workspace')).not.toHaveClass(/field-map-tv/);
  expect(state.writes).toHaveLength(0);
+});
+
+test('HTML-like imported unit and site names stay literal text in map labels',async({page})=>{
+ const {frame,state}=await mount(page,{htmlLabel:true});await expect(frame.locator('.field-pin-label')).toContainText('<img src=x');
+ await expect(frame.locator('.field-map-list')).toContainText('Site <b>literal</b>');await expect(frame.locator('.field-map-detail')).toContainText('100 <img src=x');
+ await expect(frame.locator('img[src="x"]')).toHaveCount(0);expect(await frame.locator('body').evaluate(()=>Boolean(window.mapLabelExecuted||window.mapAddressExecuted))).toBe(false);expect(state.writes).toHaveLength(0);
 });
