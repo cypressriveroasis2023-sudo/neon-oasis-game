@@ -11,15 +11,27 @@ const mock = ({
   active = 'active',
   key = 'RANGER 022',
   placement = 'SHOP'
-} = {}) => `window.calls=[];window.state={unitKey:${JSON.stringify(key)},placement:${JSON.stringify(placement)},siteLabel:'',streetAddress:'',auditId:null,canMove:true};window.fixture={id:11,unit_key:${JSON.stringify(key)},device_name:'Synthetic camera',device_type:'camera',monitoring_profile:'ranger',organization:${JSON.stringify(org)},source_status:'offline',source:'vigilant_control_center',source_last_seen_at:new Date().toISOString(),activation_state:${JSON.stringify(active)}};window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'synthetic-owner'}}}})},functions:{invoke:async()=>({data:{}})},rpc:async(name,args)=>{calls.push({name,args});if(name==='owner_camera_unit_placement_state_v2'){if(window.holdRead)await new Promise(resolve=>window.releaseRead=resolve);return {data:{...state}};}if(name==='owner_set_camera_unit_placement_v2'){if(window.holdWrite)await new Promise(resolve=>window.releaseWrite=resolve);if(window.failWrite)return {error:{message:'Synthetic denied'}};state={...state,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:'synthetic-audit'};fixture.organization=state.placement==='SHOP'?'root':state.siteLabel;fixture.activation_state='active';fixture.activation_source='owner_location_override_v2';return {data:{ok:true,unit_key:args.p_unit_key,placement:args.p_placement,request_id:args.p_request_id,audit_id:state.auditId}};}return {error:{message:'Unexpected RPC'}};},from(table){const q={select(){return q},eq(){return q},ilike(){return q},order(){return q},limit(){return q},single(){return q},maybeSingle(){return q},then(done){return Promise.resolve({data:table==='profiles'?{active:true,role:${JSON.stringify(role)}}:table==='camera_devices'?window.fixture:table==='camera_health_current'?{}:[]}).then(done)}};return q;}})};`;
+} = {}) => `window.calls=[];window.fixtureAddress='';window.state={unitKey:${JSON.stringify(key)},placement:${JSON.stringify(placement)},siteLabel:'',streetAddress:'',auditId:null,canMove:true};window.fixture={id:11,unit_key:${JSON.stringify(key)},device_name:'Synthetic camera',device_type:'camera',monitoring_profile:'ranger',organization:${JSON.stringify(org)},source_status:'offline',source:'vigilant_control_center',source_last_seen_at:new Date().toISOString(),activation_state:${JSON.stringify(active)}};window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'synthetic-owner'},access_token:'synthetic-only'}}})},functions:{invoke:async()=>({data:{}})},rpc:async(name,args)=>{calls.push({name,args});if(name==='owner_camera_unit_placement_state_v2'){if(window.holdRead)await new Promise(resolve=>window.releaseRead=resolve);return {data:{...state}};}if(name==='owner_set_camera_unit_placement_v2'){if(window.holdWrite)await new Promise(resolve=>window.releaseWrite=resolve);if(window.failWrite)return {error:{message:'Synthetic denied'}};state={...state,placement:args.p_placement,siteLabel:args.p_site_label,streetAddress:args.p_street_address,auditId:'101'};fixture.organization=state.placement==='SHOP'?'root':state.siteLabel;fixture.activation_state='active';fixture.activation_source='owner_location_override_v2';return {data:{ok:true,unit_key:args.p_unit_key,placement:args.p_placement,request_id:args.p_request_id,audit_id:state.auditId}};}return {error:{message:'Unexpected RPC'}};},from(table){const q={select(){return q},eq(){return q},ilike(){return q},order(){return q},limit(){return q},single(){return q},maybeSingle(){return q},then(done){return Promise.resolve({data:table==='profiles'?{active:true,role:${JSON.stringify(role)}}:table==='camera_devices'?window.fixture:table==='camera_health_current'?{}:[]}).then(done)}};return q;}})};`;
 async function mount(page, opts) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript({
     content: mock(opts)
   });
-  await page.route('**/*', route => {
+  await page.route('**/*', async route => {
     const u = new URL(route.request().url());
+    if (u.pathname === '/functions/v1/cos-operations-pages') {
+      const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
+      if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+      const request=route.request().postDataJSON();
+      const result=await page.evaluate(path=>{
+        if(path==='/api/camera-health/summary-v3')return {evidenceVersion:2,identityVersion:1,unitIdentities:[],identityWarnings:[],rows:[{id:fixture.id,unit:fixture.unit_key}]};
+        const row={id:'11111111-1111-4111-8111-111111111111',unitNumber:state.unitKey,readOnly:false,status:state.placement==='FIELD'?'field':'available',currentLocationType:state.placement==='FIELD'?'field':'shop',site:state.placement==='FIELD'?(state.siteLabel||'Synthetic current site'):'',address:state.placement==='FIELD'?(fixtureAddress||state.streetAddress||'10 Synthetic Road'):fixtureAddress};
+        if(state.auditId)Object.assign(row,{placement:state.placement,placementSource:'owner',placementUnitKey:state.unitKey,placementAuditId:state.auditId});
+        return {items:state.placement==='FIELD'?[row]:[],inventoryItems:[row],summary:{fieldUnits:state.placement==='FIELD'?1:0},placementReviews:[],generatedAt:new Date().toISOString()};
+      },request.path);
+      return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(result)});
+    }
     if (u.origin !== origin) return route.abort('blockedbyclient');
     const path = resolve(repo, '.' + decodeURIComponent(u.pathname));
     if (path.startsWith(repo + '/') && existsSync(path)) return route.fulfill({
@@ -58,7 +70,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
   }).click();
   await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
   await expect(page.locator('#moveShopBtn')).toHaveText('Move unit to Shop / ROOT');
-  expect(await page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(1);
 }], ['offline field can move to SHOP without health mutation', async page => {
   await mount(page, {
     org: 'Synthetic field',
@@ -118,7 +130,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
   await page.evaluate(() => document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit', {
     cancelable: true
   })));
-  expect(await page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => calls.filter(c => c.name === 'owner_set_camera_unit_placement_v2').length)).toBe(1);
   await page.evaluate(() => releaseWrite());
   await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
 }], ['Rejected save does not falsely report success or repeat', async page => {
@@ -203,13 +215,13 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Standalo
 for (const [label, savedAddress] of [['empty', ''], ['current', '100 Synthetic Road, Test City, TX 77001']]) {
   test('Placement address uses neutral hint and preserves '+label+' state value', async ({page}) => {
     await mount(page);
-    await page.evaluate(value => { state.streetAddress=value; }, savedAddress);
+    await page.evaluate(value => { fixtureAddress=value; }, savedAddress);
     await page.locator('#moveShopBtn').click();
     const address=page.getByLabel('Current installation address (street, city, state and ZIP)');
     await expect(address).toHaveValue(savedAddress);
     await expect(address).toHaveAttribute('placeholder','Street address, city, state and ZIP code');
     expect(await page.evaluate(() => calls.filter(c=>c.name==='owner_set_camera_unit_placement_v2').length)).toBe(0);
     await page.getByRole('button',{name:'Cancel',exact:true}).click();
-    expect(await page.evaluate(() => state.streetAddress)).toBe(savedAddress);
+    expect(await page.evaluate(() => fixtureAddress)).toBe(savedAddress);
   });
 }
