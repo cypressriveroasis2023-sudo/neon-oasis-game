@@ -1,5 +1,5 @@
 import { cameraTimestamp,unitEvidenceLabel,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
-import {validateCameraHealth,canonicalCameraUnit,type FieldHealthUnit,type Health} from './fieldCameraHealth';
+import {validateCameraHealth,canonicalCameraUnit,isSupportEquipment,type FieldHealthUnit,type Health} from './fieldCameraHealth';
 export {resourceKind};export type {ResourceKind};
 export type CameraUnitGroup=UnitEvidence&{key:string;name:string;site:string;rows:CameraRow[];online:number;offline:number;unknown:number;lastObservedAt:string|null;linkedIdentity:boolean};
 export function cameraOverview(health:Health,now=Date.now()){
@@ -52,6 +52,7 @@ export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[]){
   const represented=new Set(health.rows.map(row=>canonicalCameraUnit(row.unit)).filter(Boolean));
   const additions:CameraRow[]=[];
   for(const unit of units){
+    if(isSupportEquipment(unit))continue;
     const key=canonicalCameraUnit(unit.unitNumber);
     if(!key||represented.has(key)||units.filter(peer=>canonicalCameraUnit(peer.unitNumber)===key).length!==1)continue;
     represented.add(key);

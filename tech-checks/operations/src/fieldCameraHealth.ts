@@ -38,7 +38,7 @@ export function canonicalCameraUnit(value:string):string|null {
   if(Number(base)===0)return null;
   return family+'|'+Number(base)+(tail.length?'.'+tail.join('.'): '');
 }
-function scopedFieldIdentity(unit:FieldHealthUnit) {
+export function scopedFieldIdentity(unit:FieldHealthUnit) {
   const key=canonicalCameraUnit(unit.unitNumber); if(!key)return null;
   const family=key.split('|')[0],model=plain(unit.modelName||'').replace(/[\s&]/g,'');
   const aliases:Record<string,string[]>={HELIOS:['HELIOS'],RANGER:['RANGER','RANGERS'],SOLARSPOTTER:['SOLARSPOTTER','SOLARSPOTTERS'],SPOTTER:['SPOTTER','SPOTTERS'],SSHYBRID:['SSHYBRID','SSHYBRIDS'],RECON:['RECON','RECONS'],RECON2:['RECON2','RECONII'],SNIPER:['SNIPER','SNIPERS'],SNIPER2:['SNIPER2','SNIPERS'],SNIPER4:['SNIPER4','SNIPERS'],CAMV:['CAMV','CAMVRSU']};
