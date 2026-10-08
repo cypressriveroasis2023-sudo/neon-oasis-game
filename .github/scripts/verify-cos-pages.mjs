@@ -20,6 +20,8 @@ const files = [
   'tech-checks/camera-health.html',
   'tech-checks/camera-placement-controls.js',
   'tech-checks/camera-placement-controls.css',
+  'tech-checks/camera-effective-placement.js',
+  'tech-checks/camera-effective-placement.css',
   'tech-checks/camera-health-history.js',
   'tech-checks/camera-diagnostic-report.js',
   'tech-checks/camera-health-history.css',

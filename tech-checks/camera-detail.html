@@ -70,7 +70,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">
 <script defer src="./cos-eye-branding.js?v=20261006b"></script>
-<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261008-shop-deployment"></script><script src="./camera-connection-editor.js?v=20261007"></script></head>
+<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261008-fleet-identity-placement"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261008"></script></head>
 <body>
 <div class="shell">
   <div class="topbar">
@@ -135,7 +135,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
         <div class="kv">
           <div>Camera type</div><div id="cameraGroup">—</div>
           <div>Unit</div><div id="unitKey">—</div>
-          <div>Site / organization</div><div><span id="organization">—</span><button id="editSiteBtn" class="action hidden" style="margin-left:10px;padding:5px 9px">Edit site</button></div>
+          <div>Physical placement</div><div><span id="organization">—</span><div id="effectivePlacement"></div><button id="editSiteBtn" class="action hidden" style="margin-left:10px;padding:5px 9px">Edit site</button></div>
           <div>Public IP</div><div id="publicIp">—</div>
           <div>Device model</div><div id="model">—</div>
           <div>Serial</div><div id="serial">—</div>
@@ -201,7 +201,7 @@ function reconBatteryText(d=device){return ReconBattery.text(reconMetadata(d))}
 
 function cameraPlatform(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase(),model=String(d?.device_model||'').toUpperCase(),prof=String(d?.monitoring_profile||'').toLowerCase(),source=String(d?.source||'').toLowerCase();if(source==='reconeyez'||prof==='reconeyez'||s.includes('reconeyez'))return'Reconeyez';if(model.startsWith('ALI-')||['helios','nvr','ranger','solar_spotter','spotter'].includes(prof)||s.includes('alibi'))return'Vigilant';if(s.includes('sniper')||s.includes('avigilon')||s.includes('cam v')||s.includes('camv')||s.includes('es appliance'))return'Avigilon';return'Vigilant'}
 function cameraGroup(d){const s=[d?.unit_key,d?.device_name,d?.device_model,d?.device_type,d?.tech_check_unit_type,d?.monitoring_profile].join(' ').toLowerCase();if(cameraPlatform(d)==='Reconeyez')return'Reconeyez';if(s.includes('cam v')||s.includes('camv'))return'CAM V';if(cameraPlatform(d)==='Avigilon')return'Sniper';return'Vigilant'}
-function isShopDevice(d){const org=String(d?.organization||'').trim().toLowerCase();return ['root','shop','shop equipment','shop/root','root/shop'].includes(org)||(cameraGroup(d)==='Reconeyez'&&/\bshop\b/.test(org))}
+function isShopDevice(d){const effective=window.CameraEffectivePlacement?.get(d);if(effective?.status==='ready')return effective.scope==='shop';const org=String(d?.organization||'').trim().toLowerCase();return ['root','shop','shop equipment','shop/root','root/shop'].includes(org)||(cameraGroup(d)==='Reconeyez'&&/\bshop\b/.test(org))}
 function sourceFresh(d,ttlMs=20*60*1000){const t=d?.source_last_seen_at?new Date(d.source_last_seen_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
 function checkFresh(h,ttlMs=20*60*1000){h=CameraHealthHistory.connectionSnapshot(h||{},device);if(/Star4Live live API reports|Control Center live API reports/.test(String(h?.detail||'')))return false;const t=h?.checked_at?new Date(h.checked_at).getTime():0;return t>0&&Number.isFinite(t)&&Date.now()-t>=0&&Date.now()-t<=ttlMs}
 function hasDirectLiveProof(){
@@ -228,6 +228,33 @@ function sourceDetailText(){const group=cameraGroup(device),st=effectiveHealth(d
 function issueReason(){const st=effectiveHealth(device,current),group=cameraGroup(device),vig=(sourceFresh(device)?String(device?.source_status||'unknown'):'stale').toLowerCase();if(st==='online')return'';if(st==='degraded')return group==='Vigilant'?(vig==='online'?'Vigilant reports ONLINE, but the direct public-IP/port check is NOT RESPONDING. Overall status is DEGRADED.':'The direct connection is responding, but Vigilant reports OFFLINE. Overall status is DEGRADED because the sources disagree.'):'Health sources disagree. Verify this camera.';if(st==='offline')return group==='Vigilant'?'Star4Live reports this resource OFFLINE.':group==='Reconeyez'?'Reconeyez cloud currently reports this detector OFFLINE.':group+' direct health check currently reports this camera OFFLINE.';if(st==='verifying')return group==='Reconeyez'?'Waiting for a definitive Reconeyez cloud health event.':'No definitive ONLINE/OFFLINE result is available yet.';return''}
 function historyDetail(ev){const d=ev?.detail;if(typeof d==='string'&&d.trim())return d.trim();if(d&&typeof d==='object'){const parts=[];const reason=d.reason||d.message||d.error||d.detail;if(reason)parts.push(String(reason));if(d.ip_reachable===true)parts.push('IP reachable');else if(d.ip_reachable===false)parts.push('IP not responding');if(d.consecutive_failures!=null)parts.push(String(d.consecutive_failures)+' failed checks');if(d.vigilant_status)parts.push('Vigilant '+String(d.vigilant_status).toUpperCase());if(d.activation_state)parts.push('Activation '+String(d.activation_state));return parts.join(' · ')}return''}
 function interfaceLinks(){return CameraHealthHistory.connections(device,current,effectivePublicIP())}
+let placementView=null,detailLoadRevision=0;
+function renderEffectivePlacement(){
+  if(!device)return;
+  const value=CameraEffectivePlacement.get(device);
+  $('cameraMeta').textContent=(device.unit_key||'No unit')+' · '+CameraEffectivePlacement.locationText(device);
+  $('organization').textContent=CameraEffectivePlacement.locationText(device);
+  $('effectivePlacement').innerHTML=CameraEffectivePlacement.markup(device,{includeLocation:false});
+  $('fieldMapLink').href='./?fieldUnit='+encodeURIComponent(CameraEffectivePlacement.fieldLabel(device));
+  if(value){
+    const shop=placementActionAtShop(),allowed=canEditFieldPlacement();
+    $('shopActionWrap').classList.toggle('hidden',!allowed);$('shopActionWrap').classList.toggle('at-shop',shop);
+    $('shopActionTitle').textContent=shop?'Unit is at Shop / ROOT':'Unit placement · FIELD';
+    $('shopActionText').textContent=shop?'The unit stays searchable with its camera links and diagnostic history.':'Current site and address match the Field Map record. Health observations are separate.';
+    $('moveShopBtn').textContent=shop?'Move to Field':'Move unit to Shop / ROOT';
+    $('editFieldBtn').classList.toggle('hidden',!allowed||shop);
+  }
+  if(value&&value.status!=='ready'){$('shopActionTitle').textContent=!value.lastRead&&String(device.activation_state||'').toLowerCase()==='deactivated'?'Unit is stored / inactive':'Physical placement needs refresh / review';$('shopActionText').textContent=value.reason;}
+  if(String(device.activation_state||'').toLowerCase()==='deactivated'&&value?.row?.placementSource!=='owner'&&!value?.row?.importedPlacement)$('shopActionTitle').textContent='Unit is stored / inactive';
+  // Physical placement editing always uses the existing revision-checked editor.
+  // Do not write an imported/native site into the provider organization field.
+  if(value?.status==='ready'||value?.lastRead){$('editSiteBtn').classList.add('hidden');$('siteEditWrap').classList.add('hidden');}
+}
+function placementActionAtShop(){const value=window.CameraEffectivePlacement?.get(device);return value?.status==='ready'||value?.lastRead?value.scope==='shop':isShopDevice(device)||String(device?.activation_state||'').toLowerCase()==='deactivated';}
+function refreshEffectivePlacement(){
+  if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:renderEffectivePlacement});
+  return placementView.refresh();
+}
 function render(){
   const st=effectiveHealth(device,current),connectionHistory=CameraHealthHistory.record(device,current,cameraGroup(device)),reason=issueReason();
   $('cameraName').textContent=device.device_name||device.unit_key||'Camera';
@@ -264,7 +291,7 @@ function render(){
   const notice=$('issueNotice');if(reason){notice.textContent=reason;notice.className='notice '+(st==='offline'?'red':'');notice.classList.remove('hidden')}else notice.classList.add('hidden');
   $('fieldMapLink').href='./?fieldUnit='+encodeURIComponent(device.unit_key||device.device_name||'');
   const shopWrap=$('shopActionWrap'),shopBtn=$('moveShopBtn'),shopTitle=$('shopActionTitle'),shopText=$('shopActionText');
-  const owner=canEditFieldPlacement(),atShop=isShopDevice(device)||String(device.activation_state||'').toLowerCase()==='deactivated',liveProof=hasDirectLiveProof();
+  const owner=canEditFieldPlacement(),atShop=placementActionAtShop(),liveProof=hasDirectLiveProof();
   shopWrap.classList.add('hidden');shopWrap.classList.remove('at-shop');
   if(owner&&atShop){
     shopWrap.classList.remove('hidden');shopWrap.classList.add('at-shop');
@@ -317,6 +344,7 @@ function render(){
   $('history').innerHTML=events.length?events.map(ev=>{const s=String(ev.status||'unknown').toLowerCase(),detail=historyDetail(ev);return '<div class="event"><div>'+esc(fmt(ev.observed_at))+'</div><div class="eventstatus '+esc(s)+'">'+esc(s.toUpperCase())+'</div><div><b>'+esc(ev.check_source||'health check')+'</b>'+(detail?'<div class="small">'+esc(detail)+(ev.latency_ms?' · '+esc(ev.latency_ms)+'ms':'')+'</div>':(ev.latency_ms?'<div class="small">'+esc(ev.latency_ms)+'ms</div>':''))+'</div></div>'}).join(''):'<div class="small" style="padding:10px 0">No history recorded yet.</div>';
 }
 async function load(){
+  const request=++detailLoadRevision;
   const id=Number(new URLSearchParams(location.search).get('id'));
   if(!Number.isFinite(id)||id<=0)throw new Error('No camera was selected.');
   const {data:d,error:de}=await db.from('camera_devices').select('*').eq('id',id).single();
@@ -327,9 +355,10 @@ async function load(){
     d.unit_key?db.from('camera_unit_routers').select('*').ilike('unit_key',d.unit_key):Promise.resolve({data:[],error:null})
   ]);
   if(he)console.warn(he);if(hi)console.warn(hi);if(re)console.warn(re);
+  if(request!==detailLoadRevision||id!==Number(new URLSearchParams(location.search).get('id')))return;
   device=d;current=h||{};events=hist||[];unitRouters=rs||[];
   $('verifyBtn').textContent=cameraGroup(device)==='Reconeyez'?'Sync Recon inventory':'Verify now';
-  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();await loadConnectionEditor();
+  $('loading').classList.add('hidden');$('content').classList.remove('hidden');render();renderEffectivePlacement();void refreshEffectivePlacement();await loadConnectionEditor();
   if(new URLSearchParams(location.search).get('action')==='edit-ip'&&!$('ipSetupWrap').classList.contains('hidden')){$('ipSetupWrap').scrollIntoView({block:'center'});$('ipSetupInput').focus({preventScroll:true});}
 }
 async function verifyNow(){
@@ -426,7 +455,7 @@ async function saveUnitPublicIP(){
 
 async function moveUnitToShop(){
   if(!device||!canEditFieldPlacement())return;
-  await CameraPlacementControls.open({db,key:device.unit_key,placement:isShopDevice(device)||String(device.activation_state||'').toLowerCase()==='deactivated'?'FIELD':'SHOP',onSaved:load});
+  await CameraPlacementControls.open({db,key:device.unit_key,placement:placementActionAtShop()?'FIELD':'SHOP',onSaved:load});
 }
 
 

@@ -225,10 +225,12 @@ test('the single 20-minute freshness boundary agrees between backend variants an
 });
 test('v3 projections query only allowlisted identity columns using existing fixed organization/auth flow',()=>{
  const source=readFileSync(new URL('../../supabase/functions/cos-operations-pages/index.ts',import.meta.url),'utf8');
- const route=source.slice(source.indexOf("if (path === '/api/camera-health/summary-v3')"),source.indexOf("if (path === '/api/camera-health/summary')"));
+ const summary=source.slice(source.indexOf("if (path === '/api/camera-health/summary-v3')"),source.indexOf("if (path === '/api/camera-health/summary')"));
+ assert.match(summary,/readIdentitySources\(context\)/);
+ const route=source.slice(source.indexOf('const readIdentitySources'),source.indexOf('// Share one large-transfer'))+summary;
  assert.match(route,/vision_vigilant_unit_matches\?select=id,organization_id,equipment_unit_id,vigilant_device_id,camera_key,match_method,confidence&organization_id=eq\./);
  assert.match(route,/vision_vigilant_devices\?select=id,organization_id,external_device_id,device_name,device_type,source&organization_id=eq\./);
- assert.match(route,/equipment_units\?select=id,organization_id,unit_number&organization_id=eq\./);
+ assert.match(route,/equipment_units\?select=id,organization_id,unit_number,status&organization_id=eq\./);
  assert.match(route,/camera_devices\?select=id,external_device_id,device_serial,/);assert.doesNotMatch(route,/select=\*|[?&]unit_id=/);
  assert.match(route,/verifiedHealthIdentities/);assert.match(route,/projectCameraOwnerPlacement/);
 });

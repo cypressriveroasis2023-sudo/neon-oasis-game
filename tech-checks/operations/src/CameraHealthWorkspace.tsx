@@ -7,8 +7,8 @@ import { useCameraHealth } from './useCameraHealth';
 import CameraHealthOverview,{CameraResourceObservations,UnitEvidenceDetails} from './CameraHealthOverview';
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 export { validateCameraHealth } from './fieldCameraHealth';
-type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean};
-export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false}:Props){
+type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
+export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
   const {data:health,error,loading,refresh,now}=useCameraHealth();
   const [units,setUnits]=useState<FieldHealthUnit[]|null>(null),[unitError,setUnitError]=useState(''),[ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
   const revision=useRef(0),lastUnitAttempt=useRef(0);
@@ -36,7 +36,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
       </>}
     </section>}
     {!health&&!error?<p role='status'>Loading Camera Health…</p>:health&&<>
-      {!initialUnitId&&<CameraHealthOverview health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection}/>}
+      {!initialUnitId&&<CameraHealthOverview health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh();void loadUnits();}}/>}
       {initialUnitId&&<>
       <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 15 minutes while visible</p>
       <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2}/>

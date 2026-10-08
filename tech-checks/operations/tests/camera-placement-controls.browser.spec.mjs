@@ -156,6 +156,7 @@ const cases = [['full detail owner moves ROOT to FIELD with required address and
   await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
 }], ['An open site editor closes after audited placement is saved', async page => {
   await mount(page, {
+    key: 'Unlinked source group',
     org: 'Synthetic field',
     placement: 'FIELD'
   });
