@@ -1,3 +1,4 @@
+// 2026-10-08 reviewed native-alias placement capability cache tag only; alias/source/readback regressions cover behavior.
 // 2026-10-08 reviewed SHOP/new-installation and incomplete-field repair cache tag; isolated regressions cover the flows.
 // 2026-10-08 reviewed address-editor cache version; authenticated prefill/no-op/race coverage is in camera-placement-prefill tests.
 // 2026-10-08 scoped IP/revision-bound diagnostics and sanitized reports; source/port/export/browser regressions added.
@@ -19,14 +20,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "6b60be0563f75168ea1f23d7f89028572c22ab7d9cfd47c2928b7ca2265d7730",
-  "camera-detail": "1ec483ce3b680662a80acc4140b94b42dd9e1311ab4618c7c1244b26cc09cb28",
+  "camera-health": "96b61d94b60d49acf56ca75ce3b2c13d038c4a5c18b4d022f93eccd8ebf83ab1",
+  "camera-detail": "5c49099332090f58188d691bb6f58ed763e2e7a7897fb50da88ce96110cc20f5",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "39451b9d059270de25c9b558cd6c943b1c53baf21bcdde1e7f102377c82f31ac",
-  "camera-detail": "19c96089e99a8b719ca03cbccae3479e12871fc034358b9f7857c2855dc8e5be",
+  "camera-health": "f9aedd6c5a7be1cfc4610bc7da3620c9ca6f114679fcc4cba35ff54f09b897a1",
+  "camera-detail": "52205c98418a2e7dda25719542a160479e20215d0d678309fe107c8c624010c7",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
