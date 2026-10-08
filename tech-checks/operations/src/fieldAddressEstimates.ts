@@ -1,12 +1,17 @@
+import { checkedReviewedAddressEstimate, reviewedEstimatePrefix, reviewedEstimateSource, type ReviewedAddressEstimate } from '../shared/reviewedAddressEstimates';
 import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { isCurrentFieldPin, normalizeLocationAddress, type FieldLocation } from './fieldLocations';
 
 export const addressEstimateSource = 'us_census_address_range_estimate';
 export const addressEstimatePrefix = 'COS_ADDRESS_ESTIMATE_V1|';
-export type AddressEstimate = {
+export type CensusAddressEstimate = {
   latitude:number; longitude:number; matchedAddress:string; geocodedAt:string;
   confidence:'address_range_interpolation'; source:typeof addressEstimateSource; providerMatchQuality:'Exact'|'Non_Exact';
 };
+export type AddressEstimate = CensusAddressEstimate | ReviewedAddressEstimate;
+export const addressEstimateLabel = (estimate:AddressEstimate) => estimate.confidence==='approximate_property_location'?'Geocodio approximate property estimate':'U.S. Census address-range estimate';
+export const addressEstimateTimestamp = (estimate:AddressEstimate) => estimate.confidence==='approximate_property_location'?estimate.retrievedAt:estimate.geocodedAt;
+export const reviewedDifferenceExplanation = (estimate:ReviewedAddressEstimate) => ({approved_city_label_equivalence:'Reviewed city-label difference; original street, state and ZIP retained.',approved_state_route_alias:'Reviewed state-route alias; original house number, city, state and ZIP retained.',approved_missing_street_suffix:'Reviewed street-suffix completion; original house number, street name, city, state and ZIP retained.'})[estimate.approvedDifference];
 type EstimateRow = FieldLocation & { status?:string; currentLocationType?:string };
 const object = (value:unknown):value is Record<string,unknown> => Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const text = (value:unknown,max:number):value is string => typeof value==='string'&&value.trim().length>0&&value.length<=max;
@@ -19,7 +24,7 @@ const date = (value:unknown,now:number):value is string => {
 };
 /** Machine provenance is not human warning text; preserve every appended note even when validation fails. */
 export function addressEstimateHumanNote(note:string|null|undefined) {
-  if(!note?.startsWith(addressEstimatePrefix))return note||'';
+  if(!note?.startsWith(addressEstimatePrefix)&&!note?.startsWith(reviewedEstimatePrefix))return note||'';
   const newline=note.indexOf('\n');return newline<0?'':note.slice(newline+1);
 }
 function addressParts(value:string) {
@@ -41,6 +46,7 @@ export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Pr
     if(digest!==automatic.addressSha256)return null;
     return {latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'address_range_interpolation',source:addressEstimateSource,providerMatchQuality:'Exact'};
   }
+  if(unit.locationNote?.startsWith(reviewedEstimatePrefix)||unit.coordinateSource===reviewedEstimateSource||unit.historicalCoordinateSource===reviewedEstimateSource)return checkedReviewedAddressEstimate(unit,now);
   if (isCurrentFieldPin(unit)||unit.hasUnitGps===true||unit.status!=='field'||!unit.address?.trim()||unit.locationVerification==='address_changed') return null;
   // Registered units use their equipment ID. Only the server's exact, unique FIELD tracker
   // join can bind that ID to an estimate; never infer a binding from a label or an IP.
