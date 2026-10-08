@@ -213,12 +213,12 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Standalo
 });
 
 for (const [label, savedAddress] of [['empty', ''], ['current', '100 Synthetic Road, Test City, TX 77001']]) {
-  test('Placement address uses neutral hint and preserves '+label+' state value', async ({page}) => {
+  test('SHOP destination stays blank and preserves '+label+' historical source value', async ({page}) => {
     await mount(page);
     await page.evaluate(value => { fixtureAddress=value; }, savedAddress);
     await page.locator('#moveShopBtn').click();
     const address=page.getByLabel('Current installation address (street, city, state and ZIP)');
-    await expect(address).toHaveValue(savedAddress);
+    await expect(address).toHaveValue('');
     await expect(address).toHaveAttribute('placeholder','Street address, city, state and ZIP code');
     expect(await page.evaluate(() => calls.filter(c=>c.name==='owner_set_camera_unit_placement_v2').length)).toBe(0);
     await page.getByRole('button',{name:'Cancel',exact:true}).click();

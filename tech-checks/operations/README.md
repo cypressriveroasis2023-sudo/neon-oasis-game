@@ -214,3 +214,23 @@ preflight is not an atomic cross-database lock. It does not rewrite GPS, import
 records, alter permission gates, or change the deployed backend. Regression tests
 use synthetic data only, including no-op, source disagreement, interrupted reads,
 Owner/approved IT/Service boundaries, and genuine move confirmation.
+
+
+#### SHOP deployment and incomplete-detail repair
+
+A valid unit identity no longer needs a complete old installation address before
+an Owner or approved IT user can enter a corrected destination. Explicitly empty
+recorded site/address values can be repaired; missing response fields, malformed
+types, access failures and ambiguous identities still fail closed. An unchanged
+complete FIELD address or verified pin is protected from accidental move audits.
+Completing a previously missing site without a verified pin requires the same
+reason, confirmation, fresh source reads and audited save as an address change.
+
+Known SHOP units begin with a blank new destination. Old imported tracker FIELD
+membership does not itself establish a native installation: only the narrow
+unassigned tracker case (no installed site, current native location, active job,
+Owner placement or verified pin) is treated as a new SHOP deployment. Its original
+row, import revision, identity and audit still participate in the preflight check.
+Native current installations and verified-location evidence are not silently
+reclassified. No source rows, GPS, health data or permissions are rewritten by
+opening or cancelling the editor.
