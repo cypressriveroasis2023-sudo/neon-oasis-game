@@ -37,8 +37,17 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
  });
  await page.goto('/address-estimate-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(4);return {frame,state};
 }
-const mappedCount=frame=>frame.locator('.field-map-canvas').evaluate(el=>el.querySelectorAll('.cos-field-pin').length+[...el.querySelectorAll('.cos-field-cluster')].reduce((n,node)=>n+Number(node.querySelector('b')?.textContent),0));
-const estimatedCount=frame=>frame.locator('.field-map-canvas').evaluate(el=>el.querySelectorAll('.cos-field-pin-estimate').length+[...el.querySelectorAll('.cos-field-cluster')].reduce((n,node)=>n+Number(node.dataset.estimateCount||0),0));
+// Expanded markers represent their units; only collapsed summaries add member identities.
+// Fail on duplicates rather than hiding them with a Set or changing expected counts.
+const renderedUnitCount=(frame,estimated=false)=>frame.locator('.field-map-canvas').evaluate((el,estimated)=>{
+ const pins=[...el.querySelectorAll('.cos-field-pin-wrap')].filter(node=>!estimated||node.querySelector('.cos-field-pin-estimate'));
+ const ids=pins.map(node=>node.dataset.unitId);
+ for(const node of el.querySelectorAll('.cos-field-cluster-wrap:not(.cos-field-cluster-expanded)')){const raw=node.getAttribute(estimated?'data-estimate-unit-ids':'data-unit-ids');if(raw===null)throw Error('Missing rendered cluster identities');const members=JSON.parse(raw);if(!Array.isArray(members)||members.some(id=>typeof id!=='string'||!id.trim()))throw Error('Malformed rendered cluster identities');ids.push(...members);}
+ if(ids.some(id=>!id)||new Set(ids).size!==ids.length)throw Error('Missing or duplicate rendered unit identity');
+ return ids.length;
+},estimated);
+const mappedCount=frame=>renderedUnitCount(frame);
+const estimatedCount=frame=>renderedUnitCount(frame,true);
 test('exact address estimates are visible by default, separate from health and verified pins',async({page},info)=>{
  const {frame,state}=await mount(page);
  await expect.poll(()=>mappedCount(frame)).toBe(3);await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
