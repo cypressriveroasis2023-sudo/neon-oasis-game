@@ -264,8 +264,15 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
     const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44,16);
+    const mapBox=map.getContainer().getBoundingClientRect();
+    const blocked=[...map.getContainer().querySelectorAll('.leaflet-control'),...map.getContainer().parentElement?.querySelectorAll('.field-map-legend')||[]].map(control=>{const box=control.getBoundingClientRect();return {left:box.left-mapBox.left,right:box.right-mapBox.left,top:box.top-mapBox.top,bottom:box.bottom-mapBox.top};});
+    const occupied=groups.map(group=>{const point=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;return map.latLngToContainerPoint([point.latitude,point.longitude]);});
     for(const group of groups){
-      const offsets=map.getZoom()>=17?expandedGroupOffsets(group.length,tvMode&&window.innerWidth>700?1.18:1):[];
+      const site=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;
+      const screen=map.latLngToContainerPoint([site.latitude,site.longitude]),size=map.getSize();
+      const legendHeight=mapNode.current?.parentElement?.querySelector('.field-map-legend')?.getBoundingClientRect().height||0;
+      const offsets=map.getZoom()>=14?expandedGroupOffsets(group.length,tvMode&&window.innerWidth>700?1.18:1,{width:size.x,height:size.y,anchorX:screen.x,anchorY:screen.y,bottomInset:legendHeight+28,blocked,occupied:occupied.map(point=>({x:point.x-screen.x,y:point.y-screen.y}))}):[];
+      offsets.forEach(offset=>occupied.push(L.point(screen.x+offset.x,screen.y+offset.y)));
       if(group.length>1){
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
@@ -277,7 +284,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
         const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;pendingPopup.current='';popupSelection.current='';map.closePopup();map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);
         for(const {item} of group){const button=document.createElement('button');button.type='button';button.textContent=item.unitNumber+' · '+unitHealthLabel(healthById.get(item.id))+' · '+tag(item)+' · Observation '+cameraTime(healthById.get(item.id)?.checkedAt,cameras.now);clusterButtons.current.set(item.id,button);button.onclick=()=>{if(working.current||pickingRef.current)return;popupSelection.current=item.id;if(isSupportEquipment(item))pendingPopup.current=item.id;restoreViewport.current=true;setSelectedId(item.id);saveFieldMapView({selectedId:item.id});if(!isSupportEquipment(item)){openUnitHealth?.(item.id);map.closePopup();}};popup.append(button);}
         const selectedSupport=group.find(({item})=>item.id===selectedId&&isSupportEquipment(item))?.item;if(selectedSupport){const detail=document.createElement('p');detail.className='field-cluster-support-detail';detail.textContent=selectedSupport.unitNumber+' · '+(selectedSupport.address||'Address missing')+' · Support equipment, 0 cameras. No linked power evidence available in this view.';popup.append(detail);}
-        cluster.bindPopup(popup,{minWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxHeight:Math.max(120,Math.min(300,map.getSize().y-100))}).addTo(layer);clusterMarkers.current.push({marker:cluster,ids:group.map(p=>p.item.id)});if(reopenId&&group.some(p=>p.item.id===reopenId))cluster.openPopup();if(!offsets.length)continue;
+        cluster.bindPopup(popup,{minWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxHeight:Math.max(120,Math.min(300,map.getSize().y-100))}).addTo(layer);cluster.getElement()?.setAttribute('data-unit-ids',JSON.stringify(group.map(p=>p.item.id)));cluster.getElement()?.setAttribute('data-estimate-unit-ids',JSON.stringify(group.filter(p=>Boolean(estimateFor(p.item))).map(p=>p.item.id)));clusterMarkers.current.push({marker:cluster,ids:group.map(p=>p.item.id)});if(reopenId&&group.some(p=>p.item.id===reopenId))cluster.openPopup();if(!offsets.length)continue;
       }
       for(const [index,{item:unit}] of group.entries()){
       const estimate=estimateFor(unit);
@@ -304,7 +311,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       marker.bindPopup(gpsPopup(document, unit));
       markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {if(isSupportEquipment(unit))pendingPopup.current=unit.id;restoreViewport.current=true;setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});if(!isSupportEquipment(unit))openUnitHealth?.(unit.id);} });
-      marker.addTo(layer);if(reopenId===unit.id&&!offsets.length)marker.openPopup();
+      marker.addTo(layer);marker.getElement()?.setAttribute('data-unit-id',unit.id);if(reopenId===unit.id&&!offsets.length)marker.openPopup();
       }
     }
     rebuildingMarkers.current=false;
