@@ -118,6 +118,7 @@ export async function fixture({imported=false}={}){
   db.fixtureOwnerDefinitions=(await db.query("select p.proname,pg_get_functiondef(p.oid) body from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'cos_field_geocode_fallback_%' order by p.proname")).rows;
   if(imported){
    await db.exec(await readFile(new URL('../../db/geocodio-imported-jobs.sql',import.meta.url),'utf8'));
+   await db.exec(await readFile(new URL('../../db/geocodio-imported-list-due-v2.sql',import.meta.url),'utf8'));
    db.fixtureHasImported=true;
   }
   return db;
