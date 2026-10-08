@@ -17,7 +17,7 @@ const digest=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9]{64}$/.test
 const exact=(a:string[],b:string[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(x=>b.includes(x));
 const normalized=(v:unknown)=>typeof v==='string'?v.trim().toUpperCase():'';
 const sorted=(v:string[])=>[...v].sort((a,b)=>BigInt(a)<BigInt(b)?-1:BigInt(a)>BigInt(b)?1:0);
-export class OwnerIdentityError extends Error {constructor(message:string,public status=409){super(message);this.name='OwnerIdentityError';}}
+export class OwnerIdentityError extends Error {status:number;constructor(message:string,status=409){super(message);this.status=status;this.name='OwnerIdentityError';}}
 function fail(message:string):never{throw new OwnerIdentityError(message);}
 export async function ownerIdentityDigest(value:unknown){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)))),b=>b.toString(16).padStart(2,'0')).join('');}
 /** Physical fields only. IP, ports, observation/health, site and placement never enter the tuple. */
