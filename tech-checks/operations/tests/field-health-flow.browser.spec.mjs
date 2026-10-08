@@ -173,7 +173,9 @@ test('compact clusters expose every colocated unit and support equipment has no 
  await expect(frame.locator('.field-cluster-list')).toContainText('Solar Stand 72 044 · SUPPORT EQUIPMENT · 0 CAMERAS');
  await frame.locator('.field-cluster-list button').filter({hasText:'Zoom into'}).click();
  await expect(frame.locator('.cos-field-cluster')).toHaveText('3');
- await frame.locator('.cos-field-cluster-wrap').click();
+ await expect(frame.locator('.field-cluster-list')).toHaveCount(1);
+ await expect(frame.locator('.field-cluster-list')).toBeVisible();
+ await expect(frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'})).toHaveCount(1);
  await frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'}).click();
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('100 Fixture Road');
  await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
