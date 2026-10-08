@@ -3,16 +3,18 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,htmlLabel=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,mixedCrowd=false,nearbyCrowd=false,htmlLabel=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
  if(crowded)state.units=state.units.map((u,i)=>({...u,latitude:29.76,longitude:-95.37,...(i===2?{unitNumber:'Solar Stand 72 044',modelName:'SOLAR STANDS 72'}:{})}));
  if(crowded&&crowdedCount>3)state.units.push(...Array.from({length:crowdedCount-3},(_,i)=>({...base,id:'00000000-0000-4000-8000-'+String(i+4).padStart(12,'0'),unitNumber:'Solar Spotter '+(54+i),latitude:29.76,longitude:-95.37})));
+ if(nearbyCrowd)state.units.push(...Array.from({length:3},(_,i)=>({...base,id:'00000000-0000-4000-8000-'+String(i+100).padStart(12,'0'),unitNumber:'Solar Spotter '+(51+state.units.length+i),longitude:-95.36})));
  if(htmlLabel)state.units[0]={...state.units[0],unitNumber:'Ranger <img src=x onerror="window.mapLabelExecuted=true">',site:'Site <b>literal</b>',address:'100 <img src=x onerror="window.mapAddressExecuted=true"> Fixture Road'};
  if(historical)state.units[0]={...state.units[0],locationVerification:undefined,readOnly:true};
  if(ambiguous)state.units[1].unitNumber='SOLAR SPOTTER 051';
  let rows=state.units.map((u,i)=>resource(i+1,'SOLARSPOTTER '+(51+i),{name:'Fixture camera '+(i+1),status:i===1?'offline':'online',checkedAt:fresh,...(!oldApi?{evidence:{kind:'provider',source:'Star4Live',resource:'camera',active:true,status:i===1?'offline':'online',observedAt:i===2?'2026-10-06T16:00:00Z':fresh,lastOnlineAt:fresh}}:{evidence:undefined})}));
+ if(mixedCrowd)rows=rows.map((row,i)=>i>2?{...row,evidence:{...row.evidence,observedAt:'2026-10-06T16:00:00Z'}}:row);
  if(evidenceCase)rows=[resource(1,'SOLARSPOTTER 51',{name:'Fixture recorder',type:'NVR'}),resource(2,'SOLARSPOTTER 52',{name:'Fixture service unit',type:'Sniper',serviceEvidence:port()}),resource(3,'SOLARSPOTTER 53',{name:'Fixture Recon detector',type:'detector',evidence:{kind:'provider',source:'Reconeyez',resource:'detector',active:true,status:'offline',observedAt:'2026-10-06T16:00:00Z',lastOnlineAt:'2026-10-05T12:00:00Z'}})];
  if(accessCase){state.units=state.units.map((unit,i)=>({...unit,unitNumber:['SNIPER 2 005','CAM V 002','CAM V 003'][i],modelName:i?'CAM V & RSU':'SNIPERS'}));rows=[resource(101,'SNIPER 2 005',{type:'Sniper 2',evidence:undefined,serviceEvidence:port(),connection:{publicIp:'203.0.113.12',ports:[80,443,554,38880]}}),resource(102,'CAM V 002',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})}),resource(103,'CAM V 003',{type:'CAMV',evidence:undefined,serviceEvidence:port({status:'unknown',reachable:null})})];}
  if(trackerCase){state.units=[{...state.units[0],unitNumber:'Sniper 2 344',modelName:'SNIPERS',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false},{...state.units[1],unitNumber:'CAMV 010',modelName:'CAM V & RSU',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false},{...state.units[2],unitNumber:'Sniper 334',modelName:'SNIPERS',readOnly:true,latitude:null,longitude:null,locationVerification:'address_only',hasUnitGps:false}];rows=[resource(101,'Sniper 2 344',{type:'Sniper 2',evidence:undefined,scope:'unknown',serviceEvidence:port()}),resource(102,'CAMV 010',{type:'CAMV',evidence:undefined,scope:'unknown',serviceEvidence:port({status:'offline',reachable:false,confirmedOutage:true})})];}
@@ -211,11 +213,12 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-site-leader')).toHaveCount(3);
  await expect(frame.locator('.cos-cluster-support')).not.toBeVisible();
- await expect(frame.locator('.cos-reticle-lens')).toHaveCount(2);await expect(frame.locator('.cos-reticle-solar-panel')).toHaveCount(1);await expect(frame.locator('.cos-pin-unit-number')).toHaveText(['51','52','044']);
+ await expect(frame.locator('.cos-reticle-circle')).toHaveCount(2);await expect(frame.locator('.cos-reticle-lens')).toHaveCount(0);await expect(frame.locator('.cos-reticle-circle').first()).toHaveCSS('z-index','1');await expect(frame.locator('.cos-reticle-solar-panel')).toHaveCount(1);await expect(frame.locator('.cos-pin-unit-number')).toHaveText(['51','52','044']);
  await expect(frame.locator(' .cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
  await expect(frame.locator(' .cos-field-pin[data-health="offline"] .cos-reticle-artwork')).toHaveCSS('color','rgb(255, 39, 52)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
+ await expect.poll(()=>frame.locator('.cos-field-pin:not(.cos-field-pin-support)').evaluateAll(pins=>pins.every(pin=>{const circle=pin.querySelector('circle').getBoundingClientRect(),number=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return document.elementFromPoint((number.left+number.right)/2,(number.top+number.bottom)/2)===pin.querySelector('.cos-pin-unit-number')&&number.left>=circle.left&&number.right<=circle.right&&number.top>=circle.top&&number.bottom<=circle.bottom&&Math.abs((number.top+number.bottom-circle.top-circle.bottom)/2)<1;}))).toBe(true);
  await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-same-site.png')});
  await frame.locator('.cos-field-pin-support').click();
  await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
@@ -228,9 +231,9 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
  await page.clock.fastForward(16*60*1000);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
- await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-reticle-lens')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-pin-unit-number')).toHaveText(['51','52']);
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-reticle-circle')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-pin-unit-number')).toHaveText(['51','52']);
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
- await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-lenses-grey-unknown.png')});
+ await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-circles-grey-unknown.png')});
  expect(state.writes).toHaveLength(0);
 });
 
@@ -288,4 +291,28 @@ test('filtering away an open cluster discards its old popup-pan snapshot',async(
  const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
  const before=await center();await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.leaflet-popup')).toBeVisible();
  await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(before);expect(state.writes).toHaveLength(0);
+});
+
+
+test('zoom alone exposes twelve same-site statuses and blue support without opening a group',async({page},info)=>{
+ const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true});
+ const zoom=frame.locator('.leaflet-control-zoom-in'),out=frame.locator('.leaflet-control-zoom-out');
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom)).toBe(14);await out.click();await expect.poll(()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom)).toBe(13);
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-field-cluster>b')).toHaveText('12');
+ await zoom.click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect(frame.locator('.cos-site-leader')).toHaveCount(12);
+ await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(9);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
+ const visible=()=>frame.locator('.field-map-center').evaluate(el=>{const map=el.getBoundingClientRect(),legend=el.querySelector('.field-map-legend').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const b=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect(),p=pin.getBoundingClientRect();return p.left>=map.left&&p.right<=map.right&&p.top>=map.top&&Math.max(p.bottom,b.bottom)<legend.top;});});
+ await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units.png')});
+ await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');await frame.locator('.leaflet-popup-close-button').click();
+ await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units-tv.png')});
+ await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await frame.locator('.cos-field-pin[data-health="offline"]').click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+});
+
+
+test('automatically separated adjacent sites do not cover each other',async({page},info)=>{
+ const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true,nearbyCrowd:true});
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(15);await expect(frame.locator('.cos-field-cluster')).toHaveCount(2);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
+ const clear=()=>frame.locator('.field-map-center').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')],clusters=[...el.querySelectorAll('.cos-field-cluster')];const overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return clusters.every(c=>!overlap(box,c.getBoundingClientRect())&&!overlap(label,c.getBoundingClientRect()))&&pins.every((p,j)=>i===j||!overlap(box,p.getBoundingClientRect())&&!overlap(label,p.getBoundingClientRect())&&!overlap(label,p.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});
+ await expect.poll(clear).toBe(true);await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(15);await expect.poll(clear).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('adjacent-sites-automatic-tv.png')});expect(state.writes).toHaveLength(0);
 });

@@ -19,9 +19,8 @@ export function mapUnitIdentifier(unitNumber:string):string {
 }
 function individualReticleArtwork(support:boolean) {
   // Inline vector paths use only controlled markup/currentColor: no shared filter IDs.
-  const center=support
-    ? '<g class="cos-reticle-solar-panel"><path d="M18 14H35L29 28H12Z" fill="currentColor" stroke="#bdefff" stroke-width="1.2" stroke-linejoin="round"/><path d="M23.5 14 17.5 28M29.5 14 23.5 28M15 21H32" fill="none" stroke="#bdefff" stroke-width=".9"/><path d="M23 28V35M16 35H31" stroke="currentColor" stroke-width="2.7"/><path d="M14 33.5H19V36.5H14ZM28 33.5H33V36.5H28Z" fill="currentColor"/></g>'
-    : '<g class="cos-reticle-lens"><circle cx="24" cy="24" r="11" fill="currentColor"/><circle cx="24" cy="24" r="7.2" fill="#020a12"/><circle cx="27.1" cy="20.8" r="2.2" fill="#fff"/></g>';
+  if(!support)return '<svg class="cos-reticle-artwork cos-reticle-circle" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="17.5" fill="#071421" stroke="currentColor" stroke-width="2.3"/></svg>';
+  const center= '<g class="cos-reticle-solar-panel"><path d="M18 14H35L29 28H12Z" fill="currentColor" stroke="#bdefff" stroke-width="1.2" stroke-linejoin="round"/><path d="M23.5 14 17.5 28M29.5 14 23.5 28M15 21H32" fill="none" stroke="#bdefff" stroke-width=".9"/><path d="M23 28V35M16 35H31" stroke="currentColor" stroke-width="2.7"/><path d="M14 33.5H19V36.5H14ZM28 33.5H33V36.5H28Z" fill="currentColor"/></g>';
   return '<svg class="cos-reticle-artwork" viewBox="0 0 48 48" width="44" height="44" fill="none" aria-hidden="true" focusable="false"><g class="cos-reticle-arcs" stroke="currentColor" stroke-width="2.3"><path d="M28 7A17.5 17.5 0 0 1 41 20M41 28A17.5 17.5 0 0 1 28 41M20 41A17.5 17.5 0 0 1 7 28M7 20A17.5 17.5 0 0 1 20 7"/><path d="M24 1V7M41 24H47M24 41V47M1 24H7" stroke-width="2.7"/></g>'+center+'</svg>';
 }
 export function mapReticleMarkup(unitNumber:string,state:ReticleState,location:'current'|'estimate'|'historical'='current') {
@@ -38,8 +37,35 @@ export function clusterReticleMarkup(counts:ReticleCounts,estimateCount=0,histor
   return '<span class="cos-field-cluster" data-health="'+state+'" data-estimate-count="'+estimateCount+'" style="--pin:'+color+'"><i class="cos-reticle-ring"></i><b aria-hidden="true">'+count+'</b><em class="cos-cluster-caption">'+(state==='mixed'?'MIX':'GROUP')+'</em>'+(counts.support&&state!=='support'?'<i class="cos-cluster-support" title="'+counts.support+' support units; 0 cameras">'+mapSymbol(true)+'<small>'+counts.support+'</small></i>':'')+(estimateCount||historicalCount?'<em class="cos-cluster-location">'+(estimateCount&&historicalCount?'EST / OLD':estimateCount?'EST':'OLD')+'</em>':'')+'</span>';
 }
 /** A bounded display offset only; recorded locations and distance calculations never change. */
-export function expandedGroupOffsets(count:number,scale=1):{x:number;y:number}[] {
+export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:number;height:number;anchorX:number;anchorY:number;bottomInset:number;occupied?:{x:number;y:number}[]}):{x:number;y:number}[] {
   if(count<2)return [];
+  // Prefer clear visible positions, reserving other nearby sites and their units.
+  // All offsets are presentation-only; larger sites remain pannable without hiding identities.
+  if(viewport){
+    const columns=Math.max(2,Math.min(8,Math.floor((viewport.width-36)/(56*scale))));
+    const rows=Math.ceil(count/columns)+4,candidates:{x:number;y:number;visible:boolean;preferred:boolean}[]=[];
+    const anchorVisible=viewport.anchorX>=0&&viewport.anchorX<=viewport.width&&viewport.anchorY>=0&&viewport.anchorY<=viewport.height;
+    const add=(x:number,y:number,preferred=false)=>{
+      const px=viewport.anchorX+x,py=viewport.anchorY+y;
+      const visible=!anchorVisible||(px-22*scale>=0&&px+22*scale<=viewport.width&&py-30*scale>=0&&py+37*scale<=viewport.height-viewport.bottomInset);
+      candidates.push({x,y,visible,preferred});
+    };
+    if(count<=9)expandedGroupOffsets(count,scale).forEach(({x,y})=>add(x,y,true));
+    for(let row=-rows;row<=rows;row++)for(let column=0;column<columns;column++)add(Math.round((column-(columns-1)/2)*56*scale),Math.round((row*70-12)*scale));
+    candidates.sort((a,b)=>Number(b.visible)-Number(a.visible)||Number(b.preferred)-Number(a.preferred)||Math.hypot(a.x,a.y)-Math.hypot(b.x,b.y)||a.y-b.y||a.x-b.x);
+    const selected:{x:number;y:number}[]=[],occupied=[{x:0,y:0},...(viewport.occupied||[])];
+    for(const {x,y} of candidates){
+      if([...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
+      selected.push({x,y});if(selected.length===count)return selected;
+    }
+    // Dense adjacent sites may exhaust the visible grid. Continue clear rows for map panning.
+    for(let row=rows+1;selected.length<count;row++)for(let column=0;column<columns&&selected.length<count;column++){
+      const x=Math.round((column-(columns-1)/2)*56*scale),y=Math.round((row*70-12)*scale);
+      if([...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
+      selected.push({x,y});
+    }
+    return selected;
+  }
   const offsets:{x:number;y:number}[]=[];
   // Multiple rings and extra vertical clearance keep below-marker labels apart.
   for(let ring=0;offsets.length<count;ring++){

@@ -264,8 +264,13 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
     const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44,16);
+    const occupied=groups.map(group=>{const point=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;return map.latLngToContainerPoint([point.latitude,point.longitude]);});
     for(const group of groups){
-      const offsets=map.getZoom()>=17?expandedGroupOffsets(group.length,tvMode&&window.innerWidth>700?1.18:1):[];
+      const site=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;
+      const screen=map.latLngToContainerPoint([site.latitude,site.longitude]),size=map.getSize();
+      const legendHeight=mapNode.current?.parentElement?.querySelector('.field-map-legend')?.getBoundingClientRect().height||0;
+      const offsets=map.getZoom()>=14?expandedGroupOffsets(group.length,tvMode&&window.innerWidth>700?1.18:1,{width:size.x,height:size.y,anchorX:screen.x,anchorY:screen.y,bottomInset:legendHeight+28,occupied:occupied.map(point=>({x:point.x-screen.x,y:point.y-screen.y}))}):[];
+      offsets.forEach(offset=>occupied.push(L.point(screen.x+offset.x,screen.y+offset.y)));
       if(group.length>1){
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));

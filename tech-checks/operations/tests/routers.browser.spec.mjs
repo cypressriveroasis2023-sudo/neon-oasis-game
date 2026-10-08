@@ -68,7 +68,7 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(1);
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-lens')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-circle')).toHaveCount(1);
  await frame.getByLabel('COS field unit map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('COS field unit map').boundingBox();
  await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
@@ -81,6 +81,6 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await page.clock.fastForward(15*60*1000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-lens')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-circle')).toHaveCount(1);
  expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
 });
