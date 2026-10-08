@@ -1,5 +1,8 @@
 // Regression fixtures only: no real sessions, provider reads, geocoding or operational writes.
 // The acceptance address/pin is user-supplied; every resource ID, actor and proof is synthetic.
+import {createHash} from 'node:crypto';
+import {projectImportedSourceAddresses} from '../../supabase/functions/cos-operations-pages/importedSourceProjection.ts';
+import {projectOwnerPlacement} from '../../supabase/functions/cos-operations-pages/placementProjection.ts';
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {existsSync} from 'node:fs';
@@ -13,13 +16,13 @@ const rowId='11111111-1111-4111-8111-111111111111';
 const historyId='22222222-2222-4222-8222-222222222222';
 const stamp='2026-10-07T12:00:00.000Z';
 const nativeRow=(patch={})=>({id:rowId,unitNumber:'Ranger 001',modelName:'RANGER',status:'field',currentLocationType:'site',installedSiteId:'33333333-3333-4333-8333-333333333333',site,address,addressSource:'Current installation address',addressUpdatedAt:stamp,readOnly:false,recordSource:'Native equipment',hasUnitGps:true,latitude:30.069759,longitude:-95.446072,coordinateSource:'unit',gpsRecordedAt:stamp,locationVerification:'owner_verified',locationVerifiedAt:stamp,locationHistoryId:historyId,locationNote:'Synthetic verified location proof',...patch});
-const envelope=(rows=[nativeRow()])=>({items:rows,inventoryItems:rows,placementReviews:[],summary:{fieldUnits:rows.length,mappedUnits:rows.length,unitGps:rows.length,missingGps:0},generatedAt:stamp});
+const envelope=(rows=[nativeRow()])=>({items:rows,inventoryItems:rows,placementReviews:[],summary:{fieldUnits:rows.length,mappedUnits:rows.length,unitGps:rows.length,missingGps:0},generatedAt:new Date().toISOString()});
 const healthEnvelope=(key='RANGER 001')=>({evidenceVersion:2,identityVersion:1,rows:[{id:11,unit:key,trackerOnly:false}],unitIdentities:[],identityWarnings:[]});
 const fieldReads=fixture=>fixture.reads.filter(read=>read.body.path==='/api/field-map');
 const legacyState=(key='RANGER 001',patch={})=>({unitKey:key,placement:'FIELD',siteLabel:'',streetAddress:'',auditId:null,canMove:true,...patch});
 
 async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic billing label must never prefill',key='RANGER 001',native=envelope(),legacy=legacyState(key),health=healthEnvelope(key),status=200,token=true,holdNative=false}={}){
-  const fixture={native,health,status,holdNative,reads:[],geocodes:[],unexpected:[],gates:[],pageErrors:[]};
+  const fixture={native,health,status,holdNative,editorReadsArmed:false,initialDisplayReads:[],reads:[],geocodes:[],unexpected:[],gates:[],pageErrors:[]};
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));
   await page.addInitScript(({role,verifiedIt,organization,key,legacy,token})=>{
     window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldRead=false;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadDenied=false;window.fixtureSaved=[];
@@ -65,7 +68,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
       const body=request.postDataJSON();fixture.reads.push({body,headers:request.headers()});
       if(!['/api/field-map','/api/camera-health/summary-v3'].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:fixture.health),status=fixture.status;
-      if(fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
+      if(fixture.editorReadsArmed&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
       if(status===0)return route.abort('failed');
       return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
     }
@@ -73,6 +76,10 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
   });
   await page.goto(origin+'/tech-checks/camera-detail.html?id=11');
   await expect(page.locator('#content')).toBeVisible();
+  // The shared physical-placement display now performs its own initial read.
+  // Settle that real entry-path read before counting or delaying editor reads.
+  await expect(page.locator('#effectivePlacement [data-placement-status]')).toHaveAttribute('data-placement-status',/^(ready|unresolved|unavailable)$/);
+  fixture.initialDisplayReads=fixture.reads.splice(0);fixture.editorReadsArmed=true;
   return fixture;
 }
 const inputs=page=>({site:page.locator('.cos-placement-dialog [name=site]'),address:page.locator('.cos-placement-dialog [name=address]'),reason:page.locator('.cos-placement-dialog [name=reason]'),confirmed:page.locator('.cos-placement-dialog [name=confirmed]'),save:page.getByRole('button',{name:'Save placement',exact:true}),cancel:page.getByRole('button',{name:'Cancel',exact:true})});
@@ -293,4 +300,26 @@ for(const phase of ['initial','preflight'])test('a hung '+phase+' legacy read ti
   await expect.poll(()=>legacyReads(page)).toBe(phase==='initial'?1:2);await expect(inputs(page).save).toBeDisabled();
   await expect(page.locator('.placement-feedback')).toContainText(/timed out|timeout|abort|unavailable|refresh/i);await expect(inputs(page).cancel).toBeEnabled();
   await inputs(page).cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);await page.evaluate(()=>fixtureReleaseRead());await assertNoWrites(page,fixture);
+});
+
+async function importedEnvelope(placement){
+ const installation={street:'123 Example Rd',city:'Houston',state:'TX',zip:'77002'},sourceAddress='123 Example Rd, Houston, TX 77002';
+ const source={schemaVersion:1,organizationId:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',sourceSystem:'mhelpdesk_product_import',entityKind:'equipment_unit',nativeUnitId:rowId,productId:'12345',unitNumber:'Ranger 001',family:'RANGER',variant:null,sourceRevision:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',sourceFileSha256:'a'.repeat(64),sourceRowSha256:'b'.repeat(64),addressSha256:createHash('sha256').update(sourceAddress.toLowerCase()).digest('hex'),nativeGuardSha256:'c'.repeat(64),installation,suppliedComponents:{street:true,city:true,state:true,zip:true},eligibility:'FIELD',eventId:'1',placement,siteLabel:'Synthetic imported field site'};
+ const raw=nativeRow({_sourceField:false,status:'available',currentLocationType:null,installedSiteId:null,hasUnitGps:false,latitude:null,longitude:null,coordinateSource:null,gpsRecordedAt:null,locationVerification:'address_only',locationVerifiedAt:null,locationHistoryId:null,locationNote:null});
+ return projectOwnerPlacement(await projectImportedSourceAddresses({...envelope([]),inventoryItems:[raw]},[source],[],[]),[],[]);
+}
+test('actual imported FIELD DTO prefills source address and same-address save remains a no-op',async({page},info)=>{
+ const native=await importedEnvelope('FIELD'),fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'SHOP'})});await expect(page.locator('#organization')).toContainText('123 Example Rd, Houston, TX 77002');await open(page);const form=await ready(page);
+ await expect(form.site).toHaveValue('Synthetic imported field site');await expect(form.address).toHaveValue('123 Example Rd, Houston, TX 77002');await page.screenshot({path:info.outputPath('combined-imported-field-prefill.png')});await confirm(page);await form.save.click();
+ await expect(page.locator('.placement-feedback')).toContainText('unchanged');await assertNoWrites(page,fixture);
+});
+test('actual imported SHOP DTO opens a blank deliberate deployment and only writes confirmed new address',async({page},info)=>{
+ const native=await importedEnvelope('SHOP'),fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'SHOP'}),organization:'ROOT'});await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await page.locator('#moveShopBtn').click();const form=await ready(page);
+ await page.screenshot({path:info.outputPath('combined-imported-shop-deployment.png')});await expect(form.site).toHaveValue('');await expect(form.address).toHaveValue('');await form.site.fill('New synthetic installation');await form.address.fill('456 New Rd, Houston, TX 77002');await confirm(page);await form.save.click();
+ await expect.poll(async()=>(await mutations(page)).length).toBe(1);expect((await mutations(page))[0].args).toMatchObject({p_unit_key:'RANGER 001',p_placement:'FIELD',p_site_label:'New synthetic installation',p_street_address:'456 New Rd, Houston, TX 77002'});expect(fixture.unexpected).toEqual([]);
+});
+
+test('typed imported SHOP overrides only old inferred FIELD for blank deployment',async({page})=>{
+ const native=await importedEnvelope('SHOP'),fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'FIELD'}),organization:'Old provider site'});await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await page.locator('#moveShopBtn').click();const form=await ready(page);
+ await expect(form.address).toHaveValue('');await expect(form.site).toHaveValue('');await form.cancel.click();await assertNoWrites(page,fixture);
 });

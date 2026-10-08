@@ -1,11 +1,12 @@
+import {projectOwnerConfirmedIdentities, type OwnerIdentitySnapshot, type ResourceEpoch} from './ownerIdentityCrosswalk.ts';
 import {currentOwnerPlacements} from './placementProjection.ts';
 import {REVIEWED_NATIVE_IDENTITIES, REVIEWED_OWNER_IDENTITIES, REVIEWED_NATIVE_RESOURCES, REVIEWED_OWNER_RESOURCES, REVIEWED_OWNER_PHYSICAL_IDENTITIES, type ReviewedIdentityResources} from './verifiedHealthIdentityScope.ts';
 
 /** Identity-only projections. Provider serials and native association records never leave this module. */
 type Row=Record<string,any>;
-export type UnitHealthIdentity={unitId:string;unitNumber:string;kind:'native_provider'|'owner_placement';deviceIds:string[];unitKeys:string[];proof:string;placementAuditId?:string};
+export type UnitHealthIdentity={unitId:string;unitNumber:string;kind:'native_provider'|'owner_placement'|'owner_confirmed_native';deviceIds:string[];unitKeys:string[];proof:string;placementAuditId?:string};
 export type IdentityWarning={unitId:string;reason:string;deviceIds:string[];unitKeys:string[]};
-export type IdentitySources={units:Row[];matches:Row[];providers:Row[];devices:Row[];audits:Row[]};
+export type IdentitySources={units:Row[];matches:Row[];providers:Row[];devices:Row[];audits:Row[];ownerCrosswalk?:OwnerIdentitySnapshot;ownerEpochs?:ResourceEpoch[]};
 export type IdentityReview={native:Readonly<Record<string,string>>;owner:ReadonlySet<string>;nativeResources:Readonly<Record<string,ReviewedIdentityResources>>;ownerResources:Readonly<Record<string,ReviewedIdentityResources>>;ownerPhysical:Readonly<Record<string,string>>};
 const organizationId='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const record=(value:unknown):value is Row=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
@@ -79,9 +80,13 @@ export async function verifiedHealthIdentities(sources:IdentitySources,review:Id
  const presentNativeKeys=new Set<string>();
  for(const unit of units){
   if(!uuid(unit.id))continue;
-  const reviewKey=await nativeIdentityKey(unit.id),expected=review.native[reviewKey];if(!expected)continue;
+  const reviewKey=await nativeIdentityKey(unit.id),expected=review.native[reviewKey],resources=review.nativeResources[reviewKey];
+  if(!expected&&!resources)continue;
   presentNativeKeys.add(reviewKey);
-  bindWarning(unit.id,review.nativeResources[reviewKey]);
+  bindWarning(unit.id,resources);
+  // Retained resource commitments are deny-only tombstones when a positive review is revoked.
+  // They cannot prove a replacement association or silently revive name-only placement.
+  if(!expected){reject(unit.id,'The reviewed native association has been revoked and requires identity review.');continue;}
   if(unit.organization_id!==organizationId||unitIds.get(unit.id)?.length!==1||!text(unit.unit_number)){reject(unit.id,'Native equipment identity changed or is duplicated.');continue;}
   const links=byNative.get(unit.id)||[];
   if(!links.length){reject(unit.id,'Reviewed provider-resource mappings are missing.');continue;}
@@ -103,7 +108,7 @@ export async function verifiedHealthIdentities(sources:IdentitySources,review:Id
   if(proof!==expected){reject(unit.id,'The complete reviewed native/provider association has changed.');continue;}
   identities.push({unitId:unit.id,unitNumber:unit.unit_number,kind:'native_provider',deviceIds:sortIds(boundIds),unitKeys,proof});
  }
- for(const [key,resources] of Object.entries(review.nativeResources))if(review.native[key]&&!presentNativeKeys.has(key))rejectUnavailable(key,resources,'Reviewed native equipment identity is missing from the current inventory.');
+ for(const [key,resources] of Object.entries(review.nativeResources))if(!presentNativeKeys.has(key))rejectUnavailable(key,resources,'Reviewed native equipment identity is missing from the current inventory.');
  // A newer audit can replace the reviewed control, key or resource set. Keep the
  // prior control visible as untrusted even when it disappears from current moves.
  const knownOwners=new Set<string>(),presentOwnerKeys=new Set<string>();
@@ -135,10 +140,16 @@ export async function verifiedHealthIdentities(sources:IdentitySources,review:Id
   identities.push({unitId:audit.control_id,unitNumber:audit.unit_key,kind:'owner_placement',deviceIds:sortIds(boundIds),unitKeys:[audit.unit_key],proof,placementAuditId:decimal(audit.id)!});
  }
  for(const unitId of knownOwners)if(!currentOwners.has(unitId))reject(unitId,'The reviewed Owner placement control is no longer current.');
+ if(sources.ownerCrosswalk){
+  const confirmed=await projectOwnerConfirmedIdentities({units,devices,matches,providers,epochs:sources.ownerEpochs||[],crosswalk:sources.ownerCrosswalk});
+  for(const identity of confirmed.unitIdentities)identities.push(identity as UnitHealthIdentity);
+  for(const warning of confirmed.identityWarnings)warnings.set(warning.unitId,warning as IdentityWarning);
+ }
  // No approved overlap exists. Future overlapping aliases require a separately reviewed association.
  const claims=new Map<string,Set<string>>();
  for(const identity of identities)for(const id of identity.deviceIds)claims.set(id,new Set([...(claims.get(id)||[]),identity.unitId]));
- const conflicts=new Set(identities.filter(identity=>identity.deviceIds.some(id=>claims.get(id)!.size!==1)).map(identity=>identity.unitId));
+ const conflicts=new Set(identities.filter(identity=>identities.filter(other=>other.unitId===identity.unitId).length!==1||identity.deviceIds.some(id=>claims.get(id)!.size!==1)||[...warnings.values()].some(w=>w.unitId!==identity.unitId&&(w.deviceIds.some(id=>identity.deviceIds.includes(id))||w.unitKeys.some(key=>identity.unitKeys.includes(key))))).map(identity=>identity.unitId));
  for(const unitId of conflicts)reject(unitId,'Health resources have more than one equipment identity.');
- return {identityVersion:1 as const,unitIdentities:identities.filter(identity=>!warnings.has(identity.unitId)).sort((a,b)=>a.unitId.localeCompare(b.unitId)),identityWarnings:[...warnings.values()].sort((a,b)=>a.unitId.localeCompare(b.unitId))};
+ const admitted=identities.filter(identity=>!warnings.has(identity.unitId)).sort((a,b)=>a.unitId.localeCompare(b.unitId));
+ return {identityVersion:1 as const,unitIdentities:admitted.filter(identity=>identity.kind!=='owner_confirmed_native'),...(sources.ownerCrosswalk?{ownerConfirmedIdentityVersion:1 as const,ownerConfirmedUnitIdentities:admitted.filter(identity=>identity.kind==='owner_confirmed_native')}:{}) ,identityWarnings:[...warnings.values()].sort((a,b)=>a.unitId.localeCompare(b.unitId))};
 }

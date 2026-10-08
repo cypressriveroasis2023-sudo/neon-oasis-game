@@ -1,7 +1,7 @@
 import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { routerStatus, type RouterRow, type RouterStatus } from '../../supabase/functions/cos-operations-pages/routers';
 export type FieldLocation = {
-  id: string; unitNumber: string; placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>;
+  id: string; unitNumber: string; placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>;
   addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
   installedSiteId?:string|null; placementSource?:string; placementStatus?:string; placement?:string;
   addressEstimateTrackerId?: string|null; addressEstimateUnitNumber?: string|null; address?: string; latitude?: number|string|null; longitude?: number|string|null;
@@ -25,18 +25,22 @@ export function historicalFieldCoordinates(unit: FieldLocation) {
   return !isCurrentFieldPin(unit)&&hasGpsCoordinates(unit) ? {latitude:Number(unit.latitude),longitude:Number(unit.longitude),source:unit.coordinateSource||'Stored source',recordedAt:unit.gpsRecordedAt||null} : null;
 }
 export function locationTag(unit: FieldLocation) {
-  if(unit.locationGeocode?.status==='unavailable')return 'LOOKUP UNAVAILABLE';
-  if(unit.locationGeocode?.status==='not_requested')return 'ADDRESS LOOKUP NEEDED';
-  if(unit.locationGeocode?.status==='pending')return 'LOCATING ADDRESS';
-  if(['no_match','invalid_address'].includes(unit.locationGeocode?.status))return 'ADDRESS NEEDS REVIEW';
-  if(unit.locationGeocode?.status==='provider_error')return 'LOOKUP DELAYED';
+  const lookup=unit.placementSource==='owner'?unit.locationGeocode:(unit.locationImportedGeocode||unit.locationGeocode);
+  if(lookup?.status==='unavailable')return 'LOOKUP UNAVAILABLE';
+  if(lookup?.status==='not_requested')return 'ADDRESS LOOKUP NEEDED';
+  if(lookup?.status==='held')return 'SOURCE CHECK PENDING';
+  if(lookup?.status==='pending')return 'LOCATING ADDRESS';
+  if(['no_match','invalid_address'].includes(lookup?.status))return 'ADDRESS NEEDS REVIEW';
+  if(lookup?.status==='deferred')return 'LOOKUP DELAYED';
+  if(lookup?.status==='provider_error')return 'LOOKUP DELAYED';
   if (unit.locationVerification==='address_changed') return 'ADDRESS CHANGED';
   if (isCurrentFieldPin(unit)) return unit.coordinateSource==='site'?'VERIFIED ADDRESS PIN':'VERIFIED PIN';
   if (historicalFieldCoordinates(unit)) return 'HISTORICAL PIN';
   return unit.address?.trim()?'ADDRESS ONLY':'LOCATION NEEDED';
 }
 export function locationExplanation(unit: FieldLocation) {
-  if(unit.locationGeocode){const status=unit.locationGeocode.status;if(status==='unavailable')return 'Saved address lookup results are temporarily unavailable. Refresh later; existing verified locations and camera health are unchanged.';if(status==='not_requested')return 'This placement predates automatic address lookup. Open Camera Health, review the complete installation address and save it to create the map pin.';if(status==='pending')return 'Installation saved. Address lookup is pending; background processing runs every 15 minutes.';if(status==='invalid_address')return 'Add a complete installation street, city, state and ZIP in Camera Health → Edit field address.';if(status==='no_match')return 'No single exact address matched. Correct the installation address or manually verify the installation pin.';if(status==='provider_error')return unit.locationGeocode.attempts>=3?'Address lookup failed after three attempts. Correct and save the address to retry, or verify the installation pin.':'The address service is unavailable. COS will retry automatically; camera health is unchanged.';}
+  const lookup=unit.placementSource==='owner'?unit.locationGeocode:(unit.locationImportedGeocode||unit.locationGeocode);
+  if(lookup){const status=lookup.status;if(status==='unavailable')return 'Saved address lookup results are temporarily unavailable. Refresh later; existing verified locations and camera health are unchanged.';if(status==='not_requested')return 'This placement predates automatic address lookup. Open Camera Health, review the complete installation address and save it to create the map pin.';if(status==='deferred')return 'The free address lookup is waiting for its safe retry window. COS will retry automatically without paid lookups.';if(status==='held')return 'Source or placement verification is pending. No approximate point is shown until the current installation source is verified.';if(status==='pending')return 'Installation saved. Address lookup is pending; background processing runs every 15 minutes.';if(status==='invalid_address')return 'Add a complete installation street, city, state and ZIP in Camera Health → Edit field address.';if(status==='no_match')return 'No single exact address matched. Correct the installation address or manually verify the installation pin.';if(status==='provider_error')return lookup.attempts>=3?'Address lookup failed after three attempts. Correct and save the address to retry, or verify the installation pin.':'The address service is unavailable. COS will retry automatically; camera health is unchanged.';}
   if (unit.locationVerification==='address_changed') return 'The recorded address changed after this pin was saved. Verify the new location before placing it on the map.';
   if (isCurrentFieldPin(unit)) return unit.coordinateSource==='site'?'An owner confirmed an address-derived pin. It is not a live GPS observation.':'An owner confirmed this pin for the recorded address. It is not live router GPS.';
   if (historicalFieldCoordinates(unit)) return 'Historical coordinates are preserved for review and excluded from the current map and nearby-unit results. Confirm the actual installation location before using them.';

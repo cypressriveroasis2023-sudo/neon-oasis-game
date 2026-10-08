@@ -234,3 +234,72 @@ row, import revision, identity and audit still participate in the preflight chec
 Native current installations and verified-location evidence are not silently
 reclassified. No source rows, GPS, health data or permissions are rewritten by
 opening or cancelling the editor.
+
+### Reviewed native placement aliases (projection version 2)
+
+The native Field Map backend reuses the exact current `summary-v3` identity inputs
+and verifier before projecting Owner placement. Its additive
+`placementProjectionVersion: 2` / `nativePlacementAliases` capability advertises
+only complete, unique reviewed native-provider groups with one exact source key,
+one writable native UUID and label, the complete device set, identity proof and
+latest audit ID. Every target declares `COS_NATIVE_PLACEMENT_ALIAS_V1` and the
+existing `COS_CAMERA_PLACEMENT_V2` writer contract. No model suffix is removed,
+new identity is reviewed, or native/control record is edited or deleted.
+
+A valid raw-key Owner FIELD/SHOP audit applies to that native UUID exactly once;
+the synthetic control projection is not generated. Raw `placementUnitKey` and
+audit provenance remain intact. Warnings, changed association, aliases, competing
+resource claims, reused controls, native/control collisions and newer conflicting
+audits fail closed without a name fallback or generated shadow. Native sites and
+tracker addresses never overrule a valid Owner move. Existing history/GPS rules
+are unchanged: moves invalidate old current pins, while only a later matching,
+unique Owner location-history proof can restore a verified pin.
+
+The legacy editor independently refreshes the native map/capability, health
+identity and legacy state on open and again before save. It binds the full
+capability into the preflight revision; an older/incompatible backend keeps
+incompatible-name aliases read-only. A successful legacy receipt must be followed
+by matching legacy state and one matching native map/identity row without a
+shadow. Uncertain readback locks the form and never replays the write or reports
+it as confirmed. The existing reason, physical-placement confirmation, request
+ID and expected-audit CAS remain unchanged. Owner/approved IT checks remain in
+place; Service gains no access.
+
+This is not an atomic cross-database identity guard. The unchanged legacy writer
+locks its own source rows and audit revision, but cannot atomically guard the
+independently fetched native proof. If either database changes after preflight,
+the write may commit while readback becomes uncertain. Reload and review the
+saved result; do not automatically repeat it.
+
+Release this delta only through the coordinated backend release. The reviewed
+baseline was the actual native `cos-operations-pages` v24 bundle (17 files,
+`serve.ts` entrypoint, custom authentication with `verify_jwt: false`). Re-fetch
+before deployment, preserve every unrelated file and auth/route, and integrate
+any separately approved address-estimate delta without replacing its source.
+Backend deployment must precede enabling the frontend capability. No SQL/schema,
+credential, grant, identity-review scope, provider setup or production test move
+is included. Local tests use synthetic placement/resource data and injected
+transport only; fixed existing auth-map constants are used solely to test the
+unchanged role gate.
+
+After any alias move has been saved, restoring the old name-only backend can
+reintroduce a generated shadow or stop the move from affecting the native row.
+For a frontend-only rollback, restore the previous read-only editor and retain
+the reviewed backend projection. Do not roll the backend back across saved alias
+moves without reviewing their effective map projection first; never compensate
+by deleting control/audit/native records.
+
+A retained reviewed resource commitment is also a deny-only tombstone after its
+positive native digest is removed. It emits a bound identity warning and cannot
+make a replacement association. Warned native UUIDs remain quarantined even if
+all current source keys/device IDs disappear: they remain in inventory as
+UNKNOWN with historical GPS preserved, but have no current field membership,
+coordinates or verified-history marker. Independently fetched native membership
+must agree with every writable map UUID and exact label; missing, duplicated or
+renamed membership makes the snapshot unavailable rather than reviving an old
+field pin. These checks also apply before the first alias move.
+
+Keep quarantine commitments when revoking a positive review. Deliberately erasing
+both the positive proof and its resource commitments, or restoring the old
+name-only projector, is not a safe post-use revocation: it removes the evidence
+needed to prevent a camera-only fallback. No such scope edits are in this patch.

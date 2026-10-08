@@ -21,10 +21,37 @@
     const [whole,fraction]=m[2].split('.');if(Number(whole)===0)return 'full:'+value.trim().replace(/\s+/g,' ').toUpperCase();
     return 'typed:'+family+'|'+Number(whole)+(fraction===undefined?'':'.'+fraction)+(m[3]?'|'+m[3].toUpperCase():'');
   }
+  // Denial only, never a positive family/number/suffix alias.
+  function placementIdentityConcernKey(value){
+    const key=placementMatchKey(value);if(!key.startsWith('typed:'))return key;
+    const [family,number]=key.slice(6).split('|');
+    const related=['SPOTTER','SOLARSPOTTER','AXISSPOTTER','AXISSOLARSPOTTER'].includes(family)?'SPOTTER':/^SNIPER[24]?$/.test(family)?'SNIPER':/^RECON2?$/.test(family)?'RECON':family;
+    return 'concern:'+related+'|'+number;
+  }
+  function allIdentities(health){
+    if(health.ownerConfirmedIdentityVersion===undefined?health.ownerConfirmedUnitIdentities!==undefined:health.ownerConfirmedIdentityVersion!==1||!Array.isArray(health.ownerConfirmedUnitIdentities)||health.ownerConfirmedUnitIdentities.length>1000||health.ownerConfirmedUnitIdentities.some(p=>p.kind!=='owner_confirmed_native'))fail('Owner-confirmed identity contract is unavailable.');
+    if(health.unitIdentities.some(p=>p.kind==='owner_confirmed_native'))fail('Owner-confirmed identities require their additive contract.');
+    return [...health.unitIdentities,...(health.ownerConfirmedUnitIdentities||[])];
+  }
   function stateMatches(state,key){return object(state)&&state.unitKey===key&&['SHOP','FIELD','UNKNOWN'].includes(state.placement)&&(state.auditId===null||resourceId(state.auditId)===state.auditId)&&typeof state.siteLabel==='string'&&typeof state.streetAddress==='string'&&state.canMove===true;}
-  const revisionFields=['id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','snapshotImportedAt','activeJobNumber','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
+  const revisionFields=['importedPlacement','importedInstallation','id','unitNumber','site','address','addressSource','addressUpdatedAt','installedSiteId','currentLocationType','status','readOnly','placement','placementSource','placementStatus','placementUnitKey','placementAuditId','placementUpdatedAt','recordSource','sourceVerifiedAt','snapshotImportedAt','activeJobNumber','latitude','longitude','coordinateSource','gpsRecordedAt','hasUnitGps','locationVerification','locationVerifiedAt','locationHistoryId','locationNote','gpsAccuracyM','historicalLatitude','historicalLongitude','historicalCoordinateSource','historicalRecordedAt'];
   const rowRevision=row=>JSON.stringify(revisionFields.map(key=>row[key]??null));
   const legacyRevision=state=>JSON.stringify([state.unitKey,state.placement,state.siteLabel,state.streetAddress,state.auditId,state.canMove]);
+  // A newer backend explicitly advertises the existing raw-key writer's native projection.
+  // Health and legacy state are independently refreshed; a proof alone is not writer support.
+  function nativeAliasCapability(snapshot,health,row,key,ids,state){
+    if(snapshot.placementProjectionVersion!==2)return null;
+    const targets=snapshot.nativePlacementAliases;
+    if(!Array.isArray(targets)||targets.length>1000||targets.some(t=>!object(t)||t.contract!=='COS_NATIVE_PLACEMENT_ALIAS_V1'||t.writerContract!=='COS_CAMERA_PLACEMENT_V2'||!uuid(t.unitId)||!text(t.unitNumber)||!text(t.unitKey)||!Array.isArray(t.deviceIds)||!t.deviceIds.length||!t.deviceIds.every(id=>resourceId(id)===id)||new Set(t.deviceIds).size!==t.deviceIds.length||!/^[a-f0-9]{64}$/.test(t.proof)||(t.auditId!==null&&resourceId(t.auditId)!==t.auditId)))fail('Native placement capability is incomplete or incompatible.');
+    const related=targets.filter(t=>t.unitId===row.id||auditKey(t.unitKey)===auditKey(key)||t.deviceIds.some(id=>ids.includes(id)));
+    if(!related.length)return null;
+    const target=related[0],proofs=allIdentities(health).filter(p=>p.unitId===row.id),proof=proofs[0];
+    if(related.length!==1||proofs.length!==1||!['native_provider','owner_confirmed_native'].includes(proof.kind)||target.unitId!==row.id||row.readOnly!==false||target.unitNumber!==row.unitNumber||target.unitKey!==key||proof.unitNumber!==target.unitNumber||proof.proof!==target.proof||!sameSet(target.deviceIds,ids)||!sameSet(proof.deviceIds,ids)||!sameSet(proof.unitKeys,[key])||target.auditId!==state.auditId
+      ||health.rows.filter(r=>!r.trackerOnly&&auditKey(r.unit)===auditKey(key)).some(r=>r.unit!==key)
+      ||health.rows.some(r=>!r.trackerOnly&&placementMatchKey(r.unit)===placementMatchKey(row.unitNumber)&&r.unit!==key)
+      ||snapshot.inventoryItems.some(r=>r.id!==row.id&&[placementMatchKey(key),placementMatchKey(row.unitNumber)].includes(placementMatchKey(r.unitNumber))))fail('The native placement capability or reviewed association changed. Reload the unit.');
+    return {contract:target.contract,writerContract:target.writerContract,unitId:target.unitId,unitNumber:target.unitNumber,unitKey:target.unitKey,deviceIds:[...target.deviceIds].sort(),proof:target.proof,auditId:target.auditId};
+  }
   function resolvePlacement(snapshot,health,state,key){
     if(!stateMatches(state,key))fail('Current camera placement could not be verified.');
     if(!object(snapshot)||!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!object(snapshot.summary)||!Number.isFinite(Date.parse(snapshot.generatedAt))||snapshot.inventoryItems.length>100000||snapshot.items.length>100000)fail('The current Field Map address is unavailable.');
@@ -34,9 +61,9 @@
     if(snapshot.summary.fieldUnits!==items.length||items.some(row=>!inventoryById.has(row.id)||rowRevision(row)!==rowRevision(inventoryById.get(row.id))))fail('The field and equipment inventories are incomplete or disagree.');
     if(!object(health)||health.evidenceVersion!==2||health.identityVersion!==1||!Array.isArray(health.rows)||!Array.isArray(health.unitIdentities)||!Array.isArray(health.identityWarnings)||health.rows.length>100000||health.unitIdentities.length>1000||health.identityWarnings.length>1000)fail('Current equipment identity could not be verified.');
     if(health.rows.some(row=>!object(row)||!text(String(row.id??''))||typeof row.unit!=='string')||new Set(health.rows.map(row=>String(row.id))).size!==health.rows.length)fail('Camera resource identities are inconsistent.');
-    const identities=health.unitIdentities,warnings=health.identityWarnings;
+    const identities=allIdentities(health),warnings=health.identityWarnings;
     for(const identity of identities){
-      if(!object(identity)||!uuid(identity.unitId)||!text(identity.unitNumber)||!['native_provider','owner_placement'].includes(identity.kind)||!Array.isArray(identity.deviceIds)||!identity.deviceIds.length||!identity.deviceIds.every(id=>resourceId(id)===id)||new Set(identity.deviceIds).size!==identity.deviceIds.length||!Array.isArray(identity.unitKeys)||!identity.unitKeys.length||!identity.unitKeys.every(text)||new Set(identity.unitKeys).size!==identity.unitKeys.length||!/^[a-f0-9]{64}$/.test(identity.proof)||identity.kind==='owner_placement'&&resourceId(identity.placementAuditId)!==identity.placementAuditId)fail('Equipment identity proof is malformed.');
+      if(!object(identity)||!uuid(identity.unitId)||!text(identity.unitNumber)||!['native_provider','owner_placement','owner_confirmed_native'].includes(identity.kind)||!Array.isArray(identity.deviceIds)||!identity.deviceIds.length||!identity.deviceIds.every(id=>resourceId(id)===id)||new Set(identity.deviceIds).size!==identity.deviceIds.length||!Array.isArray(identity.unitKeys)||!identity.unitKeys.length||!identity.unitKeys.every(text)||new Set(identity.unitKeys).size!==identity.unitKeys.length||!/^[a-f0-9]{64}$/.test(identity.proof)||identity.kind==='owner_placement'&&resourceId(identity.placementAuditId)!==identity.placementAuditId)fail('Equipment identity proof is malformed.');
     }
     if(new Set(identities.map(identity=>identity.unitId)).size!==identities.length||warnings.some(w=>!object(w)||!text(w.unitId)||!text(w.reason)||!Array.isArray(w.deviceIds)||!w.deviceIds.every(id=>resourceId(id)===id)||!Array.isArray(w.unitKeys)||!w.unitKeys.every(text)))fail('Equipment identity proof is inconsistent.');
     const matchKey=placementMatchKey(key),group=health.rows.filter(row=>!row.trackerOnly&&auditKey(row.unit)===auditKey(key));
@@ -53,6 +80,7 @@
     if(reviews.some(review=>placementMatchKey(review.unitNumber)===matchKey))fail('The unit’s physical placement needs identity review.');
     const identityRevision=JSON.stringify([group.map(item=>[String(item.id),item.unit]).sort((a,b)=>a[0].localeCompare(b[0])),proofs.map(proof=>[proof.unitId,proof.unitNumber,proof.kind,[...proof.deviceIds].sort(),[...proof.unitKeys].sort(),proof.proof,proof.placementAuditId??null])]);
     // A camera-only SHOP control is intentionally absent from the field projection. Keep its existing explicit move path without inventing a native UUID or an address.
+    if(!proofs.length&&!candidates.length&&state.placement==='SHOP'&&!state.streetAddress.trim()&&inventory.some(row=>row.readOnly===false&&placementIdentityConcernKey(row.unitNumber)===placementIdentityConcernKey(key)))fail('A possible existing equipment model or suffix needs explicit Owner identity review before moving this camera.');
     if(!proofs.length&&!candidates.length&&state.placement==='SHOP'&&!state.streetAddress.trim())return {row:null,field:false,newInstallation:true,writerCompatible:true,site:'',address:'',revision:JSON.stringify(['camera_only_shop',key,identityRevision,legacyRevision(state)])};
     let row;
     if(proofs.length){
@@ -84,7 +112,15 @@
       &&row.locationVerification!=='owner_verified'&&row.locationVerifiedAt==null&&row.locationHistoryId==null;
     const explicitOwnerShop=row.placementSource==='owner'&&row.placement==='SHOP';
     if(!field&&!explicitOwnerShop&&(row.installedSiteId!=null||row.locationVerification==='owner_verified'||row.locationVerifiedAt!=null||row.locationHistoryId!=null))fail('The saved installation or verified location needs placement review before deployment.');
-    const newInstallation=state.placement==='SHOP'&&(!field||unassignedTrackerField);
+    // A typed, current imported SHOP presentation may supersede old inferred
+    // provider placement, but never a saved Owner address or placement audit.
+    const imported=row.importedInstallation;
+    const importedShop=row.importedPlacement==='SHOP'&&row.placementSource==null&&row.placement==null&&row.placementAuditId==null
+      &&object(imported)&&imported.nativeUnitId===row.id&&imported.entityKind===(row.readOnly?'tracker':'equipment_unit')
+      &&uuid(imported.sourceRevision)&&resourceId(imported.productId)===imported.productId&&resourceId(imported.eventId)===imported.eventId
+      &&/^[a-f0-9]{64}$/.test(imported.nativeGuardSha256)&&!state.streetAddress.trim();
+    if(row.importedPlacement==='SHOP'&&row.placementSource!=='owner'&&!importedShop)fail('The imported Shop placement proof is incomplete. Reload the unit.');
+    const newInstallation=(state.placement==='SHOP'||importedShop)&&(!field||unassignedTrackerField);
     if(newInstallation&&row.placementSource!=='owner'&&row.activeJobNumber!=null)fail('The current equipment has an active job. Review its placement before deploying it.');
     // Empty recorded details can be repaired. Missing fields/types indicate a broken
     // source contract and must never masquerade as an empty editable installation.
@@ -94,7 +130,8 @@
       if(!resourceId(row.placementAuditId)||row.placementAuditId!==state.auditId||auditKey(row.placementUnitKey)!==auditKey(key)||row.placement!==state.placement||row.placement==='FIELD'&&(row.address!==state.streetAddress||row.site!==state.siteLabel))fail('Camera placement changed while the address was loading. Reload the unit.');
     }else if(state.streetAddress.trim())fail('Camera and Field Map placement revisions disagree. Reload the unit.');
     if(row.locationVerification==='owner_verified'&&(!text(row.address)||!uuid(row.locationHistoryId)||!Number.isFinite(Date.parse(row.locationVerifiedAt))||typeof row.latitude!=='number'||Math.abs(row.latitude)>90||!Number.isFinite(row.latitude)||typeof row.longitude!=='number'||Math.abs(row.longitude)>180||!Number.isFinite(row.longitude)))fail('The verified location record is incomplete.');
-    return {row,field:field&&!newInstallation,newInstallation,writerCompatible:placementMatchKey(row.unitNumber)===matchKey,site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state)])};
+    const nativeAlias=nativeAliasCapability(snapshot,health,row,key,ids,state);
+    return {row,field:field&&!newInstallation,newInstallation,nativeAlias,writerCompatible:placementMatchKey(row.unitNumber)===matchKey||Boolean(nativeAlias),site:newInstallation?'':row.site||'',address:newInstallation?'':row.address||'',revision:JSON.stringify([rowRevision(row),field,newInstallation,identityRevision,legacyRevision(state),nativeAlias])};
   }
   async function readCurrentData(db,key,signal){
     const sessionResult=await db.auth.getSession(),session=sessionResult.data?.session;
@@ -163,6 +200,11 @@
         if(!saved||saved.ok!==true||saved.unit_key!==key||saved.placement!==placement||saved.request_id!==requestId||resourceId(saved.audit_id)!==saved.audit_id)throw new Error('The save receipt was incomplete.');
         const fresh=await db.rpc('owner_camera_unit_placement_state_v2',{p_unit_key:key});
         if(fresh.error||!stateMatches(fresh.data,key)||fresh.data.auditId!==saved.audit_id||fresh.data.placement!==placement||(placement==='FIELD'&&(fresh.data.streetAddress!==address||fresh.data.siteLabel!==site)))throw new Error('Saved placement could not be verified after reload.');
+        if(baseline.nativeAlias){
+          // Never replay a committed write when either database's independent readback is uncertain.
+          const projected=await readCurrent(db,key,requestSignal()),target=projected.nativeAlias,expected=baseline.nativeAlias;
+          if(projected.subject!==baseline.subject||!target||target.unitId!==expected.unitId||target.unitNumber!==expected.unitNumber||target.unitKey!==key||target.proof!==expected.proof||!sameSet(target.deviceIds,expected.deviceIds)||target.auditId!==saved.audit_id||projected.state.auditId!==saved.audit_id||projected.row?.placementAuditId!==saved.audit_id||projected.row?.placementUnitKey!==key||projected.row?.placement!==placement||projected.row?.placementSource!=='owner'||(placement==='FIELD'&&(!projected.field||projected.address!==address||projected.site!==site))||(placement==='SHOP'&&projected.field))throw new Error('Saved placement was not confirmed on exactly one reviewed native map record.');
+        }
         // Placement is committed. Geocoding failure must never be reported as a failed move.
         if(placement==='FIELD'){
           feedback.textContent='Placement saved. Locating the installation address…';

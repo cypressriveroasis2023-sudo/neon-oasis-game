@@ -9,10 +9,31 @@ import {resource,snapshot as evidenceSnapshot} from './fixtures/camera-evidence-
 
 const repo=resolve(fileURLToPath(new URL('../../..',import.meta.url)));
 const origin='http://127.0.0.1:4173';
+const mountedFixtures=new WeakMap();
+test.afterEach(async({page})=>{
+  const fixture=mountedFixtures.get(page.context());if(!fixture)return;
+  expect(fixture.unexpected).toEqual([]);expect(fixture.pageErrors).toEqual([]);
+  expect(fixture.allReads).toHaveLength(fixture.reads.length+fixture.displayReads.length+fixture.mapReads.length);
+  expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);
+});
 async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,native=envelope(),health=healthEnvelope(),legacy=legacyState(),holdNative=false,entry='detail'}={}){
-  const fixture={native,health,holdNative,status:200,reads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
+  const fixture={native,health,holdNative,status:200,reads:[],displayReads:[],mapReads:[],allReads:[],geocodes:[],gates:[],unexpected:[],pageErrors:[]};
+  mountedFixtures.set(page.context(),fixture);
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));page.context().on('page',other=>other.on('pageerror',error=>fixture.pageErrors.push(error.message)));
   await page.context().addInitScript(({role,verifiedIt,active,token,legacy,key})=>{
+    // Fixture-only diagnostics: preserve real fetches, headers, bodies, signals,
+    // and caching while marking the actual initiating script. Timing cannot
+    // distinguish the concurrent Health deep link or post-save display refresh.
+    const actualFetch=window.fetch.bind(window);
+    window.fetch=(input,init)=>{
+      const url=new URL(input instanceof Request?input.url:String(input),location.href);
+      if(url.href!=='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages')return actualFetch(input,init);
+      const stack=new Error().stack||'';
+      const owner=stack.includes('/camera-effective-placement.js')?'display':stack.includes('/camera-placement-controls.js')?'editor':location.pathname==='/tech-checks/operations/dist/index.html'?'map':'unknown';
+      const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined));
+      headers.set('X-Synthetic-Read-Owner',owner);
+      return actualFetch(input,{...init,headers});
+    };
     window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadbackMismatch=false;window.fixtureReadCount=0;
     window.fixtureDevice={id:9101,unit_key:key,device_name:'Synthetic provider label, never a destination',device_type:'camera',monitoring_profile:'solarspotter',organization:legacy.placement==='SHOP'?'root':'Synthetic field organization',source_status:'offline',source:'vigilant_control_center',activation_state:legacy.placement==='SHOP'?'deactivated':'active'};
     window.fixtureDevices=[9101,9102,9103,9104].map(id=>({...fixtureDevice,id,device_name:'Synthetic resource '+id}));window.fixtureDevice=fixtureDevices[0];
@@ -46,22 +67,34 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
       if(path.startsWith(repo+'/')&&existsSync(path))return route.fulfill({path,contentType:{'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg'}[extname(path)]||'application/octet-stream'});
       return route.abort('blockedbyclient');
     }
-    const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
+    const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type, x-synthetic-read-owner'};
     if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
     if(url.href==='https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-field-geocode'){
       fixture.geocodes.push({body:request.postDataJSON(),legacyReads:await page.evaluate(()=>fixtureReadCount)});return route.fulfill({headers,contentType:'application/json',body:'{"ok":true}'});
     }
     if(url.pathname==='/functions/v1/cos-operations-pages'){
-      const body=request.postDataJSON();fixture.reads.push({body,headers:request.headers()});
+      const body=request.postDataJSON(),owner=request.headers()['x-synthetic-read-owner'];
+      const read={body,headers:request.headers(),owner};fixture.allReads.push(read);
+      const recognized=['display','editor','map'].includes(owner)&&(owner!=='map'||entry==='map');
+      if(!recognized||read.headers.authorization!=='Bearer synthetic-only'||request.method()!=='POST'){
+        fixture.unexpected.push({owner,body,reason:'Invalid native read owner, bearer or transport'});return route.fulfill({status:403,headers,body:'{}'});
+      }
+      (owner==='editor'?fixture.reads:owner==='display'?fixture.displayReads:fixture.mapReads).push(read);
       if(!['/api/field-map','/api/camera-health/summary-v3',...(entry==='map'?['/api/session','/api/routers','/api/daily-board','/api/field-map/'+rowId+'/history']:[])].includes(body.path)||body.method!=='GET'){fixture.unexpected.push(body);return route.fulfill({status:400,headers,body:'{}'});}
+      if(!(active&&(role==='owner'||role==='it'&&verifiedIt))){read.status=403;return route.fulfill({status:403,headers,contentType:'application/json',body:'{"error":"Synthetic native read denied"}'});}
       const data=structuredClone(body.path==='/api/field-map'?fixture.native:body.path==='/api/camera-health/summary-v3'?fixture.health:body.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}:body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:body.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]}),status=fixture.status;
-      if(fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
-      return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
+      if(owner==='editor'&&fixture.holdNative&&body.path==='/api/field-map')await new Promise(resolve=>fixture.gates.push(resolve));
+      read.status=status;return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
     }
     return route.abort('blockedbyclient');
   });
   await page.goto(origin+(entry==='map'?'/synthetic-map-entry':entry==='health'?'/tech-checks/camera-health.html?unit='+encodeURIComponent(key)+'&action=edit-field':'/tech-checks/camera-detail.html?id=9101'));
-  if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else await expect(page.frameLocator('iframe').locator('.field-map-workspace')).toBeVisible();return fixture;
+  if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else await expect(page.frameLocator('iframe').locator('.field-map-workspace')).toBeVisible();
+  if(entry!=='map'){
+    await expect.poll(()=>page.evaluate(()=>['ready','unresolved','unavailable'].includes(CameraEffectivePlacement.get(fixtureDevice)?.status))).toBe(true);
+    if(token){expect(fixture.displayReads.map(read=>read.body.path).sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map']);expect(fixture.displayReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);}
+  }
+  return fixture;
 }
 const inputs=page=>({site:page.locator('.cos-placement-dialog [name=site]'),address:page.locator('.cos-placement-dialog [name=address]'),reason:page.locator('.cos-placement-dialog [name=reason]'),confirmed:page.locator('.cos-placement-dialog [name=confirmed]'),save:page.getByRole('button',{name:'Save placement',exact:true}),cancel:page.getByRole('button',{name:'Cancel',exact:true})});
 const mutations=page=>page.evaluate(()=>fixtureCalls.filter(call=>call.name==='owner_set_camera_unit_placement_v2'));
@@ -75,7 +108,7 @@ async function held(page,fixture){await expect(page.locator('.placement-feedback
 
 for(const role of ['owner','it'])test(role+' opens stale native/provider FIELD import from the actual Shop action with an explicit blank destination',async({page},info)=>{
   const fixture=await mount(page,{role}),before=structuredClone(fixture.native);await open(page);const form=await blank(page);
-  expect(fieldReads(fixture)).toHaveLength(1);expect(fixture.reads.every(read=>read.headers.authorization==='Bearer synthetic-only')).toBe(true);
+  expect(fieldReads(fixture)).toHaveLength(1);expect(fixture.allReads.every(read=>read.headers.authorization==='Bearer synthetic-only')).toBe(true);
   const bounds=await page.locator('.cos-placement-dialog').boundingBox();expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(page.viewportSize().width);expect(bounds.height).toBeLessThanOrEqual(page.viewportSize().height);
   await page.screenshot({path:info.outputPath('synthetic-shop-field-'+role+'.png')});await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(fixture.native).toEqual(before);await noWrites(page,fixture);
 });
@@ -148,10 +181,10 @@ test('a pending fresh read locks duplicate submissions and Cancel until it compl
 });
 
 for(const [role,verifiedIt,active] of [['it',false,true],['service',false,true],['owner',true,false]])test(role+' active='+active+' verifiedIT='+verifiedIt+' keeps existing placement permissions',async({page})=>{
-  const fixture=await mount(page,{role,verifiedIt,active});await expect(page.locator('#moveShopBtn')).not.toBeVisible();await expect(page.locator('#editFieldBtn')).not.toBeVisible();expect(fixture.reads).toEqual([]);await noWrites(page,fixture);
+  const fixture=await mount(page,{role,verifiedIt,active});await expect(page.locator('#moveShopBtn')).not.toBeVisible();await expect(page.locator('#editFieldBtn')).not.toBeVisible();expect(fixture.reads).toEqual([]);expect(fixture.displayReads).toHaveLength(2);expect(fixture.displayReads.every(read=>read.status===403)).toBe(true);expect(await page.evaluate(()=>CameraEffectivePlacement.get(fixtureDevice).status)).toBe('unavailable');await noWrites(page,fixture);
 });
 
-test('a missing bearer never unlocks the Shop form',async({page})=>{const fixture=await mount(page,{token:false});await open(page);await held(page,fixture);expect(fixture.reads).toEqual([]);});
+test('a missing bearer never unlocks the Shop form',async({page})=>{const fixture=await mount(page,{token:false});await open(page);await held(page,fixture);expect(fixture.allReads).toEqual([]);});
 
 for(const [flag,feedback] of [['fixtureWriteDenied',/Synthetic writer denied/],['fixtureReadbackMismatch',/could not be verified/i]])test(flag+' never replays an uncertain write or starts geocoding',async({page})=>{
   const fixture=await mount(page);await open(page);const form=await complete(page);await page.evaluate(flag=>window[flag]=true,flag);await form.save.click();await expect(page.locator('.placement-feedback')).toContainText(feedback);await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));expect(await mutations(page)).toHaveLength(1);expect(fixture.geocodes).toEqual([]);await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
@@ -189,7 +222,7 @@ for(const role of ['owner','it'])test(role+' actual camera-card edit-field deep 
 });
 
 test('unverified IT camera-card edit-field deep link does not open an editor',async({page})=>{
-  const fixture=await mount(page,{role:'it',verifiedIt:false,legacy:legacyState({placement:'FIELD'}),entry:'health'});await expect(page.locator('#unitDetailTitle')).toHaveText(key);await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(fixture.reads).toEqual([]);await noWrites(page,fixture);
+  const fixture=await mount(page,{role:'it',verifiedIt:false,legacy:legacyState({placement:'FIELD'}),entry:'health'});await expect(page.locator('#unitDetailTitle')).toHaveText(key);await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(fixture.reads).toEqual([]);expect(fixture.displayReads).toHaveLength(2);expect(fixture.displayReads.every(read=>read.status===403)).toBe(true);await noWrites(page,fixture);
 });
 
 test('actual native map marker reaches matching Camera Health resource and its incomplete field editor',async({page},info)=>{

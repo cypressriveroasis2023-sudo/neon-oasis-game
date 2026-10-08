@@ -1,3 +1,4 @@
+// 2026-10-08 reviewed read-only effective placement adapter; exact identity, stale read and actual-entry browser coverage.
 // 2026-10-08 reviewed SHOP/new-installation and incomplete-field repair cache tag; isolated regressions cover the flows.
 // 2026-10-08 reviewed address-editor cache version; authenticated prefill/no-op/race coverage is in camera-placement-prefill tests.
 // 2026-10-08 scoped IP/revision-bound diagnostics and sanitized reports; source/port/export/browser regressions added.
@@ -19,14 +20,14 @@ import test from 'node:test';
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
-  "camera-health": "6b60be0563f75168ea1f23d7f89028572c22ab7d9cfd47c2928b7ca2265d7730",
-  "camera-detail": "1ec483ce3b680662a80acc4140b94b42dd9e1311ab4618c7c1244b26cc09cb28",
+  "camera-health": "eaea57f2fd5cc7a5544938675eda253ee7e36378a8650460edaf2630ac7195af",
+  "camera-detail": "049804704c26ca94eafd98b4caee7c99937366c8e8548f10bb8f39874716b4e0",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
-  "camera-health": "39451b9d059270de25c9b558cd6c943b1c53baf21bcdde1e7f102377c82f31ac",
-  "camera-detail": "19c96089e99a8b719ca03cbccae3479e12871fc034358b9f7857c2855dc8e5be",
+  "camera-health": "51a4a0d2fb522938fbc844d7f79b25aa585e4acc604f7aa0e6365e1ec196cce4",
+  "camera-detail": "732b46d9a3ee49f58c6a95dc7bd3fadee5c9f9a9225119f2d289409612326467",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };
@@ -35,6 +36,7 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
     const html=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
+    if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
     const preserved=html.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
