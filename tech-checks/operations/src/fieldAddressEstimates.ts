@@ -1,5 +1,5 @@
 import {checkedImportedBinding} from '../../supabase/functions/cos-operations-pages/importedSourceProjection';
-import {matchesInstallation} from '../../supabase/functions/cos-operations-pages/importedAddressContract';
+import {matchesInstallation,fullMatchedParts} from '../../supabase/functions/cos-operations-pages/importedAddressContract';
 import { checkedReviewedAddressEstimate, reviewedEstimatePrefix, reviewedEstimateSource, type ReviewedAddressEstimate } from '../shared/reviewedAddressEstimates';
 import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { isCurrentFieldPin, normalizeLocationAddress, type FieldLocation } from './fieldLocations';
@@ -74,8 +74,8 @@ export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Pr
       ||!['rooftop','range_interpolation'].includes(automatic.accuracyType)||typeof automatic.accuracy!=='number'||!Number.isFinite(automatic.accuracy)||automatic.accuracy<0.9||automatic.accuracy>1
       ||![null,'building_centroid','parcel_centroid'].includes(automatic.matchType??null)||automatic.accuracyType==='range_interpolation'&&automatic.matchType!=null
       ||!text(automatic.matchedAddress,600)||!date(automatic.geocodedAt,now)||!hasGpsCoordinates(automatic)||typeof automatic.latitude!=='number'||typeof automatic.longitude!=='number')return null;
-    const original=addressParts(unit.address),matched=addressParts(automatic.matchedAddress);
-    if(!original||!matched||JSON.stringify(original)!==JSON.stringify(matched)||/(\d{5}(?:-\d{4})?)\s*$/.exec(unit.address)?.[1]!==/(\d{5}(?:-\d{4})?)\s*$/.exec(automatic.matchedAddress)?.[1])return null;
+    const original=fullMatchedParts(unit.address);
+    if(!original||!matchesInstallation(original,automatic.matchedAddress))return null;
     const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalizeLocationAddress(unit.address)))),x=>x.toString(16).padStart(2,'0')).join('');
     if(digest!==automatic.addressSha256)return null;
     return {latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'automatic_address_estimate',source:'geocodio_automatic_address_estimate',provider:'geocodio',accuracyType:automatic.accuracyType,accuracy:automatic.accuracy,matchType:automatic.matchType??null};

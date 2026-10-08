@@ -15,9 +15,25 @@ export function fullMatchedParts(value:unknown):Parts|null{
  const p=parseAddress(value);if(!p||typeof value!=='string'||unsafe.test(value))return null;
  const zip=/(\d{5}(?:-\d{4})?)\s*$/.exec(value)?.[1];return zip?{...p,zip}:null;
 }
+/** Basic US geocoders may return ZIP5 for a supplied ZIP+4. Never alter source bindings. */
+export function usPostalCode(value:unknown):string|null{
+ // A numeric value cannot prove a leading zero. Accept only lossless five-digit integers.
+ if(typeof value==='number')return Number.isInteger(value)&&value>=10000&&value<=99999?String(value):null;
+ return typeof value==='string'&&/^\d{5}(?:-\d{4})?$/.test(value)?value:null;
+}
+export function sameUsPostalCode(left:unknown,right:unknown):boolean{
+ const a=usPostalCode(left),b=usPostalCode(right);
+ return a!==null&&b!==null&&a.slice(0,5)===b.slice(0,5)&&(a.length===5||b.length===5||a===b);
+}
+export const geocodeRejectionReasons=['provider_empty','ambiguous_results','provider_warning','invalid_components','component_mismatch','formatted_address_mismatch','unsupported_method','low_accuracy','invalid_coordinates','provider_rejected'] as const;
+export type GeocodeRejectionReason=typeof geocodeRejectionReasons[number];
+export function safeGeocodeRejectionReason(value:unknown):GeocodeRejectionReason|null{
+ return geocodeRejectionReasons.find(reason=>reason===value)??null;
+}
 export function matchesInstallation(expected:Installation,matchedAddress:unknown):boolean{
  if(!validInstallation(expected))return false;const actual=fullMatchedParts(matchedAddress);if(!actual)return false;
- return compareAddress({street:expected.street,city:expected.city??actual.city,state:expected.state,zip:expected.zip??actual.zip},actual);
+ if(expected.zip!==null&&!sameUsPostalCode(expected.zip,actual.zip))return false;
+ return compareAddress({street:expected.street,city:expected.city??actual.city,state:expected.state,zip:actual.zip},actual);
 }
 /** Separate structured Census adapter; original Owner-address parser/contract remains byte-for-byte unchanged. */
 export async function censusInstallation(parts:Installation,requestFetch:typeof fetch=fetch):Promise<GeoResult>{
@@ -32,10 +48,14 @@ export async function censusInstallation(parts:Installation,requestFetch:typeof 
   const reader=response.body?.getReader();if(!reader)throw Error();let size=0;const chunks:Uint8Array[]=[];
   while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>262144){await reader.cancel();throw Error();}chunks.push(value);}
   const joined=new Uint8Array(size);let offset=0;for(const c of chunks){joined.set(c,offset);offset+=c.length;}
-  const matches=JSON.parse(new TextDecoder().decode(joined))?.result?.addressMatches;
-  if(!Array.isArray(matches))throw Error();if(matches.length!==1)return {status:'no_match',reason:'no_match'};
+  let payload:unknown;try{payload=JSON.parse(new TextDecoder().decode(joined));}catch{return {status:'provider_error',reason:'invalid_response'};}
+  const matches=(payload as {result?:{addressMatches?:unknown}})?.result?.addressMatches;
+  if(!Array.isArray(matches))return {status:'provider_error',reason:'invalid_response'};
+  if(matches.length!==1)return {status:'no_match',reason:matches.length?'ambiguous_results':'provider_empty'};
   const m=matches[0],lat=m?.coordinates?.y,lng=m?.coordinates?.x;
-  if(!matchesInstallation(parts,m?.matchedAddress)||typeof lat!=='number'||!Number.isFinite(lat)||Math.abs(lat)>90||typeof lng!=='number'||!Number.isFinite(lng)||Math.abs(lng)>180)return {status:'no_match',reason:'no_match'};
+  if(!fullMatchedParts(m?.matchedAddress))return {status:'no_match',reason:'invalid_components'};
+  if(!matchesInstallation(parts,m.matchedAddress))return {status:'no_match',reason:'component_mismatch'};
+  if(typeof lat!=='number'||!Number.isFinite(lat)||Math.abs(lat)>90||typeof lng!=='number'||!Number.isFinite(lng)||Math.abs(lng)>180)return {status:'no_match',reason:'invalid_coordinates'};
   return {status:'success',reason:'Approximate address-range location.',latitude:lat,longitude:lng,matchedAddress:m.matchedAddress};
  }catch{return {status:'provider_error',reason:controller.signal.aborted?'provider_timeout':'provider_unavailable'};}
  finally{clearTimeout(timer);controller.abort();}

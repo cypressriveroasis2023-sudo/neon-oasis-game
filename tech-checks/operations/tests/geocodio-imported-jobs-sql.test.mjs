@@ -219,9 +219,10 @@ test('disabled paid config exposes honest deferred state while imported Census s
  assert.deepEqual(await rpc('list_due'),[]);assert.equal((await geoReserve(a)).reason,'configuration_unavailable');assert.equal(await credits(db),0);
 });
 
-test('extension preserves every original Owner fallback RPC byte-for-byte and strict job constraints',async()=>{
+test('imported extension preserves basic Owner RPCs except the scoped retry reserve barrier',async()=>{
  const definitions=(await db.query("select p.proname,pg_get_functiondef(p.oid) body from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'cos_field_geocode_fallback_%' order by p.proname")).rows;
- assert.deepEqual(definitions,db.fixtureOwnerDefinitions);
+ assert.deepEqual(definitions.filter(x=>x.proname!=='cos_field_geocode_fallback_reserve'),db.fixtureOwnerDefinitions.filter(x=>x.proname!=='cos_field_geocode_fallback_reserve'));
+ assert.match(definitions.find(x=>x.proname==='cos_field_geocode_fallback_reserve').body,/Shared-address barrier/);
  const a=dto();await sync([a]);await censusNoMatch(a);const r=await geoReserve(a);
  await assert.rejects(db.query("update app_private.cos_geocodio_reservations set job_kind='owner_audit' where reservation_token=$1",[r.reservationToken]));
  await assert.rejects(db.query('update app_private.cos_geocodio_reservations set audit_id=$1 where reservation_token=$2',['123',r.reservationToken]));
