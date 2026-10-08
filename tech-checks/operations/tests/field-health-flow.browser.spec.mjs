@@ -210,9 +210,11 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-site-leader')).toHaveCount(3);
- await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(43, 255, 53)');
- await expect(frame.locator('.cos-field-pin[data-health="offline"] .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(255, 39, 52)');
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(21, 168, 255)');
+ await expect(frame.locator('.cos-cluster-support')).not.toBeVisible();
+ await expect(frame.locator('.cos-reticle-lens')).toHaveCount(2);await expect(frame.locator('.cos-reticle-solar-panel')).toHaveCount(1);await expect(frame.locator('.cos-pin-unit-number')).toHaveText(['51','52','044']);
+ await expect(frame.locator(' .cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
+ await expect(frame.locator(' .cos-field-pin[data-health="offline"] .cos-reticle-artwork')).toHaveCSS('color','rgb(255, 39, 52)');
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
  await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-same-site.png')});
  await frame.locator('.cos-field-pin-support').click();
@@ -221,12 +223,14 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await frame.locator('.leaflet-popup-close-button').click();
  await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
  await expect(frame.locator('.field-map-workspace')).toHaveClass(/field-map-tv/);
- await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect();const map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect();return box.top>=map.top&&box.bottom<legend.top&&box.left>=map.left&&box.right<=map.right;});})).toBe(true);
+ await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect();const map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<legend.top&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
  await page.screenshot({path:info.outputPath('approved-reticles-tv.png')});
  await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
  await page.clock.fastForward(16*60*1000);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(21, 168, 255)');
+ await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-reticle-lens')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-pin-unit-number')).toHaveText(['51','52']);
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
+ await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-lenses-grey-unknown.png')});
  expect(state.writes).toHaveLength(0);
 });
 
@@ -248,8 +252,14 @@ test('larger shared sites keep all nine unit markers and the stand selectable',a
  await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('0 cameras');
  await frame.locator('.leaflet-popup-close-button').click();
- await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect();return box.top>=map.top&&box.bottom<legend.top&&box.left>=map.left&&box.right<=map.right;});})).toBe(true);
+ await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<legend.top&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
+ await expect(frame.locator('.cos-pin-unit-number')).toHaveCount(9);
+ const clearLabels=await frame.locator('.field-map-center').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')];const decorations=[...el.querySelectorAll('.cos-field-cluster,.cos-cluster-caption,.cos-cluster-support,.field-pin-label')].filter(node=>node.getClientRects().length);const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return decorations.every(node=>!overlaps(label,node.getBoundingClientRect()))&&pins.every((other,j)=>i===j||!overlaps(label,other.querySelector('.cos-reticle-artwork').getBoundingClientRect())&&!overlaps(label,other.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});expect(clearLabels).toBe(true);
  await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});
+ await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<legend.top&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
+ await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units-tv.png')});
+ await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
  expect(state.writes).toHaveLength(0);
 });
 

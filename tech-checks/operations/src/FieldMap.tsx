@@ -263,15 +263,15 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     markersRef.current.clear();clusterButtons.current.clear();clusterMarkers.current=[];
     const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
-    const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44);
+    const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44,16);
     for(const group of groups){
-      const offsets=map.getZoom()>=17?expandedGroupOffsets(group.length):[];
+      const offsets=map.getZoom()>=17?expandedGroupOffsets(group.length,tvMode&&window.innerWidth>700?1.18:1):[];
       if(group.length>1){
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
         const first=points[0];
         const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[healthById.get(item.id)?.state||'unknown']++);
-        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap',html:clusterReticleMarkup(counts,group.filter(({item})=>Boolean(estimateFor(item))).length,group.filter(({item})=>!hasCoords(item)&&!estimateFor(item)).length),iconSize:[44,44],iconAnchor:[22,22]})});
+        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap'+(offsets.length?' cos-field-cluster-expanded':''),html:clusterReticleMarkup(counts,group.filter(({item})=>Boolean(estimateFor(item))).length,group.filter(({item})=>!hasCoords(item)&&!estimateFor(item)).length),iconSize:[44,44],iconAnchor:[22,22]})});
         const popup=document.createElement('div');popup.className='field-cluster-list';
         const heading=document.createElement('strong');heading.textContent=group.length+' units here';popup.append(heading);const summary=document.createElement('p');summary.className='field-cluster-summary';popup.append(summary);
         const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;pendingPopup.current='';popupSelection.current='';map.closePopup();map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);
@@ -300,7 +300,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
         })
       });
       const label=document.createElement('span');label.textContent=unit.unitNumber;
-      marker.bindTooltip(label,{direction:'top',permanent:unit.id===selectedId,className:'field-pin-label'});
+      marker.bindTooltip(label,{direction:'top',permanent:unit.id===selectedId&&!offsets.length,className:'field-pin-label'});
       marker.bindPopup(gpsPopup(document, unit));
       markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {if(isSupportEquipment(unit))pendingPopup.current=unit.id;restoreViewport.current=true;setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});if(!isSupportEquipment(unit))openUnitHealth?.(unit.id);} });

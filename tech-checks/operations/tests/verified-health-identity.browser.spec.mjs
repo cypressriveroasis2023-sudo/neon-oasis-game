@@ -70,8 +70,8 @@ test('Owner proof colors only its exact four IPCs; shared HDC label remains gray
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="online"]')})).toHaveAttribute('title',labels.owner+' · CAMERA RECORDS ONLINE');
  await expect(frame.locator('.cos-field-pin-wrap').filter({has:frame.locator('.cos-field-pin[data-health="unknown"]')})).toHaveAttribute('title',labels.unlinked+' · Camera status unverified');
- await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(43, 255, 53)');
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(21, 168, 255)');
+ await expect(frame.locator('.cos-field-pin[data-health="online"] .cos-reticle-artwork')).toHaveCSS('color','rgb(43, 255, 53)');
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await frame.locator('.cos-field-pin-support').click();
  await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');
  await expect(frame.locator('.field-map-detail h2')).toHaveText(labels.stand);
@@ -178,7 +178,7 @@ test('15-minute saved-data polling stays unchanged and observations older than 2
  const baseline=summaryReads();await page.clock.fastForward(14*60*1000);expect(summaryReads()).toBe(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  await page.clock.fastForward(60*1000);await expect.poll(summaryReads).toBe(baseline+1);
  await page.clock.fastForward(60*1000);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-ring')).toHaveCSS('border-top-color','rgb(21, 168, 255)');await expect(frame.locator('.field-map-display-bar')).toContainText('Saved status refreshes every 15 minutes');
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await expect(frame.locator('.field-map-display-bar')).toContainText('Saved status refreshes every 15 minutes');
  noWrites(state);
 });
 
