@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
 
-const origin = 'http://127.0.0.1:4173';
+const origin = process.env.COS_MAP_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const stamp = '2026-10-06T16:00:00Z';
 // This full-sized fleet exists only in intercepted fixtures. No live reads or writes.

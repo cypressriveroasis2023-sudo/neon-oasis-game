@@ -19,3 +19,5 @@
 .field-map-workspace.field-map-tv>.field-map-layout{height:100%!important;min-height:0!important;max-height:none!important}
 
 .field-cluster-list{min-width:0;overflow-wrap:anywhere}.field-cluster-list button{overflow-wrap:anywhere;box-sizing:border-box}.field-map-workspace .leaflet-popup-content{max-width:calc(100vw - 100px)}
+.field-map-display-bar{min-width:0;box-sizing:border-box}.field-map-display-bar>div{min-width:0;overflow-wrap:anywhere}
+.field-map-workspace{min-width:0;grid-template-columns:minmax(0,1fr)}.field-map-toolbar>input,.field-map-toolbar>select{min-width:0;max-width:100%;box-sizing:border-box}

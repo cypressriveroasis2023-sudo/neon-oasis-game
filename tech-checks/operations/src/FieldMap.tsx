@@ -259,7 +259,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
         const first=points[0];
         const approximate=group.some(({item})=>!hasCoords(item));
-        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap',html:'<span class="cos-field-cluster'+(approximate?' cos-field-cluster-approximate':'')+'">'+group.length+'</span>',iconSize:[40,40],iconAnchor:[20,20]})});
+        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap',html:'<span class="cos-field-cluster'+(approximate?' cos-field-cluster-approximate':'')+'" data-estimate-count="'+group.filter(({item})=>Boolean(estimateFor(item))).length+'">'+group.length+'</span>',iconSize:[40,40],iconAnchor:[20,20]})});
         const popup=document.createElement('div');popup.className='field-cluster-list';
         const heading=document.createElement('strong');heading.textContent=group.length+' units here';popup.append(heading);const summary=document.createElement('p');summary.className='field-cluster-summary';popup.append(summary);
         const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);

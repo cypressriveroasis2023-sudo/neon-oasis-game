@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
-const origin='http://127.0.0.1:4173',now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
+const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173',now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
 const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333','44444444-4444-4444-8444-444444444444'];
 const source='us_census_address_range_estimate',prefix='COS_ADDRESS_ESTIMATE_V1|',address='100 Example Road, Test City, TX 77001';
 function estimate(id,number,patch={}){
@@ -37,17 +37,19 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
  });
  await page.goto('/address-estimate-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(4);return {frame,state};
 }
+const mappedCount=frame=>frame.locator('.field-map-canvas').evaluate(el=>el.querySelectorAll('.cos-field-pin').length+[...el.querySelectorAll('.cos-field-cluster')].reduce((n,node)=>n+Number(node.textContent),0));
+const estimatedCount=frame=>frame.locator('.field-map-canvas').evaluate(el=>el.querySelectorAll('.cos-field-pin-estimate').length+[...el.querySelectorAll('.cos-field-cluster')].reduce((n,node)=>n+Number(node.dataset.estimateCount||0),0));
 test('exact address estimates are visible by default, separate from health and verified pins',async({page},info)=>{
  const {frame,state}=await mount(page);
- await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
- const first=frame.locator('.cos-field-pin-estimate').filter({hasText:'901'}),second=frame.locator('.cos-field-pin-estimate').filter({hasText:'902'});
- await expect(first).toHaveCSS('background-color','rgb(53, 212, 138)');await expect(second).toHaveCSS('background-color','rgb(255, 115, 125)');await expect(first).toHaveCSS('border-top-style','dashed');
+ await expect.poll(()=>mappedCount(frame)).toBe(3);await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
+ const cluster=frame.locator('.cos-field-cluster');await expect(cluster).toHaveText('2');await expect(cluster).toHaveCSS('border-top-style','dashed');await expect(cluster).toHaveCSS('border-top-color','rgb(255, 115, 125)');
+ await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 901'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 902'})).toContainText('IP / PORT OFFLINE');await expect(frame.locator('.field-cluster-list')).toContainText('ADDRESS ESTIMATE');
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[0]+'"]')).toHaveCount(0);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[2]+'"]')).toHaveCount(1);
  await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');await expect(frame.locator('.field-map-detail')).toContainText('U.S. Census address-range estimate');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
  await expect(frame.locator('.field-map-kpis article').nth(1).locator('b')).toHaveText('1');
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.field-map-center').screenshot({path:info.outputPath('address-estimate-pins.png')});
- await frame.getByLabel('Nearby unit center').selectOption(ids[2]);await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(0);await frame.getByLabel('Nearby unit center').selectOption('');await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);
- state.offline=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(first).toHaveCSS('background-color','rgb(255, 115, 125)');await expect(first).toContainText('EST');expect(state.writes).toHaveLength(0);
+ await frame.getByLabel('Nearby unit center').selectOption(ids[2]);await expect.poll(()=>estimatedCount(frame)).toBe(0);await frame.getByLabel('Nearby unit center').selectOption('');await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ state.offline=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(cluster).toHaveCSS('border-top-color','rgb(255, 115, 125)');await expect.poll(()=>estimatedCount(frame)).toBe(2);expect(state.writes).toHaveLength(0);
 });
 test('new address snapshot removes stale estimate and pending validation cannot restore it',async({page})=>{
  const {frame,state}=await mount(page,{holdHashes:true});
@@ -56,11 +58,11 @@ test('new address snapshot removes stale estimate and pending validation cannot 
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>state.reads).toBe(2);
  await expect.poll(()=>frame.locator('body').evaluate(()=>window.__hashResolvers.length)).toBe(4);
  await frame.locator('body').evaluate(()=>window.__hashResolvers.splice(0).reverse().forEach(resolve=>resolve()));
- await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(1);expect(state.writes).toHaveLength(0);
+ await expect.poll(()=>estimatedCount(frame)).toBe(0);await expect(frame.locator('.cos-field-pin')).toHaveCount(1);expect(state.writes).toHaveLength(0);
 });
 for(const noEstimates of [false,true])test('restored map viewport survives asynchronous validation '+(noEstimates?'without estimates':'with estimates'),async({page})=>{
  const {frame}=await mount(page,{restored:true,noEstimates});
- await expect(frame.locator('.cos-field-pin')).toHaveCount(noEstimates?1:3);
+ await expect.poll(()=>mappedCount(frame)).toBe(noEstimates?1:3);
  await page.clock.runFor(1000);
  const view=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);
  expect(view.center).toEqual([28,-94]);expect(view.zoom).toBe(6);
@@ -71,19 +73,19 @@ test('user viewport changes while hashes are pending are not replaced by late es
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.leaflet-control-zoom-in').click();await page.clock.runFor(1000);
  const before=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);
  await frame.locator('body').evaluate(()=>window.__hashResolvers.splice(0).forEach(resolve=>resolve()));
- await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);await page.clock.runFor(1000);
+ await expect.poll(()=>estimatedCount(frame)).toBe(2);await page.clock.runFor(1000);
  const after=await frame.locator('body').evaluate(()=>history.state.cosFieldMapView);expect(after.center).toEqual(before.center);expect(after.zoom).toBe(before.zoom);
 });
 
 test('registered unit renders its bound estimate and removes it after the installation address changes',async({page})=>{
  const {frame,state}=await mount(page,{registered:true});
- await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);
+ await expect.poll(()=>estimatedCount(frame)).toBe(2);
  await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
  await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');
  await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(1);
  state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001'};
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(1);
+ await expect.poll(()=>estimatedCount(frame)).toBe(1);
  expect(state.writes).toHaveLength(0);
 });
 test('automatic address lookup displays pending, approximate pin, new address invalidation and actionable failure',async({page})=>{
@@ -93,7 +95,7 @@ test('automatic address lookup displays pending, approximate pin, new address in
  await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('lookup is pending');
  const geocode={status:'success',auditId:'41',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:fresh,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex')};
  state.units[0]={...state.units[0],locationGeocode:geocode};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30, -95');await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(2);
+ await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30, -95');await expect.poll(()=>estimatedCount(frame)).toBe(2);
  state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001',placementAuditId:'42',locationGeocode:{status:'invalid_address'}};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect(frame.locator('.cos-field-pin-estimate')).toHaveCount(1);await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('complete installation street, city, state and ZIP');expect(state.writes).toHaveLength(0);
+ await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('complete installation street, city, state and ZIP');expect(state.writes).toHaveLength(0);
 });
