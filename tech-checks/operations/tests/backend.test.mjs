@@ -28,6 +28,11 @@ function transport(scenario, calls) {
     if (['jobs','equipment_units','owner_tasks','job_visits','quotes','invoices','purchase_orders','customers','sites','equipment_models'].some(table=>url.includes('/rest/v1/'+table+'?'))) return json(scenario.outsideOrg ? [] : [{id:recordId,job_number:'COS 001'}]);
     if (url.includes('/rest/v1/rpc/')) {
       if (scenario.rpcDenied) return json({message:'Native department or workflow guard rejected the request'},400);
+      if (url.endsWith('/rpc/cos_technician_visible_visits')) {
+        const payload=JSON.parse(init.body);
+        assert.equal(payload.p_actor_user_id,mappedActor);assert.equal(payload.p_organization_id,orgId);assert.deepEqual(payload.p_visit_ids,[recordId]);
+        return json(scenario.otherAssignee?[]:[recordId]);
+      }
       if (url.endsWith('/rpc/appdeploy_technician_visit_snapshot')) return json({visit:{id:recordId},execution:{id:recordId,status:'not_started'},current_step:{title:'Native Step',instruction:'Native instruction',step_type:'yes_no',validation_schema:{hidden:true},evidence_requirements:{hidden:true}}});
       if (url.endsWith('/rpc/appdeploy_owner_jobs_snapshot')) return json({items:[{id:recordId,visitId:recordId,jobNumber:'COS 001'}]});
       return json({items:[],ok:true,id:recordId});
@@ -102,7 +107,7 @@ const cases = [
  ['unauthorized removal denied', '/api/jobs/'+recordId+'/remove', 'POST', {confirmation:'DELETE COS 001'}, 403, {role:'service'}],
  ['wrong exact removal confirmation denied', '/api/jobs/'+recordId+'/remove', 'POST', {confirmation:'DELETE COS 002'}, 400],
  ['native removal maps authoritative guard', '/api/jobs/'+recordId+'/remove', 'POST', {confirmation:'DELETE COS 001'}, 200],
- ['technician cannot inspect Owner session', '/api/session','GET',{},403,{userId:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'}],
+ ['verified IT fleet session never borrows Owner identity', '/api/session','GET',{},200,{userId:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'}],
  ['Owner cannot borrow technician queue', '/api/tech/my-day','GET',{},403],
  ['unmapped technician keeps legacy access', '/api/tech/session','GET',{},200,{userId:'b9465a4e-c003-4205-8154-56792c9cfed9',role:'service'}],
  ['unmapped technician cannot load platform queue', '/api/tech/my-day','GET',{},403,{userId:'b9465a4e-c003-4205-8154-56792c9cfed9',role:'service'}],
@@ -164,7 +169,8 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     const data=await response.json();
     if(response.status!==status)throw new Error('Expected '+status+', received '+response.status+': '+JSON.stringify(data));
     const rpcCalls=calls.filter(c=>c.url.includes('/rest/v1/rpc/'));
-    if(status>=400&&!scenario.rpcDenied&&rpcCalls.length)throw new Error('Rejected request reached a native RPC.');
+    if(status>=400&&!scenario.rpcDenied&&rpcCalls.some(call=>!call.url.endsWith('/rpc/cos_technician_visible_visits')))throw new Error('Rejected request reached a native RPC other than the current access check.');
+    if(name==='verified IT fleet session never borrows Owner identity'){assert.equal(data.authorized,true);assert.equal(data.role,'IT');assert.equal(data.legacyOwner,false);assert.equal(data.productionOwnerUserId,null);assert.equal(data.features.fleetAccess,true);assert.equal(data.features.fieldLocationVerification,false);}
     if(name==='linked technician session'&&(data.productionTechnicianUserId!==technicians[scenario.userId].actorId||data.legacyTechnician!==true))throw new Error('Technician did not use their own actor.');
     if(name==='linked technician day'||name==='linked technician tasks') {
       if(rpcCalls.at(-1).body.p_actor_user_id!==technicians[scenario.userId].actorId)throw new Error('Technician borrowed another actor.');

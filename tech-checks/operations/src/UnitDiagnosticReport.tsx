@@ -4,7 +4,7 @@ import {unitDiagnosticReport,unitDiagnosticFilename,unitDiagnosticNextStep,type 
 
 export default function UnitDiagnosticReport(props:UnitDiagnosticInput){
   const text=unitDiagnosticReport(props),[notice,setNotice]=useState(''),[copying,setCopying]=useState(false);
-  const path=unitDiagnosticsPath(props.unit);
+  const path=unitDiagnosticsPath(props.unit,props.rows);
   useEffect(()=>{setNotice('');},[props.unit.id,text]);
   const copy=async()=>{
     if(copying)return;setCopying(true);

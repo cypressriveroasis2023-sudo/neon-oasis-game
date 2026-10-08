@@ -43,3 +43,4 @@ export function readVrmPortalConfig(value: unknown): VrmUnit[] {
     return { ...expected, portalUrl: item.portalUrl, embedUrl: item.embedUrl };
   });
 }
+
