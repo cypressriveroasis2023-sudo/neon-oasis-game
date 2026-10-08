@@ -1,4 +1,4 @@
-import {clusterMapPoints,mapSymbol} from './fieldMapMarkers';
+import {clusterMapPoints,mapReticleMarkup,clusterReticleMarkup,expandedGroupOffsets,fieldReticleColors as cameraColors} from './fieldMapMarkers';
 import {fieldMapLabelMatches} from './fieldMapNavigation';
 import {automaticRefreshDue} from './refreshCadence';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,7 +8,7 @@ import { locationTag, locationExplanation, installationAddressLink, locationVeri
 import { checkedAddressEstimate, addressEstimateHumanNote, type AddressEstimate } from './fieldAddressEstimates';
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useCameraHealth } from './useCameraHealth';
-import { fieldCameraHealth, isSupportEquipment, cameraColors, unitHealthLabel, cameraTime } from './fieldCameraHealth';
+import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime } from './fieldCameraHealth';
 import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
@@ -129,6 +129,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const viewportSignature=useRef('');
   const pendingPopup=useRef('');
   const popupSelection=useRef('');
+  const popupPanView=useRef<{center:L.LatLng;zoom:number}|null>(null);
+  const rebuildingMarkers=useRef(false);
   const clusterMarkers=useRef<{marker:L.Marker;ids:string[]}[]>([]);
   const clusterButtons=useRef(new Map<string,HTMLButtonElement>());
   const markersRef=useRef(new Map<string,L.Marker>());
@@ -225,7 +227,13 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     const map=L.map(mapNode.current,{zoomControl:true,fadeAnimation:false}).setView(restored.current.center||[29.7604,-95.3698],restored.current.zoom||8);
     map.on('zoomend resize',()=>setMapRevision(value=>value+1));
     map.on('moveend',()=>{const center=map.getCenter();saveFieldMapView({center:[center.lat,center.lng],zoom:map.getZoom()});});
-    map.on('dragstart zoomstart',()=>{if(!programmaticViewport.current)restoreViewport.current=true;});
+    map.on('dragstart zoomstart',()=>{popupPanView.current=null;if(!programmaticViewport.current)restoreViewport.current=true;});
+    map.on('autopanstart',()=>{if(!popupPanView.current)popupPanView.current={center:map.getCenter(),zoom:map.getZoom()};});
+    map.on('popupclose',()=>{
+      if(rebuildingMarkers.current)return;
+      const view=popupPanView.current;popupPanView.current=null;
+      if(view&&view.zoom===map.getZoom())moveViewport(()=>map.panTo(view.center,{animate:false}));
+    });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       maxZoom:19,
       attribution:'&copy; OpenStreetMap contributors'
@@ -238,7 +246,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return () => {
       window.cancelAnimationFrame(frame);
       resize?.disconnect();
-      map.remove();mapRef.current=null;layerRef.current=null;
+      popupPanView.current=null;map.remove();mapRef.current=null;layerRef.current=null;
     };
   },[hasMapContainer]);
 
@@ -248,39 +256,45 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     if(!map||!layer)return;
     const openGroup=clusterMarkers.current.find(entry=>entry.marker.isPopupOpen());
     const reopenId=pendingPopup.current||(openGroup?(openGroup.ids.includes(popupSelection.current)?popupSelection.current:openGroup.ids[0]):[...markersRef.current].find(([,marker])=>marker.isPopupOpen())?.[0]);pendingPopup.current='';
+    rebuildingMarkers.current=true;
     layer.clearLayers();
     markersRef.current.clear();clusterButtons.current.clear();clusterMarkers.current=[];
     const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
     const bounds:L.LatLngExpression[]=[];
-    const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}));
+    const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44);
     for(const group of groups){
+      const offsets=map.getZoom()>=17?expandedGroupOffsets(group.length):[];
       if(group.length>1){
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
         const first=points[0];
-        const approximate=group.some(({item})=>!hasCoords(item));
-        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap',html:'<span class="cos-field-cluster'+(approximate?' cos-field-cluster-approximate':'')+'" data-estimate-count="'+group.filter(({item})=>Boolean(estimateFor(item))).length+'">'+group.length+'</span>',iconSize:[40,40],iconAnchor:[20,20]})});
+        const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[healthById.get(item.id)?.state||'unknown']++);
+        const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap',html:clusterReticleMarkup(counts,group.filter(({item})=>Boolean(estimateFor(item))).length,group.filter(({item})=>!hasCoords(item)&&!estimateFor(item)).length),iconSize:[44,44],iconAnchor:[22,22]})});
         const popup=document.createElement('div');popup.className='field-cluster-list';
         const heading=document.createElement('strong');heading.textContent=group.length+' units here';popup.append(heading);const summary=document.createElement('p');summary.className='field-cluster-summary';popup.append(summary);
-        const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);
+        const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;pendingPopup.current='';popupSelection.current='';map.closePopup();map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);
         for(const {item} of group){const button=document.createElement('button');button.type='button';button.textContent=item.unitNumber+' · '+unitHealthLabel(healthById.get(item.id))+' · '+tag(item)+' · Observation '+cameraTime(healthById.get(item.id)?.checkedAt,cameras.now);clusterButtons.current.set(item.id,button);button.onclick=()=>{if(working.current||pickingRef.current)return;popupSelection.current=item.id;if(isSupportEquipment(item))pendingPopup.current=item.id;restoreViewport.current=true;setSelectedId(item.id);saveFieldMapView({selectedId:item.id});if(!isSupportEquipment(item)){openUnitHealth?.(item.id);map.closePopup();}};popup.append(button);}
         const selectedSupport=group.find(({item})=>item.id===selectedId&&isSupportEquipment(item))?.item;if(selectedSupport){const detail=document.createElement('p');detail.className='field-cluster-support-detail';detail.textContent=selectedSupport.unitNumber+' · '+(selectedSupport.address||'Address missing')+' · Support equipment, 0 cameras. No linked power evidence available in this view.';popup.append(detail);}
-        cluster.bindPopup(popup,{minWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxHeight:Math.max(120,Math.min(300,map.getSize().y-100))}).addTo(layer);clusterMarkers.current.push({marker:cluster,ids:group.map(p=>p.item.id)});if(reopenId&&group.some(p=>p.item.id===reopenId))cluster.openPopup();continue;
+        cluster.bindPopup(popup,{minWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxHeight:Math.max(120,Math.min(300,map.getSize().y-100))}).addTo(layer);clusterMarkers.current.push({marker:cluster,ids:group.map(p=>p.item.id)});if(reopenId&&group.some(p=>p.item.id===reopenId))cluster.openPopup();if(!offsets.length)continue;
       }
-      const unit=group[0].item;
+      for(const [index,{item:unit}] of group.entries()){
       const estimate=estimateFor(unit);
       const historic=!hasCoords(unit)&&!estimate?historicalFieldCoordinates(unit):null;
       const latitude=estimate?.latitude??historic?.latitude??Number(unit.latitude);
       const longitude=estimate?.longitude??historic?.longitude??Number(unit.longitude);
       bounds.push([latitude,longitude]);
-      const marker=L.marker([latitude,longitude],{
+      const anchor=L.latLng(latitude,longitude);
+      const groupAnchor=mapPoint(group[0].item)||historicalFieldCoordinates(group[0].item)!;
+      const position=offsets.length?map.unproject(map.project([groupAnchor.latitude,groupAnchor.longitude],map.getZoom()).add(L.point(offsets[index].x,offsets[index].y)),map.getZoom()):anchor;
+      if(offsets.length)L.polyline([anchor,position],{color:'#a6bbcf',weight:1,opacity:.75,interactive:false,className:'cos-site-leader'}).addTo(layer);
+      const marker=L.marker(position,{
         zIndexOffset:unit.id===selectedId?1000:0,
         title:unit.unitNumber+(estimate?' · Address estimate - needs verification':historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
-          html:'<span class="cos-field-pin'+(estimate?' cos-field-pin-estimate':historic?' cos-field-pin-historical':'')+(isSupportEquipment(unit)?' cos-field-pin-support':'')+'" style="--pin:'+cameraColors[healthById.get(unit.id)?.state||'unknown']+'"><b aria-hidden="true">'+(historic?'OLD':mapSymbol(isSupportEquipment(unit)))+'</b></span>',
-          iconSize:[32,32],
-          iconAnchor:[16,16]
+          html:mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?'estimate':historic?'historical':'current'),
+          iconSize:[44,44],
+          iconAnchor:[22,22]
         })
       });
       const label=document.createElement('span');label.textContent=unit.unitNumber;
@@ -288,8 +302,11 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       marker.bindPopup(gpsPopup(document, unit));
       markersRef.current.set(unit.id,marker);
       marker.on('click',()=>{ if (!working.current&&!pickingRef.current) {if(isSupportEquipment(unit))pendingPopup.current=unit.id;restoreViewport.current=true;setSelectedId(unit.id);saveFieldMapView({selectedId:unit.id});if(!isSupportEquipment(unit))openUnitHealth?.(unit.id);} });
-      marker.addTo(layer);if(reopenId===unit.id)marker.openPopup();
+      marker.addTo(layer);if(reopenId===unit.id&&!offsets.length)marker.openPopup();
+      }
     }
+    rebuildingMarkers.current=false;
+    if(!clusterMarkers.current.some(({marker})=>marker.isPopupOpen())&&![...markersRef.current.values()].some(marker=>marker.isPopupOpen()))popupPanView.current=null;
     // Do not consume restored/user viewport intent before this snapshot's asynchronous validation settles.
     if(estimateState?.snapshot!==data)return;
     const signature=JSON.stringify([filtered.map(unit=>[unit.id,mapPoint(unit)]),selectedId,focusSelected,showHistorical]);
@@ -313,23 +330,34 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     else moveViewport(()=>map.fitBounds(bounds,{padding:[40,40],maxZoom:14,animate:false}));
   };
 
+  // Close presentation-obscuring popups while retaining the user's chosen map view.
+  useEffect(()=>{
+    if(!tvMode)return;
+    const frame=window.requestAnimationFrame(()=>{
+      const map=mapRef.current;if(!map)return;
+      const center=popupPanView.current?.center||map.getCenter();
+      pendingPopup.current='';map.closePopup();map.invalidateSize({pan:false});
+      moveViewport(()=>map.panTo(center,{animate:false}));
+    });
+    return()=>window.cancelAnimationFrame(frame);
+  },[tvMode]);
+
   // Updating health observations must not clear an open popup or recenter a map the owner panned.
   useEffect(()=>{
     for(const {marker,ids} of clusterMarkers.current){
       const counts={online:0,offline:0,unknown:0,support:0};ids.forEach(id=>counts[healthById.get(id)?.state||'unknown']++);
-      const color=counts.offline?cameraColors.offline:counts.unknown?cameraColors.unknown:counts.online&&counts.support?'#e6bb60':counts.online?cameraColors.online:cameraColors.support;
       const content=marker.getPopup()?.getContent();if(content instanceof HTMLElement){const summary=content.querySelector('.field-cluster-summary');if(summary)summary.textContent=counts.online+' online · '+counts.offline+' offline · '+counts.unknown+' unknown · '+counts.support+' support. Colors represent camera or IP/port observations, not verified video.';}
-      const element=marker.getElement();if(element){element.title=ids.length+' units · '+counts.online+' online observations · '+counts.offline+' offline observations · '+counts.unknown+' unknown · '+counts.support+' support. Open unit list.';element.setAttribute('aria-label',element.title);element.querySelector<HTMLElement>('.cos-field-cluster')?.style.setProperty('--cluster-color',color);}
+      const element=marker.getElement();if(element){element.title=ids.length+' units · '+counts.online+' online observations · '+counts.offline+' offline observations · '+counts.unknown+' unknown · '+counts.support+' support. Open unit list.';element.setAttribute('aria-label',element.title);const groupUnits=ids.map(id=>items.find(unit=>unit.id===id)).filter((unit):unit is FieldUnit=>Boolean(unit));element.innerHTML=clusterReticleMarkup(counts,groupUnits.filter(unit=>Boolean(estimateFor(unit))).length,groupUnits.filter(unit=>!hasCoords(unit)&&!estimateFor(unit)).length);}
     }
     for(const unit of filtered){
-      const clusterButton=clusterButtons.current.get(unit.id);if(clusterButton)clusterButton.textContent=unit.unitNumber+' · '+unitHealthLabel(healthById.get(unit.id))+' · '+tag(unit)+(isSupportEquipment(unit)?'':' · Observation '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now));
+      const clusterButton=clusterButtons.current.get(unit.id);if(clusterButton){clusterButton.textContent=unit.unitNumber+' · '+unitHealthLabel(healthById.get(unit.id))+' · '+tag(unit)+(isSupportEquipment(unit)?'':' · Observation '+cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now));clusterButton.dataset.health=healthById.get(unit.id)?.state||'unknown';clusterButton.style.setProperty('--unit-status',cameraColors[healthById.get(unit.id)?.state||'unknown']);}
       const marker=markersRef.current.get(unit.id);
       if(!marker)continue;
       const estimate=estimateFor(unit);
       const element=marker.getElement();if(element)element.title=unit.unitNumber+(estimate?' · Address estimate - needs verification':!hasCoords(unit)?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id)));
       const popup=gpsPopup(document,unit);
       popup.append(document.createElement('br'),document.createTextNode(unit.address||'Installation address missing'),document.createElement('br'),document.createTextNode(tag(unit)+' · '+unitHealthLabel(healthById.get(unit.id))));
-      marker.getElement()?.querySelector<HTMLElement>('.cos-field-pin')?.style.setProperty('--pin',cameraColors[healthById.get(unit.id)?.state||'unknown']);
+      if(element){element.setAttribute('aria-label',element.title);element.innerHTML=mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?'estimate':!hasCoords(unit)?'historical':'current');}
       popup.append(document.createElement('br'),document.createTextNode(estimate?'Census address estimate · '+routerTime(estimate.geocodedAt)+' · '+estimate.matchedAddress:'Stored COS coordinates · '+routerTime(unit.gpsRecordedAt||null)));
       if(estimate)popup.append(document.createElement('br'),document.createTextNode('ADDRESS ESTIMATE - needs verification. Approximate site location, not live GPS; excluded from nearby results.'));
       else if(!hasCoords(unit))popup.append(document.createElement('br'),document.createTextNode('HISTORICAL LOCATION — unverified; excluded from nearby results.'));
@@ -451,7 +479,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations ({items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length})</label>
       {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
     </div>
-    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as dashed EST pins outside nearby mode. Each exact address match is a Census address-range estimate that needs verification. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
+    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} address estimates available as EST-tagged pins outside nearby mode. Each exact address match is a Census address-range estimate that needs verification. Shared-address units use the same approximate site point. Connection colors are independent; estimates are excluded from nearby distances.</p>}
     <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{cameras.error&&<p role='alert'>Camera Health unavailable: {cameras.error}</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     {error&&<div className='field-map-error' role='alert'>{error}</div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
@@ -468,9 +496,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       <section className='field-map-center'>
         <div ref={mapNode} className='field-map-canvas' aria-label='COS field unit map'/>
         <div className='field-map-legend'>
-          <span><i style={{background:cameraColors.online}}/>Online observation</span>
-          <span><i style={{background:cameraColors.offline}}/>Offline observation</span>
-          <span><i style={{background:cameraColors.unknown}}/>Stale / unknown</span><span><i style={{background:cameraColors.support}}/>Stand / support · 0 cameras</span>{estimates.size>0&&!nearby&&<span>Dashed EST pin: address estimate</span>}{showHistorical&&!nearby&&<span>Dashed OLD pin: unverified historical location</span>}
+          <span><i style={{color:cameraColors.online}}/>Online observation</span>
+          <span><i style={{color:cameraColors.offline}}/>Offline observation</span>
+          <span><i style={{color:cameraColors.unknown}}/>Stale / unknown</span><span><i style={{color:cameraColors.support}}/>Stand / support · 0 cameras</span>{estimates.size>0&&!nearby&&<span>EST tag: address estimate</span>}{showHistorical&&!nearby&&<span>OLD tag: unverified historical location</span>}
         </div>
       </section>
 
