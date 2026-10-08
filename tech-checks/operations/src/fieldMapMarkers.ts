@@ -37,7 +37,7 @@ export function clusterReticleMarkup(counts:ReticleCounts,estimateCount=0,histor
   return '<span class="cos-field-cluster" data-health="'+state+'" data-estimate-count="'+estimateCount+'" style="--pin:'+color+'"><i class="cos-reticle-ring"></i><b aria-hidden="true">'+count+'</b><em class="cos-cluster-caption">'+(state==='mixed'?'MIX':'GROUP')+'</em>'+(counts.support&&state!=='support'?'<i class="cos-cluster-support" title="'+counts.support+' support units; 0 cameras">'+mapSymbol(true)+'<small>'+counts.support+'</small></i>':'')+(estimateCount||historicalCount?'<em class="cos-cluster-location">'+(estimateCount&&historicalCount?'EST / OLD':estimateCount?'EST':'OLD')+'</em>':'')+'</span>';
 }
 /** A bounded display offset only; recorded locations and distance calculations never change. */
-export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:number;height:number;anchorX:number;anchorY:number;bottomInset:number;occupied?:{x:number;y:number}[]}):{x:number;y:number}[] {
+export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:number;height:number;anchorX:number;anchorY:number;bottomInset:number;occupied?:{x:number;y:number}[];blocked?:{left:number;right:number;top:number;bottom:number}[]}):{x:number;y:number}[] {
   if(count<2)return [];
   // Prefer clear visible positions, reserving other nearby sites and their units.
   // All offsets are presentation-only; larger sites remain pannable without hiding identities.
@@ -53,15 +53,16 @@ export function expandedGroupOffsets(count:number,scale=1,viewport?:{width:numbe
     if(count<=9)expandedGroupOffsets(count,scale).forEach(({x,y})=>add(x,y,true));
     for(let row=-rows;row<=rows;row++)for(let column=0;column<columns;column++)add(Math.round((column-(columns-1)/2)*56*scale),Math.round((row*70-12)*scale));
     candidates.sort((a,b)=>Number(b.visible)-Number(a.visible)||Number(b.preferred)-Number(a.preferred)||Math.hypot(a.x,a.y)-Math.hypot(b.x,b.y)||a.y-b.y||a.x-b.x);
+    const blocked=(x:number,y:number)=>viewport.blocked?.some(box=>viewport.anchorX+x+22*scale>box.left&&viewport.anchorX+x-22*scale<box.right&&viewport.anchorY+y+37*scale>box.top&&viewport.anchorY+y-30*scale<box.bottom);
     const selected:{x:number;y:number}[]=[],occupied=[{x:0,y:0},...(viewport.occupied||[])];
     for(const {x,y} of candidates){
-      if([...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
+      if(blocked(x,y)||[...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
       selected.push({x,y});if(selected.length===count)return selected;
     }
     // Dense adjacent sites may exhaust the visible grid. Continue clear rows for map panning.
     for(let row=rows+1;selected.length<count;row++)for(let column=0;column<columns&&selected.length<count;column++){
       const x=Math.round((column-(columns-1)/2)*56*scale),y=Math.round((row*70-12)*scale);
-      if([...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
+      if(blocked(x,y)||[...occupied,...selected].some(other=>Math.abs(x-other.x)<48*scale&&Math.abs(y-other.y)<68*scale))continue;
       selected.push({x,y});
     }
     return selected;

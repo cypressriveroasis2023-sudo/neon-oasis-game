@@ -61,3 +61,9 @@ test('local-site layouts expose every identity while clearing other site anchors
   const mobile=expandedGroupOffsets(12,1,{width:308,height:430,anchorX:154,anchorY:215,bottomInset:100});
   assert.ok(mobile.every(p=>p.x+154-22>=0&&p.x+154+22<=308&&p.y+215-30>=0&&p.y+215+37<=330));
 });
+
+
+test('automatic local layouts reserve visible map controls as well as nearby equipment',()=>{
+ const viewport={width:378,height:520,anchorX:189,anchorY:260,bottomInset:92,blocked:[{left:10,right:44,top:10,bottom:77}],occupied:[{x:80,y:0}]};
+ for(const scale of [1,1.18])for(const count of [9,12,15,27])for(const p of expandedGroupOffsets(count,scale,viewport))for(const box of viewport.blocked)assert.ok(!(viewport.anchorX+p.x+22*scale>box.left&&viewport.anchorX+p.x-22*scale<box.right&&viewport.anchorY+p.y+37*scale>box.top&&viewport.anchorY+p.y-30*scale<box.bottom));
+});
