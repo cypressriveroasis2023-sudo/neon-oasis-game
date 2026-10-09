@@ -1,3 +1,4 @@
+import {trackerRecordId,validNativeTrackerLabel,unsupportedSourceVersion} from '../_shared/trackerNativeSource.ts';
 import {checkedSourcePrecedence} from '../_shared/sourcePrecedence.ts';
 /** Server-to-server, COS-only read bridge. Never accepts a table, RPC or URL. */
 export const COS_ORGANIZATION_ID = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
@@ -37,22 +38,25 @@ async function body(request: Request): Promise<Row> {
   let parsed; try { parsed = JSON.parse(raw); } catch { fail(); }
   if (!object(parsed)) fail(); return parsed;
 }
-const trackerRecordId = (v: unknown): v is string => typeof v === 'string' && v.length <= 400 && /^google_sheet:[A-Za-z0-9_-]{10,128}:(?:0|[1-9][0-9]{0,18}):[A-Za-z][A-Za-z0-9 ._-]{0,159}\|[A-Za-z0-9._-]{1,40}$/.test(v);
 const identityFields = ['entityKind','nativeUnitId','productId','sourceSystem','sourceRecordId','sourceRevision'];
 function identity(v: Row) {
   if (!KIND.has(v.entityKind) || typeof v.nativeUnitId !== 'string' || !UUID.test(v.nativeUnitId) || typeof v.sourceRevision !== 'string' || !UUID.test(v.sourceRevision)) fail(503);
   if (v.sourceSystem === 'google_sheet_tracker') {
-    if (v.entityKind !== 'tracker' || !trackerRecordId(v.sourceRecordId) || Object.hasOwn(v,'productId')) fail(503);
+    if (!trackerRecordId(v.sourceRecordId) || Object.hasOwn(v,'productId')) fail(503);
     return {entityKind:v.entityKind,nativeUnitId:v.nativeUnitId,sourceSystem:v.sourceSystem,sourceRecordId:v.sourceRecordId,sourceRevision:v.sourceRevision};
   }
   if (!integer(v.productId) || Object.hasOwn(v,'sourceRecordId') || !(v.sourceSystem === undefined || v.sourceSystem === 'mhelpdesk_product_import')) fail(503);
   return { entityKind: v.entityKind, nativeUnitId: v.nativeUnitId, productId: v.productId, sourceRevision: v.sourceRevision };
 }
 /** Responses are rebuilt from the allowlist even if a backend adds private columns. */
-export function sourceDto(value: unknown): Row {
-  if (!object(value) || value.organizationId !== COS_ORGANIZATION_ID || !(value.schemaVersion === 1 && value.sourceSystem === 'mhelpdesk_product_import' || value.schemaVersion === 2 && value.sourceSystem === 'google_sheet_tracker') || !integer(value.eventId)) fail(503);
+export function sourceDto(value: unknown): Row | null {
+  if (!object(value)) fail(503);
+  // A future source version is unavailable to this reader, never a map-wide outage.
+  if (unsupportedSourceVersion(value)) return null;
+  if (value.organizationId !== COS_ORGANIZATION_ID || !(value.schemaVersion === 1 && value.sourceSystem === 'mhelpdesk_product_import' || value.schemaVersion === 2 && value.sourceSystem === 'google_sheet_tracker' && value.entityKind === 'tracker' || value.schemaVersion === 3 && value.sourceSystem === 'google_sheet_tracker' && value.entityKind === 'equipment_unit') || !integer(value.eventId)) fail(503);
   const base = { schemaVersion: value.schemaVersion, organizationId: COS_ORGANIZATION_ID, sourceSystem: value.sourceSystem, ...identity(value), eventId: value.eventId };
   if (value.eligibility === 'tombstone') return { ...base, eligibility: 'tombstone' };
+  if (value.schemaVersion === 3 && !validNativeTrackerLabel(value)) fail(503);
   if (value.eligibility !== 'FIELD' || !clean(value.unitNumber, 160) || !clean(value.family, 160) || !(value.variant === null || clean(value.variant, 160)) || !object(value.installation)) fail(503);
   for (const key of ['sourceFileSha256', 'sourceRowSha256', 'addressSha256', 'nativeGuardSha256']) if (typeof value[key] !== 'string' || !SHA.test(value[key])) fail(503);
   const { street, city, state, zip } = value.installation;

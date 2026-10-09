@@ -13,7 +13,7 @@ const names=['cos-operations-pages','camera-field-geocode','cos-geocode-sources'
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const summary=[];
 for(const name of names){
- const relative=[...(await readdir(resolve(functions,name))).filter(f=>f.endsWith('.ts')||f==='package.json').map(f=>name+'/'+f),'_shared/sourcePrecedence.ts','_shared/package.json'];
+ const relative=[...(await readdir(resolve(functions,name))).filter(f=>f.endsWith('.ts')||f==='package.json').map(f=>name+'/'+f),'_shared/sourcePrecedence.ts','_shared/trackerNativeSource.ts','_shared/package.json'];
  const files=new Map();for(const file of relative){if(file.startsWith('/')||file.split('/').includes('..'))throw Error('Unsafe upload path');files.set(file,await readFile(resolve(functions,file)));}
  const imports=[];
  for(const [file,bytes] of files){
