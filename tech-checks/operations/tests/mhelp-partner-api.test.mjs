@@ -26,7 +26,7 @@ test('preview uses only the production allowlisted GET endpoint and preserves de
  assert.equal(data.partial,true);assert.equal(data.items[0].name,'Sniper 2 023.1');assert.equal(data.items[0].active,true);assert.equal('online'in data.items[0],false);
  assert.equal(data.items[0].identity.state,'review_needed');assert.equal(data.automaticSync,false);assert.equal(data.sheetsPublisher,false);
  assert.equal(JSON.stringify(data).includes('secret'),false);assert.equal(JSON.stringify(data).includes('password'),false);
- assert.equal(f.calls[0].url,'https://connect.mhelpdesk.com/api/v1.0/me');assert.equal(data.verifiedPortalId,portalId);
+ assert.equal(f.calls[0].url,'https://connect.mhelpdesk.com/api/v1.0/users/me');assert.equal(data.verifiedPortalId,portalId);
  assert.equal(JSON.stringify(data).includes('private-user'),false);assert.equal(JSON.stringify(data).includes('private-contact'),false);
  const request=f.calls[1],url=new URL(request.url);
  assert.equal(url.origin,'https://connect.mhelpdesk.com');assert.equal(url.pathname,'/api/v1.0/portal/'+portalId+'/equipment');assert.equal(url.searchParams.get('Name'),'Sniper 2 023.1');
