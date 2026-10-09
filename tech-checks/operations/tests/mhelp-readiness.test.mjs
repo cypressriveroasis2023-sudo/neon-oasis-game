@@ -26,6 +26,14 @@ test('native failures never echo unknown errors or credentials',async()=>{
  const denied=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw new MhelpPartnerError('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.')}});
  assert.equal((await denied(request({action:'preview'}))).status,503);
 });
+test('full maintenance requires a complete scan and returns only counts and configuration booleans',async()=>{
+ const items=Array.from({length:51},()=>({name:'synthetic-private-name',identity:{state:'review_needed',candidateUnitIds:['synthetic-private-id']}}));
+ const full={...status,state:'preview_verified',liveAccessVerified:true,verifiedPortalId:'224643',totalRows:51,partial:false,items};
+ assert.throws(()=>projectReadiness(full));assert.throws(()=>projectReadiness({...full,partial:true},true));
+ const h=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw Error('not used')},fullReview:async()=>full,renewalConfiguration:()=>({refreshTokenConfigured:true,clientIdConfigured:false,clientSecretConfigured:false,password:'synthetic-private-token'})});
+ const result=await (await h(request({action:'full_review'}))).json();assert.equal(result.fullReview,true);assert.equal(result.previewCount,51);assert.equal(result.labelCandidates.single,51);
+ assert.deepEqual(result.renewalConfiguration,{refreshTokenConfigured:true,clientIdConfigured:false,clientSecretConfigured:false});assert(!JSON.stringify(result).includes('synthetic-private'));
+});
 test('maintenance exposes only the failed provider operation and HTTP status, with no provider body or URL',async()=>{
  const h=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw new MhelpPartnerError('mHelpDesk could not complete the account or equipment read. Retry later.',503,{operation:'equipment_read',httpStatus:500,body:'synthetic-private'});}});
  const result=await (await h(request({action:'preview'}))).json();assert.deepEqual(result.provider,{operation:'equipment_read',httpStatus:500});assert(!JSON.stringify(result).includes('synthetic-private'));
