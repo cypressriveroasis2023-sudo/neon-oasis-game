@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {archiveReconPayload} from '../_shared/reconEventArchive.ts';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -195,6 +196,14 @@ Deno.serve(async (req: Request) => {
   }).eq("provider", "reconeyez");
 
   const mapping = healthFromEvent(eventType || eventCode);
+  // Archival must not hold up health processing during a Storage outage.
+  // The complete original body is retained if the shared six-second budget expires.
+  const archiveDeadline = AbortSignal.timeout(6000);
+  const archiveDb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    global: {fetch: (input: any, init: any = {}) => fetch(input, {...init, signal: AbortSignal.any([
+      ...(init.signal ? [init.signal] : []), archiveDeadline
+    ])})}
+  });
   const { data: eventRow, error: eventInsertError } = await db
     .from("camera_integration_events")
     .insert({
@@ -204,7 +213,7 @@ Deno.serve(async (req: Request) => {
       event_type: eventType || null,
       event_code: eventCode || null,
       observed_at: observedAt,
-      payload: body,
+      payload: await archiveReconPayload(archiveDb, body),
       processed: Boolean(camera && mapping),
       processing_note: !externalId
         ? "Stored raw payload; device identifier was not recognized yet."
