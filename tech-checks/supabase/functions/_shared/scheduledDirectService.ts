@@ -110,12 +110,18 @@ export async function collectScheduledDirect(db:any,probe:(host:string,port:numb
   return directCandidates(m.data,d.data);
  };
  const initial=await inventory(),queue=scheduledOrder(initial.selected,startedAt),results:Row[]=[];
+ // Share only this run's transport observation for an identical saved host and
+ // complete port set. Each identity retains its own reread, prior counters and CAS.
+ const transport=new Map<string,Promise<{ports:Row;at:number}|null>>();
  let cursor=0;
  while(cursor<queue.length&&now()+PROBE_TIMEOUT_MS+1_000<deadline){
   const wave=queue.slice(cursor,cursor+SWEEP_WORKERS);cursor+=wave.length;
   // No database transaction is held across these sockets. Each preceding read
   // completed before this wave; publication starts only after every socket settles.
   const observations=await Promise.all(wave.map(async c=>{
+   const key=JSON.stringify([c.host,c.ports]),cached=transport.get(key);
+   if(cached)return cached;
+   const pending=(async()=>{
    const began=now();
    try{
     const values=await Promise.all(c.ports.map(async p=>[String(p),await boundedRequest(()=>probe(c.host,p,PROBE_TIMEOUT_MS),deadline,now,PROBE_TIMEOUT_MS+100)] as const));
@@ -123,6 +129,8 @@ export async function collectScheduledDirect(db:any,probe:(host:string,port:numb
     if(at<began||at-began>PROBE_TIMEOUT_MS+500||values.some(([,v])=>!object(v)||typeof v.online!=='boolean'||v.latency_ms!==null&&(!Number.isFinite(v.latency_ms)||v.latency_ms<0)||v.error&&/(auth|forbidden|permission|unauthori[sz]ed)/i.test(v.error)))return null;
     return {ports:Object.fromEntries(values),at};
    }catch{return null;}
+   })();
+   transport.set(key,pending);return pending;
   }));
   let fresh:ReturnType<typeof directCandidates>,previous:Row[];
   try{

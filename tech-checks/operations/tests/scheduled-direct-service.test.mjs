@@ -96,7 +96,7 @@ test('missing/held rows consume no queue slots and a rotating window prevents re
  const candidates=directCandidates(masters,devices).selected,seen=new Set();
  for(let cycle=0;cycle<18;cycle++)scheduledOrder(candidates,cycle*900_000).slice(0,10).forEach(c=>seen.add(c.device.id));assert.equal(seen.size,179);
  const f=fixture({masters,devices:devices.map((d,i)=>i<150?{...d,public_ip:null}:d)});let count=0;const r=await f.run(async()=>{count++;return {online:true,latency_ms:1};});
- assert.equal(r.eligible,29);assert.equal(r.held.length,150);assert.equal(r.results.length,29);assert.equal(count,58);
+ assert.equal(r.eligible,29);assert.equal(r.held.length,150);assert.equal(r.results.length,29);assert.equal(count,2); // One shared transport, with 29 independent guarded publications.
 });
 test('deadline stops new waves, preserves unfinished timestamps and leaves later cycles eligible',async()=>{
  const masters=Array.from({length:21},(_,i)=>master({unit_tag:String(i+1),source_label:'Sniper '+(i+1)})),devices=masters.map((m,i)=>device({id:i+1,unit_key:m.source_label}));
@@ -194,4 +194,43 @@ test('existing diagnostic reader tolerates partial Avigilon metadata without fab
  vm.runInContext(fn,context);const markup=context.diagnosticReportMarkup('Synthetic',[]);
  assert.match(markup,/"unavailable":false/);assert.match(markup,/"unavailableProviders":\[\]/);
  assert.equal(cameraState({activationState:'active',evidence:cameraEvidence(device())},now),'verifying');
+});
+
+test('identical endpoint sets share one in-run observation but keep independent identities and counters',async()=>{
+ const f=fixture({masters:[master(),master({unit_tag:'166',source_label:'Sniper 166',tracker_state:'field_or_unknown'})],devices:[device(),device({id:545,unit_key:'SNIPER 166',connection_revision:7,expected_ports:[443,80]})]});
+ let calls=0;const fail=async()=>{calls++;return {online:false,latency_ms:null,error:'Connection refused'};};
+ await f.run(fail);assert.equal(calls,2);assert.equal(f.state.writes.length,2);
+ assert.deepEqual(f.state.health.map(h=>h.consecutive_failures),[1,1]);
+ const one=f.state.health.find(h=>h.camera_device_id===545);one.port_status._connection.consecutiveFailures=2;
+ await f.run(fail);assert.equal(calls,4); // A new invocation does not reuse the old transport.
+ assert.equal(f.state.health.find(h=>h.camera_device_id===518).consecutive_failures,2);
+ assert.equal(f.state.health.find(h=>h.camera_device_id===545).consecutive_failures,3);
+ assert.deepEqual(new Set(f.state.writes.map(w=>w.args.p_revision)),new Set([2,7]));
+ assert.deepEqual(f.state.masters.map(m=>m.tracker_state),['shop','field_or_unknown']);
+});
+test('shared transport never bypasses either identity reread or endpoint/newer-result CAS',async()=>{
+ for(const mode of ['retired','ownership','endpoint','newer']){
+  const f=fixture({masters:[master(),master({unit_tag:'166',source_label:'Sniper 166'})],devices:[device(),device({id:545,unit_key:'SNIPER 166'})]});let calls=0;
+  if(mode==='endpoint')f.state.beforePublish=()=>{f.state.devices[1].connection_revision=3;};
+  if(mode==='newer')f.state.beforePublish=()=>{f.state.health=f.state.health.filter(h=>h.camera_device_id!==545).concat({camera_device_id:545,port_status:{_connection:{checkedAt:new Date(now+1000).toISOString()}}});};
+  const r=await f.run(async()=>{calls++;if(mode==='retired')f.state.masters[1].tracker_state='retired';if(mode==='ownership')f.state.devices[1].source='manual';return {online:false,latency_ms:null,error:'Connection refused'};});
+  assert.equal(calls,2);assert.equal(r.results.find(r=>r.id===518).published,true);assert.equal(r.results.find(r=>r.id===545).published,false);
+  assert.equal(f.state.writes.length,1);assert.equal(f.state.writes[0].args.p_device_id,518);
+ }
+});
+test('transport cache retains actual observation time across waves and separates different complete port sets',async()=>{
+ const masters=Array.from({length:11},(_,i)=>master({unit_tag:String(i+1),source_label:'Sniper '+(i+1)}));
+ const devices=masters.map((m,i)=>device({id:i+1,unit_key:m.source_label,public_ip:'8.8.4.'+(i+1)}));
+ const ordered=scheduledOrder(directCandidates(masters,devices).selected,now);const first=ordered[0].device.id,last=ordered[10].device.id;
+ devices.find(d=>d.id===last).public_ip=devices.find(d=>d.id===first).public_ip;
+ const f=fixture({masters,devices});let time=now,calls=0;
+ await f.run(async()=>{time++;calls++;return {online:true,latency_ms:1};},{startedAt:now,now:()=>time});
+ assert.equal(calls,20);assert.equal(f.state.writes.length,11);
+ assert.equal(f.state.health.find(h=>h.camera_device_id===first).checked_at,f.state.health.find(h=>h.camera_device_id===last).checked_at);
+ const g=fixture({masters:[master(),master({unit_tag:'166',source_label:'Sniper 166'})],devices:[device(),device({id:545,unit_key:'SNIPER 166',expected_ports:[443,8443]})]});let different=0;
+ await g.run(async()=>{different++;return {online:true,latency_ms:1};});assert.equal(different,4);assert.equal(g.state.writes.length,2);
+});
+test('failed or incomplete shared transport stays unverified for each identity without counter writes',async()=>{
+ const f=fixture({masters:[master(),master({unit_tag:'166',source_label:'Sniper 166'})],devices:[device(),device({id:545,unit_key:'SNIPER 166'})]});let calls=0;
+ const r=await f.run(async()=>{calls++;throw Error('collector unavailable');});assert.equal(calls,2);assert.equal(f.state.writes.length,0);assert.ok(r.results.every(r=>!r.published&&r.reason==='probe_incomplete'));
 });
