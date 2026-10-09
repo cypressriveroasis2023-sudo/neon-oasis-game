@@ -20,7 +20,7 @@ async function mount(page,{workspace='field-map'}={}){
   const request=route.request().postDataJSON();state.calls.push(request);expect(request.method).toBe('GET');
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1),resource(2)]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1),resource(2,'Helios 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/progressive-map-fixture');
