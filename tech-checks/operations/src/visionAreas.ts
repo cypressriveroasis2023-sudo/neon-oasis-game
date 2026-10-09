@@ -9,6 +9,7 @@ export const visionAreas = [
 export const primaryAreas = [
   { workspace: 'Today', label: 'Dashboard', icon: 'dashboard' },
   ...visionAreas,
+  { workspace: 'Unit Tracker', label: 'Unit Tracker', icon: 'units' },
   { workspace: 'Operations', label: 'Operations', icon: 'operations' },
 ] as const;
 export const locationKey = (value: unknown) => String(value || '').trim().toLowerCase().replaceAll('_', ' ');

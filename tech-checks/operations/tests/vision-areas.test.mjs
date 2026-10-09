@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { primaryAreas, visionAreas, isOnHand, locationLink } from '../src/visionAreas.ts';
 
-test('primary navigation exposes the six requested areas directly', () => {
+test('primary navigation preserves six fleet areas and includes the capability-gated Unit Tracker', () => {
   assert.deepEqual(visionAreas.map(area => area.label), ['Camera Health', 'InHand Routers', 'Victron Power', 'Units On Hand', 'Field View', 'Team']);
-  assert.equal(primaryAreas.length, 8);
+  assert.equal(primaryAreas.length, 9);
+  assert.equal(primaryAreas.filter(area=>area.workspace==='Unit Tracker').length,1);
 });
 test('on-hand inventory requires recorded physical placement', () => {
   assert.equal(isOnHand({ status: 'available', currentLocationType: null }), false);

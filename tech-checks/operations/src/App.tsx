@@ -9,6 +9,9 @@ import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
+import UnitTrackerWorkspace from './UnitTrackerWorkspace';
+import HomeUnitTracker from './HomeUnitTracker';
+import {trackerAccess} from './unitTracker';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
 import HomeFieldView from './HomeFieldView';
@@ -29,13 +32,14 @@ import './continuation.css';
 import { workspaces as nav, workspaceGroups, workspaceLabel, workspaceGroup, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
 
 type Row = Record<string, any>;
-type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
-const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
+type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Unit Tracker' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
+const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Unit Tracker","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
 const legacy: Record<string,string> = { Vision:'vision' };
-const fleetWorkspaces = ['Camera Health','Field Map','InHand Routers','Tech Check'];
+const baseFleetWorkspaces = ['Camera Health','Field Map','InHand Routers','Tech Check'];
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
+  'Unit Tracker':'Review current COS units and save pending additions or updates for the 2027 tracker.',
   'Field Map':'Find field units using recorded GPS, installed-site coordinates or their site address.',
   'Units On Hand':'Shop and yard inventory, availability and preparation status.',
   Operations:'Jobs, scheduling, customers and finance in your existing workflows.',
@@ -201,6 +205,7 @@ function OwnerApp() {
     return()=>window.removeEventListener('message',returnToChecks);
   },[setRouteLocation]);
   const [session,setSession]=useState<Row|null>(null);
+  const fleetWorkspaces = trackerAccess(session)?[...baseFleetWorkspaces,'Unit Tracker']:baseFleetWorkspaces;
   const fleetOnly=session?.authorized===true&&session?.legacyOwner===false&&session?.features?.fleetAccess===true;
   const [sessionError,setSessionError]=useState('');
   const [checking,setChecking]=useState(true);
@@ -311,7 +316,7 @@ function OwnerApp() {
       <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
       <button type='button' className='secondary operations-menu-close' onClick={()=>setMenu(false)}>Close menu <span aria-hidden='true'>×</span></button>
       <p className='company-nav-heading'>Your workspace</p>
-      <nav className='operations-area-nav' aria-label='COS Operations'>{(fleetOnly?fleetWorkspaces.map(workspace=>({workspace,label:workspace,icon:'camera' as const})):primaryAreas).map(area=><button type='button' key={area.workspace} className={selectedArea===area.workspace?'active':''} onClick={()=>navigate(area.workspace)} aria-current={selectedArea===area.workspace?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
+      <nav className='operations-area-nav' aria-label='COS Operations'>{(fleetOnly?fleetWorkspaces.map(workspace=>({workspace,label:workspace,icon:'camera' as const})):primaryAreas.filter(area=>area.workspace!=='Unit Tracker'||trackerAccess(session))).map(area=><button type='button' key={area.workspace} className={selectedArea===area.workspace?'active':''} onClick={()=>navigate(area.workspace)} aria-current={selectedArea===area.workspace?'page':undefined}><AreaIcon name={area.icon}/>{area.label}</button>)}</nav>
       <div className='company-sidebar-footer'><div className='company-sidebar-actions'><button type='button' onClick={()=>navigate('Tech Check')}>Tech Checks</button>{!fleetOnly&&<button type='button' onClick={()=>navigate('Vision')}>Vision assistant</button>}<button type='button' onClick={()=>{setMenu(false);openLegacy('logout');}}>Sign out</button></div><div className='company-owner'><span aria-hidden='true'>{ownerInitials}</span><div><strong>{session?.name||'Owner'}</strong><small>COS workspace</small></div></div></div>
     </aside>
     <main className='owner-it-main' inert={menu}>
@@ -324,11 +329,12 @@ function OwnerApp() {
 
       {active!=='Today'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div><TechChecksWorkspace/></section>
-        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Field Map…</p>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Field Map')}/>}<TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Field Map…</p>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Field Map')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true}/></section>
+        :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialUnitId={route.unitId} onSelectUnit={unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true)} openMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Unscheduled',jobId:'',detail:false},true)}/>
