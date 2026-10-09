@@ -462,7 +462,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   };
 
   return <section ref={workspaceNode} className={'field-map-workspace'+(tvMode?' field-map-tv':'')}>
-    <header className='field-map-display-bar'><div><b>COS Field Map</b><span>Select a pin or unit for details</span></div><button className='secondary' aria-label='TV / fullscreen map' aria-pressed={tvMode} disabled={!data} onClick={toggleTv}>Fullscreen</button></header>
+    <header className='field-map-display-bar'><div><b>COS Field Map</b><span role='status'>{!data?(error?'Field locations unavailable':'Loading field locations…'):busy?'Refreshing field locations…':'Select a pin or unit for details'}</span></div><button className='secondary' aria-label='TV / fullscreen map' aria-pressed={tvMode} disabled={!data} onClick={toggleTv}>Fullscreen</button></header>
     <section className='field-map-kpis' aria-label='Field inventory totals'>
       <article><b>{data?.summary?.fieldUnits??'—'}</b><span>FIELD UNITS</span></article>
       <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='online').length:'—'}</b><span>ONLINE OBSERVATIONS</span></article>
