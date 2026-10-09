@@ -4,7 +4,7 @@ import { api,openLegacy } from './api';
 import { checkedFieldMap } from './gpsPersistence';
 import { fieldCameraHealth,cameraColors,unitHealthLabel,unitDiagnosticsPath,cameraTime,type FieldHealthUnit } from './fieldCameraHealth';
 import { useCameraHealth } from './useCameraHealth';
-import CameraHealthOverview,{CameraResourceObservations,UnitEvidenceDetails} from './CameraHealthOverview';
+import CameraHealthOverview,{CameraResourceObservations,UnitEvidenceDetails,ReconProviderAreaDetails} from './CameraHealthOverview';
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 export { validateCameraHealth } from './fieldCameraHealth';
 type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
@@ -29,7 +29,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
       {!units&&!unitError?<p role='status'>Verifying the selected field unit…</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
         <h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
         <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p>
-        <UnitEvidenceDetails classification={detail?.classification||null}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
+        <UnitEvidenceDetails classification={detail?.classification||null}/><ReconProviderAreaDetails identity={detail?.association} rows={rows} now={now}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
         {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         <UnitDiagnosticReport key={selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}

@@ -1,4 +1,4 @@
-import {groupIdentityForRows,linkedUnitObservation,type VerifiedUnitIdentity,type LinkedUnitObservation} from './verifiedUnitIdentity';
+import {groupIdentityForRows,linkedUnitObservation,resolveVerifiedUnitIdentity,type VerifiedUnitIdentity,type LinkedUnitObservation} from './verifiedUnitIdentity';
 import { cameraTimestamp,unitEvidenceLabel,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
 import {validateCameraHealth,canonicalCameraUnit,isSupportEquipment,type FieldHealthUnit,type Health} from './fieldCameraHealth';
 export {resourceKind};export type {ResourceKind};
@@ -9,7 +9,7 @@ export function cameraOverview(health:Health,now=Date.now()){
   const buckets=new Map<string,CameraRow[]>();
   for(const row of records.values()){const key=typeof row.unit==='string'&&row.unit.trim()?row.unit.trim().replace(/\s+/g,' ').toUpperCase():'UNLINKED:'+row.id;buckets.set(key,[...(buckets.get(key)||[]),row]);}
   const groups=Array.from(buckets,([key,rows]):CameraUnitGroup=>{
-    const identityResult=groupIdentityForRows(rows,health);
+    const identityResult=groupIdentityForRows(rows,health,now);
     const identityConflict=identityResult.state==='conflict'?identityResult.reason:undefined;
     const sourceClassification=classifyCameraUnit(rows,now);
     const classification=identityConflict?{...sourceClassification,state:'verifying' as const,providerState:'verifying' as const,cameraState:'verifying' as const,serviceState:'verifying' as const,recorderOffline:false}:sourceClassification;
@@ -59,9 +59,15 @@ export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[];obse
 }
 
 /** Existing field inventory remains visible when the camera feed has no matching resource. */
-export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[]){
+export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[],now=Date.now()){
   if(health.evidenceVersion!==2||!health.inventory)return health;
+  const reviewed=(health.reconProviderUnitIdentities||[]).filter(identity=>resolveVerifiedUnitIdentity({id:identity.unitId,unitNumber:identity.unitNumber},health,now).state==='verified');
+  // Suppress only synthetic, exact-label placeholders for a complete reviewed group.
+  // Actual devices, field equipment and unverified/stale groups are never removed.
+  const replaced=health.rows.filter(row=>row.trackerOnly&&row.type==='tracker_unit'&&row.scope==='unknown'&&String(row.id).startsWith('tracker:')&&reviewed.some(identity=>identity.unitNumber===row.unit));
+  if(replaced.length&&health.inventory)health={...health,rows:health.rows.filter(row=>!replaced.includes(row)),totalDevices:health.totalDevices-replaced.length,inventory:{...health.inventory,allRecords:health.inventory.allRecords-replaced.length,unknownScopeRecords:(health.inventory.unknownScopeRecords||0)-replaced.length}};
   const represented=new Set(health.rows.map(row=>canonicalCameraUnit(row.unit)).filter(Boolean));
+  for(const identity of reviewed){const key=canonicalCameraUnit(identity.unitNumber);if(key)represented.add(key);}
   const additions:CameraRow[]=[];
   for(const unit of units){
     if(isSupportEquipment(unit))continue;
@@ -70,7 +76,7 @@ export function healthWithFieldInventory(health:Health,units:FieldHealthUnit[]){
     represented.add(key);
     additions.push({id:'field:'+unit.id,name:unit.unitNumber,unit:unit.unitNumber,type:'tracker_unit',organization:[unit.customer,unit.site,unit.address].filter(Boolean).join(' · '),status:'review',activationState:'',scope:'unknown',trackerOnly:true});
   }
-  if(!additions.length)return health;
+  if(!additions.length||!health.inventory)return health;
   return {...health,rows:[...health.rows,...additions],totalDevices:health.totalDevices+additions.length,
     inventory:{...health.inventory,allRecords:health.inventory.allRecords+additions.length,unknownScopeRecords:(health.inventory.unknownScopeRecords||0)+additions.length},
     coverageNote:[health.coverageNote,additions.length+' existing field inventory units have no matched camera resource. Their connection status is unknown; no check or location is invented.'].filter(Boolean).join(' ')};
