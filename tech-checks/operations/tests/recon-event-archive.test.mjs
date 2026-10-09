@@ -9,7 +9,7 @@ function storageFixture(scenario='ok'){
  const objects=new Map();let uploads=0;
  const bucket={id:ARCHIVE_BUCKET,public:false,file_size_limit:8388608,allowed_mime_types:['application/gzip']};
  const db={storage:{getBucket:async()=>({data:scenario==='public'?{...bucket,public:true}:bucket,error:null}),createBucket:async()=>{throw Error('Unexpected bucket creation')},from(name){assert.equal(name,ARCHIVE_BUCKET);return {
- upload:async(path,blob,options)=>{uploads++;assert.equal(options.upsert,false);assert.equal(options.contentType,'application/gzip');if(scenario==='upload-failed')return{error:{statusCode:'503'}};if(objects.has(path))return{error:{statusCode:'409'}};objects.set(path,scenario==='corrupt'?new Blob(['corrupt']):blob);return{error:null}},
+ upload:async(path,blob,options)=>{uploads++;assert.equal(options.upsert,false);assert.equal(options.contentType,'application/gzip');assert.equal(blob.type,'application/gzip');if(scenario==='upload-failed')return{error:{statusCode:'503'}};if(objects.has(path))return{error:{statusCode:'409'}};objects.set(path,scenario==='corrupt'?new Blob(['corrupt']):blob);return{error:null}},
  download:async(path)=>({data:objects.get(path),error:scenario==='download-failed'?{statusCode:'503'}:null})
  };}}};return{db,objects,get uploads(){return uploads}};
 }

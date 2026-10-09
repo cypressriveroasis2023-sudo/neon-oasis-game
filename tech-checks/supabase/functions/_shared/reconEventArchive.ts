@@ -61,7 +61,8 @@ export async function archiveReconPayload(db: any, payload: unknown): Promise<an
     if (bytes.byteLength > MAX_BYTES) return payload;
     const sha256 = await digest(bytes), path = `reconeyez/${sha256}.json.gz`;
     const compressed = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
-    const blob = await new Response(compressed).blob();
+    // Storage uses a Blob's own MIME type when building its multipart upload.
+    const blob = new Blob([await new Response(compressed).blob()], {type: 'application/gzip'});
     if (blob.size > MAX_BYTES) return payload;
     const {error} = await db.storage.from(ARCHIVE_BUCKET).upload(path, blob, {contentType: 'application/gzip', upsert: false, cacheControl: '31536000'});
     // An immutable existing object is acceptable only after its contents verify.
