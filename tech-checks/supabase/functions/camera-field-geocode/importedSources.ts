@@ -1,4 +1,5 @@
 import {checkedSourcePrecedence,type SourcePrecedence} from '../_shared/sourcePrecedence.ts';
+import {checkedAppAddressAuthority,type AppAddressAuthority} from '../_shared/appUnitAddressContract.ts';
 import {addressDigest} from './censusAddress.ts';
 import {validInstallation,installationAddress,suppliedComponents,type Installation} from './importedAddress.ts';
 const dependencyCodes=['rpc_transport','rpc_http','rpc_json','source_transport','source_http','source_body','source_json','source_shape'] as const;
@@ -14,7 +15,7 @@ export function geocodeDependencyCode(error:unknown):DependencyCode|null{
 }
 export const SOURCE_ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 export type ImportedIdentity={entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceSystem?:'mhelpdesk_product_import'|'google_sheet_tracker';sourceRecordId?:string;sourceRevision:string};
-export type ImportedSource=ImportedIdentity&{sourcePrecedence?:SourcePrecedence;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';unitNumber:string;family:string|null;variant:string|null;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:true;city:boolean;state:true;zip:boolean};eligibility:'FIELD';eventId:string};
+export type ImportedSource=ImportedIdentity&{sourcePrecedence?:SourcePrecedence;addressAuthority?:AppAddressAuthority;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';unitNumber:string;family:string|null;variant:string|null;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:true;city:boolean;state:true;zip:boolean};eligibility:'FIELD';eventId:string};
 export type SourceEvent=ImportedIdentity&{eventId:string;kind:'upsert'|'tombstone'};
 const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
@@ -34,10 +35,11 @@ export async function checkedImportedSource(value:unknown,expected?:ImportedIden
   ||!(value.family===null||text(value.family,160))||!(value.variant===null||text(value.variant,160))||!['sourceFileSha256','sourceRowSha256','addressSha256','nativeGuardSha256'].every(k=>sha(value[k]))
   ||!object(value.installation)||!exact(value.installation,['street','city','state','zip'])||!validInstallation(value.installation)||!object(value.suppliedComponents)||!exact(value.suppliedComponents,['street','city','state','zip'])||value.suppliedComponents.street!==true||value.suppliedComponents.state!==true||value.suppliedComponents.city!==(value.installation.city!==null)||value.suppliedComponents.zip!==(value.installation.zip!==null))return null;
  const precedence=checkedSourcePrecedence(value);if(Object.hasOwn(value,'sourcePrecedence')&&!precedence)return null;
+ const authority=checkedAppAddressAuthority(value.addressAuthority,value.sourceRevision);if(Object.hasOwn(value,'addressAuthority')&&(!authority||value.entityKind!=='tracker'||precedence))return null;
  if(expected&&JSON.stringify(sourceIdentity(value))!==JSON.stringify(sourceIdentity(expected)))return null;
  const candidate:ImportedSource={schemaVersion:value.schemaVersion,organizationId:SOURCE_ORG,sourceSystem:value.sourceSystem,...sourceIdentity(value),unitNumber:value.unitNumber,family:value.family,variant:value.variant,
   sourceFileSha256:value.sourceFileSha256,sourceRowSha256:value.sourceRowSha256,addressSha256:value.addressSha256,nativeGuardSha256:value.nativeGuardSha256,
-  installation:{street:value.installation.street,city:value.installation.city,state:value.installation.state,zip:value.installation.zip},suppliedComponents:suppliedComponents(value.installation) as ImportedSource['suppliedComponents'],eligibility:'FIELD',eventId:value.eventId,...(precedence?{sourcePrecedence:precedence}:{})};
+  installation:{street:value.installation.street,city:value.installation.city,state:value.installation.state,zip:value.installation.zip},suppliedComponents:suppliedComponents(value.installation) as ImportedSource['suppliedComponents'],eligibility:'FIELD',eventId:value.eventId,...(precedence?{sourcePrecedence:precedence}:{}),...(authority?{addressAuthority:authority}:{})};
  const address=sourceAddress(candidate);
  if(await addressDigest(address)!==candidate.addressSha256)return null;
  return candidate;

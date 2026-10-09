@@ -1,4 +1,5 @@
 import {checkedSourcePrecedence} from '../_shared/sourcePrecedence.ts';
+import {checkedAppAddressAuthority} from '../_shared/appUnitAddressContract.ts';
 /** Server-to-server, COS-only read bridge. Never accepts a table, RPC or URL. */
 export const COS_ORGANIZATION_ID = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 export const SOURCE_BODY_LIMIT = 32768;
@@ -60,12 +61,13 @@ export function sourceDto(value: unknown): Row {
   if (!/^[0-9]{1,8}[A-Za-z]? +[A-Za-z0-9 .'-]+$/.test(street) || (city !== null && !/^[A-Za-z][A-Za-z .'-]*$/.test(city)) || /\b(?:gate|password|passcode|access\s*code|combination|lockbox|login|https?|phone|telephone|tel|contact|notes?|call|email|apt|apartment|suite|ste|unit|floor|bldg|building|customer|username|passwd|pwd|token|secret|credential|code)\b/i.test(street + ' ' + city) || /\d{3}[ .)-]+\d{3}[ .-]+\d{4}/.test(street)) fail(503);
   if (/(?:password|passwd|pwd|passcode|token|secret|credential|username|login|lockbox)[A-Za-z0-9_-]*|(?:gate|access)[\s-]*code[A-Za-z0-9_-]*/i.test(street+' '+(city||''))) fail(503);
   const precedence=checkedSourcePrecedence(value);if(Object.hasOwn(value,'sourcePrecedence')&&!precedence)fail(503);
+  const authority=checkedAppAddressAuthority(value.addressAuthority,value.sourceRevision);if(Object.hasOwn(value,'addressAuthority')&&(!authority||value.entityKind!=='tracker'||precedence))fail(503);
   const suppliedComponents = { street: true, city: city !== null, state: true, zip: zip !== null };
   if (!object(value.suppliedComponents) || Object.keys(value.suppliedComponents).length !== 4 || Object.entries(suppliedComponents).some(([k,v]) => value.suppliedComponents[k] !== v)) fail(503);
   return { ...base, unitNumber: value.unitNumber, family: value.family, variant: value.variant,
     sourceFileSha256: value.sourceFileSha256, sourceRowSha256: value.sourceRowSha256,
     addressSha256: value.addressSha256, nativeGuardSha256: value.nativeGuardSha256,
-    installation: { street, city, state, zip }, suppliedComponents, eligibility: 'FIELD',...(precedence?{sourcePrecedence:precedence}:{}) };
+    installation: { street, city, state, zip }, suppliedComponents, eligibility: 'FIELD',...(precedence?{sourcePrecedence:precedence}:{}),...(authority?{addressAuthority:authority}:{}) };
 }
 export function createGeocodeSourcesHandler(options: {
   readKey?: string;

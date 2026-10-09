@@ -1,4 +1,6 @@
 import {checkedArchivedRepresentations} from './archivedRepresentationProjection.ts';
+import {checkedAppAddressAuthority} from '../_shared/appUnitAddressContract.ts';
+import {appAddressLegacyKey} from './appUnitAddress.ts';
 import {checkedSourcePrecedence,sourcePrecedenceAuditSha256,type SourcePrecedence} from '../_shared/sourcePrecedence.ts';
 import {addressDigest} from './censusAddress.ts';
 import {placementMatchKey} from './placementProjection.ts';
@@ -22,7 +24,7 @@ function labelKeys(){
  return {match,concern};
 }
 
-export type ImportedProjectionContext={nativeUnits:unknown;identity:unknown;currentSources?:unknown;archivedRepresentations?:unknown;previousArchivedRepresentations?:unknown;confirmedPrecedenceBindings?:unknown};
+export type ImportedProjectionContext={nativeUnits:unknown;identity:unknown;currentSources?:unknown;archivedRepresentations?:unknown;previousArchivedRepresentations?:unknown;confirmedPrecedenceBindings?:unknown;confirmedAppAddressBindings?:unknown;stableAppManualIds?:string[]};
 const deviceId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):decimal(v)?String(v):null;
 const sameSet=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(v=>b.includes(v));
 /** A source-registry commitment, returned only by the guarded native map RPC.
@@ -33,7 +35,7 @@ function currentNativeSourceIdentity(source:Row):boolean{
  return Boolean(source.schemaVersion===1&&source.organizationId===ORG&&source.sourceSystem==='mhelpdesk_product_import'&&source.entityKind==='equipment_unit'
   &&uuid(source.nativeUnitId)&&decimal(source.productId)&&uuid(source.sourceRevision)&&decimal(source.eventId)
   &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(source[k]))
-  &&['FIELD','SHOP'].includes(source.placement)&&source.eligibility===(source.placement==='FIELD'?'FIELD':'tombstone')
+  &&['FIELD','SHOP','INACTIVE'].includes(source.placement)&&source.eligibility===(source.placement==='FIELD'?'FIELD':'tombstone')
   &&object(p)&&p.contract==='COS_IMPORTED_NATIVE_SOURCE_IDENTITY_V1'&&uuid(p.trackerId)&&typeof p.trackerUnitNumber==='string'
   &&['nativeUnitId','productId','unitNumber','sourceRevision','sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>p[k]===source[k])
   &&placementMatchKey(p.trackerUnitNumber)===placementMatchKey(source.unitNumber));
@@ -98,15 +100,16 @@ const trackerRecordId=(v:unknown):v is string=>typeof v==='string'&&v.length<=40
 const validSourceType=(v:Row)=>v.schemaVersion===1&&v.sourceSystem==='mhelpdesk_product_import'&&decimal(v.productId)&&!Object.hasOwn(v,'sourceRecordId')
  ||v.schemaVersion===2&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='tracker'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId');
 const sourceIdentity=(v:Row)=>v.sourceSystem==='google_sheet_tracker'?{sourceSystem:'google_sheet_tracker' as const,sourceRecordId:v.sourceRecordId}:{productId:v.productId};
-export type ImportedBinding={sourcePrecedence?:SourcePrecedence;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceRecordId?:string;unitNumber:string;family:string|null;variant:string|null;sourceRevision:string;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:boolean;city:boolean;state:boolean;zip:boolean};eligibility:'FIELD';eventId:string};
+export type ImportedBinding={addressAuthority?:NonNullable<ReturnType<typeof checkedAppAddressAuthority>>;sourcePrecedence?:SourcePrecedence;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceRecordId?:string;unitNumber:string;family:string|null;variant:string|null;sourceRevision:string;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:boolean;city:boolean;state:boolean;zip:boolean};eligibility:'FIELD';eventId:string};
 export async function checkedImportedBinding(v:unknown):Promise<ImportedBinding|null>{
  if(!object(v)||!validSourceType(v)||v.organizationId!==ORG||!['equipment_unit','tracker'].includes(v.entityKind)||!uuid(v.nativeUnitId)||!uuid(v.sourceRevision)||!decimal(v.eventId)
   ||typeof v.unitNumber!=='string'||!v.unitNumber.trim()||v.unitNumber.length>250||!['sourceFileSha256','sourceRowSha256','addressSha256','nativeGuardSha256'].every(k=>sha(v[k]))||v.eligibility!=='FIELD'||!validInstallation(v.installation)||!object(v.suppliedComponents))return null;
  const precedence=checkedSourcePrecedence(v);if(Object.hasOwn(v,'sourcePrecedence')&&!precedence)return null;
+ const authority=checkedAppAddressAuthority(v.addressAuthority,v.sourceRevision);if(Object.hasOwn(v,'addressAuthority')&&(!authority||v.entityKind!=='tracker'||precedence))return null;
  const supplied=suppliedComponents(v.installation);if(Object.keys(v.suppliedComponents).length!==4||Object.entries(supplied).some(([k,value])=>v.suppliedComponents[k]!==value)||await addressDigest(installationAddress(v.installation))!==v.addressSha256)return null;
  if(!(v.family===null||typeof v.family==='string'&&v.family.length<=160)||!(v.variant===null||typeof v.variant==='string'&&v.variant.length<=160))return null;
  return {schemaVersion:v.schemaVersion,organizationId:ORG,sourceSystem:v.sourceSystem,entityKind:v.entityKind,nativeUnitId:v.nativeUnitId,...sourceIdentity(v),unitNumber:v.unitNumber,family:v.family,variant:v.variant,sourceRevision:v.sourceRevision,
-  sourceFileSha256:v.sourceFileSha256,sourceRowSha256:v.sourceRowSha256,addressSha256:v.addressSha256,nativeGuardSha256:v.nativeGuardSha256,installation:{street:v.installation.street,city:v.installation.city,state:v.installation.state,zip:v.installation.zip},suppliedComponents:supplied,eligibility:'FIELD',eventId:v.eventId,...(precedence?{sourcePrecedence:precedence}:{})};
+  sourceFileSha256:v.sourceFileSha256,sourceRowSha256:v.sourceRowSha256,addressSha256:v.addressSha256,nativeGuardSha256:v.nativeGuardSha256,installation:{street:v.installation.street,city:v.installation.city,state:v.installation.state,zip:v.installation.zip},suppliedComponents:supplied,eligibility:'FIELD',eventId:v.eventId,...(precedence?{sourcePrecedence:precedence}:{}),...(authority?{addressAuthority:authority}:{})};
 }
 /** Deny-only family/base concern; never an identity join or an assignment of an audit to a unit. */
 function legacyConcernReader(audits:unknown,devices:unknown):(unitNumber:string)=>boolean{
@@ -177,15 +180,20 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
  const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const inventoryItems=await Promise.all(snapshot.inventoryItems.map(async(raw:Row)=>{
   const s=byId.get(identity(raw));
+  // Native app authority is applied after current Owner projection, only with a
+  // fresh exact legacy proof. Never accidentally interpret it as CSV content.
+  if(s&&Object.hasOwn(s,'addressAuthority'))return raw;
   if(!s&&previouslyImported.has(identity(raw))&&raw.locationVerification!=='owner_verified'&&raw.hasUnitGps!==true&&raw.placementSource!=='owner')return {...raw,_sourceField:false,currentLocationType:'unknown',importedSourceState:'source_changed',importedInstallation:null,latitude:null,longitude:null,coordinateSource:null};
   if(!s||Object.hasOwn(s,'sourcePrecedence')&&!reviewed.has(raw.id)||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id)&&!reviewed.has(raw.id))return raw;
   // Native-only, sanitized mHelp CustomerName path. It is display text, not a
   // CRM identity or a customer/site parser; keep the complete label intact.
   const sourceLabel=typeof s.siteLabel==='string'&&s.siteLabel.trim()&&s.siteLabel.length<=250?s.siteLabel:null;
   const customerLabel=s.sourceSystem==='google_sheet_tracker'?(typeof s.customerLabel==='string'&&s.customerLabel.trim()&&s.customerLabel.length<=250?s.customerLabel:null):sourceLabel;
-  if(s.placement==='SHOP'){
+  if(s.placement==='SHOP'||s.placement==='INACTIVE'){
    if(!uuid(s.sourceRevision)||!(validSourceType(s)||s.schemaVersion===undefined&&s.sourceSystem===undefined&&!Object.hasOwn(s,'sourceRecordId')&&decimal(s.productId))||!decimal(s.eventId)||!sha(s.nativeGuardSha256)||!sha(s.sourceFileSha256)||!sha(s.sourceRowSha256))return raw;
-   return {...raw,customer:customerLabel,site:'SHOP / ROOT',address:null,addressSource:null,addressUpdatedAt:null,_sourceField:false,status:'readiness_unverified',currentLocationType:'shop',placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:'SHOP',importedInstallation:{entityKind:s.entityKind,nativeUnitId:s.nativeUnitId,...sourceIdentity(s),sourceRevision:s.sourceRevision,eventId:s.eventId,nativeGuardSha256:s.nativeGuardSha256,sourceFileSha256:s.sourceFileSha256,sourceRowSha256:s.sourceRowSha256,placement:'SHOP'},latitude:null,longitude:null,coordinateSource:null};
+   const inactive=s.placement==='INACTIVE';
+   if(inactive&&(!validSourceType(s)||s.organizationId!==ORG||s.eligibility!=='tombstone'||s.installation!=null||s.addressSha256!=null||s.suppliedComponents!=null||raw.activeJobNumber!=null))return raw;
+   return {...raw,customer:customerLabel,site:inactive?'INACTIVE / DO NOT USE':'SHOP / ROOT',address:null,addressSource:null,addressUpdatedAt:null,_sourceField:false,status:inactive?'inactive':'readiness_unverified',currentLocationType:inactive?'inactive':'shop',placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:s.placement,importedInstallation:{entityKind:s.entityKind,nativeUnitId:s.nativeUnitId,...sourceIdentity(s),sourceRevision:s.sourceRevision,eventId:s.eventId,nativeGuardSha256:s.nativeGuardSha256,sourceFileSha256:s.sourceFileSha256,sourceRowSha256:s.sourceRowSha256,placement:s.placement},latitude:null,longitude:null,coordinateSource:null};
   }
   const binding=await checkedImportedBinding(s);if(s.placement!=='FIELD'||!binding)return raw;
   // A current approved property estimate outranks a new automatic lookup. Validate
@@ -206,6 +214,64 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
  const items=inventoryItems.filter((r:Row)=>r._sourceField===true);
  return {...snapshot,items,inventoryItems,summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length}};
 }
+
+function confirmedAppSource(source:Row,row:Row,audits:unknown,devices:unknown,context?:ImportedProjectionContext):boolean{
+ if(!context||row.readOnly!==true||source.entityKind!=='tracker'||source.nativeUnitId!==row.id||source.unitNumber!==row.unitNumber
+  ||source.organizationId!==ORG||!validSourceType(source)||!checkedAppAddressAuthority(source.addressAuthority,source.sourceRevision)
+  ||Object.hasOwn(source,'sourcePrecedence')||!Array.isArray(context.confirmedAppAddressBindings)
+  ||!context.confirmedAppAddressBindings.some(s=>JSON.stringify(s)===JSON.stringify(source)))return false;
+ try{return appAddressLegacyKey({unitId:row.id,unitNumber:row.unitNumber},{sources:{units:context.nativeUnits,devices,audits},identity:context.identity})===source.addressAuthority.legacyUnitKey;}catch{return false;}
+}
+
+/** App corrections outrank the exact history reviewed at save. Future manual
+ * changes invalidate the proof and keep the ordinary Owner projection first. */
+export async function projectAppUnitAddresses(snapshot:Row,sources:unknown,audits:unknown,devices:unknown,context?:ImportedProjectionContext):Promise<Row>{
+ if(!Array.isArray(sources)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(snapshot.items))throw Error('Current app addresses are unavailable');
+ const appSources=sources.filter(s=>object(s)&&Object.hasOwn(s,'addressAuthority'));
+ if(!appSources.length)return snapshot;
+ const byId=new Map(appSources.map(s=>[s.nativeUnitId,s]));if(byId.size!==appSources.length)throw Error('Duplicate app address identities');
+ const fieldIds=new Set(snapshot.items.map((r:Row)=>r.id));
+ const inventoryItems=await Promise.all(snapshot.inventoryItems.map(async(raw:Row)=>{
+  const s=byId.get(raw.id);if(!s)return raw;
+  // Preserve existing verified GPS. This contract neither changes GPS rights nor
+  // manufactures verification for an entered street address.
+  if(raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null)return raw;
+  if(!confirmedAppSource(s,raw,audits,devices,context)){
+   if(raw.placementSource==='owner'&&context?.stableAppManualIds?.includes(raw.id))return raw;
+   fieldIds.delete(raw.id);
+   return {...raw,currentLocationType:'unknown',placement:'UNKNOWN',placementStatus:'needs_identity_review',placementReviewReason:'The saved app address has changed identity or placement evidence. Reload and review the current unit.',
+    importedInstallation:null,latitude:null,longitude:null,coordinateSource:null,locationImportedGeocode:null,locationVerification:'address_changed',locationVerifiedAt:null,locationHistoryId:null};
+  }
+  const authority=checkedAppAddressAuthority(s.addressAuthority,s.sourceRevision)!;
+  const customerLabel=typeof s.customerLabel==='string'&&s.customerLabel.trim()&&s.customerLabel.length<=250?s.customerLabel:null;
+  const core={...raw,customer:customerLabel,placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,placementStatus:null,
+   installedSiteId:null,activeJobNumber:null,latitude:null,longitude:null,coordinateSource:null,locationGeocode:null,locationImportedGeocode:null,
+   locationVerification:'address_only',locationVerifiedAt:null,locationHistoryId:null,addressEstimateTrackerId:null,addressEstimateUnitNumber:null,
+   historicalLatitude:null,historicalLongitude:null,historicalCoordinateSource:null,appAddressRevision:authority.revision,appAddressSourceConflict:s.sourceConflict===true};
+  if(['SHOP','INACTIVE'].includes(s.placement)&&s.eligibility==='tombstone'&&s.installation==null&&s.addressSha256==null&&s.suppliedComponents==null
+   &&decimal(s.eventId)&&[s.nativeGuardSha256,s.sourceFileSha256,s.sourceRowSha256].every(sha)){
+   fieldIds.delete(raw.id);const inactive=s.placement==='INACTIVE';
+   return {...core,site:inactive?'INACTIVE / DO NOT USE':'SHOP / ROOT',address:null,addressSource:null,addressUpdatedAt:null,status:inactive?'inactive':'readiness_unverified',currentLocationType:inactive?'inactive':'shop',importedPlacement:s.placement,
+    importedInstallation:{entityKind:s.entityKind,nativeUnitId:s.nativeUnitId,...sourceIdentity(s),sourceRevision:s.sourceRevision,eventId:s.eventId,nativeGuardSha256:s.nativeGuardSha256,sourceFileSha256:s.sourceFileSha256,sourceRowSha256:s.sourceRowSha256,placement:s.placement,addressAuthority:authority}};
+  }
+  const binding=await checkedImportedBinding(s);
+  if(s.placement!=='FIELD'||!binding){fieldIds.delete(raw.id);return {...core,currentLocationType:'unknown',placement:'UNKNOWN',placementStatus:'needs_identity_review',locationVerification:'address_changed',importedInstallation:null};}
+  fieldIds.add(raw.id);
+  // A same-address, already-approved property estimate remains eligible; changing
+  // an address holds its old point. All fourteen original receipts stay intact.
+  const sameAddress=typeof raw.address==='string'&&await addressDigest(raw.address)===binding.addressSha256;
+  const reviewed=sameAddress?await checkedReviewedAddressEstimate({...raw,addressEstimateLegacyEvidenceSha256:await reviewedLegacyEvidenceSha256(raw.unitNumber,audits,devices,placementMatchKey)}):null;
+  const preserve=reviewed?{latitude:raw.latitude,longitude:raw.longitude,coordinateSource:raw.coordinateSource,historicalLatitude:raw.historicalLatitude,historicalLongitude:raw.historicalLongitude,historicalCoordinateSource:raw.historicalCoordinateSource,
+   addressEstimateTrackerId:raw.addressEstimateTrackerId,addressEstimateUnitNumber:raw.addressEstimateUnitNumber,addressEstimateLegacyEvidenceSha256:await reviewedLegacyEvidenceSha256(raw.unitNumber,audits,devices,placementMatchKey)}:{};
+  return {...core,...preserve,site:typeof s.siteLabel==='string'&&s.siteLabel.trim()?s.siteLabel:'Installation site',address:installationAddress(binding.installation),
+   addressSource:'COS app Owner / IT installation address',recordSource:'COS app Owner / IT installation address',addressUpdatedAt:typeof s.addressUpdatedAt==='string'?s.addressUpdatedAt:null,
+   status:'field',currentLocationType:'field',importedPlacement:'FIELD',importedInstallation:binding};
+ }));
+ const byRow=new Map(inventoryItems.map((r:Row)=>[r.id,r]));
+ const items=[...fieldIds].map(id=>byRow.get(id)).filter((row):row is Row=>row!==undefined);
+ return {...snapshot,items,inventoryItems,summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,
+  missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length}};
+}
 export async function projectImportedGeocodes(snapshot:Row,records:unknown,audits:unknown,devices:unknown,context?:ImportedProjectionContext):Promise<Row>{
  if(!Array.isArray(records))throw Error('Imported address estimates unavailable');const byId=new Map<string,Row>();
  for(const r of records){if(!object(r)||!object(r.binding))throw Error('Imported estimate identity invalid');const key=r.binding.entityKind+'|'+r.binding.nativeUnitId;if(byId.has(key))throw Error('Duplicate imported estimate');byId.set(key,r);}
@@ -218,7 +284,9 @@ export async function projectImportedGeocodes(snapshot:Row,records:unknown,audit
   // fallback when its source proof, identity context or lookup record disappears.
   const {locationImportedGeocode:_previousImportedGeocode,...row}=raw;
   const legacyConcern=legacyConcernForUnit(row.unitNumber);
-  if(object(row.importedInstallation)&&Object.hasOwn(row.importedInstallation,'sourcePrecedence')&&!reviewed.has(row.id)||row.placementSource==='owner'||row.placementAuditId!=null||row.placement==='SHOP'||row.placement==='UNKNOWN'||row.placementStatus==='needs_identity_review'||row.locationVerification==='owner_verified'||row.hasUnitGps===true||row.installedSiteId!=null||row.currentLocationType!=='field'||legacyConcern&&!sourceOnly.has(row.id)&&!reviewed.has(row.id))return row;
+  const appSource=currentSources.find(s=>object(s)&&s.nativeUnitId===row.id&&Object.hasOwn(s,'addressAuthority'));
+  const app=appSource&&confirmedAppSource(appSource,row,audits,devices,context);
+  if(object(row.importedInstallation)&&Object.hasOwn(row.importedInstallation,'addressAuthority')&&!app||object(row.importedInstallation)&&Object.hasOwn(row.importedInstallation,'sourcePrecedence')&&!reviewed.has(row.id)||row.placementSource==='owner'||row.placementAuditId!=null||row.placement==='SHOP'||row.placement==='UNKNOWN'||row.placementStatus==='needs_identity_review'||row.locationVerification==='owner_verified'||row.hasUnitGps===true||row.installedSiteId!=null||row.currentLocationType!=='field'||legacyConcern&&!sourceOnly.has(row.id)&&!reviewed.has(row.id)&&!app)return row;
   const binding=await checkedImportedBinding(row.importedInstallation),r=byId.get(identity(row));if(!binding||!r||row.id!==binding.nativeUnitId||row.unitNumber!==binding.unitNumber||typeof row.address!=='string'||await addressDigest(row.address)!==binding.addressSha256)return row;
   if(legacyConcern||binding.sourcePrecedence){const current=await checkedImportedBinding(currentSources.find(s=>object(s)&&s.entityKind===binding.entityKind&&s.nativeUnitId===binding.nativeUnitId));if(!current||JSON.stringify(current)!==JSON.stringify(binding))return row;}
   const returned=await checkedImportedBinding(r.binding);

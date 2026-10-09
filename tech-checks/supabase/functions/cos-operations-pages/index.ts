@@ -1,7 +1,9 @@
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
-import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjection.ts';
+import {projectImportedSourceAddresses,projectImportedGeocodes,projectAppUnitAddresses,checkedImportedBinding} from './importedSourceProjection.ts';
+import {createAppUnitAddress} from './appUnitAddress.ts';
+import {APP_UNIT_ADDRESS_CONTRACT,checkedAppAddressProof,checkedAppAddressAuthority} from '../_shared/appUnitAddressContract.ts';
 import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
 import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
 import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';
@@ -270,6 +272,21 @@ export function createOperationsHandler(options) {
     const sources={units,matches,providers,devices,audits,ownerCrosswalk:crosswalk,ownerEpochs:epochs};
     return {sources,identity:await verifiedHealthIdentities(sources),reviewSources:{units,matches,providers,devices,epochs,crosswalk}};
   };
+  const readAppAddressProof = (context,unitNumber,unitKey) => readJson(LEGACY_URL+'/rest/v1/rpc/cos_app_unit_address_legacy_proof',{
+    method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_unit_number:unitNumber,p_legacy_unit_key:unitKey}),
+  },'Current unit identity and placement could not be verified.');
+  const appAddressCapability = async context => {
+    if(!context.actorId||!(context.legacyOwner||verifiedItFleet(context)))return false;
+    try{
+      const native=await rpc('cos_app_unit_address_capability',{p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID});
+      if(native?.contract!==APP_UNIT_ADDRESS_CONTRACT||native.enabled!==true||!native.readiness
+        ||!['native','bridge','worker','queue','readers','legacyProof'].every(key=>native.readiness[key]===true))return false;
+      const legacy=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_app_unit_address_legacy_capability',{
+        method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID}),
+      },'App address editing is not enabled for this backend yet.');
+      return legacy?.contract===APP_UNIT_ADDRESS_CONTRACT&&legacy.proof===true&&legacy.queue===true;
+    }catch{return false;}
+  };
   // Share one large-transfer slot across imports, original PDF downloads, and private evidence.
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
@@ -425,22 +442,32 @@ export function createOperationsHandler(options) {
         }
         fail('COS technician endpoint not found.', 404);
       }
-      // Keep the Owner gate closed for every endpoint outside this exact read allowlist.
+      // Only the explicit address contract joins the existing IT fleet reads.
+      // GPS, identity approval and unrelated Owner endpoints keep their gates.
       const verifiedFleetIt = verifiedItFleet(context);
       if (!context.legacyOwner && !(verifiedFleetIt && fleetRouteAllowed(method,path))) fail('An active COS Owner account is required.', 403);
       if (method === 'GET' && path === '/api/session' && verifiedFleetIt) return json({
         authorized:true, legacyOwner:false, role:'IT', name:context.name,
-        features:fleetFeatures(), productionOwnerUserId:null, provisioningNeeded:null, reason:null,
+        features:{...fleetFeatures(),importedUnitAddressEdit:await appAddressCapability(context)}, productionOwnerUserId:null, provisioningNeeded:null, reason:null,
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
+        features: { fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), importedUnitAddressEdit:await appAddressCapability(context), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      const appAddressRoute=/^\/api\/field-map\/([a-f0-9-]+)\/address$/i.exec(path);
+      if(appAddressRoute){
+        if(method==='POST'&&body===null)body=await requestBody(request);
+        return json(await createAppUnitAddress({
+          capability:()=>appAddressCapability(context),readNative:id=>rpc('cos_app_unit_address_read',{...actorPayload,p_native_unit_id:id}),
+          readIdentity:()=>readIdentitySources(context),readProof:(unitNumber,key)=>readAppAddressProof(context,unitNumber,key),
+          save:args=>rpc('cos_app_unit_address_save',{...actorPayload,...args}),
+        })(method,appAddressRoute[1],body));
+      }
       if(path.startsWith('/api/owner-identity/')){
         // Deliberately outside the verified IT allowlist. No identity-approval expansion.
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
@@ -549,9 +576,33 @@ export function createOperationsHandler(options) {
             }
             return confirmed;
           };
+          const readAppAddressBindings=async(sources)=>{
+            const candidates=sources.filter(source=>checkedAppAddressAuthority(source?.addressAuthority,source?.sourceRevision)),confirmed=[],proofs=new Map();
+            // Bounded ordered proof batches avoid one network hop per unit.
+            // Missing or malformed evidence holds only the app corrections.
+            for(let offset=0;offset<candidates.length;offset+=100){
+              const group=candidates.slice(offset,offset+100);
+              try{
+                const response=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_app_unit_address_legacy_proof_many',{
+                  method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_sources:group.map(source=>({unitNumber:source.unitNumber,legacyUnitKey:source.addressAuthority.legacyUnitKey}))}),
+                },'Current app address placement evidence is unavailable.');
+                if(!Array.isArray(response?.proofs)||response.proofs.length!==group.length)continue;
+                for(let i=0;i<group.length;i++){
+                  const source=group[i],authority=checkedAppAddressAuthority(source.addressAuthority,source.sourceRevision),proof=checkedAppAddressProof(response.proofs[i]);
+                  if(!proof||proof.legacyUnitKey!==authority.legacyUnitKey)continue;
+                  proofs.set(source.nativeUnitId,proof);
+                  if(['contract','legacyUnitKey','legacyIdentitySha256','legacyPlacementSha256'].every(key=>proof[key]===authority[key]))confirmed.push(source);
+                }
+              }catch{/* No app point or placement without current proof. */}
+            }
+            return {confirmed,proofs};
+          };
           const [importedSources,archivedRepresentations]=await Promise.all([readSourceProjections(),readArchivedRepresentations()]);
           const confirmedPrecedenceBindings=await readPrecedenceBindings(importedSources);
-          const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices,[],{nativeUnits:units,identity,archivedRepresentations,confirmedPrecedenceBindings}),audits,devices,identity,units);
+          const initialAppProofs=await readAppAddressBindings(importedSources);
+          const initialSourceContext={nativeUnits:units,identity,archivedRepresentations,confirmedPrecedenceBindings,confirmedAppAddressBindings:initialAppProofs.confirmed};
+          const initialOwner=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices,[],initialSourceContext),audits,devices,identity,units);
+          const initial=await projectAppUnitAddresses(initialOwner,importedSources,audits,devices,initialSourceContext);
           const importedBindings=(await Promise.all(initial.items.filter(row=>row.placementSource!=='owner').map(row=>checkedImportedBinding(row.importedInstallation)))).filter(Boolean);
           const importedGeocodes=[];
           for(let offset=0;offset<importedBindings.length;offset+=250){
@@ -560,7 +611,7 @@ export function createOperationsHandler(options) {
               if(Array.isArray(page))importedGeocodes.push(...page);
             }catch{/* No imported point is shown without current readback. */}
           }
-          const ids=[...new Set(initial.items.filter(row=>row.placementSource==='owner'&&row.placementAuditId).map(row=>row.placementAuditId))];
+          const ids=[...new Set(initialOwner.items.filter(row=>row.placementSource==='owner'&&row.placementAuditId).map(row=>row.placementAuditId))];
           const geocodes=[],fallbackGeocodes=[];let censusUnavailable=false;
           try{
             for(let offset=0;offset<ids.length;offset+=250){
@@ -578,8 +629,10 @@ export function createOperationsHandler(options) {
           const {audits:freshAudits,devices:freshDevices,units:freshUnits}=freshBundle.sources;
           const [freshSources,freshArchivedRepresentations,sourceRecorded]=await Promise.all([readSourceProjections(freshSnapshot.inventoryItems),readArchivedRepresentations(),readSourceRecordedCoordinates(freshSnapshot.inventoryItems,rpc)]);
           const archiveContext={nativeUnits:freshUnits,identity:freshBundle.identity,archivedRepresentations:freshArchivedRepresentations,previousArchivedRepresentations:archivedRepresentations};
-          const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources)};
-          const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
+          const freshAppProofs=await readAppAddressBindings(freshSources);
+          const stableAppManualIds=[...freshAppProofs.proofs.keys()].filter(id=>initialAppProofs.proofs.has(id)&&JSON.stringify(initialAppProofs.proofs.get(id))===JSON.stringify(freshAppProofs.proofs.get(id)));
+          const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources),confirmedAppAddressBindings:freshAppProofs.confirmed,stableAppManualIds};
+          const base=await projectAppUnitAddresses(await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits),freshSources,freshAudits,freshDevices,freshSourceContext);
           let projected=await projectFieldGeocodes(base,geocodes,censusUnavailable);
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{/* No imported point is shown without valid current bindings. */}

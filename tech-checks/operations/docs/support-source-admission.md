@@ -1,13 +1,29 @@
-# Reviewed mHelp support admission
+# Reviewed mHelp typed ProductId admission
 
-This operator-only path adds an absent FIELD support asset as a tracker target and
+This operator-only path adds an absent FIELD asset as a tracker target and
 admits its mHelp address source in the same transaction. It creates no equipment
 camera, provider association, Owner event, authentication identity or coordinate.
 The target says `mHelpDesk product import`; it never inherits the tracker table's
 `2027 Unit Tracker` default. All pre-existing records are preserved.
 
-The supported source categories are exactly `Stand` and `Solar Pole 72`, with a
-complete three-digit nonzero unit number and, for a pole, its explicit capacity.
+The historical `cos_support_*` API, receipt table, builder filename and support
+record shapes remain compatible. The supported complete identities are:
+
+| Kind | Source category | Accepted full label (NNN is three digits) | Stored label / family |
+| --- | --- | --- | --- |
+| `stand` | `Stand` | `ST NNN`, `Stand NNN` | `ST NNN` / `STANDS` |
+| `solar_pole` | `Solar Pole 72` | `Solar Pole NNN 72` or `Solar Pole 72 NNN`, optionally ` (Hybrid Solar Stand)` | `Solar Pole 72 NNN` / `SOLAR POLES & SKIDS` |
+| `wall_e` | `Wall-E` | `WA NNN`, `Wall-E NNN`, `Wall E NNN` | `WA NNN` / `WALL-E` |
+| `camv` | `CAM-V` | `CAMV NNN`, `CAM-V NNN`, `CAM V NNN` | `CAMV NNN` / `CAM V & RSU` |
+| `sniper_2` | `Sniper 2` | `Sniper 2-NNN`, `Sniper 2 NNN` | `Sniper 2 NNN` / `SNIPERS` |
+
+The unit number cannot be `000`. Pole capacity must be the JSON number `72`;
+all other kinds require JSON null capacity. The Sniper model token `2` is part
+of the full identity and permanent reservation key. Unknown variants, capacity
+suffixes, extra numeric tokens, incomplete labels and disposition annotations
+are rejected; nothing is stripped or completed from a guessed category. Original
+source labels remain in the permanent request receipt. There is no ProductId or
+per-unit allowlist. Unrecognized families need a separately reviewed typed contract.
 The actual source ProductId, source file/selected-row SHA-256, source observation
 watermark, original components and reviewed installation components are required.
 A tracker-only asset without an actual mHelp ProductId requires a future typed
@@ -24,17 +40,23 @@ The source importer body SHA-256 must be
 `45a4071388d9823fc9d4442c66012458f8eff56f78957674f27a8625fcbc405d`;
 admission rejects drift. No SQL is sent to the legacy database by this code.
 
-Installation adds one RLS-enabled private reservation/receipt table and five
+Initial installation adds one RLS-enabled private reservation/receipt table and five
 private SECURITY INVOKER functions with empty search paths. PUBLIC, anon,
 authenticated and service_role receive no table or function privileges. There are
 no new roles, schema grants, JWT settings, definer functions or public endpoints.
 The existing SQL administrator must have `current_user = 'postgres'`. Its actual
 role is recorded in the receipt; no Owner actor is supplied or assumed.
+The same artifact can upgrade the existing reviewed support contract: it uses
+`CREATE TABLE IF NOT EXISTS` and `CREATE OR REPLACE FUNCTION`, preserving existing
+reservations, requests, target snapshots and source revisions. Verify the existing
+ledger matches this schema before upgrading; this is not a schema repair tool.
 
 ## Required independent review
 
 1. Verify the deployed UI renders ordinary ST/Stand and Solar Pole targets as
-   blue support assets with zero cameras. Record the deployed commit and evidence
+   blue support assets with zero cameras, and Wall-E, CAM-V and Sniper 2 targets
+   as camera equipment with unknown health when there are no matching resource
+   observations. Admission creates no channel count or health evidence. Record the deployed commit and evidence
    outside this repository. A source-code merge alone is insufficient.
 2. Verify immutable source file and selected-row hashes against the actual supplied
    export. Scan the entire export for unique ProductIds and complete family,
@@ -45,9 +67,10 @@ role is recorded in the receipt; no Owner actor is supplied or assumed.
    native, provider, archived, missing, Owner or historical identity conflict.
    A matching currently FIELD source row is evidence, not an existing native
    target. Never merge units because they share an address, customer or unit digits.
-4. Independently inspect any literal component repair. The only supported repair
-   splits an empty Street plus a City containing one house/street/road-suffix and
-   city. It preserves the original literal, state and ZIP. Require exactly one
+4. Independently inspect any literal component repair. `state_case_only` permits
+   uppercasing an original two-letter state and changes no other component.
+   `street_in_city_literal_split` splits an empty Street plus a City containing
+   one house/street/road-suffix and city. It preserves the original literal, state and ZIP. Require exactly one
    parse and corroboration in the latest tracker. Do not add words, guess a ZIP,
    normalize a different site or use this path to relocate an existing asset.
 5. Assemble the private review receipt with hashes, row counts, completeness and
@@ -79,6 +102,45 @@ Label matching is deliberately conservative and used only to refuse a creation.
 Bare digits use an explicit native model family for denial; unrelated families or
 shared addresses do not identify an asset. Ambiguous capacity/number representations
 can produce a refusal and must be reviewed rather than weakening a guard.
+Non-support base/variant/capacity aliases also cause refusal, including collapsed
+Sniper model/tag forms. This broad concern parser is only a negative guard; it is
+never an identity binding, provider association or permission to drop a variant.
+The complete padded asset tag is retained inside a composite token. Distinct tags
+such as `003` and `013` remain separate. Known Sniper generation, HD/HDC hardware
+and camera-channel digits do not become a different asset's tag.
+
+### Expected legacy inventory groups
+
+A camera asset can already have an unbound tracker-derived Camera Health inventory
+stub without a native tracker/asset. For `wall_e`, `camv` and `sniper_2` only, a
+review may include `legacyGroups`, one complete exact group per ProductId. This
+does not relax any native, provider, Owner, source, archive or history guard, and
+the four inventories must still be complete, fresh and free of actual conflicts.
+Support records cannot use this exception.
+
+Each group requires `productId`, the exact canonical `identityKey` and `fullLabel`,
+JSON null `variant`, the legacy inventory's exact `rosterSha256` and `readAt`,
+`complete: true`, unique string `deviceIds` and the corresponding complete `devices`
+array. Every device preserves its `id`, `unitKey`, `deviceName`, `deviceType`,
+`source`, `organization`, `activationState`, `externalDeviceId` and `connectionRevision`.
+Both labels must match the complete requested family/model/tag, with no suffix or
+variant dropped. The current exception is limited to active `2026_unit_tracker`
+stubs with no external provider ID and connection revision zero. A device cannot
+appear in two groups.
+
+`nativeAssociations`, `providerAssociations` and `ownerPlacementGpsConflicts` must
+each be explicitly empty, and `placementGpsReviewed` must be true after reviewing
+the full authoritative evidence. A raw imported `root` organization remains in
+the receipt; that grouping alone does not claim an Owner-directed Shop move.
+Unknown or unavailable history/GPS evidence must remain held. These caller-supplied
+statements have the same independent-review limitation as the original receipt;
+they are not proof that the external system was read. Never mark a historical
+snapshot freshly reviewed or fill empty conflict lists without the checks.
+
+The group is retained only in the private admission receipt. None of its device
+IDs, source status, organization or counts is attached to the new native target,
+copied to provider/Owner tables, or used to create a health observation. Existing
+tracker-only Camera Health stubs without real observations remain unknown.
 
 A target is generated only after the checks pass. Its real server guard is then
 computed and handed to the existing reviewed source importer. The new target,
@@ -104,6 +166,19 @@ receipts outside the checkout. Generate transaction files with:
 node scripts/build-support-admission.mjs /private/records.json /private/review.json /private/prepared
 ```
 
+When external evidence is old or fresh review is not yet authorized, prepare only
+the typed records and proposed labels with:
+
+```sh
+node scripts/build-support-admission.mjs --plan /private/records.json /private/plan
+```
+
+This writes a private `apply-plan.json` marked `awaiting_fresh_independent_review`.
+It retains the supplied source watermark/hashes, sets the review receipt to null
+and allocates no target UUID. It emits no executable SQL and makes no claim that
+the inventory or deployed classifier has been freshly reviewed. Unsupported full
+labels are rejected by the preparation helper and again by SQL under the locks.
+
 The builder makes no network or database calls. It refuses repository-contained
 input/output and refuses to overwrite files. It emits `dry-run.sql`, `execute.sql`
 and a manifest containing input/output hashes. Both SQL files set READ COMMITTED,
@@ -117,8 +192,10 @@ file belongs in the public commit.
 No provider lookup is performed by admission. Existing source-change consumption
 may subsequently queue quality-gated free-tier geocoding. Before applying, coordinate
 with the release owner if that consumer must remain paused. Accepted estimates
-remain source-bound and separate from physical GPS; every support unit keeps its
-own asset/pin even when an address cache result is shared.
+remain source-bound and separate from physical GPS; every asset keeps its
+own asset/pin even when an address cache result is shared. The same queue and
+free-tier budget apply to the new typed families; this path adds no provider call,
+paid lookup or new geocoding budget.
 
 ## Rollback and withdrawal
 
@@ -151,4 +228,7 @@ admission path deliberately cannot reactivate a withdrawn identity.
 The multi-session suite accepts only localhost and uses a disposable database and
 synthetic records. It verifies actual role denials, stale-snapshot rejection,
 non-cooperating concurrent writers, native changes committed before a fresh retry,
-atomic visibility and idempotent retry. It must never be pointed at production.
+atomic visibility and idempotent retry for support and typed camera equipment,
+including provider variant collisions. The fast suite also feeds created typed
+targets into the existing camera-health classifier and checks unknown status.
+It must never be pointed at production.

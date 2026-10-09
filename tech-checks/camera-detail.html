@@ -70,7 +70,7 @@ button,a{font:inherit}button{cursor:pointer}.shell{width:100%;max-width:980px;ma
 <link rel="stylesheet" href="./camera-health-history.css?v=20261006">
 <link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">
 <script defer src="./cos-eye-branding.js?v=20261006b"></script>
-<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261008-fleet-identity-placement"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261008"></script></head>
+<link rel="stylesheet" href="./camera-placement-controls.css?v=20261007"><script src="./camera-placement-controls.js?v=20261009-app-address"></script><script src="./camera-connection-editor.js?v=20261007"></script><link rel="stylesheet" href="./camera-effective-placement.css?v=20261008"><script src="./camera-effective-placement.js?v=20261009-app-address"></script></head>
 <body>
 <div class="shell">
   <div class="topbar">
@@ -237,10 +237,10 @@ function renderEffectivePlacement(){
   $('effectivePlacement').innerHTML=CameraEffectivePlacement.markup(device,{includeLocation:false});
   $('fieldMapLink').href='./?fieldUnit='+encodeURIComponent(CameraEffectivePlacement.fieldLabel(device));
   if(value){
-    const shop=placementActionAtShop(),allowed=canEditFieldPlacement();
+    const shop=placementActionAtShop(),inactive=value.scope==='inactive',allowed=canEditFieldPlacement();
     $('shopActionWrap').classList.toggle('hidden',!allowed);$('shopActionWrap').classList.toggle('at-shop',shop);
-    $('shopActionTitle').textContent=shop?'Unit is at Shop / ROOT':'Unit placement · FIELD';
-    $('shopActionText').textContent=shop?'The unit stays searchable with its camera links and diagnostic history.':'Current site and address match the Field Map record. Health observations are separate.';
+    $('shopActionTitle').textContent=inactive?'INACTIVE / DO NOT USE':shop?'Unit is at Shop / ROOT':'Unit placement · FIELD';
+    $('shopActionText').textContent=inactive?'The source records this unit as inactive. Confirm an intentional new installation before moving it to Field.':shop?'The unit stays searchable with its camera links and diagnostic history.':'Current site and address match the Field Map record. Health observations are separate.';
     $('moveShopBtn').textContent=shop?'Move to Field':'Move unit to Shop / ROOT';
     $('editFieldBtn').classList.toggle('hidden',!allowed||shop);
   }
@@ -250,7 +250,7 @@ function renderEffectivePlacement(){
   // Do not write an imported/native site into the provider organization field.
   if(value?.status==='ready'||value?.lastRead){$('editSiteBtn').classList.add('hidden');$('siteEditWrap').classList.add('hidden');}
 }
-function placementActionAtShop(){const value=window.CameraEffectivePlacement?.get(device);return value?.status==='ready'||value?.lastRead?value.scope==='shop':isShopDevice(device)||String(device?.activation_state||'').toLowerCase()==='deactivated';}
+function placementActionAtShop(){const value=window.CameraEffectivePlacement?.get(device);return value?.status==='ready'||value?.lastRead?['shop','inactive'].includes(value.scope):isShopDevice(device)||String(device?.activation_state||'').toLowerCase()==='deactivated';}
 function refreshEffectivePlacement(){
   if(!placementView)placementView=CameraEffectivePlacement.create({db,getDevices:()=>device?[device]:[],partial:true,onChange:renderEffectivePlacement});
   return placementView.refresh();

@@ -6,7 +6,8 @@ export function verifiedItFleet(context: any): boolean {
      (context.legacyId === 'b7cc3cbf-d11e-4d4a-9742-c07701857911' && context.actorId === '3caf7c00-627f-445f-bce4-ddeae574ee5c'));
 }
 export function fleetRouteAllowed(method: string, path: string): boolean {
-  return method === 'GET' && new Set([
+  return ['GET','POST'].includes(method)&&/^\/api\/field-map\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/address$/i.test(path)
+    || method === 'GET' && new Set([
     '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/routers',
   ]).has(path);

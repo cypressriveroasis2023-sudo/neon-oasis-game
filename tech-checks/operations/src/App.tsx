@@ -9,6 +9,7 @@ import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
+import { importedAddressCapability } from './importedUnitAddress';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
 import MhelpTicketImport from './MhelpTicketImport';
@@ -327,7 +328,7 @@ function OwnerApp() {
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
-        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true}/></section>
+        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true} importedUnitAddressEditEnabled={importedAddressCapability(session)}/></section>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Unscheduled',jobId:'',detail:false},true)}/>

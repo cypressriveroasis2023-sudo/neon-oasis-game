@@ -55,7 +55,8 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(frame.getByRole('link',{name:/Look up recorded installation address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');
   await expect(frame.getByText('Installed address available. A map pin needs verified coordinates.')).toBeVisible();
   await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
-  await expect(frame.getByRole('heading',{name:'Tracker location',exact:true})).toBeVisible();
+  await expect(frame.getByRole('heading',{name:'Unit address',exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'Imported unit address correction'})).toContainText('when enabled for this backend');
   await openWorkspace(frame,'Today');
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);
