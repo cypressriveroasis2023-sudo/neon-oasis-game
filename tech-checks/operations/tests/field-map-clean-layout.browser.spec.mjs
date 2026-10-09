@@ -29,7 +29,7 @@ test('complete counts, compact map-first view, review disclosure and explicit-on
  await expect(frame.locator('.field-map-kpis article b')).toHaveText(['319','116','0','107','96']);
  await expect(frame.locator('.field-map-kpis')).toContainText('UNKNOWN / STALE');await expect(frame.locator('.field-map-kpis')).toContainText('SUPPORT · 0 CAMERAS');
  await expect(frame.locator('.field-map-info')).not.toHaveAttribute('open');await expect(frame.locator('.router-map-note')).not.toBeVisible();await expect(frame.locator('.field-map-detail')).not.toBeVisible();
- const entryMap=await frame.locator('.field-map-center').boundingBox();expect(entryMap.y).toBeLessThan(page.viewportSize().height);await page.screenshot({path:info.outputPath('compact-map-entry.png')});
+ const entryMap=await frame.locator('.field-map-center').boundingBox();expect(entryMap.y).toBeLessThan(page.viewportSize().height);if(page.viewportSize().width<=700)expect(page.viewportSize().height-80-entryMap.y).toBeGreaterThanOrEqual(240);await page.screenshot({path:info.outputPath('compact-map-entry.png')});
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
  const boxes=await frame.locator('.field-map-layout').evaluate(el=>({map:el.querySelector('.field-map-center').getBoundingClientRect().top,list:el.querySelector('.field-map-list').getBoundingClientRect().top,width:innerWidth,scroll:document.documentElement.scrollWidth}));
  if(boxes.width<=700)expect(boxes.map).toBeLessThan(boxes.list);expect(boxes.scroll).toBeLessThanOrEqual(boxes.width+1);

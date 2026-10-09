@@ -100,6 +100,16 @@
  #root .operations-shell .field-map-layout.has-selection .field-map-detail{grid-column:1/-1;max-height:640px}
 }
 @media(max-width:700px){
+ #root#root .operations-field-view>.owner-it-main{padding-left:12px!important;padding-right:12px!important}
+ #root#root .operations-field-view .company-utility-bar{height:64px;min-height:64px;margin:0 -12px 10px;padding:0 12px}
+ #root#root .operations-field-view .company-mobile-brand .company-brand-mark{width:40px!important;height:40px!important}
+ #root#root .operations-field-view .command-page-header{margin:0 0 8px!important}
+ #root#root .operations-field-view .command-page-header :is(label,p){display:none}
+ #root#root .operations-field-view .command-page-header h1{font-size:22px!important;margin:0!important}
+ #root#root .operations-field-view .field-map-module{padding:10px!important}
+ #root#root .operations-field-view .field-map-display-bar{padding:0;border:0;margin:0;align-items:center}
+ #root#root .operations-field-view .field-map-kpis{margin:0}
+ #root#root .operations-field-view .field-map-workspace button.secondary{min-height:44px}
  #root .operations-shell .field-map-display-bar>div>span{display:none}
  #root .operations-shell .field-map-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
  #root .operations-shell .field-map-kpis article{padding:7px 5px}

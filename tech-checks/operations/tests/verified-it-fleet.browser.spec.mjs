@@ -79,6 +79,18 @@ test('IT Home keeps one clear entry through real legacy redraws, keyboard, retur
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThanOrEqual(issued);
 });
 
+for(const action of ['role change','logout'])test(`IT ${action} during fullscreen restores the parent and removes stale access`,async({page})=>{
+ await mount(page);const entry=page.locator('[data-cos-field-view]');await expect(entry).toBeVisible();
+ const readParent=()=>page.evaluate(()=>({overflow:document.body.style.overflow,visibility:document.getElementById('appView').style.visibility,pointerEvents:document.getElementById('appView').style.pointerEvents,inert:document.getElementById('appView').inert}));
+ const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});
+ await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await expect(page.locator('body')).toHaveCSS('overflow','hidden');await expect(page.locator('#appView')).toHaveCSS('visibility','hidden');expect((await readParent()).inert).toBe(true);
+ await page.evaluate(action=>{if(action==='logout'){window.fixtureSubject=null;window.fixtureAuthChanged();}else{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');}},action);
+ await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);await expect.poll(readParent).toEqual(original);
+ await expect(page.locator('#appView')).toBeVisible();await page.keyboard.press('Tab');expect(await page.locator('body').evaluate(()=>document.activeElement?.closest('dialog,iframe')===null)).toBe(true);
+});
+
 for(const [label,options] of [['capability denied',{capability:false}],['inactive',{active:false}],['archived',{archived:true}],['owner preview',{effectiveRole:'owner'}]])test('IT '+label+' receives no Home entry or token',async({page})=>{
  await mount(page,'it',true,options);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);
  await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);

@@ -305,7 +305,7 @@ function OwnerApp() {
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
   const selectedArea=primaryWorkspace(active);
   const ownerInitials=String(session?.name||'Owner').split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
-  return <div className='shell operations-shell company-shell'>
+  return <div className={'shell operations-shell company-shell'+(active==='Field Map'?' operations-field-view':'')}>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
     <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
       <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
