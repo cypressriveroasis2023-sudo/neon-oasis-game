@@ -4,7 +4,7 @@
 
 Owners and the two existing verified IT identities get a Unit Tracker entry in their existing COS workspace. Service has no new button or route. The page reads current COS inventory, shows exact imported tracker provenance and source values separately from newer COS placement/address values, and supports pending new-unit and tracker-field requests when the native queue is enabled.
 
-**There is no Google Sheets publisher or Google authorization in this release.** Every queued request remains `awaiting_sheets_connection`. Saving a request does not change the workbook, native equipment, Camera Health, or Field View. The UI says this before confirmation and after a verified save. This independent release contains no PR81 imported-address editor module or route. The existing Field View and Camera Health navigation remains available for current live controls.
+**There is no Google Sheets publisher in this pending-request contract.** The separate [Google Sheets connection](google-sheets-connection.md) now supports an Owner's live read-access check once the protected Google credential and workbook sharing are configured. That check does not activate publication. Every queued request remains `awaiting_sheets_connection`. Saving a request does not change the workbook, native equipment, Camera Health, or Field View. The UI says this before confirmation and after a verified save. This independent release contains no PR81 imported-address editor module or route. The existing Field View and Camera Health navigation remains available for current live controls.
 
 The only supported workbook is the current 2027 tracker, `1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA`. Legacy/2026 workbooks cannot enter this queue.
 
@@ -38,9 +38,9 @@ Snapshot history is capped at 100 with an explicit truncation flag. Every source
 
 ## Secure Sheets setup still required
 
-The deployed bridge was inspected by configuration names only. It has no Sheets API or Google OAuth/service-account integration. Assistant-connected Google Drive access is not backend authorization.
+The bridge now has a separately tested, server-held service-account reader for the current workbook, described in [Google Sheets connection](google-sheets-connection.md). Assistant-connected Google Drive access is not backend authorization. This queue SQL remains unapplied/default-off; a successful read check does not enable it or publish requests.
 
-A future separately reviewed connector needs:
+A future separately reviewed publisher needs:
 
 - User-approved Google authorization for COS, preferably per-file `drive.file` consent selecting only this 2027 workbook, using an existing Google Cloud project when appropriate.
 - Secure server-held credentials or refresh token, with no credential in a browser bundle, repository, log, outbox row, export or support message. Creating/configuring persistent access requires specific approval; credentials must use the supported secure handoff.

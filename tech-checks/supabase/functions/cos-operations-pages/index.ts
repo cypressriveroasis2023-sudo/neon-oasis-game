@@ -1,4 +1,5 @@
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
+import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
@@ -168,6 +169,7 @@ export function createOperationsHandler(options) {
   }, 'COS workflow could not be completed. Please retry.');
   const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
+  const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
   const mhelpPartner = createMhelpPartnerHandler({
     fetch: requestFetch,
     getConfig: options.mhelpPartner?.getConfig || (() => ({})),
@@ -468,6 +470,13 @@ export function createOperationsHandler(options) {
         if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
         if (method === 'POST' && body === null) body = await requestBody(request);
         return json(await mhelpPartner(path, method, body));
+      }
+      if(path.startsWith('/api/unit-tracker/sheets/')){
+        // Connection credentials and checks stay Owner-only; existing IT
+        // tracker access and permission checks are unchanged.
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method==='POST'&&body===null)body=await requestBody(request);
+        return json(await sheetsConnection(path,method,body));
       }
       if(path==='/api/unit-tracker'||path.startsWith('/api/unit-tracker/')){
         if(method==='POST'&&body===null)body=await requestBody(request);
@@ -889,8 +898,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }
@@ -898,6 +907,7 @@ export function createOperationsHandler(options) {
 }
 
 if (typeof Deno !== 'undefined' && import.meta.main) {
+  const {signSheetsAssertion}=await import('./googleSheetsRuntime.ts');
   const mhelpTokens=nativeMhelpTokens(name=>Deno.env.get(name));
   Deno.serve(createOperationsHandler({
     platformUrl: Deno.env.get('SUPABASE_URL'),
@@ -906,6 +916,7 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     vrm: { getAccessToken: () => Deno.env.get('COS_VRM_ACCESS_TOKEN') },
     inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
     mhelpPartner: { getConfig:mhelpTokens.getPartnerConfig,renewAccess:mhelpTokens.renewAccess },
+    googleSheets: { getServiceAccountJson:()=>Deno.env.get('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion:signSheetsAssertion },
   }));
 }
 
