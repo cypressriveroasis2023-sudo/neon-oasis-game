@@ -1,6 +1,7 @@
 import {addressDigest} from './censusAddress.ts';
 import {placementMatchKey,placementIdentityConcernKey} from './placementProjection.ts';
-import {importedLegacyConcern} from './importedSourceProjection.ts';
+import {matchesInstallation} from './importedAddressContract.ts';
+import {checkedImportedBinding,importedLegacyConcern} from './importedSourceProjection.ts';
 import {reviewedLegacyEvidenceSha256,reviewedEstimatePrefix,reviewedEstimateSource} from './reviewedAddressEstimates.ts';
 type Row=Record<string,any>;
 const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
@@ -27,7 +28,7 @@ export type SourceRecordedPoint={
  sourceObservedAt:string;coordinateRecordedAt:null;sourceSpreadsheetId:string;sourceSheetId:string;coordinateCell:string;coordinateCellSha256:string;
 };
 /** Shared server/client validator. Source observation is never a GPS measurement timestamp. */
-export async function checkedSourceRecordedCoordinates(row:Row,now=Date.now()):Promise<SourceRecordedPoint|null>{
+async function checkedRecordedProvenance(row:Row,now=Date.now()):Promise<SourceRecordedPoint|null>{
  try{
   const r=row.locationSourceRecorded,b=r?.binding;
   if(!object(r)||!object(b)||r.schemaVersion!==1||r.organizationId!==ORG||r.source!=='tracker_recorded_coordinates'||r.confidence!=='source_recorded_unverified'
@@ -63,24 +64,75 @@ export async function checkedSourceRecordedCoordinates(row:Row,now=Date.now()):P
    sourceObservedAt:r.sourceObservedAt,coordinateRecordedAt:null,sourceSpreadsheetId:r.sourceSpreadsheetId,sourceSheetId:r.sourceSheetId,coordinateCell:r.coordinateCell,coordinateCellSha256:r.coordinateCellSha256};
  }catch{return null;}
 }
+// A large contradiction is a reason to withhold an unverified source point,
+// not evidence that an interpolated address point is the precise installation.
+const CONFLICT_DISTANCE_KM=20;
+function distanceKm(a:Row,b:Row):number{
+ const rad=(v:number)=>v*Math.PI/180,lat=rad(b.latitude-a.latitude),lon=rad(b.longitude-a.longitude);
+ const h=Math.sin(lat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(lon/2)**2;
+ return 6371*2*Math.asin(Math.sqrt(Math.min(1,Math.max(0,h))));
+}
+async function acceptedCurrentAddressPoint(row:Row,now:number):Promise<Row|null>{
+ const r=row.locationImportedGeocode,s=await checkedImportedBinding(row.importedInstallation);
+ if(!s||!object(r)||r.status!=='success'||r.jobKind!=='native_import'||r.verified!==false||r.liveGps!==false||!sha(r.legacyGuardSha256)
+  ||!coordinate(r.latitude,90)||!coordinate(r.longitude,180)||r.latitude===0&&r.longitude===0||!date(r.geocodedAt,now)||!matchesInstallation(s.installation,r.matchedAddress))return null;
+ const returned=await checkedImportedBinding(r.binding);
+ if(!returned||JSON.stringify(s)!==JSON.stringify(returned))return null;
+ if(r.provider==='us_census_address_range'&&r.benchmark==='Public_AR_Current')return r;
+ if(r.provider!=='geocodio'||!['rooftop','range_interpolation'].includes(r.accuracyType)||typeof r.accuracy!=='number'||!Number.isFinite(r.accuracy)||r.accuracy<0.9||r.accuracy>1
+  ||![null,'building_centroid','parcel_centroid'].includes(r.matchType??null)||r.accuracyType==='range_interpolation'&&r.matchType!=null)return null;
+ return r;
+}
+function conflict(record:Row,kind:string,km:number):Row{
+ return {kind,recordId:record.recordId,recordedLatitude:record.latitude,recordedLongitude:record.longitude,
+  distanceKm:Math.round(km*1000)/1000,source:'tracker_recorded_coordinates',verified:false,liveGps:false,
+  coordinateCell:record.coordinateCell,sourceObservedAt:record.sourceObservedAt,coordinateRecordedAt:null};
+}
+export async function checkedSourceRecordedCoordinates(row:Row,now=Date.now()):Promise<SourceRecordedPoint|null>{
+ const point=await checkedRecordedProvenance(row,now);if(!point)return null;
+ const estimate=await acceptedCurrentAddressPoint(row,now);
+ return estimate&&distanceKm(point,estimate)>CONFLICT_DISTANCE_KM?null:point;
+}
 /** Called last, with a fresh native read and fresh legacy identity evidence. No placement, coordinates, health or address writes. */
 export async function projectSourceRecordedCoordinates(snapshot:Row,records:unknown,audits:unknown,devices:unknown,now=Date.now()):Promise<Row>{
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems))throw Error('Field Map snapshot unavailable.');
- const clear=(row:Row)=>{const {locationSourceRecorded:_stale,...clean}=row;return clean;};
+ const clear=(row:Row)=>{const {locationSourceRecorded:_stale,locationSourceRecordedConflict:_oldConflict,...clean}=row;return clean;};
  const withoutSource=()=>({...snapshot,items:snapshot.items.map(clear),inventoryItems:snapshot.inventoryItems.map(clear)});
  if(!Array.isArray(records))return withoutSource();
  try{
  const byId=new Map<string,Row>();for(const r of records){if(!object(r)||!uuid(r.nativeUnitId)||!['tracker','equipment_unit'].includes(r.entityKind))return withoutSource();const key=r.entityKind+'|'+r.nativeUnitId;if(byId.has(key))return withoutSource();byId.set(key,r);}
  const concerns=new Map<string,number>();for(const row of snapshot.inventoryItems){const key=placementIdentityConcernKey(row.unitNumber);concerns.set(key,(concerns.get(key)||0)+1);}
- const apply=async(raw:Row)=>{
-  const {locationSourceRecorded:_stale,...row}=raw,r=byId.get(identity(raw));
+ const apply=async(raw:Row):Promise<Row>=>{
+  const {locationSourceRecorded:_stale,locationSourceRecordedConflict:_oldConflict,...row}=raw,r=byId.get(identity(raw));
   if(!r||concerns.get(placementIdentityConcernKey(row.unitNumber))!==1||importedLegacyConcern(row.unitNumber,audits,devices))return row;
   const evidence=await reviewedLegacyEvidenceSha256(row.unitNumber,audits,devices,placementMatchKey);
   if(!evidence||evidence!==r.legacyEvidenceSha256)return row;
   const candidate={...row,locationSourceRecorded:r};
-  return await checkedSourceRecordedCoordinates(candidate,now)?candidate:row;
+  return await checkedRecordedProvenance(candidate,now)?candidate:row;
  };
- return {...snapshot,items:await Promise.all(snapshot.items.map(apply)),inventoryItems:await Promise.all(snapshot.inventoryItems.map(apply))};
+ const [inventory,items]=await Promise.all([Promise.all(snapshot.inventoryItems.map(apply)),Promise.all(snapshot.items.map(apply))]),conflicts=new Map<string,Row>();
+ const candidates=inventory.filter(row=>row.locationSourceRecorded);
+ await Promise.all(candidates.map(async row=>{const estimate=await acceptedCurrentAddressPoint(row,now),r=row.locationSourceRecorded;
+  if(estimate){const km=distanceKm(r,estimate);if(km>CONFLICT_DISTANCE_KM)conflicts.set(identity(row),conflict(r,'current_address_disagreement',km));}
+ }));
+ const installations=new Map<string,Row[]>();
+ for(const row of candidates){
+  if(!text(row.customer,600)||!text(row.site,600))continue;
+  const key=JSON.stringify([row.locationSourceRecorded.binding.addressSha256,row.customer,row.site]),group=installations.get(key);
+  if(group)group.push(row);else installations.set(key,[row]);
+ }
+ for(const group of installations.values())for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++){
+  const a=group[i],b=group[j],ar=a.locationSourceRecorded,br=b.locationSourceRecorded;
+  // Same complete installation evidence only; this is not an equipment identity join.
+  if(identity(a)===identity(b)||ar.recordId===br.recordId)continue;
+  const km=distanceKm(ar,br);if(km>CONFLICT_DISTANCE_KM){
+   if(!conflicts.has(identity(a)))conflicts.set(identity(a),conflict(ar,'same_installation_disagreement',km));
+   if(!conflicts.has(identity(b)))conflicts.set(identity(b),conflict(br,'same_installation_disagreement',km));
+  }
+ }
+ const withhold=(row:Row)=>{const issue=conflicts.get(identity(row));if(!row.locationSourceRecorded||!issue||issue.recordId!==row.locationSourceRecorded.recordId)return row;
+  const {locationSourceRecorded:_point,...rest}=row;return {...rest,locationSourceRecordedConflict:issue};};
+ return {...snapshot,items:items.map(withhold),inventoryItems:inventory.map(withhold)};
  }catch{return withoutSource();}
 }
 /** Native RPC injection only; never uses the legacy provider bridge or a geocoder. */
