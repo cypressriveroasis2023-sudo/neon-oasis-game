@@ -10,6 +10,7 @@ import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useFieldMapDisplay } from './fieldMapDisplay';
 import { useCameraHealth } from './useCameraHealth';
 import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime } from './fieldCameraHealth';
+import {type FieldRecorderAuthority} from './fieldRecorderObservation';
 import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
@@ -25,7 +26,7 @@ type FieldUnit = {
   id:string;
   addressEstimateTrackerId?:string|null; addressEstimateUnitNumber?:string|null;
   addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
-  placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>; locationSourceRecorded?:Record<string,any>; locationSourceRecordedConflict?:Record<string,any>;
+  fieldRecorderAuthority?:FieldRecorderAuthority; importedPlacement?:string; placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>; locationSourceRecorded?:Record<string,any>; locationSourceRecordedConflict?:Record<string,any>;
   unitNumber:string;
   modelName?:string;
   category?:string;
@@ -180,8 +181,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const selected=items.find(x=>x.id===selectedId)||null;
   const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
-  const onlineBasis={camera:0,recorder:0,connection:0,provider:0};
-  for(const observation of healthById.values())if(observation.state==='online')onlineBasis[observation.basis||'provider']++;
+  const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
+  for(const observation of healthById.values()){if(observation.state==='online')onlineBasis[observation.basis||'provider']++;if(observation.state==='offline')offlineBasis[observation.basis||'provider']++;}
   const selectedHealth=selected?healthById.get(selected.id):null;
   const estimateFor=(unit:FieldUnit)=>estimates.get(unit.id)||null;
   const mapPoint=(unit:FieldUnit)=>hasCoords(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:estimateFor(unit);
@@ -496,6 +497,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     <details className='field-map-info'><summary>Map info &amp; review{data?.placementReviews?.length?' · '+data.placementReviews.length+' placement to review':''}</summary>
       <p className='field-map-count-explanation'>Field units = online + offline + unknown / stale + support. Unknown means current status is missing, older or unmatched. Support equipment has no cameras.</p>
       <p>Online observations: {onlineBasis.camera} camera / detector, {onlineBasis.recorder} recorder, {onlineBasis.connection} IP / port{onlineBasis.provider?', '+onlineBasis.provider+' other source':''}. These observations do not verify video or complete camera coverage.</p>
+      <p>Offline observations: {offlineBasis.camera} camera / detector, {offlineBasis.recorder} recorder, {offlineBasis.connection} IP / port{offlineBasis.provider?', '+offlineBasis.provider+' other source':''}. Recorder and service outages do not establish individual camera outages.</p>
       <p>{data?items.filter(hasCoords).length:'—'} verified map pins. Status and location verification are separate.</p>
       <p>Saved status refreshes every 15 minutes · Map loaded {data?new Date(data.generatedAt).toLocaleString():'pending'}</p>
       <p>Health data read {cameras.data?cameraTime(cameras.data.refreshedAt,cameras.now):'not available'} · Pin colors use each source observation’s age.</p>

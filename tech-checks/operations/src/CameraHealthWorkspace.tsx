@@ -39,7 +39,7 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
       {!initialUnitId&&<CameraHealthOverview health={health} now={now} units={units} createTicket={createTicket} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection} canReviewIdentity={canReviewIdentity} onIdentityChanged={()=>{void refresh();void loadUnits();}}/>}
       {initialUnitId&&<>
       <p>The 20-minute window marks recent observations; it is not an expected heartbeat or proof of outage. Last reported states and their ages remain below. Refresh reads saved observations and does not run a probe.</p><p>Records refreshed: <b>{cameraTime(health.refreshedAt,now)}</b> · Automatic saved-data refresh every 15 minutes while visible</p>
-      <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2}/>
+      <CameraResourceObservations rows={rows} now={now} trusted={health.evidenceVersion===2} fieldRecorderObservation={detail?.classification?.fieldRecorderVerified?detail.observation:undefined}/>
       </>}
       {initialUnitId&&selected&&!rows.length&&<p>No matching saved camera record is available for this field unit. {unitDiagnosticsPath(selected,rows)&&<a href={unitDiagnosticsPath(selected,rows)!} target='_blank' rel='noopener noreferrer'>Find this unit in Camera Health diagnostics ↗</a>}</p>}
     </>}

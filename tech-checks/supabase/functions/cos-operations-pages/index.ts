@@ -14,6 +14,7 @@ import { cameraSummary as placementCameraSummary } from './cameraPlacementEviden
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
+import {fieldRecorderHealthGuards,projectFieldRecorderAuthority} from './fieldRecorderObservation.ts';
 import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
 import { routerSnapshot } from './routers.ts';
 import { createInhandPilotReader, InhandPilotError, readPilotClaimBoolean } from './inhandPilot.ts';
@@ -599,7 +600,7 @@ export function createOperationsHandler(options) {
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{/* No imported point is shown without valid current bindings. */}
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
-          return json(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext));
+          return json(await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity));
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {
@@ -676,17 +677,18 @@ export function createOperationsHandler(options) {
             } catch { return {integrations:[],units:[]}; }
             finally {clearTimeout(timer);controller.abort();}
           };
-          const [bundle,health,tracker,witnessIntegrations,reconSources]=await Promise.all([
+          const [bundle,health,tracker,providerIntegrations,reconSources]=await Promise.all([
             readIdentitySources(context),
             legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,checked_at,ip_reachable,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers),
             legacyAll('equipment_master?select=canonical_family,unit_tag,source_label,tracker_state,health_provider&canonical_family=in.(Helios,Ranger,Solar Spotter,Spotter,SS Hybrid,CAMV,Sniper,Sniper 2,Sniper 4,Recon,Recon 2)&order=canonical_family.asc,unit_tag.asc,source_label.asc', context.headers),
-            legacyAll('camera_integrations?select=provider,units:metadata->units&provider=eq.witness&order=provider.asc', context.headers),
+            legacyAll('camera_integrations?select=provider,enabled,last_sync_at,last_sync_status,units:metadata->units&provider=in.(witness,vigilant)&order=provider.asc', context.headers),
             readReconSources(),
           ]);
           const {devices,audits:placementAudits}=bundle.sources,identity=bundle.identity;
+          const witnessIntegrations=providerIntegrations.filter(row=>row.provider==='witness');
           const recon=await projectReconProviderIdentities(reconSources.units,devices,reconSources.integrations)
             .catch(()=>projectReconProviderIdentities([],devices,[]));
-          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon)});
+          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations)});
         }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([

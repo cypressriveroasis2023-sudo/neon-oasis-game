@@ -25,7 +25,7 @@ export type CameraRow = {
 export type UnitEvidence = {
   scope:PlacementScope; state:EvidenceState|'service'|'mapping'|'shop'|'inactive';
   providerState:EvidenceState; cameraState:CameraState; serviceState:EvidenceState;
-  systemKind:'recorder'|'detector'|'system'; recorderOffline:boolean;
+  systemKind:'recorder'|'detector'|'system'; recorderOffline:boolean; fieldRecorderVerified?:boolean;
 };
 const normalized=(value:unknown)=>typeof value==='string'?value.trim().replace(/\s+/g,' ').toUpperCase():'';
 export function cameraTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
