@@ -11,6 +11,15 @@ const decimal=(v:unknown)=>typeof v==='string'&&/^[1-9]\d{0,18}$/.test(v)&&BigIn
 const coord=(v:unknown,limit:number)=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=limit;
 const identity=(r:Row)=>(r.readOnly===true?'tracker':'equipment_unit')+'|'+r.id;
 const concern=(v:unknown)=>placementMatchKey(v).replace(/\|(?:HD4|HDC[24]S?)$/,'');
+// Caches contain only pure label normalization, scoped to one projection read.
+// Source, audit, roster and authorization decisions are never shared across reads.
+function labelKeys(){
+ const matches=new Map<string,string>(),concerns=new Map<string,string>();
+ const match=(value:unknown):string=>{if(typeof value!=='string')return placementMatchKey(value);let key=matches.get(value);if(key===undefined){key=placementMatchKey(value);matches.set(value,key);}return key;};
+ const concern=(value:unknown):string=>{if(typeof value!=='string')return match(value).replace(/\|(?:HD4|HDC[24]S?)$/,'');let key=concerns.get(value);if(key===undefined){key=match(value).replace(/\|(?:HD4|HDC[24]S?)$/,'');concerns.set(value,key);}return key;};
+ return {match,concern};
+}
+
 export type ImportedProjectionContext={nativeUnits:unknown;identity:unknown;currentSources?:unknown};
 const deviceId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?String(v):decimal(v)?String(v):null;
 const sameSet=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(v=>b.includes(v));
@@ -32,6 +41,7 @@ function currentNativeSourceIdentity(source:Row):boolean{
  * A family/base comparison here can reject a conflict; it never assigns cameras. */
 function sourceOnlyOverlayIds(inventory:unknown,sources:unknown,audits:unknown,devices:unknown,context?:ImportedProjectionContext):Set<string>{
  const allowed=new Set<string>();if(!context)return allowed;
+ const {match,concern}=labelKeys();
  const units=context.nativeUnits,identity=context.identity;
  if(![inventory,sources,audits,devices,units].every(rows=>Array.isArray(rows)&&rows.length<=100000&&rows.every(object))
   ||!object(identity)||identity.identityVersion!==1||!Array.isArray(identity.unitIdentities)||!Array.isArray(identity.identityWarnings)
@@ -44,16 +54,21 @@ function sourceOnlyOverlayIds(inventory:unknown,sources:unknown,audits:unknown,d
   ||cameras.some(d=>!deviceId(d.id)||typeof d.unit_key!=='string')||new Set(cameras.map(d=>deviceId(d.id))).size!==cameras.length
   ||history.some(a=>!deviceId(a.id)||typeof a.unit_key!=='string'||!Array.isArray(a.device_ids)||a.device_ids.some((id:unknown)=>!deviceId(id)))
   ||new Set(history.map(a=>deviceId(a.id))).size!==history.length)return allowed;
+ const nativeById=new Map(nativeRows.map(r=>[r.id,r]));
+ const nativeConcerns=new Map<string,number>(),inventoryConcerns=new Map<string,number>(),cameraGroups=new Map<string,Row[]>();
+ for(const u of native){const key=concern(u.unit_number);nativeConcerns.set(key,(nativeConcerns.get(key)||0)+1);}
+ for(const r of rows){const key=concern(r.unitNumber);inventoryConcerns.set(key,(inventoryConcerns.get(key)||0)+1);}
+ for(const d of cameras){const key=concern(d.unit_key),group=cameraGroups.get(key);if(group)group.push(d);else cameraGroups.set(key,[d]);}
  const proofs=[...identity.unitIdentities,...(identity.ownerConfirmedUnitIdentities||[])],warnings=identity.identityWarnings;
  if(proofs.some(p=>!object(p)||!uuid(p.unitId)||typeof p.unitNumber!=='string'||!['native_provider','owner_placement','owner_confirmed_native'].includes(p.kind)||!sha(p.proof)||!Array.isArray(p.deviceIds)||!p.deviceIds.length||p.deviceIds.some((id:unknown)=>typeof id!=='string'||!deviceId(id))||!Array.isArray(p.unitKeys)||!p.unitKeys.length||p.unitKeys.some((k:unknown)=>typeof k!=='string'))
   ||warnings.some(w=>!object(w)||typeof w.unitId!=='string'||!Array.isArray(w.deviceIds)||!Array.isArray(w.unitKeys)||w.deviceIds.some((id:unknown)=>typeof id!=='string'||!deviceId(id))||w.unitKeys.some((k:unknown)=>typeof k!=='string')))return allowed;
  for(const source of sourceRows){
   if(!currentNativeSourceIdentity(source))continue;
-  const row=nativeRows.find(r=>r.id===source.nativeUnitId),key=placementMatchKey(source.unitNumber),base=concern(source.unitNumber);
+  const row=nativeById.get(source.nativeUnitId),key=match(source.unitNumber),base=concern(source.unitNumber);
   if(!row||row.unitNumber!==source.unitNumber||!key.startsWith('typed:')||!(/\|(?:HD4|HDC[24]S?)$/).test(key)
-   ||native.some(u=>u.id!==row.id&&concern(u.unit_number)===base)||rows.some(r=>r.id!==row.id&&concern(r.unitNumber)===base))continue;
-  const group=cameras.filter(d=>concern(d.unit_key)===base),labels=[...new Set(group.map(d=>d.unit_key))],ids=group.map(d=>deviceId(d.id)!);
-  if(labels.length!==1||placementMatchKey(labels[0])!==base)continue;
+   ||(nativeConcerns.get(base)||0)>1||(inventoryConcerns.get(base)||0)>1)continue;
+  const group=cameraGroups.get(base)||[],labels=[...new Set(group.map(d=>d.unit_key))],ids=group.map(d=>deviceId(d.id)!);
+  if(labels.length!==1||match(labels[0])!==base)continue;
   // Even unmarked historical Root/IT moves and differently labelled device audits
   // remain holds. Chronology resolution belongs to a separate reviewed policy.
   if(history.some(a=>concern(a.unit_key)===base||a.device_ids.some((id:unknown)=>ids.includes(deviceId(id)!))))continue;
@@ -76,15 +91,23 @@ export async function checkedImportedBinding(v:unknown):Promise<ImportedBinding|
   sourceFileSha256:v.sourceFileSha256,sourceRowSha256:v.sourceRowSha256,addressSha256:v.addressSha256,nativeGuardSha256:v.nativeGuardSha256,installation:{street:v.installation.street,city:v.installation.city,state:v.installation.state,zip:v.installation.zip},suppliedComponents:supplied,eligibility:'FIELD',eventId:v.eventId};
 }
 /** Deny-only family/base concern; never an identity join or an assignment of an audit to a unit. */
+function legacyConcernReader(audits:unknown,devices:unknown):(unitNumber:string)=>boolean{
+ if(!Array.isArray(audits)||!Array.isArray(devices)||audits.length>100000||devices.length>100000)return ()=>true;
+ if(audits.some(a=>!object(a)||!Array.isArray(a.device_ids)))return ()=>true;
+ const {match,concern}=labelKeys(),groups=new Map<string,Row[]>(),groupData=new Map<string,{ids:Set<string>;labels:Set<string>}>();
+ for(const d of devices){if(!object(d))continue;const key=concern(d.unit_key),group=groups.get(key);if(group)group.push(d);else groups.set(key,[d]);}
+ const history=audits.map(a=>({row:a,key:concern(a.unit_key)})),results=new Map<string,boolean>();
+ return (unitNumber:string)=>{
+  const saved=results.get(unitNumber);if(saved!==undefined)return saved;
+  const key=concern(unitNumber);if(!key)return true;
+  let group=groupData.get(key);if(!group){const rows=groups.get(key)||[];group={ids:new Set(rows.map(d=>String(d.id))),labels:new Set(rows.map(d=>match(d.unit_key)))};groupData.set(key,group);}
+  const mismatch=group.labels.size>1||group.labels.size===1&&!group.labels.has(match(unitNumber));
+  const result=mismatch||history.some(({row:a,key:auditKey})=>(auditKey===key||a.device_ids.some((id:unknown)=>group!.ids.has(String(id))))&&(a.contract==='COS_CAMERA_PLACEMENT_V2'||['MOVE_TO_FIELD','MOVE_TO_ROOT'].includes(a.action)||auditKey!==key));
+  results.set(unitNumber,result);return result;
+ };
+}
 export function importedLegacyConcern(unitNumber:string,audits:unknown,devices:unknown):boolean{
- if(!Array.isArray(audits)||!Array.isArray(devices)||audits.length>100000||devices.length>100000)return true;
- const key=concern(unitNumber);if(!key)return true;
- const relevant=devices.filter(d=>object(d)&&concern(d.unit_key)===key),ids=new Set(relevant.map(d=>String(d.id)));
- const labels=new Set(relevant.map(d=>placementMatchKey(d.unit_key)));labels.add(placementMatchKey(unitNumber));
- if(labels.size>1)return true;
- return audits.some(a=>!object(a)||!Array.isArray(a.device_ids)||
-  (concern(a.unit_key)===key||a.device_ids.some((id:unknown)=>ids.has(String(id))))&&
-  (a.contract==='COS_CAMERA_PLACEMENT_V2'||['MOVE_TO_FIELD','MOVE_TO_ROOT'].includes(a.action)||concern(a.unit_key)!==key));
+ return legacyConcernReader(audits,devices)(unitNumber);
 }
 /** Effective imported presentation/classification only, before Owner placement projection. No GPS or health writes. */
 export async function projectImportedSourceAddresses(snapshot:Row,sources:unknown,audits:unknown,devices:unknown,previousSources:Row[]=[],context?:ImportedProjectionContext):Promise<Row>{
@@ -92,10 +115,11 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
  const byId=new Map<string,Row>();for(const s of sources){if(!object(s)||!['equipment_unit','tracker'].includes(s.entityKind)||!uuid(s.nativeUnitId)||byId.has(s.entityKind+'|'+s.nativeUnitId))throw Error('Imported source identity invalid');byId.set(s.entityKind+'|'+s.nativeUnitId,s);}
  const previouslyImported=new Set(previousSources.map(s=>s.entityKind+'|'+s.nativeUnitId));
  const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,sources,audits,devices,context);
+ const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const inventoryItems=await Promise.all(snapshot.inventoryItems.map(async(raw:Row)=>{
   const s=byId.get(identity(raw));
   if(!s&&previouslyImported.has(identity(raw))&&raw.locationVerification!=='owner_verified'&&raw.hasUnitGps!==true&&raw.placementSource!=='owner')return {...raw,_sourceField:false,currentLocationType:'unknown',importedSourceState:'source_changed',importedInstallation:null,latitude:null,longitude:null,coordinateSource:null};
-  if(!s||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||importedLegacyConcern(raw.unitNumber,audits,devices)&&!sourceOnly.has(raw.id))return raw;
+  if(!s||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id))return raw;
   // Native-only, sanitized mHelp CustomerName path. It is display text, not a
   // CRM identity or a customer/site parser; keep the complete label intact.
   const sourceLabel=typeof s.siteLabel==='string'&&s.siteLabel.trim()&&s.siteLabel.length<=250?s.siteLabel:null;
@@ -127,11 +151,12 @@ export async function projectImportedGeocodes(snapshot:Row,records:unknown,audit
  for(const r of records){if(!object(r)||!object(r.binding))throw Error('Imported estimate identity invalid');const key=r.binding.entityKind+'|'+r.binding.nativeUnitId;if(byId.has(key))throw Error('Duplicate imported estimate');byId.set(key,r);}
  const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,context?.currentSources,audits,devices,context);
  const currentSources=Array.isArray(context?.currentSources)?context.currentSources:[];
+ const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const apply=async(raw:Row)=>{
   // Re-project from the current read; a previously displayed lookup is never a
   // fallback when its source proof, identity context or lookup record disappears.
   const {locationImportedGeocode:_previousImportedGeocode,...row}=raw;
-  const legacyConcern=importedLegacyConcern(row.unitNumber,audits,devices);
+  const legacyConcern=legacyConcernForUnit(row.unitNumber);
   if(row.placementSource==='owner'||row.placementAuditId!=null||row.placement==='SHOP'||row.placement==='UNKNOWN'||row.placementStatus==='needs_identity_review'||row.locationVerification==='owner_verified'||row.hasUnitGps===true||row.installedSiteId!=null||row.currentLocationType!=='field'||legacyConcern&&!sourceOnly.has(row.id))return row;
   const binding=await checkedImportedBinding(row.importedInstallation),r=byId.get(identity(row));if(!binding||!r||row.id!==binding.nativeUnitId||row.unitNumber!==binding.unitNumber||typeof row.address!=='string'||await addressDigest(row.address)!==binding.addressSha256)return row;
   if(legacyConcern){const current=await checkedImportedBinding(currentSources.find(s=>object(s)&&s.entityKind===binding.entityKind&&s.nativeUnitId===binding.nativeUnitId));if(!current||JSON.stringify(current)!==JSON.stringify(binding))return row;}
