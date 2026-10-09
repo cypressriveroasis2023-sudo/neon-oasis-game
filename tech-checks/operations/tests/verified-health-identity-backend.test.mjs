@@ -6,6 +6,7 @@ import {REVIEWED_NATIVE_IDENTITIES,REVIEWED_OWNER_IDENTITIES,REVIEWED_NATIVE_RES
 import {cameraSummary as legacySummary,serviceEvidence,serviceState,CAMERA_FRESH_MS} from '../../supabase/functions/cos-operations-pages/cameraEvidence.ts';
 import {cameraSummary as placementSummary,CAMERA_FRESH_MS as placementFreshness} from '../../supabase/functions/cos-operations-pages/cameraPlacementEvidence.ts';
 import {projectCameraOwnerPlacement} from '../../supabase/functions/cos-operations-pages/placementProjection.ts';
+import {fieldCameraHealth,unitHealthLabel,canonicalCameraUnit} from '../src/fieldCameraHealth.ts';
 const org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const uuid=(prefix,n)=>`${prefix}000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const now=Date.parse('2026-10-08T04:13:00Z'),observedAt='2026-10-08T04:03:18.933Z';
@@ -40,10 +41,10 @@ async function ownerFixture(){
  return {sources,review,control,audit};
 }
 const project=({sources,review})=>verifiedHealthIdentities(sources,review);
-test('review scope contains exactly 65 opaque native commitments and one Owner commitment',()=>{
- assert.equal(Object.keys(REVIEWED_NATIVE_IDENTITIES).length,65);assert.equal(REVIEWED_OWNER_IDENTITIES.size,1);
+test('review scope contains exactly 75 opaque native commitments and one Owner commitment',()=>{
+ assert.equal(Object.keys(REVIEWED_NATIVE_IDENTITIES).length,75);assert.equal(REVIEWED_OWNER_IDENTITIES.size,1);
  assert.deepEqual(Object.keys(REVIEWED_NATIVE_RESOURCES).sort(),Object.keys(REVIEWED_NATIVE_IDENTITIES).sort());
- assert.equal(Object.values(REVIEWED_NATIVE_RESOURCES).flatMap(row=>row.deviceIds).length,110);
+ assert.equal(Object.values(REVIEWED_NATIVE_RESOURCES).flatMap(row=>row.deviceIds).length,120);
  assert.equal(Object.keys(REVIEWED_OWNER_RESOURCES).length,1);assert.equal(Object.values(REVIEWED_OWNER_RESOURCES)[0].deviceIds.length,4);
  assert.deepEqual(Object.keys(REVIEWED_OWNER_PHYSICAL_IDENTITIES),Object.keys(REVIEWED_OWNER_RESOURCES));
  for(const digest of Object.values(REVIEWED_OWNER_PHYSICAL_IDENTITIES))assert.match(digest,/^[a-f0-9]{64}$/);
@@ -58,6 +59,56 @@ test('65 actual-shaped complete groups prove 110 unique resources without exposi
  assert.doesNotMatch(JSON.stringify(result),/synthetic-external|device_serial|external_device_id|match_method|device_name/);
  for(const identity of result.unitIdentities){assert.equal(identity.kind,'native_provider');assert.match(identity.proof,/^[a-f0-9]{64}$/);assert.equal(identity.deviceIds.length,identity.unitNumber.startsWith('Solar')?4:identity.deviceIds.length);}
  for(const key of ['units','matches','providers','devices'])f.sources[key].reverse();assert.deepEqual(await project(f),result);
+});
+test('75 reviewed groups expose 120 resources; additional recorders never become camera-channel proof',async()=>{
+ const f=await fixture(75),identities=await project(f);
+ assert.equal(identities.unitIdentities.length,75);assert.equal(identities.unitIdentities.flatMap(row=>row.deviceIds).length,120);assert.deepEqual(identities.identityWarnings,[]);
+ const health={...placementSummary(f.sources.devices,[],now),...identities},units=f.sources.units.map(row=>({id:row.id,unitNumber:row.unit_number,modelName:'Spotter'}));
+ for(const unit of units.slice(65)){
+  assert.equal(canonicalCameraUnit(unit.unitNumber),null);
+  const state=fieldCameraHealth(unit,units,health,now);
+  assert.equal(state.state,'online');assert.equal(state.basis,'recorder');assert.equal(unitHealthLabel(state),'RECORDER ONLINE');assert.equal(state.observation.cameraState,'mapping');assert.equal(state.rows.length,1);
+  assert.match(state.reason,/Individual camera channels and video are not verified/);
+  assert.equal(fieldCameraHealth(unit,units,{...health,unitIdentities:[]},now).state,'unknown');
+ }
+ assert.doesNotMatch(JSON.stringify(identities),/synthetic-external|device_serial|external_device_id|match_method|device_name/);
+});
+test('reviewed single-recorder cohort keeps authentication failures, stale evidence and inactive inventory unknown',async()=>{
+ const cases=[
+  ['reported offline',device=>{device.source_status='offline';},'offline'],
+  ['authentication failed',device=>{device.source_status='authentication_failed';},'unknown'],
+  ['missing provider status',device=>{device.source_status=null;},'unknown'],
+  ['missing provider time',device=>{device.source_last_seen_at=null;},'unknown'],
+  ['stale provider time',device=>{device.source_last_seen_at=new Date(now-CAMERA_FRESH_MS-1).toISOString();},'unknown'],
+  ['future provider time',device=>{device.source_last_seen_at=new Date(now+1).toISOString();},'unknown'],
+  ['inactive Root record',device=>{device.activation_state='deactivated';device.organization='ROOT';},'unknown'],
+ ];
+ for(const [name,change,expected] of cases){
+  const f=await fixture(75),target=f.sources.units.at(-1),match=f.sources.matches.find(row=>row.equipment_unit_id===target.id),provider=f.sources.providers.find(row=>row.id===match.vigilant_device_id),device=f.sources.devices.find(row=>row.external_device_id===provider.external_device_id);
+  change(device);
+  // Unbound service/ping results and batteries cannot supply provider or camera health.
+  const healthRows=[{camera_device_id:device.id,overall_status:'online',checked_at:observedAt,ip_reachable:true,port_status:{},confirmed_outage:false,consecutive_failures:0}];
+  device.recon_battery_percent=100;device.recon_battery_updated_at=observedAt;
+  const identities=await project(f),health={...placementSummary(f.sources.devices,healthRows,now),...identities};
+  const unit={id:target.id,unitNumber:target.unit_number,modelName:'Spotter'},state=fieldCameraHealth(unit,[unit],health,now);
+  assert.equal(state.state,expected,name);assert.equal(state.basis,'recorder',name);assert.equal(state.observation.cameraState,'mapping',name);assert.notEqual(state.classification.serviceState,'online',name);
+  assert.equal(state.rows.length,1,name);assert.equal(state.association.unitId,unit.id,name);
+  if(expected==='unknown')assert.equal(unitHealthLabel(state),'RECORDER UNVERIFIED',name);
+  if(expected==='offline')assert.equal(unitHealthLabel(state),'RECORDER OFFLINE',name);
+ }
+});
+test('reviewed single-recorder membership still rejects extra, reassigned and replaced resources',async()=>{
+ for(const change of [
+  (s,d)=>s.devices.push({...d,id:999,external_device_id:'synthetic-extra',device_serial:'synthetic-extra'}),
+  (s,d)=>{d.device_serial='synthetic-replacement';},
+  (s,d,m)=>s.matches.push({...m,id:uuid('cc',999),equipment_unit_id:uuid('aa',999)}),
+  (s,d,m)=>{s.matches=s.matches.filter(row=>row.id!==m.id);},
+ ]){
+  const f=await fixture(75),target=f.sources.units.at(-1),match=f.sources.matches.find(row=>row.equipment_unit_id===target.id),provider=f.sources.providers.find(row=>row.id===match.vigilant_device_id),device=f.sources.devices.find(row=>row.external_device_id===provider.external_device_id);
+  change(f.sources,device,match);const result=await project(f);
+  assert.equal(result.unitIdentities.some(row=>row.unitId===target.id),false);assert.equal(result.unitIdentities.length,74);
+  const warning=result.identityWarnings.find(row=>row.unitId===target.id);assert(warning);assert.deepEqual(warning.deviceIds,[String(device.id)]);assert.deepEqual(warning.unitKeys,[device.unit_key]);
+ }
 });
 test('only pre-reviewed complete mapping tuples are accepted, with no alias/name/IP inference',async()=>{
  const f=await fixture();assert.equal((await verifiedHealthIdentities(f.sources)).unitIdentities.length,0);
