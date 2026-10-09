@@ -571,9 +571,21 @@ export function createOperationsHandler(options) {
           const importedGeocodes=[];
           for(let offset=0;offset<importedBindings.length;offset+=250){
             try{
-              const page=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_imported_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_bindings:importedBindings.slice(offset,offset+250)})},'Imported address lookup results are unavailable.');
-              if(Array.isArray(page))importedGeocodes.push(...page);
-            }catch{/* No imported point is shown without current readback. */}
+              const bindings=importedBindings.slice(offset,offset+250);
+              const page=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_imported_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_bindings:bindings})},'Imported address lookup results are unavailable.');
+              // A missing job legitimately returns no row. A failed or malformed read
+              // must fail the whole refresh so clients retain their labeled last-good map.
+              if(!Array.isArray(page)||page.length>bindings.length)throw Error('Invalid imported lookup page');
+              const expected=new Set(bindings.map(binding=>JSON.stringify(binding))),seen=new Set();
+              for(const row of page){
+                const binding=await checkedImportedBinding(row?.binding),key=binding&&JSON.stringify(binding);
+                if(!key||!expected.has(key)||seen.has(key)||row.jobKind!=='native_import'||row.verified!==false||row.liveGps!==false
+                  ||typeof row.legacyGuardSha256!=='string'||!/^[a-f0-9]{64}$/.test(row.legacyGuardSha256)
+                  ||!['pending','deferred','success','no_match','invalid_address','provider_error','held'].includes(row.status))throw Error('Invalid imported lookup record');
+                seen.add(key);
+              }
+              importedGeocodes.push(...page);
+            }catch{fail('Imported address lookup results are unavailable. The map could not be refreshed.',503);}
           }
           const ids=[...new Set(initial.items.filter(row=>row.placementSource==='owner'&&row.placementAuditId).map(row=>row.placementAuditId))];
           const geocodes=[],fallbackGeocodes=[];let censusUnavailable=false;
@@ -597,7 +609,7 @@ export function createOperationsHandler(options) {
           const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
           let projected=await projectFieldGeocodes(base,geocodes,censusUnavailable);
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
-          try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{/* No imported point is shown without valid current bindings. */}
+          try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{fail('Imported address lookup results are unavailable. The map could not be refreshed.',503);}
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
           return json(await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity));

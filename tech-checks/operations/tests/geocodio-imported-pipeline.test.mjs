@@ -179,8 +179,8 @@ test('omitted current labels use bounded presentation and never blank protected 
   }
  }
 });
-async function actualFieldRoute(h,source,{afterLegacyRead,identityFixture=null,placementAudits=[],transformMapSource}={}){
- const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1';let changed=false,nativeReads=0,sourceReads=0,identityReads=0,epochReads=0;
+async function actualFieldRoute(h,source,{afterLegacyRead,identityFixture=null,placementAudits=[],transformMapSource,importedReadOverride,expectedStatus=200}={}){
+ const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1';let changed=false,nativeReads=0,sourceReads=0,identityReads=0,epochReads=0,importedReads=0;
  const afterRead=async()=>{if(!changed&&afterLegacyRead){changed=true;await afterLegacyRead();}};
  const historical={...rawRow(source),_sourceField:true,status:'field',currentLocationType:'field',historicalLatitude:27,historicalLongitude:-94,historicalCoordinateSource:'us_census_address_range_estimate'};
  const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'fixture-native-service',fetch:async(url,init={})=>{
@@ -198,13 +198,41 @@ async function actualFieldRoute(h,source,{afterLegacyRead,identityFixture=null,p
   if(name==='cos_owner_identity_snapshot'){identityReads++;return response(identityFixture?.sources.ownerCrosswalk||{revision:'a'.repeat(64),nativeEpochs:[],claims:[]});}
   if(name==='cos_camera_identity_epochs_v1'){epochReads++;assert.ok(identityFixture,'Epoch reads require exact confirmed claims');assert.deepEqual(args.p_unit_keys,[ownerIdentityKey]);return response(identityFixture.sources.ownerEpochs);}
   if(name==='cos_fleet_placement_evidence_v1')return response(placementAudits);
-  if(name==='cos_imported_geocode_read_many'){const data=await h.rpc(name,args);await afterRead();return response(data);}
+  if(name==='cos_imported_geocode_read_many'){importedReads++;const data=await h.rpc(name,args);await afterRead();return importedReadOverride?importedReadOverride(data,args):response(data);}
   if(['cos_field_geocode_read_many','cos_field_geocode_fallback_read_many'].includes(name)){await afterRead();return response([]);}
   throw Error('Unexpected fixture path: '+new URL(url).pathname);
  }});
  const result=await handler(new Request('https://platform.example/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer synthetic-owner','Content-Type':'application/json',Origin:'https://cypressriveroasis2023-sudo.github.io'},body:JSON.stringify({path:'/api/field-map',method:'GET',body:null})}));
- assert.equal(result.status,200,await result.clone().text());return {map:await result.json(),nativeReads,sourceReads,identityReads,epochReads};
+ assert.equal(result.status,expectedStatus,await result.clone().text());return {map:await result.json(),nativeReads,sourceReads,identityReads,epochReads,importedReads};
 }
+for(const [name,override] of [
+ ['network failure',()=>{throw Error('Synthetic network failure');}],
+ ['server failure',()=>response({message:'Synthetic unavailable'},503)],
+ ['authentication failure',()=>response({message:'Synthetic denied'},401)],
+ ['permission denial',()=>response({message:'Synthetic denied'},403)],
+ ['malformed JSON',()=>new Response('not JSON',{status:200})],
+ ['non-array payload',()=>response({results:[]})],
+ ['null row',()=>response([null])],
+ ['duplicate record',rows=>response([rows[0],rows[0]])],
+ ['malformed binding',rows=>response([{...rows[0],binding:{}}])],
+ ['unexpected binding',rows=>response([{...rows[0],binding:{...rows[0].binding,eventId:String(Number(rows[0].binding.eventId)+1)}}])],
+ ['invalid status',rows=>response([{...rows[0],status:'made_up'}])],
+ ['invalid proof envelope',rows=>response([{...rows[0],verified:true}])],
+])test('actual Field Map imported lookup '+name+' fails refresh without a partial map or retry',async()=>{
+ const {source}=await prepare(),h=harness();await h.run();
+ const {map,importedReads,nativeReads}=await actualFieldRoute(h,source,{importedReadOverride:override,expectedStatus:503});
+ assert.match(map.error,/Imported address lookup results are unavailable/);assert.equal(map.items,undefined);assert.equal(map.inventoryItems,undefined);assert.equal(importedReads,1);assert.equal(nativeReads,1);
+});
+for(const status of ['no_match','held','pending','deferred','provider_error','invalid_address'])test('actual Field Map preserves legitimate imported lookup '+status+' without inventing a point',async()=>{
+ const {source}=await prepare(),h=harness();await h.run();
+ const {map,importedReads}=await actualFieldRoute(h,source,{importedReadOverride:rows=>response(rows.map(row=>({...row,status,latitude:null,longitude:null,matchedAddress:null,geocodedAt:null})))});
+ assert.equal(map.items.length,1);assert.equal(await checkedAddressEstimate(map.items[0]),null);assert.equal(importedReads,1);
+ if(status!=='invalid_address')assert.equal(map.items[0].locationImportedGeocode.status,status);
+});
+test('actual Field Map accepts an empty imported lookup page when no saved job exists',async()=>{
+ const {source}=await prepare(),h=harness();const {map,importedReads}=await actualFieldRoute(h,source);
+ assert.equal(map.items.length,1);assert.equal(await checkedAddressEstimate(map.items[0]),null);assert.equal(importedReads,1);
+});
 test('actual Field Map endpoint wiring reads fresh native snapshots and returns bound imported point',async()=>{
  const {source}=await prepare();const h=harness();await h.run();const {map,nativeReads,sourceReads}=await actualFieldRoute(h,source);assert.equal(nativeReads,2);assert.equal(sourceReads,2);assert.equal(map.items[0].address,sourceAddress(source));assert.ok(await checkedAddressEstimate(map.items[0]));
 });
