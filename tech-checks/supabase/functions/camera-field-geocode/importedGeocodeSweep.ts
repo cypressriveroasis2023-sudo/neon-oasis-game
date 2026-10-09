@@ -1,3 +1,4 @@
+import {unsupportedSourceVersion} from '../_shared/trackerNativeSource.ts';
 import {censusInstallation} from './importedAddress.ts';
 import {geocodioInstallation} from './geocodioAddress.ts';
 import {createSourceReader,checkedImportedSource,sourceIdentity,sourceAddress,sameSource,SOURCE_ORG,geocodeDependencyCode,type ImportedSource} from './importedSources.ts';
@@ -59,6 +60,7 @@ export async function processImportedGeocodes(options:Options){
   const due=[...queues[0],...queues[1].filter(job=>!retryHashes.has(job?.binding?.addressSha256))];
   const group:{binding:ImportedSource;stage:'census'|'geocodio';retry:boolean}[]=[];
   for(const job of due){
+   if(job?.binding&&typeof job.binding==='object'&&unsupportedSourceVersion(job.binding))continue;
    const binding=await atStage('queue_binding',()=>checkedImportedSource(job?.binding));if(!binding||!['census','geocodio'].includes(job.stage))throw new ImportedSweepError('queue_binding','binding_shape');
    const retry=retryHashes.has(binding.addressSha256),key=binding.addressSha256+'|'+job.stage;if(seen.has(key))continue;
    if(job.stage==='geocodio'&&!options.geocodioApiKey?.trim()){note('deferred',retry);seen.add(key);continue;}
