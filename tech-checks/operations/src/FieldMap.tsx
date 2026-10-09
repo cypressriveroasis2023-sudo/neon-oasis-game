@@ -126,7 +126,6 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const lastAttemptAt = useRef(0);
   const automaticReadPaused = useRef(false);
   const gpsSaver = useRef(createGpsSaver(api));
-  const hasMapContainer = Boolean(data || error);
   const mapNode=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<L.Map|null>(null);
   const layerRef=useRef<L.LayerGroup|null>(null);
@@ -255,7 +254,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       resize?.disconnect();
       popupPanView.current=null;map.remove();mapRef.current=null;layerRef.current=null;
     };
-  },[hasMapContainer]);
+  },[]);
 
   useEffect(()=>{
     const map=mapRef.current;
@@ -403,7 +402,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     if(!locationWritesEnabled||!map||!hasGpsCoordinates({latitude:lat,longitude:lon})||!selected||selected.readOnly)return;
     const marker=L.circleMarker([Number(lat),Number(lon)],{radius:10,color:'#f0bd57',fillOpacity:0.25,dashArray:'4 4'}).addTo(map).bindTooltip('Unsaved location candidate');
     return()=>{marker.remove();};
-  },[lat,lon,selectedId,hasMapContainer]);
+  },[lat,lon,selectedId]);
   const usePastedCoordinates=()=>{
     if(!locationWritesEnabled)return;
     try{const point=parseLocationCoordinates(coordinatePaste);setLat(String(point.latitude));setLon(String(point.longitude));setSource('site');setAccuracy('');setConfirmedLocation(false);setGpsMessage('Candidate coordinates loaded. Confirm the recorded installation address before saving.');mapRef.current?.setView([point.latitude,point.longitude],16);}
@@ -511,9 +510,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error}</span> <button className='secondary' disabled={busy} onClick={()=>void load()}>Retry map load</button></div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
-    {!data?<div className='loading' role='status'>{error?'Map data unavailable. Retry loading your field units.':'Loading production field units…'}</div>:<div className={'field-map-layout'+(selected?' has-selection':'')}>
-      <aside className='field-map-list' aria-label='Field units'>
-        {filtered.length?filtered.map(unit=><button key={unit.id} data-unit-id={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
+    <div className={'field-map-layout'+(selected?' has-selection':'')}>
+      <aside className='field-map-list' aria-label='Field units' aria-busy={busy}>
+        {!data?<div className='loading' role='status'>{error?'Map data unavailable. Retry loading your field units.':'Loading production field units… Pins appear after locations are verified.'}</div>:filtered.length?filtered.map(unit=><button key={unit.id} data-unit-id={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
           <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
           <span className={hasCoords(unit)?'mapped':'missing'}>{tag(unit)}</span>
           <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))}{!isSupportEquipment(unit)&&<> · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}</>}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
@@ -588,7 +587,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
           </div>}
         </>:<div className='field-map-empty'>Select a field unit.</div>}
       </aside>
-    </div>}
+    </div>
     <footer className='field-map-footer'>Map tiles © OpenStreetMap contributors. Unit GPS is operational location data only and never changes equipment lifecycle placement automatically.</footer>
   </section>;
 }

@@ -45,6 +45,10 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
   const [healthNow,setHealthNow]=useState(Date.now());
   useEffect(()=>{const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[]);
   const camera = cameraDashboardSummary(equipment?.camera,healthNow);
+  const cameraPending = !equipment?.camera && !equipment?.errors.camera;
+  const routersPending = !equipment?.routers && !equipment?.errors.routers;
+  const jobsPending = data.jobs === null && !data.errors.jobs;
+  const reviewPending = (['jobs', 'quotes', 'invoices', 'pos'] as const).some(key => data[key] === null && !data.errors[key]);
   const teams: { label: string; count: number | null; note?: string }[] = [
     { label: 'Sales & agreements', count: null, note: 'Not connected' },
     { label: 'Operations planning', count: counts.schedule },
@@ -61,14 +65,14 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
   };
   return <section className='company-overview' aria-label='Company overview'>
     <header className='company-overview-heading'>
-      <div><h1>Company overview</h1><p><span className='company-overview-date'>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · </span>{data.jobs === null ? 'Job count unavailable' : countLabel(data.jobs.length, 'job record')} · Whole-company view</p></div>
+      <div><h1>Company overview</h1><p><span className='company-overview-date'>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · </span>{jobsPending ? 'Checking job records…' : data.jobs === null ? 'Job count unavailable' : countLabel(data.jobs.length, 'job record')} · Whole-company view</p></div>
       <div className='company-overview-actions'><button className='company-secondary' onClick={() => { setUnavailableStage(null); browseStage(null); }}>View all jobs</button><button className='company-primary' onClick={() => openWorkspace('Quotes')}>Open quotes <span aria-hidden='true'>→</span></button></div>
     </header>
 
     <div className='company-health-grid' aria-label='Equipment health'>
-      <article className='company-health-card'>
+      <article className='company-health-card' aria-busy={cameraPending}>
         <h2>Camera Health</h2>
-        <strong>{camera.headline}</strong>
+        <strong>{cameraPending ? 'Checking Camera Health…' : camera.headline}</strong>
         <p>{camera.systems}</p>
         {camera.available&&<><p>{camera.cameraCoverage}</p><p>{camera.serviceCoverage}</p><p>{camera.placement}</p></>}
         <small className={camera.attention && camera.attention > 0 ? 'company-attention-note' : ''}>{camera.available?'Source refreshed '+new Date(camera.refreshedAt!).toLocaleString():'SUMMARY NOT VERIFIED'}</small>
@@ -76,9 +80,9 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
         {equipment?.errors.camera && <p className='company-card-error' role='alert'>{equipment.errors.camera}</p>}
         <button onClick={() => openWorkspace('Camera Health')}>Open Camera Health <span aria-hidden='true'>→</span></button>
       </article>
-      <article className='company-health-card'>
+      <article className='company-health-card' aria-busy={routersPending}>
         <h2>InHand Routers</h2>
-        <strong>{equipment?.routers ? countLabel(equipment.routers.items.length, 'stored router record') : 'Router count unavailable'}</strong>
+        <strong>{routersPending ? 'Checking router inventory…' : equipment?.routers ? countLabel(equipment.routers.items.length, 'stored router record') : 'Router count unavailable'}</strong>
         <p>Live GPS setup pending</p>
         <small>STORED INVENTORY & PORT OBSERVATIONS</small>
         {equipment?.errors.routers && <p className='company-card-error' role='alert'>{equipment.errors.routers}</p>}
@@ -100,7 +104,8 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
         {COMPANY_STAGES.map((stage, index) => {
           const count = stage.id === 'quote' ? data.quotes?.length ?? null : counts[stage.id];
           const unsupported = stage.id === 'agreement' || stage.id === 'signed';
-          const label = count === null ? unsupported ? 'Not connected' : 'Unavailable' : countLabel(count, stage.id === 'quote' ? 'quote' : 'job');
+          const pending = !unsupported && (stage.id === 'quote' ? data.quotes === null && !data.errors.quotes : jobsPending);
+          const label = count === null ? unsupported ? 'Not connected' : pending ? 'Checking…' : 'Unavailable' : countLabel(count, stage.id === 'quote' ? 'quote' : 'job');
           return <button key={stage.id} className='company-stage' onClick={() => selectStage(stage.id)} aria-pressed={stageFilter === stage.id || unavailableStage === stage.id} aria-label={stage.label + ': ' + label}>
             <small>{String(index + 1).padStart(2, '0')}</small><strong>{stage.label}</strong>
             <span className={'company-stage-total' + (count === null ? ' company-stage-unknown' : '')}>{count === null ? <span>{label}</span> : <><b>{count}</b><span>{stage.id === 'quote' ? count === 1 ? 'quote' : 'quotes' : count === 1 ? 'job' : 'jobs'}</span></>}<i aria-hidden='true'>→</i></span>
@@ -119,7 +124,7 @@ export default function CompanyOverview({ data, equipment, openWorkspace, openJo
             <div><small>{item.reference} / {item.category}</small><p>{item.description}</p></div>
             <button onClick={() => item.jobId && openJob ? openJob(item.jobId, item.workspace === 'Owner Review' ? 'Owner Review' : 'Jobs') : openWorkspace(item.workspace)}>{item.action} <span aria-hidden='true'>→</span></button>
           </div>)}
-          {summary.attention === null && <p className='company-empty-state' role='status'>Some review sources did not load. Additional work may need attention.</p>}
+          {summary.attention === null && <p className='company-empty-state' role='status'>{reviewPending ? 'Some review sources are still being checked. Additional work may need attention.' : 'Some review sources did not load. Additional work may need attention.'}</p>}
           {summary.attention === 0 && <p className='company-empty-state'>Nothing currently needs Owner attention in the loaded review sources.</p>}
           {attention.length > 6 && <div className='company-attention-more'><span>{countLabel(attention.length - 6, 'additional review item')}</span><button onClick={() => openWorkspace('Needs Attention')}>Open attention workspace <span aria-hidden='true'>→</span></button></div>}
         </div>

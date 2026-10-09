@@ -12,10 +12,11 @@ export const dashboardSources = [
 export type SourceKey = typeof dashboardSources[number][0];
 export type DashboardData = Record<SourceKey, DashboardRow[] | null> & { errors: Partial<Record<SourceKey, string>> };
 export type DashboardApi = { get: (path: string) => Promise<{ data: unknown }> };
+export const emptyTodayDashboard = (): DashboardData => ({ jobs: null, quotes: null, invoices: null, pos: null, tasks: null, errors: {} });
 
 /** A failed source is null, never an invented empty list. Each source is independent. */
-export async function loadTodayDashboard(api: DashboardApi): Promise<DashboardData> {
-  const result: DashboardData = { jobs: null, quotes: null, invoices: null, pos: null, tasks: null, errors: {} };
+export async function loadTodayDashboard(api: DashboardApi, onProgress?: (snapshot: DashboardData) => void): Promise<DashboardData> {
+  const result = emptyTodayDashboard();
   await Promise.all(dashboardSources.map(async ([key, path, label]) => {
     try {
       const response = await api.get(path);
@@ -29,6 +30,8 @@ export async function loadTodayDashboard(api: DashboardApi): Promise<DashboardDa
         ? label + ': sign-in or Owner access needs attention.'
         : label + ' could not be loaded. Retry to verify this section.';
     }
+    // Do not mutate a snapshot that a consumer has already rendered.
+    onProgress?.({ ...result, errors: { ...result.errors } });
   }));
   return result;
 }
@@ -67,16 +70,18 @@ export type CompanyEquipmentData = {
   routers: RouterSnapshot | null;
   errors: Partial<Record<'camera' | 'routers', string>>;
 };
-export async function loadCompanyEquipment(api: DashboardApi): Promise<CompanyEquipmentData> {
+export async function loadCompanyEquipment(api: DashboardApi, onProgress?: (snapshot: CompanyEquipmentData) => void): Promise<CompanyEquipmentData> {
   const result: CompanyEquipmentData = { camera: null, routers: null, errors: {} };
   await Promise.all([
     (async () => {
       try { result.camera = validateCameraHealth((await api.get('/api/camera-health/summary-v3')).data); }
       catch (cause) { result.errors.camera = equipmentError(cause, 'Camera Health'); }
+      onProgress?.({ ...result, errors: { ...result.errors } });
     })(),
     (async () => {
       try { result.routers = readRouterSnapshot((await api.get('/api/routers')).data); }
       catch (cause) { result.errors.routers = equipmentError(cause, 'Router inventory'); }
+      onProgress?.({ ...result, errors: { ...result.errors } });
     })(),
   ]);
   return result;
