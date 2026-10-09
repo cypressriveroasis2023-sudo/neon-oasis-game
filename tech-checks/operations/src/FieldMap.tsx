@@ -149,6 +149,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const response=await api.get('/api/field-map');
       const snapshot = checkedFieldMap(response.data) as unknown as Snapshot;
       setData(snapshot);
+      cameras.updateClock();
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
       const matches = initialUnitLabel ? fieldMapLabelMatches(snapshot.items,initialUnitLabel) : [];
@@ -446,6 +447,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const payload = gpsWrite({ latitude: lat, longitude: lon, accuracyM: accuracy, source, note:verificationNote }, 'owner', true);
       const saved = await gpsSaver.current.owner(selected.id, payload);
       setData(saved as unknown as Snapshot);
+      cameras.updateClock();
       const message = selected.unitNumber + ' location saved and read back successfully.';
       setGpsMessage(message);
       show(message);
