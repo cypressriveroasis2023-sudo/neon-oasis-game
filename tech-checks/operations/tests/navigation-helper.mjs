@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-const labels = { Today: 'Dashboard', 'Camera Health': 'Camera Health', 'InHand Routers': 'InHand Routers', 'Victron VRM': 'Victron Power', 'Units On Hand': 'Units On Hand', 'Field Map': 'Field View', Team: 'Team', Operations: 'Operations' };
+const labels = { Today: 'Dashboard', 'Camera Health': 'Camera Health', 'InHand Routers': 'InHand Routers', 'Victron VRM': 'Victron Power', 'Units On Hand': 'Units On Hand', 'Field Map': 'Field View', 'Unit Tracker': 'Unit Tracker', Team: 'Team', Operations: 'Operations' };
 const directoryLabels = { 'Tech Check':'Tech Checks', Jobs: 'Job flow', Billing: 'Billing & Invoices', Invoices: 'Billing & Invoices', 'Daily Board': 'Dispatch Board' };
 
 export async function openWorkspace(frame, workspace) {

@@ -41,7 +41,7 @@ test('ticket bookmarks use only existing job types on Dispatch Board without a j
 
 test('map, unit health and ticket routes retain a validated stable unit identifier',()=>{
  const unitId='11111111-1111-4111-8111-111111111111';
- for(const workspace of ['Field Map','Camera Health','Daily Board']){
+ for(const workspace of ['Field Map','Camera Health','Unit Tracker','Daily Board']){
   const route={workspace,jobId:'',detail:false,unitId,...(workspace==='Daily Board'?{createType:'SWAP'}:{})};
   assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
  }

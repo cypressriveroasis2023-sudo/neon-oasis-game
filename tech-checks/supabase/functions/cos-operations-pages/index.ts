@@ -1,3 +1,4 @@
+import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
@@ -116,6 +117,14 @@ export function createOperationsHandler(options) {
     let data;
     try { data = await response.json(); } catch { data = {}; }
     if (!response.ok) {
+      if (/\/rest\/v1\/rpc\/cos_unit_tracker_/.test(url)) {
+        if (data.code === '42501') fail('An active COS Owner or verified IT account is required.',403);
+        if (['55000','PGRST202','42883'].includes(data.code)) fail('Pending tracker requests are not enabled on this backend. Sheets connection required.',503);
+        if (data.code === '23505') fail('This exact unit already has a pending tracker request. Refresh to review it.',409);
+        if (['55P03','40001','40P01'].includes(data.code)) fail(typeof data.message === 'string' ? data.message : 'A tracker request or source changed. Reload before saving.',409);
+        if (data.code === '22023') fail(typeof data.message === 'string' ? data.message : 'Invalid tracker request.',400);
+      }
+
       if (url.endsWith('/rest/v1/rpc/appdeploy_request_delivery_go_back') && ['55P03','40001','40P01'].includes(data.code)) fail('This delivery is being updated. Refresh the job before trying again.', 409);
       if (url.endsWith('/rest/v1/rpc/appdeploy_mhelp_import') && data.code === '40001') fail(typeof data.message === 'string' ? data.message : 'Another mHelpDesk import is in progress. Review import history before retrying.', 409);
       if (response.status >= 500) fail(fallback, 503);
@@ -435,13 +444,17 @@ export function createOperationsHandler(options) {
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
+        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if(path==='/api/unit-tracker'||path.startsWith('/api/unit-tracker/')){
+        if(method==='POST'&&body===null)body=await requestBody(request);
+        return json(await createUnitTracker({rpc,actorPayload})(path,method,body));
+      }
       if(path.startsWith('/api/owner-identity/')){
         // Deliberately outside the verified IT allowlist. No identity-approval expansion.
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
@@ -840,8 +853,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }
