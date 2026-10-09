@@ -17,6 +17,7 @@
     "pdfjs-dist": "6.4.299"
   },
   "devDependencies": {
+    "jose": "6.2.12",
     "@vitejs/plugin-react": "4.3.4",
     "vite": "6.0.11",
     "typescript": "5.7.3",
