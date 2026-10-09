@@ -2,6 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {api,OperationsApiError} from './api';
 import {addressUuid,checkedTrackerRequest,checkedTrackerSnapshot,checkedTrackerDetail,checkedTrackerLookup,newTrackerDraft,trackerAccess,trackerChanges,trackerDraft,trackerDraftProblem,trackerFieldLabels,trackerInventory,trackerRequestMatches,trackerRequestPayload,trackerWorkbookId,type TrackerDraft,type TrackerFields,type TrackerInventory,type TrackerRequest,type TrackerSnapshot,type TrackerSource} from './unitTracker';
 import './unitTracker.css';
+import MhelpPartnerReview from './MhelpPartnerReview';
 
 type Props={session:unknown;show:(message:string)=>void;initialUnitId?:string;onSelectUnit?:(id:string)=>void;openMap:(id:string)=>void;openHealth:(id:string)=>void};
 const message=(cause:unknown)=>cause instanceof Error?cause.message:'Unit Tracker could not verify the current records.';
@@ -68,6 +69,7 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
  if(!allowed)return <section className='panel module' role='alert'><h2>Unit Tracker unavailable</h2><p>This workspace requires an authorized Owner or verified IT account and a compatible backend.</p></section>;
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
+  {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<MhelpPartnerReview openMap={openMap} openHealth={openHealth}/>}
   <section className='unit-tracker-connection' aria-label='Sheets connection status'><strong>Sheets connection required</strong><p>{snapshot?.queueEnabled?'New units and tracker changes can be saved as pending requests in COS. They have not been sent to Google Sheets or applied to Camera Health or Field View.':'Saving pending additions and tracker changes is not enabled on this backend yet. Existing COS records remain available below.'}</p><a href={'https://docs.google.com/spreadsheets/d/'+trackerWorkbookId+'/edit'} target='_blank' rel='noopener noreferrer'>Open 2027 tracker ↗</a></section>
   {trackerError&&<p className='operations-error' role='alert'>{trackerError} Pending requests and their save controls are unavailable.</p>}{snapshot?.availability==='unavailable'&&<p role='status'>{snapshot.reason||'The pending request store is not ready.'}</p>}
   {error&&<p className='operations-error' role='alert'>{error}</p>}{notice&&<p className='operations-notice' role='status'>{notice}</p>}{saveError&&<p className='operations-error' role='alert'>{saveError}</p>}
