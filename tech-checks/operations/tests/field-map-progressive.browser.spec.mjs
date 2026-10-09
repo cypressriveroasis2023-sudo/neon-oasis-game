@@ -34,6 +34,7 @@ test('basemap renders while field records wait, with no invented pins or empty f
  const {frame,state}=await mount(page);
  const canvas=frame.locator('.field-map-canvas');
  await expect(canvas).toBeVisible();await expect(canvas).toHaveClass(/leaflet-container/);
+ await expect(frame.locator('.field-map-display-bar').getByRole('status')).toBeVisible();
  await expect(frame.locator('.field-map-display-bar')).toContainText('Loading field locations…');
  await expect.poll(()=>state.tiles).toBeGreaterThan(0);
  await expect(canvas.locator('.leaflet-tile-loaded').first()).toBeVisible();
