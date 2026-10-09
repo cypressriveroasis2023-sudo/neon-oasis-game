@@ -27,7 +27,8 @@ async function harness({stage='census',rpcFailure,readFailure,queue,claim,reserv
   if(name==='cos_imported_geocode_cursor_read')return {eventId:'0',scanGeneration:id};
   if(name==='cos_imported_geocode_sync')return {accepted:true,eventId:'1',scanGeneration:id,applied:1};
   if(name==='cos_imported_geocode_scan_complete')return {accepted:true};
-  if(name==='cos_imported_geocode_list_due')return dueReads++?[]:queue??[{binding,stage}];
+  if(name==='cos_imported_geocode_postal_retry_list_due')return [];
+  if(name==='cos_imported_geocode_postal_ordinary_list_due')return dueReads++?[]:queue??[{binding,stage}];
   if(name==='cos_imported_geocode_invalidate')return {accepted:true};
   if(name==='cos_imported_geocode_census_claim')return claim??{claimed:true,claimToken:id};
   if(name==='cos_imported_geocode_reserve')return reservation??{reserved:true,reservationToken:id,sendBefore:new Date(Date.now()+10000).toISOString()};
@@ -55,7 +56,7 @@ async function receipt(h,stage,code){
  assert.deepEqual(body.importedResults,{status:'unavailable',stage,code});return body;
 }
 for(const [rpcName,stage,provider,beforeStale] of [
- ['cursor_read','cursor_read'],['sync','source_sync'],['scan_complete','scan_complete'],['list_due','queue_read'],
+ ['cursor_read','cursor_read'],['sync','source_sync'],['scan_complete','scan_complete'],['postal_ordinary_list_due','queue_read'],['postal_retry_list_due','queue_read'],
  ['invalidate','source_invalidate','census',true],['census_claim','census_claim'],['reserve','geocodio_reserve','geocodio'],
  ['census_finish','census_finish'],['finish','geocodio_finish','geocodio'],
 ])test('HTTP keeps successful Owner result and redacts '+stage+' RPC failure',async()=>{
@@ -95,7 +96,7 @@ for(const stage of ['census','geocodio'])test(stage+' success and handled provid
 test('unknown and hostile exceptions cannot smuggle fields into the receipt',async()=>{
  const fallback={status:'unavailable',stage:'unknown',code:'unexpected'};
  for(const error of [failure(),{stage:secret,code:secret},new Proxy({}, {getPrototypeOf(){throw failure();}})])assert.deepEqual(importedGeocodeFailure(error),fallback);
- const h=await harness({rpcFailure:'cos_imported_geocode_list_due'});let caught;
+ const h=await harness({rpcFailure:'cos_imported_geocode_postal_ordinary_list_due'});let caught;
  try{await processImportedGeocodes({...h.options,deadlineMs:Date.now()+100000});}catch(error){caught=error;}
  assert.ok(caught);caught.code=secret;assert.deepEqual(importedGeocodeFailure(caught),fallback);
  let reads=0;Object.defineProperty(caught,'code',{get(){return reads++?'private-key':'rpc_error';}});
@@ -109,7 +110,7 @@ test('concurrent reservation failure retains its own stage while another claim i
  const h=await harness();let release,entered=false;
  const waiting=new Promise(resolve=>{release=resolve;});
  const rpc=h.options.rpc;h.options.rpc=async(name,args)=>{
-  if(name==='cos_imported_geocode_list_due')return [{binding:h.binding,stage:'geocodio'},{binding:h.binding,stage:'census'}];
+  if(name==='cos_imported_geocode_postal_ordinary_list_due')return [{binding:h.binding,stage:'geocodio'},{binding:h.binding,stage:'census'}];
   if(name==='cos_imported_geocode_reserve'){await waiting;throw failure();}
   if(name==='cos_imported_geocode_census_claim'){entered=true;release();await new Promise(resolve=>setTimeout(resolve,5));return {claimed:false};}
   return rpc(name,args);
@@ -132,4 +133,17 @@ test('actual serve transport reports fixed RPC transport, HTTP, and JSON codes',
    assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,results:[],fallbackResults:[],importedResults:{status:'unavailable',stage:'cursor_read',code}});
   }
  }finally{globalThis.fetch=originalFetch;if(originalDeno===undefined)delete globalThis.Deno;else globalThis.Deno=originalDeno;}
+});
+test('enrolled postal Census takes priority over ordinary fallback for the same full-address hash',async()=>{
+ const h=await harness({stage:'geocodio'}),rpc=h.options.rpc;
+ h.options.rpc=(name,args)=>name==='cos_imported_geocode_postal_retry_list_due'?Promise.resolve([{binding:h.binding,stage:'census'}]):rpc(name,args);
+ const response=await h.run(),body=await response.json();assert.equal(response.status,200);assert.equal(body.importedResults.censusSucceeded,1);assert.equal(body.importedResults.geocodioSucceeded,0);
+ assert.equal(h.calls.includes('cos_imported_geocode_census_claim'),true);assert.equal(h.calls.includes('cos_imported_geocode_reserve'),false);
+});
+test('malformed or oversized enrolled cohort cannot authorize a claim or leak provider material',async()=>{
+ for(const invalid of [{error:secret},Array.from({length:81},()=>({binding:{address:secret},stage:'census'}))]){
+  const h=await harness(),rpc=h.options.rpc;
+  h.options.rpc=(name,args)=>name==='cos_imported_geocode_postal_retry_list_due'?Promise.resolve(invalid):rpc(name,args);
+  await receipt(h,'queue_read','queue_shape');assert.equal(h.calls.includes('cos_imported_geocode_census_claim'),false);assert.equal(h.calls.includes('cos_imported_geocode_reserve'),false);
+ }
 });

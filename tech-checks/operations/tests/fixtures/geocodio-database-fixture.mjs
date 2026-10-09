@@ -115,16 +115,21 @@ export async function fixture({imported=false}={}){
   await db.exec(legacySchema);
   db.fixtureLegacyDefinitions=(await db.query("select p.proname,pg_get_functiondef(p.oid) body from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app_private' and (p.proname like 'cos_geocode_%' or p.proname='cos_verified_fleet_actor') order by p.proname")).rows;
   await db.exec(await readFile(new URL('../../db/geocodio-free-fallback.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../db/geocodio-postal-precision-rejections.sql',import.meta.url),'utf8'));
   db.fixtureOwnerDefinitions=(await db.query("select p.proname,pg_get_functiondef(p.oid) body from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'cos_field_geocode_fallback_%' order by p.proname")).rows;
   if(imported){
    await db.exec(await readFile(new URL('../../db/geocodio-imported-jobs.sql',import.meta.url),'utf8'));
    await db.exec(await readFile(new URL('../../db/geocodio-imported-list-due-v2.sql',import.meta.url),'utf8'));
+   await db.exec(await readFile(new URL('../../db/geocodio-imported-postal-precision-rejections.sql',import.meta.url),'utf8'));
+   await db.exec(await readFile(new URL('../../db/geocodio-postal-retry-v1.sql',import.meta.url),'utf8'));
+   db.fixtureHasPostalRetry=true;
    db.fixtureHasImported=true;
   }
   return db;
  }catch(error){await db.close();throw error;}
 }
 export async function reset(db){
+ if(db.fixtureHasPostalRetry) await db.exec(`reset role;truncate app_private.cos_imported_postal_retry_jobs,app_private.cos_imported_postal_retry_batches;`);
  if(db.fixtureHasImported) await db.exec(`reset role;truncate app_private.cos_imported_geocode_jobs,app_private.cos_imported_geocode_events,app_private.cos_imported_census_requests,app_private.cos_imported_census_cache;update app_private.cos_imported_geocode_cursor set event_id=0,scan_generation=gen_random_uuid(),last_page_count=null;`);
  await db.exec(`reset role; truncate public.profiles;
  insert into public.profiles(user_id,role,active,archived_at) values

@@ -101,14 +101,20 @@ test('Census-only behavior stays available when fallback configuration is absent
  let fetched=0;const saved=await row();const handler=createGeocodeHandler({verifyFleetActor:async()=>true,fetch:async()=>{fetched++;return response({result:{addressMatches:[{matchedAddress:address,coordinates:{x:-95,y:30}}]}})},rpc:async(name,args)=>{if(name==='cos_field_geocode_list_due')return [saved];if(name==='cos_field_geocode_claim')return {claimed:true,claimToken:'12345678-1234-1234-1234-123456789012'};assert.equal(name,'cos_field_geocode_finish');assert.equal(args.p_status,'success');return {accepted:true,record:{status:'success'}};}});
  const r=await handler(new Request('https://fixture',{method:'POST',body:JSON.stringify({unitKey:saved.unitKey,auditId:saved.auditId})}));assert.equal(r.status,200);assert.equal(fetched,1);assert.deepEqual((await r.json()).fallbackResults,[]);
 });
-test('new provider preserves and exactly matches ZIP+4, leaving Census parser untouched',async()=>{
+test('basic provider ZIP precision keeps source ZIP+4 and accepts ZIP5 through both consumers',async()=>{
  const saved=address+'-1234';assert.equal(safeGeocodioParts(saved).zip,'77001-1234');
- const good=payload({formatted_address:address+'-1234',address_components:{...result().address_components,postal_code:'77001-1234'}});
- assert.equal(selectGeocodioResult(saved,good).status,'success');
- for(const zip of ['77001','77001-9999'])assert.equal(selectGeocodioResult(saved,payload({formatted_address:address.replace('77001',zip),address_components:{...result().address_components,postal_code:zip}})).status,'no_match');
- await geocodioAddress(saved,'fixture',async(url)=>{assert.equal(new URL(url).searchParams.get('postal_code'),'77001-1234');return response(good)});
- for(const matchedAddress of [address,address+'-9999']){
-  const u={...unit(),address:saved};const r=await record({address:saved,addressSha256:await addressDigest(saved),matchedAddress});
+ for(const zip of ['77001','77001-1234']){
+  const matchedAddress=address.replace('77001',zip),good=payload({formatted_address:matchedAddress,address_components:{...result().address_components,postal_code:zip}});
+  assert.equal(selectGeocodioResult(saved,good).status,'success');
+  await geocodioAddress(saved,'fixture',async(url)=>{assert.equal(new URL(url).searchParams.get('postal_code'),'77001-1234');return response(good)});
+  const u={...unit(),address:saved},r=await record({address:saved,addressSha256:await addressDigest(saved),matchedAddress});
+  assert.equal((await projectFallbackGeocodes({items:[u],inventoryItems:[u]},[r])).items[0].locationGeocode.status,'success');
+  assert.ok(await checkedAddressEstimate({...u,locationGeocode:r}));
+ }
+ for(const zip of ['77002','77001-9999']){
+  const matchedAddress=address.replace('77001',zip);
+  assert.equal(selectGeocodioResult(saved,payload({formatted_address:matchedAddress,address_components:{...result().address_components,postal_code:zip}})).status,'no_match');
+  const u={...unit(),address:saved},r=await record({address:saved,addressSha256:await addressDigest(saved),matchedAddress});
   assert.deepEqual((await projectFallbackGeocodes({items:[u],inventoryItems:[u]},[r])).items[0],u);
   assert.equal(await checkedAddressEstimate({...u,locationGeocode:r}),null);
  }

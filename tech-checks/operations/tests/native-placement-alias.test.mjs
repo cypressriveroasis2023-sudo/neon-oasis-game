@@ -101,7 +101,7 @@ test('field-map and summary-v3 use exactly the same deployed selected-field iden
  const summary=source.slice(source.indexOf("if (path === '/api/camera-health/summary-v3')"),source.indexOf("if (path === '/api/camera-health/summary')"));
  const helper=source.slice(source.indexOf('const readIdentitySources'),source.indexOf('// Share one large-transfer'));
  for(const table of ['camera_devices','equipment_units','vision_vigilant_unit_matches','vision_vigilant_devices'])assert.ok(helper.includes(table+'?select='),table);
- assert.match(map,/readIdentitySources\(context\)/);assert.match(summary,/readIdentitySources\(context\)/);assert.match(helper,/verifiedHealthIdentities\(sources\)/);assert.match(map,/projectOwnerPlacement\(await projectImportedSourceAddresses\(snapshot,importedSources,audits,devices\),audits,devices,identity,units\)/);assert.match(map,/freshAudits,freshDevices,freshBundle\.identity,freshUnits\)/);
+ assert.match(map,/readIdentitySources\(context\)/);assert.match(summary,/readIdentitySources\(context\)/);assert.match(helper,/verifiedHealthIdentities\(sources\)/);assert.match(map,/projectOwnerPlacement\(await projectImportedSourceAddresses\(snapshot,importedSources,audits,devices,\[\],\{nativeUnits:units,identity\}\),audits,devices,identity,units\)/);assert.match(map,/freshAudits,freshDevices,freshBundle\.identity,freshUnits\)/);
  assert.doesNotMatch(fs.readFileSync(new URL('../../supabase/functions/cos-operations-pages/placementProjection.ts',import.meta.url),'utf8'),/import .*verifiedHealthIdentity/);
 });
 test('warning with completely missing resources never invents a control row',async()=>{

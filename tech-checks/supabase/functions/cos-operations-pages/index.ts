@@ -525,7 +525,7 @@ export function createOperationsHandler(options) {
             return rows;
           };
           const importedSources=await readSourceProjections();
-          const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices),audits,devices,identity,units);
+          const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices,[],{nativeUnits:units,identity}),audits,devices,identity,units);
           const importedBindings=(await Promise.all(initial.items.filter(row=>row.placementSource!=='owner').map(row=>checkedImportedBinding(row.importedInstallation)))).filter(Boolean);
           const importedGeocodes=[];
           for(let offset=0;offset<importedBindings.length;offset+=250){
@@ -551,10 +551,11 @@ export function createOperationsHandler(options) {
           const [freshSnapshot,freshBundle]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context)]);
           const {audits:freshAudits,devices:freshDevices,units:freshUnits}=freshBundle.sources;
           const freshSources=await readSourceProjections(freshSnapshot.inventoryItems);
-          const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources),freshAudits,freshDevices,freshBundle.identity,freshUnits);
+          const freshSourceContext={nativeUnits:freshUnits,identity:freshBundle.identity,currentSources:freshSources};
+          const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
           let projected=await projectFieldGeocodes(base,geocodes,censusUnavailable);
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
-          try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices);}catch{/* No imported point is shown without valid current bindings. */}
+          try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{/* No imported point is shown without valid current bindings. */}
           return json(await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey));
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
