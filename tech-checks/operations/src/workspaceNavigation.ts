@@ -2,6 +2,7 @@ import { isTicketUnitId } from './ticketContext';
 import { isTicketType, type TicketType } from './ticketTypes';
 
 /** Presentation routes only. Authorization and actions stay in their existing workspaces. */
+export const itWorkspaces = ['IT Dashboard','MHelp'];
 export const workspaces = ['Operations','Units On Hand','Today','Daily Board','Field Map','Unit Tracker','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 export const workspaceGroups = [
   { label:'Overview', home:'Today', items:['Operations','Today','Daily Board','Needs Attention','Activity'] },
@@ -18,7 +19,7 @@ export type WorkspaceRoute = { workspace:string; jobId:string; detail:boolean; c
 export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {
   const [key,query=''] = hash.replace(/^#/,'').split('?');
   const aliases:Record<string,string> = {overview:'Today','dispatch-board':'Daily Board','field-view':'Field Map','victron-power':'Victron VRM',dashboard:'Today'};
-  const workspace = aliases[key] || workspaces.find(name=>name.toLowerCase().replaceAll(' ','-')===key) || 'Today';
+  const workspace = aliases[key] || [...workspaces,...itWorkspaces].find(name=>name.toLowerCase().replaceAll(' ','-')===key) || 'Today';
   const params = new URLSearchParams(query);
   const createType = params.get('create');
   const unitId=params.get('unit');

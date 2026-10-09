@@ -56,3 +56,5 @@ test('Victron bookmarks preserve only positive safe installation IDs',()=>{
  assert.deepEqual(readWorkspaceRoute('#victron-power?installationId=2048123'),route);
  for(const hash of ['#victron-vrm?installationId=0','#victron-vrm?installationId=-2','#victron-vrm?installationId=1.5','#victron-vrm?installationId=9007199254740993','#victron-vrm?installationId=HELIOS001','#victron-vrm?job=42&installationId=123','#today?installationId=123'])assert.equal(readWorkspaceRoute(hash).installationId,undefined);
 });
+
+test('IT-only dashboard and MHelp bookmarks do not change Owner workspace groups',()=>{for(const workspace of ['IT Dashboard','MHelp']){const route={workspace,jobId:'',detail:false};assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);assert.equal(workspaces.includes(workspace),false);}});

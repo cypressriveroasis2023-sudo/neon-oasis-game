@@ -11,9 +11,11 @@ export function fleetRouteAllowed(method: string, path: string): boolean {
     || method === 'GET' && new Set([
     '/api/session', '/api/field-map', '/api/camera-health/summary',
     '/api/camera-health/summary-v2', '/api/camera-health/summary-v3', '/api/routers',
+    // Saved, read-only installations only. /refresh and all discovery/sharing writes stay Owner-only.
+    '/api/vrm-fleet',
   ]).has(path);
 }
 export function fleetFeatures() {
-  return {unitTracker:true, fleetAccess:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
+  return {unitTracker:true, fleetAccess:true, vrmRead:true, fleetPlacementEdit:true, fleetConnectionEdit:true,
     cameraHealthV2:true, fieldLocationVerification:false, mhelpTicketImport:false, deliveryGoBack:false};
 }

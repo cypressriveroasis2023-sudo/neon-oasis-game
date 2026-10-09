@@ -74,9 +74,21 @@ test('Cloudflare lookalikes and unrelated Pages projects are rejected before dat
 const cases = [
  ['owner VRM fleet permitted', '/api/vrm-portal', 'GET', {}, 200],
  ['owner dynamic VRM fleet permitted', '/api/vrm-fleet', 'GET', {}, 200],
- ['verified IT cannot read dynamic VRM fleet', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId}],
+ ['verified IT can read saved dynamic VRM fleet', '/api/vrm-fleet', 'GET', {}, 200, {userId:verifiedItId}],
+ ['second verified IT can read saved dynamic VRM fleet', '/api/vrm-fleet', 'GET', {}, 200, {userId:'b7cc3cbf-d11e-4d4a-9742-c07701857911'}],
+ ['inactive verified IT cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId,inactive:true}],
+ ['archived verified IT cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId,archived:true}],
+ ['native revoked IT cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId,roleRevoked:true}],
+ ['native inactive IT cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId,actorInactive:true}],
+ ['wrong-org IT cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId,wrongRoleOrg:true}],
+ ['service cannot read saved VRM', '/api/vrm-fleet', 'GET', {}, 403, {userId:serviceId}],
+ ['IT cannot write saved VRM', '/api/vrm-fleet', 'POST', {}, 403, {userId:verifiedItId}],
+ ['IT cannot write legacy VRM', '/api/vrm-portal', 'POST', {}, 403, {userId:verifiedItId}],
+ ['IT cannot start VRM sync', '/api/vrm-fleet/refresh', 'POST', {}, 403, {userId:verifiedItId}],
+ ['IT cannot read mHelp partner records', '/api/mhelpdesk/partner/status', 'GET', {}, 403, {userId:verifiedItId}],
+ ['IT cannot read finance records', '/api/ar', 'GET', {}, 403, {userId:verifiedItId}],
  ['owner VRM refresh permitted', '/api/vrm-fleet/refresh', 'GET', {}, 200],
- ['verified IT cannot read VRM fleet', '/api/vrm-portal', 'GET', {}, 403, {userId:verifiedItId}],
+ ['verified IT cannot recover legacy static VRM sharing links', '/api/vrm-portal', 'GET', {}, 403, {userId:verifiedItId}],
  ['verified IT cannot refresh VRM fleet', '/api/vrm-fleet/refresh', 'GET', {}, 403, {userId:verifiedItId}],
  ['service cannot refresh VRM fleet', '/api/vrm-fleet/refresh', 'GET', {}, 403, {userId:serviceId}],
  ['IT VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'it'}],
@@ -220,4 +232,17 @@ test('Legacy cached client keeps nine exact portals while dynamic route serves e
  const current=await (await handler(request('/api/vrm-fleet'))).json();assert.equal(current.items.length,11);
  assert.deepEqual(current.items.map(u=>u.installationId),newItems.map(u=>u.installationId));
  const forbidden=await handler(request('/api/vrm-fleet','POST'));assert.equal(forbidden.status,404);
+});
+
+
+test('verified IT saved fleet omits unavailable sharing URLs and cannot recover them through Owner legacy route',async()=>{
+ const calls=[],mock=transport({userId:verifiedItId},calls);
+ const secret='synthetic-approved';
+ const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'synthetic-server',vrm:{getAccessToken:()=>undefined},vrmEmbeds:JSON.stringify({1022969:'https://vrm.victronenergy.com/installation/1022969/embed/'+secret}),fetch:async(url,init)=>{
+  if(url.endsWith('/rpc/cos_vrm_fleet_snapshot'))return json({items:[{installationId:1022969,name:'Now removed',available:false,lastSeenAt:null}],lastAttemptAt:'2026-10-09T10:00:00Z',lastSuccessAt:'2026-10-09T10:00:00Z',errorCode:null,retryAfterAt:null,syncing:false,scheduleActive:false});
+  return mock(url,init);
+ }});
+ const current=await handler(request('/api/vrm-fleet'));assert.equal(current.status,200);const data=await current.json();assert.equal(data.items[0].available,false);assert.equal(data.items[0].embedUrl,null);assert.equal(JSON.stringify(data).includes(secret),false);
+ const old=await handler(request('/api/vrm-portal'));assert.equal(old.status,403);assert.equal((await old.text()).includes(secret),false);
+ assert.equal(calls.some(call=>/cos_vrm_fleet_(?:begin|finish|fail)$/.test(call.url)),false);
 });

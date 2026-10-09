@@ -21,6 +21,8 @@ on:
       - 'tech-checks/it-send-repair.html'
       - 'tech-checks/resources/fonts/**'
       - 'tech-checks/operations-host.*'
+      - 'tech-checks/verified-it-fleet-host.js'
+      - 'tech-checks/it-mhelp-projection.js'
       - 'tech-checks/production-assignments-host.*'
       - 'tech-checks/operations/dist/**'
       - '.github/workflows/cos-pages-smoke.yml'
