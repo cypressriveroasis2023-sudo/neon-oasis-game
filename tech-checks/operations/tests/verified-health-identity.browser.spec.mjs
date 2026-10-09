@@ -178,7 +178,7 @@ test('15-minute saved-data polling stays unchanged and observations older than 2
  const baseline=summaryReads();await page.clock.fastForward(14*60*1000);expect(summaryReads()).toBe(baseline);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  await page.clock.fastForward(60*1000);await expect.poll(summaryReads).toBe(baseline+1);
  await page.clock.fastForward(60*1000);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await expect(frame.locator('.field-map-display-bar')).toContainText('Saved status refreshes every 15 minutes');
+ await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await frame.locator('.field-map-info>summary').click();await expect(frame.locator('.field-map-info')).toContainText('Saved status refreshes every 15 minutes');
  noWrites(state);
 });
 

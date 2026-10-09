@@ -291,6 +291,7 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
 test('Field Map blocks another GPS write until a successful manual refresh', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Field Map');
+  await frame.locator('.field-map-list>button').first().click();
   const save = frame.getByRole('button', { name: 'Save verified location' });
   await expect(save).toBeDisabled();
   await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
@@ -380,6 +381,7 @@ test('Field View keeps address verification explicit and hides changed-address p
  await expect(units).toContainText('HISTORICAL PIN');
  await expect(units).toContainText('ADDRESS ONLY');
  await expect(units).toContainText('Camera status unverified');
+ await frame.locator('.field-map-list>button').first().click();
  const save=frame.getByRole('button',{name:'Save verified location'});
  await expect(save).toBeDisabled();
  await expect(frame.getByRole('link',{name:'Look up recorded installation address ↗'})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=1%20Fixture%20St%2C%20Test%20City');
@@ -412,6 +414,7 @@ test('Field View keeps address verification explicit and hides changed-address p
 test('Field View never offers GPS writes before verified projection capability is enabled',async({page})=>{
  const {frame,state}=await fixturePage(page,{locationWritesEnabled:false});
  await open(frame,'Field Map');
+ await frame.locator('.field-map-list>button').first().click();
  await expect(frame.getByText('Verified location editing is not enabled for this backend yet.',{exact:false})).toBeVisible();
  await expect(frame.getByRole('button',{name:'Save verified location'})).toHaveCount(0);
  await expect(frame.getByRole('button',{name:'Use My Current GPS'})).toHaveCount(0);

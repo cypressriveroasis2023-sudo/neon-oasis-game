@@ -11,6 +11,7 @@ import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
+import HomeFieldView from './HomeFieldView';
 import MhelpTicketImport from './MhelpTicketImport';
 import type { TicketType } from './ticketTypes';
 import ProductionAssignments from './ProductionAssignments';
@@ -304,7 +305,7 @@ function OwnerApp() {
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
   const selectedArea=primaryWorkspace(active);
   const ownerInitials=String(session?.name||'Owner').split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
-  return <div className='shell operations-shell company-shell'>
+  return <div className={'shell operations-shell company-shell'+(active==='Field Map'?' operations-field-view':'')}>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
     <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
       <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
@@ -323,7 +324,7 @@ function OwnerApp() {
 
       {active!=='Today'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{workspaceLabel(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div><TechChecksWorkspace/></section>
-        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Field Map…</p>:active==='Today'?<>{!route.detail&&<><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening Field Map…</p>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Field Map')}/>}<TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>}<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>{!route.createType&&<DailyBoard api={api} openWorkspace={navigate}/>}</>
