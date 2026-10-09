@@ -39,7 +39,7 @@ const baseFleetWorkspaces = ['Camera Health','Field Map','InHand Routers','Tech 
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'Daily Board':'Today’s jobs, assigned tasks, readiness and TV view.',
-  'Unit Tracker':'Review current COS units and save pending additions or updates for the 2027 tracker.',
+  'Unit Tracker':'Review current COS units and their 2027 tracker information.',
   'Field Map':'Find field units using recorded GPS, installed-site coordinates or their site address.',
   'Units On Hand':'Shop and yard inventory, availability and preparation status.',
   Operations:'Jobs, scheduling, customers and finance in your existing workflows.',
