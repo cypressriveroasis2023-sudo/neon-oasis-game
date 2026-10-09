@@ -132,3 +132,6 @@
 #root .operations-shell .field-map-tv .field-map-fullscreen-controls{display:flex;position:absolute;z-index:1001;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));gap:8px}
 #root .operations-shell .field-map-tv .leaflet-top.leaflet-left{top:env(safe-area-inset-top);left:env(safe-area-inset-left)}
 #root .operations-shell .field-map-tv .leaflet-bottom.leaflet-right{bottom:env(safe-area-inset-bottom);right:env(safe-area-inset-right)}
+
+/* Keep pending/error context visible above the mobile basemap. */
+#root .operations-shell .field-map-display-bar>div>span.field-map-load-state{display:block}

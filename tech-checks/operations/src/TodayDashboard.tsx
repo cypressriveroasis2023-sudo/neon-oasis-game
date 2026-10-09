@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import WorkspaceOverview from './WorkspaceOverview';
 import CompanyOverview from './CompanyOverview';
 import { api } from './api';
-import { dashboardSources, loadCompanyEquipment, loadTodayDashboard, type CompanyEquipmentData, type DashboardData } from './todayDashboardData';
+import { dashboardSources, emptyTodayDashboard, loadCompanyEquipment, loadTodayDashboard, type CompanyEquipmentData, type DashboardData } from './todayDashboardData';
 import type { CompanyStageId } from './companyLifecycle';
 
 type Props = { setActive: (workspace: string) => void; openJob?: (id:string, workspace?:'Jobs'|'Unscheduled'|'Owner Review'|'Dispatch')=>void; openUnit?: (unit:number)=>void; selectedJobId?:string; detailOpen?:boolean; selectJob?:(id:string)=>void; backToJobs?:()=>void };
 
 export default function LiveTodayDashboard({ setActive, openJob, openUnit, selectedJobId, detailOpen, selectJob, backToJobs }: Props) {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardData>(emptyTodayDashboard);
   const [equipment, setEquipment] = useState<CompanyEquipmentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<CompanyStageId | null>(null);
@@ -19,10 +19,13 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     running.current = true;
     const request = ++revision.current;
     setLoading(true);
-    const [next, health] = await Promise.all([loadTodayDashboard(api), loadCompanyEquipment(api)]);
+    setData(emptyTodayDashboard());
+    setEquipment(null);
+    await Promise.all([
+      loadTodayDashboard(api, next => { if (request === revision.current) setData(next); }),
+      loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(next); }),
+    ]);
     if (request !== revision.current) return;
-    setData(next);
-    setEquipment(health);
     running.current = false;
     setLoading(false);
   };
@@ -30,9 +33,8 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     void refresh();
     return () => { revision.current += 1; running.current = false; };
   }, []);
-  if (!data) return <div className='loading' role='status'>Loading company overview…</div>;
   const failed = dashboardSources.filter(([key]) => Boolean(data.errors[key]));
-  const complete = failed.length === 0 && !Object.keys(equipment?.errors || {}).length;
+  const complete = !loading && failed.length === 0 && !Object.keys(equipment?.errors || {}).length;
   const browseStage = (stage: CompanyStageId | null) => {
     setStageFilter(stage);
     window.requestAnimationFrame(() => {
@@ -44,7 +46,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     {!detailOpen && <>
       <CompanyOverview data={data} equipment={equipment} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
-        <span role='status'>{loading ? 'Refreshing overview. Values shown are from the previous response.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
+        <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
         <button type='button' className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
       </div>
       {failed.length > 0 && <section className='company-source-error' role='alert' aria-label='Dashboard data unavailable'>
@@ -56,7 +58,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     </>}
     <div className='company-jobs-section' ref={jobsSection} tabIndex={-1}>
       {!detailOpen && stageFilter && <div className='company-job-filter'><span>Showing jobs for the selected stage</span><button className='secondary' onClick={() => setStageFilter(null)}>Show all active jobs</button></div>}
-      <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit} selectedJobId={selectedJobId} detailOpen={detailOpen} selectJob={selectJob} backToJobs={backToJobs} stageFilter={stageFilter}/>
+      {data.jobs === null && !data.errors.jobs ? <p className='loading' role='status'>Checking job records…</p> : <WorkspaceOverview jobs={data.jobs} openWorkspace={setActive} openJob={openJob} openUnit={openUnit} selectedJobId={selectedJobId} detailOpen={detailOpen} selectJob={selectJob} backToJobs={backToJobs} stageFilter={stageFilter}/>}
     </div>
   </div>;
 }

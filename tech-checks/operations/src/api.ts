@@ -9,6 +9,13 @@ export class OperationsApiError extends Error {
 }
 const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 type ParentSession = { token: string; role: string };
+// Only reviewed snapshot routes may share a pending read. A logical GET alone
+// is not enough: new routes can perform work or have independent-read semantics.
+const sharedReadPaths = new Set([
+  '/api/jobs', '/api/quotes', '/api/ar', '/api/purchasing', '/api/owner-tasks',
+  '/api/field-map', '/api/routers', '/api/camera-health/summary-v3',
+]);
+const pendingReads = new Map<string, Promise<ApiResponse>>();
 let tokenRequest: Promise<ParentSession> | null = null;
 function requestParentToken(): Promise<ParentSession> {
   if (window.parent === window || location.origin === 'null') {
@@ -46,11 +53,31 @@ export function permitsTechnicianRequest(method: string, path: string, body?: un
     (body == null || typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
 }
 async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResponse<T>> {
+  const mode = new URLSearchParams(location.search).get('mode');
   if (!/^\/api\/[a-zA-Z0-9_\-\/]+$/.test(path)) throw new OperationsApiError('This Operations request is unavailable.', 400);
-  if (new URLSearchParams(location.search).get('mode') === 'production-assignments' && !permitsTechnicianRequest(method, path, body)) throw new OperationsApiError('This assignment view permits technician reads and taking an available IT queue visit only.', 403);
+  if (mode === 'production-assignments' && !permitsTechnicianRequest(method, path, body)) throw new OperationsApiError('This assignment view permits technician reads and taking an available IT queue visit only.', 403);
+  // Always verify the current parent session before consulting pending reads.
+  // A path-only promise could otherwise expose a previous account's response.
   const session = await requestParentToken();
+  if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
-  const token = session.token;
+  if (method === 'POST') {
+    // Reads started before or during a save cannot satisfy its fresh readback.
+    // Forget their lookup entries without cancelling their existing callers.
+    pendingReads.clear();
+    try { return await sendRequest<T>(method, path, session.token, body); }
+    finally { pendingReads.clear(); }
+  }
+  if (!sharedReadPaths.has(path)) return sendRequest<T>(method, path, session.token, body);
+  const key = JSON.stringify([session.token, session.role, mode, path]);
+  const existing = pendingReads.get(key);
+  if (existing) return existing;
+  const pending = sendRequest<T>(method, path, session.token, body);
+  pendingReads.set(key, pending);
+  try { return await pending; }
+  finally { if (pendingReads.get(key) === pending) pendingReads.delete(key); }
+}
+async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown): Promise<ApiResponse<T>> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 30000);
   try {

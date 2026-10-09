@@ -115,8 +115,9 @@ test('native Jobs scheduling validates department and times, sends one write, an
 });
 
 test('native Dispatch verifies one write and preserves an unverified outcome until refresh',async({page})=>{
-  const {frame,state}=await openFixture(page,'jobs');
-  Object.assign(state.jobs[0],{status:'Scheduled',technician:'Casey Service',scheduled:day+' 08:00',scheduledEnd:day+' 10:00'});
+  const {frame,state}=await openFixture(page,'jobs',state=>{
+    Object.assign(state.jobs[0],{status:'Scheduled',technician:'Casey Service',scheduled:day+' 08:00',scheduledEnd:day+' 10:00'});
+  });
   await routeTo(page,'dispatch');
   await expect(frame.locator('.row-actions').getByRole('button',{name:'Dispatch',exact:true})).toBeVisible();
   state.readbackMismatch=true;
