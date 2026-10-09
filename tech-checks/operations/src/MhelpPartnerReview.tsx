@@ -21,7 +21,7 @@ export default function MhelpPartnerReview({openMap,openHealth}:{openMap:(id:str
     } catch(cause) {if(active.current){setStatus(null);setError(cause instanceof Error?cause.message:'The mHelpDesk connection could not be verified.');}}
     finally {pending.current=false;if(active.current)setBusy(false);}
   };
-  return <section className='unit-tracker-connection' aria-label='mHelpDesk Partner API review'>
+  return <section className='unit-tracker-connection mhelp-partner-review' aria-label='mHelpDesk Partner API review'>
     <h3>mHelpDesk connection</h3>
     <p>Review equipment from mHelpDesk alongside COS. Previewing reads equipment only; applying changes to the tracker, Camera Health, and Field View still requires verified equipment links and source review.</p>
     <div className='unit-tracker-actions'><button className='secondary' disabled={busy} onClick={()=>void run(false)}>{busy?'Checking mHelpDesk…':'Check mHelpDesk connection'}</button><a href='https://www.mhelpdesk.com/partner-api/index.html' target='_blank' rel='noopener noreferrer'>Partner API documentation ↗</a></div>

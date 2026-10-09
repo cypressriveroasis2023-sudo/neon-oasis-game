@@ -37,6 +37,7 @@ test('verified read displays partial coverage, exact decimal label and separate 
  await review.getByRole('button',{name:'Preview mHelpDesk equipment'}).click();
  await expect(review).toContainText('API equipment read verified');await expect(review).toContainText('Showing 1 of 100');await expect(review).toContainText('additional records have not been read');
  await expect(review.locator('tbody')).toContainText('Sniper 2 023.1');await expect(review).toContainText('Equipment link needs review');await expect(review).toContainText('administrative flag');await expect(review).toContainText('Addresses and GPS have not changed');
+  await expect(review.locator('tbody').getByText('Equipment link needs review',{exact:true})).toBeVisible();
  expect(calls.find(x=>x.path.endsWith('/preview')).body).toEqual({name:item.name});
  await expect(review.getByRole('button',{name:'View Field View'})).toHaveCount(0);
  expect(calls.filter(x=>x.method==='POST').map(x=>x.path)).toEqual(['/api/mhelpdesk/partner/preview']);
