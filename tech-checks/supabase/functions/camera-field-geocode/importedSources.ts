@@ -1,3 +1,4 @@
+import {trackerRecordId,validNativeTrackerLabel,unsupportedSourceVersion} from '../_shared/trackerNativeSource.ts';
 import {checkedSourcePrecedence,type SourcePrecedence} from '../_shared/sourcePrecedence.ts';
 import {addressDigest} from './censusAddress.ts';
 import {validInstallation,installationAddress,suppliedComponents,type Installation} from './importedAddress.ts';
@@ -14,7 +15,7 @@ export function geocodeDependencyCode(error:unknown):DependencyCode|null{
 }
 export const SOURCE_ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 export type ImportedIdentity={entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceSystem?:'mhelpdesk_product_import'|'google_sheet_tracker';sourceRecordId?:string;sourceRevision:string};
-export type ImportedSource=ImportedIdentity&{sourcePrecedence?:SourcePrecedence;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';unitNumber:string;family:string|null;variant:string|null;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:true;city:boolean;state:true;zip:boolean};eligibility:'FIELD';eventId:string};
+export type ImportedSource=ImportedIdentity&{sourcePrecedence?:SourcePrecedence;schemaVersion:1|2|3;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';unitNumber:string;family:string|null;variant:string|null;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:true;city:boolean;state:true;zip:boolean};eligibility:'FIELD';eventId:string};
 export type SourceEvent=ImportedIdentity&{eventId:string;kind:'upsert'|'tombstone'};
 const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
@@ -22,15 +23,16 @@ const sha=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const decimal=(v:unknown,zero=false)=>typeof v==='string'&&(zero?/^(0|[1-9]\d{0,18})$/:/^[1-9]\d{0,18}$/).test(v)&&BigInt(v)<=9223372036854775807n;
 const text=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v);
 const exact=(v:Record<string,any>,keys:string[])=>Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
-export const trackerRecordId=(v:unknown):v is string=>typeof v==='string'&&v.length<=400&&/^google_sheet:[A-Za-z0-9_-]{10,128}:(?:0|[1-9][0-9]{0,18}):[A-Za-z][A-Za-z0-9 ._-]{0,159}\|[A-Za-z0-9._-]{1,40}$/.test(v);
+export {trackerRecordId};
 export const validSourceType=(v:Record<string,any>)=>v.schemaVersion===1&&v.sourceSystem==='mhelpdesk_product_import'&&decimal(v.productId)&&!Object.hasOwn(v,'sourceRecordId')
- ||v.schemaVersion===2&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='tracker'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId');
+ ||v.schemaVersion===2&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='tracker'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId')
+ ||v.schemaVersion===3&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='equipment_unit'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId');
 export const sourceIdentity=(s:ImportedIdentity):ImportedIdentity=>({entityKind:s.entityKind,nativeUnitId:s.nativeUnitId,
  ...(s.sourceSystem==='google_sheet_tracker'?{sourceSystem:s.sourceSystem,sourceRecordId:s.sourceRecordId}:{productId:s.productId}),sourceRevision:s.sourceRevision});
 export const sourceAddress=(s:ImportedSource)=>installationAddress(s.installation);
-export function validIdentity(value:unknown):value is ImportedIdentity&Record<string,any>{return object(value)&&['equipment_unit','tracker'].includes(value.entityKind)&&uuid(value.nativeUnitId)&&uuid(value.sourceRevision)&&(value.sourceSystem==='google_sheet_tracker'?value.entityKind==='tracker'&&trackerRecordId(value.sourceRecordId)&&!Object.hasOwn(value,'productId'):decimal(value.productId)&&!Object.hasOwn(value,'sourceRecordId')&&(value.sourceSystem===undefined||value.sourceSystem==='mhelpdesk_product_import'));}
+export function validIdentity(value:unknown):value is ImportedIdentity&Record<string,any>{return object(value)&&['equipment_unit','tracker'].includes(value.entityKind)&&uuid(value.nativeUnitId)&&uuid(value.sourceRevision)&&(value.sourceSystem==='google_sheet_tracker'?trackerRecordId(value.sourceRecordId)&&!Object.hasOwn(value,'productId'):decimal(value.productId)&&!Object.hasOwn(value,'sourceRecordId')&&(value.sourceSystem===undefined||value.sourceSystem==='mhelpdesk_product_import'));}
 export async function checkedImportedSource(value:unknown,expected?:ImportedIdentity):Promise<ImportedSource|null>{
- if(!object(value)||!validIdentity(value)||!validSourceType(value)||value.organizationId!==SOURCE_ORG||value.eligibility!=='FIELD'||!decimal(value.eventId)||!text(value.unitNumber,250)
+ if(!object(value)||!validIdentity(value)||!validSourceType(value)||value.schemaVersion===3&&!validNativeTrackerLabel(value)||value.organizationId!==SOURCE_ORG||value.eligibility!=='FIELD'||!decimal(value.eventId)||!text(value.unitNumber,250)
   ||!(value.family===null||text(value.family,160))||!(value.variant===null||text(value.variant,160))||!['sourceFileSha256','sourceRowSha256','addressSha256','nativeGuardSha256'].every(k=>sha(value[k]))
   ||!object(value.installation)||!exact(value.installation,['street','city','state','zip'])||!validInstallation(value.installation)||!object(value.suppliedComponents)||!exact(value.suppliedComponents,['street','city','state','zip'])||value.suppliedComponents.street!==true||value.suppliedComponents.state!==true||value.suppliedComponents.city!==(value.installation.city!==null)||value.suppliedComponents.zip!==(value.installation.zip!==null))return null;
  const precedence=checkedSourcePrecedence(value);if(Object.hasOwn(value,'sourcePrecedence')&&!precedence)return null;
@@ -78,7 +80,7 @@ export function createSourceReader(key:string|undefined,requestFetch:typeof fetc
    const results=await Promise.all(groups.map(async(group)=>{
     const data=await request({action:'read_current',sources:group});
     if(!object(data)||!Array.isArray(data.sources)||data.sources.length!==group.length)throw new GeocodeDependencyError('source_shape');
-    return Promise.all(data.sources.map(async(s:unknown,i:number)=>{if(s===null)return null;if(object(s)&&s.eligibility==='tombstone'&&validSourceType(s)&&s.organizationId===SOURCE_ORG&&validIdentity(s)&&JSON.stringify(sourceIdentity(s))===JSON.stringify(sourceIdentity(group[i])))return null;const checked=await checkedImportedSource(s,group[i]);if(!checked)throw new GeocodeDependencyError('source_shape');return checked;}));
+    return Promise.all(data.sources.map(async(s:unknown,i:number)=>{if(s===null||object(s)&&unsupportedSourceVersion(s))return null;if(object(s)&&s.eligibility==='tombstone'&&validSourceType(s)&&s.organizationId===SOURCE_ORG&&validIdentity(s)&&JSON.stringify(sourceIdentity(s))===JSON.stringify(sourceIdentity(group[i])))return null;const checked=await checkedImportedSource(s,group[i]);if(!checked)throw new GeocodeDependencyError('source_shape');return checked;}));
    }));
    return results.flat();
   },

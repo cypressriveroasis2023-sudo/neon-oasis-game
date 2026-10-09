@@ -1,3 +1,4 @@
+import {trackerRecordId,validNativeTrackerLabel,unsupportedSourceVersion} from '../_shared/trackerNativeSource.ts';
 import {checkedArchivedRepresentations} from './archivedRepresentationProjection.ts';
 import {checkedSourcePrecedence,sourcePrecedenceAuditSha256,type SourcePrecedence} from '../_shared/sourcePrecedence.ts';
 import {addressDigest} from './censusAddress.ts';
@@ -30,6 +31,16 @@ const sameSet=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===
  * association. Never expose it as a health proof or a placement alias. */
 function currentNativeSourceIdentity(source:Row):boolean{
  const p=source.nativeSourceIdentity;
+ if(source.schemaVersion===3){
+  const fields=['sourceSystem','sourceRecordId','nativeUnitId','unitNumber','sourceRevision','sourceFileSha256','sourceRowSha256','nativeGuardSha256'];
+  const keys=['contract','trackerId','trackerUnitNumber',...fields];
+  return Boolean(source.organizationId===ORG&&source.sourceSystem==='google_sheet_tracker'&&source.entityKind==='equipment_unit'
+   &&uuid(source.nativeUnitId)&&!Object.hasOwn(source,'productId')&&validNativeTrackerLabel(source)&&uuid(source.sourceRevision)&&decimal(source.eventId)
+   &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(source[k]))
+   &&['FIELD','SHOP'].includes(source.placement)&&source.eligibility===(source.placement==='FIELD'?'FIELD':'tombstone')
+   &&object(p)&&Object.keys(p).length===keys.length&&keys.every(k=>Object.hasOwn(p,k))&&p.contract==='COS_IMPORTED_NATIVE_SOURCE_IDENTITY_V3'
+   &&uuid(p.trackerId)&&p.trackerId!==source.nativeUnitId&&p.trackerUnitNumber===source.unitNumber&&fields.every(k=>p[k]===source[k]));
+ }
  return Boolean(source.schemaVersion===1&&source.organizationId===ORG&&source.sourceSystem==='mhelpdesk_product_import'&&source.entityKind==='equipment_unit'
   &&uuid(source.nativeUnitId)&&decimal(source.productId)&&uuid(source.sourceRevision)&&decimal(source.eventId)
   &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(source[k]))
@@ -94,13 +105,13 @@ function sourceOnlyOverlayIds(inventory:unknown,sources:unknown,audits:unknown,d
  }
  return allowed;
 }
-const trackerRecordId=(v:unknown):v is string=>typeof v==='string'&&v.length<=400&&/^google_sheet:[A-Za-z0-9_-]{10,128}:(?:0|[1-9][0-9]{0,18}):[A-Za-z][A-Za-z0-9 ._-]{0,159}\|[A-Za-z0-9._-]{1,40}$/.test(v);
 const validSourceType=(v:Row)=>v.schemaVersion===1&&v.sourceSystem==='mhelpdesk_product_import'&&decimal(v.productId)&&!Object.hasOwn(v,'sourceRecordId')
- ||v.schemaVersion===2&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='tracker'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId');
+ ||v.schemaVersion===2&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='tracker'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId')
+ ||v.schemaVersion===3&&v.sourceSystem==='google_sheet_tracker'&&v.entityKind==='equipment_unit'&&trackerRecordId(v.sourceRecordId)&&!Object.hasOwn(v,'productId');
 const sourceIdentity=(v:Row)=>v.sourceSystem==='google_sheet_tracker'?{sourceSystem:'google_sheet_tracker' as const,sourceRecordId:v.sourceRecordId}:{productId:v.productId};
-export type ImportedBinding={sourcePrecedence?:SourcePrecedence;schemaVersion:1|2;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceRecordId?:string;unitNumber:string;family:string|null;variant:string|null;sourceRevision:string;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:boolean;city:boolean;state:boolean;zip:boolean};eligibility:'FIELD';eventId:string};
+export type ImportedBinding={sourcePrecedence?:SourcePrecedence;schemaVersion:1|2|3;organizationId:string;sourceSystem:'mhelpdesk_product_import'|'google_sheet_tracker';entityKind:'equipment_unit'|'tracker';nativeUnitId:string;productId?:string;sourceRecordId?:string;unitNumber:string;family:string|null;variant:string|null;sourceRevision:string;sourceFileSha256:string;sourceRowSha256:string;addressSha256:string;nativeGuardSha256:string;installation:Installation;suppliedComponents:{street:boolean;city:boolean;state:boolean;zip:boolean};eligibility:'FIELD';eventId:string};
 export async function checkedImportedBinding(v:unknown):Promise<ImportedBinding|null>{
- if(!object(v)||!validSourceType(v)||v.organizationId!==ORG||!['equipment_unit','tracker'].includes(v.entityKind)||!uuid(v.nativeUnitId)||!uuid(v.sourceRevision)||!decimal(v.eventId)
+ if(!object(v)||!validSourceType(v)||v.schemaVersion===3&&!validNativeTrackerLabel(v)||v.organizationId!==ORG||!['equipment_unit','tracker'].includes(v.entityKind)||!uuid(v.nativeUnitId)||!uuid(v.sourceRevision)||!decimal(v.eventId)
   ||typeof v.unitNumber!=='string'||!v.unitNumber.trim()||v.unitNumber.length>250||!['sourceFileSha256','sourceRowSha256','addressSha256','nativeGuardSha256'].every(k=>sha(v[k]))||v.eligibility!=='FIELD'||!validInstallation(v.installation)||!object(v.suppliedComponents))return null;
  const precedence=checkedSourcePrecedence(v);if(Object.hasOwn(v,'sourcePrecedence')&&!precedence)return null;
  const supplied=suppliedComponents(v.installation);if(Object.keys(v.suppliedComponents).length!==4||Object.entries(supplied).some(([k,value])=>v.suppliedComponents[k]!==value)||await addressDigest(installationAddress(v.installation))!==v.addressSha256)return null;
@@ -158,7 +169,8 @@ function agreeingShopSourceIds(inventory:unknown,sources:unknown,audits:unknown,
  const byConcern:Index=new Map(),byDevice:Index=new Map(),claimsByUnit:Index=new Map(),claimsByConcern:Index=new Map(),claimsByDevice:Index=new Map(),warningsByUnit:Index=new Map(),warningsByConcern:Index=new Map(),warningsByDevice:Index=new Map();
  const add=(index:Index,key:string,row:Row)=>{let group=index.get(key);if(!group){group=new Set();index.set(key,group);}group.add(row);};
  for(const row of rows){const key=concern(row.unitNumber);counts.set(key,(counts.get(key)||0)+1);}
- for(const s of current)if(s.sourceSystem==='mhelpdesk_product_import'){products.set(s.productId,(products.get(s.productId)||0)+1);}
+ const sourceRecordKey=(s:Row)=>s.sourceSystem==='google_sheet_tracker'?'google_sheet_tracker|'+s.sourceRecordId:s.productId;
+ for(const s of current)if(s.sourceSystem==='mhelpdesk_product_import'||s.schemaVersion===3&&s.sourceSystem==='google_sheet_tracker'){const key=sourceRecordKey(s);products.set(key,(products.get(key)||0)+1);}
  for(const d of cameras){let group=groups.get(d.unit_key);if(!group){group=[];groups.set(d.unit_key,group);}group.push(d);const key=match(d.unit_key),labels=groupsByMatch.get(key)||new Set<string>();labels.add(d.unit_key);groupsByMatch.set(key,labels);}
  // Include every sibling label and device reference as a veto, including history
  // under another family. Neither index is used to establish the positive join.
@@ -168,13 +180,15 @@ function agreeingShopSourceIds(inventory:unknown,sources:unknown,audits:unknown,
  const cameraConcerns=new Map<string,Set<string>>();for(const key of groups.keys()){const base=concern(key),labels=cameraConcerns.get(base)||new Set<string>();labels.add(key);cameraConcerns.set(base,labels);}
  const related=(units:Index,labels:Index,resources:Index,row:Row,base:string,ids:string[])=>{const found=new Set([...(units.get(row.id)||[]),...(labels.get(base)||[])]);for(const id of ids)for(const item of resources.get(id)||[])found.add(item);return found;};
  const rosterAgrees=(values:unknown[],ids:Set<string>)=>values.length===ids.size&&new Set(values.map(deviceId)).size===values.length&&values.every(v=>ids.has(deviceId(v)!));
- const validShop=(s:Row)=>s.schemaVersion===1&&s.organizationId===ORG&&s.sourceSystem==='mhelpdesk_product_import'&&decimal(s.productId)&&uuid(s.sourceRevision)&&decimal(s.eventId)
+ const validShop=(s:Row)=>(s.schemaVersion===1&&s.sourceSystem==='mhelpdesk_product_import'&&decimal(s.productId)&&!Object.hasOwn(s,'sourceRecordId')
+  ||s.schemaVersion===3&&s.sourceSystem==='google_sheet_tracker'&&s.entityKind==='equipment_unit'&&validNativeTrackerLabel(s)&&!Object.hasOwn(s,'productId'))
+  &&s.organizationId===ORG&&uuid(s.sourceRevision)&&decimal(s.eventId)
   &&s.placement==='SHOP'&&s.eligibility==='tombstone'&&s.installation===null&&s.addressSha256===null&&s.suppliedComponents===null
-  &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(s[k]))&&!Object.hasOwn(s,'sourcePrecedence')&&!Object.hasOwn(s,'sourceRecordId');
- const sourceFields=['schemaVersion','organizationId','sourceSystem','entityKind','nativeUnitId','productId','unitNumber','sourceRevision','eventId','sourceFileSha256','sourceRowSha256','nativeGuardSha256','placement','eligibility','siteLabel'];
+  &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(s[k]))&&!Object.hasOwn(s,'sourcePrecedence');
+ const sourceFields=['schemaVersion','organizationId','sourceSystem','entityKind','nativeUnitId','productId','unitNumber','sourceRevision','eventId','sourceFileSha256','sourceRowSha256','nativeGuardSha256','placement','eligibility','siteLabel','sourceRecordId'];
  for(const source of sourceRows){
   const fresh=currentById.get(sourceKey(source)),row=rowById.get(source.nativeUnitId);
-  if(!row||row._sourceField!==true||!fresh||!validShop(source)||!validShop(fresh)||sourceFields.some(k=>source[k]!==fresh[k])||products.get(source.productId)!==1
+  if(!row||row._sourceField!==true||!fresh||!validShop(source)||!validShop(fresh)||sourceFields.some(k=>source[k]!==fresh[k])||source.schemaVersion===3&&source.customerLabel!==fresh.customerLabel||products.get(sourceRecordKey(source))!==1
    ||sourceKey(source)!==identity(row)||row.unitNumber!==source.unitNumber||!match(row.unitNumber).startsWith('typed:')||row.placementAuditId!=null)continue;
   const base=concern(row.unitNumber);if(counts.get(base)!==1)continue;
   let key:string;
@@ -248,16 +262,18 @@ async function reviewedSourcePrecedenceIds(inventory:unknown,sources:unknown,aud
 /** Effective imported presentation/classification only, before Owner placement projection. No GPS or health writes. */
 export async function projectImportedSourceAddresses(snapshot:Row,sources:unknown,audits:unknown,devices:unknown,previousSources:Row[]=[],context?:ImportedProjectionContext):Promise<Row>{
  if(!Array.isArray(sources)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(snapshot.items)||!object(snapshot.summary))throw Error('Imported source projection unavailable');
- const byId=new Map<string,Row>();for(const s of sources){if(!object(s)||!['equipment_unit','tracker'].includes(s.entityKind)||!uuid(s.nativeUnitId)||byId.has(s.entityKind+'|'+s.nativeUnitId))throw Error('Imported source identity invalid');byId.set(s.entityKind+'|'+s.nativeUnitId,s);}
+ const sourceRows=sources.filter(s=>!object(s)||!unsupportedSourceVersion(s));
+ if(context&&Array.isArray(context.currentSources))context={...context,currentSources:context.currentSources.filter(s=>!object(s)||!unsupportedSourceVersion(s))};
+ const byId=new Map<string,Row>();for(const s of sourceRows){if(!object(s)||!['equipment_unit','tracker'].includes(s.entityKind)||!uuid(s.nativeUnitId)||byId.has(s.entityKind+'|'+s.nativeUnitId))throw Error('Imported source identity invalid');byId.set(s.entityKind+'|'+s.nativeUnitId,s);}
  const previouslyImported=new Set(previousSources.map(s=>s.entityKind+'|'+s.nativeUnitId));
- const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,sources,audits,devices,context);
- const agreeingShop=agreeingShopSourceIds(snapshot.inventoryItems,sources,audits,devices,context);
- const reviewed=await reviewedSourcePrecedenceIds(snapshot.inventoryItems,sources,audits,devices,context);
+ const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,sourceRows,audits,devices,context);
+ const agreeingShop=agreeingShopSourceIds(snapshot.inventoryItems,sourceRows,audits,devices,context);
+ const reviewed=await reviewedSourcePrecedenceIds(snapshot.inventoryItems,sourceRows,audits,devices,context);
  const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const inventoryItems=await Promise.all(snapshot.inventoryItems.map(async(raw:Row)=>{
   const s=byId.get(identity(raw));
   if(!s&&previouslyImported.has(identity(raw))&&raw.locationVerification!=='owner_verified'&&raw.hasUnitGps!==true&&raw.placementSource!=='owner')return {...raw,_sourceField:false,currentLocationType:'unknown',importedSourceState:'source_changed',importedInstallation:null,latitude:null,longitude:null,coordinateSource:null};
-  if(!s||Object.hasOwn(s,'sourcePrecedence')&&!reviewed.has(raw.id)||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id)&&!reviewed.has(raw.id)&&!agreeingShop.has(raw.id))return raw;
+  if(!s||s.schemaVersion===3&&(raw.readOnly!==false||!currentNativeSourceIdentity(s))||Object.hasOwn(s,'sourcePrecedence')&&!reviewed.has(raw.id)||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id)&&!reviewed.has(raw.id)&&!agreeingShop.has(raw.id))return raw;
   // Native-only, sanitized mHelp CustomerName path. It is display text, not a
   // CRM identity or a customer/site parser; keep the complete label intact.
   const sourceLabel=typeof s.siteLabel==='string'&&s.siteLabel.trim()&&s.siteLabel.length<=250?s.siteLabel:null;
@@ -279,7 +295,7 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
    locationVerification:raw.locationVerification,locationVerifiedAt:raw.locationVerifiedAt,locationHistoryId:raw.locationHistoryId,addressEstimateLegacyEvidenceSha256:reviewedCandidate.addressEstimateLegacyEvidenceSha256}
    :{latitude:null,longitude:null,coordinateSource:null,locationVerification:'address_only',locationVerifiedAt:null,locationHistoryId:null,
     ...(raw.historicalCoordinateSource===reviewedEstimateSource?{historicalLatitude:null,historicalLongitude:null,historicalCoordinateSource:null}:{})};
-  return {...raw,customer:customerLabel,site:sourceLabel??'Installation site',_sourceField:true,placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:'FIELD',status:['assigned','in_transit','installed','returning'].includes(raw.status)?raw.status:'field',currentLocationType:'field',address:installationAddress(binding.installation),addressSource:binding.sourceSystem==='google_sheet_tracker'?'Tracker imported installation address':'mHelpDesk imported installation address',recordSource:binding.sourceSystem==='google_sheet_tracker'?'Tracker imported installation address':'mHelpDesk imported installation address',
+  return {...raw,customer:customerLabel,site:sourceLabel??'Installation site',_sourceField:true,placement:null,placementSource:null,placementUnitKey:null,placementAuditId:null,placementUpdatedAt:null,importedPlacement:'FIELD',status:['assigned','in_transit','installed','returning'].includes(raw.status)?raw.status:'field',currentLocationType:'field',address:installationAddress(binding.installation),addressSource:binding.sourceSystem==='google_sheet_tracker'?'Tracker imported installation address':'mHelpDesk imported installation address',recordSource:binding.schemaVersion===3?raw.recordSource:binding.sourceSystem==='google_sheet_tracker'?'Tracker imported installation address':'mHelpDesk imported installation address',
    importedInstallation:binding,...coordinates};
  }));
  const items=inventoryItems.filter((r:Row)=>r._sourceField===true);
@@ -287,9 +303,10 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
 }
 export async function projectImportedGeocodes(snapshot:Row,records:unknown,audits:unknown,devices:unknown,context?:ImportedProjectionContext):Promise<Row>{
  if(!Array.isArray(records))throw Error('Imported address estimates unavailable');const byId=new Map<string,Row>();
- for(const r of records){if(!object(r)||!object(r.binding))throw Error('Imported estimate identity invalid');const key=r.binding.entityKind+'|'+r.binding.nativeUnitId;if(byId.has(key))throw Error('Duplicate imported estimate');byId.set(key,r);}
- const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,context?.currentSources,audits,devices,context);
- const currentSources=Array.isArray(context?.currentSources)?context.currentSources:[];
+ for(const r of records){if(object(r)&&object(r.binding)&&unsupportedSourceVersion(r.binding))continue;if(!object(r)||!object(r.binding))throw Error('Imported estimate identity invalid');const key=r.binding.entityKind+'|'+r.binding.nativeUnitId;if(byId.has(key))throw Error('Duplicate imported estimate');byId.set(key,r);}
+ const currentSources=Array.isArray(context?.currentSources)?context.currentSources.filter(s=>!object(s)||!unsupportedSourceVersion(s)):[];
+ if(context)context={...context,currentSources};
+ const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,currentSources,audits,devices,context);
  const reviewed=await reviewedSourcePrecedenceIds(snapshot.inventoryItems,currentSources,audits,devices,context);
  const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const apply=async(raw:Row)=>{
@@ -299,7 +316,9 @@ export async function projectImportedGeocodes(snapshot:Row,records:unknown,audit
   const legacyConcern=legacyConcernForUnit(row.unitNumber);
   if(object(row.importedInstallation)&&Object.hasOwn(row.importedInstallation,'sourcePrecedence')&&!reviewed.has(row.id)||row.placementSource==='owner'||row.placementAuditId!=null||row.placement==='SHOP'||row.placement==='UNKNOWN'||row.placementStatus==='needs_identity_review'||row.locationVerification==='owner_verified'||row.hasUnitGps===true||row.installedSiteId!=null||row.currentLocationType!=='field'||legacyConcern&&!sourceOnly.has(row.id)&&!reviewed.has(row.id))return row;
   const binding=await checkedImportedBinding(row.importedInstallation),r=byId.get(identity(row));if(!binding||!r||row.id!==binding.nativeUnitId||row.unitNumber!==binding.unitNumber||typeof row.address!=='string'||await addressDigest(row.address)!==binding.addressSha256)return row;
-  if(legacyConcern||binding.sourcePrecedence){const current=await checkedImportedBinding(currentSources.find(s=>object(s)&&s.entityKind===binding.entityKind&&s.nativeUnitId===binding.nativeUnitId));if(!current||JSON.stringify(current)!==JSON.stringify(binding))return row;}
+  if(legacyConcern||binding.sourcePrecedence||binding.schemaVersion===3){const source=currentSources.find(s=>object(s)&&s.entityKind===binding.entityKind&&s.nativeUnitId===binding.nativeUnitId);
+   if(binding.schemaVersion===3&&(!source||row.readOnly!==false||!currentNativeSourceIdentity(source)))return row;
+   const current=await checkedImportedBinding(source);if(!current||JSON.stringify(current)!==JSON.stringify(binding))return row;}
   const returned=await checkedImportedBinding(r.binding);
   if(!returned||JSON.stringify(returned)!==JSON.stringify(binding)||r.jobKind!=='native_import'||r.verified!==false||r.liveGps!==false||!sha(r.legacyGuardSha256)||!['pending','deferred','success','no_match','provider_error','held'].includes(r.status))return row;
   const geocode:Row={jobKind:'native_import',binding,legacyGuardSha256:r.legacyGuardSha256,status:r.status,verified:false,liveGps:false};
