@@ -42,10 +42,11 @@ const defaultUnits = [{
   latitude: 31
 }];
 async function mount(page, label, units = defaultUnits, {
-  restored, placementReviews=[], storedShop=false
+  restored, placementReviews=[], storedShop=false, mapFailure=false
 } = {}) {
   const state = {
     units,
+    mapFailure,
     requests: [],
     writes: []
   };
@@ -104,6 +105,7 @@ async function mount(page, label, units = defaultUnits, {
         body: '{}'
       });
     }
+    if(request.path==='/api/field-map'&&state.mapFailure)return route.fulfill({status:546,headers,contentType:'application/json',body:JSON.stringify({error:'Operations request failed.'})});
     const data = request.path === '/api/session' ? {
       authorized: true,
       name: 'Synthetic Owner',
@@ -143,7 +145,7 @@ async function mount(page, label, units = defaultUnits, {
   await page.goto(origin + '/fixture');
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('.field-map-workspace')).toBeVisible();
-  await expect(frame.getByLabel('Search field units')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
+  if(!mapFailure)await expect(frame.getByLabel('Search field units')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
   return {
     state,
     frame,
@@ -238,3 +240,26 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-ma
 test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
 
 test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','online');await expect(frame.locator('.field-map-workspace')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.field-map-detail')).toContainText(/online/i);});
+
+// Failures must not masquerade as an empty fleet; fixtures never reach production.
+test('initial map failure shows unavailable state and retry restores units',async({page})=>{
+ const {frame,state}=await mount(page,'Ranger 022',defaultUnits,{mapFailure:true});
+ await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');
+ await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
+ await expect(frame.locator('.field-map-layout')).toHaveCount(0);
+ await expect(frame.locator('.router-map-note')).not.toContainText('0 support units');
+ await expect(frame.getByLabel('Review unverified historical locations').locator('..')).not.toContainText('(0)');
+ state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
+ await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
+});
+test('failed map refresh retains last good units and labels stale map data',async({page})=>{
+ const {frame,state}=await mount(page,'Ranger 022');
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(1);state.mapFailure=true;
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');
+ await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
+ await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
+ state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
+ await expect(frame.locator('.field-map-error')).toHaveCount(0);
+});
