@@ -8,9 +8,9 @@ const portalId='224643',token='synthetic-test-token';
 const row=(values={})=>({equipmentId:1001,portalId:Number(portalId),equipmentTypeId:20,name:'Sniper 2 023.1',model:'Sniper 2',customerId:21,serviceLocationId:22,IsActive:true,lastUpdateUTC:'2026-10-09T01:00:00Z',...values});
 const native=()=>({id:randomUUID(),unit_number:'Sniper 2 023.1',metadata:{product_id:'1001'}});
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json'}});
-function fixture({config={portalId,accessToken:token},rows=[row()],units=[native()],totalRows=rows.length,fetcher}={}){
+function fixture({config={portalId,accessToken:token},rows=[row()],units=[native()],totalRows=rows.length,fetcher,fullEquipmentReview=false}={}){
  const calls=[];
- const handler=createMhelpPartnerHandler({getConfig:()=>config,readNativeUnits:async()=>units,fetch:async(url,init)=>{calls.push({url,init});return fetcher?fetcher(url,init):url.endsWith('/me')?json({portalId:Number(portalId),userName:'private-user',email:'private-contact',password:'synthetic-profile-secret'}):json({totalRows,results:rows});}});
+ const handler=createMhelpPartnerHandler({fullEquipmentReview,getConfig:()=>config,readNativeUnits:async()=>units,fetch:async(url,init)=>{calls.push({url,init});return fetcher?fetcher(url,init):url.endsWith('/me')?json({portalId:Number(portalId),userName:'private-user',email:'private-contact',password:'synthetic-profile-secret'}):json({totalRows,results:rows});}});
  return {handler,calls};
 }
 test('configuration is default off, reveals only readiness, and never tests credentials through GET',async()=>{
@@ -32,7 +32,7 @@ test('preview uses only the production allowlisted GET endpoint and preserves de
  assert.equal(url.origin,'https://connect.mhelpdesk.com');assert.equal(url.pathname,'/api/v1.0/portal/'+portalId+'/equipment');assert.equal(url.searchParams.get('Name'),'Sniper 2 023.1');
  assert.equal(url.searchParams.get('Fields').includes('CustomFields'),false);assert.equal(request.init.method,'GET');assert.equal(request.init.redirect,'error');assert.equal(request.init.headers.Authorization,'Bearer '+token);assert.equal(url.href.includes(token),false);
 });
-test('token alone resolves the portal through /me without mutating config or reading through GET',async()=>{
+test('token alone resolves the portal through /users/me without mutating config or reading through GET',async()=>{
  const config={accessToken:token},f=fixture({config});
  const status=checkedPartnerStatus(await f.handler('/api/mhelpdesk/partner/status','GET',{}));
  assert.equal(status.tokenConfigured,true);assert.equal(status.portalConfigured,false);assert.equal(f.calls.length,0);
@@ -40,6 +40,34 @@ test('token alone resolves the portal through /me without mutating config or rea
  assert.equal(preview.verifiedPortalId,portalId);assert.equal(preview.portalConfigured,false);assert.equal(preview.liveAccessVerified,true);
  assert.deepEqual(config,{accessToken:token});assert.equal(f.calls.length,2);
  assert.equal(new URL(f.calls[1].url).pathname,'/api/v1.0/portal/'+portalId+'/equipment');
+});
+test('server full review checks complete sorted pages for both zero and one based pagination',async()=>{
+ const rows=Array.from({length:403},(_,i)=>row({equipmentId:i+1,name:'Sniper 2 '+String(i+1).padStart(3,'0')}));
+ for(const indexBase of [0,1]){
+  const f=fixture({fullEquipmentReview:true,fetcher:url=>{
+   if(url.endsWith('/me'))return json({portalId:Number(portalId)});
+   const u=new URL(url);assert.equal(u.searchParams.get('sort'),null);assert.equal(u.searchParams.get('pageSize'),'200');
+   const start=Math.max(0,Number(u.searchParams.get('rowIndex'))-indexBase);
+   return json({totalRows:rows.length,results:rows.slice(start,start+200)});
+  }});
+  const review=await f.handler('/api/mhelpdesk/partner/preview','POST',{});
+  assert.equal(review.items.length,403);assert.equal(review.partial,false);assert.deepEqual(review.items.map(v=>v.equipmentId),rows.map(v=>String(v.equipmentId)));
+ }
+});
+test('full review rejects ignored cursors, changing totals, unsorted identities and missing rows',async()=>{
+ const rows=Array.from({length:201},(_,i)=>row({equipmentId:i+1}));
+ for(const mode of ['ignored','changed','unordered','truncated','cross-portal']){
+  let pages=0;const f=fixture({fullEquipmentReview:true,fetcher:url=>{
+   if(url.endsWith('/me'))return json({portalId:Number(portalId)});
+   pages++;let page=pages===1?rows.slice(0,200):rows.slice(200);
+   if(mode==='ignored'&&pages>1)page=rows.slice(0,200);
+   if(mode==='unordered')page=page.toReversed();
+   if(mode==='truncated'&&pages>1)page=[];
+   if(mode==='cross-portal'&&pages>1)page=page.map(v=>({...v,portalId:999}));
+   return json({totalRows:mode==='changed'&&pages>1?202:201,results:page});
+  }});await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{}));
+ }
+ const f=fixture({fullEquipmentReview:true});await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{name:'Sniper 2 023.1'}),/does not accept filters/);
 });
 test('invalid or conflicting account portal IDs fail before any equipment or native read',async()=>{
  for(const value of [undefined,0,-1,1.5,'username','001','1/other',Number.MAX_SAFE_INTEGER+1]){
@@ -93,7 +121,7 @@ test('duplicate preview requests cannot fan out, and a completed read releases t
  let release;const f=fixture({fetcher:url=>url.endsWith('/me')?new Promise(resolve=>{release=()=>resolve(json({portalId:Number(portalId)}));}):json({totalRows:1,results:[row()]})});
  const first=f.handler('/api/mhelpdesk/partner/preview','POST',{});
  await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{}),error=>error.status===409);release();await first;
- const second=f.handler('/api/mhelpdesk/partner/preview','POST',{});release();await second;assert.equal(f.calls.length,4);
+ const second=f.handler('/api/mhelpdesk/partner/preview','POST',{});await Promise.resolve();release();await second;assert.equal(f.calls.length,4);
 });
 test('client rejects fabricated connected states, partial totals, duplicate identities and broken exact links',async()=>{
  const f=fixture(),data=await f.handler('/api/mhelpdesk/partner/preview','POST',{});

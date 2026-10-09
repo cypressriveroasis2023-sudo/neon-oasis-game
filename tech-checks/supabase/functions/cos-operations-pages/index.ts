@@ -1,5 +1,6 @@
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
+import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
@@ -168,6 +169,7 @@ export function createOperationsHandler(options) {
   const mhelpPartner = createMhelpPartnerHandler({
     fetch: requestFetch,
     getConfig: options.mhelpPartner?.getConfig || (() => ({})),
+    renewAccess: options.mhelpPartner?.renewAccess,
     readNativeUnits: () => platformAll('equipment_units?select=id,unit_number,metadata&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
   });
   // This isolated control RPC is claimed once before the provider secret can be read.
@@ -889,12 +891,13 @@ export function createOperationsHandler(options) {
 }
 
 if (typeof Deno !== 'undefined' && import.meta.main) {
+  const mhelpTokens=nativeMhelpTokens(name=>Deno.env.get(name));
   Deno.serve(createOperationsHandler({
     platformUrl: Deno.env.get('SUPABASE_URL'),
     serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
     vrmEmbeds: Deno.env.get('COS_VRM_EMBEDS'),
     inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
-    mhelpPartner: { getConfig: () => ({portalId: Deno.env.get('COS_MHELP_PORTAL_ID'), accessToken: Deno.env.get('COS_MHELP_ACCESS_TOKEN')}) },
+    mhelpPartner: { getConfig:mhelpTokens.getPartnerConfig,renewAccess:mhelpTokens.renewAccess },
   }));
 }
 

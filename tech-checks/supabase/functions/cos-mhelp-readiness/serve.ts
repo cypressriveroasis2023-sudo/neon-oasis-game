@@ -1,9 +1,12 @@
 import {createMhelpReadinessHandler} from './index.ts';
 import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts';
+import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 const NATIVE = 'https://tughscoxralhofrckvxy.supabase.co';
 const ORGANIZATION = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 // Existing camera-cron authorization is verified by its original project; no credential is copied or created.
-const partner = createMhelpPartnerHandler({fetch,getConfig:()=>({accessToken:Deno.env.get('COS_MHELP_ACCESS_TOKEN'),portalId:Deno.env.get('COS_MHELP_PORTAL_ID')}),readNativeUnits:async()=>{
+const tokens=nativeMhelpTokens(name=>Deno.env.get(name));
+const getConfig=tokens.getPartnerConfig;
+const readNativeUnits=async()=>{
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (Deno.env.get('SUPABASE_URL') !== NATIVE || !service) throw Error('Backend unavailable');
   const rows: any[] = [];
@@ -16,7 +19,10 @@ const partner = createMhelpPartnerHandler({fetch,getConfig:()=>({accessToken:Den
     if (page.length<1000) return rows;
   }
   throw Error('Backend unavailable');
-}});
+};
+const partner = createMhelpPartnerHandler({fetch,getConfig,readNativeUnits,renewAccess:tokens.renewAccess});
+const fullPartner = createMhelpPartnerHandler({fetch,getConfig,readNativeUnits,fullEquipmentReview:true,renewAccess:tokens.renewAccess});
+const configured=(name:string)=>{const value=Deno.env.get(name);return !!value && value.length<=16384 && !/\s/.test(value)};
 Deno.serve(createMhelpReadinessHandler({authenticate:async req=>{
   if (Deno.env.get('SUPABASE_URL')!==NATIVE) return false;
   const candidate=req.headers.get('x-camera-cron-secret');
@@ -25,4 +31,4 @@ Deno.serve(createMhelpReadinessHandler({authenticate:async req=>{
   if (!response.ok) return false;
   const raw=await response.text(); if (raw.length>128) return false;
   const v=JSON.parse(raw); return v && typeof v==='object' && Object.keys(v).length===1 && v.authenticated===true;
-},partner}));
+},partner,fullReview:()=>fullPartner('/api/mhelpdesk/partner/preview','POST',{}),renewAccess:tokens.renewAccess,renewalConfiguration:()=>({refreshTokenConfigured:configured('COS_MHELP_REFRESH_TOKEN'),clientIdConfigured:configured('COS_MHELP_CLIENT_ID'),clientSecretConfigured:configured('COS_MHELP_CLIENT_SECRET')})}));
