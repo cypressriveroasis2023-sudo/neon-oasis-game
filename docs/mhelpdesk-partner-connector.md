@@ -26,4 +26,6 @@ Before enabling tracker/map updates, validate live equipment IDs and full identi
 
 ## Validation
 
+Server maintenance can check configuration and an explicit equipment preview through `camera-mhelp-readiness` → `cos-mhelp-readiness`. The first gate validates the existing Camera Health cron credential; the native gate validates the existing server-to-server source-read key. No user permissions or credentials are added. Only setup booleans, verified portal ID and aggregate preview/identity counts return to maintenance. Equipment labels, customer records, user profiles and secret values are excluded. The Owner UI continues to use its existing authentication and preview routes. Configure the token in **Tech Check Platform**, not Cameras On Site; Edge Function secrets belong to individual projects. These checks never enable timers or perform data writes.
+
 Synthetic tests exercise Owner-only access, denied IT/Service access before configuration read, decimal identity, explicit binding versus legacy Product ID, duplicate/changed identities, partial pages, oversized/cross-portal responses, request allowlists, concurrent previews, credential exclusion and sanitized errors. Browser fixtures cover setup status, preview review, partial-page wording and separate equipment activity versus connectivity. No production test equipment or rows are created.

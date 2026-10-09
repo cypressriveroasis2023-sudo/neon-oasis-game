@@ -125,7 +125,7 @@ export function createMhelpPartnerHandler(options: {
       if (payload.name) url.searchParams.set('Name', payload.name as string);
       const data = await read(url.href);
       if (!Array.isArray(data.results) || data.results.length > 50 || !Number.isSafeInteger(data.totalRows) || Number(data.totalRows) < data.results.length || Number(data.totalRows) < 0) fail('mHelpDesk returned an unsupported equipment page.');
-      const rows = data.results.map(row => projectPartnerEquipment(row, verifiedPortalId));
+      const rows = (data.results as unknown[]).map(row => projectPartnerEquipment(row, verifiedPortalId));
       if (new Set(rows.map(row => row.equipmentId)).size !== rows.length) fail('mHelpDesk returned duplicate equipment identities.');
       const nativeUnits = await options.readNativeUnits();
       if (!Array.isArray(nativeUnits) || nativeUnits.length > 10000) fail('COS equipment could not be verified. Retry the preview.');
