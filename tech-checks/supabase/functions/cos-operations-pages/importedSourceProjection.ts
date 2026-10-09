@@ -127,6 +127,84 @@ function legacyConcernReader(audits:unknown,devices:unknown):(unitNumber:string)
 export function importedLegacyConcern(unitNumber:string,audits:unknown,devices:unknown):boolean{
  return legacyConcernReader(audits,devices)(unitNumber);
 }
+/** Current SHOP and an unchanged, unmarked legacy Root placement agree. This is
+ * a read-only classification allowance, never a camera/health identity or a move.
+ * Native units require the verified provider association; tracker rows require a
+ * complete typed-label match. Family/base keys only veto competing evidence.
+ * All membership, source and history indexes are local to this projection read. */
+function agreeingShopSourceIds(inventory:unknown,sources:unknown,audits:unknown,devices:unknown,context?:ImportedProjectionContext):Set<string>{
+ const allowed=new Set<string>();
+ if(!context||![inventory,sources,audits,devices,context.nativeUnits,context.currentSources].every(v=>Array.isArray(v)&&v.length<=100000&&v.every(object)))return allowed;
+ const rows=inventory as Row[],sourceRows=sources as Row[],history=audits as Row[],cameras=devices as Row[],native=context.nativeUnits as Row[],current=context.currentSources as Row[],proof=context.identity;
+ if(!object(proof)||proof.identityVersion!==1||!Array.isArray(proof.unitIdentities)||!Array.isArray(proof.identityWarnings)
+  ||(proof.ownerConfirmedIdentityVersion===undefined?proof.ownerConfirmedUnitIdentities!==undefined:proof.ownerConfirmedIdentityVersion!==1||!Array.isArray(proof.ownerConfirmedUnitIdentities)))return allowed;
+ const {match,concern}=labelKeys(),rowById=new Map(rows.map(r=>[r.id,r])),nativeById=new Map(native.map(r=>[r.id,r]));
+ const sourceKey=(s:Row)=>s.entityKind+'|'+s.nativeUnitId,currentById=new Map(current.map(s=>[sourceKey(s),s]));
+ if(rows.some(r=>!uuid(r.id)||typeof r.unitNumber!=='string'||typeof r.readOnly!=='boolean')||rowById.size!==rows.length
+  ||nativeById.size!==native.length||native.some(r=>!uuid(r.id)||r.organization_id!==ORG||typeof r.unit_number!=='string')
+  ||rows.filter(r=>r.readOnly===false).length!==native.length||rows.some(r=>r.readOnly===false&&nativeById.get(r.id)?.unit_number!==r.unitNumber)
+  ||currentById.size!==current.length||new Set(sourceRows.map(sourceKey)).size!==sourceRows.length
+  ||[...sourceRows,...current].some(s=>!['equipment_unit','tracker'].includes(s.entityKind)||!uuid(s.nativeUnitId))
+  ||cameras.some(d=>!deviceId(d.id)||typeof d.unit_key!=='string')||new Set(cameras.map(d=>deviceId(d.id))).size!==cameras.length
+  ||history.some(a=>!deviceId(a.id)||typeof a.unit_key!=='string'||!Array.isArray(a.device_ids)||a.device_ids.some((id:unknown)=>!deviceId(id)))
+  ||new Set(history.map(a=>deviceId(a.id))).size!==history.length)return allowed;
+ const claims=[...proof.unitIdentities,...(proof.ownerConfirmedUnitIdentities||[])],warnings=proof.identityWarnings;
+ const validResources=(p:Row)=>Array.isArray(p.deviceIds)&&p.deviceIds.length<=100000&&p.deviceIds.every((id:unknown)=>typeof id==='string'&&deviceId(id))&&new Set(p.deviceIds).size===p.deviceIds.length
+  &&Array.isArray(p.unitKeys)&&p.unitKeys.length<=100000&&p.unitKeys.every((k:unknown)=>typeof k==='string'&&k.trim())&&new Set(p.unitKeys).size===p.unitKeys.length;
+ if(claims.length>100000||warnings.length>100000||claims.some(p=>!object(p)||!uuid(p.unitId)||typeof p.unitNumber!=='string'||!['native_provider','owner_placement','owner_confirmed_native'].includes(p.kind)||!sha(p.proof)||!validResources(p)||!p.deviceIds.length||!p.unitKeys.length)
+  ||warnings.some((p:unknown)=>!object(p)||typeof p.unitId!=='string'||!validResources(p)))return allowed;
+ const counts=new Map<string,number>(),products=new Map<string,number>(),groups=new Map<string,Row[]>(),groupsByMatch=new Map<string,Set<string>>();
+ type Index=Map<string,Set<Row>>;
+ const byConcern:Index=new Map(),byDevice:Index=new Map(),claimsByUnit:Index=new Map(),claimsByConcern:Index=new Map(),claimsByDevice:Index=new Map(),warningsByUnit:Index=new Map(),warningsByConcern:Index=new Map(),warningsByDevice:Index=new Map();
+ const add=(index:Index,key:string,row:Row)=>{let group=index.get(key);if(!group){group=new Set();index.set(key,group);}group.add(row);};
+ for(const row of rows){const key=concern(row.unitNumber);counts.set(key,(counts.get(key)||0)+1);}
+ for(const s of current)if(s.sourceSystem==='mhelpdesk_product_import'){products.set(s.productId,(products.get(s.productId)||0)+1);}
+ for(const d of cameras){let group=groups.get(d.unit_key);if(!group){group=[];groups.set(d.unit_key,group);}group.push(d);const key=match(d.unit_key),labels=groupsByMatch.get(key)||new Set<string>();labels.add(d.unit_key);groupsByMatch.set(key,labels);}
+ // Include every sibling label and device reference as a veto, including history
+ // under another family. Neither index is used to establish the positive join.
+ for(const a of history){add(byConcern,concern(a.unit_key),a);for(const id of a.device_ids)add(byDevice,deviceId(id)!,a);}
+ const indexClaims=(records:Row[],units:Index,labels:Index,ids:Index)=>{for(const p of records){add(units,p.unitId,p);for(const k of p.unitKeys)add(labels,concern(k),p);for(const id of p.deviceIds)add(ids,id,p);}};
+ indexClaims(claims,claimsByUnit,claimsByConcern,claimsByDevice);indexClaims(warnings,warningsByUnit,warningsByConcern,warningsByDevice);
+ const cameraConcerns=new Map<string,Set<string>>();for(const key of groups.keys()){const base=concern(key),labels=cameraConcerns.get(base)||new Set<string>();labels.add(key);cameraConcerns.set(base,labels);}
+ const related=(units:Index,labels:Index,resources:Index,row:Row,base:string,ids:string[])=>{const found=new Set([...(units.get(row.id)||[]),...(labels.get(base)||[])]);for(const id of ids)for(const item of resources.get(id)||[])found.add(item);return found;};
+ const rosterAgrees=(values:unknown[],ids:Set<string>)=>values.length===ids.size&&new Set(values.map(deviceId)).size===values.length&&values.every(v=>ids.has(deviceId(v)!));
+ const validShop=(s:Row)=>s.schemaVersion===1&&s.organizationId===ORG&&s.sourceSystem==='mhelpdesk_product_import'&&decimal(s.productId)&&uuid(s.sourceRevision)&&decimal(s.eventId)
+  &&s.placement==='SHOP'&&s.eligibility==='tombstone'&&s.installation===null&&s.addressSha256===null&&s.suppliedComponents===null
+  &&['sourceFileSha256','sourceRowSha256','nativeGuardSha256'].every(k=>sha(s[k]))&&!Object.hasOwn(s,'sourcePrecedence')&&!Object.hasOwn(s,'sourceRecordId');
+ const sourceFields=['schemaVersion','organizationId','sourceSystem','entityKind','nativeUnitId','productId','unitNumber','sourceRevision','eventId','sourceFileSha256','sourceRowSha256','nativeGuardSha256','placement','eligibility','siteLabel'];
+ for(const source of sourceRows){
+  const fresh=currentById.get(sourceKey(source)),row=rowById.get(source.nativeUnitId);
+  if(!row||row._sourceField!==true||!fresh||!validShop(source)||!validShop(fresh)||sourceFields.some(k=>source[k]!==fresh[k])||products.get(source.productId)!==1
+   ||sourceKey(source)!==identity(row)||row.unitNumber!==source.unitNumber||!match(row.unitNumber).startsWith('typed:')||row.placementAuditId!=null)continue;
+  const base=concern(row.unitNumber);if(counts.get(base)!==1)continue;
+  let key:string;
+  if(row.readOnly===false){
+   const own=[...(claimsByUnit.get(row.id)||[])];
+   if(!currentNativeSourceIdentity(source)||!currentNativeSourceIdentity(fresh)||source.nativeSourceIdentity.trackerId!==fresh.nativeSourceIdentity.trackerId
+    ||source.nativeSourceIdentity.trackerUnitNumber!==fresh.nativeSourceIdentity.trackerUnitNumber||own.length!==1||own[0].kind!=='native_provider'||own[0].unitNumber!==row.unitNumber||own[0].unitKeys.length!==1)continue;
+   key=own[0].unitKeys[0];
+  }else{
+   if(source.nativeSourceIdentity!=null||fresh.nativeSourceIdentity!=null)continue;
+   const labels=groupsByMatch.get(match(row.unitNumber));if(labels?.size!==1)continue;key=[...labels][0];
+  }
+  if(concern(key)!==base||cameraConcerns.get(base)?.size!==1)continue;
+  const group=groups.get(key)||[],ids=group.map(d=>deviceId(d.id)!),idSet=new Set(ids);
+  if(!group.length||group.some(d=>d.organization!=='root'||d.activation_state!=='deactivated'))continue;
+  const associations=related(claimsByUnit,claimsByConcern,claimsByDevice,row,base,ids);
+  if(related(warningsByUnit,warningsByConcern,warningsByDevice,row,base,ids).size
+   ||(row.readOnly?associations.size!==0:associations.size!==1||![...associations].every(p=>p.unitId===row.id&&p.kind==='native_provider'&&p.unitNumber===row.unitNumber&&p.unitKeys.length===1&&p.unitKeys[0]===key&&rosterAgrees(p.deviceIds,idSet))))continue;
+  const relatedHistory=new Set(byConcern.get(base)||[]);for(const id of ids)for(const a of byDevice.get(id)||[])relatedHistory.add(a);
+  let latest:Row|undefined,invalid=false;
+  for(const a of relatedHistory){
+   if(a.unit_key!==key||!['MOVE_TO_ROOT','MOVE_TO_FIELD'].includes(a.action)||['contract','control_id','request_id','placement','site_label','street_address'].some(k=>a[k]!=null)
+    ||!rosterAgrees(a.device_ids,idSet)||typeof a.created_at!=='string'||!Number.isFinite(Date.parse(a.created_at))){invalid=true;break;}
+   if(!latest||BigInt(deviceId(a.id)!)>BigInt(deviceId(latest.id)!))latest=a;
+  }
+  if(invalid||!latest||latest.action!=='MOVE_TO_ROOT'||[...relatedHistory].some(a=>Date.parse(a.created_at)>Date.parse(latest!.created_at)))continue;
+  allowed.add(row.id);
+ }
+ return allowed;
+}
 /** A separately reviewed import may supersede exactly one unmarked historical
  * Root audit. Every other audit/identity change holds it; no health alias is made.
  * Indexes live for this read only, and absent decisions add no roster scans. */
@@ -173,12 +251,13 @@ export async function projectImportedSourceAddresses(snapshot:Row,sources:unknow
  const byId=new Map<string,Row>();for(const s of sources){if(!object(s)||!['equipment_unit','tracker'].includes(s.entityKind)||!uuid(s.nativeUnitId)||byId.has(s.entityKind+'|'+s.nativeUnitId))throw Error('Imported source identity invalid');byId.set(s.entityKind+'|'+s.nativeUnitId,s);}
  const previouslyImported=new Set(previousSources.map(s=>s.entityKind+'|'+s.nativeUnitId));
  const sourceOnly=sourceOnlyOverlayIds(snapshot.inventoryItems,sources,audits,devices,context);
+ const agreeingShop=agreeingShopSourceIds(snapshot.inventoryItems,sources,audits,devices,context);
  const reviewed=await reviewedSourcePrecedenceIds(snapshot.inventoryItems,sources,audits,devices,context);
  const legacyConcernForUnit=legacyConcernReader(audits,devices);
  const inventoryItems=await Promise.all(snapshot.inventoryItems.map(async(raw:Row)=>{
   const s=byId.get(identity(raw));
   if(!s&&previouslyImported.has(identity(raw))&&raw.locationVerification!=='owner_verified'&&raw.hasUnitGps!==true&&raw.placementSource!=='owner')return {...raw,_sourceField:false,currentLocationType:'unknown',importedSourceState:'source_changed',importedInstallation:null,latitude:null,longitude:null,coordinateSource:null};
-  if(!s||Object.hasOwn(s,'sourcePrecedence')&&!reviewed.has(raw.id)||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id)&&!reviewed.has(raw.id))return raw;
+  if(!s||Object.hasOwn(s,'sourcePrecedence')&&!reviewed.has(raw.id)||s.unitNumber!==raw.unitNumber||raw.placementSource==='owner'||raw.placementStatus==='needs_identity_review'||raw.placement==='UNKNOWN'||raw.hasUnitGps===true||raw.locationVerification==='owner_verified'||raw.installedSiteId!=null||legacyConcernForUnit(raw.unitNumber)&&!sourceOnly.has(raw.id)&&!reviewed.has(raw.id)&&!agreeingShop.has(raw.id))return raw;
   // Native-only, sanitized mHelp CustomerName path. It is display text, not a
   // CRM identity or a customer/site parser; keep the complete label intact.
   const sourceLabel=typeof s.siteLabel==='string'&&s.siteLabel.trim()&&s.siteLabel.length<=250?s.siteLabel:null;
