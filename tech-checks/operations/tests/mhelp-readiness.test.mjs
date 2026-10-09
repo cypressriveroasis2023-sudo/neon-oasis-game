@@ -26,6 +26,10 @@ test('native failures never echo unknown errors or credentials',async()=>{
  const denied=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw new MhelpPartnerError('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.')}});
  assert.equal((await denied(request({action:'preview'}))).status,503);
 });
+test('maintenance exposes only the failed provider operation and HTTP status, with no provider body or URL',async()=>{
+ const h=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw new MhelpPartnerError('mHelpDesk could not complete the account or equipment read. Retry later.',503,{operation:'equipment_read',httpStatus:500,body:'synthetic-private'});}});
+ const result=await (await h(request({action:'preview'}))).json();assert.deepEqual(result.provider,{operation:'equipment_read',httpStatus:500});assert(!JSON.stringify(result).includes('synthetic-private'));
+});
 test('credential introspection validates the existing camera cron before answering',async()=>{
  let calls=0;const h=createCameraMhelpReadinessHandler({verifyCron:async candidate=>{calls++;assert.equal(candidate,'synthetic-only');return false}});
  assert.equal((await h(request({action:'authenticate'}))).status,403);assert.equal(calls,1);

@@ -31,6 +31,9 @@ export function createMhelpReadinessHandler(options: {authenticate:(req:Request)
     catch { return reply({error:'Forbidden'},403); }
     let action: 'status'|'preview'; try { action = await readAction(req); } catch { return reply({error:'Invalid readiness request'},400); }
     try { return reply(projectReadiness(await options.partner('/api/mhelpdesk/partner/'+action, action === 'status' ? 'GET':'POST',{}))); }
-    catch (e) { return reply({error:e instanceof MhelpPartnerError ? e.message:'mHelpDesk readiness is unavailable'},e instanceof MhelpPartnerError ? e.status:503); }
+    catch (e) {
+      const provider=e instanceof MhelpPartnerError && e.provider && ['account_read','equipment_read'].includes(e.provider.operation) && Number.isInteger(e.provider.httpStatus) && e.provider.httpStatus>=100 && e.provider.httpStatus<=599 ? {operation:e.provider.operation,httpStatus:e.provider.httpStatus}:null;
+      return reply({error:e instanceof MhelpPartnerError ? e.message:'mHelpDesk readiness is unavailable',...(provider?{provider}: {})},e instanceof MhelpPartnerError ? e.status:503);
+    }
   };
 }

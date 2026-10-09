@@ -4,7 +4,7 @@ export const MHELP_PARTNER_DOCS = 'https://www.mhelpdesk.com/partner-api/index.h
 const API = 'https://connect.mhelpdesk.com/api/v1.0';
 const FIELDS = 'equipmentId,portalId,equipmentTypeId,name,model,customerId,serviceLocationId,IsActive,lastUpdateUTC';
 export class MhelpPartnerError extends Error {
-  constructor(message: string, public status = 503) { super(message); }
+  constructor(message: string, public status = 503, public provider?: {operation:'account_read'|'equipment_read';httpStatus:number}) { super(message); }
 }
 type ObjectValue = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
@@ -109,9 +109,10 @@ export function createMhelpPartnerHandler(options: {
         try { response = await options.fetch(url, {method: 'GET', headers: {Authorization: 'Bearer ' + config.accessToken, Accept: 'application/json'}, redirect: 'error', cache: 'no-store', signal: controller.signal}); }
         catch { return fail('mHelpDesk could not be reached. Retry the preview.'); }
         // Never echo vendor errors, profile fields, request URLs, headers, or credentials.
-        if (response.status === 401 || response.status === 403) fail('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.', 503);
-        if (response.status === 429) fail('mHelpDesk is limiting requests. Wait before retrying.', 429);
-        if (!response.ok) fail('mHelpDesk could not complete the account or equipment read. Retry later.');
+        const provider = {operation:(url === API + '/me' ? 'account_read' : 'equipment_read') as 'account_read'|'equipment_read',httpStatus:response.status};
+        if (response.status === 401 || response.status === 403) throw new MhelpPartnerError('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.',503,provider);
+        if (response.status === 429) throw new MhelpPartnerError('mHelpDesk is limiting requests. Wait before retrying.',429,provider);
+        if (!response.ok) throw new MhelpPartnerError('mHelpDesk could not complete the account or equipment read. Retry later.',503,provider);
         return object(await boundedJson(response, controller.signal, maxBytes));
       };
       // Resolve identity through the authenticated account, never from caller input or token decoding.
