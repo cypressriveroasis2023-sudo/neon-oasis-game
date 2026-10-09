@@ -1,3 +1,4 @@
+import {checkedSourceRecordedCoordinates,type SourceRecordedPoint} from '../../supabase/functions/cos-operations-pages/sourceRecordedCoordinates';
 import {checkedImportedBinding} from '../../supabase/functions/cos-operations-pages/importedSourceProjection';
 import {matchesInstallation,fullMatchedParts} from '../../supabase/functions/cos-operations-pages/importedAddressContract';
 import { checkedReviewedAddressEstimate, reviewedEstimatePrefix, reviewedEstimateSource, type ReviewedAddressEstimate } from '../shared/reviewedAddressEstimates';
@@ -14,9 +15,9 @@ export type AutomaticGeocodioEstimate = {
  latitude:number;longitude:number;matchedAddress:string;geocodedAt:string;confidence:'automatic_address_estimate';
  inferredComponents?:string[]; originalAddress?:string; source:'geocodio_automatic_address_estimate';provider:'geocodio';accuracyType:'rooftop'|'range_interpolation';accuracy:number;matchType:'building_centroid'|'parcel_centroid'|null;
 };
-export type AddressEstimate = CensusAddressEstimate | ReviewedAddressEstimate | AutomaticGeocodioEstimate;
-export const addressEstimateLabel = (estimate:AddressEstimate) => estimate.confidence==='approximate_property_location'?'Geocodio approximate property estimate':estimate.confidence==='automatic_address_estimate'?(estimate.accuracyType==='rooftop'?'Geocodio rooftop address estimate':'Geocodio address-range estimate'):'U.S. Census address-range estimate';
-export const addressEstimateTimestamp = (estimate:AddressEstimate) => estimate.confidence==='approximate_property_location'?estimate.retrievedAt:estimate.geocodedAt;
+export type AddressEstimate = CensusAddressEstimate | ReviewedAddressEstimate | AutomaticGeocodioEstimate | SourceRecordedPoint;
+export const addressEstimateLabel = (estimate:AddressEstimate) => estimate.confidence==='source_recorded_unverified'?'Tracker-recorded coordinates (unverified)':estimate.confidence==='approximate_property_location'?'Geocodio approximate property estimate':estimate.confidence==='automatic_address_estimate'?(estimate.accuracyType==='rooftop'?'Geocodio rooftop address estimate':'Geocodio address-range estimate'):'U.S. Census address-range estimate';
+export const addressEstimateTimestamp = (estimate:AddressEstimate) => estimate.confidence==='source_recorded_unverified'?estimate.sourceObservedAt:estimate.confidence==='approximate_property_location'?estimate.retrievedAt:estimate.geocodedAt;
 export const reviewedDifferenceExplanation = (estimate:ReviewedAddressEstimate) => ({approved_city_label_equivalence:'Reviewed city-label difference; original street, state and ZIP retained.',approved_state_route_alias:'Reviewed state-route alias; original house number, city, state and ZIP retained.',approved_missing_street_suffix:'Reviewed street-suffix completion; original house number, street name, city, state and ZIP retained.'})[estimate.approvedDifference];
 type EstimateRow = FieldLocation & { status?:string; currentLocationType?:string; importedPlacement?:string|null };
 const object = (value:unknown):value is Record<string,unknown> => Boolean(value&&typeof value==='object'&&!Array.isArray(value));
@@ -55,6 +56,7 @@ export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Pr
     }
     const reviewed=await checkedReviewedAddressEstimate(unit,now);if(reviewed)return reviewed;
   }
+  const recorded=await checkedSourceRecordedCoordinates(unit,now);if(recorded)return recorded;
   if(unit.importedInstallation&&unit.placementSource!=='owner'){
     const binding=await checkedImportedBinding(unit.importedInstallation),r=unit.locationImportedGeocode;
     if(!binding||!r||r.status!=='success'||r.jobKind!=='native_import'||r.verified!==false||r.liveGps!==false||!/^[a-f0-9]{64}$/.test(r.legacyGuardSha256)||unit.id!==binding.nativeUnitId||unit.unitNumber!==binding.unitNumber

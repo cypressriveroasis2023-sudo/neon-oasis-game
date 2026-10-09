@@ -1,3 +1,4 @@
+import {checkedSourcePrecedence} from '../_shared/sourcePrecedence.ts';
 /** Server-to-server, COS-only read bridge. Never accepts a table, RPC or URL. */
 export const COS_ORGANIZATION_ID = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 export const SOURCE_BODY_LIMIT = 32768;
@@ -36,14 +37,21 @@ async function body(request: Request): Promise<Row> {
   let parsed; try { parsed = JSON.parse(raw); } catch { fail(); }
   if (!object(parsed)) fail(); return parsed;
 }
+const trackerRecordId = (v: unknown): v is string => typeof v === 'string' && v.length <= 400 && /^google_sheet:[A-Za-z0-9_-]{10,128}:(?:0|[1-9][0-9]{0,18}):[A-Za-z][A-Za-z0-9 ._-]{0,159}\|[A-Za-z0-9._-]{1,40}$/.test(v);
+const identityFields = ['entityKind','nativeUnitId','productId','sourceSystem','sourceRecordId','sourceRevision'];
 function identity(v: Row) {
-  if (!KIND.has(v.entityKind) || typeof v.nativeUnitId !== 'string' || !UUID.test(v.nativeUnitId) || !integer(v.productId) || typeof v.sourceRevision !== 'string' || !UUID.test(v.sourceRevision)) fail(503);
+  if (!KIND.has(v.entityKind) || typeof v.nativeUnitId !== 'string' || !UUID.test(v.nativeUnitId) || typeof v.sourceRevision !== 'string' || !UUID.test(v.sourceRevision)) fail(503);
+  if (v.sourceSystem === 'google_sheet_tracker') {
+    if (v.entityKind !== 'tracker' || !trackerRecordId(v.sourceRecordId) || Object.hasOwn(v,'productId')) fail(503);
+    return {entityKind:v.entityKind,nativeUnitId:v.nativeUnitId,sourceSystem:v.sourceSystem,sourceRecordId:v.sourceRecordId,sourceRevision:v.sourceRevision};
+  }
+  if (!integer(v.productId) || Object.hasOwn(v,'sourceRecordId') || !(v.sourceSystem === undefined || v.sourceSystem === 'mhelpdesk_product_import')) fail(503);
   return { entityKind: v.entityKind, nativeUnitId: v.nativeUnitId, productId: v.productId, sourceRevision: v.sourceRevision };
 }
 /** Responses are rebuilt from the allowlist even if a backend adds private columns. */
 export function sourceDto(value: unknown): Row {
-  if (!object(value) || value.schemaVersion !== 1 || value.organizationId !== COS_ORGANIZATION_ID || value.sourceSystem !== 'mhelpdesk_product_import' || !integer(value.eventId)) fail(503);
-  const base = { schemaVersion: 1, organizationId: COS_ORGANIZATION_ID, sourceSystem: 'mhelpdesk_product_import', ...identity(value), eventId: value.eventId };
+  if (!object(value) || value.organizationId !== COS_ORGANIZATION_ID || !(value.schemaVersion === 1 && value.sourceSystem === 'mhelpdesk_product_import' || value.schemaVersion === 2 && value.sourceSystem === 'google_sheet_tracker') || !integer(value.eventId)) fail(503);
+  const base = { schemaVersion: value.schemaVersion, organizationId: COS_ORGANIZATION_ID, sourceSystem: value.sourceSystem, ...identity(value), eventId: value.eventId };
   if (value.eligibility === 'tombstone') return { ...base, eligibility: 'tombstone' };
   if (value.eligibility !== 'FIELD' || !clean(value.unitNumber, 160) || !clean(value.family, 160) || !(value.variant === null || clean(value.variant, 160)) || !object(value.installation)) fail(503);
   for (const key of ['sourceFileSha256', 'sourceRowSha256', 'addressSha256', 'nativeGuardSha256']) if (typeof value[key] !== 'string' || !SHA.test(value[key])) fail(503);
@@ -51,12 +59,13 @@ export function sourceDto(value: unknown): Row {
   if (!clean(street, 250) || !(city === null || clean(city, 100)) || typeof state !== 'string' || !STATES.has(state) || !(zip === null || typeof zip === 'string' && /^\d{5}(?:-\d{4})?$/.test(zip)) || city === null && zip === null) fail(503);
   if (!/^[0-9]{1,8}[A-Za-z]? +[A-Za-z0-9 .'-]+$/.test(street) || (city !== null && !/^[A-Za-z][A-Za-z .'-]*$/.test(city)) || /\b(?:gate|password|passcode|access\s*code|combination|lockbox|login|https?|phone|telephone|tel|contact|notes?|call|email|apt|apartment|suite|ste|unit|floor|bldg|building|customer|username|passwd|pwd|token|secret|credential|code)\b/i.test(street + ' ' + city) || /\d{3}[ .)-]+\d{3}[ .-]+\d{4}/.test(street)) fail(503);
   if (/(?:password|passwd|pwd|passcode|token|secret|credential|username|login|lockbox)[A-Za-z0-9_-]*|(?:gate|access)[\s-]*code[A-Za-z0-9_-]*/i.test(street+' '+(city||''))) fail(503);
+  const precedence=checkedSourcePrecedence(value);if(Object.hasOwn(value,'sourcePrecedence')&&!precedence)fail(503);
   const suppliedComponents = { street: true, city: city !== null, state: true, zip: zip !== null };
   if (!object(value.suppliedComponents) || Object.keys(value.suppliedComponents).length !== 4 || Object.entries(suppliedComponents).some(([k,v]) => value.suppliedComponents[k] !== v)) fail(503);
   return { ...base, unitNumber: value.unitNumber, family: value.family, variant: value.variant,
     sourceFileSha256: value.sourceFileSha256, sourceRowSha256: value.sourceRowSha256,
     addressSha256: value.addressSha256, nativeGuardSha256: value.nativeGuardSha256,
-    installation: { street, city, state, zip }, suppliedComponents, eligibility: 'FIELD' };
+    installation: { street, city, state, zip }, suppliedComponents, eligibility: 'FIELD',...(precedence?{sourcePrecedence:precedence}:{}) };
 }
 export function createGeocodeSourcesHandler(options: {
   readKey?: string;
@@ -86,11 +95,11 @@ export function createGeocodeSourcesHandler(options: {
         if ('sources' in input) {
           fields(input, ['action', 'sources']);
           if (!Array.isArray(input.sources) || input.sources.length < 1 || input.sources.length > 100) fail();
-          for (const item of input.sources) { if (!object(item)) fail(); fields(item, ['entityKind','nativeUnitId','productId','sourceRevision']); try { identity(item); } catch { fail(); } }
+          for (const item of input.sources) { if (!object(item)) fail(); fields(item, identityFields); try { identity(item); } catch { fail(); } }
           const raw = await options.rpc('cos_geocode_sources_read_current_batch', { p_organization_id: COS_ORGANIZATION_ID, p_sources: input.sources });
           if (!object(raw) || !Array.isArray(raw.sources) || raw.sources.length !== input.sources.length) fail(503);
           const sources = raw.sources.map((item: unknown, i: number) => { const source = item === null ? null : sourceDto(item);
-            if (source && ['entityKind','nativeUnitId','productId','sourceRevision'].some(k => source[k] !== input.sources[i][k])) fail(503); return source; });
+            if (source && identityFields.filter(k=>k!=='sourceSystem'||input.sources[i].sourceSystem!==undefined).some(k => source[k] !== input.sources[i][k])) fail(503); return source; });
           return response({ sources });
         }
         fields(input, ['action', 'entityKind', 'nativeUnitId', 'productId', 'sourceRevision']);

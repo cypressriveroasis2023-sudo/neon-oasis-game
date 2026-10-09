@@ -33,13 +33,16 @@ export async function processImportedGeocodes(options:Options){
  for(let page=0;page<4&&remaining()>60000&&now()-syncStarted<20000;page++){
   const changes=await atStage('source_changes',()=>reader.changes(after,100));
   const current=changes.events.length?await atStage('source_sync_read',()=>reader.currentMany(changes.events.map(sourceIdentity))):[];
-  const events=changes.events.map((event,i)=>({eventId:event.eventId,entityKind:event.entityKind,nativeUnitId:event.nativeUnitId,productId:event.productId,sourceRevision:event.sourceRevision,source:event.kind==='tombstone'?null:current[i]}));
+  const events=changes.events.map((event,i)=>({eventId:event.eventId,...sourceIdentity(event),source:event.kind==='tombstone'?null:current[i]}));
   const saved=await rpc('source_sync','cos_imported_geocode_sync',{...org,p_scan_generation:scanGeneration,p_after_event_id:after,p_events:events,p_next_event_id:changes.nextEventId});
   if(saved?.accepted!==true||saved.eventId!==changes.nextEventId||saved.scanGeneration!==scanGeneration)break;
   summary.syncedSources+=saved.applied;after=changes.nextEventId;
   if(changes.events.length<100){await rpc('scan_complete','cos_imported_geocode_scan_complete',{...org,p_after_event_id:after,p_scan_generation:scanGeneration});break;}
  }
  const seen=new Set<string>(),addressesSeen=new Set<string>(),retryAddressesSeen=new Set<string>();
+ // Join every started operation before surfacing the first error; sibling work may already hold a charged lease.
+ const failures:unknown[]=[];
+ const settle=<T>(operation:Promise<T>)=>operation.catch(error=>{if(!failures.length)failures.push(error);return null;});
  const recovery={consideredAddresses:0,censusSucceeded:0,geocodioSucceeded:0,deferred:0,stale:0};let hasPostalRetry=false;
  const note=(key:'censusSucceeded'|'geocodioSucceeded'|'deferred'|'stale',retry:boolean)=>{summary[key]++;if(retry)recovery[key]++;};
  while(addressesSeen.size<80&&seen.size<160&&remaining()>45000){
@@ -48,7 +51,8 @@ export async function processImportedGeocodes(options:Options){
   const queues=await Promise.all([
    rpc('queue_read','cos_imported_geocode_postal_retry_list_due',{...org,p_limit:80}),
    rpc('queue_read','cos_imported_geocode_postal_ordinary_list_due',{...org,p_limit:80}),
-  ]);
+  ].map(settle));
+  if(failures.length)throw failures[0];
   if(queues.some(due=>!Array.isArray(due)||due.length>80))throw new ImportedSweepError('queue_read','queue_shape');
   // A shared-address retry must complete Census before an ordinary fallback row can run.
   const retryHashes=new Set(queues[0].map(job=>job?.binding?.addressSha256));hasPostalRetry||=retryHashes.size>0;
@@ -82,12 +86,12 @@ export async function processImportedGeocodes(options:Options){
    if(now()>=Date.parse(reservation.sendBefore)||remaining()<25000){note('deferred',retry);return null;}
    const result=await atStage('geocodio_provider',()=>geocodioInstallation(binding.installation,options.geocodioApiKey!,options.fetch||fetch,now));
    return {binding,stage,retry,token:reservation.reservationToken,result};
-  }));
+  }).map(settle));
   const completed=work.filter(item=>item!==null);
-  if(!completed.length)continue;
+  if(!completed.length){if(failures.length)throw failures[0];continue;}
   // A failed post-read leaves charged leases unresolved. It never authorizes a retry or stale publication.
-  const afterSources=await atStage('source_after',()=>reader.currentMany(completed.map(item=>sourceIdentity(item.binding))));
-  await Promise.all(completed.map(async(item,i)=>{
+  const afterSources=await settle(atStage('source_after',()=>reader.currentMany(completed.map(item=>sourceIdentity(item.binding)))));
+  if(afterSources)await Promise.all(completed.map(async(item,i)=>{
    const sourceCurrent=sameSource(item.binding,afterSources[i]),result=item.result;
    const common={...org,p_binding:item.binding,p_source_current:sourceCurrent,p_status:result.status==='invalid_address'?'no_match':result.status,
     p_latitude:result.latitude??null,p_longitude:result.longitude??null,p_matched_address:result.matchedAddress??null};
@@ -97,7 +101,8 @@ export async function processImportedGeocodes(options:Options){
    if(!sourceCurrent||saved?.accepted!==true)note('stale',item.retry);
    else if(result.status==='success')note(item.stage==='census'?'censusSucceeded':'geocodioSucceeded',item.retry);
    else note('deferred',item.retry);
-  }));
+  }).map(settle));
+  if(failures.length)throw failures[0];
  }
  return hasPostalRetry?{...summary,postalRetry:recovery}:summary;
 }

@@ -1,3 +1,5 @@
+import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
+import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
 import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjection.ts';
 import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
@@ -513,6 +515,17 @@ export function createOperationsHandler(options) {
           return json({ ...board, jobs });
         }
         if (path === '/api/owner-review') return json(withDeliveryGoBacks(await rpc(snapshots[path], actorPayload), await rpc('appdeploy_delivery_go_back_snapshot', actorPayload)));
+        const readArchivedRepresentations=async()=>{
+          try{const rows=await rpc('cos_archived_representation_projection',{p_organization_id:ORGANIZATION_ID});return Array.isArray(rows)?rows:[];}
+          catch{return [];} // Unavailable evidence restores visibility; it never hides a row.
+        };
+        if (path === '/api/equipment') {
+          const previousArchivedRepresentations=await readArchivedRepresentations();
+          if(!previousArchivedRepresentations.length)return json(await rpc(snapshots[path],actorPayload));
+          const [snapshot,bundle]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context)]);
+          const archivedRepresentations=await readArchivedRepresentations();
+          return json(projectArchivedEquipmentRegistry(snapshot,archivedRepresentations,bundle.sources.audits,bundle.sources.devices,{nativeUnits:bundle.sources.units,identity:bundle.identity,previousArchivedRepresentations}));
+        }
         if (path === '/api/field-map') {
           const [snapshot,bundle]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context)]);
           const {audits,devices,units}=bundle.sources,identity=bundle.identity;
@@ -524,8 +537,21 @@ export function createOperationsHandler(options) {
             }
             return rows;
           };
-          const importedSources=await readSourceProjections();
-          const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices,[],{nativeUnits:units,identity}),audits,devices,identity,units);
+          const readPrecedenceBindings=async(sources)=>{
+            const bindings=(await Promise.all(sources.filter(s=>s?.sourcePrecedence!==undefined).map(checkedImportedBinding))).filter(Boolean);
+            const confirmed=[];
+            for(let offset=0;offset<bindings.length;offset+=250){
+              try{
+                const page=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_imported_precedence_read_current',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_bindings:bindings.slice(offset,offset+250)})},'Reviewed source precedence is unavailable.');
+                if(!Array.isArray(page)||page.length>Math.min(250,bindings.length-offset))return [];
+                confirmed.push(...(await Promise.all(page.map(checkedImportedBinding))).filter(Boolean));
+              }catch{return [];}
+            }
+            return confirmed;
+          };
+          const [importedSources,archivedRepresentations]=await Promise.all([readSourceProjections(),readArchivedRepresentations()]);
+          const confirmedPrecedenceBindings=await readPrecedenceBindings(importedSources);
+          const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(snapshot,importedSources,audits,devices,[],{nativeUnits:units,identity,archivedRepresentations,confirmedPrecedenceBindings}),audits,devices,identity,units);
           const importedBindings=(await Promise.all(initial.items.filter(row=>row.placementSource!=='owner').map(row=>checkedImportedBinding(row.importedInstallation)))).filter(Boolean);
           const importedGeocodes=[];
           for(let offset=0;offset<importedBindings.length;offset+=250){
@@ -550,13 +576,16 @@ export function createOperationsHandler(options) {
           // after lookups, and never publish an imported overlay with a changed source guard.
           const [freshSnapshot,freshBundle]=await Promise.all([rpc(snapshots[path],actorPayload),readIdentitySources(context)]);
           const {audits:freshAudits,devices:freshDevices,units:freshUnits}=freshBundle.sources;
-          const freshSources=await readSourceProjections(freshSnapshot.inventoryItems);
-          const freshSourceContext={nativeUnits:freshUnits,identity:freshBundle.identity,currentSources:freshSources};
+          const [freshSources,freshArchivedRepresentations,sourceRecorded]=await Promise.all([readSourceProjections(freshSnapshot.inventoryItems),readArchivedRepresentations(),readSourceRecordedCoordinates(freshSnapshot.inventoryItems,rpc)]);
+          const archiveContext={nativeUnits:freshUnits,identity:freshBundle.identity,archivedRepresentations:freshArchivedRepresentations,previousArchivedRepresentations:archivedRepresentations};
+          const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources)};
           const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
           let projected=await projectFieldGeocodes(base,geocodes,censusUnavailable);
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{/* No imported point is shown without valid current bindings. */}
-          return json(await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey));
+          projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
+          projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
+          return json(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext));
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {

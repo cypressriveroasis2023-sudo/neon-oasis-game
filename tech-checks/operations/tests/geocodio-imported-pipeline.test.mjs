@@ -193,6 +193,7 @@ async function actualFieldRoute(h,source,{afterLegacyRead,identityFixture=null,p
   if(url.includes('/rest/v1/vision_vigilant_unit_matches?')||url.includes('/rest/v1/vision_vigilant_devices?'))return response([]);
   const name=url.split('/rest/v1/rpc/')[1];const args=init.body?JSON.parse(init.body):{};
   if(name==='appdeploy_field_map_snapshot'){nativeReads++;return response({items:[historical],inventoryItems:[historical],summary:{fieldUnits:1,mappedUnits:0,unitGps:0,missingGps:1},generatedAt:new Date().toISOString()});}
+  if(name==='cos_archived_representation_projection')return response([]);
   if(name==='cos_geocode_sources_map_projection'){sourceReads++;const rows=await nativeRPC(native,'map_projection',args);return response(transformMapSource?transformMapSource(rows,sourceReads):rows);}
   if(name==='cos_owner_identity_snapshot'){identityReads++;return response(identityFixture?.sources.ownerCrosswalk||{revision:'a'.repeat(64),nativeEpochs:[],claims:[]});}
   if(name==='cos_camera_identity_epochs_v1'){epochReads++;assert.ok(identityFixture,'Epoch reads require exact confirmed claims');assert.deepEqual(args.p_unit_keys,[ownerIdentityKey]);return response(identityFixture.sources.ownerEpochs);}

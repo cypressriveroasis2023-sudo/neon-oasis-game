@@ -8,7 +8,7 @@ function estimate(id,number,patch={}){
  const marker={schemaVersion:1,trackerId:id,unitNumber:'Sniper '+number,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex'),latitude:30,longitude:-95,provider:'us_census_address_range',benchmark:'Public_AR_Current',providerMatchQuality:'Exact',matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:fresh,confidence:'address_range_interpolation',verified:false,liveGps:false,requiresOwnerConfirmation:true,batchId:'synthetic-batch',approvalReference:'synthetic-approval',appliedByDatabaseRole:'synthetic-role',appliedAt:fresh};
  return {id,unitNumber:'Sniper '+number,modelName:'SNIPERS',status:'field',currentLocationType:'field',address,readOnly:true,hasUnitGps:false,locationVerification:'coordinates_unverified',latitude:null,longitude:null,historicalLatitude:30,historicalLongitude:-95,historicalCoordinateSource:source,locationNote:prefix+JSON.stringify(marker),...patch};
 }
-async function mount(page,{holdHashes=false,restored=false,noEstimates=false,registered=false}={}){
+async function mount(page,{holdHashes=false,restored=false,noEstimates=false,registered=false,noCameras=false}={}){
  const state={units:[estimate(ids[0],901),estimate(ids[1],902),estimate(ids[2],903,{latitude:30.1,longitude:-95.1,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh}),estimate(ids[3],904,{historicalLatitude:31,historicalCoordinateSource:'legacy_tracker',locationNote:'Old location only'})],writes:[],reads:0,offline:false};
  if(registered)state.units[0]={...state.units[0],id:'99999999-9999-4999-8999-999999999999',readOnly:false,currentLocationType:null,addressEstimateTrackerId:ids[0],addressEstimateUnitNumber:'Sniper 901'};
  await page.clock.install({time:new Date(now)});
@@ -26,7 +26,7 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
   const request=route.request().postDataJSON();
   if(request.method!=='GET'){state.writes.push(request);return route.fulfill({status:400,headers,body:'{}'});}
   if(request.path==='/api/field-map')state.reads++;
-  const health=snapshot(state.units.map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
+  const health=snapshot((noCameras?[]:state.units).map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
   const data=request.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:1,unitGps:0,missingGps:state.units.length-1},generatedAt:now}
    :request.path==='/api/camera-health/summary-v3'?health
@@ -139,4 +139,20 @@ test('imported offline camera and support stand stay independently colored and p
  await frame.locator('.field-map-list>button').filter({hasText:'Solar Stand 72 002'}).click();await expect(frame.locator('.field-map-detail')).toContainText('SUPPORT EQUIPMENT');await expect(frame.locator('.field-map-detail')).toContainText('0 CAMERAS');
  await page.reload();await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-estimate[data-health="support"]')).toHaveCount(1);expect(state.writes).toHaveLength(0);
  state.units[1]={...state.units[1],currentLocationType:'shop',status:'readiness_unverified',importedPlacement:'SHOP'};state.units=state.units.filter(unit=>unit.id!==ids[1]);await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>estimatedCount(frame)).toBe(1);
+});
+
+test('eight V2 tracker poles share an EST site with distinct support identities and no cameras',async({page},info)=>{
+ const {frame,state}=await mount(page,{noCameras:true});
+ state.units=Array.from({length:8},(_,i)=>{
+  const n=i+1,id=`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`,unitNumber=`Solar Pole 72 ${String(n).padStart(3,'0')}`;
+  const binding={schemaVersion:2,organizationId:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',sourceSystem:'google_sheet_tracker',sourceRecordId:`google_sheet:synthetic_sheet_123:12:Solar Pole 72|${String(n).padStart(3,'0')}`,entityKind:'tracker',nativeUnitId:id,unitNumber,family:'Solar Pole 72',variant:null,sourceRevision:`20000000-0000-4000-8000-${String(n).padStart(12,'0')}`,sourceFileSha256:'a'.repeat(64),sourceRowSha256:'b'.repeat(64),addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex'),nativeGuardSha256:'c'.repeat(64),installation:{street:'100 Example Road',city:'Test City',state:'TX',zip:'77001'},suppliedComponents:{street:true,city:true,state:true,zip:true},eligibility:'FIELD',eventId:String(n)};
+  return {id,unitNumber,modelName:'SOLAR POLES & SKIDS',readOnly:true,hasUnitGps:false,status:'field',currentLocationType:'field',address,customer:'Synthetic customer',site:'Synthetic site',addressSource:'Tracker imported installation address',recordSource:'Tracker imported installation address',latitude:null,longitude:null,locationVerification:'address_only',importedPlacement:'FIELD',importedInstallation:binding,locationImportedGeocode:{jobKind:'native_import',binding,legacyGuardSha256:'d'.repeat(64),status:'success',provider:'us_census_address_range',benchmark:'Public_AR_Current',verified:false,liveGps:false,latitude:30,longitude:-95,matchedAddress:address,geocodedAt:fresh}};
+ });
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-list>button')).toHaveCount(8);await expect.poll(()=>estimatedCount(frame)).toBe(8);
+ await expect(frame.locator('.cos-field-cluster')).toHaveAttribute('data-health','support');await expect(frame.locator('.cos-field-cluster b')).toHaveText('8');
+ await frame.locator('.field-map-list>button').filter({hasText:'Solar Pole 72 001'}).click();await expect(frame.locator('.field-map-detail')).toContainText('0 CAMERAS');await expect(frame.locator('.field-map-detail')).toContainText('SUPPORT EQUIPMENT');await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
+ await page.reload();await expect.poll(()=>estimatedCount(frame)).toBe(8);
+ state.units[0]={...state.units[0],importedInstallation:{...state.units[0].importedInstallation,sourceRevision:'30000000-0000-4000-8000-000000000001'}};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>estimatedCount(frame)).toBe(7);expect(state.writes).toHaveLength(0);
+ await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.field-map-center').screenshot({path:info.outputPath('typed-tracker-support-estimates.png')});
 });
