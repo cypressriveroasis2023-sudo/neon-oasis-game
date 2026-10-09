@@ -1,6 +1,8 @@
+import { unmappedResourceDiagnostics } from "./unmapped-resource-diagnostics.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { crypto } from "jsr:@std/crypto@1";
+import {projectReconProviderInventory} from '../_shared/reconProviderInventory.ts';
 
 const cors={"content-type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-camera-cron-secret","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const json=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:cors});
@@ -167,6 +169,7 @@ async function starInventory(db:any){
         device_serial:String(v.deviceSerial||""),
         status:Number(v.status)===1?"online":"offline",
         organization:String(v.organizationName||v.orgName||v.organization||v.parentOrganizationName||""),
+        ...unmappedResourceDiagnostics(v, now),
         query_tags:[...(resourceQueryTags.get(resourceKey)||new Set<string>())].sort()
       });
       continue
@@ -296,7 +299,11 @@ async function reconInventory(db:any){
   }
   const now=new Date().toISOString();
   const {data:intRow}=await db.from("camera_integrations").select("metadata").eq("provider","reconeyez").maybeSingle();
-  const {error:reconSummaryError}=await db.from("camera_integrations").upsert({provider:"reconeyez",server_host:host,server_port:port,enabled:true,last_sync_at:now,last_sync_status:"ok",last_error:null,metadata:{...(intRow?.metadata||{}),last_inventory_count:list.length,last_detector_count:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:now}},{onConflict:"provider"});
+  const {data:bridgeEvents,error:bridgeEventError}=await db.from("camera_integration_events").select("external_device_id,observed_at").eq("provider","reconeyez").eq("payload->device_info->>type","bridge_4g").order("observed_at",{ascending:false}).limit(1000);
+  const identityInventory=await projectReconProviderInventory(list,now,bridgeEventError?[]:bridgeEvents||[]);
+  // Retain an older event's original time only for the unchanged complete group.
+  for(const group of identityInventory.groups){const previous=intRow?.metadata?.identity_inventory_v1?.groups?.find((g:any)=>g.proof===group.proof&&g.areaKey===group.areaKey);if(group.bridgeLastEventAt===null&&typeof previous?.bridgeLastEventAt==='string'&&Date.parse(previous.bridgeLastEventAt)<=Date.parse(now))group.bridgeLastEventAt=previous.bridgeLastEventAt;}
+  const {error:reconSummaryError}=await db.from("camera_integrations").upsert({provider:"reconeyez",server_host:host,server_port:port,enabled:true,last_sync_at:now,last_sync_status:"ok",last_error:null,metadata:{...(intRow?.metadata||{}),identity_inventory_v1:identityInventory,last_inventory_count:list.length,last_detector_count:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage,reconciled_at:now}},{onConflict:"provider"});
   if(reconSummaryError)throw new Error("Reconeyez inventory summary save failed: "+reconSummaryError.message);
   return {server:host+":"+port,inventory_total:list.length,detectors:detectors.length,matched_local_detectors:matched,unmatched_provider_detectors:Math.max(0,detectors.length-matched),local_active:active,local_shop:shop,tracker_coverage:trackerCoverage};
 }
@@ -392,7 +399,10 @@ Deno.serve(async(req)=>{
   try{
     const result:any={ok:true,reconciled_at:new Date().toISOString()};
     if(mode==="all"||mode==="vigilant")result.vigilant=await starInventory(db);
-    if(mode==="all"||mode==="reconeyez"||mode==="recon")result.reconeyez=await reconInventory(db);
+    if(mode==="all"||mode==="reconeyez"||mode==="recon"){
+      try{result.reconeyez=await reconInventory(db);}
+      catch(error){await db.from("camera_integrations").update({last_sync_status:"failed",last_error:"Reconeyez authenticated inventory is unavailable."}).eq("provider","reconeyez");throw error;}
+    }
     if(mode==="all"||mode==="avigilon"||mode==="direct")result.avigilon=await avigilonInventory(db);
     if(mode==="all"||mode==="witness")result.witness=await witnessInventory(db);
     return json(result);

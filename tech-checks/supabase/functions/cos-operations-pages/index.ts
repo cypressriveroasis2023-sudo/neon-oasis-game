@@ -13,6 +13,7 @@ import { cameraSummary as placementCameraSummary } from './cameraPlacementEviden
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
+import {projectReconProviderIdentities,appendReconProviderIdentities} from './reconProviderIdentity.ts';
 import { routerSnapshot } from './routers.ts';
 import { createInhandPilotReader, InhandPilotError, readPilotClaimBoolean } from './inhandPilot.ts';
 import { vrmPortalConfig } from './vrm.ts';
@@ -649,14 +650,30 @@ export function createOperationsHandler(options) {
           return json(cameraSummary(devices, health, Date.now(), tracker, witnessIntegrations));
         }
         if (path === '/api/camera-health/summary-v3') {
-          const [bundle,health,tracker,witnessIntegrations]=await Promise.all([
+          // Optional Recon proof must not hold the existing health response open.
+          // Reuse the authorized reader without exposing tracker tables or adding grants.
+          const readReconSources=async()=>{
+            const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+            try {
+              const [integrations,snapshot]=await Promise.all([
+                readJson(LEGACY_URL+'/rest/v1/camera_integrations?select=provider,enabled,last_sync_at,last_sync_status,identity_inventory:metadata->identity_inventory_v1&provider=eq.reconeyez&order=provider.asc&limit=2',{headers:context.headers,signal:controller.signal},'Reconeyez inventory is unavailable.'),
+                readJson(platformUrl+'/rest/v1/rpc/appdeploy_field_map_snapshot',{method:'POST',headers:platformHeaders(),body:JSON.stringify(actorPayload),signal:controller.signal},'Recon II tracker proof is unavailable.'),
+              ]);
+              return {integrations:Array.isArray(integrations)?integrations:[],units:snapshot?.inventoryItems||snapshot?.items||[]};
+            } catch { return {integrations:[],units:[]}; }
+            finally {clearTimeout(timer);controller.abort();}
+          };
+          const [bundle,health,tracker,witnessIntegrations,reconSources]=await Promise.all([
             readIdentitySources(context),
             legacyAll('camera_health_current?select=camera_device_id,port_status,overall_status,checked_at,ip_reachable,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers),
             legacyAll('equipment_master?select=canonical_family,unit_tag,source_label,tracker_state,health_provider&canonical_family=in.(Helios,Ranger,Solar Spotter,Spotter,SS Hybrid,CAMV,Sniper,Sniper 2,Sniper 4,Recon,Recon 2)&order=canonical_family.asc,unit_tag.asc,source_label.asc', context.headers),
             legacyAll('camera_integrations?select=provider,units:metadata->units&provider=eq.witness&order=provider.asc', context.headers),
+            readReconSources(),
           ]);
           const {devices,audits:placementAudits}=bundle.sources,identity=bundle.identity;
-          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...identity});
+          const recon=await projectReconProviderIdentities(reconSources.units,devices,reconSources.integrations)
+            .catch(()=>projectReconProviderIdentities([],devices,[]));
+          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon)});
         }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([
