@@ -9,14 +9,14 @@ import UnitDiagnosticReport from './UnitDiagnosticReport';
 export { validateCameraHealth } from './fieldCameraHealth';
 type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
 export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
-  const {data:health,error,loading,refresh,now}=useCameraHealth();
+  const {data:health,error,loading,refresh,now,updateClock}=useCameraHealth();
   const [units,setUnits]=useState<FieldHealthUnit[]|null>(null),[unitError,setUnitError]=useState(''),[ticketType,setTicketType]=useState<'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP'>('SERVICE');
   const revision=useRef(0),lastUnitAttempt=useRef(0);
   const loadUnits=useCallback(async()=>{
     lastUnitAttempt.current=Date.now();const request=++revision.current;setUnits(null);setUnitError('');
-    try{const snapshot=checkedFieldMap((await api.get('/api/field-map')).data);if(request===revision.current)setUnits(snapshot.items as unknown as FieldHealthUnit[]);}
+    try{const snapshot=checkedFieldMap((await api.get('/api/field-map')).data);if(request===revision.current){setUnits(snapshot.items as unknown as FieldHealthUnit[]);updateClock();}}
     catch(cause){if(request===revision.current)setUnitError(cause instanceof Error?cause.message:'Field unit could not be verified.');}
-  },[initialUnitId]);
+  },[initialUnitId,updateClock]);
   useEffect(()=>{void loadUnits();setTicketType('SERVICE');const check=()=>{if(automaticRefreshDue(lastUnitAttempt.current,Date.now(),document.hidden))void loadUnits();};const timer=window.setInterval(check,60000);document.addEventListener('visibilitychange',check);return()=>{revision.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};},[loadUnits]);
   const selected=units?.find(unit=>unit.id===initialUnitId);
   const detail=selected?fieldCameraHealth(selected,units||[],health,now):null;
