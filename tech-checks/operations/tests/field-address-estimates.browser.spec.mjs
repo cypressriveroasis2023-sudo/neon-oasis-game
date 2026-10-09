@@ -68,7 +68,7 @@ test('failed imported lookup refresh retains labeled last-good estimates and rec
 test('initial imported lookup failure is visibly unavailable and explicit retry restores eligible points',async({page})=>{
  const {frame,state}=await mount(page);await expect.poll(()=>estimatedCount(frame)).toBe(2);state.mapFailure=true;await page.reload();
  await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');await expect(frame.getByRole('alert')).toContainText('Imported address lookup results are unavailable');
- await expect(frame.locator('.field-map-layout')).toHaveCount(0);await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
+ await expect(frame.locator('.field-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
  const before=state.reads;await page.clock.runFor(1000);expect(state.reads).toBe(before);
  state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);expect(state.writes).toHaveLength(0);
 });
