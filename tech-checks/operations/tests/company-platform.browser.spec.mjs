@@ -21,7 +21,8 @@ async function mount(page, denied = false) {
     requests.push(request);
     expect(request.method).toBe('GET');
     const stamp = new Date().toISOString();
-    const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', reason:denied?'Fixture access denied':'' }
+    const data = request.path === '/api/session' ? { authorized:!denied, role:'Owner', name:'Fixture owner', features:{unitTracker:!denied}, reason:denied?'Fixture access denied':'' }
+      : request.path === '/api/unit-tracker' ? {contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,availability:'unavailable',sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0}
       : request.path === '/api/routers' ? { items:[], source:'camera_health', gpsAvailable:false, generatedAt:stamp }
       : request.path === '/api/camera-health/summary-v3' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
       : request.path === '/api/daily-board' ? { jobs:[], tasks:[], readiness:[], asOf:stamp }

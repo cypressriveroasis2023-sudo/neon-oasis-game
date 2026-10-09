@@ -102,7 +102,11 @@ test('field map responds to narrow windows and repeated resizing without a fleet
     await page.setViewportSize({ width, height });
     await bounded(frame);
     await expect.poll(async () => frame.locator('.leaflet-marker-icon').evaluate(marker => {
-      const pin = marker.getBoundingClientRect(), canvas = marker.closest('.field-map-canvas').getBoundingClientRect();
+      // Resizing replaces Leaflet markers; a detached sample must retry rather
+      // than throw before the next rendered marker can be measured.
+      const parent = marker.closest('.field-map-canvas');
+      if (!marker.isConnected || !parent) return false;
+      const pin = marker.getBoundingClientRect(), canvas = parent.getBoundingClientRect();
       return pin.x >= canvas.x && pin.right <= canvas.right && pin.y >= canvas.y && pin.bottom <= canvas.bottom;
     })).toBe(true);
   }
