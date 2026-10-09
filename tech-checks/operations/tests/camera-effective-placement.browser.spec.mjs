@@ -77,3 +77,12 @@ test('existing unique full-family fallback remains available without claiming an
  const card=page.locator('.compact-unit[data-unit="RANGER 022"]');await expect(card.locator('[data-placement-status="ready"]')).toContainText('Exact full unit identifier');await expect(card.locator('.compact-unit-site')).toContainText('10 Source Road');
  await page.evaluate(async()=>{const old=healthFixture;window.healthFixture=()=>{const h=old();h.rows.push({id:99,unit:'RANGER 22'});return h};await refreshEffectivePlacement();});await expect(card.locator('[data-placement-status="unresolved"]')).toContainText('Source group remains separate');await expect(card.locator('.compact-unit-site')).not.toContainText('10 Source Road');expect(errors).toEqual([]);
 });
+
+test('inactive source stays searchable with camera links and intentional deployment while raw activation and health remain unchanged',async({page})=>{
+ const errors=await mount(page),before=await page.evaluate(()=>JSON.stringify(fixtureDevices));await page.evaluate(async()=>{fixtureMode='inactive';await refreshEffectivePlacement();});
+ const search=page.getByLabel('Search units',{exact:true}),card=page.locator('.compact-unit[data-unit="RANGER 022"]');await search.fill('INACTIVE / DO NOT USE');
+ await expect(card.locator('.compact-unit-site')).toHaveText('INACTIVE / DO NOT USE');await expect(card.locator('.statuspill')).toHaveText('INACTIVE');await expect(card).toContainText('Activation: active');await expect(card).not.toContainText('Deactivated or retired');
+ await expect(card.locator('a[href="http://192.0.2.11"]')).toBeVisible();await card.getByRole('button',{name:'Move to Field',exact:true}).click();
+ await expect(page.getByLabel('Current job / site')).toHaveValue('');await expect(page.getByLabel('Current installation address (street, city, state and ZIP)')).toHaveValue('');await expect(page.getByRole('button',{name:'Save placement',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);expect(await page.evaluate(()=>JSON.stringify(fixtureDevices))).toBe(before);expect(await page.evaluate(()=>writes)).toEqual([]);expect(errors).toEqual([]);
+});

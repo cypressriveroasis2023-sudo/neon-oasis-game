@@ -75,6 +75,22 @@ test('tombstone-only and mixed pages advance cursor without poisoning current re
  assert.equal((await h.rpc('cos_imported_geocode_cursor_read',{p_organization_id:ORG})).eventId,'0');
  const map=await projected(h,[{...a.source,unitNumber:a.record.unitNumber,family:'HELIOS'},b.source]);assert.deepEqual(map.items.map(row=>row.id),[b.source.nativeUnitId]);assert.equal(map.inventoryItems.find(row=>row.id===a.source.nativeUnitId).currentLocationType,'shop');
 });
+test('INACTIVE source tombstone retires only its queue binding and keeps budget/cache/history intact',async()=>{
+ await native.exec(readFileSync(new URL('../db/cos-geocode-sources-admin-import.sql',import.meta.url),'utf8'));
+ await native.exec(readFileSync(new URL('../db/cos-inactive-source-placement.sql',import.meta.url),'utf8'));
+ const {record,source}=await prepare({kind:'tracker',label:'Spotter 905HD'}),h=harness();
+ await h.run();assert.equal(h.counts.geocodio,1);
+ const budgetBefore=(await legacy.query('select jsonb_agg(to_jsonb(b)) v from app_private.cos_geocodio_daily_budget b')).rows[0].v;
+ const inactive={...record,placement:'INACTIVE',previousSourceRevision:source.sourceRevision,installation:null,addressSha256:null,sourceStatus:'DO NOT USE',sourceFullLabel:record.unitNumber+' - DO NOT USE',sourceObservedAt:'2026-10-01T00:00:00Z'};
+ const [gone]=(await native.query('select app_private.cos_geocode_sources_admin_inactive_reviewed($1,$2) v',[ORG,[inactive]])).rows[0].v;
+ assert.equal(gone.eligibility,'tombstone');await h.run();assert.equal(h.counts.geocodio,1);assert.equal(h.counts.census,1);
+ assert.deepEqual((await legacy.query('select jsonb_agg(to_jsonb(b)) v from app_private.cos_geocodio_daily_budget b')).rows[0].v,budgetBefore);
+ assert.deepEqual(await h.rpc('cos_imported_geocode_list_due',{p_organization_id:ORG}),[]);
+ assert.deepEqual(await h.reader.currentMany([sourceIdentity(gone)]),[null]);
+ const map=await projected(h,[{...gone,unitNumber:record.unitNumber,family:'SPOTTER'}]);
+ assert.equal(map.items.length,0);assert.equal(map.inventoryItems[0].importedPlacement,'INACTIVE');assert.equal(map.inventoryItems[0].currentLocationType,'inactive');
+ assert.equal(Number((await legacy.query('select count(*) n from public.camera_inventory_audit')).rows[0].n),0);
+});
 for(const partial of ['city','zip'])test('partial '+partial+' stays null at source and provider fills only omitted locality',async()=>{
  const {source}=await prepare({partial});const h=harness();await h.run();const current=(await h.reader.currentMany([sourceIdentity(source)]))[0];assert.equal(current.installation[partial],null);
  const map=await projected(h,[source]);const estimate=await checkedAddressEstimate(map.items[0]);assert.ok(estimate);assert.deepEqual(estimate.inferredComponents,[partial==='zip'?'ZIP':'city']);

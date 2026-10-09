@@ -17,7 +17,7 @@
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const maxAge=20*60*1000;
   let client=null;
-  function resolve(snapshot,health,devices,{partial=false,now=Date.now()}={}){
+  function resolve(snapshot,health,devices,{partial=false,now=Date.now(),appProofs=[]}={}){
     const fail=message=>{throw new Error(message);};
     const date=Date.parse(snapshot?.generatedAt||'');
     if(!object(snapshot)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(snapshot.items)||!object(snapshot.summary)||!Number.isFinite(date)||date>now+60000||now-date>maxAge||snapshot.inventoryItems.length>100000||snapshot.items.length>100000)fail('Current Field Map placement is unavailable or stale.');
@@ -56,16 +56,21 @@
       if(warning)value=unverified('Equipment link needs review: '+warning.reason);
       else if(claims.length!==1)value=unverified(claims.length?'Conflicting equipment links need review.':'No verified equipment link. Source group remains separate.');
       else{
-        const claim=claims[0],mapped=inventory.filter(r=>r.id===claim.unitId),source=rows.filter(r=>claim.deviceIds.includes(String(r.id))),wholeGroup=rows.filter(r=>claim.unitKeys.includes(r.unit));
+        const claim=claims[0],appRows=claim.kind==='owner_placement'?inventory.filter(r=>root.CameraPlacementControls?.appAddressAuthority(r,unit)&&typed(r.unitNumber)===typed(unit)):[];
+        // App placement may supersede a standalone camera control. It keeps that
+        // complete group's original health identity; no camera link is written.
+        const appMapping=appRows.length===1&&claim.unitKeys.length===1&&claim.unitKeys[0]===unit?appRows[0]:null;
+        const mapped=appMapping?[appMapping]:inventory.filter(r=>r.id===claim.unitId),source=rows.filter(r=>claim.deviceIds.includes(String(r.id))),wholeGroup=rows.filter(r=>claim.unitKeys.includes(r.unit));
         const localGroup=devices.filter(d=>claim.unitKeys.some(k=>label(k)===label(d.unit_key)));
         const conflict=claim.kind!=='exact_full_identifier'&&identities.filter(i=>i.unitId===claim.unitId).length!==1||identities.some(i=>i!==claim&&i.deviceIds.some(v=>claim.deviceIds.includes(v)))||!same(source.map(r=>String(r.id)),claim.deviceIds)||!same(wholeGroup.map(r=>String(r.id)),claim.deviceIds)||source.some(r=>r.trackerOnly||!claim.unitKeys.includes(r.unit)||claim.kind==='native_provider'&&(r.evidence?.kind!=='provider'||r.evidence?.source!=='Star4Live'))||!source.some(r=>String(r.id)===key&&r.unit===unit)||!partial&&!same(localGroup.map(d=>id(d.id)),claim.deviceIds)||devices.filter(d=>id(d.id)===key).length!==1;
-        if(conflict||mapped.length!==1||mapped[0].unitNumber!==claim.unitNumber||inventory.filter(r=>label(r.unitNumber)===label(claim.unitNumber)).length!==1)value=unverified('The complete camera group or equipment link changed. Refresh and review.');
+        if(conflict||mapped.length!==1||!appMapping&&mapped[0].unitNumber!==claim.unitNumber||inventory.filter(r=>label(r.unitNumber)===label(appMapping?appMapping.unitNumber:claim.unitNumber)).length!==1)value=unverified('The complete camera group or equipment link changed. Refresh and review.');
         else{
-          const row=mapped[0],inField=fields.some(r=>r.id===row.id),atShop=String(row.currentLocationType||'').toLowerCase()==='shop'||row.placement==='SHOP';
+          const row=mapped[0],appAuthority=root.CameraPlacementControls?.appAddressAuthority(row,unit),inField=fields.some(r=>r.id===row.id),atShop=String(row.currentLocationType||'').toLowerCase()==='shop'||row.placement==='SHOP',inactive=root.CameraPlacementControls?.isImportedInactive(row)===true;
           const ownerFields=['placement','placementUnitKey','placementAuditId','placementUpdatedAt'].some(k=>row[k]!=null),badOwner=(ownerFields||row.placementSource!=null)&&row.placementSource!=='owner'||row.placementSource==='owner'&&(!['FIELD','SHOP'].includes(row.placement)||!id(row.placementAuditId)||!text(row.placementUnitKey));
-          if(badOwner||row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string'||warnings.some(w=>w.unitId===row.id)||reviews.some(r=>r.unitId===row.id||label(r.unitNumber)===label(row.unitNumber))||row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||inField&&atShop||!inField&&!atShop||claim.kind==='owner_placement'&&(row.placementAuditId!==claim.placementAuditId||row.placementUnitKey!==claim.unitNumber))value=unverified('Current physical placement needs identity review.');
-          else if(device.activation_source==='owner_location_override_v2'&&(row.placementSource!=='owner'||label(device.organization)!==label(row.placement==='SHOP'?'root':row.site)))value=unverified('The Owner placement changed. Refresh the saved unit.');
-          else value={status:'ready',scope:inField?'field':'shop',site:row.site||'',address:row.address||'',unitId:row.id,unitNumber:row.unitNumber,source:(row.placementSource==='owner'?'Owner-confirmed placement':row.importedInstallation?'mHelpDesk equipment document':'Current Field Map record')+(claim.kind==='exact_full_identifier'?' · Exact full unit identifier':''),identityBasis:claim.kind,row,proof:claim.proof||null,generatedAt:snapshot.generatedAt,reason:''};
+          const currentProofs=Array.isArray(appProofs)?appProofs.filter(p=>p?.unitId===row.id):[];
+          if(badOwner||Object.hasOwn(row.importedInstallation||{},'addressAuthority')&&(!appAuthority||currentProofs.length!==1||!root.CameraPlacementControls.sameAppProof(appAuthority,currentProofs[0].proof))||row.currentLocationType!=null&&typeof row.currentLocationType!=='string'||row.activeJobNumber!=null&&typeof row.activeJobNumber!=='string'||warnings.some(w=>w.unitId===row.id)||reviews.some(r=>r.unitId===row.id||label(r.unitNumber)===label(row.unitNumber))||row.placementStatus==='needs_identity_review'||row.placement==='UNKNOWN'||inField&&(atShop||inactive)||!inField&&!atShop&&!inactive||row.importedPlacement==='INACTIVE'&&row.placementSource!=='owner'&&!inactive||!appAuthority&&claim.kind==='owner_placement'&&(row.placementAuditId!==claim.placementAuditId||row.placementUnitKey!==claim.unitNumber))value=unverified('Current physical placement needs identity review.');
+          else if(!appAuthority&&device.activation_source==='owner_location_override_v2'&&(row.placementSource!=='owner'||label(device.organization)!==label(row.placement==='SHOP'?'root':row.site)))value=unverified('The Owner placement changed. Refresh the saved unit.');
+          else value={status:'ready',scope:inField?'field':inactive?'inactive':'shop',site:row.site||'',address:row.address||'',unitId:row.id,unitNumber:row.unitNumber,source:(appAuthority?'COS app Owner / IT placement':row.placementSource==='owner'?'Owner-confirmed placement':row.importedInstallation?.sourceSystem==='google_sheet_tracker'?'Tracker equipment document':row.importedInstallation?'mHelpDesk equipment document':'Current Field Map record')+(claim.kind==='exact_full_identifier'?' · Exact full unit identifier':''),identityBasis:appMapping?'app_address_placement':claim.kind,row,proof:claim.proof||null,generatedAt:snapshot.generatedAt,reason:''};
         }
       }
       result.set(key,{...value,deviceSignature:signature([device])});
@@ -100,8 +105,24 @@
               if(!response.ok)throw new Error('Current physical placement unavailable.');
               return response.json();
             };
-            const [snapshot,health]=await Promise.all([get('/api/field-map'),get('/api/camera-health/summary-v3')]);
-            const resolved=resolve(snapshot,health,ds,{partial}),fresh=await db.auth.getSession();
+            let [snapshot,health]=await Promise.all([get('/api/field-map'),get('/api/camera-health/summary-v3')]);
+            const appRows=Array.isArray(snapshot?.inventoryItems)?snapshot.inventoryItems.filter(row=>root.CameraPlacementControls?.appAddressAuthority(row)):[],appProofs=[];
+            if(appRows.length){
+              const readProofs=async()=>{
+                const proofs=[];
+                for(let offset=0;offset<appRows.length;offset+=100){
+                  const batch=appRows.slice(offset,offset+100),result=await db.rpc('cos_app_unit_address_legacy_proof_many',{p_organization_id:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',p_sources:batch.map(row=>({unitNumber:row.unitNumber,legacyUnitKey:row.importedInstallation.addressAuthority.legacyUnitKey}))});
+                  if(result.error||!Array.isArray(result.data?.proofs)||result.data.proofs.length!==batch.length)throw new Error('Current app placement proofs unavailable.');
+                  proofs.push(...result.data.proofs);
+                }
+                return proofs;
+              };
+              const beforeProofs=await readProofs();
+              [snapshot,health]=await Promise.all([get('/api/field-map'),get('/api/camera-health/summary-v3')]);
+              const afterProofs=await readProofs();
+              for(let i=0;i<appRows.length;i++)if(beforeProofs[i]&&JSON.stringify(beforeProofs[i])===JSON.stringify(afterProofs[i]))appProofs.push({unitId:appRows[i].id,proof:afterProofs[i]});
+            }
+            const resolved=resolve(snapshot,health,ds,{partial,appProofs}),fresh=await db.auth.getSession();
             if(request!==revision||stopped)throw new Error('Placement read superseded.');
             if(fresh.error||fresh.data?.session?.user?.id!==subject||!text(fresh.data?.session?.access_token)){values.clear();throw new Error('Signed-in account changed.');}
             if(before!==signature(getDevices()))throw new Error('Displayed camera group changed.');
@@ -122,8 +143,8 @@
   const get=device=>client?client.get(device):null;
   const locationText=device=>{
     const value=get(device);if(!value)return device?.organization||'Site not linked';
-    if(value.status==='ready')return (value.scope==='shop'?'SHOP / ROOT':value.scope==='field'?'FIELD':'LOCATION REVIEW')+(value.scope==='field'&&value.site&&value.site!=='SHOP / ROOT'?' · '+value.site:'')+(value.scope==='field'&&value.address?' · '+value.address:'');
-    if(value.lastRead)return value.scope==='shop'?'Last read: SHOP / ROOT':'Last read: FIELD · '+[value.site,value.address].filter(Boolean).join(' · ');
+    if(value.status==='ready')return (value.scope==='shop'?'SHOP / ROOT':value.scope==='inactive'?'INACTIVE / DO NOT USE':value.scope==='field'?'FIELD':'LOCATION REVIEW')+(value.scope==='field'&&value.site&&value.site!=='SHOP / ROOT'?' · '+value.site:'')+(value.scope==='field'&&value.address?' · '+value.address:'');
+    if(value.lastRead)return value.scope==='shop'?'Last read: SHOP / ROOT':value.scope==='inactive'?'Last read: INACTIVE / DO NOT USE':'Last read: FIELD · '+[value.site,value.address].filter(Boolean).join(' · ');
     return 'Location unverified · source organization: '+(device?.organization||'not recorded');
   };
   function markup(device,{includeLocation=true}={}){

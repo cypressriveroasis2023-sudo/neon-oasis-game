@@ -31,6 +31,11 @@ export function record(overrides={}){
  const installation={street:'123 Example Rd',city:'Example City',state:'TX',zip:'77002'};
  return {productId:'9000001',sourceLabel:'ST 901',kind:'stand',number:'901',capacity:null,sourceCategory:'Stand',sourceFileSha256:hash('synthetic-source-file'),sourceRowSha256:hash('synthetic-source-row'),sourceObservedAt:'2026-01-01T00:00:00Z',installation,originalInstallation:{...installation},normalization:'none',customer:'Synthetic Customer',siteLabel:'Synthetic Site',...overrides};
 }
+export function productRecord(kind='wall_e',overrides={}){
+ const types={wall_e:{productId:'9000011',sourceLabel:'WA 901',sourceCategory:'Wall-E'},camv:{productId:'9000012',sourceLabel:'CAMV 901',sourceCategory:'CAM-V'},sniper_2:{productId:'9000013',sourceLabel:'Sniper 2-901',sourceCategory:'Sniper 2'}};
+ if(!Object.hasOwn(types,kind))throw new Error('Unknown fixture family');
+ return record({...types[kind],kind,...overrides});
+}
 export function review(overrides={}){
  const readAt=new Date(Date.now()-1000).toISOString();
  return {reviewedAt:new Date().toISOString(),manifestSha256:hash('synthetic-manifest'),sourceFileSha256:hash('synthetic-source-file'),classifierVerified:true,inventories:['mhelp','tracker','archive','legacy'].map(kind=>({kind,sha256:hash(kind),readAt,rowCount:100,complete:true,conflicts:[]})),...overrides};

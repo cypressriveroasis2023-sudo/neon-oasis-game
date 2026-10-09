@@ -3,6 +3,8 @@
 import {createHash} from 'node:crypto';
 import {projectImportedSourceAddresses} from '../../supabase/functions/cos-operations-pages/importedSourceProjection.ts';
 import {projectOwnerPlacement} from '../../supabase/functions/cos-operations-pages/placementProjection.ts';
+import {inactiveSnapshot} from './camera-inactive-placement.fixture.mjs';
+import {appLegacyFixture} from './app-address-legacy-fixture.mjs';
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {existsSync} from 'node:fs';
@@ -21,11 +23,11 @@ const healthEnvelope=(key='RANGER 001')=>({evidenceVersion:2,identityVersion:1,r
 const fieldReads=fixture=>fixture.reads.filter(read=>read.body.path==='/api/field-map');
 const legacyState=(key='RANGER 001',patch={})=>({unitKey:key,placement:'FIELD',siteLabel:'',streetAddress:'',auditId:null,canMove:true,...patch});
 
-async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic billing label must never prefill',key='RANGER 001',native=envelope(),legacy=legacyState(key),health=healthEnvelope(key),status=200,token=true,holdNative=false}={}){
+async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic billing label must never prefill',key='RANGER 001',native=envelope(),legacy=legacyState(key),health=healthEnvelope(key),status=200,token=true,holdNative=false,appProof=null}={}){
   const fixture={native,health,status,holdNative,editorReadsArmed:false,initialDisplayReads:[],reads:[],geocodes:[],unexpected:[],gates:[],pageErrors:[]};
   page.on('pageerror',error=>fixture.pageErrors.push(error.message));
-  await page.addInitScript(({role,verifiedIt,organization,key,legacy,token})=>{
-    window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldRead=false;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadDenied=false;window.fixtureSaved=[];
+  await page.addInitScript(({role,verifiedIt,organization,key,legacy,token,appProof})=>{
+    window.fixtureAppProof=appProof;window.fixtureCalls=[];window.fixtureLegacy=legacy;window.fixtureSubject='synthetic-'+role;window.fixtureHoldRead=false;window.fixtureHoldWrite=false;window.fixtureWriteDenied=false;window.fixtureReadDenied=false;window.fixtureSaved=[];
     window.fixtureDevice={id:11,unit_key:key,device_name:'Synthetic provider label must never prefill',device_type:'camera',monitoring_profile:'ranger',organization,source_status:'offline',source:'vigilant_control_center',source_last_seen_at:'2026-10-07T12:00:00.000Z',activation_state:'active'};
     window.fixtureDb={
       auth:{getSession:async()=>({data:{session:{user:{id:window.fixtureSubject},...(token?{access_token:'synthetic-only'}:{})}}})},
@@ -33,6 +35,8 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
       async rpc(name,args){
         window.fixtureCalls.push({name,args});
         if(name==='cos_verified_fleet_capabilities_v1')return {data:{fleetRead:role==='owner'||role==='it'&&verifiedIt,fleetPlacementEdit:role==='it'&&verifiedIt,fleetConnectionEdit:role==='it'&&verifiedIt}};
+        if(name==='cos_app_unit_address_legacy_proof')return {data:structuredClone(window.fixtureAppProof)};
+        if(name==='cos_app_unit_address_legacy_proof_many')return {data:{proofs:args.p_sources.map(()=>structuredClone(window.fixtureAppProof))}};
         if(name==='owner_camera_unit_placement_state_v2'){
           const snapshot=structuredClone(window.fixtureLegacy);
           if(window.fixtureHoldRead)await new Promise(resolve=>window.fixtureReleaseRead=resolve);
@@ -51,7 +55,7 @@ async function mount(page,{role='owner',verifiedIt=true,organization='Synthetic 
       from(table){const query={select(){return query},eq(){return query},ilike(){return query},order(){return query},limit(){return query},single(){return query},maybeSingle(){return query},then(done){return Promise.resolve({data:table==='profiles'?{active:true,role}:table==='camera_devices'?window.fixtureDevice:table==='camera_health_current'?{}:[]}).then(done)}};return query;}
     };
     window.supabase={createClient:()=>window.fixtureDb};
-  },{role,verifiedIt,organization,key,legacy,token});
+  },{role,verifiedIt,organization,key,legacy,token,appProof});
   await page.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
     if(url.origin===origin){
@@ -322,4 +326,56 @@ test('actual imported SHOP DTO opens a blank deliberate deployment and only writ
 test('typed imported SHOP overrides only old inferred FIELD for blank deployment',async({page})=>{
  const native=await importedEnvelope('SHOP'),fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'FIELD'}),organization:'Old provider site'});await expect(page.locator('#organization')).toHaveText('SHOP / ROOT');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await page.locator('#moveShopBtn').click();const form=await ready(page);
  await expect(form.address).toHaveValue('');await expect(form.site).toHaveValue('');await form.cancel.click();await assertNoWrites(page,fixture);
+});
+
+for(const version of [1,2])for(const role of ['owner','it'])test(role+' opens actual V'+version+' INACTIVE inventory as an intentional installation and Cancel preserves source and health',async({page})=>{
+ const native=await inactiveSnapshot({version}),before=structuredClone(native),fixture=await mount(page,{native,role});
+ await expect(page.locator('#organization')).toHaveText('INACTIVE / DO NOT USE');await expect(page.locator('#shopActionTitle')).toHaveText('INACTIVE / DO NOT USE');await expect(page.locator('#moveShopBtn')).toHaveText('Move to Field');await expect(page.locator('#effectivePlacement')).toContainText('Activation: active');
+ const camera=await page.evaluate(()=>JSON.stringify(window.fixtureDevice)),healthLabel=await page.locator('#statusPill').textContent();await page.locator('#moveShopBtn').click();const form=await ready(page);await expect(form.site).toHaveValue('');await expect(form.address).toHaveValue('');await expect(form.confirmed).not.toBeChecked();
+ await form.cancel.click();await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);await assertNoWrites(page,fixture);expect(fixture.native).toEqual(before);expect(await page.evaluate(()=>JSON.stringify(window.fixtureDevice))).toBe(camera);await expect(page.locator('#statusPill')).toHaveText(healthLabel);
+});
+
+test('inactive deployment requires a fresh reason and confirmation and preserves exactly-once writer semantics',async({page})=>{
+ const native=await inactiveSnapshot(),fixture=await mount(page,{native});await page.locator('#moveShopBtn').click();const form=await ready(page);
+ await form.site.fill('Confirmed synthetic deployment');await form.address.fill('456 New Rd, Houston, TX 77002');await form.save.click();await assertNoWrites(page,fixture);
+ await form.reason.fill('Owner reviewed inactive inventory');await form.save.click();await assertNoWrites(page,fixture);
+ await form.confirmed.check();await page.evaluate(()=>window.fixtureHoldWrite=true);await form.save.click();await expect(form.save).toBeDisabled();await page.evaluate(()=>document.querySelector('.cos-placement-dialog form').dispatchEvent(new Event('submit',{cancelable:true})));
+ await page.evaluate(()=>{window.fixtureHoldWrite=false;window.fixtureReleaseWrite?.();});await expect(page.locator('.cos-placement-dialog')).toHaveCount(0);
+ expect(await mutations(page)).toHaveLength(1);expect((await mutations(page))[0].args).toMatchObject({p_unit_key:'RANGER 001',p_placement:'FIELD',p_site_label:'Confirmed synthetic deployment',p_street_address:'456 New Rd, Houston, TX 77002',p_expected_audit_id:null});expect(fixture.unexpected).toEqual([]);expect(fixture.pageErrors).toEqual([]);
+});
+
+for(const change of ['source revision','legacy audit','identity warning'])test('inactive '+change+' changing while the editor is open blocks the save',async({page})=>{
+ const native=await inactiveSnapshot(),fixture=await mount(page,{native});await page.locator('#moveShopBtn').click();const form=await ready(page);await form.site.fill('Synthetic destination');await form.address.fill('456 New Rd, Houston, TX 77002');await confirm(page);
+ if(change==='source revision')fixture.native.inventoryItems[0].importedInstallation.sourceRevision='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ if(change==='legacy audit')await page.evaluate(()=>window.fixtureLegacy.auditId='100');
+ if(change==='identity warning')fixture.health.identityWarnings=[{unitId:rowId,reason:'Source association changed',deviceIds:['11'],unitKeys:['RANGER 001']}];
+ await form.save.click();await expect(page.locator('.placement-feedback')).toContainText('No move was saved');await expect(form.save).toBeDisabled();await assertNoWrites(page,fixture);
+});
+
+test('malformed inactive proof stays unavailable even when old legacy state says SHOP',async({page})=>{
+ const native=await inactiveSnapshot();delete native.inventoryItems[0].importedInstallation.sourceRowSha256;
+ const fixture=await mount(page,{native,legacy:legacyState('RANGER 001',{placement:'SHOP'}),organization:'ROOT'});
+ await page.evaluate(()=>CameraPlacementControls.open({db:window.fixtureDb,key:'RANGER 001',placement:'FIELD'}));
+ await expect(page.locator('.placement-feedback')).toContainText('inactive placement proof');await expect(inputs(page).site).toBeDisabled();await expect(inputs(page).save).toBeDisabled();await assertNoWrites(page,fixture);
+});
+
+for(const role of ['service','it'])test('unapproved '+role+' cannot expose inactive move controls',async({page})=>{
+ await mount(page,{native:await inactiveSnapshot(),role,verifiedIt:false});await expect(page.locator('#shopActionWrap')).toBeHidden();await expect(page.locator('#editFieldBtn')).toBeHidden();expect(await mutations(page)).toEqual([]);
+});
+
+for(const version of [1,2])for(const placement of ['FIELD','SHOP','INACTIVE'])for(const role of ['owner','it'])test(role+' can review current app V'+version+' '+placement+' after an older Owner move without source edits',async({page})=>{
+ const f=await appLegacyFixture(placement,true,version),fixture=await mount(page,{role,native:f.snapshot,legacy:f.state,health:f.health,appProof:f.proof});
+ await expect(page.locator('#effectivePlacement')).toContainText('COS app Owner / IT placement');
+ if(placement==='FIELD')await open(page);else await page.locator('#moveShopBtn').click();const form=await ready(page);
+ await expect(form.address).toHaveValue(placement==='FIELD'?'123 App St, Houston, TX 77002':'');
+ if(placement==='FIELD'){await confirm(page);await form.save.click();await expect(page.locator('.placement-feedback')).toContainText('unchanged');}
+ await form.cancel.click();await assertNoWrites(page,fixture);expect(fixture.pageErrors).toEqual([]);
+});
+for(const change of ['proof','source revision','family'])test('app placement '+change+' changing before a legacy save is held without a write',async({page})=>{
+ const f=await appLegacyFixture('INACTIVE',true,2),fixture=await mount(page,{native:f.snapshot,legacy:f.state,health:f.health,appProof:f.proof});
+ await page.locator('#moveShopBtn').click();const form=await ready(page);await form.site.fill('New synthetic deployment');await form.address.fill('456 New Rd, Houston, TX 77002');await confirm(page);
+ if(change==='proof')await page.evaluate(()=>window.fixtureAppProof.legacyPlacementSha256='0'.repeat(64));
+ if(change==='source revision')fixture.native.inventoryItems[0].importedInstallation.sourceRevision='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ if(change==='family')fixture.native.inventoryItems[0].importedInstallation.addressAuthority.legacyUnitKey='SNIPER 001';
+ await form.save.click();await expect(page.locator('.placement-feedback')).toContainText('No move was saved');await assertNoWrites(page,fixture);
 });

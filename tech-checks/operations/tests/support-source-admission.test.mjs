@@ -1,7 +1,11 @@
 import{test,before,after,beforeEach}from'node:test';
 import assert from'node:assert/strict';
 import{randomUUID}from'node:crypto';
-import{fixture,record,review,admit,withdraw,state,reset,ORG,hash}from'./fixtures/support-admission-fixture.mjs';
+import{fixture,record,productRecord,review,admit,withdraw,state,reset,ORG,hash}from'./fixtures/support-admission-fixture.mjs';
+import {fieldCameraHealth,isSupportEquipment,unitHealthLabel} from '../src/fieldCameraHealth.ts';
+import {snapshot,now} from './fixtures/camera-evidence-fixtures.mjs';
+import {readFile} from 'node:fs/promises';
+import {creationIdentity} from '../scripts/product-creation-identity.mjs';
 let db;before(async()=>{db=await fixture();});after(async()=>{await db?.close();});beforeEach(async()=>{await reset(db);});
 const pole=()=>record({productId:'9000002',sourceLabel:'Solar Pole 902 72 (Hybrid solar stand)',kind:'solar_pole',number:'902',capacity:72,sourceCategory:'Solar Pole 72'});
 test('dry-run has no rows, generated identifiers, source events or sequence effects',async()=>{
@@ -30,6 +34,11 @@ test('literal street-in-City repair preserves supplied text and rejects ambiguou
  const original={street:'',city:'123 Example Rd Sample City',state:'TX',zip:'77002'},row=record({originalInstallation:original,installation:{street:'123 Example Rd',city:'Sample City',state:'TX',zip:'77002'},normalization:'street_in_city_literal_split'});
  await admit(db,[row]);assert.deepEqual((await state(db)).admissions[0].request.originalInstallation,original);await reset(db);
  for(const change of[{installation:{...row.installation,city:'Invented City'}},{installation:{...row.installation,zip:'77003'}},{originalInstallation:{...original,city:'123 Example Rd Sample St City'}},{normalization:'invented'}])await assert.rejects(()=>admit(db,[{...row,...change}]),/split|normalization/);
+});
+test('state case normalization preserves raw components and permits no other address change',async()=>{
+ const row=productRecord(),original={...row.installation,state:'Tx'},input={...row,originalInstallation:original,normalization:'state_case_only'};
+ await admit(db,[input]);assert.deepEqual((await state(db)).admissions[0].request.originalInstallation,original);await reset(db);
+ for(const change of[{installation:{...row.installation,state:'CA'}},{installation:{...row.installation,zip:'77003'}},{installation:{...row.installation,street:'124 Example Rd'}},{originalInstallation:{...original,state:'Texas'}},{originalInstallation:{...original,state:'TX '}},{normalization:'none'}])await assert.rejects(()=>admit(db,[{...input,...change}]),/case change|address change/);
 });
 test('addresses/display text cannot contain credentials, contact data, notes or malformed components',async()=>{
  for(const field of['street','city','state','zip']){const installation={...record().installation,[field]:'password123'};await assert.rejects(()=>admit(db,[record({installation,originalInstallation:installation})]),/Unsafe/);}
@@ -118,4 +127,94 @@ test('ordinary ST, Solar Stand and Solar Skid remain different explicit support 
 test('a distinct solar phrase cannot conceal an explicit ordinary ST label or family alias',async()=>{
  await db.query("insert into public.vision_cameras(organization_id,camera_key)values($1,'Solar Stand 72 999 (ST 901)')",[ORG]);await assert.rejects(()=>admit(db),/Existing identity/);await reset(db);
  await db.query("insert into public.audit_events(organization_id,previous_value)values($1,'{\"unit_label\":\"901\",\"family\":\"Stand\",\"unit_family\":\"Solar Stand 72\"}')",[ORG]);await assert.rejects(()=>admit(db),/Existing identity/);
+});
+const productKinds=['wall_e','camv','sniper_2'];
+test('typed absent ProductIds retain full families, independent pins and unknown camera health',async()=>{
+ const rows=productKinds.map(kind=>productRecord(kind));
+ const before=await state(db),dry=await admit(db,rows,false);assert.equal(dry.records.length,3);assert.deepEqual(await state(db),before);
+ const result=await admit(db,rows),saved=await state(db);
+ assert.deepEqual(saved.targets.map(t=>t.unit_number).sort(),['CAMV 901','Sniper 2 901','WA 901']);
+ assert.deepEqual(saved.targets.map(t=>t.family).sort(),['CAM V & RSU','SNIPERS','WALL-E']);
+ assert.equal(new Set(saved.targets.map(t=>t.id)).size,3);assert.equal(saved.sources.length,3);assert.equal(saved.events.length,3);assert.equal(saved.equipment.length,0);assert.equal(saved.audits.length,0);
+ const fields=saved.targets.map(t=>({id:t.id,unitNumber:t.unit_number,modelName:t.family}));
+ for(const unit of fields){const health=fieldCameraHealth(unit,fields,snapshot([]),now);assert.equal(isSupportEquipment(unit),false);assert.equal(health.state,'unknown');assert.equal(health.classification,null);assert.deepEqual(health.rows,[]);assert.doesNotMatch(unitHealthLabel(health),/0 CAMERAS|ONLINE|OFFLINE/);}
+ for(const t of saved.targets){assert.equal(t.source_name,'mHelpDesk product import');assert.equal(t.placement,'FIELD');assert.equal(t.latitude,null);assert.equal(t.longitude,null);}
+ for(const name of ['vision_vigilant_devices','vision_vigilant_unit_matches','vision_cameras'])assert.equal((await db.query(`select count(*)::int n from public.${name}`)).rows[0].n,0);
+ assert.deepEqual((await admit(db,rows)).records.map(r=>r.trackerId),result.records.map(r=>r.trackerId));assert.deepEqual(await state(db),saved);
+ const identities=result.records.map(({productId,trackerId,sourceRevision})=>({productId,trackerId,sourceRevision}));await withdraw(db,identities);const withdrawn=await state(db);assert.equal(withdrawn.targets.length,0);assert.ok(withdrawn.sources.every(s=>!s.active&&s.eligibility==='tombstone'));assert.equal(withdrawn.admissions.length,3);await assert.rejects(()=>admit(db,rows),/reactivated/);
+});
+test('creation rejects every missing discriminator, suffix, capacity and numeric token mismatch',async()=>{
+ for(const kind of productKinds){const row=productRecord(kind);for(const change of[{sourceLabel:row.sourceLabel+' HD4'},{sourceLabel:row.sourceLabel+' 72'},{sourceLabel:row.sourceLabel+' / 902'},{sourceLabel:row.sourceLabel+' MISSING'},{sourceLabel:row.sourceLabel.replace('901','0901')},{sourceLabel:row.sourceLabel.replace('901','902')},{capacity:72},{number:'01'},{sourceCategory:'Stand'},{variant:'HD4'},{variant:null},{cameraCount:2},{providerId:'invented'}])await assert.rejects(()=>admit(db,[{...row,...change}]));}
+ for(const label of['Sniper 901','Sniper 2901','Sniper 4-901','Sniper 2 901 4'])await assert.rejects(()=>admit(db,[productRecord('sniper_2',{sourceLabel:label})]));
+ assert.equal((await state(db)).targets.length,0);
+});
+test('full-label aliases share one permanent family reservation without adopting another target',async()=>{
+ for(const[kind,label]of[['wall_e','Wall-E 901'],['camv','CAM-V 901'],['sniper_2','Sniper 2 901']]){
+  await reset(db);const row=productRecord(kind,{sourceLabel:label});await admit(db,[row]);await assert.rejects(()=>admit(db,[productRecord(kind)]),/cannot be changed/);await assert.rejects(()=>admit(db,[{...row,productId:'9000099'}]),/already reserved/);
+ }
+});
+test('base, variant and capacity aliases fail closed across every native inventory',async()=>{
+ const stores=[
+  ['equipment_units',"insert into public.equipment_units(id,organization_id,unit_number,status)values(gen_random_uuid(),$1,$2,'retired')"],
+  ['tracker',"insert into app_private.vision_tracker_locations(organization_id,unit_number,family,placement)values($1,$2,'Unknown','SHOP')"],
+  ['provider',"insert into public.vision_vigilant_devices(organization_id,device_name)values($1,$2)"],
+  ['provider match',"insert into public.vision_vigilant_unit_matches(organization_id,camera_key)values($1,$2)"],
+  ['camera',"insert into public.vision_cameras(organization_id,internal_name)values($1,$2)"],
+  ['Owner',"insert into app_private.cos_owner_identity_claims(organization_id,native_unit_label)values($1,$2)"],
+  ['audit',"insert into public.audit_events(organization_id,previous_value)values($1,jsonb_build_object('unitNumber',$2::text))"],
+  ['source inventory',"insert into app_private.vision_source_inventory_v1(organization_id,unit_label)values($1,$2)"],
+  ['catalog',"insert into public.mhelpdesk_equipment_catalog(organization_id,product_model)values($1,$2)"]
+ ];
+ for(const kind of productKinds){const row=productRecord(kind);for(const[store,query]of stores){await reset(db);await db.query(query,[ORG,'MISSING '+row.sourceLabel+' HD4']);const before=await state(db);await assert.rejects(()=>admit(db,[row]),/Existing identity/,store+' '+kind);assert.deepEqual(await state(db),before);}}
+ for(const[kind,labels]of [['wall_e',['WA901HD4','WallE72901','WAHD4901','WA 901 72']],['camv',['CAMV901HD4','CAMV72901','CAMVHD4901','CAM-V 901 72']],['sniper_2',['Sniper 901','Sniper 4-901','Sniper2901HD4','SniperHD42901','Sniper 2 0901 Camera 1']]])for(const label of labels){await reset(db);await db.query('insert into public.vision_cameras(organization_id,camera_key)values($1,$2)',[ORG,label]);await assert.rejects(()=>admit(db,[productRecord(kind)]),/Existing identity/,label);}
+});
+test('native family context and withdrawn source aliases remain denial-only evidence for typed creations',async()=>{
+ for(const kind of productKinds)for(const label of ['901','72901','90172']){await reset(db);const row=productRecord(kind),model=randomUUID();await db.query('insert into public.equipment_models values($1,$2)',[model,row.sourceCategory+' HD4']);await db.query("insert into public.equipment_units(id,organization_id,unit_number,model_id)values(gen_random_uuid(),$1,$2,$3)",[ORG,label,model]);await assert.rejects(()=>admit(db,[row]),/Existing identity/);}
+ await reset(db);const created=(await admit(db,[productRecord()])).records[0];await withdraw(db,[{productId:created.productId,trackerId:created.trackerId,sourceRevision:created.sourceRevision}]);await assert.rejects(()=>admit(db,[productRecord('wall_e',{productId:'9000099'})]),/reserved/);
+});
+test('full neighboring tags never collapse into a short requested tag, including decorated labels',async()=>{
+ const examples=[['wall_e','003',['013','030','103','300']],['camv','014',['114','140']],['sniper_2','003',['013','030','103','300']]];
+ for(const[kind,number,neighbors]of examples){
+  const base=productRecord(kind),row={...base,number,sourceLabel:base.sourceLabel.replace('901',number)};
+  for(const tag of neighbors)for(const suffix of ['', ' HD4',' Camera 1',' 72']){await reset(db);await db.query('insert into public.vision_cameras(organization_id,camera_key)values($1,$2)',[ORG,base.sourceLabel.replace('901',tag)+suffix]);await admit(db,[row]);}
+  for(const suffix of ['', ' HD4',' Camera 1',' 72']){await reset(db);await db.query('insert into public.vision_cameras(organization_id,camera_key)values($1,$2)',[ORG,row.sourceLabel+suffix]);await assert.rejects(()=>admit(db,[row]),/Existing identity/);}
+ }
+});
+test('known generation, hardware and camera-channel tokens never stand in for the asset tag',async()=>{
+ for(const[kind,number,labels]of [['sniper_2','002',['Sniper 2 347','Sniper2-013','Sniper 2 347 HD4 Camera 2']],['sniper_2','004',['Sniper 4 347','Sniper2-013 HD4']],['wall_e','004',['WA 013 HD4','WAHD4013']],['camv','001',['CAMV 014 Camera 1']]]){
+  const base=productRecord(kind),row={...base,number,sourceLabel:base.sourceLabel.replace('901',number)};
+  for(const label of labels){await reset(db);await db.query('insert into public.vision_cameras(organization_id,camera_key)values($1,$2)',[ORG,label]);await admit(db,[row]);}
+ }
+});
+test('typed creation shares administrator-only authorization and batch rollback',async()=>{
+ for(const role of ['anon','authenticated','service_role']){await db.exec('set role '+role);try{await assert.rejects(()=>admit(db,[productRecord()]),/permission denied/);}finally{await db.exec('reset role');}}
+ await assert.rejects(()=>admit(db,[productRecord(),productRecord('camv'),productRecord('sniper_2',{sourceLabel:'Sniper 901'})]));assert.equal((await state(db)).targets.length,0);assert.equal((await state(db)).sources.length,0);
+});
+test('upgrade of the existing support artifact preserves original receipts and retry semantics',async()=>{
+ const first=await admit(db),before=await state(db);await db.exec(await readFile(new URL('../db/support-source-admission.sql',import.meta.url),'utf8'));assert.deepEqual(await state(db),before);assert.equal((await admit(db)).records[0].trackerId,first.records[0].trackerId);await admit(db,[productRecord()]);
+});
+function legacyReceipt(row=productRecord('sniper_2')){
+ const receipt=review(),legacy=receipt.inventories.find(r=>r.kind==='legacy'),identity=creationIdentity(row);
+ return {...receipt,legacyGroups:[{productId:row.productId,identityKey:identity.identityKey,fullLabel:identity.unitNumber,variant:null,rosterSha256:legacy.sha256,readAt:legacy.readAt,complete:true,deviceIds:['9901'],devices:[{id:'9901',unitKey:identity.unitNumber.toUpperCase(),deviceName:identity.unitNumber,deviceType:row.sourceCategory,source:'2026_unit_tracker',organization:'TRACKER FIELD',activationState:'active',externalDeviceId:null,connectionRevision:0}],nativeAssociations:[],providerAssociations:[],ownerPlacementGpsConflicts:[],placementGpsReviewed:true}]};
+}
+test('fresh exact legacy inventory stub review permits creation without adopting its IDs or health',async()=>{
+ for(const kind of productKinds){await reset(db);const row=productRecord(kind),receipt=legacyReceipt(row);receipt.legacyGroups[0].devices[0].organization='root';
+  const result=await admit(db,[row],true,receipt),saved=await state(db);assert.equal(saved.targets.length,1);assert.notEqual(result.records[0].trackerId,'9901');assert.deepEqual(saved.admissions[0].review_receipt,receipt);assert.equal(saved.equipment.length,0);assert.equal(saved.audits.length,0);
+  for(const name of ['vision_vigilant_devices','vision_vigilant_unit_matches','vision_cameras'])assert.equal((await db.query(`select count(*)::int n from public.${name}`)).rows[0].n,0);
+ }
+});
+test('legacy review rejects unbound/incomplete/ambiguous groups, variants, provider links and authoritative history',async()=>{
+ const row=productRecord('sniper_2'),normal=legacyReceipt(row),group=normal.legacyGroups[0];
+ for(const patch of [{complete:false},{placementGpsReviewed:false},{ownerPlacementGpsConflicts:['Owner placement']},{nativeAssociations:['another target']},{providerAssociations:['provider binding']},{rosterSha256:hash('other roster')},{readAt:'2000-01-01T00:00:00Z'},{productId:'9000099'},{productId:Number(row.productId)},{identityKey:'Sniper|901'},{fullLabel:'Sniper 901'},{variant:'HD4'},{deviceIds:[]},{deviceIds:['9901','9901']},{deviceIds:['9902']},{deviceIds:[9901]},{devices:[]}])await assert.rejects(()=>admit(db,[row],true,{...normal,legacyGroups:[{...group,...patch}]}));
+ for(const patch of [{source:'Vigilant'},{activationState:'inactive'},{externalDeviceId:'provider-1'},{connectionRevision:1},{deviceName:'Sniper 901'},{unitKey:'SNIPER 4 901'},{deviceType:'Sniper 4'},{deviceName:'Sniper 2 901 HD4'},{id:'9902'},{unexpected:true}])await assert.rejects(()=>admit(db,[row],true,{...normal,legacyGroups:[{...group,devices:[{...group.devices[0],...patch}]}]}));
+ for(const id of ['9223372036854775808','9999999999999999999'])await assert.rejects(()=>admit(db,[row],true,{...normal,legacyGroups:[{...group,deviceIds:[id],devices:[{...group.devices[0],id}]}]}),/Ambiguous legacy device/);
+ for(const groups of [null,[group,group],[{...group,productId:record().productId}]])await assert.rejects(()=>admit(db,groups?.[0]?.productId===record().productId?[record()]:[row],true,{...normal,legacyGroups:groups}));
+ const other=productRecord('camv'),otherGroup=legacyReceipt(other).legacyGroups[0];await assert.rejects(()=>admit(db,[row,other],true,{...normal,legacyGroups:[group,{...otherGroup,readAt:group.readAt}]}),/multiple groups/);
+ assert.equal((await state(db)).targets.length,0);
+});
+test('reviewed legacy stubs never excuse native provider or Owner conflicts',async()=>{
+ const row=productRecord('sniper_2'),receipt=legacyReceipt(row);
+ await db.query('insert into public.vision_vigilant_devices(organization_id,device_name)values($1,$2)',[ORG,row.sourceLabel]);await assert.rejects(()=>admit(db,[row],true,receipt),/Existing identity/);await reset(db);
+ await db.query('insert into app_private.cos_owner_identity_claims(organization_id,native_unit_label)values($1,$2)',[ORG,row.sourceLabel]);await assert.rejects(()=>admit(db,[row],true,receipt),/Existing identity/);
+ await reset(db);const bad={...receipt,inventories:receipt.inventories.map(r=>r.kind==='legacy'?{...r,conflicts:['ambiguous variant']}:r)};await assert.rejects(()=>admit(db,[row],true,bad),/conflicting/);
 });

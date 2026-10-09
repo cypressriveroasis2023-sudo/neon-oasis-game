@@ -1,10 +1,11 @@
 -- REVIEW ARTIFACT, native database only. Apply separately from admission.
 -- Existing postgres administrator, existing source importer, no API/role grants.
+-- Historical support API names/ledger remain stable for typed ProductId assets.
 begin;
 
 -- Permanent reservation and honest administrator provenance. No Owner actor.
 -- A withdrawn reservation is retained even if its untouched new target is removed.
-create table app_private.cos_support_admissions (
+create table if not exists app_private.cos_support_admissions (
  organization_id uuid not null check (organization_id='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'),
  product_id text primary key,
  identity_key text not null unique,
@@ -25,12 +26,17 @@ revoke all on app_private.cos_support_admissions from public,anon,authenticated,
 -- All numbers in a typed label are considered, so ambiguous or incomplete
 -- capacity/unit permutations fail closed. Different, explicit capacities remain
 -- separate when their unit numbers differ. False positives require human review.
-create function app_private.cos_support_label_concern(p_label text,p_family text,p_kind text,p_number text)
+create or replace function app_private.cos_support_label_concern(p_label text,p_family text,p_kind text,p_number text)
 returns boolean language sql immutable set search_path='' as $$
- with normalized as (select regexp_replace(lower(coalesce(p_label,'')),'[^a-z0-9]','','g') label,
+ with label_tokens as (select regexp_replace(regexp_replace(coalesce(p_label,''),'hdc?[24]s?','','gi'),
+  '(camera|channel|ch)[ _-]*[0-9]+','','gi') label),
+ normalized as (select regexp_replace(lower(coalesce(p_label,'')),'[^a-z0-9]','','g') label,
   regexp_replace(coalesce(p_label,''),'solar[ _-]*stands?','','gi') stand_label,
   regexp_replace(coalesce(p_family,''),'solar[ _-]*stands?','','gi') stand_family,
-  coalesce(nullif(ltrim(p_number,'0'),''),'0') number)
+  regexp_replace(lower(coalesce(p_family,'')),'[^a-z0-9]','','g') family,
+  case when p_kind='sniper_2' then regexp_replace(label_tokens.label,'snipers?[ _-]*[24](?=[ _-]+[0-9])','','gi')
+   when p_kind in ('wall_e','camv') then label_tokens.label else coalesce(p_label,'') end numeric_label,
+  coalesce(nullif(ltrim(p_number,'0'),''),'0') number from label_tokens)
  select coalesce((
   case when p_kind='stand' then
    (normalized.stand_label~*'(^|[^a-z])(st|stands?)([^a-z]|$)'
@@ -38,14 +44,22 @@ returns boolean language sql immutable set search_path='' as $$
   when p_kind='solar_pole' then
    (coalesce(p_label,'')~*'solar[ _-]*poles?'
     or (coalesce(p_family,'')~*'solar[ _-]*poles?' and normalized.label!~'^(archived?|missing|donotuse)*solar(skids?|stands?)'))
+  when p_kind='wall_e' then (normalized.label~'(walle|wa)[a-z]*[0-9]' or coalesce(p_family,'')~*'(^|[^a-z])(wall[ _-]*e|wa)([^a-z]|$)' or normalized.family~'^(walle|wa)[a-z]*[0-9]')
+  when p_kind='camv' then (normalized.label~'camv[a-z]*[0-9]' or coalesce(p_family,'')~*'(^|[^a-z])cam[ _-]*v([^a-z]|$)' or normalized.family~'^camv[a-z]*[0-9]')
+  when p_kind='sniper_2' then (normalized.label~'snipers?[a-z]*[0-9]' or coalesce(p_family,'')~*'(^|[^a-z])snipers?([^a-z]|$)' or normalized.family~'^snipers?[a-z]*[0-9]')
   else false end
-  and exists(select 1 from regexp_matches(coalesce(p_label,''),'[0-9]+','g') n
+  and exists(select 1 from regexp_matches(normalized.numeric_label,'[0-9]+','g') n
    where coalesce(nullif(ltrim(n[1],'0'),''),'0')=normalized.number
-    or (p_kind='solar_pole' and n[1]~('^([1-9][0-9]{1,2})?0*'||normalized.number||'([1-9][0-9]{1,2})?$'))))
+    or (p_kind='solar_pole' and n[1]~('^([1-9][0-9]{1,2})?0*'||normalized.number||'([1-9][0-9]{1,2})?$'))
+    -- Composite capacity/model tokens must retain the complete padded tag.
+    -- Otherwise a requested 003 would incorrectly collide with 013 or 300.
+    or (p_kind in ('wall_e','camv','sniper_2') and n[1]~('^([1-9][0-9]{1,2})?'||p_number||'([1-9][0-9]{1,2})?$'))
+    or (p_kind='sniper_2' and n[1]~('^20*'||p_number||'([1-9][0-9]{1,2})?$')))
   -- Lost separators must not make the same identity appear absent in another
   -- table. Only deny; never use these collapsed forms to bind a target.
   or (p_kind='stand' and regexp_replace(lower(normalized.stand_label),'[^a-z0-9]','','g')
-   ~('stands?0*'||normalized.number||'([^0-9]|$)|st0*'||normalized.number||'([^0-9]|$)')),false)
+   ~('stands?0*'||normalized.number||'([^0-9]|$)|st0*'||normalized.number||'([^0-9]|$)'))
+  ),false)
  from normalized
 $$;
 revoke all on function app_private.cos_support_label_concern(text,text,text,text) from public,anon,authenticated,service_role;
@@ -53,20 +67,22 @@ revoke all on function app_private.cos_support_label_concern(text,text,text,text
 -- Native negative evidence is checked in full, including retired/tombstoned rows,
 -- former labels in audit history, provider records and revoked Owner reservations.
 -- No label match ever adopts an existing target.
-create function app_private.cos_support_assert_absent(p_org uuid,p_record jsonb,p_own_target uuid default null)
+create or replace function app_private.cos_support_assert_absent(p_org uuid,p_record jsonb,p_own_target uuid default null)
 returns void language plpgsql security invoker set search_path='' as $$
 declare k text:=p_record->>'kind'; n text:=p_record->>'number'; pid text:=p_record->>'productId';
+ canonical text:=case k when 'stand' then 'ST '||n when 'solar_pole' then 'Solar Pole 72 '||n
+  when 'wall_e' then 'WA '||n when 'camv' then 'CAMV '||n when 'sniper_2' then 'Sniper 2 '||n end;
 begin
  if current_user is distinct from 'postgres' then raise exception 'Existing SQL administrator required.' using errcode='42501';end if;
  if exists(select 1 from public.equipment_units u left join public.equipment_models m on m.id=u.model_id where u.organization_id=p_org and
    (app_private.cos_support_label_concern(u.unit_number,m.name,k,n)
-    or app_private.cos_source_label(u.unit_number) in (app_private.cos_source_label(p_record->>'sourceLabel'),app_private.cos_source_label(case when k='stand' then 'ST '||n else 'Solar Pole 72 '||n end))
+    or app_private.cos_source_label(u.unit_number) in (app_private.cos_source_label(p_record->>'sourceLabel'),app_private.cos_source_label(canonical))
     or pid in (u.metadata->>'productId',u.metadata->>'product_id',u.metadata->>'sourceProductId')))
  or exists(select 1 from app_private.vision_tracker_locations t where t.organization_id=p_org and t.id is distinct from p_own_target
    and app_private.cos_support_label_concern(t.unit_number,t.family,k,n))
  or exists(select 1 from public.vision_vigilant_devices d where d.organization_id=p_org
    and (app_private.cos_support_label_concern(d.device_name,d.device_type,k,n)
-    or app_private.cos_source_label(d.device_name) in (app_private.cos_source_label(p_record->>'sourceLabel'),app_private.cos_source_label(case when k='stand' then 'ST '||n else 'Solar Pole 72 '||n end))))
+    or app_private.cos_source_label(d.device_name) in (app_private.cos_source_label(p_record->>'sourceLabel'),app_private.cos_source_label(canonical))))
  or exists(select 1 from public.vision_vigilant_unit_matches m where m.organization_id=p_org
    and (m.equipment_unit_id=p_own_target or app_private.cos_support_label_concern(m.camera_key,null,k,n)))
  or exists(select 1 from public.vision_cameras c where c.organization_id=p_org and
@@ -101,7 +117,7 @@ revoke all on function app_private.cos_support_assert_absent(uuid,jsonb,uuid) fr
 
 -- Both admission and withdrawal use this lock order. Table locks also exclude
 -- writers that do not know about the import advisory lock. No provider calls.
-create function app_private.cos_support_lock_inventory()
+create or replace function app_private.cos_support_lock_inventory()
 returns void language plpgsql security invoker set search_path='' as $$
 begin
  if current_user is distinct from 'postgres' then raise exception 'Existing SQL administrator required.' using errcode='42501';end if;
@@ -116,11 +132,11 @@ begin
 end $$;
 revoke all on function app_private.cos_support_lock_inventory() from public,anon,authenticated,service_role;
 
-create function app_private.cos_support_admit_reviewed(p_organization_id uuid,p_records jsonb,p_review jsonb,p_apply boolean default false)
+create or replace function app_private.cos_support_admit_reviewed(p_organization_id uuid,p_records jsonb,p_review jsonb,p_apply boolean default false)
 returns jsonb language plpgsql security invoker set search_path='' as $$
-declare r jsonb; ext jsonb; a app_private.cos_support_admissions; s app_private.cos_geocode_sources;
+declare r jsonb; ext jsonb; g jsonb; d jsonb; a app_private.cos_support_admissions; s app_private.cos_geocode_sources;
  v_id uuid; v_label text; v_family text; v_key text; v_guard text; v_address text; v_result jsonb:='[]'; v_source jsonb;
- v_original jsonb; v_installation jsonb; v_split text[]; v_review_at timestamptz;
+ v_original jsonb; v_installation jsonb; v_split text[]; v_review_at timestamptz; v_legacy jsonb; v_groups jsonb; v_pattern text;
 begin
  if current_user is distinct from 'postgres' or p_organization_id is distinct from 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid then
   raise exception 'Existing SQL administrator required.' using errcode='42501';end if;
@@ -132,12 +148,12 @@ begin
  -- External projects and files cannot participate in this database transaction.
  -- Require fresh complete review evidence; keep the receipt for independent audit.
  if jsonb_typeof(p_review) is distinct from 'object'
-  or (p_review-array['reviewedAt','manifestSha256','sourceFileSha256','classifierVerified','inventories'])<>'{}'::jsonb
+  or (p_review-array['reviewedAt','manifestSha256','sourceFileSha256','classifierVerified','inventories','legacyGroups'])<>'{}'::jsonb
   or p_review->>'manifestSha256' !~ '^[a-f0-9]{64}$' or p_review->>'manifestSha256' is null
   or p_review->>'sourceFileSha256' !~ '^[a-f0-9]{64}$' or p_review->>'sourceFileSha256' is null
   or p_review->'classifierVerified' is distinct from 'true'::jsonb
   or jsonb_typeof(p_review->'inventories') is distinct from 'array' or jsonb_array_length(p_review->'inventories')<>4 then
-  raise exception 'Complete independent source review and deployed support classifier required.' using errcode='22023';end if;
+  raise exception 'Complete independent source review and deployed equipment classifier required.' using errcode='22023';end if;
  v_review_at:=(p_review->>'reviewedAt')::timestamptz;
  if v_review_at is null or v_review_at>clock_timestamp() or v_review_at<clock_timestamp()-interval '10 minutes' then
   raise exception 'External review is stale.' using errcode='40001';end if;
@@ -152,6 +168,35 @@ begin
    or (ext->>'readAt')::timestamptz<clock_timestamp()-interval '10 minutes' then
    raise exception 'Incomplete, conflicting or stale external inventory.' using errcode='40001';end if;
  end loop;
+ -- An exact tracker-derived legacy inventory group can exist before its native
+ -- asset. This exception is evidence only: never adopt its IDs, provider link,
+ -- placement or health. Native/provider/Owner negative scans below are unchanged.
+ v_groups:=coalesce(p_review->'legacyGroups','[]'::jsonb);
+ select value into v_legacy from jsonb_array_elements(p_review->'inventories') where value->>'kind'='legacy';
+ if jsonb_typeof(v_groups) is distinct from 'array' or jsonb_array_length(v_groups)>jsonb_array_length(p_records)
+  or exists(select 1 from jsonb_array_elements(v_groups) x group by x->>'productId' having count(*)>1) then
+  raise exception 'Invalid reviewed legacy groups.' using errcode='22023';end if;
+ for g in select value from jsonb_array_elements(v_groups) loop
+  if jsonb_typeof(g) is distinct from 'object'
+   or (g-array['productId','identityKey','fullLabel','variant','rosterSha256','readAt','complete','deviceIds','devices','nativeAssociations','providerAssociations','ownerPlacementGpsConflicts','placementGpsReviewed'])<>'{}'::jsonb
+   or jsonb_typeof(g->'productId') is distinct from 'string'
+   or g->'complete' is distinct from 'true'::jsonb or g->'placementGpsReviewed' is distinct from 'true'::jsonb
+   or g->'variant' is distinct from 'null'::jsonb
+   or g->>'rosterSha256' is distinct from v_legacy->>'sha256'
+   or g->>'readAt' is distinct from v_legacy->>'readAt'
+   or g->'nativeAssociations' is distinct from '[]'::jsonb or g->'providerAssociations' is distinct from '[]'::jsonb
+   or g->'ownerPlacementGpsConflicts' is distinct from '[]'::jsonb
+   or jsonb_typeof(g->'deviceIds') is distinct from 'array' or jsonb_array_length(g->'deviceIds') not between 1 and 100
+   or jsonb_typeof(g->'devices') is distinct from 'array' or jsonb_array_length(g->'devices')<>jsonb_array_length(g->'deviceIds')
+   or not exists(select 1 from jsonb_array_elements(p_records) x where x->>'productId'=g->>'productId' and x->>'kind' in ('wall_e','camv','sniper_2')) then
+   raise exception 'Complete unbound exact legacy inventory review required.' using errcode='22023';end if;
+  if exists(select 1 from jsonb_array_elements(g->'deviceIds') x where jsonb_typeof(x) is distinct from 'string' or (x#>>'{}')!~'^[1-9][0-9]{0,18}$' or (x#>>'{}')::numeric>9223372036854775807)
+   or (select count(distinct x) from jsonb_array_elements(g->'deviceIds') x)<>jsonb_array_length(g->'deviceIds')
+   or (select count(distinct x->>'id') from jsonb_array_elements(g->'devices') x)<>jsonb_array_length(g->'devices') then
+   raise exception 'Ambiguous legacy device roster.' using errcode='22023';end if;
+ end loop;
+ if exists(select 1 from jsonb_array_elements(v_groups) x cross join lateral jsonb_array_elements(x->'deviceIds') id group by id having count(*)>1) then
+  raise exception 'Legacy device appears in multiple groups.' using errcode='22023';end if;
  if exists(select 1 from jsonb_array_elements(p_records) x group by x->>'productId' having count(*)>1)
   or exists(select 1 from jsonb_array_elements(p_records) x group by x->>'kind',x->>'number' having count(*)>1) then
   raise exception 'Duplicate or ambiguous support identity.' using errcode='22023';end if;
@@ -175,7 +220,32 @@ begin
   elsif r->>'kind'='solar_pole' and r->>'sourceCategory'='Solar Pole 72' and r->'capacity'='72'::jsonb
    and r->>'sourceLabel' ~* ('^Solar Pole ('||(r->>'number')||' 72|72 '||(r->>'number')||')( \(Hybrid Solar Stand\))?$') then
    v_label:='Solar Pole 72 '||(r->>'number');v_family:='SOLAR POLES & SKIDS';v_key:='Solar Pole 72|'||(r->>'number');
+  elsif r->>'kind'='wall_e' and r->>'sourceCategory'='Wall-E' and r->'capacity'='null'::jsonb
+   and r->>'sourceLabel' ~ ('^(WA|Wall-E|Wall E) '||(r->>'number')||'$') then
+   v_label:='WA '||(r->>'number');v_family:='WALL-E';v_key:='Wall-E|'||(r->>'number');
+  elsif r->>'kind'='camv' and r->>'sourceCategory'='CAM-V' and r->'capacity'='null'::jsonb
+   and r->>'sourceLabel' ~ ('^CAM[- ]?V '||(r->>'number')||'$') then
+   v_label:='CAMV '||(r->>'number');v_family:='CAM V & RSU';v_key:='CAM-V|'||(r->>'number');
+  elsif r->>'kind'='sniper_2' and r->>'sourceCategory'='Sniper 2' and r->'capacity'='null'::jsonb
+   and r->>'sourceLabel' ~ ('^Sniper 2[- ]'||(r->>'number')||'$') then
+   v_label:='Sniper 2 '||(r->>'number');v_family:='SNIPERS';v_key:='Sniper 2|'||(r->>'number');
   else raise exception 'Unsupported or inconsistent complete support identity.' using errcode='22023';end if;
+  select value into g from jsonb_array_elements(v_groups) where value->>'productId'=r->>'productId';
+  if found then
+   if g->>'identityKey' is distinct from v_key or g->>'fullLabel' is distinct from v_label then
+    raise exception 'Legacy full identity differs from requested asset.' using errcode='22023';end if;
+   v_pattern:=case r->>'kind' when 'wall_e' then '^(WA|Wall-E|Wall E) ' when 'camv' then '^CAM[- ]?V ' else '^Sniper 2[- ]' end||(r->>'number')||'$';
+   for d in select value from jsonb_array_elements(g->'devices') loop
+    if jsonb_typeof(d) is distinct from 'object' or (d-array['id','unitKey','deviceName','deviceType','source','organization','activationState','externalDeviceId','connectionRevision'])<>'{}'::jsonb
+     or jsonb_typeof(d->'id') is distinct from 'string' or not (g->'deviceIds' @> jsonb_build_array(d->'id'))
+     or coalesce(d->>'unitKey','')!~*v_pattern or coalesce(d->>'deviceName','')!~*v_pattern
+     or lower(coalesce(d->>'deviceType',''))<>all(case r->>'kind' when 'wall_e' then array['wa','wall-e','wall e'] when 'camv' then array['camv','cam-v','cam v'] else array['sniper 2','sniper2'] end)
+     or d->>'source' is distinct from '2026_unit_tracker' or d->>'activationState' is distinct from 'active'
+     or d->'externalDeviceId' is distinct from 'null'::jsonb or d->'connectionRevision' is distinct from '0'::jsonb
+     or jsonb_typeof(d->'organization') is distinct from 'string' or length(d->>'organization') not between 1 and 120 then
+     raise exception 'Legacy group is not an exact unbound inventory stub.' using errcode='22023';end if;
+   end loop;
+  end if;
   if coalesce(jsonb_typeof(r->'customer'),'null') not in ('string','null')
    or coalesce(jsonb_typeof(r->'siteLabel'),'null') not in ('string','null') then
    raise exception 'Invalid support display text.' using errcode='22023';end if;
@@ -190,6 +260,10 @@ begin
    raise exception 'Invalid address components.' using errcode='22023';end if;
   if r->>'normalization'='none' then
    if v_original is distinct from v_installation then raise exception 'Unreviewed address change.' using errcode='22023';end if;
+  elsif r->>'normalization'='state_case_only' then
+   if coalesce(v_original->>'state','')!~'^[A-Za-z]{2}$'
+    or v_installation is distinct from jsonb_set(v_original,'{state}',to_jsonb(upper(v_original->>'state'))) then
+    raise exception 'Unreviewed state case change.' using errcode='22023';end if;
   elsif r->>'normalization'='street_in_city_literal_split' then
    -- One road suffix, no invented text, identical supplied state/postcode.
    v_split:=regexp_match(v_original->>'city','^([0-9]{1,8}[A-Za-z]? [A-Za-z0-9 .''-]+ (?:Rd|Road|St|Street|Dr|Drive|Ave|Avenue|Blvd|Boulevard|Ln|Lane|Ct|Court|Way|Pkwy|Parkway)) ([A-Za-z][A-Za-z .''-]*)$');
@@ -256,7 +330,7 @@ revoke all on function app_private.cos_support_admit_reviewed(uuid,jsonb,jsonb,b
 -- This deletes new targets; it is not an in-product restore flow. Original
 -- records, source tombstones/events and administrator provenance are retained.
 -- Owner/GPS/provider/history/source changes make withdrawal fail closed.
-create function app_private.cos_support_withdraw_reviewed(p_organization_id uuid,p_records jsonb)
+create or replace function app_private.cos_support_withdraw_reviewed(p_organization_id uuid,p_records jsonb)
 returns jsonb language plpgsql security invoker set search_path='' as $$
 declare r jsonb; a app_private.cos_support_admissions; s app_private.cos_geocode_sources; result jsonb:='[]'; v_id uuid;
 begin

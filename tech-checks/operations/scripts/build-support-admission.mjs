@@ -2,10 +2,12 @@ import {createHash} from 'node:crypto';
 import {readFile,mkdir,realpath,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {validateCreationBatch} from './product-creation-identity.mjs';
 const repo=resolve(dirname(fileURLToPath(import.meta.url)),'../../..');
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const literal=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb";
 export function statements(records,review,receipt=null){
+ validateCreationBatch(records);
  if(!Array.isArray(records)||records.length<1||records.length>100||!review||typeof review!=='object')throw new Error('A bounded records array and reviewed evidence object are required.');
  const org="'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid";
  const begin="\\set ON_ERROR_STOP on\nbegin isolation level read committed;\nset local lock_timeout='2s';\nset local statement_timeout='20s';\n";
@@ -34,7 +36,24 @@ export async function build({recordsPath,reviewPath,outPath,receiptPath}){
  const manifest={schemaVersion:1,status:'prepared_not_executed',recordsSha256:sha(rb),reviewSha256:sha(vb),recordCount:JSON.parse(rb).length,files:hashes,productionWrites:0,providerCalls:0};
  await writeFile(resolve(out,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600,flag:'wx'});return manifest;
 }
+// A plan deliberately has no review timestamp, completeness assertion, UUID or SQL.
+// Old evidence can prepare records; it cannot authorize admission without re-reading.
+export async function plan({recordsPath,outPath}){
+ const input=await outside(recordsPath),bytes=await readFile(input),records=JSON.parse(bytes),identities=validateCreationBatch(records);
+ await outside(dirname(resolve(outPath)));await mkdir(outPath,{recursive:true,mode:0o700});const out=await outside(outPath);
+ const result={schemaVersion:1,status:'awaiting_fresh_independent_review',recordsSha256:sha(bytes),recordCount:records.length,records,
+  proposedTargets:records.map((r,i)=>({productId:r.productId,...identities[i],trackerId:null,providerAssociation:false,cameraCount:null,cameraHealth:'unknown'})),
+  requiredBeforeExecution:['Complete fresh mhelp, tracker, archive and legacy scans with original read times and hashes','Deployed support/non-support classifier verification','Review exact source bytes and all native identity/history scans under existing admission locks'],
+  reviewReceipt:null,productionWrites:0,providerCalls:0};
+ await writeFile(resolve(out,'apply-plan.json'),JSON.stringify(result,null,2)+'\n',{mode:0o600,flag:'wx'});return result;
+}
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- const args=process.argv.slice(2);if(args.length<3||args.length>4)throw new Error('Usage: node build-support-admission.mjs RECORDS_JSON REVIEW_JSON PRIVATE_OUTPUT_DIR [EXECUTION_RECEIPT_JSON]');
- console.log(JSON.stringify(await build({recordsPath:args[0],reviewPath:args[1],outPath:args[2],receiptPath:args[3]}),null,2));
+ const args=process.argv.slice(2);
+ if(args[0]==='--plan'){
+  if(args.length!==3)throw new Error('Usage: node build-support-admission.mjs --plan RECORDS_JSON PRIVATE_OUTPUT_DIR');
+  const result=await plan({recordsPath:args[1],outPath:args[2]});console.log(JSON.stringify({status:result.status,recordCount:result.recordCount,productionWrites:0,providerCalls:0},null,2));
+ }else{
+  if(args.length<3||args.length>4)throw new Error('Usage: node build-support-admission.mjs RECORDS_JSON REVIEW_JSON PRIVATE_OUTPUT_DIR [EXECUTION_RECEIPT_JSON]');
+  console.log(JSON.stringify(await build({recordsPath:args[0],reviewPath:args[1],outPath:args[2],receiptPath:args[3]}),null,2));
+ }
 }
