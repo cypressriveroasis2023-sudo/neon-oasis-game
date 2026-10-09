@@ -1,45 +1,54 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2";
+import {collectScheduledDirect,boundedRequest} from "../_shared/scheduledDirectService.ts";
 
 const json=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:{"Content-Type":"application/json"}});
-const SNIPER_PORTS=[80,443,8443,38880,38881];
-const VIGILANT_PORTS=[80,81,443,1400,1443,1454,1500,1543,1554,1600,1643,1654,1700,1743,1754,1900,1943,1954];
-const VIGILANT_PROFILES=new Set(["helios","nvr","ranger","solar_spotter","spotter"]);
+// Only configured public IPv4 hosts may be contacted. No DNS, URL or private-network fallback.
+function publicHost(value:unknown):string|null {
+ if(typeof value!=="string")return null;const host=value.replace(/\/32$/,""),p=host.split(".");
+ if(p.length!==4||p.some(x=>!/^(?:0|[1-9]\d{0,2})$/.test(x)||Number(x)>255))return null;
+ const [a,b,c]=p.map(Number);
+ if(a===0||a===10||a===127||a>=224||(a===100&&b>=64&&b<=127)||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&(b===168||(b===0&&(c===0||c===2))))||(a===198&&(b===18||b===19||(b===51&&c===100)))||(a===203&&b===0&&c===113))return null;
+ return host;
+}
 
 async function tcp(host:string,port:number,timeout=2200){
-  const t=Date.now();let c:any;
+  if(!publicHost(host)||!Number.isInteger(port)||port<1||port>65535)return {online:false,latency_ms:null,error:"Unsupported public endpoint"};
+  const t=Date.now(),controller=new AbortController();let c:any,timer:ReturnType<typeof setTimeout>;
   try{
-    c=await Promise.race([
-      Deno.connect({hostname:host,port}),
-      new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),timeout))
-    ]) as any;
-    c.close();
+    const connection=Deno.connect({hostname:host,port,signal:controller.signal}).then(conn=>{
+      if(controller.signal.aborted){conn.close();throw new Error("timeout");}return conn;
+    });
+    c=await Promise.race([connection,new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new Error("timeout"));},timeout);})]);
     return {online:true,latency_ms:Date.now()-t};
   }catch(e){
-    try{c?.close()}catch{}
-    return {online:false,latency_ms:null,error:String((e as any)?.message||e)};
-  }
+    return {online:false,latency_ms:null,error:controller.signal.aborted?"timeout":String((e as any)?.message||e)};
+  }finally{clearTimeout(timer!);try{c?.close()}catch{}}
+
 }
 
 Deno.serve(async(req)=>{
+  const requestStarted=Date.now();
   if(req.method!=="POST")return json({error:"POST required"},405);
 
-  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{
+    global:{fetch:(input:any,init:any={})=>fetch(input,{...init,signal:AbortSignal.any([
+      ...(init.signal?[init.signal]:[]),AbortSignal.timeout(Math.max(1,Math.min(4000,requestStarted+52_000-Date.now())))
+    ])})}
+  });
   const {data:valid}=await db.rpc("verify_camera_health_cron_secret",{candidate:req.headers.get("x-camera-cron-secret")});
   if(valid!==true)return json({error:"Forbidden"},403);
 
   const body=await req.json().catch(()=>({}));
   const n=Math.min(Math.max(Number(body.batch_size)||12,1),25);
 
-  const {data:devices,error}=await db.from("camera_devices")
-    .select("id,unit_key,device_name,device_model,device_type,tech_check_unit_type,public_ip,expected_ports,monitoring_profile,last_health_checked_at,last_probe_online_at,activation_state,organization,vigilant_status")
-    .eq("monitoring_enabled",true)
-    .order("last_health_checked_at",{ascending:true,nullsFirst:true})
-    .limit(1000);
-  if(error)return json({error:error.message},500);
+  // Cameras and the existing bounded router batch share elapsed time, not a
+  // serial budget. Router work cannot consume the camera window first.
+  const cameraRun=collectScheduledDirect(db,tcp,{startedAt:requestStarted})
+    .then(value=>({value,error:null}),()=>({value:null,error:"Direct inventory unavailable"}));
 
-  const {data:routerMappings}=await db.from("camera_unit_routers")
-    .select("id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,reported_status,reported_latency_ms,status_source,status_observed_at,current_status,last_checked_at,last_online_at")
+  const {data:routerMappings,error:routerReadError}=await db.from("camera_unit_routers")
+    .select("id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,reported_status,reported_latency_ms,status_source,status_observed_at,current_status,last_checked_at,last_online_at,updated_at")
     .or("router_public_ip.not.is.null,unit_ip.not.is.null");
   // Router health must stay fresh. Recheck every 5 minutes; UI can expire older evidence.
   const routerProbeIntervalMs=5*60*1000;
@@ -52,8 +61,9 @@ Deno.serve(async(req)=>{
       return at-bt;
     }).slice(0,n);
 
-  const routerResults=await Promise.all(routers.map(async(r:any)=>{
+  const routerRun=Promise.all(routers.map(async(r:any)=>{
     const host=String(r.router_public_ip||r.unit_ip||"").replace("/32","");
+    if(!publicHost(host))return {id:r.id,unit:r.unit_key,status:"unknown",reason:"unsupported_public_endpoint"};
     // Router health is authoritative only on its configured management port (InHand standard: 8080).
     // Do not let camera/NVR services on the same public IP manufacture router ONLINE.
     const ports=[Number(r.web_port||8080)].filter((x:number)=>x>0);
@@ -74,157 +84,55 @@ Deno.serve(async(req)=>{
       const patch:any={current_status:status,last_checked_at:checked,updated_at:checked};
       if(status==="online"&&(statusChanged||!r.last_online_at))patch.last_online_at=checked;
       if(latencyChanged)patch.reported_latency_ms=bestLatency;
-      await db.from("camera_unit_routers").update(patch).eq("id",r.id);
+      let routerSave=db.from("camera_unit_routers").update(patch).eq("id",r.id).eq("unit_key",r.unit_key).eq("updated_at",r.updated_at);
+      for(const key of ["router_public_ip","unit_ip","web_port"]){routerSave=r[key]==null?routerSave.is(key,null):routerSave.eq(key,r[key]);}
+      const {data:savedRouter,error:routerError}=await routerSave.select("id");
+      if(routerError)return {id:r.id,unit:r.unit_key,status:"unknown",reason:"router_publication_unverified"};
+      if(!savedRouter?.length)return {id:r.id,unit:r.unit_key,status:"unknown",reason:"router_configuration_changed"};
     }
     return{id:r.id,unit:r.unit_key,name:r.router_name,model:r.router_model,status,direct_online:directOnline,reported_status:r.reported_status,ports:probes,latency_ms:bestLatency};
-  }));
+  })).then(value=>({value,error:null}),error=>({value:null,error}));
 
-  const routerByUnit=new Map<string,any>();
-  for(const r of (routerMappings||[])){const k=String(r.unit_key||"").trim().toLowerCase();if(k&&!routerByUnit.has(k))routerByUnit.set(k,r)}
-  const normUnit=(s:any)=>String(s||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"");
-  const DIRECT_PROFILES=new Set(["sniper","camv"]);
-  const checkable=(devices||[]).filter((d:any)=>{
-    const profile=String(d.monitoring_profile||"").toLowerCase();
-    const org=String(d.organization||"").trim().toLowerCase(),unit=String(d.unit_key||"").toLowerCase();
-    const shop=String(d.activation_state||"").toLowerCase()==="deactivated"||["root","shop","shop equipment","retired"].includes(org)||[org,unit].some(x=>/not in use|stolen|\\s*-\\s*shop\\b/.test(x));
-    const host=d.public_ip||routerByUnit.get(String(d.unit_key||"").trim().toLowerCase())?.router_public_ip||routerByUnit.get(String(d.unit_key||"").trim().toLowerCase())?.unit_ip;
-    return DIRECT_PROFILES.has(profile)&&!shop&&!!host;
-  });
-  // Reuse identical host+port probe sets within this sweep. Multiple camera rows on
-  // one Helios/Alibi unit often share the same public IP, so they should not open
-  // the same TCP connections repeatedly in the same run.
-  const probeCache=new Map<string,Promise<any>>();
-  const probePorts=(host:string,ports:number[])=>{
-    const normalized=[...new Set(ports.map(Number).filter((p:number)=>p>0))].sort((a,b)=>a-b);
-    const key=host+"|"+normalized.join(",");
-    if(!probeCache.has(key)){
-      probeCache.set(key,Promise.all(normalized.map(async(p:number)=>[p,await tcp(host,p)])).then(entries=>Object.fromEntries(entries)));
-    }
-    return probeCache.get(key)!;
-  };
+  const camera=await cameraRun;
+  const routerOutcome=await routerRun;
+  const routerResults=routerReadError||routerOutcome.error
+    ? [{status:"unknown",reason:"router_inventory_unavailable"}]
+    : routerOutcome.value!;
+  const {results,eligible,held,deferred,deadlineReached}=camera.value||{results:[],eligible:null,held:[],deferred:null,deadlineReached:Date.now()>=requestStarted+48_000};
+  const published=results.filter((r:any)=>r.published).length,unverified=results.length-published;
+  const reasons:string[]=[];
+  if(camera.error)reasons.push("collector_unavailable");
+  if(held.length)reasons.push("records_held");
+  if(deferred||deadlineReached)reasons.push("deadline_reached");
+  if(unverified)reasons.push("observations_unverified");
+  const countReasons=(rows:any[])=>rows.reduce((counts:any,row:any)=>{const key=row.reason||"unverified";counts[key]=(counts[key]||0)+1;return counts;},{});
+  const heartbeat=new Date().toISOString();
+  const coverage={source:"owned_saved_service_ports",complete:reasons.length===0,reason:reasons[0]||null,reasons,
+    counts_known:!camera.error,eligible,held:camera.error?null:held.length,deferred,
+    scanned:camera.error?null:results.length,published:camera.error?null:published,unverified:camera.error?null:unverified,
+    deadline_reached:deadlineReached,held_reasons:countReasons(held),unverified_reasons:countReasons(results.filter((r:any)=>!r.published)),
+    online:camera.error?null:results.filter((r:any)=>r.published&&r.status==="online").length,offline:camera.error?null:results.filter((r:any)=>r.published&&r.status==="offline").length,
+    verifying:camera.error?null:results.filter((r:any)=>r.published&&r.status==="verifying").length,reconciled_at:heartbeat};
 
-  const checkableIds=checkable.map((d:any)=>d.id);
-  const {data:previousHealth,error:previousHealthError}=checkableIds.length
-    ? await db.from("camera_health_current")
-        .select("camera_device_id,overall_status,consecutive_failures,first_failed_at")
-        .in("camera_device_id",checkableIds)
-    : {data:[],error:null};
-  if(previousHealthError)return json({error:previousHealthError.message},500);
-  const previousHealthByDevice=new Map((previousHealth||[]).map((h:any)=>[h.camera_device_id,h]));
-
-  const results=await Promise.all(checkable.map(async(d:any)=>{
-    const profile=String(d.monitoring_profile||"").trim().toLowerCase();
-    const configured=(d.expected_ports||[]).map(Number);
-    const identity=[d.unit_key,d.device_name,d.device_model,d.device_type,d.tech_check_unit_type,profile].join(" ").toLowerCase();
-    const avigilon=profile==="sniper"||identity.includes("avigilon")||identity.includes("sniper")||identity.includes("cam v")||identity.includes("camv");
-    const basePorts=avigilon?SNIPER_PORTS:(VIGILANT_PROFILES.has(profile)?VIGILANT_PORTS:(configured.length?configured:[80,81,443,8080]));
-    const ports=[...new Set(avigilon?[...basePorts,443]:basePorts)];
-    const router=routerByUnit.get(String(d.unit_key||"").trim().toLowerCase());
-    const host=String(d.public_ip||router?.router_public_ip||router?.unit_ip||"").replace("/32","");
-    const ipSource=d.public_ip?"camera":"router";
-    const ps=await probePorts(host,ports);
-    const ok=Object.values(ps).filter((x:any)=>x.online).length;
-    const reachable=ok>0;
-    const providerOnline=String(d.vigilant_status||"").toLowerCase()==="online";
-    const status=VIGILANT_PROFILES.has(profile)?(reachable&&providerOnline?"online":"offline"):(reachable?"online":"offline");
-    const checked=new Date().toISOString();
-
-    const prev=previousHealthByDevice.get(d.id)||null;
-
-    const probeFailed=status!=="online";
-    const vigilantOnline=providerOnline;
-    const shop=String(d.organization||"").trim().toLowerCase()==="root";
-    // Authoritative health: only this sweep's successful live probe can produce ONLINE.
-    const effective=status==="online"?"online":((Number(prev?.consecutive_failures)||0)+1>=3?"offline":"verifying");
-    const failed=probeFailed;
-    const wasFailed=!!prev&&prev.overall_status!=="online";
-    const failures=failed?Math.min((Number(prev?.consecutive_failures)||0)+1,3):0;
-    const confirmed=failed&&failures>=3;
-
-    const patch:any={
-      camera_device_id:d.id,
-      overall_status:effective,
-      ip_reachable:reachable,
-      port_status:ps,
-      checked_at:checked,
-      consecutive_failures:failures,
-      detail:(profile==="sniper"||profile==="camv")
-        ? (reachable?(profile==="camv"?"CAM V responding on an approved Avigilon service port":"Sniper responding on an approved Avigilon service port"):(profile==="camv"?"No approved CAM V / Avigilon service ports responded":"No approved Sniper service ports responded"))
-        : (VIGILANT_PROFILES.has(profile)
-            ? (reachable?"Vigilant / Alibi camera responding on an approved service port":"No approved Vigilant / Alibi service ports responded")
-            : (probeFailed&&vigilantOnline?"Live probe FAILED; Vigilant source reports online but cannot override current probe":"Automatic TCP public-port health sweep")),
-      confirmed_outage:confirmed,
-      confirmation_reason:confirmed?"3+ consecutive failed health checks":null
-    };
-
-    if(failed&&!wasFailed)patch.first_failed_at=checked;
-    if(effective==="online"){
-      patch.first_failed_at=null;
-      if(wasFailed)patch.last_recovered_at=checked;
-      patch.acknowledged_at=null;
-      patch.acknowledged_by=null;
-    }
-
-    // camera_health_current is the freshness source used by the UI, so checked_at
-    // must advance on EVERY real probe, even when the status did not change.
-    // History remains change-only below to avoid noisy event rows.
-    const {error:healthError}=await db.from("camera_health_current").upsert(patch);
-    if(healthError)throw new Error("Health save failed: "+healthError.message);
-
-    // Health checks update health timestamps only. They must never deploy,
-    // reactivate, or otherwise change inventory lifecycle state.
-    const probeHeartbeatDue=reachable&&(!d.last_probe_online_at || (Date.now()-new Date(d.last_probe_online_at).getTime())>=6*60*60*1000);
-    const schedulePatch:any={last_health_checked_at:checked};
-    if(reachable) schedulePatch.last_probe_online_at=checked;
-    const {error:deviceError}=await db.from("camera_devices").update(schedulePatch).eq("id",d.id);
-    if(deviceError)throw new Error("Health timestamp save failed: "+deviceError.message);
-
-    if(!prev||prev.overall_status!==effective){
-      await db.from("camera_health_history").insert({
-        camera_device_id:d.id,
-        status:effective,
-        check_source:"automatic_tcp_sweep",
-        detail:{
-          previous_status:prev?.overall_status||null,
-          monitoring_profile:profile,
-          probe_status:status,
-          vigilant_status:d.vigilant_status,
-          ports:ps,
-          activation_state:d.activation_state,
-          ip_source:ipSource,
-          public_ip_used:host
-        }
-      });
-    }
-
-    return{
-      id:d.id,
-      name:d.device_name,
-      monitoring_profile:profile,
-      status:effective,
-      probe_status:status,
-      vigilant_status:d.vigilant_status,
-      confirmed_outage:confirmed,
-      activated:false,
-      ip_source:ipSource,
-      public_ip_used:host
-    };
-  }));
-
-  // Record the monitor heartbeat only after this sweep reaches successful completion.
-  // This is monitor health metadata; it does not alter camera inventory or lifecycle state.
-  if(results.length){
-    const heartbeat=new Date().toISOString();
-    await db.from("camera_integrations").update({
-      last_sync_at:heartbeat,
-      last_sync_status:"ok",
-      last_error:null,
-      metadata:{source:"saved_field_direct_ports",scanned:results.length,online:results.filter((x:any)=>x.status==="online").length,offline:results.filter((x:any)=>x.status==="offline").length,verifying:results.filter((x:any)=>x.status==="verifying").length,reconciled_at:heartbeat}
-    }).eq("provider","avigilon");
+  // Persist incomplete coverage too, including zero-publication runs. This is
+  // monitor metadata only; no camera result or outage is created by this write.
+  let coverageRecorded=false;
+  if(Date.now()<requestStarted+50_000){
+    try{
+      const saved:any=await boundedRequest(signal=>db.from("camera_integrations").update({
+        last_sync_at:heartbeat,last_sync_status:coverage.complete?"ok":"partial",
+        last_error:coverage.complete?null:"Direct service sweep coverage is incomplete: "+reasons.join(", "),metadata:coverage
+      }).eq("provider","avigilon").select("provider").abortSignal(signal),requestStarted+52_000);
+      coverageRecorded=!saved.error&&saved.data?.length===1;
+    }catch{}
   }
+  if(camera.error||!coverageRecorded)return json({error:camera.error||"Sweep coverage could not be recorded",coverage,coverage_recorded:coverageRecorded,routers_checked:routerResults.length,router_results:routerResults},503);
 
   return json({
     checked:results.length,
+    eligible,held:held.length,deferred,deadline_reached:deadlineReached,
+    evidence:"service_port_only",
+    coverage,coverage_recorded:coverageRecorded,
     results,
     routers_checked:routerResults.length,
     router_results:routerResults
