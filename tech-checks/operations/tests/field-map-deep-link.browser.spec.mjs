@@ -263,3 +263,13 @@ test('failed map refresh retains last good units and labels stale map data',asyn
  state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();
  await expect(frame.locator('.field-map-error')).toHaveCount(0);
 });
+
+test('hardware-suffixed field pin shows its number and unit cards keep dark high-contrast surfaces',async({page})=>{
+ const units=[{...defaultUnits[0],unitNumber:'Spotter211HDC2S'},defaultUnits[1]];
+ const {frame}=await mount(page,'Spotter211HDC2S',units);
+ await expect(frame.locator('.cos-pin-unit-number')).toHaveText('211');
+ const card=frame.locator('.field-map-list>button').first();
+ await expect(card).toHaveCSS('background-color','rgb(32, 52, 86)');
+ await expect(card.locator('strong')).toHaveCSS('color','rgb(243, 246, 251)');
+ await expect(card.locator('small').first()).toHaveCSS('color','rgb(192, 206, 224)');
+});

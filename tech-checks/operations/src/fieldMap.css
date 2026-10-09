@@ -64,3 +64,9 @@
 .cos-field-cluster-expanded .cos-cluster-support{display:none}
 
 @media(max-width:700px){.field-map-tv .cos-field-pin{scale:1}}
+
+/* Unit cards are records, not primary action buttons. Keep their text readable. */
+#root .operations-shell .field-map-workspace .field-map-list>button{background:#111b2a!important;color:#f3f6fb!important;border-color:#34445b!important;text-align:left}
+#root .operations-shell .field-map-workspace .field-map-list>button:hover,#root .operations-shell .field-map-workspace .field-map-list>button.selected{background:#203456!important;border-color:#91b0ff!important}
+#root .operations-shell .field-map-workspace .field-map-list>button small{color:#c0cee0}
+#root .operations-shell .field-map-workspace .field-map-list>button strong{color:#f3f6fb!important}

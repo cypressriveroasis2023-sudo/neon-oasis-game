@@ -77,3 +77,8 @@ test('ordinary Stand assets are blue zero-camera support without matching camera
  for(const unitNumber of ['001','STREET 001','ST 001 camera','ST 001 / 002','Standalone camera 001','Spotter 001','Solar Spotter 001','SS Hybrid 001','Ranger 001','Helios 001','Sniper 001','CAM V 001','Recon 001','Recon II 001','Wall-E 001'])assert.equal(isSupportEquipment({id:unitNumber,unitNumber}),false,unitNumber);
  for(const modelName of ['Standalone camera','Solar Spotter','Spotter','SS Hybrid','RANGER','Helios','Sniper','CAMV & RSU','Recon','Wall-E'])assert.equal(isSupportEquipment({id:modelName,unitNumber:'001',modelName}),false,modelName);
 });
+
+test('display numbers preserve leading zeros and decimals on known hardware-suffixed labels',()=>{
+ for(const [label,number] of [['Spotter211HDC2S','211'],['SolarSpotter023.1HDC4','023.1'],['SPOTTER 007HD4','007'],['Ranger001','001'],['CAMV008','008'],['Spotter205HD','205'],['Spotter260HD','260'],['SS Hybrid252HD4','252'],['SS Hybrid253HDC4','253'],['SS Hybrid298HDC2S','298'],['SNIPER 233','233'],['SNIPER 245','245'],['SNIPER 401','401'],['SNIPER233','233'],['SNIPER 2 033','033'],['SNIPER 4 103','103']]){assert.equal(mapUnitIdentifier(label),number);assert.ok(mapReticleMarkup(label,'online').includes('>'+number+'</b>'));}
+ for(const label of ['Spotter1234567HDC2','Spotter 123HDC2<script>','Spotter 123NOTREAL'])assert.equal(mapUnitIdentifier(label),'');
+});
