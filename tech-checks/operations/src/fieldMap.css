@@ -64,6 +64,8 @@
 .cos-field-cluster-expanded .cos-cluster-support{display:none}
 
 @media(max-width:700px){.field-map-tv .cos-field-pin{scale:1}}
+/* Keep recorded-source provenance visible below the selected unit's name tooltip. */
+.cos-field-pin-recorded>.cos-pin-location-tag{top:44px;left:auto;right:calc(50% + 16px);transform:none}
 
 /* Unit cards are records, not primary action buttons. Keep their text readable. */
 #root .operations-shell .field-map-workspace .field-map-list>button{background:#111b2a!important;color:#f3f6fb!important;border-color:#34445b!important;text-align:left}

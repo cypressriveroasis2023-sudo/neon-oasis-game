@@ -49,7 +49,7 @@ export default function EquipmentWorkspace({show}:{show:(message:string)=>void})
       </div></fieldset>
     </section>}
     {data&&<div className='records'>{filtered.length?filtered.map(unit=><div className='record op-record' key={unit.id}>
-      <div><strong>{unit.modelName} · {unit.unitNumber}</strong><small>{[unit.serialNumber&&'Serial '+unit.serialNumber,unit.status,unit.currentLocationType,unit.activeJobNumber&&'Job '+unit.activeJobNumber,unit.installedSite,unit.customer].filter(Boolean).join(' · ')}</small></div>
+      <div><strong>{unit.modelName} · {unit.unitNumber}</strong><small>{[unit.serialNumber&&'Serial '+unit.serialNumber,unit.status,unit.currentLocationType,unit.activeJobNumber&&'Job '+unit.activeJobNumber,unit.installedSite,unit.customer].filter(Boolean).join(' · ')}</small>{unit.representationStatus==='conflict'&&<small role='status'>Association needs review · {unit.representationReason}</small>}</div>
       <div className='row-actions'><em>{String(unit.status||'').replaceAll('_',' ')}</em><button className='secondary' disabled={busy||uncertain} onClick={()=>edit(unit)}>Edit</button></div>
     </div>):<div className='loading'>No equipment units match this view.</div>}</div>}
   </section>;

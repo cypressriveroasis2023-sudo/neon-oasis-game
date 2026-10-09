@@ -2,7 +2,7 @@ import { openWorkspace } from './navigation-helper.mjs';
 import {test,expect} from '@playwright/test';
 
 // Isolated browser fixtures only; all external requests are blocked.
-const origin='http://127.0.0.1:4173';
+const origin=process.env.COS_BROWSER_TEST_ORIGIN||'http://127.0.0.1:4173';
 const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const customerId='11111111-1111-4111-8111-111111111111';
 const siteId='22222222-2222-4222-8222-222222222222';
@@ -175,4 +175,11 @@ test('Team shows only actual roster, exact assignment and readiness without prov
   expect(state.writes).toHaveLength(0);
   await expect(workspace.getByRole('button',{name:/PROVISION|REPAIR/})).toHaveCount(0);
   await noOverflow(page);
+});
+
+test('Archive association conflicts are visible without changing editable native fields',async({page},testInfo)=>{
+ const{state,frame}=await setup(page);state.units[0].representationStatus='conflict';state.units[0].representationReason='The archived and retained records have conflicting identity evidence. Review their association.';
+ const workspace=await open(frame,'Equipment');await expect(workspace.getByRole('status')).toContainText('Association needs review');
+ await workspace.getByRole('button',{name:'Edit',exact:true}).click();await expect(workspace.getByLabel('Location Type',{exact:true})).toHaveValue('shop');await expect(workspace.getByLabel('Status',{exact:true})).toHaveValue('available');
+ await workspace.getByRole('button',{name:'Cancel',exact:true}).click();expect(state.writes).toHaveLength(0);await noOverflow(page);await page.screenshot({path:testInfo.outputPath('archive-association-conflict.png'),fullPage:true});
 });
