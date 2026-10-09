@@ -70,7 +70,7 @@ export async function archiveReconPayload(db: any, payload: unknown): Promise<an
     const marker = {version: 1, bucket: ARCHIVE_BUCKET, path, sha256, jsonBytes: bytes.byteLength, storedBytes: blob.size, archivedFields: ['binary']};
     const restored = await restoreReconPayload(db, marker);
     if (JSON.stringify(restored) !== JSON.stringify(payload)) return payload;
-    const compact = {...payload, [MARKER]: marker}; delete compact.binary;
+    const compact: Row = {...payload, [MARKER]: marker}; delete compact.binary;
     return compact;
   } catch { return payload; }
 }

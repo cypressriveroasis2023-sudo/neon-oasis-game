@@ -37,7 +37,7 @@ test('maintenance accepts only bounded IDs and retains a source whose compare-an
  const f=storageFixture(),p=payload();let writes=0;
  const db={...f.db,rpc:async(name,args)=>{if(name==='verify_camera_health_cron_secret')return{data:true,error:null};assert.equal(name,'cos_archive_camera_event_v1');assert.deepEqual(args.p_expected,p);assert(!args.p_archived.binary);writes++;return{data:false,error:null}},from(name){assert.equal(name,'camera_integration_events');const q={select(){return q},eq(k,v){assert.equal(k,'provider');assert.equal(v,'reconeyez');return q},in(){return q},limit:async()=>({data:[{id:1,payload:p}],error:null})};return q}};
  const handler=createEventArchiveHandler({url:'https://synthetic.invalid',serviceKey:'synthetic',createClient:()=>db});
- for(const ids of [['1','1'],['0'],['9223372036854775808'],Array.from({length:101},(_,i)=>String(i+1))])assert.equal((await handler(new Request('https://synthetic.invalid',{method:'POST',body:JSON.stringify({ids})}))).status,400);
+ for(const ids of [['1','1'],['0'],['9223372036854775808'],Array.from({length:26},(_,i)=>String(i+1))])assert.equal((await handler(new Request('https://synthetic.invalid',{method:'POST',body:JSON.stringify({ids})}))).status,400);
  assert.equal((await handler(new Request('https://synthetic.invalid',{method:'POST',body:JSON.stringify({ids:['1'],url:'https://attacker.invalid'})}))).status,400);
  const result=await handler(new Request('https://synthetic.invalid',{method:'POST',body:JSON.stringify({ids:['1']})}));assert.deepEqual(await result.json(),{ok:false,requested:1,found:1,archived:0,unchanged:0,deferred:0,failed:1});assert.equal(writes,1);assert(p.binary);
 });

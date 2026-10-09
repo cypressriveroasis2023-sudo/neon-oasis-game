@@ -6,15 +6,15 @@ export function createEventArchiveHandler(deps: Dependencies) {
     if (req.method !== 'POST') return reply({error: 'POST required'}, 405);
     const now = deps.now || Date.now, started = now();
     const db = deps.createClient(deps.url, deps.serviceKey, {global: {fetch: (input: any, init: any = {}) => fetch(input, {...init, signal: AbortSignal.any([
-      ...(init.signal ? [init.signal] : []), AbortSignal.timeout(Math.max(1, Math.min(8000, started + 48_000 - now())))
+      ...(init.signal ? [init.signal] : []), AbortSignal.timeout(Math.max(1, Math.min(15000, started + 48_000 - now())))
     ])})}});
     const {data: valid, error: authError} = await db.rpc('verify_camera_health_cron_secret', {candidate: req.headers.get('x-camera-cron-secret')});
     if (authError || valid !== true) return reply({error: 'Forbidden'}, 403);
     const body = await req.json().catch(() => null);
-    if (!body || Object.keys(body).some(k => k !== 'ids') || !Array.isArray(body.ids) || body.ids.length < 1 || body.ids.length > 100
+    if (!body || Object.keys(body).some(k => k !== 'ids') || !Array.isArray(body.ids) || body.ids.length < 1 || body.ids.length > 25
       || body.ids.some((id: unknown) => typeof id !== 'string' || !/^[1-9][0-9]{0,18}$/.test(id) || BigInt(id) > 9223372036854775807n)
-      || new Set(body.ids).size !== body.ids.length) return reply({error: 'Provide 1–100 unique event IDs.'}, 400);
-    const {data: rows, error} = await db.from('camera_integration_events').select('id,payload').eq('provider', 'reconeyez').in('id', body.ids).limit(100);
+      || new Set(body.ids).size !== body.ids.length) return reply({error: 'Provide 1–25 unique event IDs.'}, 400);
+    const {data: rows, error} = await db.from('camera_integration_events').select('id,payload').eq('provider', 'reconeyez').in('id', body.ids).limit(25);
     if (error || !Array.isArray(rows)) return reply({error: 'Event archive source is unavailable.'}, 503);
     let cursor = 0, archived = 0, unchanged = 0, deferred = 0, failed = 0;
     const worker = async () => {
@@ -30,7 +30,7 @@ export function createEventArchiveHandler(deps: Dependencies) {
         } catch { failed++; }
       }
     };
-    await Promise.all([worker(), worker()]);
+    await Promise.all([worker(), worker(), worker(), worker()]);
     return reply({ok: failed === 0, requested: body.ids.length, found: rows.length, archived, unchanged, deferred, failed});
   };
 }
