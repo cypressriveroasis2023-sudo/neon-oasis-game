@@ -75,7 +75,8 @@ test('Camera Health remains useful before and after the independent field read f
  await expect(health.getByRole('button',{name:/Provider systems online/})).toContainText('2');
  await expect(health.getByText('Loading Camera Health…')).toHaveCount(0);
  state.fail=true;state.release();
- await expect(health.getByRole('alert')).toContainText('Field locations unavailable: Synthetic field read unavailable. Saved Camera Health observations load separately.');
+ await expect(health.getByRole('alert')).toContainText('Field locations unavailable: Synthetic field read unavailable');
+ await expect(health.getByRole('alert')).toContainText('Saved Camera Health observations load separately.');
  await expect(health.getByRole('button',{name:/Provider systems online/})).toContainText('2');
  state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();
  await expect(health.getByText(/Field locations unavailable/)).toHaveCount(0);
