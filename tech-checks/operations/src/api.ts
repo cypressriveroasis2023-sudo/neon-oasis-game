@@ -13,7 +13,7 @@ type ParentSession = { token: string; role: string };
 // is not enough: new routes can perform work or have independent-read semantics.
 const sharedReadPaths = new Set([
   '/api/jobs', '/api/quotes', '/api/ar', '/api/purchasing', '/api/owner-tasks',
-  '/api/field-map', '/api/routers', '/api/camera-health/summary-v3',
+  '/api/field-map', '/api/routers', '/api/camera-health/summary-v3', '/api/vrm-portal', '/api/vrm-fleet',
 ]);
 const pendingReads = new Map<string, Promise<ApiResponse>>();
 let tokenRequest: Promise<ParentSession> | null = null;

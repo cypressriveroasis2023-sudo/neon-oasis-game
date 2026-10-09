@@ -334,3 +334,24 @@ for (const saveFails of [false, true]) {
     assert.equal((await afterAgain).data.stage, 'after');
   });
 }
+
+test('dynamic Victron snapshots share pending reads but explicit fleet discovery never does', async () => {
+ const f=fixture();
+ const cached=[f.api.get('/api/vrm-fleet'),f.api.get('/api/vrm-fleet')];
+ await flush();assert.equal(f.requests.length,1);
+ const discovery=[f.api.get('/api/vrm-fleet/refresh'),f.api.get('/api/vrm-fleet/refresh')];
+ await flush();
+ assert.deepEqual(f.requests.map(request=>request.envelope.path),['/api/vrm-fleet','/api/vrm-fleet/refresh','/api/vrm-fleet/refresh']);
+ f.requests.forEach((_,index)=>f.answer(index,{synthetic:index}));
+ assert.deepEqual((await Promise.all([...cached,...discovery])).map(result=>result.data.synthetic),[0,0,1,2]);
+ const later=f.api.get('/api/vrm-fleet');await flush();assert.equal(f.requests.length,4);f.answer(3);await later;
+});
+
+
+test('legacy Victron snapshots retain separate same-session deduplication', async () => {
+ const f=fixture();
+ const reads=[f.api.get('/api/vrm-portal'),f.api.get('/api/vrm-portal'),f.api.get('/api/vrm-fleet')];
+ await flush();assert.deepEqual(f.requests.map(request=>request.envelope.path),['/api/vrm-portal','/api/vrm-fleet']);
+ f.answer(0,{source:'legacy'});f.answer(1,{source:'dynamic'});
+ assert.deepEqual((await Promise.all(reads)).map(result=>result.data.source),['legacy','legacy','dynamic']);
+});

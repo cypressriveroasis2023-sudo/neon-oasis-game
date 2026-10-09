@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
 import { resource, snapshot, now } from './fixtures/camera-evidence-fixtures.mjs';
 
-const origin = 'http://127.0.0.1:4173';
+const origin = process.env.COS_VRM_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const paths = {
-  camera: '/api/camera-health/summary-v3', routers: '/api/routers', power: '/api/vrm-portal',
+  camera: '/api/camera-health/summary-v3', routers: '/api/routers', power: '/api/vrm-fleet',
   equipment: '/api/equipment', field: '/api/field-map', team: '/api/team-production',
   jobs: '/api/jobs', quotes: '/api/quotes', invoices: '/api/ar', purchasing: '/api/purchasing', tasks: '/api/owner-tasks',
 };

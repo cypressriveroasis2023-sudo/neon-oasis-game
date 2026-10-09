@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { primaryAreas, visionAreas, onHandInventory } from './visionAreas';
 import { cameraDashboardSummary } from './cameraDashboardSummary';
+import { getVrmFleet } from './vrmFleetApi';
 import './visionAreas.css';
 
 type Api = { get(path: string): Promise<{ data: any }> };
@@ -26,7 +27,7 @@ const records = (data: any) => {
 };
 const sources: Record<string, string> = {
   'Camera Health': '/api/camera-health/summary-v3', 'InHand Routers': '/api/routers',
-  'Victron VRM': '/api/vrm-portal', 'Units On Hand': '/api/equipment',
+  'Victron VRM': '/api/vrm-fleet', 'Units On Hand': '/api/equipment',
   'Field Map': '/api/field-map', Team: '/api/team-production',
 };
 function summary(workspace: string, data: any,now=Date.now()): string {
@@ -62,7 +63,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
     setHealthNow(Date.now());
     await Promise.all(visionAreas.map(async area => {
       let value: unknown = null;
-      try { const data=(await api.get(sources[area.workspace])).data;summary(area.workspace,data);value=data; }
+      try { const data=(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
       catch { /* Keep this card unavailable without hiding other settled sources. */ }
       if (request !== revision.current) return;
       setValues(previous => request === revision.current ? { ...previous, [area.workspace]: value } : previous);

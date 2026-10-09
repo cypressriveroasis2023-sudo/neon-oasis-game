@@ -22,6 +22,7 @@ import {projectReconProviderIdentities,appendReconProviderIdentities} from './re
 import { routerSnapshot } from './routers.ts';
 import { createInhandPilotReader, InhandPilotError, readPilotClaimBoolean } from './inhandPilot.ts';
 import { vrmPortalConfig } from './vrm.ts';
+import { createVrmFleetReader } from './vrmDiscovery.ts';
 import { createPrivateEvidenceReader, PrivateEvidenceError } from './privateEvidence.ts';
 // COS Operations bridge: existing GitHub Tech Check identity -> same-person production Owner or scoped technician access.
 // No browser-supplied actor, organization, table, RPC name, service key, or identity provisioning.
@@ -165,6 +166,7 @@ export function createOperationsHandler(options) {
   const rpc = (name, payload) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload),
   }, 'COS workflow could not be completed. Please retry.');
+  const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const mhelpPartner = createMhelpPartnerHandler({
     fetch: requestFetch,
@@ -519,8 +521,13 @@ export function createOperationsHandler(options) {
           }
           return json({ customerId, items: rows.map(row => ({ id: row.id, customerId, name: row.name || '', email: row.email || '', phone: row.phone || '', title: row.title || '', isPrimary: row.is_primary === true, billingContact: row.billing_contact === true })) });
         }
+        // Keep the legacy nine-record response for already-open/cached clients.
         if (path === '/api/vrm-portal') {
-          try { return json(vrmPortalConfig(options.vrmEmbeds)); }
+          try { return json({ items: vrmPortalConfig(options.vrmEmbeds).items }); }
+          catch { fail('VRM dashboard configuration is unavailable.', 503); }
+        }
+        if (path === '/api/vrm-fleet' || path === '/api/vrm-fleet/refresh') {
+          try { return json(readVrmFleet ? await readVrmFleet(path.endsWith('/refresh')) : vrmPortalConfig(options.vrmEmbeds)); }
           catch { fail('VRM dashboard configuration is unavailable.', 503); }
         }
         const snapshots = {
@@ -896,6 +903,7 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     platformUrl: Deno.env.get('SUPABASE_URL'),
     serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
     vrmEmbeds: Deno.env.get('COS_VRM_EMBEDS'),
+    vrm: { getAccessToken: () => Deno.env.get('COS_VRM_ACCESS_TOKEN') },
     inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
     mhelpPartner: { getConfig:mhelpTokens.getPartnerConfig,renewAccess:mhelpTokens.renewAccess },
   }));

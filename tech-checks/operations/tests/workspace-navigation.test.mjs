@@ -49,3 +49,10 @@ test('map, unit health and ticket routes retain a validated stable unit identifi
 });
 
 test('legacy camera field links preserve full unit labels without treating numbers as IDs',()=>{const route=readWorkspaceRoute('#field-map?unitLabel=SNIPER%20312');assert.equal(route.unitLabel,'SNIPER 312');assert.equal(workspaceHash(route),'#field-map?unitLabel=SNIPER+312');assert.equal(readWorkspaceRoute('#camera-health?unitLabel=312').unitLabel,undefined);});
+
+test('Victron bookmarks preserve only positive safe installation IDs',()=>{
+ const route={workspace:'Victron VRM',jobId:'',detail:false,installationId:2048123};
+ assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
+ assert.deepEqual(readWorkspaceRoute('#victron-power?installationId=2048123'),route);
+ for(const hash of ['#victron-vrm?installationId=0','#victron-vrm?installationId=-2','#victron-vrm?installationId=1.5','#victron-vrm?installationId=9007199254740993','#victron-vrm?installationId=HELIOS001','#victron-vrm?job=42&installationId=123','#today?installationId=123'])assert.equal(readWorkspaceRoute(hash).installationId,undefined);
+});
