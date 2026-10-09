@@ -7,5 +7,4 @@ Deno.serve(createCameraMhelpReadinessHandler({
     const db=createClient(LEGACY,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{global:{fetch:(input,init={})=>fetch(input,{...init,signal:AbortSignal.timeout(10000)})}});
     const {data,error}=await db.rpc('verify_camera_health_cron_secret',{candidate});return !error && data===true;
   },
-  readKey:()=>Deno.env.get('COS_GEOCODE_SOURCE_READ_KEY'),fetch,
 }));

@@ -1,8 +1,8 @@
-import {createMhelpReadinessHandler,validReadKey} from './index.ts';
+import {createMhelpReadinessHandler} from './index.ts';
 import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts';
 const NATIVE = 'https://tughscoxralhofrckvxy.supabase.co';
 const ORGANIZATION = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
-// Reuse the existing server-to-server source-read credential. No user grant or new credential.
+// Existing camera-cron authorization is verified by its original project; no credential is copied or created.
 const partner = createMhelpPartnerHandler({fetch,getConfig:()=>({accessToken:Deno.env.get('COS_MHELP_ACCESS_TOKEN'),portalId:Deno.env.get('COS_MHELP_PORTAL_ID')}),readNativeUnits:async()=>{
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (Deno.env.get('SUPABASE_URL') !== NATIVE || !service) throw Error('Backend unavailable');
@@ -17,4 +17,12 @@ const partner = createMhelpPartnerHandler({fetch,getConfig:()=>({accessToken:Den
   }
   throw Error('Backend unavailable');
 }});
-Deno.serve(createMhelpReadinessHandler({authenticate:req=>Deno.env.get('SUPABASE_URL')===NATIVE && validReadKey(Deno.env.get('COS_GEOCODE_SOURCE_READ_KEY'),req.headers.get('x-cos-mhelp-read-key')),partner}));
+Deno.serve(createMhelpReadinessHandler({authenticate:async req=>{
+  if (Deno.env.get('SUPABASE_URL')!==NATIVE) return false;
+  const candidate=req.headers.get('x-camera-cron-secret');
+  if (!candidate || candidate.length>1024 || /\s/.test(candidate)) return false;
+  const response=await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'authenticate'}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});
+  if (!response.ok) return false;
+  const raw=await response.text(); if (raw.length>128) return false;
+  const v=JSON.parse(raw); return v && typeof v==='object' && Object.keys(v).length===1 && v.authenticated===true;
+},partner}));

@@ -1,12 +1,6 @@
 import {MhelpPartnerError, MHELP_PARTNER_CONTRACT} from '../cos-operations-pages/mhelpPartner.ts';
 type Row = Record<string, any>;
 export const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type':'application/json', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'}});
-export function validReadKey(expected: unknown, supplied: unknown): boolean {
-  if (typeof expected !== 'string' || typeof supplied !== 'string' || !/^[a-fA-F0-9]{64}$/.test(expected) || !/^[a-fA-F0-9]{64}$/.test(supplied)) return false;
-  let difference = 0;
-  for (let i = 0; i < 64; i++) difference |= expected.toLowerCase().charCodeAt(i) ^ supplied.toLowerCase().charCodeAt(i);
-  return difference === 0;
-}
 export async function readAction(req: Request): Promise<'status'|'preview'> {
   if (req.method !== 'POST' || new URL(req.url).search || !/^application\/json(?:;|$)/i.test(req.headers.get('Content-Type') || '')) throw Error('Invalid request');
   const reader = req.body?.getReader(); if (!reader) throw Error('Invalid request');
@@ -31,9 +25,10 @@ export function projectReadiness(v: Row): Row {
   }
   return result;
 }
-export function createMhelpReadinessHandler(options: {authenticate:(req:Request)=>boolean; partner:(path:string,method:string,body:unknown)=>Promise<Row>}) {
+export function createMhelpReadinessHandler(options: {authenticate:(req:Request)=>Promise<boolean>|boolean; partner:(path:string,method:string,body:unknown)=>Promise<Row>}) {
   return async (req: Request) => {
-    if (!options.authenticate(req)) return reply({error:'Forbidden'},403);
+    try { if (!await options.authenticate(req)) return reply({error:'Forbidden'},403); }
+    catch { return reply({error:'Forbidden'},403); }
     let action: 'status'|'preview'; try { action = await readAction(req); } catch { return reply({error:'Invalid readiness request'},400); }
     try { return reply(projectReadiness(await options.partner('/api/mhelpdesk/partner/'+action, action === 'status' ? 'GET':'POST',{}))); }
     catch (e) { return reply({error:e instanceof MhelpPartnerError ? e.message:'mHelpDesk readiness is unavailable'},e instanceof MhelpPartnerError ? e.status:503); }

@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createMhelpReadinessHandler,projectReadiness,validReadKey} from '../../supabase/functions/cos-mhelp-readiness/index.ts';
+import {createMhelpReadinessHandler,projectReadiness} from '../../supabase/functions/cos-mhelp-readiness/index.ts';
 import {createCameraMhelpReadinessHandler} from '../../supabase/functions/camera-mhelp-readiness/index.ts';
 import {MhelpPartnerError} from '../../supabase/functions/cos-operations-pages/mhelpPartner.ts';
 const key='ab'.repeat(32),contract='cos-mhelpdesk-partner-review-v1';
 const request=(body={action:'status'})=>new Request('https://synthetic.invalid/check',{method:'POST',headers:{'Content-Type':'application/json','x-cos-mhelp-read-key':key,'x-camera-cron-secret':'synthetic-only'},body:JSON.stringify(body)});
 const status={contract,state:'ready_to_test',tokenConfigured:true,portalConfigured:false,liveAccessVerified:false,automaticSync:false};
-test('native readiness uses the existing fixed server key and rejects unauthenticated requests before configuration reads',async()=>{
- assert(validReadKey(key,key));assert(validReadKey(key,key.toUpperCase()));for(const other of ['',key.slice(1),'cd'.repeat(32)])assert(!validReadKey(key,other));
+test('native readiness requires existing server authentication before configuration reads',async()=>{
  let called=false;const h=createMhelpReadinessHandler({authenticate:()=>false,partner:async()=>{called=true;throw Error('must not read')}});
  assert.equal((await h(request())).status,403);assert.equal(called,false);
 });
@@ -27,14 +26,13 @@ test('native failures never echo unknown errors or credentials',async()=>{
  const denied=createMhelpReadinessHandler({authenticate:()=>true,partner:async()=>{throw new MhelpPartnerError('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.')}});
  assert.equal((await denied(request({action:'preview'}))).status,503);
 });
-test('legacy bridge validates the existing camera cron credential before reading its existing source-read key',async()=>{
- let keyRead=false;const h=createCameraMhelpReadinessHandler({verifyCron:async()=>false,readKey:()=>{keyRead=true;return key},fetch:async()=>{throw Error('must not fetch')}});
- assert.equal((await h(request())).status,403);assert.equal(keyRead,false);
+test('credential introspection validates the existing camera cron before answering',async()=>{
+ let calls=0;const h=createCameraMhelpReadinessHandler({verifyCron:async candidate=>{calls++;assert.equal(candidate,'synthetic-only');return false}});
+ assert.equal((await h(request({action:'authenticate'}))).status,403);assert.equal(calls,1);
 });
-test('legacy bridge makes one fixed native request and refuses oversized or credential-bearing replies',async()=>{
- const calls=[];const h=createCameraMhelpReadinessHandler({verifyCron:async()=>true,readKey:()=>key,fetch:async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify(status),{headers:{'Content-Type':'application/json'}})}});
- assert.deepEqual(await (await h(request())).json(),status);assert.equal(calls.length,1);assert.equal(calls[0].url,'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-mhelp-readiness');assert.equal(calls[0].init.redirect,'error');assert.equal(calls[0].init.headers['x-cos-mhelp-read-key'],key);assert(!Object.hasOwn(calls[0].init.headers,'x-camera-cron-secret'));
- for(const text of ['x'.repeat(16385),JSON.stringify({...status,private:key}),JSON.stringify({...status,private:'synthetic-secret'})]){
-  const failed=createCameraMhelpReadinessHandler({verifyCron:async()=>true,readKey:()=>key,fetch:async()=>new Response(text)});assert.equal((await failed(request())).status,503);
- }
+test('credential introspection returns one boolean and rejects alternate actions or caller fields',async()=>{
+ const h=createCameraMhelpReadinessHandler({verifyCron:async()=>true});
+ assert.deepEqual(await (await h(request({action:'authenticate'}))).json(),{authenticated:true});
+ for(const b of [{action:'status'},{action:'preview'},{action:'authenticate',actor:'owner'},[],{action:'authenticate',key:'x'.repeat(500)}])assert.equal((await h(request(b))).status,400);
+ const failed=createCameraMhelpReadinessHandler({verifyCron:async()=>{throw Error('synthetic-private-key')}});const r=await failed(request({action:'authenticate'}));assert.equal(r.status,403);assert(!(await r.text()).includes('synthetic-private'));
 });
