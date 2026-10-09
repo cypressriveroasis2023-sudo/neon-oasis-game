@@ -4,6 +4,7 @@ on:
     branches: [cos-operations-pages, main]
     paths:
       - 'tech-checks/operations/**'
+      - 'tech-checks/sw.js'
       - 'tech-checks/operations-host.*'
       - 'tech-checks/vision-platform.css'
       - 'tech-checks/vision-workspace.js'
@@ -32,6 +33,7 @@ on:
   pull_request:
     paths:
       - 'tech-checks/operations/**'
+      - 'tech-checks/sw.js'
       - 'tech-checks/operations-host.*'
       - 'tech-checks/vision-platform.css'
       - 'tech-checks/vision-workspace.js'

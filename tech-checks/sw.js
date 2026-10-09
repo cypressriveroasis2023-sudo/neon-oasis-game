@@ -1,6 +1,53 @@
 const CACHE_NAME = 'tech-check-service-direct-20260928g';
-const APP_SHELL = './';
-const VISION_SHELL = './onsite-vision.html';
+// The same worker is published at the GitHub subpath and Cloudflare root.
+const APP_SHELL = new URL('./', self.registration.scope).href;
+const VISION_SHELL = new URL('onsite-vision.html', APP_SHELL).href;
+
+function unavailableNavigation() {
+  // A failed page request is not evidence about camera or unit connectivity.
+  // A fixed, CSP-hashed handler reloads this exact document, including iframe
+  // fragments, without automatic requests, session changes or workflow writes.
+  return new Response(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cameras Onsite · Workspace unavailable</title>
+<style>html{color-scheme:dark}body{margin:0;background:#0d1215;color:#fff;font:16px/1.5 system-ui,sans-serif;min-height:100vh;display:grid;place-items:center}main{box-sizing:border-box;width:min(100%,36rem);padding:2rem}h1{font-size:1.6rem;line-height:1.2}p{color:#ccc}button{display:inline-block;background:#fff;color:#0d1215;padding:.8rem 1.2rem;border:0;border-radius:.6rem;font:inherit;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid #fff;outline-offset:4px}</style>
+</head><body><main><p>CAMERAS ONSITE</p><h1>Workspace couldn't load</h1>
+<p>This browser couldn't reach the workspace page, and no saved page is available. Check your connection, then try again.</p>
+<p>This page load does not tell us whether any camera or unit is online.</p>
+<button type="button" id="retry">Try again</button><noscript><p>Reload this page to try again.</p></noscript></main>
+<script>document.getElementById('retry').addEventListener('click',()=>location.reload());</script></body></html>`, {
+    status: 503,
+    statusText: 'Workspace Unavailable',
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'; script-src 'sha256-A9CX4QlSqyB1GVk9l09AGanndVz8GvBqUl8tV8ex7UQ='; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+    },
+  });
+}
+
+async function cachedNavigation(request, url) {
+  try {
+    // Never take a page from an unrelated app's cache on this origin.
+    const cache = await caches.open(CACHE_NAME);
+    const cachedPage = await cache.match(request, { ignoreSearch: true });
+    if (cachedPage?.ok) return cachedPage;
+    const rootPath = new URL(APP_SHELL).pathname;
+    const isRoot = url.pathname === rootPath ||
+      url.pathname === rootPath.replace(/\/$/, '') ||
+      url.pathname === `${rootPath}index.html`;
+    if (url.pathname === new URL(VISION_SHELL).pathname) {
+      const cachedVision = await cache.match(VISION_SHELL, { ignoreSearch: true });
+      return cachedVision?.ok ? cachedVision : null;
+    }
+    if (isRoot) {
+      const cachedRoot = await cache.match(APP_SHELL, { ignoreSearch: true });
+      return cachedRoot?.ok ? cachedRoot : null;
+    }
+    // An Operations iframe must never receive the host/auth shell as its page.
+  } catch {}
+  return null;
+}
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -42,30 +89,22 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      const isVision = url.pathname.endsWith('/onsite-vision.html');
-      const isRoot = /\/tech-checks\/?$/.test(url.pathname);
-      const cachedPage = await caches.match(request, { ignoreSearch: true });
+      let response;
       try {
         const freshRequest = new Request(request, { cache:'reload' });
-        const response = await fetch(freshRequest);
-        if (response?.ok) {
-          const cache=await caches.open(CACHE_NAME);
-          cache.put(request,response.clone()).catch(() => {});
-          return response;
-        }
-      } catch {}
-      if (cachedPage) return cachedPage;
-      if (isVision) {
-        const cachedVision = await caches.match(VISION_SHELL, { ignoreSearch:true });
-        if (cachedVision) return cachedVision;
-        return fetch(VISION_SHELL, { cache:'reload' });
+        response = await fetch(freshRequest);
+      } catch {
+        return await cachedNavigation(request, url) || unavailableNavigation();
       }
-      if (isRoot) {
-        const cachedRoot = await caches.match(APP_SHELL, { ignoreSearch:true });
-        if (cachedRoot) return cachedRoot;
-        return fetch(APP_SHELL, { cache:'reload' });
+      // Preserve actual HTTP errors, redirects and authentication responses.
+      // A cache failure must not turn a successful network request into Offline.
+      if (response.ok) {
+        const cachedResponse = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME)
+          .then(cache => cache.put(request, cachedResponse))
+          .catch(() => {}));
       }
-      return new Response('Offline', { status:503, statusText:'Offline' });
+      return response;
     })());
     return;
   }
