@@ -9,6 +9,7 @@ async function mount(page,role='it',linked=true,options={}){
  await page.route('**/*',async route=>{
   const url=route.request().url();
   if(new URL(url).origin===origin&&new URL(url).pathname==='/fleet-fixture')return route.fulfill({contentType:'text/html',body:itHomeFixture(role,linked,options)});
+  if(url===origin+'/it-mhelp-projection.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../it-mhelp-projection.js',import.meta.url),'utf8')});
   if(url===origin+'/field-map-display-host.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../field-map-display-host.js',import.meta.url),'utf8')});
   if(url.startsWith(origin+'/resources/fonts/'))return route.fulfill({path:new URL('../../resources/fonts/'+url.split('/').pop(),import.meta.url).pathname});
   if(url===origin+'/techcheck-eye-favicon-32.png')return route.fulfill({path:new URL('../../techcheck-eye-favicon-32.png',import.meta.url).pathname});
@@ -36,7 +37,7 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
- await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch|Dashboard/})).toHaveCount(0);
+ await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();await nav.getByRole('button',{name:'InHand Routers',exact:true}).click();await expect.poll(()=>calls.some(c=>c.path==='/api/routers')).toBe(true);
  expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(c.path))).toBe(true);

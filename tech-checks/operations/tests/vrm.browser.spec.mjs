@@ -259,7 +259,7 @@ test('The mounted visible workspace polls saved data every minute without discov
 test('IT fleet routes never request or expose the Owner Victron workspace',async({page})=>{
  const {frame,requests}=await mount(page,{role:'it',mode:'fleet',initialHash:'#victron-vrm',onVrmRequest:async()=>{throw Error('IT must never request Owner Victron data');}});
  await expect(frame.getByRole('heading',{name:'Helios power monitoring'})).toHaveCount(0);
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map');
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#it-dashboard');
  expect(requests.some(request=>request.path.startsWith('/api/vrm-'))).toBeFalsy();
 });
 

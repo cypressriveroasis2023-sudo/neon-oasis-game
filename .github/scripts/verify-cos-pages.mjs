@@ -9,6 +9,8 @@ const walk = dir => readdirSync(dir).flatMap(name => {
 const files = [
   'tech-checks/index.html',
   'tech-checks/operations-host.js',
+  'tech-checks/verified-it-fleet-host.js',
+  'tech-checks/it-mhelp-projection.js',
   'tech-checks/production-assignments-host.js',
   'tech-checks/operations-host.css',
   'tech-checks/vision-platform.css',
