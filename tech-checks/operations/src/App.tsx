@@ -60,7 +60,7 @@ const descriptions: Record<string,string> = {
   Purchasing:'Purchase requests, three-way matching and AP decisions.',
   'Camera Health':'Live camera status and existing diagnostics.',
   'InHand Routers':'Router inventory, IP addresses and timestamped management-port observations.',
-  'Victron VRM':'Battery, solar and power dashboards for Helios units 1–9.',
+  'Victron VRM':'Battery, solar and power dashboards for the connected Victron fleet.',
   'Tech Check':'IT and Service checklists, check assignments and technician access in one place.',
 };
 const errorMessage = (cause:unknown, fallback:string) => cause instanceof Error ? cause.message : fallback;
@@ -351,7 +351,7 @@ function OwnerApp() {
         :active==='Tech Check'?(fleetOnly?<section className='panel module'><h2>IT Tech Checks</h2><button onClick={()=>openLegacy('it')}>Return to my IT Tech Checks</button></section>:<TechChecksWorkspace/>)
         :active==='Camera Health'?<CameraHealthWorkspace initialUnitId={route.unitId} backToMap={returnToMap} createTicket={fleetOnly?undefined:createTicket} canEditPlacement={session?.features?.fleetPlacementEdit===true} canEditConnection={session?.features?.fleetConnectionEdit===true} canReviewIdentity={session?.features?.ownerIdentityReview===true}/>
         :active==='InHand Routers'?<RouterWorkspace openMap={id=>{setMapUnitId(id);navigate('Field Map');}}/>
-        :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit}/>
+        :active==='Victron VRM'?<VrmWorkspace initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true)}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}
     </main>
     <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{(fleetOnly?[{label:'Camera Health',workspace:'Camera Health'},{label:'Field View',workspace:'Field Map'},{label:'Tech Checks',workspace:'Tech Check'}]:[{label:'Dashboard',workspace:'Today'},{label:'Field View',workspace:'Field Map'},{label:'Team',workspace:'Team'}]).map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>

@@ -12,6 +12,8 @@ const technicians = {
   '78e54fbd-c2db-4d18-8e3d-a9740adcf285': {actorId:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',name:'Abel Cervantes',department:'service',roleCode:'service_technician'},
   '49dce28e-099a-40bb-a8d8-b39f9ffbabee': {actorId:'1a7d3523-8a3c-488a-9216-4e37f4f7ecb9',name:'Josh Mireles',department:'service',roleCode:'service_technician'},
 };
+const verifiedItId = Object.entries(technicians).find(([,actor]) => actor.department === 'it')[0];
+const serviceId = Object.entries(technicians).find(([,actor]) => actor.department === 'service')[0];
 const orgId = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const origin = 'https://cypressriveroasis2023-sudo.github.io';
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
@@ -71,6 +73,12 @@ test('Cloudflare lookalikes and unrelated Pages projects are rejected before dat
 });
 const cases = [
  ['owner VRM fleet permitted', '/api/vrm-portal', 'GET', {}, 200],
+ ['owner dynamic VRM fleet permitted', '/api/vrm-fleet', 'GET', {}, 200],
+ ['verified IT cannot read dynamic VRM fleet', '/api/vrm-fleet', 'GET', {}, 403, {userId:verifiedItId}],
+ ['owner VRM refresh permitted', '/api/vrm-fleet/refresh', 'GET', {}, 200],
+ ['verified IT cannot read VRM fleet', '/api/vrm-portal', 'GET', {}, 403, {userId:verifiedItId}],
+ ['verified IT cannot refresh VRM fleet', '/api/vrm-fleet/refresh', 'GET', {}, 403, {userId:verifiedItId}],
+ ['service cannot refresh VRM fleet', '/api/vrm-fleet/refresh', 'GET', {}, 403, {userId:serviceId}],
  ['IT VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'it'}],
  ['service VRM denied', '/api/vrm-portal', 'GET', {}, 403, {role:'service'}],
  ['unmapped VRM denied', '/api/vrm-portal', 'GET', {}, 403, {userId:'2e304f31-2500-415a-90b5-dbadd7d56f61'}],
@@ -198,3 +206,18 @@ for (const [name,path,method,body,status,scenario={},headers={}] of cases) {
     if(name==='native task create contract permitted'&&(rpcCalls.at(-1).body.p_task_id!==null||rpcCalls.at(-1).body.p_payload.priority!=='medium'))throw new Error('Task create contract changed.');
   });
 }
+
+test('Legacy cached client keeps nine exact portals while dynamic route serves expanded registry',async()=>{
+ const calls=[];const mock=transport({},calls);
+ const newItems=Array.from({length:11},(_,i)=>({installationId:70000+i,name:'Synthetic '+i,available:true,lastSeenAt:null}));
+ const handler=createOperationsHandler({platformUrl:'https://platform.example',serviceKey:'synthetic-server',vrm:{getAccessToken:()=>undefined},fetch:async(url,init)=>{
+  if(url.endsWith('/rpc/cos_vrm_fleet_snapshot'))return json({items:newItems,lastAttemptAt:null,lastSuccessAt:null,errorCode:null,retryAfterAt:null,syncing:false,scheduleActive:false});
+  return mock(url,init);
+ }});
+ const old=await (await handler(request('/api/vrm-portal'))).json();assert.deepEqual(Object.keys(old),['items']);assert.equal(old.items.length,9);
+ assert.deepEqual(old.items.map(u=>u.number),[1,2,3,4,5,6,7,8,9]);
+ assert.ok(old.items.every((u,i)=>u.name==='HELIOS '+String(i+1).padStart(3,'0')&&u.portalUrl==='https://vrm.victronenergy.com/installation/'+u.installationId+'/dashboard'));
+ const current=await (await handler(request('/api/vrm-fleet'))).json();assert.equal(current.items.length,11);
+ assert.deepEqual(current.items.map(u=>u.installationId),newItems.map(u=>u.installationId));
+ const forbidden=await handler(request('/api/vrm-fleet','POST'));assert.equal(forbidden.status,404);
+});
