@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {archiveReconPayload} from '../_shared/reconEventArchive.ts';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -204,7 +205,7 @@ Deno.serve(async (req: Request) => {
       event_type: eventType || null,
       event_code: eventCode || null,
       observed_at: observedAt,
-      payload: body,
+      payload: await archiveReconPayload(db, body),
       processed: Boolean(camera && mapping),
       processing_note: !externalId
         ? "Stored raw payload; device identifier was not recognized yet."
