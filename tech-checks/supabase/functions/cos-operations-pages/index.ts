@@ -1,4 +1,5 @@
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
+import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
@@ -164,6 +165,11 @@ export function createOperationsHandler(options) {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload),
   }, 'COS workflow could not be completed. Please retry.');
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
+  const mhelpPartner = createMhelpPartnerHandler({
+    fetch: requestFetch,
+    getConfig: options.mhelpPartner?.getConfig || (() => ({})),
+    readNativeUnits: () => platformAll('equipment_units?select=id,unit_number,metadata&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
+  });
   // This isolated control RPC is claimed once before the provider secret can be read.
   const readInhandPilot = createInhandPilotReader({
     ...options.inhandPilot,
@@ -453,6 +459,12 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if (path.startsWith('/api/mhelpdesk/partner/')) {
+        // This owner-only review does not expand the verified IT route allowlist.
+        if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
+        if (method === 'POST' && body === null) body = await requestBody(request);
+        return json(await mhelpPartner(path, method, body));
+      }
       if(path==='/api/unit-tracker'||path.startsWith('/api/unit-tracker/')){
         if(method==='POST'&&body===null)body=await requestBody(request);
         return json(await createUnitTracker({rpc,actorPayload})(path,method,body));
@@ -868,8 +880,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }
@@ -882,6 +894,7 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
     vrmEmbeds: Deno.env.get('COS_VRM_EMBEDS'),
     inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
+    mhelpPartner: { getConfig: () => ({portalId: Deno.env.get('COS_MHELP_PORTAL_ID'), accessToken: Deno.env.get('COS_MHELP_ACCESS_TOKEN')}) },
   }));
 }
 
