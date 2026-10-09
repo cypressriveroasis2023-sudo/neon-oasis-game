@@ -16,6 +16,14 @@ Raw tracker and imported-source family text is retained in the binding. Only the
 
 No frontend write endpoint or browser/provider call is added. A failed native coordinate read returns no coordinate records. Fresh snapshot validation, full typed identity, source/address/native guards and current legacy evidence must all agree. A malformed or duplicate optional source DTO drops only source-recorded data. The projection preserves the complete map snapshot and all Owner/GPS/property data, never substitutes a historical point, and does not fail the Field Map route.
 
+## Read-only conflict guard
+
+A source point is withheld when a validated estimate for its exact current imported installation is more than 20 km away. Two independently validated, distinct source records are both withheld when their current address hashes, customer labels and site labels are identical but their coordinates are more than 20 km apart. Address similarity alone does not join installations or equipment identities. Nearby coordinates, including large construction-site distances below the threshold, remain eligible.
+
+Only accepted Census or Geocodio results with valid coordinates, timestamps, current source bindings and matching address components can trigger the address comparison. Pending, stale, malformed, mismatched or lower-quality results cannot suppress a source point. The shared client validator also rejects that contradiction in an older backend DTO. The existing address-estimate selector continues to validate any approximate fallback; no point becomes verified GPS through this guard.
+
+The response retains a conflict reason, separation distance, original coordinates, tracker cell and source-observation time in `locationSourceRecordedConflict`. The explanation appears only in selected unit details. Every projection clears old conflict flags before reevaluating current evidence. The source ledger, raw history, Owner/manual/GPS/property points, camera associations and nearby-distance rules are unchanged. No network request, database write, schema change or geocoder call is added. Installation comparisons are grouped by their exact evidence key rather than scanning unrelated pairs.
+
 ## Administrator review and import
 
 Real identities and data remain outside the repository. For each explicitly reviewed candidate, collect the current `cos_recorded_coordinate_binding` result using exact native/tracker identities, product, full labels and family. Compare it with the frozen source-address hash and current reviewed snapshot. Record fresh legacy evidence with `reviewedLegacyEvidenceSha256`; a new Owner/IT/history conflict requires review. Preserve the exact spreadsheet/tab/cell, literal coordinate-cell hash, source-file/row hashes and source-observed timestamp. Never invent a measurement time, house number or Owner actor.
