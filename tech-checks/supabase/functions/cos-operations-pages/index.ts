@@ -2,7 +2,8 @@ import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
-import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjection.ts';
+// Keep the verified production reader until the V3 database rollout passes its live map check.
+import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBinding} from './importedSourceProjectionV2.ts';
 import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
 import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
 import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';

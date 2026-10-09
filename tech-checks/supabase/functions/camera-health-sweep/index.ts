@@ -40,45 +40,51 @@ Deno.serve(async(req)=>{
   if(valid!==true)return json({error:"Forbidden"},403);
 
   const body=await req.json().catch(()=>({}));
-  const n=Math.min(Math.max(Number(body.batch_size)||12,1),25);
+  // The existing batch setting bounds concurrency, never fleet coverage.
+  const requestedWorkers=Number(body.batch_size);
+  const n=Number.isFinite(requestedWorkers)&&requestedWorkers>0?Math.min(Math.max(Math.floor(requestedWorkers),1),25):25;
 
-  // Cameras and the existing bounded router batch share elapsed time, not a
+  // Cameras and the bounded router workers share elapsed time, not a
   // serial budget. Router work cannot consume the camera window first.
   const cameraRun=collectScheduledDirect(db,tcp,{startedAt:requestStarted})
     .then(value=>({value,error:null}),()=>({value:null,error:"Direct inventory unavailable"}));
 
-  const {data:routerMappings,error:routerReadError}=await db.from("camera_unit_routers")
+  const {data:routerMappings,error:routerQueryError}=await db.from("camera_unit_routers")
     .select("id,unit_key,router_name,router_model,router_public_ip,unit_ip,web_port,web_protocol,reported_status,reported_latency_ms,status_source,status_observed_at,current_status,last_checked_at,last_online_at,updated_at")
     .or("router_public_ip.not.is.null,unit_ip.not.is.null");
+  const routerReadError=routerQueryError||!Array.isArray(routerMappings)||routerMappings.length>=1000;
   // Router health must stay fresh. Recheck every 5 minutes; UI can expire older evidence.
   const routerProbeIntervalMs=5*60*1000;
   const routerDueBefore=Date.now()-routerProbeIntervalMs;
-  const routers=[...(routerMappings||[])]
-    .filter((r:any)=>!r.last_checked_at||new Date(r.last_checked_at).getTime()<=routerDueBefore)
+  const routers=[...(routerReadError?[]:routerMappings)]
+    .filter((r:any)=>!r.last_checked_at||!Number.isFinite(Date.parse(r.last_checked_at))||Date.parse(r.last_checked_at)<=routerDueBefore)
     .sort((a:any,b:any)=>{
       const at=a.last_checked_at?new Date(a.last_checked_at).getTime():0;
       const bt=b.last_checked_at?new Date(b.last_checked_at).getTime():0;
       return at-bt;
-    }).slice(0,n);
+    });
 
-  const routerRun=Promise.all(routers.map(async(r:any)=>{
+  const routerCheck=async(r:any)=>{
     const host=String(r.router_public_ip||r.unit_ip||"").replace("/32","");
     if(!publicHost(host))return {id:r.id,unit:r.unit_key,status:"unknown",reason:"unsupported_public_endpoint"};
     // Router health is authoritative only on its configured management port (InHand standard: 8080).
     // Do not let camera/NVR services on the same public IP manufacture router ONLINE.
-    const ports=[Number(r.web_port||8080)].filter((x:number)=>x>0);
+    const port=Number(r.web_port??8080);
+    if(!Number.isInteger(port)||port<1||port>65535)return {id:r.id,unit:r.unit_key,status:"unknown",reason:"unsupported_management_port"};
+    const ports=[port];
     const probes=host?Object.fromEntries(await Promise.all(ports.map(async(p:number)=>[p,await tcp(host,p)]))):{};
+    if(Date.now()>=requestStarted+48_000)return {id:r.id,unit:r.unit_key,status:"unknown",reason:"router_deadline_reached"};
     const responding=Object.entries(probes).filter(([,v]:any)=>v?.online);
     const directOnline=responding.length>0;
-    const reportedOnline=String(r.reported_status||"").toLowerCase()==="online"&&!!r.status_observed_at&&(Date.now()-new Date(r.status_observed_at).getTime())<5*60*1000;
     // Router ONLINE requires a successful live probe. Reported/cached state is context only.
     const status=directOnline?"online":"offline";
     const checked=new Date().toISOString();
-    const bestLatency=responding.length?Math.min(...responding.map(([,v]:any)=>Number(v.latency_ms||999999))):null;
+    const latencies=responding.map(([,v]:any)=>v.latency_ms).filter((v:any)=>typeof v==="number"&&Number.isFinite(v)&&v>=0);
+    const bestLatency=latencies.length?Math.min(...latencies):null;
     const previousStatus=String(r.current_status||"").toLowerCase();
     const statusChanged=previousStatus!==status;
     const previousLatency=r.reported_latency_ms==null?null:Number(r.reported_latency_ms);
-    const latencyChanged=directOnline&&(previousLatency==null||bestLatency==null||Math.abs(previousLatency-bestLatency)>=250);
+    const latencyChanged=directOnline&&bestLatency!==null&&(previousLatency==null||Math.abs(previousLatency-bestLatency)>=250);
     const heartbeatDue=!r.last_checked_at||(Date.now()-new Date(r.last_checked_at).getTime())>=routerProbeIntervalMs;
     if(statusChanged||latencyChanged||heartbeatDue){
       const patch:any={current_status:status,last_checked_at:checked,updated_at:checked};
@@ -91,7 +97,18 @@ Deno.serve(async(req)=>{
       if(!savedRouter?.length)return {id:r.id,unit:r.unit_key,status:"unknown",reason:"router_configuration_changed"};
     }
     return{id:r.id,unit:r.unit_key,name:r.router_name,model:r.router_model,status,direct_online:directOnline,reported_status:r.reported_status,ports:probes,latency_ms:bestLatency};
-  })).then(value=>({value,error:null}),error=>({value:null,error}));
+  };
+  let routerCursor=0;
+  const routerRun=(async()=>{
+    const results:any[]=[];
+    while(routerCursor<routers.length&&Date.now()+3200<requestStarted+48_000){
+      const wave=routers.slice(routerCursor,routerCursor+n);routerCursor+=wave.length;
+      results.push(...await Promise.all(wave.map(async(r:any)=>{
+        try{return await routerCheck(r);}catch{return {id:r.id,unit:r.unit_key,status:"unknown",reason:"router_observation_unverified"};}
+      })));
+    }
+    return results;
+  })().then(value=>({value,error:null}),error=>({value:null,error}));
 
   const camera=await cameraRun;
   const routerOutcome=await routerRun;
@@ -107,12 +124,18 @@ Deno.serve(async(req)=>{
   if(unverified)reasons.push("observations_unverified");
   const countReasons=(rows:any[])=>rows.reduce((counts:any,row:any)=>{const key=row.reason||"unverified";counts[key]=(counts[key]||0)+1;return counts;},{});
   const heartbeat=new Date().toISOString();
+  const routerCoverage={counts_known:!routerReadError&&!routerOutcome.error,total:routerReadError?null:routerMappings?.length??0,
+    complete:!routerReadError&&!routerOutcome.error&&routerCursor===routers.length&&routerResults.every((r:any)=>r.status!=="unknown"),
+    due:routerReadError?null:routers.length,scanned:routerReadError?null:routerResults.length,
+    published:routerReadError?null:routerResults.filter((r:any)=>r.status==="online"||r.status==="offline").length,
+    unverified:routerReadError?null:routerResults.filter((r:any)=>r.status==="unknown").length,
+    deferred:routerReadError?null:routers.length-routerCursor,reconciled_at:heartbeat};
   const coverage={source:"owned_saved_service_ports",complete:reasons.length===0,reason:reasons[0]||null,reasons,
     counts_known:!camera.error,eligible,held:camera.error?null:held.length,deferred,
     scanned:camera.error?null:results.length,published:camera.error?null:published,unverified:camera.error?null:unverified,
     deadline_reached:deadlineReached,held_reasons:countReasons(held),unverified_reasons:countReasons(results.filter((r:any)=>!r.published)),
     online:camera.error?null:results.filter((r:any)=>r.published&&r.status==="online").length,offline:camera.error?null:results.filter((r:any)=>r.published&&r.status==="offline").length,
-    verifying:camera.error?null:results.filter((r:any)=>r.published&&r.status==="verifying").length,reconciled_at:heartbeat};
+    verifying:camera.error?null:results.filter((r:any)=>r.published&&r.status==="verifying").length,reconciled_at:heartbeat,router_coverage:routerCoverage};
 
   // Persist incomplete coverage too, including zero-publication runs. This is
   // monitor metadata only; no camera result or outage is created by this write.
