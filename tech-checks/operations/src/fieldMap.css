@@ -68,7 +68,57 @@
 .cos-field-pin-recorded>.cos-pin-location-tag{top:44px;left:auto;right:calc(50% + 16px);transform:none}
 
 /* Unit cards are records, not primary action buttons. Keep their text readable. */
-#root .operations-shell .field-map-workspace .field-map-list>button{background:#111b2a!important;color:#f3f6fb!important;border-color:#34445b!important;text-align:left}
-#root .operations-shell .field-map-workspace .field-map-list>button:hover,#root .operations-shell .field-map-workspace .field-map-list>button.selected{background:#203456!important;border-color:#91b0ff!important}
-#root .operations-shell .field-map-workspace .field-map-list>button small{color:#c0cee0}
-#root .operations-shell .field-map-workspace .field-map-list>button strong{color:#f3f6fb!important}
+#root#root .operations-shell .field-map-workspace .field-map-list>button{background:#111b2a!important;color:#f3f6fb!important;border-color:#34445b!important;text-align:left}
+#root#root .operations-shell .field-map-workspace .field-map-list>button:hover,#root#root .operations-shell .field-map-workspace .field-map-list>button.selected{background:#203456!important;border-color:#91b0ff!important}
+#root#root .operations-shell .field-map-workspace .field-map-list>button small{color:#c0cee0}
+#root#root .operations-shell .field-map-workspace .field-map-list>button strong{color:#f3f6fb!important}
+
+/* Map-first presentation. Provenance and inventory reviews are available on demand. */
+#root .operations-shell .field-map-workspace{gap:10px}
+#root .operations-shell .field-map-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+#root .operations-shell .field-map-kpis article{padding:8px 10px;gap:1px;min-width:0}
+#root .operations-shell .field-map-kpis b{font-size:22px;line-height:1.2}
+#root .operations-shell .field-map-kpis span{font-size:9px;letter-spacing:.25px;line-height:1.4}
+#root .operations-shell .field-map-display-bar{padding:9px 12px}
+#root .operations-shell .field-map-toolbar{gap:6px}
+#root .operations-shell .field-map-toolbar input{flex:1 1 250px}
+#root .operations-shell .field-map-filters{display:flex;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:9px}
+#root .operations-shell .field-map-filters[hidden],#root .operations-shell .field-map-detail[hidden]{display:none!important}
+#root .operations-shell .field-map-filters>select{flex:1 1 220px}
+#root .operations-shell .field-map-filters .field-map-nearby{flex-basis:100%}
+#root .operations-shell .field-map-info{border:1px solid var(--border);border-radius:9px;padding:0 12px;font-size:12px;min-width:0}
+#root .operations-shell .field-map-info>summary{padding:11px 0;cursor:pointer;min-height:44px;box-sizing:border-box;color:#c0cee0}
+#root .operations-shell .field-map-info>summary:focus-visible{outline:2px solid #91b0ff;outline-offset:2px}
+#root .operations-shell .field-map-info .panel{margin:10px 0}
+#root .operations-shell .field-map-layout:not(.has-selection){grid-template-columns:minmax(200px,.65fr) minmax(0,1.7fr);grid-template-rows:minmax(0,clamp(430px,70dvh,760px))}
+#root .operations-shell .field-map-layout.has-selection{grid-template-columns:minmax(180px,.6fr) minmax(0,1.3fr) minmax(260px,1fr)}
+#root .operations-shell .field-map-close-detail{float:right;margin:0 0 8px 8px}
+.field-map-fullscreen-controls{display:none}
+@media(max-width:1200px){
+ #root .operations-shell .field-map-layout:not(.has-selection){grid-template-columns:minmax(180px,.6fr) minmax(0,1fr);grid-template-rows:minmax(0,clamp(430px,65dvh,640px))}
+ #root .operations-shell .field-map-layout.has-selection{grid-template-columns:minmax(180px,.6fr) minmax(0,1fr);grid-template-rows:minmax(0,clamp(430px,65dvh,640px)) auto}
+ #root .operations-shell .field-map-layout.has-selection .field-map-detail{grid-column:1/-1;max-height:640px}
+}
+@media(max-width:700px){
+ #root .operations-shell .field-map-display-bar>div>span{display:none}
+ #root .operations-shell .field-map-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+ #root .operations-shell .field-map-kpis article{padding:7px 5px}
+ #root .operations-shell .field-map-kpis article:first-child{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;padding:6px 10px}
+ #root .operations-shell .field-map-kpis b{font-size:20px}
+ #root .operations-shell .field-map-kpis span{font-size:8px;letter-spacing:0}
+ #root .operations-shell .field-map-toolbar>input{flex-basis:100%}
+ #root .operations-shell .field-map-toolbar>button{flex:1 1 auto;padding:8px 7px;font-size:12px}
+ #root .operations-shell .field-map-layout:not(.has-selection),#root .operations-shell .field-map-layout.has-selection{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(430px,60dvh) auto auto}
+ #root .operations-shell .field-map-center{grid-row:1;grid-column:1}
+ #root .operations-shell .field-map-list{grid-row:3;max-height:300px}
+ #root .operations-shell .field-map-layout.has-selection .field-map-detail{grid-row:2;grid-column:1;max-height:640px}
+}
+/* Only the map, attribution and minimal map controls fill native or fallback fullscreen. */
+#root .operations-shell .field-map-workspace.field-map-tv{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:0!important;z-index:2147483646!important;display:block!important;padding:0!important;gap:0!important;overflow:hidden!important;border:0!important;border-radius:0!important}
+#root .operations-shell .field-map-workspace.field-map-tv>:not(.field-map-layout){display:none!important}
+#root .operations-shell .field-map-workspace.field-map-tv>.field-map-layout{display:block!important;width:100%!important;height:100%!important;margin:0!important}
+#root .operations-shell .field-map-workspace.field-map-tv .field-map-center{height:100%!important;width:100%!important;border:0!important;border-radius:0!important}
+#root .operations-shell .field-map-workspace.field-map-tv .field-map-legend{display:none!important}
+#root .operations-shell .field-map-tv .field-map-fullscreen-controls{display:flex;position:absolute;z-index:1001;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));gap:8px}
+#root .operations-shell .field-map-tv .leaflet-top.leaflet-left{top:env(safe-area-inset-top);left:env(safe-area-inset-left)}
+#root .operations-shell .field-map-tv .leaflet-bottom.leaflet-right{bottom:env(safe-area-inset-bottom);right:env(safe-area-inset-right)}

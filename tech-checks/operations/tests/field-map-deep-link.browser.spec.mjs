@@ -1,3 +1,4 @@
+import {revealMapFilters,revealMapInfo} from './field-map-controls.mjs';
 // Full-page synthetic fixtures. Every external request is blocked or fulfilled locally.
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
@@ -222,7 +223,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   const {
     frame
   } = await mount(page, 'RII-022');
-  await frame.getByLabel('Field health filter').selectOption('offline');
+  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
   await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
@@ -237,7 +238,7 @@ for (const width of [390, 1440]) for (const [name, run] of cases) test('Field-ma
   await run(page);
 });
 
-test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
+test('held placement records remain visible and searchable without invented pins',async({page})=>{const {frame}=await mount(page,'Sniper 312',defaultUnits,{placementReviews:[{unitNumber:'Sniper 312',reason:'Two inventory identities need review.',placementAuditId:'123'}]});await revealMapInfo(frame);const review=frame.getByRole('region',{name:'Placement records needing review'});await expect(review).toContainText('Sniper 312');await expect(review).toContainText('Two inventory identities');await expect(review.getByRole('link',{name:'Open Camera Health'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20312');await expect(frame.locator('.cos-field-pin')).toHaveCount(0);});
 
 test('one deactivated Shop record does not turn healthy field units gray',async({page})=>{const {frame}=await mount(page,'Ranger 022',defaultUnits,{storedShop:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(1);await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','online');await expect(frame.locator('.field-map-workspace')).not.toContainText('Camera Health unavailable');await expect(frame.locator('.field-map-detail')).toContainText(/online/i);});
 
@@ -272,4 +273,8 @@ test('hardware-suffixed field pin shows its number and unit cards keep dark high
  await expect(card).toHaveCSS('background-color','rgb(32, 52, 86)');
  await expect(card.locator('strong')).toHaveCSS('color','rgb(243, 246, 251)');
  await expect(card.locator('small').first()).toHaveCSS('color','rgb(192, 206, 224)');
+});
+
+test('closing a deep-linked unit remains closed through manual and automatic refresh',async({page})=>{
+ const {frame,state}=await mount(page,'Ranger 022');await frame.getByRole('button',{name:'Close unit details',exact:true}).click();await expect(frame.locator('.field-map-list>button').first()).toBeFocused();await expect(frame.locator('.field-map-detail')).not.toBeVisible();await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-detail')).not.toBeVisible();await page.clock.fastForward(16*60*1000);await expect(frame.locator('.field-map-detail')).not.toBeVisible();expect(state.writes).toHaveLength(0);
 });

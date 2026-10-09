@@ -1,0 +1,10 @@
+.home-field-view{margin:0 0 20px;min-width:0}
+#root .operations-shell .home-field-view>button{display:flex;align-items:center;gap:16px;width:100%;min-height:84px;padding:18px 22px!important;border:1px solid var(--cos-blue)!important;border-radius:12px!important;background:var(--cos-selected)!important;color:var(--cos-text)!important;box-shadow:none!important;text-align:left;white-space:normal;letter-spacing:0;line-height:1.4}
+#root .operations-shell .home-field-view>button:hover{filter:brightness(1.12)}
+#root .operations-shell .home-field-view>button:focus-visible{outline:3px solid var(--cos-blue);outline-offset:3px}
+.home-field-view svg{width:28px;height:28px;flex:none;color:var(--cos-blue)}
+.home-field-view strong,.home-field-view small{display:block}
+.home-field-view strong{font-size:20px;font-weight:700}
+.home-field-view small{font-size:12px;color:var(--cos-muted);font-weight:400;margin-top:4px}
+.home-field-view-arrow{margin-left:auto;font-size:24px;color:var(--cos-blue)}
+@media(max-width:600px){#root .operations-shell .home-field-view>button{padding:16px!important;gap:12px}.home-field-view strong{font-size:18px}}

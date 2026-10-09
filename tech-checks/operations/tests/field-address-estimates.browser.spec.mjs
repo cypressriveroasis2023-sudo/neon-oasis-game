@@ -1,3 +1,4 @@
+import {revealMapFilters,revealMapInfo} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
@@ -55,9 +56,9 @@ test('exact address estimates are visible by default, separate from health and v
  await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 901'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-cluster-list button').filter({hasText:'Sniper 902'})).toContainText('IP / PORT OFFLINE');await expect(frame.locator('.field-cluster-list')).toContainText('ADDRESS ESTIMATE');
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[0]+'"]')).toHaveCount(0);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+ids[2]+'"]')).toHaveCount(1);
  await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('not a verified unit position');await expect(frame.locator('.field-map-detail')).toContainText('U.S. Census address-range estimate');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
- await expect(frame.locator('.field-map-kpis article').nth(1).locator('b')).toHaveText('1');
+ await revealMapInfo(frame);await expect(frame.locator('.field-map-info')).toContainText('1 verified map pins');
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.field-map-center').screenshot({path:info.outputPath('address-estimate-pins.png')});
- await frame.getByLabel('Nearby unit center').selectOption(ids[2]);await expect.poll(()=>estimatedCount(frame)).toBe(0);await frame.getByLabel('Nearby unit center').selectOption('');await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(ids[2]);await expect.poll(()=>estimatedCount(frame)).toBe(0);await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption('');await expect.poll(()=>estimatedCount(frame)).toBe(2);
  state.offline=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(cluster).toHaveAttribute('data-health','offline');await expect.poll(()=>estimatedCount(frame)).toBe(2);expect(state.writes).toHaveLength(0);
 });
 test('new address snapshot removes stale estimate and pending validation cannot restore it',async({page})=>{
