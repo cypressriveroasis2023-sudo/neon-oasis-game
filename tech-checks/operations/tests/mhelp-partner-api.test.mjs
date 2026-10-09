@@ -10,7 +10,7 @@ const native=()=>({id:randomUUID(),unit_number:'Sniper 2 023.1',metadata:{produc
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json'}});
 function fixture({config={portalId,accessToken:token},rows=[row()],units=[native()],totalRows=rows.length,fetcher}={}){
  const calls=[];
- const handler=createMhelpPartnerHandler({getConfig:()=>config,readNativeUnits:async()=>units,fetch:async(url,init)=>{calls.push({url,init});return fetcher?fetcher(url,init):json({totalRows,results:rows});}});
+ const handler=createMhelpPartnerHandler({getConfig:()=>config,readNativeUnits:async()=>units,fetch:async(url,init)=>{calls.push({url,init});return fetcher?fetcher(url,init):url.endsWith('/me')?json({portalId:Number(portalId),userName:'private-user',email:'private-contact',password:'synthetic-profile-secret'}):json({totalRows,results:rows});}});
  return {handler,calls};
 }
 test('configuration is default off, reveals only readiness, and never tests credentials through GET',async()=>{
@@ -26,9 +26,39 @@ test('preview uses only the production allowlisted GET endpoint and preserves de
  assert.equal(data.partial,true);assert.equal(data.items[0].name,'Sniper 2 023.1');assert.equal(data.items[0].active,true);assert.equal('online'in data.items[0],false);
  assert.equal(data.items[0].identity.state,'review_needed');assert.equal(data.automaticSync,false);assert.equal(data.sheetsPublisher,false);
  assert.equal(JSON.stringify(data).includes('secret'),false);assert.equal(JSON.stringify(data).includes('password'),false);
- const request=f.calls[0],url=new URL(request.url);
+ assert.equal(f.calls[0].url,'https://connect.mhelpdesk.com/api/v1.0/me');assert.equal(data.verifiedPortalId,portalId);
+ assert.equal(JSON.stringify(data).includes('private-user'),false);assert.equal(JSON.stringify(data).includes('private-contact'),false);
+ const request=f.calls[1],url=new URL(request.url);
  assert.equal(url.origin,'https://connect.mhelpdesk.com');assert.equal(url.pathname,'/api/v1.0/portal/'+portalId+'/equipment');assert.equal(url.searchParams.get('Name'),'Sniper 2 023.1');
  assert.equal(url.searchParams.get('Fields').includes('CustomFields'),false);assert.equal(request.init.method,'GET');assert.equal(request.init.redirect,'error');assert.equal(request.init.headers.Authorization,'Bearer '+token);assert.equal(url.href.includes(token),false);
+});
+test('token alone resolves the portal through /me without mutating config or reading through GET',async()=>{
+ const config={accessToken:token},f=fixture({config});
+ const status=checkedPartnerStatus(await f.handler('/api/mhelpdesk/partner/status','GET',{}));
+ assert.equal(status.tokenConfigured,true);assert.equal(status.portalConfigured,false);assert.equal(f.calls.length,0);
+ const preview=checkedPartnerPreview(await f.handler('/api/mhelpdesk/partner/preview','POST',{}));
+ assert.equal(preview.verifiedPortalId,portalId);assert.equal(preview.portalConfigured,false);assert.equal(preview.liveAccessVerified,true);
+ assert.deepEqual(config,{accessToken:token});assert.equal(f.calls.length,2);
+ assert.equal(new URL(f.calls[1].url).pathname,'/api/v1.0/portal/'+portalId+'/equipment');
+});
+test('invalid or conflicting account portal IDs fail before any equipment or native read',async()=>{
+ for(const value of [undefined,0,-1,1.5,'username','001','1/other',Number.MAX_SAFE_INTEGER+1]){
+  const f=fixture({config:{accessToken:token},fetcher:()=>json({portalId:value,email:token})});
+  await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{}),error=>/valid company portal ID/.test(error.message)&&!error.message.includes(token));
+  assert.equal(f.calls.length,1);
+ }
+ const conflict=fixture({fetcher:()=>json({portalId:999,email:token})});
+ await assert.rejects(conflict.handler('/api/mhelpdesk/partner/preview','POST',{}),/does not match/);assert.equal(conflict.calls.length,1);
+ const wrongSetting=fixture({config:{portalId:'my username',accessToken:token}});
+ await assert.rejects(wrongSetting.handler('/api/mhelpdesk/partner/preview','POST',{}),/numeric company ID/);assert.equal(wrongSetting.calls.length,0);
+});
+test('account reads are bounded and equipment failures remain sanitized after portal discovery',async()=>{
+ const oversized=fixture({config:{accessToken:token},fetcher:()=>new Response('x'.repeat(16385))});
+ await assert.rejects(oversized.handler('/api/mhelpdesk/partner/preview','POST',{}),/oversized/);assert.equal(oversized.calls.length,1);
+ for(const status of [401,403,429,500]){
+  const f=fixture({fetcher:url=>url.endsWith('/me')?json({portalId:Number(portalId)}):json({error:token},status)});
+  await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{}),error=>!error.message.includes(token)&&error.status===(status===429?429:503));assert.equal(f.calls.length,2);
+ }
 });
 test('identity requires explicit equipment ID, portal, full label, and model; legacy Product IDs never bind',()=>{
  const equipment=projectPartnerEquipment(row(),portalId),unit=native();
@@ -60,14 +90,14 @@ test('caller cannot provide credentials, a portal, a URL, an actor, or a publica
  await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','GET',{}),/Method/);assert.equal(f.calls.length,0);
 });
 test('duplicate preview requests cannot fan out, and a completed read releases the guard',async()=>{
- let release;const f=fixture({fetcher:()=>new Promise(resolve=>{release=()=>resolve(json({totalRows:1,results:[row()]}));})});
+ let release;const f=fixture({fetcher:url=>url.endsWith('/me')?new Promise(resolve=>{release=()=>resolve(json({portalId:Number(portalId)}));}):json({totalRows:1,results:[row()]})});
  const first=f.handler('/api/mhelpdesk/partner/preview','POST',{});
  await assert.rejects(f.handler('/api/mhelpdesk/partner/preview','POST',{}),error=>error.status===409);release();await first;
- const second=f.handler('/api/mhelpdesk/partner/preview','POST',{});release();await second;assert.equal(f.calls.length,2);
+ const second=f.handler('/api/mhelpdesk/partner/preview','POST',{});release();await second;assert.equal(f.calls.length,4);
 });
 test('client rejects fabricated connected states, partial totals, duplicate identities and broken exact links',async()=>{
  const f=fixture(),data=await f.handler('/api/mhelpdesk/partner/preview','POST',{});
- for(const bad of [{...data,automaticSync:true},{...data,liveAccessVerified:false},{...data,partial:true},{...data,items:[data.items[0],data.items[0]],totalRows:2},{...data,items:[{...data.items[0],identity:{state:'verified_link',nativeUnitId:null,candidateUnitIds:[]}}]}])assert.throws(()=>checkedPartnerPreview(bad));
+ for(const bad of [{...data,automaticSync:true},{...data,liveAccessVerified:false},{...data,partial:true},{...data,portalConfigured:false,verifiedPortalId:undefined},{...data,verifiedPortalId:'999'},{...data,verifiedPortalId:'username'},{...data,items:[data.items[0],data.items[0]],totalRows:2},{...data,items:[{...data.items[0],identity:{state:'verified_link',nativeUnitId:null,candidateUnitIds:[]}}]}])assert.throws(()=>checkedPartnerPreview(bad));
 });
 test('full bridge rechecks Owner identity and denies IT/Service before config or external access',async()=>{
  for(const who of [

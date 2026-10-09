@@ -61,8 +61,8 @@ export function reviewPartnerIdentity(equipment: PartnerEquipment, nativeUnits: 
     candidateUnitIds: candidates,
   };
 }
-async function boundedJson(response: Response, signal: AbortSignal) {
-  if (!response.body || Number(response.headers.get('Content-Length')) > 1048576) fail('mHelpDesk returned an oversized response.');
+async function boundedJson(response: Response, signal: AbortSignal, maxBytes = 1048576) {
+  if (!response.body || Number(response.headers.get('Content-Length')) > maxBytes) fail('mHelpDesk returned an oversized response.');
   const reader = response.body.getReader(); let size = 0, raw = '';
   const decoder = new TextDecoder('utf-8', {fatal: true});
   try {
@@ -70,7 +70,7 @@ async function boundedJson(response: Response, signal: AbortSignal) {
       if (signal.aborted) fail('The mHelpDesk read timed out. Retry the preview.');
       const {done, value} = await reader.read(); if (done) break;
       size += value.byteLength;
-      if (size > 1048576) { await reader.cancel(); fail('mHelpDesk returned an oversized response.'); }
+      if (size > maxBytes) { await reader.cancel(); fail('mHelpDesk returned an oversized response.'); }
       raw += decoder.decode(value, {stream: true});
     }
     raw += decoder.decode(); return JSON.parse(raw);
@@ -98,28 +98,38 @@ export function createMhelpPartnerHandler(options: {
       state: portalConfigured && tokenConfigured ? 'ready_to_test' : 'setup_required', portalConfigured, tokenConfigured,
       automaticSync: false, sheetsPublisher: false, liveAccessVerified: false};
     if (path.endsWith('/status')) return status;
-    if (!portalConfigured || !tokenConfigured) fail('mHelpDesk needs a verified portal ID and a server-held access token before previewing equipment.', 503);
+    if (!tokenConfigured) fail('mHelpDesk needs a server-held access token before previewing equipment.', 503);
+    if (config.portalId && !portalConfigured) fail('The saved mHelpDesk portal ID must be a numeric company ID. Correct or remove that setting before previewing equipment.', 503);
     if (busy) fail('A mHelpDesk preview is already running. Wait for it to finish.', 409);
     busy = true;
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const url = new URL(API + '/portal/' + config.portalId + '/equipment');
+      const read = async (url: string, maxBytes?: number) => {
+        let response: Response;
+        try { response = await options.fetch(url, {method: 'GET', headers: {Authorization: 'Bearer ' + config.accessToken, Accept: 'application/json'}, redirect: 'error', cache: 'no-store', signal: controller.signal}); }
+        catch { return fail('mHelpDesk could not be reached. Retry the preview.'); }
+        // Never echo vendor errors, profile fields, request URLs, headers, or credentials.
+        if (response.status === 401 || response.status === 403) fail('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.', 503);
+        if (response.status === 429) fail('mHelpDesk is limiting requests. Wait before retrying.', 429);
+        if (!response.ok) fail('mHelpDesk could not complete the account or equipment read. Retry later.');
+        return object(await boundedJson(response, controller.signal, maxBytes));
+      };
+      // Resolve identity through the authenticated account, never from caller input or token decoding.
+      const account = await read(API + '/me', 16384);
+      let verifiedPortalId: string;
+      try { verifiedPortalId = numericId(account.portalId)!; }
+      catch { return fail('mHelpDesk did not return a valid company portal ID. Contact mHelpDesk Partner API support.'); }
+      if (portalConfigured && config.portalId !== verifiedPortalId) fail('The saved portal ID does not match the mHelpDesk account for this token. Correct the server setting before previewing equipment.');
+      const url = new URL(API + '/portal/' + verifiedPortalId + '/equipment');
       url.searchParams.set('Fields', FIELDS);
       if (payload.name) url.searchParams.set('Name', payload.name as string);
-      let response: Response;
-      try { response = await options.fetch(url.href, {method: 'GET', headers: {Authorization: 'Bearer ' + config.accessToken, Accept: 'application/json'}, redirect: 'error', cache: 'no-store', signal: controller.signal}); }
-      catch { return fail('mHelpDesk could not be reached. Retry the preview.'); }
-      // Never echo vendor errors, request URLs, headers, or credentials.
-      if (response.status === 401 || response.status === 403) fail('mHelpDesk denied API access. Verify the token, portal, and Partner API approval.', 503);
-      if (response.status === 429) fail('mHelpDesk is limiting requests. Wait before retrying.', 429);
-      if (!response.ok) fail('mHelpDesk could not return equipment. Retry later.');
-      const data = object(await boundedJson(response, controller.signal));
+      const data = await read(url.href);
       if (!Array.isArray(data.results) || data.results.length > 50 || !Number.isSafeInteger(data.totalRows) || Number(data.totalRows) < data.results.length || Number(data.totalRows) < 0) fail('mHelpDesk returned an unsupported equipment page.');
-      const rows = data.results.map(row => projectPartnerEquipment(row, config.portalId!));
+      const rows = data.results.map(row => projectPartnerEquipment(row, verifiedPortalId));
       if (new Set(rows.map(row => row.equipmentId)).size !== rows.length) fail('mHelpDesk returned duplicate equipment identities.');
       const nativeUnits = await options.readNativeUnits();
       if (!Array.isArray(nativeUnits) || nativeUnits.length > 10000) fail('COS equipment could not be verified. Retry the preview.');
-      return {...status, state: 'preview_verified', liveAccessVerified: true, readAt: new Date().toISOString(),
+      return {...status, state: 'preview_verified', liveAccessVerified: true, verifiedPortalId, readAt: new Date().toISOString(),
         totalRows: data.totalRows, partial: rows.length < Number(data.totalRows),
         items: rows.map(row => ({...row, identity: reviewPartnerIdentity(row, nativeUnits)}))};
     } finally { clearTimeout(timer); busy = false; }
