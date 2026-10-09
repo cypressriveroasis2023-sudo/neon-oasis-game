@@ -10,7 +10,7 @@ function estimate(id,number,patch={}){
  return {id,unitNumber:'Sniper '+number,modelName:'SNIPERS',status:'field',currentLocationType:'field',address,readOnly:true,hasUnitGps:false,locationVerification:'coordinates_unverified',latitude:null,longitude:null,historicalLatitude:30,historicalLongitude:-95,historicalCoordinateSource:source,locationNote:prefix+JSON.stringify(marker),...patch};
 }
 async function mount(page,{holdHashes=false,restored=false,noEstimates=false,registered=false,noCameras=false}={}){
- const state={units:[estimate(ids[0],901),estimate(ids[1],902),estimate(ids[2],903,{latitude:30.1,longitude:-95.1,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh}),estimate(ids[3],904,{historicalLatitude:31,historicalCoordinateSource:'legacy_tracker',locationNote:'Old location only'})],writes:[],reads:0,offline:false};
+ const state={units:[estimate(ids[0],901),estimate(ids[1],902),estimate(ids[2],903,{latitude:30.1,longitude:-95.1,coordinateSource:'site',locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh}),estimate(ids[3],904,{historicalLatitude:31,historicalCoordinateSource:'legacy_tracker',locationNote:'Old location only'})],writes:[],reads:0,offline:false,mapFailure:false};
  if(registered)state.units[0]={...state.units[0],id:'99999999-9999-4999-8999-999999999999',readOnly:false,currentLocationType:null,addressEstimateTrackerId:ids[0],addressEstimateUnitNumber:'Sniper 901'};
  await page.clock.install({time:new Date(now)});
  if(noEstimates)state.units=state.units.map((u,i)=>i<2?{...u,locationNote:'No approved estimate'}:u);
@@ -27,6 +27,7 @@ async function mount(page,{holdHashes=false,restored=false,noEstimates=false,reg
   const request=route.request().postDataJSON();
   if(request.method!=='GET'){state.writes.push(request);return route.fulfill({status:400,headers,body:'{}'});}
   if(request.path==='/api/field-map')state.reads++;
+  if(request.path==='/api/field-map'&&state.mapFailure)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Imported address lookup results are unavailable. The map could not be refreshed.'})});
   const health=snapshot((noCameras?[]:state.units).map((u,i)=>resource(i+1,u.unitNumber,{name:'Synthetic service '+i,type:'Sniper',evidence:undefined,serviceEvidence:port((i===1||state.offline)?{status:'offline',reachable:false,confirmedOutage:true}:{})})));
   const data=request.path==='/api/session'?{authorized:true,name:'Synthetic Owner',role:'Owner',features:{fieldLocationVerification:true}}
    :request.path==='/api/field-map'?{items:state.units,summary:{fieldUnits:state.units.length,mappedUnits:1,unitGps:0,missingGps:state.units.length-1},generatedAt:now}
@@ -49,6 +50,28 @@ const renderedUnitCount=(frame,estimated=false)=>frame.locator('.field-map-canva
 },estimated);
 const mappedCount=frame=>renderedUnitCount(frame);
 const estimatedCount=frame=>renderedUnitCount(frame,true);
+test('failed imported lookup refresh retains labeled last-good estimates and recovers without bypassing a new address guard',async({page})=>{
+ const {frame,state}=await mount(page,{registered:true}),row=state.units[0];
+ const binding={schemaVersion:1,organizationId:'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5',sourceSystem:'mhelpdesk_product_import',entityKind:'equipment_unit',nativeUnitId:row.id,productId:'12345',unitNumber:row.unitNumber,family:'SNIPER',variant:null,sourceRevision:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',sourceFileSha256:'a'.repeat(64),sourceRowSha256:'b'.repeat(64),addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex'),nativeGuardSha256:'c'.repeat(64),installation:{street:'100 Example Road',city:'Test City',state:'TX',zip:'77001'},suppliedComponents:{street:true,city:true,state:true,zip:true},eligibility:'FIELD',eventId:'1'};
+ state.units[0]={...row,currentLocationType:'field',locationVerification:'address_only',importedInstallation:binding,importedPlacement:'FIELD',locationImportedGeocode:{jobKind:'native_import',binding,legacyGuardSha256:'d'.repeat(64),status:'success',provider:'geocodio',verified:false,liveGps:false,latitude:30,longitude:-95,matchedAddress:address,geocodedAt:fresh,accuracyType:'rooftop',accuracy:1,matchType:null}};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('Geocodio');
+ const before=state.reads;state.mapFailure=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.getByRole('alert')).toContainText('Showing the last successfully loaded units');await expect(frame.getByRole('alert')).toContainText('Imported address lookup results are unavailable');
+ await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);await expect(frame.locator('.field-map-list>button')).toHaveCount(4);
+ await page.clock.runFor(1000);expect(state.reads).toBe(before+1);
+ state.mapFailure=false;state.units[0].locationImportedGeocode={...state.units[0].locationImportedGeocode,latitude:30.2,longitude:-95.2};
+ await frame.getByRole('button',{name:'Retry map load'}).click();await expect(frame.locator('.field-map-error')).toHaveCount(0);await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30.2, -95.2');
+ state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001'};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);expect(state.writes).toHaveLength(0);
+});
+test('initial imported lookup failure is visibly unavailable and explicit retry restores eligible points',async({page})=>{
+ const {frame,state}=await mount(page);await expect.poll(()=>estimatedCount(frame)).toBe(2);state.mapFailure=true;await page.reload();
+ await expect(frame.getByRole('alert')).toContainText('This does not mean the fleet is empty');await expect(frame.getByRole('alert')).toContainText('Imported address lookup results are unavailable');
+ await expect(frame.locator('.field-map-layout')).toHaveCount(0);await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
+ const before=state.reads;await page.clock.runFor(1000);expect(state.reads).toBe(before);
+ state.mapFailure=false;await frame.getByRole('button',{name:'Retry map load'}).click();await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect.poll(()=>mappedCount(frame)).toBe(3);expect(state.writes).toHaveLength(0);
+});
 test('exact address estimates are visible by default, separate from health and verified pins',async({page},info)=>{
  const {frame,state}=await mount(page);
  await expect.poll(()=>mappedCount(frame)).toBe(3);await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
