@@ -6,9 +6,10 @@ export const intakeReviewReasons = {
   configuration_reviewer_inactive: 'Configuration approval needs an active reviewer',
   existing_ticket_requires_reconciliation: 'An existing ticket needs reconciliation',
   source_changed_review_required: 'Source changed; existing work is preserved',
+  source_identity_changed_review_required: 'Source identity changed; reconciliation is required before any recheck',
   source_creation_in_future: 'Source creation time is in the future',
   source_schema_unverified: 'Source fields need verification',
-  source_scope_or_route_invalid: 'Source scope or workflow needs review',
+  source_scope_or_route_invalid: 'Source details or workflow are incomplete or need review',
   source_status_incomplete_or_deleted: 'Source status is incomplete or deleted',
   source_status_review_required: 'Source status needs review',
   source_status_reviewer_inactive: 'Status approval needs an active reviewer',
@@ -92,7 +93,7 @@ export function intakeReviewHealth(status: IntakeReviewStatus, now: number): { s
   if (status.lastSuccessAt === null) return { state: 'unknown', text: 'No completed source scan recorded.' };
   if (now - Date.parse(status.lastSuccessAt) > INTAKE_STATUS_STALE_MS)
     return { state: 'stale', text: 'Stale. The last completed source scan is more than 15 minutes old.' };
-  if (status.pendingReviewCount > 0) return { state: 'review', text: 'Recent source scan completed. Review is required.' };
+  if (status.pendingReviewCount > 0) return { state: 'review', text: 'Recent source scan completed. Saved receipt holds remain.' };
   return { state: 'recent', text: 'Recent source scan completed.' };
 }
 export function intakeReviewErrorMessage(cause: unknown): string {
@@ -101,4 +102,53 @@ export function intakeReviewErrorMessage(cause: unknown): string {
   if (code === 403) return 'This saved status requires your normal authorized Owner session. Intake state is unknown.';
   if (code === 404) return 'Saved intake status is unavailable on this backend. Intake state is unknown.';
   return 'Saved intake status could not be verified. Refresh to check again. Intake state is unknown.';
+}
+
+export const PENDING_SCHEDULE_CAPABILITY = 'pending_schedule_v1';
+export const PENDING_STATUS_CONTRACT = 'cos-mhelp-pending-status-v1';
+export const EXTENDED_REVIEW_CONTRACT = 'cos-mhelp-intake-status-pending-v1';
+export const pendingRefreshStates = {
+  created: 'Assignment created on the last ticket recheck',
+  existing: 'Existing work preserved on the last ticket recheck',
+  review_needed: 'Last rechecked ticket still has unresolved receipt holds',
+  deferred: 'Last ticket recheck deferred; waiting for a later retry',
+} as const;
+export const pendingRefreshCodes = {
+  SOURCE_UNAVAILABLE: 'Pending-ticket source read unavailable', SOURCE_INVALID: 'Pending-ticket source response could not be verified',
+  DEADLINE: 'Pending-ticket refresh exceeded its time limit', CONFIGURATION: 'Pending-ticket configuration needs review',
+  INTERNAL: 'Pending-ticket refresh could not complete',
+} as const;
+export type PendingScheduleStatus = {
+  contract: typeof PENDING_STATUS_CONTRACT; waitingCount: number; dueCount: number; oldestWaitingCreatedAt: string | null;
+  lastRefreshAt: string | null; lastRefreshState: keyof typeof pendingRefreshStates | null;
+  lastRefreshCode: keyof typeof pendingRefreshCodes | null;
+};
+export type IntakeStatusSnapshot = { review: IntakeReviewStatus; pendingSchedule: PendingScheduleStatus | null };
+export function checkedPendingScheduleStatus(value: unknown): PendingScheduleStatus {
+  const row = record(value, ['contract','waitingCount','dueCount','oldestWaitingCreatedAt','lastRefreshAt','lastRefreshState','lastRefreshCode']);
+  if (row.contract !== PENDING_STATUS_CONTRACT ||
+      row.lastRefreshState !== null && (typeof row.lastRefreshState !== 'string' || !Object.hasOwn(pendingRefreshStates, row.lastRefreshState)) ||
+      row.lastRefreshCode !== null && (typeof row.lastRefreshCode !== 'string' || !Object.hasOwn(pendingRefreshCodes, row.lastRefreshCode))) invalid();
+  const waitingCount = count(row.waitingCount), dueCount = count(row.dueCount), oldestWaitingCreatedAt = time(row.oldestWaitingCreatedAt);
+  if (dueCount > waitingCount || (waitingCount === 0) !== (oldestWaitingCreatedAt === null)) invalid();
+  return { contract: PENDING_STATUS_CONTRACT, waitingCount, dueCount, oldestWaitingCreatedAt,
+    lastRefreshAt: time(row.lastRefreshAt), lastRefreshState: row.lastRefreshState as PendingScheduleStatus['lastRefreshState'],
+    lastRefreshCode: row.lastRefreshCode as PendingScheduleStatus['lastRefreshCode'] };
+}
+/** A legacy result lacks enrichment evidence; unknown must never become zero waiting. */
+export function checkedIntakeStatus(value: unknown): IntakeStatusSnapshot {
+  if (value && typeof value === 'object' && !Array.isArray(value) && (value as Record<string, unknown>).contract === INTAKE_REVIEW_CONTRACT)
+    return { review: checkedIntakeReview(value), pendingSchedule: null };
+  const row = record(value, ['contract','review','pendingSchedule']);
+  if (row.contract !== EXTENDED_REVIEW_CONTRACT) invalid();
+  return { review: checkedIntakeReview(row.review), pendingSchedule: row.pendingSchedule === null ? null : checkedPendingScheduleStatus(row.pendingSchedule) };
+}
+export function pendingScheduleHealth(status: PendingScheduleStatus | null, now: number): { state: string; text: string } {
+  if (status === null) return { state: 'unavailable', text: 'Schedule enrichment status unavailable. Waiting tickets and refresh outcomes could not be verified.' };
+  if (!Number.isFinite(now) || [status.lastRefreshAt, status.oldestWaitingCreatedAt].some(value => value !== null && Date.parse(value) > now))
+    return { state: 'unknown', text: 'Pending-ticket timestamps could not be verified. Schedule enrichment state is unknown.' };
+  if (status.lastRefreshCode !== null || status.lastRefreshState === 'deferred')
+    return { state: 'deferred', text: 'Pending-ticket refresh deferred or failed. A completed discovery scan does not verify schedule enrichment.' };
+  if (status.waitingCount > 0) return { state: 'waiting', text: 'Tickets are waiting for automatic recheck of schedule, technician or other source details.' };
+  return { state: 'empty', text: 'No tickets are waiting for automatic recheck in this saved status.' };
 }

@@ -1,5 +1,6 @@
 /** Local-only orchestration. No secrets, vendor URLs, user identities or transport are accepted by HTTP callers. */
 import {isRetryAfterSeconds} from './mhelpIntakeRetry.ts';
+import {PENDING_LIMITS,parsePendingScope,validatePendingBatch} from './mhelpIntakePending.ts';
 export const INTAKE_CONTRACT='cos-mhelp-ticket-intake-run-v1';
 export const BATCH_CONTRACT='cos-mhelp-ticket-operational-batch-v1';
 export const INTAKE_LIMITS=Object.freeze({cadenceSeconds:300,leaseSeconds:180,deadlineMs:120000,pageSize:50,maxTickets:500,maxPages:10,overlapMs:600000,maxForwardMs:900000,maxWindowMs:1500001,maxResponseBytes:3*1048576});
@@ -15,7 +16,7 @@ export type Lease=Window&{state:'leased';leaseId:string;portalId:string;schemaCo
 export type IntakeTicket=Row&{contract:'cos-mhelp-legacy-intake-v1';schemaContract:string;source:Row&{portalId:string;ticketId:string;createdAt:string}};
 export type OperationalBatch={contract:typeof BATCH_CONTRACT;portalId:string;schemaContract:string;window:Window;totalRows:number;partial:false;tickets:IntakeTicket[]};
 export type Rpc=(input:Row,signal:AbortSignal)=>Promise<unknown>;
-export type RunResult={contract:typeof INTAKE_CONTRACT;state:'disabled'|'busy'|'backoff'|'idle'|'complete'|'failed';scanned:number;created:number;existing:number;reviewNeeded:number;watermarkAdvanced:boolean;completionUncertain?:true;code?:FaultCode};
+export type RunResult={contract:typeof INTAKE_CONTRACT;state:'disabled'|'busy'|'backoff'|'idle'|'complete'|'failed';scanned:number;created:number;existing:number;reviewNeeded:number;watermarkAdvanced:boolean;completionUncertain?:true;pending?:{attempted:number;created:number;existing:number;reviewNeeded:number;deferred:number;state:'complete'|'deferred'|'failed';code?:FaultCode};code?:FaultCode};
 export const row=(v:unknown):Row=>{if(!v||typeof v!=='object'||Array.isArray(v))throw new IntakeFault('SOURCE_INVALID');return v as Row;};
 export const exact=(v:Row,keys:readonly string[])=>{if(Object.keys(v).some(k=>!keys.includes(k)))throw new IntakeFault('SOURCE_INVALID');};
 export function utc(value:unknown):string {
@@ -31,7 +32,7 @@ export function parseLease(value:unknown,now:number):Lease {
   if(floor>now||after<floor-1||before<=after||before>now||before-after>INTAKE_LIMITS.maxWindowMs||until<=now||until-now>INTAKE_LIMITS.leaseSeconds*1000+1000)throw new IntakeFault('CONFIGURATION');
   return r as Lease;
 }
-const ticketKeys=['contract','schemaContract','source','departmentAssignments','ticketLead','sourceEvidence','request'];
+const ticketKeys=['contract','schemaContract','source','departmentAssignments','ticketLead','sourceEvidence','request','localWorkflowPolicy'];
 const sourceKeys=['portalId','ticketId','ticketNumber','typeId','statusId','customStatusId','deleted','assignment','createdAt'];
 const requestKeys=['ticket_no','site','work_type','targets','requested_unit_count','unit_summary','job_description','notes','equipment_manifest','scheduled_for','scheduled_time','solar_panel_qty','battery_replacement_qty','camera_replacement_qty','sim_replacement_qty','micro_sd_qty'];
 const nested=(value:unknown,keys:string[])=>{if(value!==null&&value!==undefined)exact(row(value),keys);};
@@ -45,7 +46,8 @@ export function validateOperationalTicket(value:unknown,scope:{portalId:string;s
   if(r.contract!=='cos-mhelp-legacy-intake-v1'||r.schemaContract!==scope.schemaContract||s.portalId!==scope.portalId)throw new IntakeFault('SOURCE_INVALID');
   identity(s.ticketId);const created=Date.parse(utc(s.createdAt));
   if(created<Date.parse(scope.activationFloor)||created<=Date.parse(scope.createdAfter)||created>=Date.parse(scope.createdBefore))throw new IntakeFault('SOURCE_INVALID');
-  terminalFields(r,['source','departmentAssignments','ticketLead','sourceEvidence','request']);terminalFields(s,['assignment']);
+  terminalFields(r,['source','departmentAssignments','ticketLead','sourceEvidence','request','localWorkflowPolicy']);
+  if(Object.hasOwn(r,'localWorkflowPolicy')){const policy=row(r.localWorkflowPolicy);exact(policy,['policy']);if(policy.policy!=='technician_equipment_selection_v1')throw new IntakeFault('SOURCE_INVALID');}terminalFields(s,['assignment']);
   nested(s.assignment,['state','identities','evidence']);assignmentFields(s.assignment);
   nested(r.ticketLead,['sourceIdentity','evidence','policy']);nested(r.sourceEvidence,['equipment','parts','site','description','schedule','complete']);terminalFields(r.ticketLead);terminalFields(r.sourceEvidence);
   if(r.ticketLead!==undefined&&r.ticketLead!==null){const lead=row(r.ticketLead);if(Object.hasOwn(lead,'policy')&&(lead.policy!=='reviewed_local_unassigned_v1'||Object.keys(lead).length!==1))throw new IntakeFault('SOURCE_INVALID');}
@@ -67,7 +69,7 @@ export async function deadline<T>(work:()=>Promise<T>,signal:AbortSignal):Promis
   let onAbort:()=>void=()=>{};const aborted=new Promise<never>((_,reject)=>{onAbort=()=>reject(new IntakeFault('DEADLINE',true));signal.addEventListener('abort',onAbort,{once:true});});
   try{return await Promise.race([work(),aborted]);}finally{signal.removeEventListener('abort',onAbort);}
 }
-export async function runMhelpIntake(options:{enabled:boolean;rpc:Rpc;readSource:(window:Window,signal:AbortSignal)=>Promise<unknown>;now?:()=>number;sleep?:(ms:number,signal:AbortSignal)=>Promise<void>;random?:()=>number;deadlineMs?:number}):Promise<RunResult>{
+export async function runMhelpIntake(options:{enabled:boolean;rpc:Rpc;readSource:(window:Window,signal:AbortSignal)=>Promise<unknown>;readPending?:(leaseId:string,signal:AbortSignal)=>Promise<unknown>;now?:()=>number;sleep?:(ms:number,signal:AbortSignal)=>Promise<void>;random?:()=>number;deadlineMs?:number}):Promise<RunResult>{
   const result:RunResult={contract:INTAKE_CONTRACT,state:'disabled',scanned:0,created:0,existing:0,reviewNeeded:0,watermarkAdvanced:false};
   if(options.enabled!==true)return result;
   const now=options.now??Date.now,controller=new AbortController(),duration=Math.min(INTAKE_LIMITS.deadlineMs,Math.max(1,options.deadlineMs??INTAKE_LIMITS.deadlineMs));
@@ -89,11 +91,36 @@ export async function runMhelpIntake(options:{enabled:boolean;rpc:Rpc;readSource
       // SQL, not the worker's counts, verifies every durable receipt again at finish.
     }
     finishAttempted=true;
-    const finished=row(await retry(()=>options.rpc({action:'finish',leaseId:lease!.leaseId,expectedTicketIds:batch.tickets.map(t=>t.source.ticketId),total:batch.totalRows},controller.signal)));
+    const finished=row(await retry(()=>options.rpc({action:'commit_discovery',leaseId:lease!.leaseId,expectedTicketIds:batch.tickets.map(t=>t.source.ticketId),total:batch.totalRows},controller.signal)));
     if(finished.state!=='complete'||finished.total!==batch.totalRows||finished.watermarkAdvanced!==true)throw new IntakeFault('RECEIPT_INVALID');
-    result.state='complete';result.watermarkAdvanced=true;return result;
+    result.state='complete';result.watermarkAdvanced=true;
+    if(options.readPending){
+      const pending=result.pending={attempted:0,created:0,existing:0,reviewNeeded:0,deferred:0,state:'complete' as 'complete'|'deferred'|'failed',code:undefined as FaultCode|undefined};
+      const scope=parsePendingScope(await retry(()=>options.rpc({action:'pending_scope',leaseId:lease!.leaseId},controller.signal)),now());
+      if(scope.leaseId!==lease.leaseId||scope.portalId!==lease.portalId||scope.schemaContract!==lease.schemaContract||scope.activationFloor!==lease.activationFloor)throw new IntakeFault('CONFIGURATION');
+      if(scope.tickets.length){
+        const refreshSignal=AbortSignal.any([controller.signal,AbortSignal.timeout(PENDING_LIMITS.deadlineMs)]);
+        // The native reader owns the one provider budget, including retries.
+        // Retrying the whole refresh here could multiply its provider allowance.
+        const refreshed=validatePendingBatch(await deadline(()=>options.readPending!(lease!.leaseId,refreshSignal),refreshSignal),scope);
+        for(const outcome of refreshed.outcomes){
+          const recorded=row(await retry(()=>options.rpc({action:'record_pending',leaseId:lease!.leaseId,outcome},controller.signal)));
+          if(recorded.state==='created')pending.created++;
+          else if(recorded.state==='existing')pending.existing++;
+          else if(recorded.state==='review_needed')pending.reviewNeeded++;
+          else if(recorded.state==='deferred')pending.deferred++;
+          else throw new IntakeFault('RECEIPT_INVALID');
+          pending.attempted++;
+        }
+        if(refreshed.budgetExhausted||pending.deferred)pending.state='deferred';
+        if(refreshed.failure)throw new IntakeFault(refreshed.failure.code,refreshed.failure.retryable,refreshed.failure.retryAfterSeconds);
+      }
+    }
+    const released=row(await retry(()=>options.rpc({action:'finish',leaseId:lease!.leaseId},controller.signal)));
+    if(released.state!=='complete'||released.watermarkAdvanced!==true)throw new IntakeFault('RECEIPT_INVALID');
+    return result;
   }catch(error){
-    const failure=error instanceof IntakeFault?error:new IntakeFault('INTERNAL');result.state='failed';result.code=failure.code;if(finishAttempted)result.completionUncertain=true;
+    const failure=error instanceof IntakeFault?error:new IntakeFault('INTERNAL');result.state='failed';result.code=failure.code;if(finishAttempted&&!result.watermarkAdvanced)result.completionUncertain=true;if(result.pending){result.pending.state='failed';result.pending.code=failure.code;}
     if(lease){const cleanup=new AbortController(),limit=setTimeout(()=>cleanup.abort(),2000);try{await deadline(()=>options.rpc({action:'fail',leaseId:lease!.leaseId,code:failure.code,retryable:failure.retryable,...(failure.retryAfterSeconds!==undefined?{retryAfterSeconds:failure.retryAfterSeconds}:{})},cleanup.signal),cleanup.signal);}catch{/* Lost cleanup must never advance a watermark; the fenced lease expires. */}finally{clearTimeout(limit);}}
     return result;
   }finally{clearTimeout(timer);controller.abort();}

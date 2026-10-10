@@ -5,7 +5,6 @@ after(async()=>{await sharedDatabase?.close();});
 import {readFile} from 'node:fs/promises';
 import {LEGACY_PART_FIELDS, LEGACY_TECH_CHECK_PROJECT} from '../shared/mhelpLegacyRoutePlan.ts';
 import {prepareMhelpLegacyIntake} from './mhelpIntakeAdapter.ts';
-import {mhelpLocalLeadUpgradeSql} from './deploymentAssembly.mjs';
 export const owner='10000000-0000-4000-8000-000000000001';
 export const it='20000000-0000-4000-8000-000000000001';
 export const service='30000000-0000-4000-8000-000000000001';
@@ -30,8 +29,24 @@ export function payload(type='service') {
   if(!result.payload) throw Error('Invalid synthetic fixture: '+result.reasonCodes.join(','));
   return result.payload;
 }
+// Synthetic scheduled shells deliberately omit structured scope and Ticket Lead.
+export function shellInput(type='delivery',department='service') {
+  const value=input(type);
+  value.localWorkflowPolicy={policy:'technician_equipment_selection_v1'};
+  delete value.equipment;delete value.parts;delete value.site;
+  value.source.assignment={state:'assigned',identities:[department+'.source'],evidence:'Synthetic exact scheduled technician'};
+  value.description.value='  Synthetic original instructions.\nKeep spacing.  ';
+  value.notes='\tSynthetic original notes.\r\nKeep this too.  ';
+  return value;
+}
+export function shellPayload(type='delivery',department='service') {
+  const {ticketLead,...shellOptions}=options();
+  const result=prepareMhelpLegacyIntake(shellInput(type,department),shellOptions);
+  if(!result.payload)throw Error('Invalid synthetic shell fixture: '+result.reasonCodes.join(','));
+  return result.payload;
+}
 export const sql=()=>readFile(new URL('./mhelp-intake-proposal.sql',import.meta.url),'utf8');
-export async function fixture({enabled=true,type='service',database,realScheduler=false,localLeadUpgrade=true}={}) {
+export async function fixture({enabled=true,type='service',database,realScheduler=false}={}) {
   // One WASM engine per serial test file avoids repeated-runtime V8 teardown
   // instability. Every fixture rebuilds isolated schemas and roles from scratch.
   const db=database ?? (sharedDatabase ||= new PGlite());
@@ -81,11 +96,11 @@ export async function fixture({enabled=true,type='service',database,realSchedule
     if(realScheduler)await db.exec(await readFile(new URL('../intake/mhelp-intake-scheduler-proposal.sql',import.meta.url),'utf8'));
     else {
     // Explicit scheduler fixture stub, not a production lease implementation.
-    await db.exec(`create function cos_mhelp_intake.validate_intake_lease_v1(uuid) returns jsonb language sql as $$
+    await db.exec(`create function cos_mhelp_intake.schedule_pending_v1(text,text) returns void language plpgsql as $$begin return;end$$;
+      create function cos_mhelp_intake.validate_intake_lease_v1(uuid) returns jsonb language sql as $$
       select '{"portalId":"17","createdAfter":"2026-10-09T00:00:00Z","createdBefore":"2026-10-11T00:00:00Z"}'::jsonb$$;
       revoke all on function cos_mhelp_intake.validate_intake_lease_v1(uuid) from public,anon,authenticated,service_role;`);
     }
-    if(localLeadUpgrade)await db.exec(await mhelpLocalLeadUpgradeSql());
     await db.exec(await readFile(new URL('./tests/contracts/legacy-workflow-contract.sql',import.meta.url),'utf8'));
     await db.query(`insert into cos_mhelp_intake.portal_config(portal_id,enabled,activated_at,schema_contract,schema_evidence,reviewed_by,reviewed_at)
       values('17',$1,'2026-10-10T00:00:00Z','synthetic-verified-v1','Synthetic schema verification',$2,now())`,[enabled,owner]);

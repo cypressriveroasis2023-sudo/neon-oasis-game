@@ -14,8 +14,8 @@ switch cannot produce a working production source mapper.
 - The legacy runtime uses its own already-available service client to call ONE
   service-only public RPC, `camera_mhelp_ticket_intake_v1(p_request)`. It does not
   impersonate an Owner or transfer a service key to native Operations.
-- The native source handler accepts only the fixed `ticket_batch` action and a
-  bounded creation window. It independently fetches the legacy authoritative policy
+- The native source handler accepts fixed `ticket_batch` with a bounded creation
+  window, or `ticket_refresh` with only a fenced lease ID. It independently fetches the legacy authoritative policy
   through the existing verifier's locally prepared `intake_policy` action, reusing the
   incoming Camera Health credential. No request may choose a portal, actor,
   assignment, URL, credentials or activation settings.
@@ -33,8 +33,9 @@ switch cannot produce a working production source mapper.
   uses only fixed account/type/status/ticket GET endpoints. The original manager
   continues to own single-flight rotation, lease contention and durable pair commit.
 - Source schemas are not assumed. The unregistered adapter must verify real type,
-  status, assignment, site/work and equipment structure before using the bounded
-  reader. The known preview DTO deliberately lacks work/equipment details and is
+  status, appointment, exact technician identity and instruction-note semantics
+  before using the bounded reader. The exact local technician-equipment policy
+  permits deferred equipment selection; it does not invent source evidence. The known preview DTO deliberately lacks work/equipment details and is
   insufficient. Actual rowIndex semantics also require verification; this prepared
   access layer does not silently guess a different pagination convention. A future
   evidence-bound type registry may project only verified routes; unknown types
@@ -45,13 +46,57 @@ switch cannot produce a working production source mapper.
   logs source rows, raw errors, billing, contacts, attachments, credentials or headers.
   Only the normalized allowlisted work envelope reaches the private receipt RPC.
 
+## Inactive normalized source-shell projector
+
+`projectMhelpSourceShell` in `mhelpSourceShellProjection.ts` prepares the existing
+`cos-mhelp-legacy-intake-v1` deferred-policy envelope from already verified,
+normalized facts. It does not parse raw mHelp fields or read an appointment,
+register an adapter, call a service, or establish source-contract readiness.
+The production registry remains empty. Actual appointment/assigned-person/timezone
+contract verification, including the pending live appointment read for PR #117,
+is still required before a real adapter can use it.
+
+The input contains only immutable source identity, reviewed description/notes and
+schedule, optional reviewed site/summary, and genuine source department facts.
+When a source summary is absent, explicit reviewed `notesEvidence` can provide
+the instruction proof; `job_description:''` is then only a storage placeholder
+and original notes remain unchanged. No reviewed vendor summary is invented.
+A separate explicit reviewed configuration supplies the exact portal/type-to-kind
+mapping; names, notes and fuzzy aliases never choose a route. The builder accepts
+no COS UUID, identity crosswalk, fake Ticket Lead, equipment scope or raw provider
+fields. It preserves original description and note strings, including whitespace.
+Every projected target has `assignee_user_id:null`: this means unresolved projection,
+not source unassignment. The exact opaque scheduled source identity remains under
+`source.assignment`; only the private legacy writer resolves it to its current
+reviewed same-person profile. Genuine secondary source assignments follow the same
+private resolution. The private writer still rejects a scheduled IT identity for
+a Service-only route and independently rechecks route, status and profile authority.
+
+The existing deferred policy carries empty equipment, unknown count, zero part
+placeholders and `sourceEvidence.complete:false`. These placeholders do not assert
+source-confirmed equipment/part quantities. Missing or ambiguous notes, schedule,
+assignment, routing or review facts produce `request:null` with mandatory immutable
+identity and independently validated, allowlisted source facts. Known source type,
+status, deletion and exact assignment are retained; genuinely unknown or ambiguous
+facts are omitted. A known deletion always stays held. Such receipts can enter
+the existing pending lane without erasing verified status or assignment evidence. Invalid
+immutable identity/configuration and unexpected fields fail closed without a
+receipt. Source parsing errors are not converted into successful projections.
+The existing source-complete planner and preparer remain unchanged.
+
+Synthetic tests validate produced envelopes with the runtime allowlist and execute
+the unchanged proposal SQL in isolated PGlite fixtures, including private crosswalk
+resolution, all routes, both departments, pending enrichment and atomic rollback.
+This is local compatibility evidence, not production or multi-session PostgreSQL
+proof. Legacy SQL remains unapplied; the prior migration risk denial and all
+separate deployment/activation gates still apply.
+
 ## Runtime and storage contract
 
-Apply `legacy/mhelp-intake-proposal.sql` definitions and then
-`intake/mhelp-intake-scheduler-proposal.sql`, then
-`legacy/mhelp-local-lead-upgrade-proposal.sql` as one reviewed fresh-deployment assembly.
-An existing disabled PR114 installation uses only the forward local-lead upgrade;
-see the legacy README for drift guards and deployment order.
+The revised fresh proposal contains `legacy/mhelp-intake-proposal.sql` and
+`intake/mhelp-intake-scheduler-proposal.sql` only. The unnecessary local-lead upgrade
+is excluded. These are inactive local definitions, not permission to execute the
+previously denied deployment DDL or to apply a replacement.
 The latter supplies only private, explicitly revoked helpers and an RLS table;
 the former owns the only exposed service-role-only wrapper.
 
@@ -59,17 +104,29 @@ the former owns the only exposed service-role-only wrapper.
   aggregate disabled/busy/backoff/idle state. No caller-supplied scope.
 - `record`: `{leaseId,ticket}`; the wrapper validates the current lease and exact
   portal/window, then atomically records an immutable source receipt with any work.
-- `finish`: `{leaseId,expectedTicketIds,total}`; verifies all expected unique keys
+- `commit_discovery`: `{leaseId,expectedTicketIds,total}`; verifies all expected unique keys
   have durable created/review receipts in the same window/schema, then commits the
-  forward-only watermark. Repeating the identical finish after an uncertain response
-  is safe; a different manifest is rejected. A lost finish acknowledgement is marked
+  forward-only watermark while retaining the lease. Repeating the identical commit
+  after an uncertain response is safe; a different manifest is rejected. A lost
+  commit acknowledgement is marked
   `completionUncertain` if retries do not establish the result.
-- `fail`: `{leaseId,code,retryable,retryAfterSeconds?}`; no cursor advance, only a
-  safe allowlisted code and persisted cooldown. Optional provider seconds must be
+- `pending_scope`: `{leaseId}`; freezes at most ten existing, due, uncreated IDs
+  after confirmed discovery commit, excluding IDs observed by discovery this run.
+- `record_pending`: `{leaseId,outcome}`; accepts one admitted normalized ticket or
+  safe failure; exact same-lease retries replay without increasing backoff twice.
+- `finish`: `{leaseId}`; releases the lease only after discovery commit. It does
+  not wait for pending tickets to become schedulable.
+- `fail`: `{leaseId,code,retryable,retryAfterSeconds?}`; never advances or reverses
+  a cursor, only stores a safe allowlisted code and persisted cooldown. Optional provider seconds must be
   an integer from 0 through 86,400; SQL uses at least the existing backoff and the
   requested delay. Stale workers cannot clear a newer lease.
 - Private state includes last attempt/success times, failure count, retry time,
   last safe error code, completed lease and its exact expected manifest.
+- `pending_status`: optional aggregate-only read, separate from unchanged Owner
+  `review_status` v1. Returns waiting/due counts, oldest waiting creation time,
+  and the last saved refresh timestamp/state/safe code. No source or person IDs.
+  Waiting means a retry is scheduled; a coarse hold reason alone does not prove
+  that only scheduling information is missing.
 
 The fixed minimum poll interval is five minutes, enforced durably by the private
 begin action before source access. The prepared provider-reconcile hook reuses
@@ -108,11 +165,35 @@ scan advances only after every review receipt exists and reports zero created,
 with the full review-needed count. Such a scan is not proof of operational rollout
 success. Mapping coverage and held work must be reported separately.
 
-A null request is retained as an unresolved immutable snapshot. Filling in a new
-projection later requires explicit reconciliation; do not rewrite the receipt or
-loosen equality. Exact private mapping/status repair may promote an unchanged
-envelope only when that ticket is read again within the existing bounded scope.
-There is no automatic reprocessing of older holds beyond the overlap window.
+Every first snapshot remains immutable. A separate candidate may change only
+before assignment creation and only with the same source key, printed reference,
+and original creation instant. It is frozen at successful creation. Later observed
+notes, schedule or assignment changes flag review without updating any local work.
+Immutable identity changes are reconciliation-only and leave the retry queue.
+
+The pending lane revisits known post-activation holds beyond the discovery overlap;
+it never scans historical date ranges or admits arbitrary IDs. Its native HTTP
+request contains only `ticket_refresh` and `leaseId`. The native service gets the
+frozen scope from the existing trusted legacy callback (`intake_pending_scope`),
+then independently verifies policy, floor, original creation instant and schema.
+The production adapter remains unregistered; a typed injected adapter must account
+for every detail, appointment and auth GET through the shared provider budget.
+No appointment endpoint or operational mapper is guessed.
+
+Each admitted invocation permits at most ten pending IDs, thirty seconds within
+the existing 120-second total budget, and twenty refresh-related provider requests
+including retries. Transient requests have at most three attempts; Retry-After
+stops further provider access and persists the global cooldown. Individual failures
+retain sibling outcomes. Per-ticket backoff is 5/10/20/40/60 minutes with a bounded
+counter; oldest due items come first. Unattempted IDs remain due. There is no global
+queue cap, retry-count expiry, or silent deletion of unfinished tickets.
+
+Discovery commits before pending access. A failure after that confirmed commit
+reports `watermarkAdvanced:true` honestly, with separate pending counters/status.
+An unconfirmed commit remains explicitly uncertain. Created tickets leave pending
+polling; this does not promise detection of source edits outside ordinary overlap.
+Stream reads and fetches race abort signals and use nonblocking best-effort cleanup,
+including when a transport ignores abort or cancellation never settles.
 
 The ten-minute overlap mitigates short source indexing delays. It does NOT prove
 late visibility or old-ticket changes are fully covered. A source ticket first

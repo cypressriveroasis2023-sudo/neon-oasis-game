@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test';
 import {existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-const origin='http://127.0.0.1:4173',dist=resolve(fileURLToPath(new URL('../dist',import.meta.url)));
+const origin='http://127.0.0.1:4173',dist=resolve(process.env.COS_STATUS_TEST_DIST||fileURLToPath(new URL('../dist',import.meta.url)));
 const now=Date.parse('2026-10-10T05:00:00.000Z');
 const status=(patch={})=>({contract:'cos-mhelp-intake-review-v1',enabled:true,activationAt:'2026-10-10T04:00:00.000Z',pendingReviewCount:1,createdCount:2,lastAttemptAt:'2026-10-10T04:59:00.000Z',lastSuccessAt:'2026-10-10T04:59:00.000Z',failureCount:0,retryAfter:null,lastErrorCode:null,held:[{ticketNumber:'000042',reasonCodes:['source_changed_review_required']}],heldTruncated:false,...patch});
 async function mount(page,{role='owner',legacyOwner=role==='owner',value=status()}={}){
@@ -25,7 +25,7 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
   if(request.path==='/api/session')return answer({authorized:true,legacyOwner,role:role==='owner'?'Owner':role==='it'?'IT':'Service',features:{unitTracker:true,fleetAccess:true}});
   if(request.path==='/api/unit-tracker')return answer({contract:'COS_UNIT_TRACKER_OUTBOX_V1',workbookId:'1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA',connector:{enabled:false,state:'awaiting_sheets_connection'},queueEnabled:false,sources:[],requests:[],sourcesTruncated:false,requestsTruncated:false,sourcesHeld:0});
   if(request.path==='/api/field-map')return answer({items:[],inventoryItems:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}});
-  if(request.path==='/api/mhelpdesk/intake/status'){
+  if(request.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1'){
    const value=structuredClone(state.value),failure=state.failure;
    if(state.hold)await new Promise(resolve=>state.releases.push(resolve));
    return answer(failure?{error:'PRIVATE source body contact@example.invalid secret'}:value,failure||200);
@@ -37,7 +37,7 @@ async function mount(page,{role='owner',legacyOwner=role==='owner',value=status(
  else await expect(frame.getByRole('alert')).toContainText('Your existing Tech Check session is unavailable');
  return {frame,panel:frame.getByRole('region',{name:'mHelpDesk automatic intake status',exact:true}),state};
 }
-const reads=state=>state.calls.filter(x=>x.path==='/api/mhelpdesk/intake/status');
+const reads=state=>state.calls.filter(x=>x.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1');
 const refresh=panel=>panel.getByRole('button',{name:'Refresh intake status',exact:true});
 test('explicit saved-status read shows active state, activation, poll, counts, held printed number and code',async({page})=>{
  const {panel,state}=await mount(page);await expect(panel).toContainText('Intake state unknown');expect(reads(state)).toHaveLength(0);
@@ -78,11 +78,13 @@ test('hidden host cancels old reads and a newer refresh wins over the old respon
  await expect(panel).toContainText('Intake state unknown');state.hold=false;state.value=status({pendingReviewCount:0,held:[],createdCount:7});
  await refresh(panel).click();await expect(panel).toContainText('Created by intake7');state.releases.shift()();await expect(panel).not.toContainText('000042');await expect(panel).toContainText('Created by intake7');expect(state.errors).toEqual([]);
 });
-test('navigation and Back discard a pending result and return to unknown status',async({page})=>{
+test('navigation and Back/Forward discard a pending result and return to unknown status',async({page})=>{
  const {frame,panel,state}=await mount(page);state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
  await frame.locator('body').evaluate(()=>{location.hash='#units-on-hand';});await expect(panel).toHaveCount(0);state.releases.shift()();
  await traverseIframeHistory(frame,'back','#unit-tracker');
  await expect(panel).toBeVisible();await expect(panel).toContainText('Intake state unknown');await expect(panel).not.toContainText('000042');
+ await traverseIframeHistory(frame,'forward','#units-on-hand');await expect(panel).toHaveCount(0);
+ await traverseIframeHistory(frame,'back','#unit-tracker');await expect(panel).toContainText('Intake state unknown');
  state.hold=false;await refresh(panel).click();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
 });
 test('bounded held list remains readable on mobile and clearly says it is truncated',async({page})=>{
@@ -96,6 +98,54 @@ for(const role of ['it','service'])test(`${role} session has no intake review or
 
 test('a completed all-held scan never claims that Tech Check assignments were created',async({page})=>{
  const {panel,state}=await mount(page,{value:status({createdCount:0})});await refresh(panel).click();
- await expect(panel.getByRole('status')).toContainText('Review is required');await expect(panel).toContainText('No Tech Check assignments have been created by this intake yet.');
- state.value=status({createdCount:0,pendingReviewCount:0,held:[]});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');await expect(panel.getByRole('status')).not.toContainText('Review is required');await expect(panel).toContainText('No Tech Check assignments have been created');
+ await expect(panel.getByRole('status')).toContainText('Saved receipt holds remain');await expect(panel).toContainText('No Tech Check assignments have been created by this intake yet.');
+ state.value=status({createdCount:0,pendingReviewCount:0,held:[]});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');await expect(panel.getByRole('status')).not.toContainText('Saved receipt holds remain');await expect(panel).toContainText('No Tech Check assignments have been created');
+});
+
+const pending=(patch={})=>({contract:'cos-mhelp-pending-status-v1',waitingCount:3,dueCount:2,oldestWaitingCreatedAt:'2026-10-10T04:30:00.000Z',lastRefreshAt:'2026-10-10T04:59:00.000Z',lastRefreshState:'review_needed',lastRefreshCode:null,...patch});
+const extended=(pendingSchedule=pending(),review=status())=>({contract:'cos-mhelp-intake-status-pending-v1',review,pendingSchedule});
+test('legacy v1 response makes missing enrichment evidence explicit and never invents waiting counts',async({page})=>{
+ const {panel,state}=await mount(page);await refresh(panel).click();
+ await expect(panel.getByRole('status')).toContainText('Recent source scan completed');
+ await expect(panel.getByRole('status')).toContainText('Schedule enrichment status unavailable');
+ await expect(panel).not.toContainText('Tickets waiting for recheck');
+ expect(reads(state)[0].path).toBe('/api/mhelpdesk/intake/status?capability=pending_schedule_v1');
+ expect(reads(state)[0].body).toBe(null);
+});
+test('waiting ticket counts remain separate from receipt holds and technician work after discovery completes',async({page})=>{
+ const {panel,state}=await mount(page,{value:extended(pending(),status({createdCount:0,held:[{ticketNumber:'000042',reasonCodes:['source_scope_or_route_invalid']}]}))});
+ await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Tickets are waiting for automatic recheck');
+ await expect(panel).toContainText('Tickets waiting for recheck3');await expect(panel).toContainText('Eligible for recheck now2');
+ await expect(panel).toContainText('Oct 10, 2026, 4:30:00 AM UTC');await expect(panel).toContainText('Unresolved receipt holds1');
+ await expect(panel).toContainText('counts are not added together');await expect(panel).toContainText('No Tech Check assignments have been created');
+ await expect(panel.getByRole('status')).not.toContainText('Review is required');await expect(panel.getByRole('status')).not.toContainText('healthy');
+ expect(reads(state)).toHaveLength(1);expect(state.calls.some(x=>x.method==='POST'||x.path.startsWith('/api/mhelpdesk/partner'))).toBe(false);
+ expect(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth)).toBe(true);expect(state.errors).toEqual([]);
+});
+test('deferred pending refresh stays visible alongside completed discovery and subsequent unavailable evidence',async({page})=>{
+ const {panel,state}=await mount(page,{value:extended(pending({lastRefreshState:'deferred',lastRefreshCode:'SOURCE_UNAVAILABLE'}),status({pendingReviewCount:0,held:[]}))});
+ await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');
+ await expect(panel.getByRole('status')).toContainText('Pending-ticket refresh deferred or failed');
+ await expect(panel).toContainText('Last ticket recheck deferred; waiting for a later retry');await expect(panel).toContainText('SOURCE_UNAVAILABLE');
+ state.value=extended(null,status({pendingReviewCount:0,held:[]}));await refresh(panel).click();
+ await expect(panel.getByRole('status')).toContainText('Schedule enrichment status unavailable');await expect(panel).not.toContainText('Tickets waiting for recheck');
+ await expect(panel).not.toContainText('SOURCE_UNAVAILABLE');await expect(panel).toContainText('Created by intake2');
+ state.value=extended(pending({waitingCount:0,dueCount:0,oldestWaitingCreatedAt:null,lastRefreshState:'created'}),status({pendingReviewCount:0,held:[],createdCount:3}));await refresh(panel).click();
+ await expect(panel).toContainText('Tickets waiting for recheck0');await expect(panel).toContainText('Created by intake3');await expect(panel).toContainText('Assignment created on the last ticket recheck');
+});
+test('invalid enrichment response clears all evidence and arbitrary source data stays redacted',async({page})=>{
+ const {panel,state}=await mount(page,{value:extended()});await refresh(panel).click();await expect(panel).toContainText('Tickets waiting for recheck3');
+ for(const pendingSchedule of [{...pending(),ticketId:'PRIVATE'},{...pending(),lastRefreshCode:'PRIVATE'},{...pending(),dueCount:4}]){
+  state.value=extended(pendingSchedule);await refresh(panel).click();await expect(panel.getByRole('alert')).toContainText('unknown');
+  await expect(panel.locator('dl')).toHaveCount(0);await expect(panel).not.toContainText('PRIVATE');await expect(panel).not.toContainText('000042');
+ }
+ state.value=extended(pending(),status({held:[{ticketNumber:'000042',reasonCodes:['source_identity_changed_review_required']}]}));await refresh(panel).click();
+ await expect(panel).toContainText('Source identity changed; reconciliation is required');await expect(panel).toContainText('source_identity_changed_review_required');expect(state.errors).toEqual([]);
+});
+test('hidden host discards old enrichment counts and newer refresh wins as a complete snapshot',async({page})=>{
+ const {panel,state}=await mount(page,{value:extended()});state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
+ await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));await expect(panel).toContainText('Intake state unknown');
+ state.hold=false;state.value=extended(pending({waitingCount:8,dueCount:1}),status({createdCount:7}));await refresh(panel).click();
+ await expect(panel).toContainText('Tickets waiting for recheck8');await expect(panel).toContainText('Created by intake7');state.releases.shift()();
+ await expect(panel).not.toContainText('Tickets waiting for recheck3');await expect(panel).toContainText('Tickets waiting for recheck8');expect(state.errors).toEqual([]);
 });

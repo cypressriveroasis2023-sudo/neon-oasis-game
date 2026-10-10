@@ -100,6 +100,6 @@ test('page counts up to 500 roundtrip and match distributions remain bounded ind
 });
 test('appointment browser cases remain in the exact-head hosted pre-publication CI gate',()=>{
   const yaml=readFileSync(new URL('../../../.github/workflows/cos-operations.yml',import.meta.url),'utf8');
-  assert.match(yaml,/Verify mHelp Owner interactions before the full browser suite[\s\S]*npm run test:browser -- tests\/mhelp-intake-review.browser.spec.mjs tests\/mhelp-ticket-preview.browser.spec.mjs/);
+  assert.match(yaml,/Verify mHelp Owner and IT interactions before the full browser suite[\s\S]*npm run test:browser -- tests\/mhelp-intake-review.browser.spec.mjs tests\/mhelp-ticket-preview.browser.spec.mjs tests\/it-ticket-instructions.browser.spec.mjs/);
   const spec=readFileSync(new URL('./mhelp-ticket-preview.browser.spec.mjs',import.meta.url),'utf8');assert.match(spec,/appointment.*seven-day/);assert.doesNotMatch(yaml,/continue-on-error: true/);
 });

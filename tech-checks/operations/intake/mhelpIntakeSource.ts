@@ -55,3 +55,73 @@ export function createBoundedMhelpSource(options:{getPolicy:(signal:AbortSignal)
     throw new IntakeFault('BATCH_LIMIT');
   };
 }
+
+import {PENDING_LIMITS,PENDING_BATCH_CONTRACT,parsePendingScope,pendingIdentityChanged,validatePendingTicket,validatePendingBatch,type PendingScope,type PendingFailure,type PendingOutcome} from './mhelpIntakePending.ts';
+import {deadline} from './mhelpIntakeRuntime.ts';
+/** Only a verified adapter may classify an error as isolated to one ticket.
+ * Unknown errors, authentication faults and provider cooldowns stop the batch. */
+export class PendingTicketFault extends IntakeFault {}
+class PendingBudgetFault extends IntakeFault {constructor(){super('DEADLINE',true);}}
+export type PendingProviderRequest=<T>(work:()=>Promise<T>)=>Promise<T>;
+export type PendingSourceAdapter=VerifiedSourceAdapter&{
+  openPending?:(portalId:string,signal:AbortSignal,request:PendingProviderRequest)=>Promise<void>;
+  readPendingTicket:(input:{portalId:string;ticketId:string},signal:AbortSignal,request:PendingProviderRequest)=>Promise<unknown>;
+};
+/** No production adapter is registered. Every future provider GET, including
+ * auth/open and appointment pagination, MUST use the shared request allowance. */
+export function createBoundedPendingSource(options:{
+  getPolicy:(signal:AbortSignal)=>Promise<unknown>;
+  getScope:(leaseId:string,signal:AbortSignal)=>Promise<unknown>;
+  adapterFor:(policy:IntakePolicy)=>PendingSourceAdapter|null;
+  now?:()=>number;sleep?:(ms:number,signal:AbortSignal)=>Promise<void>;
+}){
+  return async(leaseId:string,signal:AbortSignal)=>{
+    signal=AbortSignal.any([signal,AbortSignal.timeout(PENDING_LIMITS.deadlineMs-1000)]);
+    const now=options.now??Date.now;
+    const scope=parsePendingScope(await deadline(()=>options.getScope(leaseId,signal),signal),now());
+    if(scope.leaseId!==leaseId)throw new IntakeFault('CONFIGURATION');
+    const policy=parseIntakePolicy(await deadline(()=>options.getPolicy(signal),signal));
+    if(policy.portalId!==scope.portalId||policy.activationFloor!==scope.activationFloor||policy.schemaContract!==scope.schemaContract)throw new IntakeFault('CONFIGURATION');
+    const adapter=options.adapterFor(policy);
+    if(!adapter||adapter.schemaContract!==policy.schemaContract||adapter.schemaEvidence!==policy.schemaEvidence)throw new IntakeFault('CONFIGURATION');
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),PENDING_LIMITS.deadlineMs-1000);
+    const bounded=AbortSignal.any([signal,controller.signal]);let requests=0,budgetExhausted=false,failure:PendingFailure|undefined;
+    const outcomes:PendingOutcome[]=[];
+    const sleep=options.sleep??((ms:number,s:AbortSignal)=>new Promise<void>((resolve,reject)=>{const abort=()=>{clearTimeout(t);reject(new PendingBudgetFault());};const t=setTimeout(()=>{s.removeEventListener('abort',abort);resolve();},ms);s.addEventListener('abort',abort,{once:true});}));
+    const request:PendingProviderRequest=async work=>{
+      for(let attempt=0;;attempt++){
+        if(bounded.aborted||requests>=PENDING_LIMITS.maxProviderRequests)throw new PendingBudgetFault();
+        requests++;
+        try{return await deadline(work,bounded);}catch(error){
+          if(bounded.aborted)throw new PendingBudgetFault();
+          if(!(error instanceof IntakeFault)||!error.retryable||error.retryAfterSeconds!==undefined||attempt>=2)throw error;
+          await deadline(()=>sleep(250*2**attempt,bounded),bounded);
+        }
+      }
+    };
+    const safeFailure=(error:unknown):PendingFailure=>{const e=error instanceof IntakeFault?error:new IntakeFault('INTERNAL');
+      const code=['SOURCE_UNAVAILABLE','SOURCE_INVALID','DEADLINE','CONFIGURATION','INTERNAL'].includes(e.code)?e.code as PendingFailure['code']:'INTERNAL';
+      return {code,retryable:e.retryable&&['SOURCE_UNAVAILABLE','DEADLINE'].includes(code),...(e.retryAfterSeconds!==undefined?{retryAfterSeconds:e.retryAfterSeconds}:{})};};
+    try{
+      if(scope.tickets.length)await deadline(()=>adapter.openPending?.(scope.portalId,bounded,request)??Promise.resolve(),bounded);
+      for(const item of scope.tickets){
+        if(bounded.aborted||requests>=PENDING_LIMITS.maxProviderRequests){budgetExhausted=true;break;}
+        try{
+          const raw=await deadline(()=>adapter.readPendingTicket({portalId:scope.portalId,ticketId:item.ticketId},bounded,request),bounded);
+          const projected=adapter.projectTicket(raw,policy);
+          if(pendingIdentityChanged(projected,scope,item.ticketId)){outcomes.push({ticketId:item.ticketId,identityChanged:true});continue;}
+          const ticket=validatePendingTicket(projected,scope);
+          if(ticket.source.ticketId!==item.ticketId)throw new IntakeFault('SOURCE_INVALID');
+          outcomes.push({ticketId:item.ticketId,ticket});
+        }catch(error){
+          if(error instanceof PendingBudgetFault||bounded.aborted){budgetExhausted=true;break;}
+          const safe=safeFailure(error);outcomes.push({ticketId:item.ticketId,...safe});
+          if(!(error instanceof PendingTicketFault)||safe.retryAfterSeconds!==undefined){failure=safe;break;}
+        }
+      }
+    }catch(error){if(error instanceof PendingBudgetFault||bounded.aborted)budgetExhausted=true;else failure=safeFailure(error);}
+    finally{clearTimeout(timer);controller.abort();}
+    const batch=validatePendingBatch({contract:PENDING_BATCH_CONTRACT,leaseId,outcomes,budgetExhausted,...(failure?{failure}:{})},scope);
+    return {scope,batch};
+  };
+}

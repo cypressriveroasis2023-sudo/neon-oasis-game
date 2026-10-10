@@ -364,7 +364,7 @@ export function createOperationsHandler(options) {
         const envelopeLimit = envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
         if (envelopeBytes > envelopeLimit) fail('Request body is too large.', 413);
         if (Object.keys(envelope).some(k => !['path', 'method', 'body'].includes(k))) fail('Unsupported transport fields.');
-        if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path)) fail('COS endpoint not found.', 404);
+        if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path) && !(envelope.method==='GET' && envelope.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1')) fail('COS endpoint not found.', 404);
         if (!['GET', 'POST'].includes(envelope.method)) fail('Method not supported.', 405);
         path = envelope.path.replace(/\/$/, '');
         method = envelope.method;
@@ -471,12 +471,14 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
-      if(path==='/api/mhelpdesk/intake/status') {
+      if(path==='/api/mhelpdesk/intake/status'||path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1') {
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
         if(method!=='GET')fail('Method not supported.',405);
         allowedFields(body || {},[],'Intake status request');
-        if(new URL(request.url).search)fail('Intake status query parameters are unsupported.');
-        try{return json(await readMhelpIntakeReview(context.authorization,request.signal));}
+        const query=new URL(request.url).search,transportOptIn=path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1';
+        if(query!==''&&(query!=='?capability=pending_schedule_v1'||transportOptIn))fail('Intake status query parameters are unsupported.');
+        const capability=transportOptIn||query==='?capability=pending_schedule_v1'?'pending_schedule_v1':undefined;
+        try{return json(await readMhelpIntakeReview(context.authorization,request.signal,capability));}
         catch(cause){const failure=cause instanceof MhelpIntakeReviewError?cause:new MhelpIntakeReviewError();return json({error:failure.message},failure.status);}
       }
       if (path.startsWith('/api/mhelpdesk/partner/')) {

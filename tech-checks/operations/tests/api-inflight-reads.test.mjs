@@ -355,3 +355,14 @@ test('legacy Victron snapshots retain separate same-session deduplication', asyn
  f.answer(0,{source:'legacy'});f.answer(1,{source:'dynamic'});
  assert.deepEqual((await Promise.all(reads)).map(result=>result.data.source),['legacy','legacy','dynamic']);
 });
+
+
+test('pending schedule opt-in is the only allowed query path and never shares status reads',async()=>{
+ const path='/api/mhelpdesk/intake/status?capability=pending_schedule_v1',f=fixture();
+ const first=f.api.get(path),second=f.api.get(path);await flush();assert.equal(f.requests.length,2);
+ for(const entry of f.requests)assert.deepEqual(entry.envelope,{path,method:'GET',body:null});
+ f.answer(0,{saved:true});f.answer(1,{saved:true});await Promise.all([first,second]);
+ for(const invalid of ['/api/jobs?capability=pending_schedule_v1','/api/mhelpdesk/intake/status?capability=other',path+'&portalId=17',path+'&capability=pending_schedule_v1',path+'#ignored','/api/mhelpdesk/intake/status?evidenceCapability=pending_schedule_v1'])await assert.rejects(f.api.get(invalid),status(400));
+ await assert.rejects(f.api.post(path,{}),status(400));assert.equal(f.requests.length,2);
+ const tech=fixture({mode:'production-assignments',role:'it'});await assert.rejects(tech.api.get(path),status(403));assert.equal(tech.requests.length,0);assert.equal(tech.handshakes.length,0);
+});

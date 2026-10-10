@@ -11,8 +11,7 @@ test('real PostgreSQL harness is opt-in hosted CI only with hardcoded ephemeral 
 test('PostgreSQL and PGlite reuse exact common fixture and actual scheduler SQL rather than a concurrency reimplementation',async()=>{
  const statements=[];await fixture({database:{exec:async sql=>statements.push(sql),query:async(sql,values)=>{statements.push(sql);return {rows:[]};}},realScheduler:true});
  const proposal=await readFile(new URL('../legacy/mhelp-intake-proposal.sql',import.meta.url),'utf8'),scheduler=await readFile(new URL('../intake/mhelp-intake-scheduler-proposal.sql',import.meta.url),'utf8'),contracts=await readFile(new URL('../legacy/tests/contracts/legacy-workflow-contract.sql',import.meta.url),'utf8');
- const localLead=await readFile(new URL('../legacy/mhelp-local-lead-upgrade-proposal.sql',import.meta.url),'utf8');
- assert(statements.includes(proposal));assert(statements.includes(scheduler));assert(statements.includes(localLead));assert(statements.includes(contracts));assert(!statements.some(sql=>sql.includes('2026-10-09T00:00:00Z')&&sql.includes('validate_intake_lease_v1(uuid)')));
+ assert(statements.includes(proposal));assert(statements.includes(scheduler));assert(!statements.some(sql=>sql.includes('create table cos_mhelp_intake.ticket_lead_policies')));assert(statements.includes(contracts));assert(!statements.some(sql=>sql.includes('2026-10-09T00:00:00Z')&&sql.includes('validate_intake_lease_v1(uuid)')));
 });
 test('CI adds official postgres and mandatory concurrency step without dropping existing verification/publish guards',async()=>{
  const yaml=await readFile(new URL('../../../.github/workflows/cos-operations.yml',import.meta.url),'utf8');assert.match(yaml,/image: postgres:17\.11/);assert.match(yaml,/POSTGRES_DB: cos_mhelp_intake_ci/);assert.match(yaml,/COS_MHELP_POSTGRES_CI: '1'/);assert.match(yaml,/node --import tsx legacy\/tests\/mhelp-postgres-concurrency\.ci\.mjs/);
@@ -25,4 +24,21 @@ test('PostgreSQL isolation validates fixed database/user/port without assuming a
  for(const change of [{database:'postgres'},{account:'other'},{port:6543},{port:'5432'}])assert.throws(()=>validateIsolatedServer({...valid,...change}));
  for(const address of ['172.19.0.2','192.168.1.2','10.10.0.2','::ffff:172.18.0.2'])assert.doesNotThrow(()=>validateIsolatedServer({...valid,address}));
  assert.equal(connection.host,'127.0.0.1');
+});
+
+
+test('hosted PostgreSQL harness covers concurrent pending enrichment and split commit/release acknowledgements',async()=>{
+ const source=await readFile(new URL('../legacy/tests/mhelp-postgres-concurrency.ci.mjs',import.meta.url),'utf8');for(const text of ['async function pendingEnrichment()',"action:'record_pending'","action:'commit_discovery'",'mhelp-ci-pending-replay','pending_attempt_count','Synthetic post-enrichment manual edit'])assert(source.includes(text),text);assert.match(source,/await pendingEnrichment\(\)/);
+});
+
+
+test('hosted lock harness retains valid-intake blocking and proves held candidates permit real public writes',async()=>{
+ const source=await readFile(new URL('../legacy/tests/mhelp-postgres-concurrency.ci.mjs',import.meta.url),'utf8');
+ for(const name of ['creatingCandidatePublicContention','heldCandidatePublicWrites'])assert.match(source,new RegExp('await '+name+'\\(\\)'));
+ assert(source.includes("for(const ending of ['commit','rollback'])"));assert(source.includes('await first.rollback()'));
+ assert(source.includes("waitForLock('mhelp-ci-waiting-human',2500)"));assert(source.includes("set local lock_timeout='5s'"));
+ assert(source.includes("for(const table of ['job_assignments','prep_tickets','unit_returns'])"));
+ assert(source.includes("locks.every(lock=>lock.mode==='AccessShareLock')"));
+ assert(source.includes('complete.source.createdAt=record.ticket.source.createdAt'));
+ assert(source.includes("setup('pickup',30)"));assert(source.includes("second=rpc(observation,{application:'mhelp-ci-pending-replay'})"));
 });

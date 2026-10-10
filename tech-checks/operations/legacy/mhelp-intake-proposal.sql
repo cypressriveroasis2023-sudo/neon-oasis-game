@@ -84,6 +84,8 @@ create table cos_mhelp_intake.receipts (
   ticket_number text not null,
   source_created_at timestamptz not null,
   first_payload jsonb not null,
+  -- First observation is immutable; only an uncreated candidate may be enriched.
+  candidate_payload jsonb not null,
   state text not null check (state in ('review_needed','created')),
   reason_codes text[] not null default '{}',
   review_required boolean not null default false,
@@ -99,6 +101,7 @@ create table cos_mhelp_intake.receipts (
 -- The legacy printed ticket has a global namespace. Multiple portals cannot
 -- silently co-own that reference even if someone later removes an assignment.
 create unique index receipts_created_ticket_number on cos_mhelp_intake.receipts(ticket_number) where state='created';
+create index receipts_ticket_number_history on cos_mhelp_intake.receipts(ticket_number);
 create index receipts_review_queue on cos_mhelp_intake.receipts(received_at) where review_required;
 alter table cos_mhelp_intake.portal_config enable row level security;
 alter table cos_mhelp_intake.type_mappings enable row level security;
@@ -106,6 +109,36 @@ alter table cos_mhelp_intake.identity_crosswalk enable row level security;
 alter table cos_mhelp_intake.source_status_policies enable row level security;
 alter table cos_mhelp_intake.receipts enable row level security;
 revoke all on all tables in schema cos_mhelp_intake from public, anon, authenticated, service_role;
+
+
+-- Private ledger integrity also applies to future scheduler helpers. No update
+-- can rewrite the first observation, source identity or a created candidate.
+create function cos_mhelp_intake.guard_receipt_snapshots_v1()
+returns trigger language plpgsql security invoker set search_path='' as $receipt_guard$
+begin
+  if tg_op='INSERT' then
+    if new.candidate_payload is distinct from new.first_payload then
+      raise exception 'MHELP_INTAKE_INVALID_INITIAL_CANDIDATE'; end if;
+  elsif new.portal_id is distinct from old.portal_id or new.ticket_id is distinct from old.ticket_id
+    or new.ticket_number is distinct from old.ticket_number or new.source_created_at is distinct from old.source_created_at
+    or new.first_payload is distinct from old.first_payload
+    or (old.state='created' and (new.candidate_payload is distinct from old.candidate_payload
+      or new.state is distinct from old.state or new.assignment_ids is distinct from old.assignment_ids
+      or new.created_at is distinct from old.created_at)) then
+    raise exception 'MHELP_INTAKE_RECEIPT_IMMUTABLE';
+  end if;
+  if new.candidate_payload#>'{source,portalId}' is distinct from new.first_payload#>'{source,portalId}'
+    or new.candidate_payload#>'{source,ticketId}' is distinct from new.first_payload#>'{source,ticketId}'
+    or new.candidate_payload#>'{source,ticketNumber}' is distinct from new.first_payload#>'{source,ticketNumber}'
+    or new.candidate_payload#>'{source,createdAt}' is distinct from new.first_payload#>'{source,createdAt}' then
+    raise exception 'MHELP_INTAKE_CANDIDATE_IDENTITY_IMMUTABLE';
+  end if;
+  return new;
+end;
+$receipt_guard$;
+revoke all on function cos_mhelp_intake.guard_receipt_snapshots_v1() from public,anon,authenticated,service_role;
+create trigger guard_mhelp_intake_receipt_snapshots_v1 before insert or update on cos_mhelp_intake.receipts
+  for each row execute function cos_mhelp_intake.guard_receipt_snapshots_v1();
 
 
 -- Preserve human attribution requirements. Only the approved service marker can
@@ -162,6 +195,11 @@ declare
   v_number text := p_ticket#>>'{source,ticketNumber}';
   v_created timestamptz;
   v_work text;
+  v_deferred boolean := p_ticket ? 'localWorkflowPolicy';
+  v_scheduled_department text;
+  v_local_queue boolean;
+  -- ECMAScript trim whitespace, matching the pure source preparer.
+  v_trim_chars constant text := U&'\0009\000A\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF';
   v_roles text[];
   v_reasons text[] := '{}';
   v_target jsonb;
@@ -204,7 +242,9 @@ begin
   -- Persist only this bounded normalized envelope, never raw provider bodies or
   -- caller-added fields (credentials, contacts, billing and arbitrary metadata).
   begin
-    if exists(select 1 from jsonb_object_keys(p_ticket) k where k<>all(array['contract','schemaContract','source','departmentAssignments','ticketLead','sourceEvidence','request']))
+    if v_deferred and p_ticket->'localWorkflowPolicy' is distinct from
+      '{"policy":"technician_equipment_selection_v1"}'::jsonb then raise exception 'invalid local workflow policy'; end if;
+    if exists(select 1 from jsonb_object_keys(p_ticket) k where k<>all(array['contract','schemaContract','source','departmentAssignments','ticketLead','sourceEvidence','request','localWorkflowPolicy']))
       or exists(select 1 from jsonb_object_keys(v_source) k where k<>all(array['portalId','ticketId','ticketNumber','typeId','statusId','customStatusId','deleted','assignment','createdAt']))
       or exists(select 1 from jsonb_object_keys(v_request) k where k<>all(array['ticket_no','site','work_type','targets','requested_unit_count','unit_summary','job_description','notes','equipment_manifest','scheduled_for','scheduled_time','solar_panel_qty','battery_replacement_qty','camera_replacement_qty','sim_replacement_qty','micro_sd_qty']))
       or exists(select 1 from jsonb_object_keys(p_ticket->'ticketLead') k where k<>all(array['sourceIdentity','evidence']))
@@ -231,7 +271,9 @@ begin
       or length(btrim(v_source#>>'{assignment,evidence}')) not between 1 and 1000) then raise exception 'invalid assignment evidence'; end if;
     foreach v_key in array array['equipment','parts','site','description','schedule'] loop
       if (p_ticket->'sourceEvidence') ? v_key and (jsonb_typeof(p_ticket->'sourceEvidence'->v_key) is distinct from 'string'
-        or length(btrim(p_ticket->'sourceEvidence'->>v_key)) not between 1 and 1000) then raise exception 'invalid source evidence'; end if;
+        or length(btrim(p_ticket->'sourceEvidence'->>v_key)) not between 1 and 1000
+        or (v_deferred and (p_ticket->'sourceEvidence'->>v_key<>btrim(p_ticket->'sourceEvidence'->>v_key,v_trim_chars)
+          or p_ticket->'sourceEvidence'->>v_key ~ '[[:cntrl:]]'))) then raise exception 'invalid source evidence'; end if;
     end loop;
     for v_item in select value from jsonb_array_elements(p_ticket->'departmentAssignments') loop
       if exists(select 1 from jsonb_object_keys(v_item) k where k<>all(array['department','state','identities','evidence'])) then raise exception 'unsupported fact'; end if;
@@ -256,23 +298,32 @@ begin
   select * into v_receipt from cos_mhelp_intake.receipts
     where portal_id=v_portal and ticket_id=v_ticket for update;
   if found then
-    if v_receipt.first_payload is distinct from p_ticket then
-      update cos_mhelp_intake.receipts set reason_codes=array['source_changed_review_required'],review_required=true
+    -- Source identity cannot change, even before assignments exist. This hold is
+    -- latched: returning to an earlier candidate cannot silently reconcile it.
+    if v_receipt.source_created_at is distinct from v_created or v_receipt.ticket_number is distinct from v_number
+      or v_receipt.first_payload#>>'{source,createdAt}' is distinct from v_source->>'createdAt' then
+      v_reasons:=array['source_identity_changed_review_required'];
+    elsif v_receipt.state='created' and v_receipt.candidate_payload is distinct from p_ticket then
+      v_reasons:=case when 'source_identity_changed_review_required'=any(v_receipt.reason_codes)
+        then array['source_identity_changed_review_required'] else array['source_changed_review_required'] end;
+    end if;
+    if cardinality(v_reasons)>0 then
+      update cos_mhelp_intake.receipts set reason_codes=v_reasons,review_required=true
         where portal_id=v_portal and ticket_id=v_ticket;
-      return jsonb_build_object('state','review_needed','reasonCodes',array['source_changed_review_required'],
+      return jsonb_build_object('state','review_needed','reasonCodes',v_reasons,
         'assignmentIds',v_receipt.assignment_ids,'notifications',false);
     end if;
-    -- Once a never-created source changed, even the old envelope must remain
-    -- held until explicit reconciliation. Mapping repair alone is insufficient.
-    if v_receipt.state='review_needed' and 'source_changed_review_required'=any(v_receipt.reason_codes) then
+    if v_receipt.state='review_needed' and v_receipt.reason_codes && array['source_identity_changed_review_required','source_changed_review_required','existing_ticket_requires_reconciliation'] then
       return jsonb_build_object('state','review_needed','reasonCodes',v_receipt.reason_codes,
         'assignmentIds',v_receipt.assignment_ids,'notifications',false);
     end if;
     if v_receipt.state='created' then
-      -- No lookup by current assignee/status; never recreate claimed, completed,
-      -- cancelled, manually edited, or even missing local work on replay.
+      -- Compare the frozen creation candidate, never mutable local work or the
+      -- possibly incomplete first observation. No assignment is recreated.
       return jsonb_build_object('state','existing','assignmentIds',v_receipt.assignment_ids,'reviewRequired',v_receipt.review_required,'reasonCodes',v_receipt.reason_codes,'notifications',false);
     end if;
+    -- Uncreated normalized candidates may now be enriched and revalidated.
+    -- Persist the replacement with the final held/created outcome below.
   end if;
 
   select * into v_config from cos_mhelp_intake.portal_config where portal_id=v_portal for share;
@@ -322,10 +373,8 @@ begin
       or jsonb_typeof(v_request->'targets') is distinct from 'array'
       or jsonb_typeof(p_ticket->'departmentAssignments') is distinct from 'array'
       or jsonb_array_length(p_ticket->'departmentAssignments')>2
-      or jsonb_typeof(v_request->'site') is distinct from 'string'
       or jsonb_typeof(v_request->'job_description') is distinct from 'string'
-      or length(btrim(coalesce(v_request->>'site',''))) not between 1 and 500
-      or length(btrim(coalesce(v_request->>'job_description',''))) not between 1 and 10000
+      or length(v_request->>'job_description')>10000
       or jsonb_typeof(v_request->'notes') is distinct from 'string' or length(v_request->>'notes')>10000
       or jsonb_typeof(v_request->'unit_summary') is distinct from 'string' or length(v_request->>'unit_summary')>2000
       or coalesce(v_request->>'scheduled_for','') !~ '^\d{4}-\d{2}-\d{2}$'
@@ -333,14 +382,38 @@ begin
       or (v_request->'scheduled_time'<>'null'::jsonb and coalesce(v_request->>'scheduled_time','') !~ '^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$')
     then raise exception 'invalid request'; end if;
     perform (v_request->>'scheduled_for')::date;
-    if p_ticket#>'{sourceEvidence,complete}' is distinct from 'true'::jsonb then raise exception 'incomplete source scope'; end if;
-    foreach v_key in array array['equipment','parts','site','description','schedule'] loop
+    if (v_request->>'scheduled_for')::date < date '1900-01-01' then raise exception 'invalid date'; end if;
+    -- Body text is preserved, including line breaks. Reject control bytes that
+    -- the pure preparer rejects, rather than silently editing original text.
+    foreach v_key in array array['job_description','notes','unit_summary'] loop
+      if translate(v_request->>v_key,E'\n\r\t','') ~ '[[:cntrl:]]' then raise exception 'invalid instruction text'; end if;
+    end loop;
+    if v_deferred then
+      if not(v_request ? 'site') or (v_request->'site'<>'null'::jsonb and
+        (jsonb_typeof(v_request->'site') is distinct from 'string' or length(v_request->>'site') not between 1 and 500
+          or v_request->>'site'<>btrim(v_request->>'site',v_trim_chars) or v_request->>'site' ~ '[[:cntrl:]]'))
+        or (btrim(v_request->>'job_description',v_trim_chars)='' and btrim(v_request->>'notes',v_trim_chars)='')
+        or p_ticket#>'{sourceEvidence,complete}' is distinct from 'false'::jsonb
+        or (p_ticket->'sourceEvidence') ?| array['equipment','parts']
+        or v_request->'equipment_manifest' is distinct from '[]'::jsonb
+        or v_request->'requested_unit_count' is distinct from 'null'::jsonb
+      then raise exception 'invalid deferred shell'; end if;
+      if v_request->'site'<>'null'::jsonb and nullif(btrim(p_ticket#>>'{sourceEvidence,site}'),'') is null then
+        raise exception 'missing optional site evidence'; end if;
+    elsif jsonb_typeof(v_request->'site') is distinct from 'string'
+      or length(btrim(v_request->>'site')) not between 1 and 500
+      or length(btrim(v_request->>'job_description')) not between 1 and 10000
+      or p_ticket#>'{sourceEvidence,complete}' is distinct from 'true'::jsonb then
+      raise exception 'incomplete source scope';
+    end if;
+    foreach v_key in array case when v_deferred then array['description','schedule'] else array['equipment','parts','site','description','schedule'] end loop
       if jsonb_typeof(p_ticket->'sourceEvidence'->v_key) is distinct from 'string'
         or length(btrim(p_ticket->'sourceEvidence'->>v_key)) not between 1 and 1000 then raise exception 'missing source evidence'; end if;
     end loop;
     foreach v_key in array array['solar_panel_qty','battery_replacement_qty','camera_replacement_qty','sim_replacement_qty','micro_sd_qty'] loop
       if jsonb_typeof(v_request->v_key) is distinct from 'number' or (v_request->>v_key) !~ '^\d+$'
-        or (v_request->>v_key)::numeric>1000000 then raise exception 'invalid quantity'; end if;
+        or (v_request->>v_key)::numeric>1000000
+        or (v_deferred and v_request->v_key is distinct from '0'::jsonb) then raise exception 'invalid quantity'; end if;
       v_has_prep:=v_has_prep or (v_request->>v_key)::integer>0;
     end loop;
     for v_item in select value from jsonb_array_elements(v_request->'equipment_manifest') loop
@@ -355,9 +428,9 @@ begin
       if v_item->>'category'='device' then v_units:=v_units+(v_item->>'qty')::integer; end if;
       v_has_prep:=true;
     end loop;
-    if v_request->'requested_unit_count' is distinct from to_jsonb(v_units)
+    if not v_deferred and (v_request->'requested_unit_count' is distinct from to_jsonb(v_units)
       or (v_work<>'service' and cardinality(v_labels)=0)
-      or (v_work='delivery' and 'Solar Spotter'=any(v_labels) and 'Solar Stand'=any(v_labels))
+      or (v_work='delivery' and 'Solar Spotter'=any(v_labels) and 'Solar Stand'=any(v_labels)))
     then raise exception 'invalid equipment scope'; end if;
     v_roles:=case when v_work='pickup' then array['service','it']
       when v_work in ('delivery','swap') or (v_work='service' and v_has_prep) then array['it','service']
@@ -373,8 +446,9 @@ begin
     end loop;
   exception when others then v_reasons:=array_append(v_reasons,'source_scope_or_route_invalid'); end;
 
-  -- The lead is deliberate, exact, reviewed, and current. All categories require
-  -- one so that imported tickets actually appear in the IT MHelp lead view.
+  -- A source-complete request retains its deliberate lead requirement. Shells
+  -- need no invented lead; an explicitly supplied lead is checked identically.
+  if not v_deferred or p_ticket ? 'ticketLead' then
   select * into v_crosswalk from cos_mhelp_intake.identity_crosswalk
     where portal_id=v_portal and source_identity=p_ticket#>>'{ticketLead,sourceIdentity}'
       and department='it' and enabled for share;
@@ -387,8 +461,11 @@ begin
       v_reasons:=array_append(v_reasons,'ticket_lead_inactive_or_unverified'); end if;
   end if;
 
-  -- Validate assignment facts globally and per routed department. A missing field
-  -- is unknown. An explicit empty source assignment is the only queue authority.
+  end if;
+
+  -- Validate source facts globally and per routed department. A shell's fixed
+  -- local policy alone authorizes a missing counterpart queue, never a vendor
+  -- unassigned claim. Explicit unknown or contradictory facts still hold.
   begin
     v_fact:=v_source->'assignment';
     if jsonb_typeof(v_fact) is distinct from 'object'
@@ -396,23 +473,44 @@ begin
       or jsonb_typeof(v_fact->'identities') is distinct from 'array'
       or jsonb_array_length(v_fact->'identities')<>(case when v_fact->>'state'='assigned' then 1 else 0 end)
       or length(btrim(coalesce(v_fact->>'evidence','')))=0 then raise exception 'unknown source assignment'; end if;
+    if v_deferred then
+      if v_fact->>'state'<>'assigned' then raise exception 'scheduled technician required'; end if;
+      select * into v_crosswalk from cos_mhelp_intake.identity_crosswalk
+        where portal_id=v_portal and source_identity=v_fact#>>'{identities,0}' and enabled for share;
+      if not found or not(v_crosswalk.department=any(v_roles))
+        or (v_crosswalk.review_actor='owner' and not exists(select 1 from public.profiles where user_id=v_crosswalk.reviewed_by and active and archived_at is null and role::text='owner'))
+        then raise exception 'unverified scheduled technician'; end if;
+      select * into v_profile from public.profiles where user_id=v_crosswalk.legacy_user_id
+        and active and archived_at is null and role::text=v_crosswalk.department for share;
+      if not found then raise exception 'inactive or wrong-role scheduled technician'; end if;
+      v_scheduled_department:=v_crosswalk.department;
+    end if;
     for v_item in select value from jsonb_array_elements(p_ticket->'departmentAssignments') loop
-      if coalesce(v_item->>'department','')<>all(v_roles) then raise exception 'unrouted department'; end if;
+      if not v_deferred and coalesce(v_item->>'department','')<>all(v_roles) then raise exception 'unrouted department'; end if;
+      if v_deferred and (coalesce(v_item->>'department','') not in ('it','service')
+        or coalesce(v_item->>'state','') not in ('assigned','unassigned')
+        or jsonb_typeof(v_item->'identities') is distinct from 'array'
+        or jsonb_array_length(v_item->'identities')<>(case when v_item->>'state'='assigned' then 1 else 0 end)
+        or length(btrim(coalesce(v_item->>'evidence','')))=0
+        or (v_item->>'state'='assigned' and coalesce(v_item->>'department','')<>all(v_roles))
+        or (select count(*) from jsonb_array_elements(p_ticket->'departmentAssignments') d where d->>'department'=v_item->>'department')<>1)
+        then raise exception 'invalid department fact'; end if;
     end loop;
     for v_target in select value from jsonb_array_elements(v_request->'targets') loop
       v_role:=v_target->>'role';
       select count(*) into v_n from jsonb_array_elements(p_ticket->'departmentAssignments') d where d->>'department'=v_role;
       if v_n>1 then raise exception 'ambiguous department'; end if;
+      v_local_queue:=v_deferred and v_n=0 and v_role<>v_scheduled_department;
       if v_n=1 then select value into v_fact from jsonb_array_elements(p_ticket->'departmentAssignments') where value->>'department'=v_role;
       else v_fact:=v_source->'assignment'; end if;
-      if coalesce(v_fact->>'state','') not in ('assigned','unassigned')
+      if not v_local_queue and (coalesce(v_fact->>'state','') not in ('assigned','unassigned')
         or jsonb_typeof(v_fact->'identities') is distinct from 'array'
         or jsonb_array_length(v_fact->'identities')<>(case when v_fact->>'state'='assigned' then 1 else 0 end)
         or length(btrim(coalesce(v_fact->>'evidence','')))=0
-        or (v_source#>>'{assignment,state}'='unassigned' and v_fact->>'state'='assigned')
+        or (v_source#>>'{assignment,state}'='unassigned' and v_fact->>'state'='assigned'))
       then raise exception 'unknown department assignment'; end if;
       v_assignee:=null;
-      if v_fact->>'state'='unassigned' then
+      if v_local_queue or v_fact->>'state'='unassigned' then
         if v_target->'assignee_user_id' is distinct from 'null'::jsonb then raise exception 'invented assignee'; end if;
       else
         v_source_identity:=v_fact#>>'{identities,0}';
@@ -440,24 +538,30 @@ begin
   exception when others then v_reasons:=array_append(v_reasons,'assignment_identity_unverified'); end;
 
   perform pg_advisory_xact_lock(hashtextextended('owner-assignment:'||v_number,0));
+  -- Already-invalid candidates can only persist a hold. Avoid write-conflicting
+  -- public-table locks for them; ordinary history SELECTs below remain useful
+  -- for remembering any collision observed even before source enrichment.
+  if cardinality(v_reasons)=0 then
   -- Legacy direct v6/v8 callers do not all take the bundle advisory lock. This
   -- short table lock closes the otherwise-unprotected history-check/insert race.
   -- Existing workflows acquire these tables in other orders. NOWAIT ensures an
   -- occupied table aborts this intake (55P03), never waits in a lock-order cycle.
   -- Retry the whole source-key transaction after backoff; do not retry fragments.
   lock table public.job_assignments, public.prep_tickets, public.unit_returns in share row exclusive mode nowait;
+  end if;
   -- Includes every current/previous assignee and every status. Existing work is
-  -- held for reconciliation, never silently adopted or overwritten.
+  -- held for reconciliation, never silently adopted or overwritten. A recorded
+  -- collision is latched above even if someone later removes all legacy rows.
   if exists(select 1 from public.job_assignments where btrim(ticket_no)=v_number)
     or exists(select 1 from public.prep_tickets where btrim(ticket_no)=v_number)
     or exists(select 1 from public.unit_returns where btrim(ticket_no)=v_number)
-    or exists(select 1 from cos_mhelp_intake.receipts where ticket_number=v_number and state='created') then
+    or exists(select 1 from cos_mhelp_intake.receipts where ticket_number=v_number and (portal_id<>v_portal or ticket_id<>v_ticket or state='created')) then
     v_reasons:=array_append(v_reasons,'existing_ticket_requires_reconciliation');
   end if;
   if cardinality(v_reasons)>0 then
-    insert into cos_mhelp_intake.receipts(portal_id,ticket_id,ticket_number,source_created_at,first_payload,state,reason_codes,review_required,received_by)
-      values(v_portal,v_ticket,v_number,v_created,p_ticket,'review_needed',v_reasons,true,null)
-      on conflict(portal_id,ticket_id) do update set reason_codes=excluded.reason_codes,review_required=true;
+    insert into cos_mhelp_intake.receipts(portal_id,ticket_id,ticket_number,source_created_at,first_payload,candidate_payload,state,reason_codes,review_required,received_by)
+      values(v_portal,v_ticket,v_number,v_created,p_ticket,p_ticket,'review_needed',v_reasons,true,null)
+      on conflict(portal_id,ticket_id) do update set candidate_payload=excluded.candidate_payload,reason_codes=excluded.reason_codes,review_required=true;
     return jsonb_build_object('state','review_needed','reasonCodes',v_reasons,'assignmentIds','[]'::jsonb,'notifications',false);
   end if;
 
@@ -478,19 +582,22 @@ begin
       case when v_assignee is null then case when v_role='it' then 'IT Department' else 'Service Department' end
         else coalesce(v_profile.full_name,v_profile.username,'Technician') end,
       case when v_assignee is null then 'department' else 'technician' end,
-      v_units,nullif(btrim(v_request->>'unit_summary'),''),btrim(v_request->>'job_description'),nullif(btrim(v_request->>'notes'),''),
+      case when v_deferred then null else v_units end,nullif(btrim(v_request->>'unit_summary'),''),
+      case when v_deferred then v_request->>'job_description' else btrim(v_request->>'job_description') end,
+      case when v_deferred then v_request->>'notes' else nullif(btrim(v_request->>'notes'),'') end,
       null,'mHelpDesk automatic intake',
       (v_request->>'solar_panel_qty')::integer,(v_request->>'battery_replacement_qty')::integer,
       (v_request->>'camera_replacement_qty')::integer,(v_request->>'sim_replacement_qty')::integer,(v_request->>'micro_sd_qty')::integer,
       v_request->'equipment_manifest',(v_target->>'requires_it_handoff')::boolean,
       (v_request->>'scheduled_for')::date,(v_request->>'scheduled_time')::time,v_work,
-      v_lead.user_id,coalesce(v_lead.full_name,v_lead.username,'Technician'),'it','mhelpdesk_service_intake'
+      v_lead.user_id,case when v_lead.user_id is not null then coalesce(v_lead.full_name,v_lead.username,'Technician') end,
+      case when v_lead.user_id is not null then 'it' end,'mhelpdesk_service_intake'
     ) returning id into v_id;
     v_ids:=array_append(v_ids,v_id);
   end loop;
-  insert into cos_mhelp_intake.receipts(portal_id,ticket_id,ticket_number,source_created_at,first_payload,state,assignment_ids,received_by,created_at)
-    values(v_portal,v_ticket,v_number,v_created,p_ticket,'created',v_ids,null,now())
-    on conflict(portal_id,ticket_id) do update set state='created',reason_codes='{}',review_required=false,assignment_ids=excluded.assignment_ids,created_at=excluded.created_at;
+  insert into cos_mhelp_intake.receipts(portal_id,ticket_id,ticket_number,source_created_at,first_payload,candidate_payload,state,assignment_ids,received_by,created_at)
+    values(v_portal,v_ticket,v_number,v_created,p_ticket,p_ticket,'created',v_ids,null,now())
+    on conflict(portal_id,ticket_id) do update set candidate_payload=excluded.candidate_payload,state='created',reason_codes='{}',review_required=false,assignment_ids=excluded.assignment_ids,created_at=excluded.created_at;
   return jsonb_build_object('state','created','assignmentIds',v_ids,'notifications',false);
 end;
 $function$;
@@ -562,7 +669,7 @@ revoke all on function cos_mhelp_intake.read_review_status_v1() from public,anon
 -- Scheduler helpers are installed from the separate scheduler proposal before use.
 create function public.camera_mhelp_ticket_intake_v1(p_request jsonb)
 returns jsonb language plpgsql security definer set search_path='' set lock_timeout='2s' as $rpc$
-declare v_action text:=p_request->>'action'; v_window jsonb; v_created timestamptz;
+declare v_action text:=p_request->>'action'; v_window jsonb; v_result jsonb; v_created timestamptz;
 begin
   if coalesce(current_setting('role',true),'')<>'service_role' or auth.uid() is not null then
     raise exception 'MHELP_INTAKE_SERVICE_ROLE_REQUIRED' using errcode='42501'; end if;
@@ -571,6 +678,9 @@ begin
   if v_action='review_status' then
     if p_request<>jsonb_build_object('action','review_status') then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
     return cos_mhelp_intake.read_review_status_v1();
+  elsif v_action='pending_status' then
+    if p_request<>jsonb_build_object('action','pending_status') then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
+    return cos_mhelp_intake.read_pending_status_v1();
   elsif v_action='policy' then
     if p_request<>jsonb_build_object('action','policy') then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
     return cos_mhelp_intake.read_intake_policy_v1();
@@ -581,6 +691,7 @@ begin
     if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','ticket']))
       or nullif(p_request->>'leaseId','') is null then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
     v_window:=cos_mhelp_intake.validate_intake_lease_v1((p_request->>'leaseId')::uuid);
+    if v_window->'discoveryCommitted'='true'::jsonb then raise exception 'MHELP_INTAKE_DISCOVERY_ALREADY_COMMITTED'; end if;
     if coalesce(p_request#>>'{ticket,source,createdAt}','') !~ '^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{3})?Z$' then
       raise exception 'MHELP_INTAKE_INVALID_SOURCE'; end if;
     begin v_created:=(p_request#>>'{ticket,source,createdAt}')::timestamptz;
@@ -590,11 +701,22 @@ begin
       or p_request#>>'{ticket,source,portalId}' is distinct from v_window->>'portalId'
       or v_created is null or v_created<=(v_window->>'createdAfter')::timestamptz
       or v_created>=(v_window->>'createdBefore')::timestamptz then raise exception 'MHELP_INTAKE_OUTSIDE_LEASE'; end if;
-    return cos_mhelp_intake.accept_ticket_v1(p_request->'ticket');
-  elsif v_action='finish' then
+    v_result:=cos_mhelp_intake.accept_ticket_v1(p_request->'ticket');
+    perform cos_mhelp_intake.schedule_pending_v1(p_request#>>'{ticket,source,portalId}',p_request#>>'{ticket,source,ticketId}');
+    return v_result;
+  elsif v_action='commit_discovery' then
     if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','expectedTicketIds','total'])) then
       raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
-    return cos_mhelp_intake.finish_intake_v1((p_request->>'leaseId')::uuid,p_request->'expectedTicketIds',(p_request->>'total')::integer);
+    return cos_mhelp_intake.commit_discovery_v1((p_request->>'leaseId')::uuid,p_request->'expectedTicketIds',(p_request->>'total')::integer);
+  elsif v_action='pending_scope' then
+    if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId'])) or nullif(p_request->>'leaseId','') is null then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
+    return cos_mhelp_intake.pending_scope_v1((p_request->>'leaseId')::uuid);
+  elsif v_action='record_pending' then
+    if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','outcome'])) or nullif(p_request->>'leaseId','') is null then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
+    return cos_mhelp_intake.record_pending_v1((p_request->>'leaseId')::uuid,p_request->'outcome');
+  elsif v_action='finish' then
+    if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId'])) or nullif(p_request->>'leaseId','') is null then raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
+    return cos_mhelp_intake.finish_intake_v1((p_request->>'leaseId')::uuid);
   elsif v_action='fail' then
     if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','code','retryable','retryAfterSeconds'])) then
       raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
