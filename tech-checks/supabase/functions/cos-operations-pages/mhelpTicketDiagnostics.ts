@@ -5,6 +5,9 @@ import {projectMhelpTicketSchema} from './mhelpTicketSchema.ts';
 // Match only our own fixed parser messages. Never log a caught message, stack,
 // response body, URL, request, identity or credential, even for unknown errors.
 const REASONS = Object.freeze({
+  'Unsupported mHelpDesk appointment evidence.':'APPOINTMENT_PROJECTION_INVALID',
+  'mHelpDesk returned an oversized appointment page.':'APPOINTMENT_COUNT_LIMIT',
+  'The appointment schedule window is not available.':'APPOINTMENT_WINDOW_INVALID',
   'mHelpDesk detail does not match the selected ticket.':'DETAIL_IDENTITY_MISMATCH',
   'mHelpDesk ticket changed during the detail preview.':'DETAIL_CHANGED',
   'mHelpDesk detail is outside the verified creation window.':'DETAIL_WINDOW_MISMATCH',
@@ -53,7 +56,7 @@ const REASONS = Object.freeze({
   'Use a ticket window of at most 31 days and a limit from 1 to 500.':'WINDOW_INVALID',
   'The ticket preview request contains unsupported fields.':'WINDOW_INVALID',
 });
-const OPERATIONS = ['ticket_detail_read','account_read','ticket_read','ticket_types_read','ticket_statuses_read'] as const;
+const OPERATIONS = ['appointment_read','ticket_detail_read','account_read','ticket_read','ticket_types_read','ticket_statuses_read'] as const;
 export const MHELP_PREVIEW_DIAGNOSTIC_CODES = Object.freeze([...new Set([
   ...Object.values(REASONS),'PROVIDER_HTTP','RATE_LIMIT','INTERNAL_FAILURE',
 ])]);
