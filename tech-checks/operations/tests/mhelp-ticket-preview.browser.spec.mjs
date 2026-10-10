@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {ticketPreviewAppointmentFixture} from './fixtures/mhelpAppointmentTicketPreview.mjs';
 import {syntheticAppointment} from './fixtures/mhelpAppointmentPreview.mjs';
 import {ticketPreviewFixture,ticketPreviewEvidenceFixture,ticketPreviewDetailFixture} from './fixtures/mhelpTicketPreview.mjs';
@@ -364,9 +365,9 @@ for(const diagnostic of ['APPOINTMENT_PROJECTION_INVALID','APPOINTMENT_COUNT_LIM
 test('appointment evidence cannot return from an abandoned request or Back/Forward navigation',async({page})=>{
   const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
   await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(preview).toHaveCount(0);
-  await page.goBack();await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(1);
+  await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(1);
   state.delay=null;state.preview=ticketPreviewAppointmentFixture({appointments:[]});await dayButton(preview,'previous').click();await expect(preview).toContainText('No match was found within this inspected schedule window');
   const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST'&&response.request().postDataJSON()?.path===path);release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(preview).toContainText('No match was found within this inspected schedule window');await expect(preview).not.toContainText('One structural match was found');
-  await page.goForward();await expect(preview).toHaveCount(0);await page.goBack();await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+  await traverseIframeHistory(frame,'forward','#field-map');await expect(preview).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });

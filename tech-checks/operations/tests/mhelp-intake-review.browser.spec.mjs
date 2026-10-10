@@ -1,3 +1,4 @@
+import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {test,expect} from '@playwright/test';
 import {existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
@@ -80,10 +81,7 @@ test('hidden host cancels old reads and a newer refresh wins over the old respon
 test('navigation and Back discard a pending result and return to unknown status',async({page})=>{
  const {frame,panel,state}=await mount(page);state.hold=true;await refresh(panel).click();await expect.poll(()=>state.releases.length).toBe(1);
  await frame.locator('body').evaluate(()=>{location.hash='#units-on-hand';});await expect(panel).toHaveCount(0);state.releases.shift()();
- // The route belongs to the iframe's same-document history. page.goBack()
- // waits for a top-level load that this hash traversal cannot produce.
- await frame.locator('body').evaluate(()=>{history.back();});
- await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#unit-tracker');
+ await traverseIframeHistory(frame,'back','#unit-tracker');
  await expect(panel).toBeVisible();await expect(panel).toContainText('Intake state unknown');await expect(panel).not.toContainText('000042');
  state.hold=false;await refresh(panel).click();await expect(panel).toContainText('000042');expect(state.errors).toEqual([]);
 });
