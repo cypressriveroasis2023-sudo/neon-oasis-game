@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,OperationsApiError} from './api';
+import {api} from './api';
 import {checkedMhelpTicketPreview,ticketPreviewGaps,type MhelpTicketPreview as Preview} from './mhelpTicketPreviewModel';
+import {mhelpTicketPreviewErrorMessage} from './mhelpTicketPreviewError';
 
 const chicagoTime=(value:string)=>new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
 /** Rendered only inside the existing Owner mHelpDesk review. No request runs on mount. */
@@ -16,10 +17,7 @@ export default function MhelpTicketPreview(){
       const result=checkedMhelpTicketPreview((await api.post('/api/mhelpdesk/partner/tickets/preview',{})).data);
       if(active.current)setPreview(result);
     }catch(cause){
-      if(active.current)setError(cause instanceof OperationsApiError&&[401,403].includes(cause.response.status)
-        ?'Your Owner session could not be verified. Return to Tech Check and sign in again.'
-        :cause instanceof OperationsApiError&&cause.response.status===429?'mHelpDesk is limiting ticket reads. Wait a moment, then try again.'
-        :'The ticket preview could not be verified. Try again.');
+      if(active.current)setError(mhelpTicketPreviewErrorMessage(cause));
     }finally{pending.current=false;if(active.current)setBusy(false);}
   };
   const gaps=preview?ticketPreviewGaps(preview):[];
