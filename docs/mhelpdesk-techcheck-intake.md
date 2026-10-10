@@ -26,13 +26,13 @@ Request:
 - `createdBefore`: explicit UTC timestamp
 - Creation window must be positive and at most 31 days. Both vendor bounds are strict (`>` start, `<` end), as documented.
 
-The server uses its existing token manager, confirms `/users/me` portal identity, then reads the fixed portal's `/tickettypes`, `/ticketstatus` and `/Tickets` endpoints. Ticket results use `{totalRows,data}`; equipment's `{totalRows,results}` is not a ticket contract. Requests use 50-row pages, at most 500 tickets, a shared 20-second ticket-request deadline and bounded response bytes. Unknown/overlapping/incomplete pages and changed totals fail closed. A single renewal on account-read HTTP 401 uses the existing token store. Token renewal retains its separate existing 45-second deadline and atomic persistence, so a preview that needs renewal can take longer than 20 seconds. Vendor errors and tokens never enter responses or logs.
+The server uses its existing token manager, confirms `/users/me` portal identity, then reads the fixed portal's `/tickettypes`, `/ticketstatus` and `/Tickets` endpoints. Ticket types and ticket pages accept exactly one collection: documented `{totalRows,data}` or the `{totalRows,results}` shape observed in an authorized Owner preview. Both keys together, missing collections and non-array collections are rejected rather than guessed or used as fallbacks. Ticket types require the complete dictionary with an exact total and at most 500 rows; ticket statuses retain their top-level array contract and 500-row limit. Requests use 50-row pages, at most 500 tickets, a shared 20-second ticket-request deadline and bounded response bytes. Unknown/overlapping/incomplete pages and changed totals fail closed. A single renewal on account-read HTTP 401 uses the existing token store. Token renewal retains its separate existing 45-second deadline and atomic persistence, so a preview that needs renewal can take longer than 20 seconds. Vendor errors and tokens never enter responses or logs.
 
 The result exposes only verified portal ID, read time, bounded creation window, counts, type/status dictionaries and missing/unknown-field metrics. It does not expose ticket IDs, source assignments, ticket text, customers, contacts, billing fields or credentials. Dictionary labels are source values and do not by themselves authorize a workflow mapping.
 
 For the first authorized preview, use the user's local current day; on October 9, 2026 in America/Chicago, the lower bound is October 9 at 05:00 UTC. Never substitute UTC midnight for a known local day.
 
-## Prepared Owner app action
+## Owner app action
 
 The alternate real app action is `POST /api/mhelpdesk/partner/tickets/preview` with an empty JSON object. It uses the existing active, linked Owner authentication and existing server token manager. IT, Service, unmapped Owners and inactive/revoked sessions are denied before connector configuration is read. No role mapping, grant or authentication mechanism is changed.
 
@@ -40,7 +40,7 @@ The server chooses today's America/Chicago midnight and the current time. Caller
 
 Failed Owner previews return an allowlisted `MHELP_PREVIEW_*` reference code and show a fixed, actionable explanation. The same failure emits one structured `mhelp_ticket_preview_failed` log containing only the code, local HTTP status, and (when verified) one of four fixed provider operations and a numeric provider HTTP status. Unknown exceptions use `INTERNAL_FAILURE`. Error messages, stacks, URLs, headers, credentials, identities, ticket bodies and source response data are never logged or forwarded by this diagnostic path. Authentication and request-field rejection still happen before the preview and its diagnostic logger. These diagnostics do not relax any source validation or enable automatic retries or intake.
 
-After this action is approved and published, use the existing Owner account: **Unit Tracker → mHelpDesk connection → Preview today’s ticket types**. A verified signed-in Owner browser session is required for the live check. The prepared Owner action is not part of the deployed maintenance v20 bundle, and must not be described as live before its separate coordinated rollout. Preserve every file of the current Operations bridge when adding the route. Keep only the selected production invocation path; do not widen maintenance authentication as a workaround.
+Use the existing Owner account: **Unit Tracker → mHelpDesk connection → Preview today’s ticket types**. A verified signed-in Owner browser session is required for the live check. The deployed Owner action produced the structural failure evidence recorded below; that failed read does not establish a successful preview. The revised collection adapter requires its own verified rollout and fresh Owner read. Preserve every file of the current Operations bridge when applying the reader delta. Keep only the selected production invocation path; do not widen maintenance authentication as a workaround.
 
 ## Legacy workflow mapping
 
@@ -65,9 +65,9 @@ Proposed polling cadence is every five minutes, subject to verified vendor limit
 
 ## Verification
 
-Synthetic reader tests cover actual documented endpoints/envelopes, portal mismatch, missing fields, timezone validation, page base, duplicate/repeated pages, changed totals, count/byte limits, timeout/error sanitization, credential renewal and aggregate output projection. The maintenance tests verify authentication occurs before configuration reads and reject caller credentials, URLs, identities and unbounded windows. Routing planner tests use test-only inputs and do not create production tickets.
+Synthetic reader tests cover documented and observed collection envelopes (including 60 synthetic types and an empty ticket page), reject ambiguous/malformed collections, and retain regression coverage for portal mismatch, missing fields, timezone validation, page base, duplicate/repeated pages, changed totals, count/byte limits, timeout/error sanitization, credential renewal and aggregate output projection. The maintenance tests verify authentication occurs before configuration reads and reject caller credentials, URLs, identities and unbounded windows. Routing planner tests use test-only inputs and do not create production tickets.
 
-These checks do not establish live ticket-schema compatibility or actionable technician assignment success. Those are separately recorded rollout gates, including real read-only preview and a non-mutating/local proof of the existing legacy bundle behavior before activation.
+These checks do not establish live nonempty ticket-row compatibility, source timezone/pagination semantics, reviewed type/identity mappings or actionable technician assignment success. Those are separately recorded rollout gates, including real read-only preview and a non-mutating/local proof of the existing legacy bundle behavior before activation.
 
 ## Primary API documentation
 
@@ -82,3 +82,13 @@ These checks do not establish live ticket-schema compatibility or actionable tec
 When strict parsing fails, the existing diagnostic log may include only fixed expected-field kinds and string-format categories, bounded total/array counts, and at most 50 sampled rows per already-authorized endpoint. No source values, row identities, arbitrary field names, labels, request details or credentials are logged. The account is verified before the same bounded type/status/first-ticket-page GETs; strict validation and all byte/time/count bounds remain in force. This evidence distinguishes a different response envelope from a truncated dictionary without guessing an adapter change. It is diagnostic evidence, never successful intake or complete ticket counts.
 
 The Owner panel separately offers the prior Central Time calendar day for explicit read-only schema review after midnight. Only `{day:'previous'}` is accepted; arbitrary dates and other modes are rejected before vendor access. Today's existing empty-body contract is unchanged. Returned timestamps disclose the actual window, and both buttons share one in-flight guard. Neither choice imports tickets.
+
+### Observed collection shapes
+
+A genuine signed-in Owner read recorded only bounded structural evidence:
+
+- Ticket types: object with a numeric `totalRows` matching the complete `results` array and no `data` field. The bounded row sample had integer `typeId`/`portalId`, string `typeName` and boolean `isActive` fields. The sample alone does not validate every row; the reader still validates the entire dictionary.
+- Ticket statuses: a top-level array whose sampled rows had the expected field types.
+- Tickets: an empty `results` array with a matching total and no `data` field.
+
+This observation supports the explicit collection adapter only. The read failed the old data-only type-dictionary check; it was not a successful preview or intake. An empty ticket page provides no evidence of actual ticket-row fields, timestamp timezone, multi-page behavior, workflow mappings or assignment success. The 60-type and 24-status regression fixtures are wholly synthetic; the type fixture exercises validation beyond the 50-row diagnostic sample boundary. No private source values or production fixtures are included. Those live rollout gates remain open, and strict row/timestamp/portal validation and complete bounded pagination are unchanged.
