@@ -1,3 +1,4 @@
+import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
@@ -179,6 +180,7 @@ export function createOperationsHandler(options) {
     renewAccess: options.mhelpPartner?.renewAccess,
     readNativeUnits: () => platformAll('equipment_units?select=id,unit_number,metadata&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
   });
+  const readMhelpIntakeReview=createMhelpIntakeReviewBridge(requestFetch);
   const mhelpTickets=createMhelpTicketReader({fetch:requestFetch,getConfig:options.mhelpPartner?.getConfig || (()=>({})),renewAccess:options.mhelpPartner?.renewAccess});
   // This isolated control RPC is claimed once before the provider secret can be read.
   const readInhandPilot = createInhandPilotReader({
@@ -469,6 +471,14 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      if(path==='/api/mhelpdesk/intake/status') {
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method!=='GET')fail('Method not supported.',405);
+        allowedFields(body || {},[],'Intake status request');
+        if(new URL(request.url).search)fail('Intake status query parameters are unsupported.');
+        try{return json(await readMhelpIntakeReview(context.authorization,request.signal));}
+        catch(cause){const failure=cause instanceof MhelpIntakeReviewError?cause:new MhelpIntakeReviewError();return json({error:failure.message},failure.status);}
+      }
       if (path.startsWith('/api/mhelpdesk/partner/')) {
         // This owner-only review does not expand the verified IT route allowlist.
         if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);

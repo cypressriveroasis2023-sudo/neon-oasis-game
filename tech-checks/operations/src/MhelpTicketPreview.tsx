@@ -24,7 +24,7 @@ export default function MhelpTicketPreview(){
   const gaps=preview?ticketPreviewGaps(preview):[];
   return <section className='unit-tracker-source' aria-label='mHelpDesk ticket type preview' aria-busy={busy}>
     <h4>mHelpDesk ticket types</h4>
-    <p>Read today’s or the previous day’s ticket counts and type IDs in Central Time. Automatic intake is paused. This preview does not change tickets or assignments.</p>
+    <p>Read today’s or the previous day’s ticket counts and type IDs in Central Time. This is a read-only preview. This preview does not change tickets or assignments.</p>
     <button className='secondary' disabled={busy} onClick={()=>void run('today')}>{busy&&day==='today'?'Reading today’s ticket types…':'Preview today’s ticket types'}</button>
     <button className='secondary' disabled={busy} onClick={()=>void run('previous')}>{busy&&day==='previous'?'Reading previous day’s ticket types…':'Preview previous day’s ticket types'}</button>
     <p>The previous-day preview reads the prior Central Time calendar day for review. It does not import historical tickets.</p>
@@ -36,7 +36,7 @@ export default function MhelpTicketPreview(){
       <p>{preview.metrics.assignedTickets} with a recorded assignee · {preview.metrics.missingAssignmentFields} with assignment unknown · {preview.metrics.deletedTickets} marked deleted in mHelpDesk.</p>
       {preview.types.length>0?<div className='unit-tracker-table-wrap'><table className='unit-tracker-table'><caption>Verified mHelpDesk type IDs and counts</caption><thead><tr><th scope='col'>mHelpDesk type</th><th scope='col'>Tickets in window</th></tr></thead><tbody>{preview.types.map(type=><tr key={type.typeId}><td>{type.typeName}<small>Type ID {type.typeId} · {type.isActive?'Active':'Inactive'}</small></td><td>{type.count}</td></tr>)}</tbody></table></div>:<p>No ticket types were returned.</p>}
       {gaps.length>0?<><h4>Fields needing review</h4><ul>{gaps.map(gap=><li key={gap}>{gap}</li>)}</ul></>:<p>No missing or unrecognized fields were flagged by this preview.</p>}
-      <p>These type IDs still need a reviewed Service, Install, Swap or Pickup mapping before intake can be enabled.</p>
+      <p>Workflow routing uses separately reviewed type and technician mappings. Check Automatic ticket intake for saved configuration and polling status.</p>
     </>}
   </section>;
 }

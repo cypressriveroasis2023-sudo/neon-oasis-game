@@ -32,7 +32,7 @@ try{
     await page.addScriptTag({content:result.outputFiles[0].text});
     const region=page.getByRole('region',{name:'mHelpDesk ticket type preview'}),button=region.getByRole('button',{name:/^(?:Preview|Reading) today’s ticket types/});
     await button.waitFor();assert.equal((await page.evaluate(()=>window.fixtureCalls)).length,0,'mount must not read');
-    assert.match(await region.innerText(),/Automatic intake is paused/);
+    assert.match(await region.innerText(),/This is a read-only preview/);
     await page.evaluate(()=>{window.fixtureMode='hold';});
     await button.evaluate(element=>{element.click();element.click();});
     await page.waitForFunction(()=>window.fixtureCalls.length===1&&typeof window.releaseFixture==='function');

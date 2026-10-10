@@ -37,7 +37,7 @@ test('today ticket preview is explicit, aggregate-only and preserves equipment c
   await expect(frame.getByRole('button',{name:'Check mHelpDesk connection'})).toBeVisible();
   await dayButton(preview).click();
   await expect(preview.getByRole('status')).toContainText('3 tickets');await expect(preview).toContainText('Type ID 11');await expect(preview).toContainText('Installation');
-  await expect(preview).toContainText('assignment unknown');await expect(preview).toContainText('1 ticket missing a service-location ID');await expect(preview).toContainText('Automatic intake is paused');
+  await expect(preview).toContainText('assignment unknown');await expect(preview).toContainText('1 ticket missing a service-location ID');await expect(preview).toContainText('This is a read-only preview');
   await expect(preview).toContainText('12:00 AM CDT');await expect(preview).toContainText('3:00 PM CDT');
   expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
@@ -101,7 +101,7 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket timestamps do not include a supported timezone. Review the source date format before retrying. Reference: MHELP_PREVIEW_TIMESTAMP_TIMEZONE.');
   await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);
-  await expect(preview).toContainText('Automatic intake is paused');await expect(preview).not.toContainText('synthetic private');
+  await expect(preview).toContainText('This is a read-only preview');await expect(preview).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
   state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');

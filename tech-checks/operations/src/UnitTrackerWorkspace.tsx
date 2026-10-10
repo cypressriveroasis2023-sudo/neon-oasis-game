@@ -3,6 +3,7 @@ import {api,OperationsApiError} from './api';
 import {addressUuid,checkedTrackerRequest,checkedTrackerSnapshot,checkedTrackerDetail,checkedTrackerLookup,newTrackerDraft,trackerAccess,trackerChanges,trackerDraft,trackerDraftProblem,trackerFieldLabels,trackerInventory,trackerRequestMatches,trackerRequestPayload,trackerWorkbookId,type TrackerDraft,type TrackerFields,type TrackerInventory,type TrackerRequest,type TrackerSnapshot,type TrackerSource} from './unitTracker';
 import './unitTracker.css';
 import MhelpPartnerReview from './MhelpPartnerReview';
+import MhelpIntakeReview from './MhelpIntakeReview';
 import SheetsConnectionReview from './SheetsConnectionReview';
 
 type Props={session:unknown;show:(message:string)=>void;initialUnitId?:string;onSelectUnit?:(id:string)=>void;openMap:(id:string)=>void;openHealth:(id:string)=>void};
@@ -71,6 +72,7 @@ export default function UnitTrackerWorkspace({session,show,initialUnitId,onSelec
  return <section className='panel module unit-tracker' aria-label='Unit Tracker workspace'>
   <div className='unit-tracker-heading'><div><h2>One place for your units</h2><p>Current COS inventory and saved requests for the 2027 tracker.</p></div><button className='secondary' disabled={loading||saving||sourceLoading||Boolean(draft)} onClick={()=>void refresh()}>{loading?'Refreshing…':'Refresh tracker'}</button></div>
   {(session as {legacyOwner?:boolean})?.legacyOwner===true&&<MhelpPartnerReview openMap={openMap} openHealth={openHealth}/>}
+  <MhelpIntakeReview session={session}/>
   <SheetsConnectionReview canCheck={(session as {legacyOwner?:boolean})?.legacyOwner===true} queueEnabled={snapshot?.queueEnabled===true}/>
   {trackerError&&<p className='operations-error' role='alert'>{trackerError} Pending requests and their save controls are unavailable.</p>}{snapshot?.availability==='unavailable'&&<p role='status'>{snapshot.reason||'The pending request store is not ready.'}</p>}
   {error&&<p className='operations-error' role='alert'>{error}</p>}{notice&&<p className='operations-notice' role='status'>{notice}</p>}{saveError&&<p className='operations-error' role='alert'>{saveError}</p>}

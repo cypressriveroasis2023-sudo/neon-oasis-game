@@ -229,7 +229,7 @@ export type Database = {
       job_assignments: {
         Row: {
           assigned_at: string
-          assigned_by: string
+          assigned_by: string | null
           assigned_by_name: string
           assigned_role: string
           assignee_name: string
@@ -263,7 +263,7 @@ export type Database = {
         }
         Insert: {
           assigned_at?: string
-          assigned_by: string
+          assigned_by: string | null
           assigned_by_name: string
           assigned_role: string
           assignee_name: string
@@ -297,7 +297,7 @@ export type Database = {
         }
         Update: {
           assigned_at?: string
-          assigned_by?: string
+          assigned_by?: string | null
           assigned_by_name?: string
           assigned_role?: string
           assignee_name?: string
@@ -1948,7 +1948,7 @@ export type Database = {
         Args: { p_role: string }
         Returns: {
           assigned_at: string
-          assigned_by: string
+          assigned_by: string | null
           assigned_by_name: string
           assigned_role: string
           assignee_name: string

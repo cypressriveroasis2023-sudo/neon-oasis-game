@@ -50,9 +50,9 @@ test('diagnostic rendering ignores extra response fields and generic transport s
   assert.equal(mhelpTicketPreviewErrorMessage(cause),mhelpPreviewDiagnosticMessages.TIMESTAMP_TIMEZONE+' Reference: MHELP_PREVIEW_TIMESTAMP_TIMEZONE.');
   assert.equal(mhelpTicketPreviewErrorMessage(new OperationsApiError('The save could not be confirmed. Refresh this workspace before trying again.',503)),'The ticket preview could not be verified. Try again.');
 });
-test('ticket previews offer only explicit today and previous-day reads with automatic intake paused',()=>{
+test('ticket previews offer only explicit today and previous-day reads without claiming global intake status',()=>{
   const html=renderToStaticMarkup(React.createElement(MhelpTicketPreview));
-  assert.match(html,/Preview today’s ticket types/);assert.match(html,/Preview previous day’s ticket types/);assert.match(html,/Automatic intake is paused/);assert.match(html,/does not change tickets or assignments/);
+  assert.match(html,/Preview today’s ticket types/);assert.match(html,/Preview previous day’s ticket types/);assert.match(html,/This is a read-only preview/);assert.match(html,/does not change tickets or assignments/);
   assert.match(html,/prior Central Time calendar day/);assert.match(html,/does not import historical tickets/);assert.equal((html.match(/<button\b/g)||[]).length,2);
   assert(!html.includes('Verified mHelpDesk type IDs and counts'));assert(!html.includes('<input'));assert(!html.includes('<select'));
 });
