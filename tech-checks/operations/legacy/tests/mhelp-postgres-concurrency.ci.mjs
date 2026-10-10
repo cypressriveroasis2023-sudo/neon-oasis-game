@@ -9,6 +9,11 @@ export function assertCiContext(env=process.env){
   if(env.GITHUB_ACTIONS!=='true'||env.COS_MHELP_POSTGRES_CI!=='1')throw Error('Real PostgreSQL tests require the explicit ephemeral GitHub Actions service; no local database was contacted.');
 }
 export const connection=Object.freeze({host:'127.0.0.1',port:'5432',database:'cos_mhelp_intake_ci',user:'postgres'});
+export function validateIsolatedServer(guard){
+  assert.equal(guard.database,connection.database);assert.equal(guard.account,connection.user);assert.equal(guard.port,Number(connection.port));
+  // The client destination above is fixed loopback. inet_server_addr() identifies
+  // the container-side interface, whose Docker subnet is intentionally not fixed.
+}
 const literal=value=>value===null?'NULL':typeof value==='boolean'?String(value):typeof value==='number'&&Number.isFinite(value)?String(value):"'"+String(value).replaceAll("'","''")+"'";
 export const parameters=(sql,values=[])=>sql.replace(/\$(\d+)/g,(_,number)=>{if(Number(number)<1||Number(number)>values.length)throw Error('Invalid synthetic SQL parameter');return literal(values[Number(number)-1]);});
 function openPsql(sql,{application='mhelp-ci',held=false}={}){
@@ -39,8 +44,8 @@ const rpc=async(input,options)=>jsonLines(await exec('begin;'+rpcSql(input)+'com
 const snapshot=async()=> (await query('select id,ticket_no,status,assignee_user_id,assignee_name,assignment_scope,notes,started_at,completed_at,claimed_at,updated_at from public.job_assignments order by id')).rows;
 const stats=async()=> (await query("select (select count(*) from public.job_assignments)::integer assignments,(select count(*) from cos_mhelp_intake.receipts)::integer receipts,(select count(*) from public.app_notifications)::integer notifications,(select watermark from cos_mhelp_intake.scheduler_state where portal_id='17') watermark")).rows[0];
 async function setup(type='service'){
-  const guard=(await query('select current_database() database,current_user account,inet_server_addr()::text address')).rows[0];
-  assert.equal(guard.database,connection.database);assert.equal(guard.account,connection.user);assert(['127.0.0.1','172.17.0.2','172.18.0.2'].includes(guard.address)||/^172\.\d+\.\d+\.\d+$/.test(guard.address),'Expected isolated localhost service forwarding');
+  const guard=(await query('select current_database() database,current_user account,inet_server_port() port')).rows[0];
+  validateIsolatedServer(guard);
   await fixture({type,database:{exec,query:async(sql,values)=>{await exec(parameters(sql,values));return {rows:[]};}},realScheduler:true});
   await exec("update cos_mhelp_intake.portal_config set activated_at=date_trunc('milliseconds',clock_timestamp()-interval '5 minutes') where portal_id='17';");
   const lease=await rpc({action:'begin'});assert.equal(lease.state,'leased');
