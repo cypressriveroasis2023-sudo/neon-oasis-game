@@ -23,3 +23,11 @@ export function mhelpTodayPreviewWindow(now = new Date()) {
 export function mhelpPreviousDayPreviewWindow(now = new Date()) {
   return {createdAfter:new Date(localMidnight(now,-1)).toISOString(),createdBefore:new Date(localMidnight(now)).toISOString()};
 }
+
+/** Scheduling evidence is a separate seven-calendar-day interval from creation day.
+ * It includes future jobs and never establishes the absence of appointments outside it. */
+export function mhelpAppointmentPreviewWindow(createdAfter:string) {
+  const start=new Date(createdAfter);
+  if (!Number.isFinite(start.getTime()) || localMidnight(start)!==start.getTime()) throw new Error('The appointment schedule window is not available.');
+  return {startDateUtc:start.toISOString(),endDateUtc:new Date(localMidnight(start,7)).toISOString(),timeZone:'America/Chicago' as const,calendarDays:7 as const};
+}

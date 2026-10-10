@@ -12,7 +12,7 @@ test('new explicit detail capability preserves both legacy aggregate and v1 stru
   assert.equal(ticketDetailEvidenceCapability,'ticket_detail_structure_v1');
   for(const value of [ticketPreviewFixture(),ticketPreviewEvidenceFixture(),ticketPreviewDetailFixture()])assert.deepEqual(checkedMhelpTicketPreview(value),value);
   const source=readFileSync(new URL('../src/MhelpTicketPreview.tsx',import.meta.url),'utf8');
-  assert.match(source,/evidence:ticketDetailEvidenceCapability/);
+  assert.match(source,/evidence:ticketAppointmentEvidenceCapability/);
   assert.doesNotMatch(source,/ticketId:|ticket_id:|\.get\(/);
   const html=renderToStaticMarkup(React.createElement(MhelpTicketPreview));
   for(const text of ['at most one additional ticket detail read','only when exactly one ticket is found','same window','cannot enter or select a ticket ID','No detail is read automatically','does not import historical tickets'])assert(html.includes(text));

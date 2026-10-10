@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
-import {checkedMhelpTicketPreview,ticketPreviewGaps,ticketDetailEvidenceCapability,ticketDetailEvidenceFields,ticketDetailItemEvidenceFields,ticketDetailCustomEvidenceFields,type TicketDetailEvidence,ticketEvidenceKinds,ticketEvidenceFormats,ticketEvidenceFields,ticketItemEvidenceFields,ticketCustomEvidenceFields,type TicketFieldEvidence,type TicketCollectionEvidence,type TicketOperationalEvidence,type MhelpTicketPreview as Preview} from './mhelpTicketPreviewModel';
+import {checkedMhelpTicketPreview,ticketPreviewGaps,ticketDetailEvidenceFields,ticketDetailItemEvidenceFields,ticketDetailCustomEvidenceFields,type TicketDetailEvidence,ticketEvidenceKinds,ticketEvidenceFormats,ticketEvidenceFields,ticketItemEvidenceFields,ticketCustomEvidenceFields,type TicketFieldEvidence,type TicketCollectionEvidence,type TicketOperationalEvidence,type MhelpTicketPreview as Preview} from './mhelpTicketPreviewModel';
+import {ticketAppointmentEvidenceCapability,ticketAppointmentEvidenceFields,ticketAppointmentReviewKeys,type TicketAppointmentEvidence} from './mhelpAppointmentPreviewModel';
 import {mhelpTicketPreviewErrorMessage} from './mhelpTicketPreviewError';
 
 const chicagoTime=(value:string)=>new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
@@ -56,30 +57,50 @@ export function MhelpTicketDetailEvidence({evidence}:{evidence:TicketDetailEvide
     </>}
   </section>;
 }
+const appointmentReviewLabels:Record<typeof ticketAppointmentReviewKeys[number],string>={deleted:'Deleted ticket or appointment',hidden:'Hidden appointment',team:'Team assignment needing review',recurrence:'Recurrence needing review',missingFlags:'Missing deletion or visibility flags',missingUser:'Missing or unsupported user reference',invalidTime:'Unverified time or all-day state',invalidIdentity:'Unverified appointment identity'};
+export function MhelpAppointmentEvidence({evidence}:{evidence:TicketAppointmentEvidence|undefined}){
+  return <section aria-label='mHelpDesk appointment structural evidence'>
+    <h4>Appointment evidence</h4>
+    {!evidence?<p>Appointment evidence is unavailable in this response. No appointment read is established; schedule and technician assignment remain unverified.</p>:<>
+      <p>Server-defined scheduled period: {chicagoTime(evidence.window.startDateUtc)} to {chicagoTime(evidence.window.endDateUtc)} (end excluded). {evidence.window.calendarDays} calendar days in {evidence.window.timeZone}, beginning at the selected creation-day midnight.</p>
+      {evidence.state==='selection_unavailable'?<p>{evidence.reason==='empty_window'?'No tickets were found in the creation window.':'More than one ticket was found in the creation window.'} A unique ticket could not be selected. No appointments were read.</p>:<>
+        <p>One bounded appointment-list read inspected this scheduled period for the same server-selected ticket. {evidence.sampledAppointments} appointment rows inspected; reported total: {evidence.reportedTotal===null?'unverified':evidence.reportedTotal}. Page limit: {evidence.pageLimit}. Field counts cover all inspected rows in this period.</p>
+        <p>{evidence.completeness==='complete'?'The reported count matches the inspected rows.':evidence.completeness==='incomplete'?'The appointment page is incomplete. Additional rows were not fetched; linkage remains unverified.':'The appointment envelope is unverified; complete coverage cannot be established.'}</p>
+        <p>{evidence.exactMatchCount} exact structural ticket-and-portal matches · {evidence.unverifiedLinkageCount} rows with unverified linkage.</p>
+        <p>{evidence.linkage==='single_structural_match'?'One structural match was found. The candidate appointment contract still does not verify an operational schedule or technician assignment.':evidence.linkage==='no_match_in_window'?'No match was found within this inspected schedule window. An appointment may exist outside this period; the ticket’s scheduling status remains unverified.':evidence.linkage==='ambiguous_matches'?'Multiple structural matches were found. The appointment is ambiguous; scheduling and assignment remain unverified.':evidence.linkage==='review_required'?'The structural match requires review. Deleted, hidden, team, recurring or incomplete appointment details cannot establish scheduling or assignment.':'Ticket-to-appointment linkage remains unverified. This response cannot establish scheduling or assignment.'}</p>
+        {ticketAppointmentReviewKeys.some(key=>evidence.reviewCounts[key]>0)&&<ul aria-label='Appointment review reasons'>{ticketAppointmentReviewKeys.filter(key=>evidence.reviewCounts[key]>0).map(key=><li key={key}>{appointmentReviewLabels[key]}: {evidence.reviewCounts[key]}</li>)}</ul>}
+        <EvidenceFields caption='Inspected appointment field shapes' fields={evidence.fields} keys={ticketAppointmentEvidenceFields}/>
+        <p>Only fixed shapes and counts are shown. No appointment date values, technician identities, ticket text or source values are displayed. No staff lookup was performed; the technician remains unresolved.</p>
+      </>}
+      <p>These observations do not establish work-order readiness or workflow routing. Site and technician mappings still need separate verification.</p>
+    </>}
+  </section>;
+}
 /** Rendered only inside the existing Owner mHelpDesk review. No request runs on mount. */
 export default function MhelpTicketPreview(){
   const [preview,setPreview]=useState<Preview|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [day,setDay]=useState<'today'|'previous'>('today');
-  const active=useRef(true),pending=useRef(false);
-  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
+  const active=useRef(true),pending=useRef(false),sequence=useRef(0);
+  useEffect(()=>{active.current=true;return()=>{active.current=false;sequence.current++;};},[]);
   const run=async(requestedDay:'today'|'previous')=>{
     if(pending.current)return;
-    pending.current=true;setBusy(true);setDay(requestedDay);setError('');setPreview(null);
+    pending.current=true;const request=++sequence.current;setBusy(true);setDay(requestedDay);setError('');setPreview(null);
     try{
       // Existing api.post obtains the signed-in parent session. Server selects a fixed Chicago day.
-      const result=checkedMhelpTicketPreview((await api.post('/api/mhelpdesk/partner/tickets/preview',{evidence:ticketDetailEvidenceCapability,...(requestedDay==='previous'?{day:'previous'}:{})})).data);
-      if(active.current)setPreview(result);
+      const result=checkedMhelpTicketPreview((await api.post('/api/mhelpdesk/partner/tickets/preview',{evidence:ticketAppointmentEvidenceCapability,...(requestedDay==='previous'?{day:'previous'}:{})})).data);
+      if(active.current&&request===sequence.current)setPreview(result);
     }catch(cause){
-      if(active.current)setError(mhelpTicketPreviewErrorMessage(cause));
-    }finally{pending.current=false;if(active.current)setBusy(false);}
+      if(active.current&&request===sequence.current)setError(mhelpTicketPreviewErrorMessage(cause));
+    }finally{if(request===sequence.current){pending.current=false;if(active.current)setBusy(false);}}
   };
   const gaps=preview?ticketPreviewGaps(preview):[];
   return <section className='unit-tracker-source' aria-label='mHelpDesk ticket type preview' aria-busy={busy}>
     <h4>mHelpDesk ticket types</h4>
     <p>Read today’s or the previous day’s ticket counts and type IDs in Central Time. This is a read-only preview. This preview does not change tickets or assignments.</p>
+    <p>Each explicit preview allows at most one additional ticket detail read, only when exactly one ticket is found. The server selects that ticket from the same window. It may then inspect one seven-calendar-day scheduled period for that same server-selected ticket, beginning at the selected creation-day midnight in America/Chicago. No appointments are read for empty or multiple-ticket windows. You cannot enter dates, filters or URLs, and you cannot enter or select a ticket ID. No detail is read automatically.</p>
+    <p>A work-order shell does not require equipment or a Ticket Lead. Technicians choose the unit later; ticket notes hold the work instructions. Scheduling and source-to-COS mappings remain unverified by this preview.</p>
     <button className='secondary' disabled={busy} onClick={()=>void run('today')}>{busy&&day==='today'?'Reading today’s ticket types…':'Preview today’s ticket types'}</button>
     <button className='secondary' disabled={busy} onClick={()=>void run('previous')}>{busy&&day==='previous'?'Reading previous day’s ticket types…':'Preview previous day’s ticket types'}</button>
-    <p>Each explicit preview allows at most one additional ticket detail read, only when exactly one ticket is found. The server selects that ticket from the same window; you cannot enter or select a ticket ID. No detail is read automatically.</p>
     <p>The previous-day preview reads the prior Central Time calendar day for review. It does not import historical tickets.</p>
     {error&&<p className='operations-error' role='alert'>{error}</p>}
     {preview&&<>
@@ -93,6 +114,7 @@ export default function MhelpTicketPreview(){
       <p>Status labels and parent relationships are source dictionary evidence; they do not establish COS workflow meaning or readiness.</p>
       <OperationalEvidence evidence={preview.operationalEvidence}/>
       <MhelpTicketDetailEvidence evidence={preview.detailEvidence}/>
+      <MhelpAppointmentEvidence evidence={preview.appointmentEvidence}/>
       {gaps.length>0?<><h4>Fields needing review</h4><ul>{gaps.map(gap=><li key={gap}>{gap}</li>)}</ul></>:<p>No missing or unrecognized fields were flagged by this preview.</p>}
       <p>Workflow routing uses separately reviewed type and technician mappings. Check Automatic ticket intake for saved configuration and polling status.</p>
     </>}

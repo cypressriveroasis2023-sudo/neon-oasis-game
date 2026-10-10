@@ -1,10 +1,14 @@
 import {test,expect} from '@playwright/test';
+import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
+import {ticketPreviewAppointmentFixture} from './fixtures/mhelpAppointmentTicketPreview.mjs';
+import {syntheticAppointment} from './fixtures/mhelpAppointmentPreview.mjs';
 import {ticketPreviewFixture,ticketPreviewEvidenceFixture,ticketPreviewDetailFixture} from './fixtures/mhelpTicketPreview.mjs';
 const origin='http://127.0.0.1:4173',path='/api/mhelpdesk/partner/tickets/preview';
 const dayButton=(preview,day='today')=>preview.getByRole('button',{name:day==='previous'?/^(?:Preview|Reading) previous day’s ticket types/:/^(?:Preview|Reading) today’s ticket types/});
 async function expectNoDiagnostics(preview){
   await expect(preview.getByRole('region',{name:'mHelpDesk operational structural evidence'})).toHaveCount(0);
   await expect(preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'})).toHaveCount(0);
+  await expect(preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'})).toHaveCount(0);
   await expect(preview.getByRole('table',{name:'Verified mHelpDesk statuses and counts'})).toHaveCount(0);
 }
 async function mount(page,{role='owner'}={}){
@@ -51,7 +55,7 @@ test('today ticket preview is explicit, aggregate-only and preserves equipment c
   await expect(preview.getByRole('table',{name:'Sampled ticket field shapes'}).getByRole('row',{name:'subject string: 3 2 nonempty · 1 empty Other string: 3',exact:true})).toBeVisible();
   await expect(preview).toContainText('scheduledDate and neededBy are deprecated');await expect(preview).toContainText('equipment linkage remains unverified');
   await expect(preview).toContainText('12:00 AM CDT');await expect(preview).toContainText('3:00 PM CDT');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1'}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('previous-day read is explicit, shares the busy guard and clears stale results across day switches',async({page})=>{
@@ -75,7 +79,7 @@ test('previous-day read is explicit, shares the busy guard and clears stale resu
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
   state.bad=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');
   await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('Preview: previous day');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1'}},{path,body:{evidence:'ticket_detail_structure_v1',day:'previous'}},{path,body:{evidence:'ticket_detail_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1'}},{path,body:{evidence:'appointment_structure_v1',day:'previous'}},{path,body:{evidence:'appointment_structure_v1'}}]);
 });
 test('repeated clicks issue one request and a failed refresh clears previous counts',async({page})=>{
   const {preview,calls,state}=await mount(page);let release;state.delay=new Promise(resolve=>{release=resolve});
@@ -122,7 +126,7 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
   await expect(preview).not.toContainText('MHELP_PREVIEW_');await expect(preview).not.toContainText('synthetic private');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'ticket_detail_structure_v1'}})));
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'appointment_structure_v1'}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
   const {preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
@@ -203,7 +207,7 @@ for(const day of ['today','previous'])test(`${day}: explicit singleton detail re
   await expect(equipment.getByRole('table')).toHaveCount(0);
   await expect(detail).toContainText('POST/PUT write-model candidate');await expect(detail).toContainText('a GET equipment contract has not been verified');
   await expect(detail).toContainText('Items and custom fields remain unmapped structures');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('zero or multiple tickets show explicit unavailable detail reasons while list evidence stays available',async({page})=>{
@@ -284,4 +288,86 @@ test('a late single-ticket detail cannot restore evidence after navigation or re
   await expect(preview.getByRole('status')).toContainText('0 tickets');await expect(preview).toContainText('No ticket detail was read');
   await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toHaveCount(0);
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+
+for(const day of ['today','previous'])test(`${day}: appointment preview discloses one seven-day scheduled period and shows only returned structural evidence`,async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  state.preview=ticketPreviewAppointmentFixture(day==='previous'?{createdAfter:'2026-10-08T05:00:00.000Z'}:{});
+  await expect(preview).toContainText('one seven-calendar-day scheduled period');
+  await expect(preview).toContainText('same server-selected ticket');await expect(preview).toContainText('No appointments are read for empty or multiple-ticket windows');
+  await expect(preview).toContainText('does not require equipment or a Ticket Lead');await expect(preview).toContainText('Technicians choose the unit later');await expect(preview).toContainText('ticket notes hold the work instructions');
+  expect(await preview.evaluate(element=>{const button=element.querySelector('button');return [...element.querySelectorAll('p')].some(p=>p.textContent.includes('seven-calendar-day')&&!!(p.compareDocumentPosition(button)&Node.DOCUMENT_POSITION_FOLLOWING));})).toBe(true);
+  expect(calls.filter(call=>call.path===path)).toHaveLength(0);
+  await expect(preview.locator('input,select,textarea')).toHaveCount(0);
+  await dayButton(preview,day).click();
+  const evidence=preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'});
+  await expect(evidence).toContainText(`Server-defined scheduled period: Oct ${day==='previous'?'8':'9'}, 2026, 12:00 AM CDT to Oct ${day==='previous'?'15':'16'}, 2026, 12:00 AM CDT`);
+  await expect(evidence).toContainText('(end excluded). 7 calendar days in America/Chicago');
+  await expect(evidence).toContainText('1 appointment rows inspected; reported total: 1');
+  await expect(evidence).toContainText('One structural match was found');await expect(evidence).toContainText('does not verify an operational schedule or technician assignment');
+  await expect(evidence).toContainText('No staff lookup was performed; the technician remains unresolved');
+  await expect(evidence.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
+  await expect(evidence.getByRole('row',{name:'StartUTC string: 1 1 nonempty · 0 empty ISO with timezone: 1',exact:true})).toBeVisible();
+  await expect(evidence).not.toContainText('synthetic-private');await expect(evidence).not.toContainText('2026-10-11T12:00');await expect(evidence).not.toContainText('781234');
+  await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();await expect(preview.getByRole('table',{name:'Sampled ticket field shapes',exact:true})).toBeVisible();
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+});
+test('appointment evidence distinguishes unavailable selection, no match, incomplete and ambiguous without claiming no schedule',async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  const evidence=preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'});
+  for(const count of [0,3]){
+    state.preview=ticketPreviewAppointmentFixture({count});await dayButton(preview).click();
+    await expect(evidence).toContainText(count?'More than one ticket was found':'No tickets were found');await expect(evidence).toContainText('No appointments were read');await expect(evidence.getByRole('table')).toHaveCount(0);
+  }
+  state.preview=ticketPreviewAppointmentFixture({appointments:[]});await dayButton(preview).click();
+  await expect(evidence).toContainText('No match was found within this inspected schedule window');await expect(evidence).toContainText('An appointment may exist outside this period');await expect(evidence).not.toContainText('unscheduled');
+  state.preview=ticketPreviewAppointmentFixture({reportedTotal:2});await dayButton(preview,'previous').click();
+  await expect(evidence).toContainText('appointment page is incomplete');await expect(evidence).toContainText('Ticket-to-appointment linkage remains unverified');await expect(evidence).not.toContainText('One structural match was found');
+  state.preview=ticketPreviewAppointmentFixture({appointments:[syntheticAppointment(),syntheticAppointment({ID:991235})]});await dayButton(preview).click();
+  await expect(evidence).toContainText('Multiple structural matches were found');await expect(evidence).toContainText('scheduling and assignment remain unverified');await expect(evidence).not.toContainText('unscheduled');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(5);
+});
+test('deleted, hidden, team and recurring appointment candidates stay unverified and reveal only review counters',async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  state.preview=ticketPreviewAppointmentFixture({appointments:[syntheticAppointment({IsDeleted:true,IsHidden:true,TeamId:5,RecurrenceRule:'synthetic-private-rule',UserId:null,StartUTC:'2026-10-11T12:00:00'})]});
+  await dayButton(preview).click();const evidence=preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'});
+  await expect(evidence).toContainText('The structural match requires review');
+  for(const text of ['Deleted ticket or appointment: 1','Hidden appointment: 1','Team assignment needing review: 1','Recurrence needing review: 1','Missing or unsupported user reference: 1','Unverified time or all-day state: 1'])await expect(evidence.getByRole('list',{name:'Appointment review reasons'})).toContainText(text);
+  await expect(evidence).not.toContainText('synthetic-private');await expect(evidence).not.toContainText('2026-10-11T12:00:00');await expect(evidence).not.toContainText('One structural match was found');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(1);
+});
+test('appointment busy guard removes old evidence, rejects repeated clicks and clears all results on Owner denial',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();
+  await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
+  let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewAppointmentFixture({appointments:[]});await dayButton(preview,'previous').click();
+  await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();await expectNoDiagnostics(preview);
+  await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
+  release();state.delay=null;await expect(preview).toContainText('No match was found within this inspected schedule window');await expect(preview).not.toContainText('One structural match was found');
+  state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');
+  await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');expect(calls.filter(call=>call.path===path)).toHaveLength(3);
+});
+test('malformed appointment bounds, private values and forged safe states fail closed before any evidence renders',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
+  const mutations=[
+    e=>{e.window.endDateUtc='2026-10-15T05:00:00.000Z';},e=>{e.ticketId='synthetic private';},e=>{e.fields.UserId.value='synthetic private@example.test';},
+    e=>{e.fields.StartUTC.formats['synthetic private']=1;},e=>{e.reviewCounts.technician='synthetic private';},e=>{e.reviewCounts.hidden=1;},
+    e=>{e.linkage='no_match_in_window';},e=>{e.sampledAppointments=501;},e=>{e.fields.StartUTC.raw='synthetic private'.repeat(16000);},
+  ];
+  for(const mutation of mutations){state.preview=ticketPreviewAppointmentFixture();mutation(state.preview.appointmentEvidence);await dayButton(preview,'previous').click();
+    await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');}
+  state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();expect(calls.filter(call=>call.path===path)).toHaveLength(mutations.length+2);
+});
+for(const diagnostic of ['APPOINTMENT_PROJECTION_INVALID','APPOINTMENT_COUNT_LIMIT','APPOINTMENT_WINDOW_INVALID'])test(`${diagnostic}: appointment failures clear evidence with only an allowlisted diagnostic`,async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field shapes'})).toBeVisible();
+  state.diagnostic='MHELP_PREVIEW_'+diagnostic;await dayButton(preview,'previous').click();await expect(preview.getByRole('alert')).toContainText('Reference: MHELP_PREVIEW_'+diagnostic+'.');await expectNoDiagnostics(preview);await expect(preview).not.toContainText('synthetic private');expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+test('appointment evidence cannot return from an abandoned request or Back/Forward navigation',async({page})=>{
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentFixture();let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
+  await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(preview).toHaveCount(0);
+  await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(1);
+  state.delay=null;state.preview=ticketPreviewAppointmentFixture({appointments:[]});await dayButton(preview,'previous').click();await expect(preview).toContainText('No match was found within this inspected schedule window');
+  const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST'&&response.request().postDataJSON()?.path===path);release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(preview).toContainText('No match was found within this inspected schedule window');await expect(preview).not.toContainText('One structural match was found');
+  await traverseIframeHistory(frame,'forward','#field-map');await expect(preview).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });

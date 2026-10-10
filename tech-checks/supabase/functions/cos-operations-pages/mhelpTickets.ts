@@ -3,6 +3,8 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
+import {MHELP_APPOINTMENT_EVIDENCE,MHELP_APPOINTMENT_PAGE_LIMIT,MHELP_APPOINTMENT_FIELDS,describeMhelpAppointments,unavailableMhelpAppointments,projectMhelpAppointmentEvidence} from './mhelpAppointments.ts';
+import {mhelpAppointmentPreviewWindow} from './mhelpTicketDay.ts';
 import {MHELP_TICKET_DETAIL_EVIDENCE,describeMhelpTicketDetail,projectMhelpTicketDetailEvidence,unavailableMhelpTicketDetail,describeMhelpTicketDetailFailure} from './mhelpTicketDetail.ts';
 import {describeMhelpTicketSchema,describeMhelpOperationalEvidence,projectMhelpOperationalEvidence,MHELP_OPERATIONAL_EVIDENCE} from './mhelpTicketSchema.ts';
 export const MHELP_TICKET_CONTRACT = 'cos-mhelpdesk-ticket-preview-v1';
@@ -12,7 +14,7 @@ const PAGE_SIZE = 50, MAX_TICKETS = 500, MAX_DICTIONARY_ROWS = 500;
 const MAX_WINDOW_MS = 31 * 86400000;
 type Row = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
-type Operation = 'ticket_detail_read' | 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
+type Operation = 'appointment_read' | 'ticket_detail_read' | 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
 export class MhelpTicketError extends Error {
   schema?: Record<string,unknown>;
   detailSchema?: Record<string,unknown>;
@@ -111,9 +113,9 @@ function windowOf(value: unknown) {
 }
 const METRICS = ['deletedTickets','assignedTickets','missingAssignmentFields','missingTypeIds','unknownTypeIds','unknownStatusIds','unknownCustomStatusIds','missingCustomerIds','missingServiceLocationIds','ticketsWithUnknownFields','unknownFieldOccurrences','typeLabelMismatches','duplicateTypeNames'] as const;
 /** Defense-in-depth allowlist for maintenance. Never spread an untrusted reader result. */
-export type MhelpTicketEvidenceCapability=typeof MHELP_OPERATIONAL_EVIDENCE|typeof MHELP_TICKET_DETAIL_EVIDENCE;
+export type MhelpTicketEvidenceCapability=typeof MHELP_OPERATIONAL_EVIDENCE|typeof MHELP_TICKET_DETAIL_EVIDENCE|typeof MHELP_APPOINTMENT_EVIDENCE;
 export function projectMhelpTicketPreview(value: unknown, evidence?:MhelpTicketEvidenceCapability) {
-  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
+  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE&&evidence!==MHELP_APPOINTMENT_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
   const row=object(value);
   if(row.contract!==MHELP_TICKET_CONTRACT || row.state!=='preview_verified' || row.liveAccessVerified!==true || row.automaticSync!==false || row.ticketWrites!==false || row.partial!==false)fail('Unsupported mHelpDesk ticket preview.');
   const portalId=identity(row.verifiedPortalId),window=windowOf(row.window);
@@ -136,17 +138,22 @@ export function projectMhelpTicketPreview(value: unknown, evidence?:MhelpTicketE
     verifiedPortalId:portalId,readAt:timestamp(row.readAt),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
     totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics,
     ...(evidence!==undefined?{operationalEvidence:projectMhelpOperationalEvidence(row.operationalEvidence,totalRows)}:{}),
-    ...(evidence===MHELP_TICKET_DETAIL_EVIDENCE?{detailEvidence:projectDetailEvidence(row.detailEvidence,totalRows)}:{})};
+    ...((evidence===MHELP_TICKET_DETAIL_EVIDENCE||evidence===MHELP_APPOINTMENT_EVIDENCE)?{detailEvidence:projectDetailEvidence(row.detailEvidence,totalRows)}:{}),
+    ...(evidence===MHELP_APPOINTMENT_EVIDENCE?{appointmentEvidence:projectAppointmentEvidence(row.appointmentEvidence,totalRows,window.createdAfter)}:{})};
 }
 function projectDetailEvidence(value:unknown,totalTickets:number){
   try {return projectMhelpTicketDetailEvidence(value,totalTickets);}catch {return fail('Unsupported mHelpDesk ticket detail evidence.');}
+}
+function projectAppointmentEvidence(value:unknown,totalTickets:number,createdAfter:string){
+  try {return projectMhelpAppointmentEvidence(value,totalTickets,createdAfter);}catch {return fail('Unsupported mHelpDesk appointment evidence.');}
 }
 /** Instantiate once and call only behind the existing protected maintenance/Owner gate. */
 export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Config>;renewAccess?:()=>Promise<Config>;fetch:typeof fetch}) {
   let busy=false;
   return {preview:async(value:TicketPreviewWindow,evidence?:MhelpTicketEvidenceCapability)=>{
     const window=windowOf(value);
-    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
+    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE&&evidence!==MHELP_APPOINTMENT_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
+    if(evidence===MHELP_APPOINTMENT_EVIDENCE)try {mhelpAppointmentPreviewWindow(window.createdAfter);}catch {fail('The appointment schedule window is not available.',400);}
     if(busy)fail('A mHelpDesk ticket preview is already running.',409);
     busy=true;
     const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),20000);
@@ -264,8 +271,9 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         }
         boundaryChecked=true;
       }
-      let detailEvidence;
-      if(evidence===MHELP_TICKET_DETAIL_EVIDENCE){
+      let detailEvidence,appointmentEvidence;
+      if(evidence===MHELP_APPOINTMENT_EVIDENCE&&total!==1)appointmentEvidence=unavailableMhelpAppointments(total!,window.createdAfter);
+      if(evidence===MHELP_TICKET_DETAIL_EVIDENCE||evidence===MHELP_APPOINTMENT_EVIDENCE){
         detailEvidence=total===1?undefined:unavailableMhelpTicketDetail(total!);
         if(total===1){
           // The sole selected identity comes from the complete, validated bounded
@@ -288,6 +296,17 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
           const snapshotKeys=['creationDate','lastModDate','typeId','typeName','statusId','customStatusId','deleted','customerId','serviceLocationId','assignedTo','assignmentState'] as const;
           if(snapshotKeys.some(key=>detail[key]!==selected[key]))fail('mHelpDesk ticket changed during the detail preview.');
           try {detailEvidence=describeMhelpTicketDetail(rawDetail);} catch {fail('Unsupported mHelpDesk ticket detail evidence.');}
+          if(evidence===MHELP_APPOINTMENT_EVIDENCE){
+            const schedule=mhelpAppointmentPreviewWindow(window.createdAfter),appointmentUrl=new URL(prefix+'/Appointments');
+            appointmentUrl.searchParams.set('startDateUtc',schedule.startDateUtc);appointmentUrl.searchParams.set('endDateUtc',schedule.endDateUtc);
+            appointmentUrl.searchParams.set('pageSize',String(MHELP_APPOINTMENT_PAGE_LIMIT));appointmentUrl.searchParams.set('sort','StartUtc');
+            appointmentUrl.searchParams.set('fields',MHELP_APPOINTMENT_FIELDS.join(','));
+            // Public row/rowIndex semantics disagree. First page only, no retries,
+            // invented ticket filter, staff join or caller-selected parameters.
+            const rawAppointments=await read(appointmentUrl.href,'appointment_read');
+            try {appointmentEvidence=describeMhelpAppointments(rawAppointments,detail,window.createdAfter);}
+            catch(error){if(error instanceof Error&&error.message==='mHelpDesk returned an oversized appointment page.')fail(error.message);fail('Unsupported mHelpDesk appointment evidence.');}
+          }
         }
       }
       const typeIds=new Set(typeRows.map(row=>row.typeId)),statusIds=new Set(statusRows.map(row=>row.statusId));
@@ -295,7 +314,8 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         verifiedPortalId:portalId,readAt:new Date().toISOString(),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
         totalRows:total!,previewCount:tickets.length,partial:false,
         ...(evidence!==undefined?{operationalEvidence:describeMhelpOperationalEvidence(collectionRows(object(rawTickets))!,total!)}:{}),
-        ...(evidence===MHELP_TICKET_DETAIL_EVIDENCE?{detailEvidence}:{}),
+        ...((evidence===MHELP_TICKET_DETAIL_EVIDENCE||evidence===MHELP_APPOINTMENT_EVIDENCE)?{detailEvidence}:{}),
+        ...(evidence===MHELP_APPOINTMENT_EVIDENCE?{appointmentEvidence}:{}),
         types:typeRows.map(row=>({...row,count:tickets.filter(ticket=>ticket.typeId===row.typeId).length})),
         statuses:statusRows.map(row=>({...row,statusCount:tickets.filter(ticket=>ticket.statusId===row.statusId).length,customStatusCount:tickets.filter(ticket=>ticket.customStatusId===row.statusId).length})),
         metrics:{deletedTickets:tickets.filter(row=>row.deleted).length,assignedTickets:tickets.filter(row=>row.assignmentState==='assigned').length,

@@ -19,6 +19,7 @@ function fixture(change={}) {
   if(url==='https://connect.mhelpdesk.com/api/v1.0/users/me')return json({portalId:Number(portal),private:'do-not-export'});
   if(url.endsWith('/tickettypes'))return change.invalidTypes?json({private:'synthetic-mhelp'}):json({totalRows:1,data:[{portalId:Number(portal),typeId:1,typeName:'Service',isActive:true}]});
   if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true}]);
+  if(url.includes('/Appointments?'))return json({TotalRows:0,results:[]});
   if(url.includes('/Tickets/'))return change.detailHttp?json({private:'synthetic-mhelp'},change.detailHttp):json(change.detail||change.rows?.[0]);
   if(url.includes('/Tickets?')){
    const u=new URL(url);assert.equal(u.searchParams.get('createStart'),change.previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),change.previous?'2026-10-09T05:00:00.000Z':'2026-10-09T22:00:00.000Z');
@@ -140,5 +141,26 @@ test('detail failures return only fixed reference codes and log sanitized operat
   assert.equal(f.diagnostics.length,1);assert.equal(f.diagnostics[0].code,code);assert.equal(f.calls.filter(call=>call.url.includes('/Tickets/')).length,1);
   if(change.detailHttp)assert.equal(f.diagnostics[0].operation,'ticket_detail_read');else assert(f.diagnostics[0].detailSchema);
   for(const secret of ['synthetic-mhelp','synthetic-private-detail','781234','891234','671234','561234','https://','Authorization'])assert(!JSON.stringify(f.diagnostics).includes(secret),secret);
+ }
+});
+
+const appointmentCapability='appointment_structure_v1';
+test('appointment capability uses the same active same-person Owner gate and rejects all caller scope overrides',async()=>{
+ for(const previous of [false,true]){
+  const f=fixture({previous,rows:[singleTicket(previous)]}),response=await f.handler(request({evidence:appointmentCapability,...(previous?{day:'previous'}:{})})),value=await response.json();
+  assert.equal(response.status,200);assert.equal(value.appointmentEvidence.state,'window_reviewed');assert.equal(value.appointmentEvidence.linkage,'no_match_in_window');
+  assert.equal(value.appointmentEvidence.window.startDateUtc,previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');
+  assert.equal(value.appointmentEvidence.window.endDateUtc,previous?'2026-10-15T05:00:00.000Z':'2026-10-16T05:00:00.000Z');
+  assert.equal(f.calls.filter(call=>call.url.includes('/Appointments?')).length,1);assert(f.calls.every(call=>call.method==='GET'));assert.deepEqual(f.diagnostics,[]);
+ }
+ for(const change of [{role:'it'},{role:'service'},{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'},{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285'},{id:'22222222-2222-2222-2222-222222222222'},{invalid:true},{inactive:true},{archived:true},{nativeInactive:true},{revoked:true}]){
+  const f=fixture({...change,rows:[singleTicket()]}),response=await f.handler(request({evidence:appointmentCapability}));assert([401,403].includes(response.status));assert.equal(f.configReads(),0);assert(!f.calls.some(call=>call.url.includes('mhelpdesk.com')));assert.deepEqual(f.diagnostics,[]);
+ }
+ for(const extra of [{appointmentId:991234},{ticketId:781234},{portalId:portal},{url:'https://elsewhere.invalid'},{startDateUtc:'2026-10-09T05:00:00Z'},{endDateUtc:'2026-10-16T05:00:00Z'},{window:{}},{scheduleWindow:{}},{pageSize:500},{rowIndex:0},{fields:['Subject']},{sort:'StartUTC'},{scope:'all'},{activate:true}]){
+  const f=fixture({rows:[singleTicket()]});assert.equal((await f.handler(request({evidence:appointmentCapability,...extra}))).status,400);assert.equal(f.configReads(),0);assert.deepEqual(f.diagnostics,[]);
+ }
+ for(const count of [0,2]){
+  const f=fixture({rows:Array.from({length:count},(_,i)=>({...singleTicket(),ticketId:781234+i,ticketNumber:891234+i}))}),value=await(await f.handler(request({evidence:appointmentCapability}))).json();
+  assert.equal(value.appointmentEvidence.state,'selection_unavailable');assert(!f.calls.some(call=>call.url.includes('/Appointments?')||call.url.includes('/Tickets/')));
  }
 });

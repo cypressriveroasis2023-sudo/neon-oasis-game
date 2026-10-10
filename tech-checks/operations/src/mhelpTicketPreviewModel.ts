@@ -1,3 +1,4 @@
+import {checkedMhelpAppointmentEvidence,type TicketAppointmentEvidence} from './mhelpAppointmentPreviewModel';
 /** Client-only aggregate contract. Never import the server token or ticket reader modules here. */
 export const ticketPreviewMetrics = ['deletedTickets','assignedTickets','missingAssignmentFields','missingTypeIds','unknownTypeIds','unknownStatusIds','unknownCustomStatusIds','missingCustomerIds','missingServiceLocationIds','ticketsWithUnknownFields','unknownFieldOccurrences','typeLabelMismatches','duplicateTypeNames'] as const;
 export type TicketPreviewMetrics = Record<typeof ticketPreviewMetrics[number],number>;
@@ -34,6 +35,7 @@ export type MhelpTicketPreview = {
   metrics:TicketPreviewMetrics;
   operationalEvidence?:TicketOperationalEvidence;
   detailEvidence?:TicketDetailEvidence;
+  appointmentEvidence?:TicketAppointmentEvidence;
 };
 function invalid():never {throw Error('The ticket preview response could not be verified. Try again.');}
 function record(value:unknown,keys:readonly string[]):Record<string,unknown>{
@@ -126,8 +128,9 @@ function detailEvidence(value:unknown,previewCount:number):TicketDetailEvidence{
 export function checkedMhelpTicketPreview(value:unknown):MhelpTicketPreview {
   const hasEvidence=!!value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'operationalEvidence');
   const hasDetail=!!value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'detailEvidence');
-  if(hasDetail&&!hasEvidence)invalid();
-  const row=record(value,['contract','state','liveAccessVerified','automaticSync','ticketWrites','verifiedPortalId','readAt','window','totalRows','previewCount','partial','types','statuses','metrics',...(hasEvidence?['operationalEvidence']:[]),...(hasDetail?['detailEvidence']:[])]);
+  const hasAppointment=!!value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'appointmentEvidence');
+  if(hasDetail&&!hasEvidence||hasAppointment&&!hasDetail)invalid();
+  const row=record(value,['contract','state','liveAccessVerified','automaticSync','ticketWrites','verifiedPortalId','readAt','window','totalRows','previewCount','partial','types','statuses','metrics',...(hasEvidence?['operationalEvidence']:[]),...(hasDetail?['detailEvidence']:[]),...(hasAppointment?['appointmentEvidence']:[])]);
   if(row.contract!=='cos-mhelpdesk-ticket-preview-v1'||row.state!=='preview_verified'||row.liveAccessVerified!==true||row.automaticSync!==false||row.ticketWrites!==false||row.partial!==false)invalid();
   const verifiedPortalId=id(row.verifiedPortalId),readAt=utc(row.readAt),totalRows=count(row.totalRows);
   if(count(row.previewCount)!==totalRows)invalid();
@@ -155,7 +158,7 @@ export function checkedMhelpTicketPreview(value:unknown):MhelpTicketPreview {
     metrics.assignedTickets+metrics.missingAssignmentFields>totalRows || metrics.unknownFieldOccurrences<metrics.ticketsWithUnknownFields ||
     metrics.duplicateTypeNames!==types.length-new Set(types.map(type=>type.typeName)).size)invalid();
   return {contract:'cos-mhelpdesk-ticket-preview-v1',state:'preview_verified',liveAccessVerified:true,automaticSync:false,ticketWrites:false,
-    verifiedPortalId,readAt,window:{createdAfter,createdBefore},totalRows,previewCount:totalRows,partial:false,types,statuses,metrics,...(hasEvidence?{operationalEvidence:operationalEvidence(row.operationalEvidence,totalRows)}:{}),...(hasDetail?{detailEvidence:detailEvidence(row.detailEvidence,totalRows)}:{})};
+    verifiedPortalId,readAt,window:{createdAfter,createdBefore},totalRows,previewCount:totalRows,partial:false,types,statuses,metrics,...(hasEvidence?{operationalEvidence:operationalEvidence(row.operationalEvidence,totalRows)}:{}),...(hasDetail?{detailEvidence:detailEvidence(row.detailEvidence,totalRows)}:{}),...(hasAppointment?{appointmentEvidence:checkedMhelpAppointmentEvidence(row.appointmentEvidence,totalRows,createdAfter)}:{})};
 }
 export function ticketPreviewGaps(preview:MhelpTicketPreview):string[] {
   const labels:Partial<Record<keyof TicketPreviewMetrics,string>>={missingAssignmentFields:'tickets with an unknown assignment field',missingTypeIds:'tickets missing a type ID',unknownTypeIds:'tickets with an unrecognized type ID',unknownStatusIds:'tickets with an unrecognized status ID',unknownCustomStatusIds:'tickets with an unrecognized custom status ID',missingCustomerIds:'tickets missing a customer ID',missingServiceLocationIds:'tickets missing a service-location ID',ticketsWithUnknownFields:'tickets with unrecognized source fields',typeLabelMismatches:'tickets whose type label differs from the type list',duplicateTypeNames:'duplicate type names requiring review'};
