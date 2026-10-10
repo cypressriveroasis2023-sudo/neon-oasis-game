@@ -1,6 +1,8 @@
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
+import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
+import {mhelpTodayPreviewWindow} from './mhelpTicketDay.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
@@ -176,6 +178,7 @@ export function createOperationsHandler(options) {
     renewAccess: options.mhelpPartner?.renewAccess,
     readNativeUnits: () => platformAll('equipment_units?select=id,unit_number,metadata&organization_id=eq.' + ORGANIZATION_ID + '&order=id.asc'),
   });
+  const mhelpTickets=createMhelpTicketReader({fetch:requestFetch,getConfig:options.mhelpPartner?.getConfig || (()=>({})),renewAccess:options.mhelpPartner?.renewAccess});
   // This isolated control RPC is claimed once before the provider secret can be read.
   const readInhandPilot = createInhandPilotReader({
     ...options.inhandPilot,
@@ -469,6 +472,12 @@ export function createOperationsHandler(options) {
         // This owner-only review does not expand the verified IT route allowlist.
         if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
         if (method === 'POST' && body === null) body = await requestBody(request);
+        if(path==='/api/mhelpdesk/partner/tickets/preview') {
+          if(method!=='POST')fail('Method not supported.',405);
+          allowedFields(body || {},[],'Ticket preview request');
+          const window=mhelpTodayPreviewWindow(options.now ? options.now() : new Date());
+          return json(projectMhelpTicketPreview(await mhelpTickets.preview(window)));
+        }
         return json(await mhelpPartner(path, method, body));
       }
       if(path.startsWith('/api/unit-tracker/sheets/')){
@@ -898,8 +907,8 @@ export function createOperationsHandler(options) {
       }
       fail('COS endpoint not found.', 404);
     } catch (cause) {
-      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.status : 503;
-      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
+      const status = cause instanceof PrivateEvidenceError ? cause.statusCode : cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.status : 503;
+      return json({ error: cause instanceof PrivateEvidenceError || cause instanceof SheetsConnectionError || cause instanceof UnitTrackerError || cause instanceof OwnerIdentityError || cause instanceof HttpError || cause instanceof InhandPilotError || cause instanceof MhelpImportError || cause instanceof MhelpPartnerError || cause instanceof MhelpTicketError ? cause.message : 'COS Operations is unavailable. Please retry.' }, status);
     } finally {
       if (!responseOwnsPermit) releaseLargeBody();
     }
