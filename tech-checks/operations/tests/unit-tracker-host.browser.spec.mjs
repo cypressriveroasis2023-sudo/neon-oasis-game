@@ -11,7 +11,7 @@ async function mount(page,{role='it',linked=true,feature=true,held=false,...opti
   const url=new URL(route.request().url());
   if(url.origin===origin&&url.pathname==='/tracker-home')return route.fulfill({contentType:'text/html',body:itHomeFixture(role,linked,options)});
   if(url.href===origin+'/fleet-host-fixture.js')return route.fulfill({contentType:'text/javascript',body:host+'\nwindow.fixtureHostLoaded=true;'});
-  if(url.href===origin+'/it-mhelp-projection.js')return route.fulfill({contentType:'text/javascript',body:readFileSync(new URL('../../it-mhelp-projection.js',import.meta.url),'utf8')});
+  if(url.href===origin+'/it-mhelp-projection.js?v=it-assignment-queue-20261010')return route.fulfill({contentType:'text/javascript',body:readFileSync(new URL('../../it-mhelp-projection.js',import.meta.url),'utf8')});
   if(url.href===origin+'/field-map-display-host.js')return route.fulfill({contentType:'text/javascript',body:readFileSync(new URL('../../field-map-display-host.js',import.meta.url),'utf8')});
   if(url.origin===origin&&url.pathname.startsWith('/resources/fonts/'))return route.fulfill({path:new URL('../../resources/fonts/'+url.pathname.split('/').pop(),import.meta.url).pathname});
   if(url.origin===origin&&url.pathname==='/techcheck-eye-favicon-32.png')return route.fulfill({path:new URL('../../techcheck-eye-favicon-32.png',import.meta.url).pathname});

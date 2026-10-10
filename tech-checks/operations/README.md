@@ -71,6 +71,12 @@ VRM sharing is disabled by default and must be approved before activation: anyon
 
 ### Private Owner Review evidence
 
+The additive [legacy installation evidence contract](docs/legacy-install-evidence-contract.md)
+documents the local read-only IT → Service projection, exact installed-vs-unused
+semantics, explicit installation gaps, bounded Owner authorization, and pending
+native equipment/site linkage. It does not create operational rows, move map
+units, or change mHelpDesk/billing status.
+
 Owner Review loads eligible saved photos and signatures only when an existing authorized Owner chooses View. The protected `GET /api/evidence/:id` bridge rechecks the current active same-organization Owner identity, role and job-view permission, then verifies the document/job organization and private bucket/path before reading bytes. It never returns a Storage URL, signed URL or credential, and does not create roles, grants, identities or public buckets.
 
 The current JSON transport supports private JPEG/PNG/WebP and photo-GIF previews up to 4 MiB. Larger or unsupported files stay preserved with an explicit explanation. Preview bytes are local to the page, clear on close/navigation/background, and expire from the view after one minute; reopening rechecks access. The host clears previews even when it hides an iframe without unmounting it.
@@ -303,3 +309,89 @@ Keep quarantine commitments when revoking a positive review. Deliberately erasin
 both the positive proof and its resource commitments, or restoring the old
 name-only projector, is not a safe post-use revocation: it removes the evidence
 needed to prevent a camera-only fallback. No such scope edits are in this patch.
+
+### Appointment casing diagnostics (explicit Owner preview)
+
+The same two Owner ticket-preview buttons now opt into `appointment_variants_v1`.
+It retains the verified singleton ticket/detail and seven-Chicago-calendar-day
+window gates and makes exactly one appointment-list GET. The fixed fields
+projection includes all 17 documented operational candidates and 36 ID/UTC and
+lower-camel spellings together. The source does not document a reliable runtime
+model: alternate spellings are hypotheses observed individually, never aliases
+used for scheduling or assignment.
+
+The separate `cos-mhelpdesk-appointment-evidence-v2` response shows only fixed
+field-kind/string-format counts, eight fixed envelope descriptors, root/row kinds,
+empty-object counts, and counts of suppressed unknown keys. Four fixed user-ID
+spellings have numeric/UUID-like/email-like/other string-shape counts; these do
+not identify staff. Sixteen fixed ticket/portal spelling pairs show comparable
+positive-integer and exact-selected-pair counts, with separate conflicting-alias
+row counts. These comparisons never coerce strings or expose an identifier.
+All v2 completeness, linkage, schedule and technician mapping remains unverified.
+No-match diagnostic counts do not establish that an appointment does not exist.
+
+The new capability preserves the shared 20-second deadline, 3 MiB aggregate and
+1 MiB per-appointment-response budgets, 500-row page limit, 16,000-byte evidence
+limit, no retries/fallbacks, Owner gate, and absence of staff reads or vendor
+writes. Unknown field names and values are never emitted, even if a key looks
+like a standard API name. Existing capabilities retain their exact original DTOs,
+field projections and request counts. Frontend accepts old DTOs unchanged.
+Synthetic tests cover casing, projection, malformed/conflicting counters, empty
+and multi-ticket no-call gates, privacy, strict nested allowlists, exact candidate
+comparisons, bounds, compatibility and the existing early hosted browser gate.
+
+### Private single-ticket operational inspection (Owner only)
+
+The separate explicit Owner form posts `ticket_private_sample_v1` to the existing
+protected ticket-preview route. It accepts only a displayed positive ticket number
+and one Chicago appointment calendar day within 31 days before or after server
+now. The server derives DST-aware UTC bounds and reads one Tickets page with the
+published `appointmentStart` / `appointmentEnd` parameters, page size 500 and
+stable `ticketId` order. A complete supported envelope and exactly one matching
+number in the authenticated configured portal are required before any detail or
+appointment read. Missing, ambiguous or incomplete selections return bounded
+counts; there is no history, customer, caller-selected ID or URL fallback.
+
+A safe selection permits one fixed ticket detail GET, checked against the list's
+identity and snapshot, then one appointment GET with 57 fixed operational field
+spellings (the 53 diagnostic fields plus Subject/subject/Description/description).
+The private contract is `cos-mhelpdesk-ticket-private-sample-v1`. Existing aggregate
+contracts, projections and request counts are unchanged. All reads share the
+existing Owner/token-manager gates, 20-second deadline, 3 MiB aggregate budget,
+1 MiB response cap, 500-row page limit and overlapping-read guard. No Staff,
+contact, billing, attachment, history-log or write API is called.
+
+Item values are limited to ten independent spellings: name/Name,
+description/Description, notes/Notes, quantity/Quantity and
+durationSeconds/DurationSeconds. Recorded quantities and durations remain
+unclassified, never physical-unit counts. Fields are literal candidates rather
+than precedence rules. Appointment values are limited to identity, start/end,
+user reference, Subject and Description spellings; every present ticket/portal
+reference must be a positive integer exactly equal to the selected source, and
+conflicting identity, user or time aliases withhold that entire row's values.
+A matching row can show literal values even if the appointment total/envelope
+contract is unresolved; its completeness and all schema/staff/COS mappings remain
+explicitly unverified. Unmatched rows contribute only fixed structural counts.
+The result includes all 57 field distributions, eight envelope descriptors,
+root/row kinds, empty rows, suppressed-key counts and strict candidate comparisons.
+Unknown keys, nested objects, financial fields and raw payloads never pass through.
+
+The view returns at most 50 item rows and 50 matching appointment rows, with
+explicit truncation and a 256 KiB DTO ceiling. Each field has an independent
+length/kind bound; text preserves line breaks and indentation. Unsupported control
+characters, recognizable secret patterns and exact configured credential bytes
+are withheld as whole fields, never rewritten. These are conservative safety
+screens, not a claim to classify every possible sentence or credential format.
+The browser independently reconstructs every allowlist, checks request correlation,
+and renders values as escaped React text. Values remain only in component state:
+input changes, Close, navigation, Back/Forward, observed authentication changes or
+failure, hidden workspace, and unmount clear and abort the private read. There is
+no storage, download, logging, import, assignment or automatic mHelpDesk writeback.
+Operational review and the user's manual equipment/billing steps remain separate.
+
+Synthetic unit/route tests cover selection, DST/date bounds, source privacy,
+alias conflicts, incomplete envelopes, literal multiline text, size limits,
+credential suppression, cancellation and legacy compatibility. The existing early
+hosted browser spec includes the Owner form, IT exclusion, cross-view busy guards,
+malformed responses, stale results, authentication clearing, Close and Back/Forward.
+No local browser gate or authorization bypass is added.

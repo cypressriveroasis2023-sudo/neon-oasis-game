@@ -345,7 +345,7 @@ function OwnerApp() {
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
         :active==='Unscheduled'?<OperationsJobs key='unscheduled' mode='unscheduled' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Unscheduled',jobId:'',detail:false},true)}/>
         :active==='Dispatch'?<OperationsJobs key='dispatch' mode='dispatch' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Dispatch',jobId:'',detail:false},true)}/>
-        :active==='Owner Review'?<OperationsJobs key='review' mode='review' show={show} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Owner Review',jobId:'',detail:false},true)}/>
+        :active==='Owner Review'?<OperationsJobs key='review' mode='review' show={show} legacyInstallEvidenceEnabled={session?.features?.legacyInstallEvidence===true} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Owner Review',jobId:'',detail:false},true)}/>
         :active==='Calendar'?<OperationsCalendar show={show}/>
         :active==='Handoffs'?<HandoffsWorkspace show={show}/>
         :active==='Customers'||active==='Sites'?<DirectoryWorkspace kind={active} show={show}/>

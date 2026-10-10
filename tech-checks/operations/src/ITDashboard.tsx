@@ -6,7 +6,7 @@ import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { checkedTrackerSnapshot, trackerAccess } from './unitTracker';
 import { readRouterSnapshot, summarizeRouters } from '../../supabase/functions/cos-operations-pages/routers';
 import { readVrmFleetConfig } from '../../supabase/functions/cos-operations-pages/vrm';
-import { readITMhelpInfo } from './itMhelpBridge';
+import { readITMhelpInfo, readITAssignments } from './itMhelpBridge';
 import './itDashboard.css';
 
 type ReadState<T> = { data: T | null; loading: boolean; error: string; readAt: number | null };
@@ -18,7 +18,7 @@ type Summary = {
 /** A card owns its pending read. No global gate, settled cache, or write retry.
  * Deferring connect's first read avoids StrictMode's discarded setup request.
  * Every completion is tied to the exact connection and request generation. */
-export function createITSourceReader<T>(load: () => Promise<T>, enabled = true) {
+export function createITSourceReader<T>(load: () => Promise<T>, enabled = true, keepPrevious = true) {
   let state: ReadState<T> = { data: null, loading: enabled, error: '', readAt: null };
   let connected = false, revision = 0, pending: number | null = null;
   const listeners = new Set<() => void>();
@@ -27,7 +27,7 @@ export function createITSourceReader<T>(load: () => Promise<T>, enabled = true) 
     if (!connected || !enabled || pending !== null) return;
     const request = ++revision;
     pending = request;
-    publish({ ...state, loading: true, error: '' });
+    publish({ ...state, ...(!keepPrevious ? { data: null, readAt: null } : {}), loading: true, error: '' });
     try {
       const data = await load();
       if (connected && request === revision) publish({ data, loading: false, error: '', readAt: Date.now() });
@@ -116,6 +116,26 @@ export function summarizeITMhelp(value: Awaited<ReturnType<typeof readITMhelpInf
   note: 'MHelp ticket information already available to your signed-in IT account.' };
 }
 
+export function summarizeITAssignments(value: Awaited<ReturnType<typeof readITAssignments>>): Summary {
+  return { count: value.items.length, label: 'active IT assignments', metrics: [
+    { label: 'Assigned to you', value: value.items.filter(item => item.audience === 'mine').length },
+    { label: 'Department queue', value: value.items.filter(item => item.audience === 'department').length },
+  ], note: 'Your assigned or started work and unclaimed IT department work. A Ticket Lead is not required.' };
+}
+
+function ITAssignmentSummary({ session }: { session: Record<string, any> }) {
+  const reader = useMemo(() => createITSourceReader(readITAssignments, true, false), [session]);
+  const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
+  useEffect(() => reader.connect(), [reader]);
+  const summary = state.data ? summarizeITAssignments(state.data) : null;
+  return <section className='it-dashboard-assignment-summary' aria-label='IT assignment queue summary' aria-busy={state.loading}>
+    <h3>Your IT assignments and department queue</h3>
+    {summary ? <><div className='it-dashboard-assignment-count'><strong>{summary.count.toLocaleString()}</strong> {summary.label}</div><dl className='it-dashboard-metrics'>{summary.metrics.map(metric => <div key={metric.label}><dd>{metric.value}</dd><dt>{metric.label}</dt></div>)}</dl><p className='it-dashboard-note'>{summary.note}</p><p className='it-dashboard-note'>Queue read {new Date(state.data!.generatedAt).toLocaleString()}</p></> : <p className='it-dashboard-note' role='status'>{state.loading ? 'Loading IT assignment queue…' : 'IT assignment count unavailable.'}</p>}
+    {state.error && <p className='it-dashboard-error' role='alert'>{state.error}</p>}
+    <button type='button' className='it-dashboard-refresh' disabled={state.loading} onClick={() => void reader.refresh()}>{state.loading ? 'Loading IT queue…' : 'Refresh IT queue'}</button>
+  </section>;
+}
+
 type Source = {
   id: string; label: string; route: string; description: string; icon: string;
   read: () => Promise<unknown>; summarize: (value: any, now: number) => Summary;
@@ -172,6 +192,7 @@ function ITSourceCard({ source, session, now, navigate }: { source: Source; sess
       </> : <p className='it-dashboard-empty'>{state.loading ? 'Checking authorized records…' : 'Summary unavailable. Open this view or retry.'}</p>}
       {state.error && <p className='it-dashboard-error' role='alert'>{state.error}{summary ? ' Showing the last successful snapshot.' : ''}</p>}
     </div>
+    {source.id === 'mhelp' && <ITAssignmentSummary session={session} />}
     <div className='it-dashboard-card-bottom'>
       <span className='it-dashboard-read-time'>{state.readAt ? <>Read <time dateTime={new Date(state.readAt).toISOString()}>{new Date(state.readAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</time></> : 'Source status kept separate'}</span>
       <div className='it-dashboard-actions'>
