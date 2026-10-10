@@ -48,7 +48,10 @@ switch cannot produce a working production source mapper.
 ## Runtime and storage contract
 
 Apply `legacy/mhelp-intake-proposal.sql` definitions and then
-`intake/mhelp-intake-scheduler-proposal.sql` as one reviewed deployment assembly.
+`intake/mhelp-intake-scheduler-proposal.sql`, then
+`legacy/mhelp-local-lead-upgrade-proposal.sql` as one reviewed fresh-deployment assembly.
+An existing disabled PR114 installation uses only the forward local-lead upgrade;
+see the legacy README for drift guards and deployment order.
 The latter supplies only private, explicitly revoked helpers and an RLS table;
 the former owns the only exposed service-role-only wrapper.
 

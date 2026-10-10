@@ -11,7 +11,8 @@ test('real PostgreSQL harness is opt-in hosted CI only with hardcoded ephemeral 
 test('PostgreSQL and PGlite reuse exact common fixture and actual scheduler SQL rather than a concurrency reimplementation',async()=>{
  const statements=[];await fixture({database:{exec:async sql=>statements.push(sql),query:async(sql,values)=>{statements.push(sql);return {rows:[]};}},realScheduler:true});
  const proposal=await readFile(new URL('../legacy/mhelp-intake-proposal.sql',import.meta.url),'utf8'),scheduler=await readFile(new URL('../intake/mhelp-intake-scheduler-proposal.sql',import.meta.url),'utf8'),contracts=await readFile(new URL('../legacy/tests/contracts/legacy-workflow-contract.sql',import.meta.url),'utf8');
- assert(statements.includes(proposal));assert(statements.includes(scheduler));assert(statements.includes(contracts));assert(!statements.some(sql=>sql.includes('2026-10-09T00:00:00Z')&&sql.includes('validate_intake_lease_v1(uuid)')));
+ const localLead=await readFile(new URL('../legacy/mhelp-local-lead-upgrade-proposal.sql',import.meta.url),'utf8');
+ assert(statements.includes(proposal));assert(statements.includes(scheduler));assert(statements.includes(localLead));assert(statements.includes(contracts));assert(!statements.some(sql=>sql.includes('2026-10-09T00:00:00Z')&&sql.includes('validate_intake_lease_v1(uuid)')));
 });
 test('CI adds official postgres and mandatory concurrency step without dropping existing verification/publish guards',async()=>{
  const yaml=await readFile(new URL('../../../.github/workflows/cos-operations.yml',import.meta.url),'utf8');assert.match(yaml,/image: postgres:17\.11/);assert.match(yaml,/POSTGRES_DB: cos_mhelp_intake_ci/);assert.match(yaml,/COS_MHELP_POSTGRES_CI: '1'/);assert.match(yaml,/node --import tsx legacy\/tests\/mhelp-postgres-concurrency\.ci\.mjs/);

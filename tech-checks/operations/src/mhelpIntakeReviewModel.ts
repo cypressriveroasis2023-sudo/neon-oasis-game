@@ -16,6 +16,7 @@ export const intakeReviewReasons = {
   source_status_unreviewed: 'Source status has not been reviewed',
   ticket_lead_inactive_or_unverified: 'Ticket lead is inactive or unverified',
   ticket_lead_unverified: 'Ticket lead needs verification',
+  ticket_lead_policy_conflict: 'Local ticket lead policy conflicts with source assignment',
   type_mapping_reviewer_inactive: 'Type mapping needs an active reviewer',
   type_mapping_unverified: 'Ticket type mapping needs verification',
 } as const;

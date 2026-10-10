@@ -6,6 +6,8 @@ Target: actionable legacy Tech Check `goqrnolcvqnirjmzaeyk`. The SQL is outside 
 
 - `mhelpIntakeAdapter.ts`: pure normalized-payload preparation; no network/execution.
 - `mhelp-intake-proposal.sql`: private receipts/reviewed mappings, constrained service attribution, and one restricted public RPC.
+- `mhelp-local-lead-upgrade-proposal.sql`: disabled-only forward upgrade for a private reviewed local IT Ticket Lead; no configuration rows or public grants.
+- `../tests/mhelp-local-lead-policy.test.mjs`: local policy, provenance, contradictory-source, replay, ACL and forward-upgrade tests.
 - `mhelp-intake-fixture.mjs`: isolated synthetic database fixtures.
 - `tests/mhelp-legacy-intake.test.mjs`: normalizer, SQL, privilege and original-workflow contract tests.
 - `../tests/mhelp-intake-assembled.test.mjs`: real proposal/helper SQL plus runtime, lost acknowledgements, private identity projection and backend/UI contract tests.
@@ -109,4 +111,31 @@ PGlite proves rollback, privilege behavior, routes and queued replay, not true m
 
 ## Atomic definition deployment
 
-`deploymentAssembly.mjs` reads the two checked-in proposal files and produces one transaction; it does not connect to a database or activate intake. Use that reviewed assembly for deployment so the restricted wrapper, scheduler helpers, attribution guard and grants become visible together. Local rollback tests deliberately fail the final statement and verify that all new objects disappear and the original nonnull actor requirement remains. A successful assembly still inserts no portal configuration or assignments.
+`deploymentAssembly.mjs` reads the base, scheduler, and local-lead-upgrade proposal files and produces one transaction; it does not connect to a database or activate intake. Use that reviewed assembly for deployment so the restricted wrapper, scheduler helpers, attribution guard and grants become visible together. Local rollback tests deliberately fail the final statement and verify that all new objects disappear and the original nonnull actor requirement remains. A successful assembly still inserts no portal configuration or assignments.
+
+
+## Reviewed local IT Ticket Lead (follow-on proposal)
+
+There are two mutually exclusive normalized lead selections:
+
+- Existing source-crosswalk selection: `ticketLead: {sourceIdentity, evidence}`. This still requires the exact reviewed source-identity → legacy IT profile mapping. A configured local policy is never a fallback for an unknown source identity.
+- Explicit local ownership selection: `ticketLead: {policy: "reviewed_local_unassigned_v1"}`. The fixed marker contains no person UUID, vendor identity, source evidence or approval claim. The pure preparer's `ready` means a valid non-executing envelope, not authorization or configured lead availability.
+
+The local marker can be chosen only for verified explicitly unassigned work. A source-explicit lead must retain the source-crosswalk representation; never erase it or replace it with the local marker to make a ticket pass. Unknown lead/source assignment semantics remain unresolved. Mixed marker/source fields or caller-supplied UUIDs reject before receipt storage. Global assigned/unknown facts or contradictory department assignments cause a durable `ticket_lead_policy_conflict` hold. Queue targets still have NULL assignees: selecting a Ticket Lead does not claim, start, complete, or personally assign either department's work.
+
+A real user must deliberately choose the responsible existing IT person before any production policy configuration. Verify that person's exact legacy profile, never a name guess or synthetic fixture UUID. The private `ticket_lead_policies` table holds one row per portal with the fixed policy name, actual legacy UUID, disabled-by-default flag, bounded evidence, review timestamp, and either a real Owner reviewer or approved-service provenance with a real approval reference. The SQL writer locks and checks the exact policy and active, unarchived IT profile; Owner review also needs a currently active, unarchived Owner. Missing, disabled, wrong-portal, wrong-role, inactive, archived, future-dated or invalid-review policies create no assignments. No policy/person row is seeded by either SQL proposal.
+
+The private receipt's new `ticket_lead_resolution` stores the actual resolution and review provenance at first successful creation, independently of the immutable normalized source envelope. A local resolution truthfully identifies local policy ownership, with no invented vendor mapping. Source-crosswalk resolutions retain their genuine source identity and review evidence. Historical and still-held receipts remain NULL; no prior selection is inferred or backfilled. Created replays return original IDs before consulting mutable policy, profile or portal settings. Later policy changes, disabling, deletion, profile edits or manual assignment-lead edits do not rewrite work or saved creation provenance. Changing the normalized marker to a source lead (or vice versa) remains source-change reconciliation.
+
+The new table is private, RLS-enabled, and fully revoked from PUBLIC, anon, authenticated and service_role. The existing single service-role-only RPC and its public ACL are unchanged. Neither the source-policy DTO nor Owner review DTO exposes a local UUID or private review provenance. Identity-crosswalk coverage diagnostics keep their original meaning and may remain false for fully unassigned local-policy work; SQL makes per-ticket decisions. The production schema-adapter registry remains empty.
+
+### Forward deployment plan, not authorization to deploy
+
+1. Preserve the original base SQL for existing installations. If PR114 is already installed, do not rerun its CREATE TABLE/schema/trigger statements.
+2. While intake remains disabled, review current schema/function/ACL/trigger drift, confirm no live intake lease, and obtain the separate deployment approval. The upgrade itself refuses enabled portal configuration, a live lease, an unexpected function owner or a changed original acceptance body. Its baseline `prosrc` MD5 is `a82b4b83d707b22665c7593c4b5812fe`; this is a drift guard, not a security signature. Stop and re-review on any mismatch rather than editing the guard to force deployment.
+3. For an existing disabled installation, the pure `mhelpLocalLeadUpgradeSql()` helper returns only `mhelp-local-lead-upgrade-proposal.sql`: one transaction adds the private table, adds the nullable receipt provenance column, and replaces the private acceptance helper. It does not modify the public wrapper, grants, activation, mappings, receipts, assignments or scheduler cursor. A failure rolls everything back. A second application refuses because the old acceptance contract no longer matches.
+4. For a fresh installation only, `mhelpIntakeDeploymentSql()` assembles base → scheduler → forward upgrade in one transaction. It seeds no policy/person/configuration and remains disabled. Local fixtures and the hosted PostgreSQL harness use this same upgraded acceptance implementation.
+5. Ship the marker-aware runtime plus backend/UI reason-code allowlists before any source adapter can emit the new marker. Existing source-crosswalk envelopes remain supported. Configure a policy only after the actual person and scope are explicitly selected and verified. All existing source-semantic, schedule, equipment, status, trigger, concurrency and activation gates still apply.
+6. Rollback means keep intake disabled and retain the private table/receipt history. Do not delete provenance or user work, synthesize a vendor crosswalk, backfill old receipts, or switch old normalized envelopes automatically. Reverting the acceptance function requires a separate reviewed plan once marker receipts exist.
+
+Focused local tests use synthetic isolated PGlite data. They establish atomic upgrade/rollback, ACLs, truthfulness and normal workflow behavior, not production readiness or multi-session race behavior. The hosted PostgreSQL concurrency harness still requires its explicit ephemeral CI environment; do not point it at production.

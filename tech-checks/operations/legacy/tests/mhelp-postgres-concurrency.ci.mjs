@@ -4,7 +4,7 @@ import {spawn} from 'node:child_process';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as sleep} from 'node:timers/promises';
-import {fixture,payload,service} from '../mhelp-intake-fixture.mjs';
+import {fixture,payload,owner,it,service} from '../mhelp-intake-fixture.mjs';
 export function assertCiContext(env=process.env){
   if(env.GITHUB_ACTIONS!=='true'||env.COS_MHELP_POSTGRES_CI!=='1')throw Error('Real PostgreSQL tests require the explicit ephemeral GitHub Actions service; no local database was contacted.');
 }
@@ -100,5 +100,47 @@ async function lostAcknowledgement(){
   assert.equal((await stats()).assignments,1);assert.equal((await stats()).receipts,1);
   console.log('PASS: lost record/finish acknowledgements replay safely after genuine fixture claim, manual edits and completion.');
 }
-export async function main(){assertCiContext();await duplicateRace();await legacyTableContention();await lostAcknowledgement();console.log('All real PostgreSQL concurrency checks passed.');}
+async function localPolicyContention(){
+  // The shared fixture installs the forward upgrade (and its exact original
+  // prosrc drift guard) on this real PostgreSQL server, before seeding data.
+  for(const target of ['policy','profile']){
+    const {record}=await setup('pickup');
+    record.ticket.ticketLead={policy:'reviewed_local_unassigned_v1'};
+    await exec(`insert into cos_mhelp_intake.ticket_lead_policies(portal_id,legacy_user_id,enabled,evidence,reviewed_by,reviewed_at)
+      values('17',${literal(it)}::uuid,true,'Synthetic explicit local selection',${literal(owner)}::uuid,clock_timestamp());
+      delete from cos_mhelp_intake.identity_crosswalk;`);
+    for(const role of ['anon','authenticated','service_role']){
+      const access=(await query(`select has_schema_privilege($1,'cos_mhelp_intake','usage') s,
+        has_table_privilege($1,'cos_mhelp_intake.ticket_lead_policies','select,insert,update,delete') t,
+        has_function_privilege($1,'cos_mhelp_intake.accept_ticket_v1(jsonb)','execute') f,
+        has_function_privilege($1,'public.camera_mhelp_ticket_intake_v1(jsonb)','execute') rpc`,[role])).rows[0];
+      assert.deepEqual(access,{s:false,t:false,f:false,rpc:role==='service_role'});
+    }
+    const implementation=(await query("select prosrc,prosecdef from pg_proc where oid='cos_mhelp_intake.accept_ticket_v1(jsonb)'::regprocedure")).rows[0];
+    assert.equal(implementation.prosecdef,false);assert(implementation.prosrc.includes('reviewed_local_unassigned_v1'));
+    const first=openPsql('begin;'+rpcSql(record),{application:'mhelp-ci-local-first',held:true});
+    let edit;
+    try{
+      await first.ready;
+      edit=exec(target==='policy'
+        ? `update cos_mhelp_intake.ticket_lead_policies set legacy_user_id=${literal(service)}::uuid,evidence='Synthetic later policy edit' where portal_id='17';`
+        : `update public.profiles set active=false where user_id=${literal(it)}::uuid;`,{application:'mhelp-ci-local-edit'});
+      edit.catch(()=>{});await waitForLock('mhelp-ci-local-edit');
+      const created=jsonLines(await first.release()).at(-1);assert.equal(created.state,'created');await edit;
+      const jobs=(await query('select id,job_lead_user_id,assignee_user_id,status from public.job_assignments order by id')).rows;
+      assert.equal(jobs.length,2);assert(jobs.every(row=>row.job_lead_user_id===it&&row.assignee_user_id===null&&row.status==='assigned'));
+      const saved=(await query('select first_payload,ticket_lead_resolution from cos_mhelp_intake.receipts')).rows;
+      assert.equal(saved[0].ticket_lead_resolution.legacy_user_id,it);assert.deepEqual(saved[0].first_payload.ticketLead,{policy:'reviewed_local_unassigned_v1'});
+      assert.equal((await rpc(record)).state,'existing');
+      assert.deepEqual((await query('select id,job_lead_user_id,assignee_user_id,status from public.job_assignments order by id')).rows,jobs);
+      assert.deepEqual((await query('select first_payload,ticket_lead_resolution from cos_mhelp_intake.receipts')).rows,saved);
+      assert.equal((await stats()).notifications,0);
+      const newer=structuredClone(record);newer.ticket.source.ticketId='43';newer.ticket.source.ticketNumber='000043';newer.ticket.request.ticket_no='000043';
+      const held=await rpc(newer);assert.equal(held.state,'review_needed');assert(held.reasonCodes.includes('ticket_lead_inactive_or_unverified'));
+      assert.equal((await stats()).assignments,2);
+      console.log('PASS: real PostgreSQL '+target+' edits wait for local-lead creation; replay/provenance/ACLs stay unchanged and later invalid selections hold.');
+    }finally{await first.release().catch(()=>first.abort());if(edit)await edit.catch(()=>{});}
+  }
+}
+export async function main(){assertCiContext();await duplicateRace();await legacyTableContention();await lostAcknowledgement();await localPolicyContention();console.log('All real PostgreSQL concurrency checks passed.');}
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(error.message);process.exitCode=1;});
