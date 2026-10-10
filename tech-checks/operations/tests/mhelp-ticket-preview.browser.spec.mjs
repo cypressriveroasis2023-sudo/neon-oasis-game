@@ -54,7 +54,10 @@ test('previous-day read is explicit, shares the busy guard and clears stale resu
   release();state.delay=null;await expect(preview.getByRole('status')).toContainText('3 tickets');
   await expect(preview).toContainText('Preview: previous day (Central Time).');
   await expect(preview).toContainText('after Oct 8, 2026');await expect(preview).toContainText('before Oct 9, 2026');
+  await expect(preview.getByRole('columnheader',{name:'mHelpDesk type'})).toBeVisible();
+  await expect(preview.getByRole('columnheader',{name:'mHelpDesk type'})).toHaveAttribute('scope','col');
   await expect(preview.getByRole('columnheader',{name:'Tickets in window'})).toBeVisible();
+  await expect(preview.getByRole('columnheader',{name:'Tickets in window'})).toHaveAttribute('scope','col');
   await expect(preview).toContainText('does not import historical tickets');
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
   state.bad=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');

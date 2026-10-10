@@ -60,6 +60,11 @@ test('client accepts a completed prior-day window without inventing a local date
   const fixture=ticketPreviewFixture();fixture.window={createdAfter:'2026-10-08T05:00:00.000Z',createdBefore:'2026-10-09T05:00:00.000Z'};
   const checked=checkedMhelpTicketPreview(fixture);assert.deepEqual(checked.window,fixture.window);assert.equal(checked.readAt,fixture.readAt);
 });
+test('preview count headers explicitly describe their columns to assistive technology',()=>{
+  const source=readFileSync(new URL('../src/MhelpTicketPreview.tsx',import.meta.url),'utf8');
+  assert.match(source,/<th scope='col'>mHelpDesk type<\/th>/);
+  assert.match(source,/<th scope='col'>Tickets in window<\/th>/);
+});
 test('client rejects partial reads, inactive safety flags, invalid portals and inconsistent totals',()=>{
   const v=ticketPreviewFixture();
   for(const change of [{contract:'other'},{state:'ready'},{liveAccessVerified:false},{automaticSync:true},{ticketWrites:true},{partial:true},{verifiedPortalId:'999'},{totalRows:501},{previewCount:2},{totalRows:3.5}])assert.throws(()=>checkedMhelpTicketPreview({...v,...change}));
