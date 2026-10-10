@@ -3,6 +3,7 @@ import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
 import {mhelpTodayPreviewWindow} from './mhelpTicketDay.ts';
+import {mhelpTicketDiagnostic} from './mhelpTicketDiagnostics.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
@@ -475,8 +476,15 @@ export function createOperationsHandler(options) {
         if(path==='/api/mhelpdesk/partner/tickets/preview') {
           if(method!=='POST')fail('Method not supported.',405);
           allowedFields(body || {},[],'Ticket preview request');
-          const window=mhelpTodayPreviewWindow(options.now ? options.now() : new Date());
-          return json(projectMhelpTicketPreview(await mhelpTickets.preview(window)));
+          try {
+            const window=mhelpTodayPreviewWindow(options.now ? options.now() : new Date());
+            return json(projectMhelpTicketPreview(await mhelpTickets.preview(window)));
+          } catch(cause) {
+            const diagnostic=mhelpTicketDiagnostic(cause);
+            // The log is a new fixed allowlisted object, never the error or request.
+            try { (options.reportTicketPreviewFailure || (entry=>console.warn(JSON.stringify(entry))))(diagnostic.log); } catch { /* Logging cannot alter the safe response. */ }
+            return json({error:diagnostic.error},diagnostic.httpStatus);
+          }
         }
         return json(await mhelpPartner(path, method, body));
       }

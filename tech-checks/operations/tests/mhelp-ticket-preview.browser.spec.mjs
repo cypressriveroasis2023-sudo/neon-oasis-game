@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {ticketPreviewFixture} from './fixtures/mhelpTicketPreview.mjs';
 const origin='http://127.0.0.1:4173',path='/api/mhelpdesk/partner/tickets/preview';
 async function mount(page,{role='owner'}={}){
-  const calls=[],state={bad:false,fail:false,denied:false,delay:null,preview:ticketPreviewFixture()};
+  const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewFixture()};
   // Only local test assets may reach a server. Specific mocks registered below
   // take precedence, including the production-shaped API URL with synthetic data.
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -17,10 +17,11 @@ async function mount(page,{role='owner'}={}){
     if(request.path===path){
       // Capture this request's response before waiting, so later fixture changes
       // cannot accidentally turn a stale-response test into a fresh response.
-      const {delay,fail,denied}=state,payload=structuredClone({...state.preview,...(state.bad?{automaticSync:true}:{})});
+      const {delay,fail,denied,diagnostic}=state,payload=structuredClone({...state.preview,...(state.bad?{automaticSync:true}:{})});
       if(delay)await delay;
       if(fail)return route.abort('failed');
       if(denied)return route.fulfill({status:403,headers,contentType:'application/json',body:JSON.stringify({error:'synthetic private provider text'})});
+      if(diagnostic)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:diagnostic,detail:'synthetic private provider text'})});
       return answer(payload);
     }
     return answer({});
@@ -71,6 +72,18 @@ test('an expired Owner session clears old aggregates and does not display provid
   await expect(preview.getByRole('alert')).toHaveText('Your Owner session could not be verified. Return to Tech Check and sign in again.');
   await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+test('known safe diagnostic explains the read failure, clears old counts and redacts unknown codes',async({page})=>{
+  const {preview,calls,state}=await mount(page);await preview.getByRole('button').click();await expect(preview.getByRole('status')).toContainText('3 tickets');
+  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE';await preview.getByRole('button').click();
+  await expect(preview.getByRole('alert')).toHaveText('The ticket timestamps do not include a supported timezone. Review the source date format before retrying. Reference: MHELP_PREVIEW_TIMESTAMP_TIMEZONE.');
+  await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);
+  await expect(preview).toContainText('Automatic intake is paused');await expect(preview).not.toContainText('synthetic private');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await preview.getByRole('button').click();
+  await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
+  await expect(preview).not.toContainText('MHELP_PREVIEW_');await expect(preview).not.toContainText('synthetic private');
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
   const {preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
