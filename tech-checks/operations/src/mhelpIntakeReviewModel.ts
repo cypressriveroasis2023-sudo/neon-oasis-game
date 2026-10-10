@@ -87,11 +87,12 @@ export function intakeReviewHealth(status: IntakeReviewStatus, now: number): { s
   if (status.retryAfter !== null && Date.parse(status.retryAfter) > now)
     return { state: 'backoff', text: 'Backoff. The scheduler is waiting until the saved next eligible poll time.' };
   if (status.failureCount > 0 || status.lastErrorCode !== null)
-    return { state: 'error', text: 'Poll error recorded. A later successful poll has not been verified.' };
-  if (status.lastSuccessAt === null) return { state: 'unknown', text: 'No successful poll recorded.' };
+    return { state: 'error', text: 'Poll error recorded. A later completed source scan has not been verified.' };
+  if (status.lastSuccessAt === null) return { state: 'unknown', text: 'No completed source scan recorded.' };
   if (now - Date.parse(status.lastSuccessAt) > INTAKE_STATUS_STALE_MS)
-    return { state: 'stale', text: 'Stale. The last successful poll is more than 15 minutes old.' };
-  return { state: 'recent', text: 'Recent successful poll recorded.' };
+    return { state: 'stale', text: 'Stale. The last completed source scan is more than 15 minutes old.' };
+  if (status.pendingReviewCount > 0) return { state: 'review', text: 'Recent source scan completed. Review is required.' };
+  return { state: 'recent', text: 'Recent source scan completed.' };
 }
 export function intakeReviewErrorMessage(cause: unknown): string {
   const code = (cause as { response?: { status?: number } } | null)?.response?.status;

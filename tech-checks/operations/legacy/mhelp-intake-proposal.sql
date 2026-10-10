@@ -154,7 +154,9 @@ declare
   v_status cos_mhelp_intake.source_status_policies%rowtype;
   v_crosswalk cos_mhelp_intake.identity_crosswalk%rowtype;
   v_source jsonb := p_ticket->'source';
-  v_request jsonb := p_ticket->'request';
+  -- JSON null denotes an incomplete projection, not an untrusted scalar body.
+  -- Normalize only this validation view; retain p_ticket unchanged in receipts.
+  v_request jsonb := nullif(p_ticket->'request','null'::jsonb);
   v_portal text := p_ticket#>>'{source,portalId}';
   v_ticket text := p_ticket#>>'{source,ticketId}';
   v_number text := p_ticket#>>'{source,ticketNumber}';
@@ -258,6 +260,12 @@ begin
       update cos_mhelp_intake.receipts set reason_codes=array['source_changed_review_required'],review_required=true
         where portal_id=v_portal and ticket_id=v_ticket;
       return jsonb_build_object('state','review_needed','reasonCodes',array['source_changed_review_required'],
+        'assignmentIds',v_receipt.assignment_ids,'notifications',false);
+    end if;
+    -- Once a never-created source changed, even the old envelope must remain
+    -- held until explicit reconciliation. Mapping repair alone is insufficient.
+    if v_receipt.state='review_needed' and 'source_changed_review_required'=any(v_receipt.reason_codes) then
+      return jsonb_build_object('state','review_needed','reasonCodes',v_receipt.reason_codes,
         'assignmentIds',v_receipt.assignment_ids,'notifications',false);
     end if;
     if v_receipt.state='created' then

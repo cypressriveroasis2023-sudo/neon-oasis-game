@@ -62,7 +62,7 @@ export default function MhelpIntakeReview({ session }: { session: unknown }) {
       {oldRead && <p className='mhelp-intake-warning'>This status was read more than 15 minutes ago. Refresh to verify the current configuration and counts.</p>}
       <dl className='unit-tracker-values'>
         <div><dt>Activation date (UTC)</dt><dd>{formatTime(status.activationAt)}</dd></div>
-        <div><dt>Last successful poll (UTC)</dt><dd>{formatTime(status.lastSuccessAt)}</dd></div>
+        <div><dt>Last completed source scan (UTC)</dt><dd>{formatTime(status.lastSuccessAt)}</dd></div>
         <div><dt>Last poll attempt (UTC)</dt><dd>{formatTime(status.lastAttemptAt)}</dd></div>
         <div><dt>Next eligible poll (UTC)</dt><dd>{status.retryAfter === null ? 'No backoff recorded' : formatTime(status.retryAfter)}</dd></div>
         <div><dt>Consecutive failures</dt><dd>{status.failureCount}</dd></div>
@@ -70,6 +70,7 @@ export default function MhelpIntakeReview({ session }: { session: unknown }) {
         <div><dt>Created by intake</dt><dd>{status.createdCount}</dd></div>
         <div><dt>Needs review</dt><dd>{status.pendingReviewCount}</dd></div>
       </dl>
+      {status.createdCount === 0 && <p className='mhelp-intake-warning'>No Tech Check assignments have been created by this intake yet.</p>}
       <p>These are saved intake receipt counts, not live ticket totals. A created ticket can also need review if its source later changed.</p>
       <h4>Held tickets for review</h4>
       {status.held.length > 0 ? <ul className='mhelp-intake-held'>{status.held.map((ticket, index) => <li key={index}>

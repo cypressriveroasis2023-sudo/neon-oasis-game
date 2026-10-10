@@ -59,7 +59,15 @@ test('native policy checks independent activation floor, fixed portal and hard m
 });
 test('no production schema adapter exists: policy flags alone can never activate intake',async()=>{
  assert.equal(productionAdapterFor(policy()),null);const read=createBoundedMhelpSource({getPolicy:async()=>policy(),adapterFor:productionAdapterFor,now});await assert.rejects(read(batch().window,new AbortController().signal),e=>e.code==='CONFIGURATION');
- for(const update of [{state:'disabled'},{typeMappingsVerified:false},{identityMappingsVerified:false},{statusPoliciesVerified:false},{schemaEvidence:''}]){let called=false;const r=createBoundedMhelpSource({getPolicy:async()=>({...policy(),...update}),adapterFor:()=>{called=true;return null;},now});await assert.rejects(r(batch().window,new AbortController().signal));assert.equal(called,false);}
+ for(const update of [{state:'disabled'},{state:'review_needed'},{typeMappingsVerified:'true'},{identityMappingsVerified:null},{statusPoliciesVerified:undefined},{schemaEvidence:''}]){let called=false;const r=createBoundedMhelpSource({getPolicy:async()=>({...policy(),...update}),adapterFor:()=>{called=true;return null;},now});await assert.rejects(r(batch().window,new AbortController().signal));assert.equal(called,false);}
+});
+test('verified discovery preserves false or partial mapping diagnostics without inventing source authority',async()=>{
+ for(const flags of [{typeMappingsVerified:false},{identityMappingsVerified:false},{statusPoliciesVerified:false},{typeMappingsVerified:false,identityMappingsVerified:false,statusPoliciesVerified:false}]){
+  const p={...policy(),...flags};let seen;const adapter={schemaContract:p.schemaContract,schemaEvidence:p.schemaEvidence,readPage:async()=>({totalRows:1,rows:[ticket()]}),projectTicket:(value,scope)=>{seen=scope;return value;}};
+  const read=createBoundedMhelpSource({getPolicy:async()=>p,adapterFor:()=>adapter,now});assert.equal((await read(batch().window,new AbortController().signal)).totalRows,1);assert.deepEqual(seen,p);
+  const blocked=createBoundedMhelpSource({getPolicy:async()=>p,adapterFor:productionAdapterFor,now});await assert.rejects(blocked(batch().window,new AbortController().signal),e=>e.code==='CONFIGURATION');
+  const mismatch=createBoundedMhelpSource({getPolicy:async()=>p,adapterFor:()=>({...adapter,schemaEvidence:'Different unverified evidence'}),now});await assert.rejects(mismatch(batch().window,new AbortController().signal),e=>e.code==='CONFIGURATION');
+ }
 });
 test('legacy HTTP denies before body/config reads; request cannot select records, source, identity or settings',async()=>{
  let called=false;const denied=createLegacyIntakeHandler({authenticate:()=>false,run:async()=>{called=true;throw Error();}}),request=req();assert.equal((await denied(request)).status,403);assert.equal(request.bodyUsed,false);assert.equal(called,false);

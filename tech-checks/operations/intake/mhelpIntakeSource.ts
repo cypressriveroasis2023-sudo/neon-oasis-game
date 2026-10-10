@@ -1,5 +1,5 @@
 import {BATCH_CONTRACT,INTAKE_LIMITS,IntakeFault,exact,identity,row,utc,validateOperationalTicket,type IntakeTicket,type OperationalBatch,type Window} from './mhelpIntakeRuntime.ts';
-export type IntakePolicy={state:'ready';portalId:string;activationFloor:string;schemaContract:string;schemaEvidence:string;typeMappingsVerified:true;identityMappingsVerified:true;statusPoliciesVerified:true};
+export type IntakePolicy={state:'ready';portalId:string;activationFloor:string;schemaContract:string;schemaEvidence:string;typeMappingsVerified:boolean;identityMappingsVerified:boolean;statusPoliciesVerified:boolean};
 /** Trusted binding only: uses the native existing mHelp token manager and fixed vendor endpoints. */
 export type VerifiedSourceAdapter={
   schemaContract:string;
@@ -19,7 +19,10 @@ export function projectIntakePolicyResponse(value:unknown){
 }
 export function parseIntakePolicy(value:unknown):IntakePolicy {
   const r=projectIntakePolicyResponse(value);
-  if(r.state!=='ready'||!('typeMappingsVerified' in r)||r.typeMappingsVerified!==true||r.identityMappingsVerified!==true||r.statusPoliciesVerified!==true)throw new IntakeFault('CONFIGURATION');
+  // Ready authorizes only bounded discovery under the reviewed source schema.
+  // Coverage flags are diagnostics: unknown per-ticket mappings must reach the
+  // private writer as durable holds, without blocking unrelated eligible work.
+  if(r.state!=='ready'||!('typeMappingsVerified' in r))throw new IntakeFault('CONFIGURATION');
   return r as IntakePolicy;
 }
 /** There are currently NO approved operational schema adapters. Environment flags cannot invent one. */

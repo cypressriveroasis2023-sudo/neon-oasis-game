@@ -40,7 +40,7 @@ const reads=state=>state.calls.filter(x=>x.path==='/api/mhelpdesk/intake/status'
 const refresh=panel=>panel.getByRole('button',{name:'Refresh intake status',exact:true});
 test('explicit saved-status read shows active state, activation, poll, counts, held printed number and code',async({page})=>{
  const {panel,state}=await mount(page);await expect(panel).toContainText('Intake state unknown');expect(reads(state)).toHaveLength(0);
- await refresh(panel).focus();await page.keyboard.press('Enter');await expect(panel).toContainText('Recent successful poll recorded');
+ await refresh(panel).focus();await page.keyboard.press('Enter');await expect(panel).toContainText('Recent source scan completed');
  await expect(panel).toContainText('Active configuration');await expect(panel).toContainText('Oct 10, 2026, 4:00:00 AM UTC');
  await expect(panel).toContainText('000042');await expect(panel).toContainText('source_changed_review_required');await expect(panel).toContainText('Created by intake2');
  expect(reads(state)).toHaveLength(1);expect(reads(state)[0].method).toBe('GET');expect(state.calls.some(x=>x.method==='POST')).toBe(false);
@@ -49,7 +49,7 @@ test('explicit saved-status read shows active state, activation, poll, counts, h
 });
 test('disabled and unrecorded timing never claim a successful poll or activation',async({page})=>{
  const {panel,state}=await mount(page,{value:status({enabled:false,activationAt:null,lastAttemptAt:null,lastSuccessAt:null,pendingReviewCount:0,held:[]})});
- await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Disabled');await expect(panel).toContainText('Not recorded');await expect(panel).toContainText('No tickets are held');await expect(panel).not.toContainText('Recent successful');
+ await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Disabled');await expect(panel).toContainText('Not recorded');await expect(panel).toContainText('No tickets are held');await expect(panel).not.toContainText('Recent source scan');
  state.value=status({activationAt:null});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('activation unverified');await expect(panel.getByRole('status')).not.toContainText('Active configuration');
 });
 test('stale, backoff, error and local read age are explicit without automatic network refresh',async({page})=>{
@@ -90,4 +90,10 @@ test('bounded held list remains readable on mobile and clearly says it is trunca
 });
 for(const role of ['it','service'])test(`${role} session has no intake review or read even with forged Owner flag`,async({page})=>{
  const {panel,state}=await mount(page,{role,legacyOwner:true});await expect(panel).toHaveCount(0);expect(reads(state)).toHaveLength(0);
+});
+
+test('a completed all-held scan never claims that Tech Check assignments were created',async({page})=>{
+ const {panel,state}=await mount(page,{value:status({createdCount:0})});await refresh(panel).click();
+ await expect(panel.getByRole('status')).toContainText('Review is required');await expect(panel).toContainText('No Tech Check assignments have been created by this intake yet.');
+ state.value=status({createdCount:0,pendingReviewCount:0,held:[]});await refresh(panel).click();await expect(panel.getByRole('status')).toContainText('Recent source scan completed');await expect(panel.getByRole('status')).not.toContainText('Review is required');await expect(panel).toContainText('No Tech Check assignments have been created');
 });

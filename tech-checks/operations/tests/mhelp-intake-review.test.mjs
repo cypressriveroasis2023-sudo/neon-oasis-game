@@ -32,8 +32,9 @@ test('only the normal verified Owner can render saved review status',()=>{
 test('health distinguishes disabled, unknown, active saved proof and stale success with exact boundary',()=>{
  assert.equal(intakeReviewHealth(checkedIntakeReview(data()),now).state,'disabled');
  for(const patch of [{activationAt:null},{activationAt:'2026-10-10T06:00:00.000Z'},{lastSuccessAt:null},{lastSuccessAt:'2026-10-10T06:00:00.000Z'},{lastAttemptAt:'2026-10-10T06:00:00.000Z'}])assert.equal(intakeReviewHealth(active(patch),now).state,'unknown');
- assert.equal(intakeReviewHealth(active(),now).state,'recent');
- assert.equal(intakeReviewHealth(active({lastSuccessAt:new Date(now-INTAKE_STATUS_STALE_MS).toISOString()}),now).state,'recent');
+ assert.equal(intakeReviewHealth(active(),now).state,'review');
+ assert.equal(intakeReviewHealth(active({pendingReviewCount:0,held:[]}),now).state,'recent');
+ assert.equal(intakeReviewHealth(active({lastSuccessAt:new Date(now-INTAKE_STATUS_STALE_MS).toISOString()}),now).state,'review');
  assert.equal(intakeReviewHealth(active({lastSuccessAt:new Date(now-INTAKE_STATUS_STALE_MS-1).toISOString()}),now).state,'stale');
  assert.equal(intakeReviewHealth(active(),NaN).state,'unknown');
 });
@@ -52,4 +53,9 @@ test('panel has one fixed read-only backend path and no direct RPC, vendor read,
  assert.doesNotMatch(source,/api\.post|fetch\(|\.rpc\(|connect\.mhelpdesk|service_role|accessToken|localStorage/);
  assert.match(source,/request !== sequence\.current/);assert.match(source,/setStatus\(null\)/);
  const workspace=readFileSync(new URL('../src/UnitTrackerWorkspace.tsx',import.meta.url),'utf8');assert.match(workspace,/<MhelpIntakeReview session=\{session\}/);
+});
+
+test('completed scans distinguish unresolved receipts from assignment creation',()=>{
+ const result=intakeReviewHealth(active({createdCount:0}),now);assert.equal(result.state,'review');assert.match(result.text,/source scan completed/);assert.match(result.text,/Review is required/);assert.doesNotMatch(result.text,/successful|created|working/i);
+ const source=readFileSync(new URL('../src/MhelpIntakeReview.tsx',import.meta.url),'utf8');assert.match(source,/status.createdCount === 0/);assert.match(source,/No Tech Check assignments have been created by this intake yet/);
 });

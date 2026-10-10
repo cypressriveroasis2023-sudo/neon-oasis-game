@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,payload,rows,receipt,service,it} from '../legacy/mhelp-intake-fixture.mjs';
 import {BATCH_CONTRACT,IntakeFault,runMhelpIntake} from '../intake/mhelpIntakeRuntime.ts';
+import {createBoundedMhelpSource} from '../intake/mhelpIntakeSource.ts';
 import {createExistingServiceRpc} from '../intake/mhelpIntakeTransport.ts';
 import {projectIntakeReview} from '../../supabase/functions/cos-operations-pages/mhelpIntakeReview.ts';
 import {checkedIntakeReview} from '../src/mhelpIntakeReviewModel.ts';
@@ -105,4 +106,56 @@ test('private crosswalk holds unknown source, mismatched nonnull UUID, absent fi
     const result=await call({action:'record',leaseId:lease.leaseId,ticket});assert.equal(result.state,'review_needed');assert(result.reasonCodes.includes('assignment_identity_unverified')||result.reasonCodes.includes('source_scope_or_route_invalid'));
     assert.equal((await rows(db)).length,0);assert.equal((await receipt(db)).length,1);
   }
+});
+
+
+test('false coverage diagnostics permit a known creation and unknown null-projection hold in one complete source batch',async()=>{
+  const {db,call,rpc,tickets,run,state}=await assembled();
+  // Coverage is deliberately incomplete; unrelated stale mappings must not veto
+  // a ticket whose own type/status/lead facts are independently valid in SQL.
+  await db.exec(`insert into cos_mhelp_intake.identity_crosswalk(portal_id,source_identity,legacy_user_id,department,enabled,evidence,review_actor,approval_reference,reviewed_at)
+    values('17','synthetic-stale-identity','90000000-0000-4000-8000-000000000001','service',true,'Synthetic stale mapping','approved_service','Synthetic approval',now());
+    insert into cos_mhelp_intake.source_status_policies(portal_id,status_id,classification,enabled,evidence,reviewed_by,reviewed_at)
+    values('17','synthetic-unrelated-status','review',true,'Synthetic inactive reviewer','90000000-0000-4000-8000-000000000002',now());`);
+  const policy=await call({action:'policy'});assert.equal(policy.state,'ready');assert.equal(policy.typeMappingsVerified,false);assert.equal(policy.identityMappingsVerified,false);assert.equal(policy.statusPoliciesVerified,false);
+  tickets[1].source.typeId='synthetic-unknown-type';tickets[1].request=null;
+  const readSource=createBoundedMhelpSource({getPolicy:async()=>call({action:'policy'}),adapterFor:p=>({schemaContract:p.schemaContract,schemaEvidence:p.schemaEvidence,readPage:async()=>({totalRows:2,rows:tickets}),projectTicket:value=>value})});
+  let checkedFinish=false;const result=await run({readSource,rpc:async(input,signal)=>{
+    if(input.action==='finish'){assert.equal((await receipt(db)).length,2);assert.equal((await rows(db)).length,1);assert.equal((await state()).watermark.toISOString(),'2026-10-10T00:00:00.000Z');checkedFinish=true;}
+    return rpc(input,signal);
+  }});
+  assert(checkedFinish);assert.equal(result.state,'complete');assert.equal(result.created,1);assert.equal(result.reviewNeeded,1);assert.equal(result.watermarkAdvanced,true);
+  const held=(await receipt(db)).find(r=>r.ticket_id==='43');assert.equal(held.state,'review_needed');assert.equal(held.first_payload.request,null);assert(held.reason_codes.includes('type_mapping_unverified'));assert(held.reason_codes.includes('source_scope_or_route_invalid'));
+  assert.equal((await rows(db))[0].ticket_no,'000042');assert.equal(await size(db,'public.workflow_checkpoints'),1);assert.equal(await size(db,'public.app_notifications'),0);
+  const status=checkedIntakeReview(projectIntakeReview(await call({action:'review_status'})));assert.equal(status.createdCount,1);assert.equal(status.pendingReviewCount,1);
+});
+
+test('an all-held scan retains every null projection with zero created work and never reports a created count',async()=>{
+  const {db,call,tickets,run,state}=await assembled();for(const ticket of tickets){ticket.source.typeId='synthetic-unknown-type';ticket.request=null;}
+  const result=await run();assert.equal(result.state,'complete');assert.equal(result.scanned,2);assert.equal(result.created,0);assert.equal(result.existing,0);assert.equal(result.reviewNeeded,2);assert.equal(result.watermarkAdvanced,true);
+  assert.equal((await rows(db)).length,0);assert.equal(await size(db,'public.workflow_checkpoints'),0);assert.equal((await receipt(db)).length,2);assert.equal((await state()).completed_total,2);
+  const status=checkedIntakeReview(projectIntakeReview(await call({action:'review_status'})));assert.equal(status.createdCount,0);assert.equal(status.pendingReviewCount,2);
+});
+
+test('explicit null hold is immutable; later enriched request requires reconciliation rather than silent promotion',async()=>{
+  const {db,call,tickets}=await assembled();const lease=await call({action:'begin'}),ticket=structuredClone(tickets[0]);ticket.request=null;
+  assert.equal((await call({action:'record',leaseId:lease.leaseId,ticket})).state,'review_needed');
+  assert.equal((await call({action:'record',leaseId:lease.leaseId,ticket})).state,'review_needed');assert.equal((await receipt(db)).length,1);
+  const changed=await call({action:'record',leaseId:lease.leaseId,ticket:tickets[0]});assert.equal(changed.state,'review_needed');assert.deepEqual(changed.reasonCodes,['source_changed_review_required']);
+  assert.equal((await receipt(db))[0].first_payload.request,null);assert.equal((await rows(db)).length,0);
+  const replay=await call({action:'record',leaseId:lease.leaseId,ticket});assert.equal(replay.state,'review_needed');assert.deepEqual(replay.reasonCodes,['source_changed_review_required']);
+  for(const request of [false,1,'untrusted scalar',[],{unapproved:'field'}]){const invalid=structuredClone(tickets[1]);invalid.request=request;await assert.rejects(call({action:'record',leaseId:lease.leaseId,ticket:invalid}));}
+  assert.equal((await receipt(db)).length,1);
+});
+
+
+test('source-changed never-created holds remain latched even when original payload becomes individually eligible',async()=>{
+  const {db,call,tickets}=await assembled();const lease=await call({action:'begin'}),original=tickets[0];
+  await db.exec("update cos_mhelp_intake.type_mappings set enabled=false where type_id='5'");
+  assert.equal((await call({action:'record',leaseId:lease.leaseId,ticket:original})).state,'review_needed');
+  const changed=structuredClone(original);changed.request.notes='Synthetic changed work detail';
+  assert.deepEqual((await call({action:'record',leaseId:lease.leaseId,ticket:changed})).reasonCodes,['source_changed_review_required']);
+  await db.exec("update cos_mhelp_intake.type_mappings set enabled=true where type_id='5'");
+  const replay=await call({action:'record',leaseId:lease.leaseId,ticket:original});assert.equal(replay.state,'review_needed');assert.deepEqual(replay.reasonCodes,['source_changed_review_required']);
+  const saved=(await receipt(db))[0];assert.deepEqual(saved.first_payload,original);assert.equal(saved.review_required,true);assert.equal(saved.state,'review_needed');assert.equal((await rows(db)).length,0);
 });

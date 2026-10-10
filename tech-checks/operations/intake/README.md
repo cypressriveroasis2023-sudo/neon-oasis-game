@@ -20,7 +20,11 @@ switch cannot produce a working production source mapper.
   incoming Camera Health credential. No request may choose a portal, actor,
   assignment, URL, credentials or activation settings.
 - The policy read returns the fixed portal, activation floor, schema evidence and
-  reviewed type/identity/source-status-policy booleans. There is only one durable watermark, in legacy.
+  type/identity/source-status-policy coverage booleans. These booleans are diagnostics,
+  not global discovery gates. Ready authority still requires the reviewed portal,
+  activation floor and exact registered schema evidence. SQL independently checks
+  every ticket’s type, status, identity and current profiles before creating work.
+  There is only one durable watermark, in legacy.
   Repeated bounded source reads are intentionally allowed for retries and overlap.
 - `createNativeMhelpTicketAccess` takes the SAME `nativeMhelpTokens` object already
   constructed by native maintenance. Its optional constructor fallback uses the
@@ -32,7 +36,10 @@ switch cannot produce a working production source mapper.
   status, assignment, site/work and equipment structure before using the bounded
   reader. The known preview DTO deliberately lacks work/equipment details and is
   insufficient. Actual rowIndex semantics also require verification; this prepared
-  access layer does not silently guess a different pagination convention.
+  access layer does not silently guess a different pagination convention. A future
+  evidence-bound type registry may project only verified routes; unknown types
+  remain in the complete source batch with `request:null`, never silently filtered
+  out. The production registry remains empty until its real source proof exists.
 - Operational ticket responses travel directly native Edge → legacy Edge, never
   through pg_net request/response tables. HTTP output is no-store; no implementation
   logs source rows, raw errors, billing, contacts, attachments, credentials or headers.
@@ -74,6 +81,18 @@ advance; missing/incomplete/duplicate/reordered/changing-total/over-limit scans
 cannot. Receipts commit before watermark movement, so a crash retries unchanged
 source keys rather than recreating claimed/completed/manually edited work.
 
+`complete` and last-success timestamps mean the source scan was durably accounted
+for, not that assignments were created or every mapping is ready. An all-held
+scan advances only after every review receipt exists and reports zero created,
+with the full review-needed count. Such a scan is not proof of operational rollout
+success. Mapping coverage and held work must be reported separately.
+
+A null request is retained as an unresolved immutable snapshot. Filling in a new
+projection later requires explicit reconciliation; do not rewrite the receipt or
+loosen equality. Exact private mapping/status repair may promote an unchanged
+envelope only when that ticket is read again within the existing bounded scope.
+There is no automatic reprocessing of older holds beyond the overlap window.
+
 The ten-minute overlap mitigates short source indexing delays. It does NOT prove
 late visibility or old-ticket changes are fully covered. A source ticket first
 visible after that overlap can be missed; an over-500 window is held rather than
@@ -82,8 +101,11 @@ separately reviewed reconciliation approach for those cases.
 
 ## Remaining activation gates
 
-1. Inspect the real read-only schema evidence and approve exact workflow/identity
-   mappings and exact open/terminal/custom-status classifications; register a production adapter with matching evidence.
+1. Inspect the real read-only schema evidence and register a production adapter
+   with matching evidence for the authorized fixed portal and new-only bounds.
+   Approve exact workflow/identity mappings and open/terminal/custom-status
+   classifications for tickets that may create work; unknown per-ticket mappings
+   remain durable review holds instead of preventing discovery globally.
 2. Reconcile and test the assembled service wrapper/helpers against the actual
    legacy trigger/schema contract and privilege checks.
 3. Publish the locally assembled protected entrypoints only after review. The
