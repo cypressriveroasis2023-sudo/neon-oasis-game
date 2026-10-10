@@ -1,9 +1,15 @@
+import {projectMhelpTicketDetailFailure} from './mhelpTicketDetail.ts';
 import {MhelpTicketError} from './mhelpTickets.ts';
 import {projectMhelpTicketSchema} from './mhelpTicketSchema.ts';
 
 // Match only our own fixed parser messages. Never log a caught message, stack,
 // response body, URL, request, identity or credential, even for unknown errors.
 const REASONS = Object.freeze({
+  'mHelpDesk detail does not match the selected ticket.':'DETAIL_IDENTITY_MISMATCH',
+  'mHelpDesk ticket changed during the detail preview.':'DETAIL_CHANGED',
+  'mHelpDesk detail is outside the verified creation window.':'DETAIL_WINDOW_MISMATCH',
+  'mHelpDesk returned an unsupported flat ticket detail.':'DETAIL_SCHEMA',
+  'Unsupported mHelpDesk ticket detail evidence.':'DETAIL_PROJECTION_INVALID',
   'A mHelpDesk ticket preview is already running.':'BUSY',
   'mHelpDesk ticket configuration is unavailable.':'CONFIG_UNAVAILABLE',
   'mHelpDesk needs its existing server-held access token.':'TOKEN_UNAVAILABLE',
@@ -47,7 +53,7 @@ const REASONS = Object.freeze({
   'Use a ticket window of at most 31 days and a limit from 1 to 500.':'WINDOW_INVALID',
   'The ticket preview request contains unsupported fields.':'WINDOW_INVALID',
 });
-const OPERATIONS = ['account_read','ticket_read','ticket_types_read','ticket_statuses_read'] as const;
+const OPERATIONS = ['ticket_detail_read','account_read','ticket_read','ticket_types_read','ticket_statuses_read'] as const;
 export const MHELP_PREVIEW_DIAGNOSTIC_CODES = Object.freeze([...new Set([
   ...Object.values(REASONS),'PROVIDER_HTTP','RATE_LIMIT','INTERNAL_FAILURE',
 ])]);
@@ -66,5 +72,6 @@ export function mhelpTicketDiagnostic(cause: unknown) {
   }
   return {error:'MHELP_PREVIEW_'+code,httpStatus,
     log:{event:'mhelp_ticket_preview_failed',code,httpStatus,operation,providerHttpStatus,
-      ...(cause instanceof MhelpTicketError && cause.schema?{schema:projectMhelpTicketSchema(cause.schema)}:{})}};
+      ...(cause instanceof MhelpTicketError && cause.schema?{schema:projectMhelpTicketSchema(cause.schema)}:{}),
+      ...(cause instanceof MhelpTicketError && cause.detailSchema?{detailSchema:projectMhelpTicketDetailFailure(cause.detailSchema)}:{})}};
 }

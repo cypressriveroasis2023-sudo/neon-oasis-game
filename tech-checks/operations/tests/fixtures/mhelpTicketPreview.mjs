@@ -34,3 +34,24 @@ export function ticketPreviewEvidenceFixture(options={}){
   preview.statuses.push({statusId:'2',statusText:'Awaiting review',displayText:'Review queue',parentId:'1',canBeParent:false,statusCount:0,customStatusCount:ticketCount?1:0});
   return {...preview,operationalEvidence:operationalEvidenceFixture({...options,ticketCount})};
 }
+
+/** Synthetic singleton detail evidence. Field names are fixed, never source values. */
+export function ticketDetailEvidenceFixture({ticketCount=1,itemEntries=2,customEntries=1,equipmentEntries=2,hasDescription=true}={}){
+  const header={contract:'cos-mhelpdesk-ticket-detail-evidence-v1',scope:'single_server_selected_ticket'};
+  if(ticketCount!==1)return {...header,state:'selection_unavailable',reason:ticketCount===0?'empty_window':'ambiguous_window',sampledTickets:0};
+  const field=(kind,n=1,format='other')=>({kinds:n?{[kind]:n}:{},formats:kind==='string'&&n?{[format]:n}:{},emptyStrings:0,nonemptyStrings:kind==='string'?n:0});
+  const fields=Object.fromEntries('subject summary comment customerId serviceLocationId categoryId priority typeId typeName statusId customStatusId ticketStatus assignedTo deleted creationDate lastModDate scheduledDate neededBy appointmentCount estimatedTime lastCalledDate nextCallDate parentTicketId originalTicketId recurringRuleId generatedByRecurring businessUnitId'.split(' ').map(key=>[key,field('absent')]));
+  fields.subject=field(hasDescription?'string':'null');fields.customerId=field('integer');fields.serviceLocationId=field('integer');fields.ticketStatus=field('object');fields.deleted=field('boolean');
+  fields.creationDate=field('string',1,'iso_with_zone');fields.lastModDate=field('string',1,'iso_with_zone');fields.scheduledDate=field('null');fields.neededBy=field('null');
+  const collection=(totalEntries,shape)=>{
+    const sampledEntries=Math.min(totalEntries,50);
+    return {kinds:{array:1},emptyArrays:totalEntries?0:1,nonemptyArrays:totalEntries?1:0,totalEntries,sampledEntries,entryKinds:sampledEntries?{object:sampledEntries}:{},fields:Object.fromEntries(Object.entries(shape).map(([key,kind])=>[key,field(kind,sampledEntries)]))};
+  };
+  return {...header,state:'detail_verified',sampledTickets:1,nestedSampleLimit:50,fields,
+    collections:{items:collection(itemEntries,{ticketItemId:'integer',ticketId:'integer',portalId:'integer',priceListId:'integer',priceListTypeId:'integer',name:'string',description:'null',quantity:'number',currentStatus:'string',notes:'string',startTime:'null',dateEntry:'null',durationSeconds:'integer',groupId:'integer',lastUpdateUTC:'null',sortNumber:'integer'}),customFields:collection(customEntries,{id:'integer',customFieldId:'integer',fieldValue:'string',fieldLabel:'string',sortOrder:'integer',isRequired:'boolean'}),equipment:collection(equipmentEntries,{})},
+    availability:{description:hasDescription?'nonempty_text_present':'nonempty_text_absent',site:'unresolved_no_join',equipment:'unverified_write_model_candidate',schedule:'unverified_deprecated_get_fields',items:'unmapped_structures_only',customFields:'unmapped_structures_only'}};
+}
+export function ticketPreviewDetailFixture(options={}){
+  const ticketCount=options.ticketCount??1;
+  return {...ticketPreviewEvidenceFixture({...options,ticketCount}),detailEvidence:ticketDetailEvidenceFixture({...options,ticketCount})};
+}

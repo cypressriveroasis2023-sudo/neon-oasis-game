@@ -19,10 +19,11 @@ function fixture(change={}) {
   if(url==='https://connect.mhelpdesk.com/api/v1.0/users/me')return json({portalId:Number(portal),private:'do-not-export'});
   if(url.endsWith('/tickettypes'))return change.invalidTypes?json({private:'synthetic-mhelp'}):json({totalRows:1,data:[{portalId:Number(portal),typeId:1,typeName:'Service',isActive:true}]});
   if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true}]);
+  if(url.includes('/Tickets/'))return change.detailHttp?json({private:'synthetic-mhelp'},change.detailHttp):json(change.detail||change.rows?.[0]);
   if(url.includes('/Tickets?')){
    const u=new URL(url);assert.equal(u.searchParams.get('createStart'),change.previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),change.previous?'2026-10-09T05:00:00.000Z':'2026-10-09T22:00:00.000Z');
    if(change.providerError)return json({private:'synthetic-mhelp'},change.providerError===true?429:change.providerError);
-   return json({totalRows:0,data:[],private:'do-not-export'});
+   return json({totalRows:change.rows?.length||0,data:change.rows||[],private:'do-not-export'});
   }
   throw Error('Unexpected transport');
  }});
@@ -96,5 +97,48 @@ test('operational capability is explicitly opted in on the same bounded Owner ro
  }
  for(const change of [{role:'it'},{role:'service'},{invalid:true},{revoked:true}]){
   const f=fixture(change),response=await f.handler(request({evidence}));assert([401,403].includes(response.status));assert.equal(f.configReads(),0);assert(!f.calls.some(c=>c.url.includes('mhelpdesk.com')));
+ }
+});
+
+const detailCapability='ticket_detail_structure_v1';
+const singleTicket=(previous=false)=>({portalId:Number(portal),ticketId:781234,ticketNumber:891234,typeId:1,typeName:'Service',statusId:1,customStatusId:null,deleted:false,
+ creationDate:previous?'2026-10-08T12:00:00Z':'2026-10-09T12:00:00Z',lastModDate:previous?'2026-10-08T13:00:00Z':'2026-10-09T13:00:00Z',assignedTo:null,customerId:671234,serviceLocationId:561234,
+ subject:'synthetic-private-detail',summary:'synthetic-private-detail',comment:null,items:null,customFields:null});
+test('single-ticket detail capability reuses active same-person Owner gate and fixed today/previous windows',async()=>{
+ for(const previous of [false,true]){
+  const row=singleTicket(previous),f=fixture({previous,rows:[row]}),body={evidence:detailCapability,...(previous?{day:'previous'}:{})};
+  const response=await f.handler(request(body)),value=await response.json();assert.equal(response.status,200);
+  assert.equal(value.detailEvidence.state,'detail_verified');assert.equal(value.operationalEvidence.sampledTickets,1);
+  assert.equal(f.calls.filter(call=>call.url.includes('/Tickets/')).length,1);assert.equal(f.calls.at(-1).url,'https://connect.mhelpdesk.com/api/v1.0/portal/'+portal+'/Tickets/781234');
+  assert(!JSON.stringify(value).includes('synthetic-private-detail'));assert(!JSON.stringify(value).includes('781234'));assert.deepEqual(f.diagnostics,[]);
+  assert(f.calls.every(call=>call.method==='GET'));assert(!f.calls.some(call=>call.url.includes('/rpc/')||call.url.includes('vault')));
+ }
+ for(const change of [{role:'it'},{role:'service'},{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'},{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285'},{id:'22222222-2222-2222-2222-222222222222'},{invalid:true},{inactive:true},{archived:true},{nativeInactive:true},{revoked:true}]){
+  const f=fixture({...change,rows:[singleTicket()]});const response=await f.handler(request({evidence:detailCapability}));
+  assert([401,403].includes(response.status));assert.equal(f.configReads(),0);assert(!f.calls.some(call=>call.url.includes('mhelpdesk.com')));assert.deepEqual(f.diagnostics,[]);
+ }
+});
+test('detail capability rejects caller ticket selection, arbitrary destinations and other overrides before configuration',async()=>{
+ for(const extra of [{ticketId:781234},{ticket_id:781234},{portalId:portal},{url:'https://elsewhere.invalid'},{path:'/Tickets/781234'},{fields:['summary']},{expand:'items'},{createdAfter:'2026-10-08T00:00:00Z'},{createdBefore:'2026-10-10T00:00:00Z'},{maxTickets:1},{activate:true},{token:'private'},{actorId:actor}]){
+  const f=fixture({rows:[singleTicket()]});assert.equal((await f.handler(request({evidence:detailCapability,...extra}))).status,400);assert.equal(f.configReads(),0);assert.deepEqual(f.diagnostics,[]);
+ }
+});
+test('same Owner route makes no detail request for legacy clients or a zero/ambiguous bounded selection',async()=>{
+ for(const count of [0,2]){
+  const f=fixture({rows:Array.from({length:count},(_,i)=>({...singleTicket(),ticketId:781234+i,ticketNumber:891234+i}))});
+  const response=await f.handler(request({evidence:detailCapability})),value=await response.json();assert.equal(response.status,200);
+  assert.equal(value.detailEvidence.state,'selection_unavailable');assert.equal(value.detailEvidence.reason,count===0?'empty_window':'ambiguous_window');
+  assert(!f.calls.some(call=>call.url.includes('/Tickets/')));
+ }
+ for(const body of [{},{evidence}]){
+  const f=fixture({rows:[singleTicket()]}),value=await (await f.handler(request(body))).json();assert.equal(value.detailEvidence,undefined);assert(!f.calls.some(call=>call.url.includes('/Tickets/')));
+ }
+});
+test('detail failures return only fixed reference codes and log sanitized operation/shape evidence',async()=>{
+ for(const [change,code] of [[{detail:{data:singleTicket()}},'DETAIL_SCHEMA'],[{detail:{...singleTicket(),ticketId:781235}},'DETAIL_IDENTITY_MISMATCH'],[{detail:{...singleTicket(),lastModDate:'2026-10-09T15:00:00Z'}},'DETAIL_CHANGED'],[{detailHttp:403},'PROVIDER_HTTP']]){
+  const f=fixture({rows:[singleTicket()],...change}),response=await f.handler(request({evidence:detailCapability}));assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'MHELP_PREVIEW_'+code});
+  assert.equal(f.diagnostics.length,1);assert.equal(f.diagnostics[0].code,code);assert.equal(f.calls.filter(call=>call.url.includes('/Tickets/')).length,1);
+  if(change.detailHttp)assert.equal(f.diagnostics[0].operation,'ticket_detail_read');else assert(f.diagnostics[0].detailSchema);
+  for(const secret of ['synthetic-mhelp','synthetic-private-detail','781234','891234','671234','561234','https://','Authorization'])assert(!JSON.stringify(f.diagnostics).includes(secret),secret);
  }
 });

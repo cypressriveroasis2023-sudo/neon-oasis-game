@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
-import {checkedMhelpTicketPreview,ticketPreviewGaps,ticketEvidenceKinds,ticketEvidenceFormats,ticketEvidenceFields,ticketItemEvidenceFields,ticketCustomEvidenceFields,type TicketFieldEvidence,type TicketCollectionEvidence,type TicketOperationalEvidence,type MhelpTicketPreview as Preview} from './mhelpTicketPreviewModel';
+import {checkedMhelpTicketPreview,ticketPreviewGaps,ticketDetailEvidenceCapability,ticketDetailEvidenceFields,ticketDetailItemEvidenceFields,ticketDetailCustomEvidenceFields,type TicketDetailEvidence,ticketEvidenceKinds,ticketEvidenceFormats,ticketEvidenceFields,ticketItemEvidenceFields,ticketCustomEvidenceFields,type TicketFieldEvidence,type TicketCollectionEvidence,type TicketOperationalEvidence,type MhelpTicketPreview as Preview} from './mhelpTicketPreviewModel';
 import {mhelpTicketPreviewErrorMessage} from './mhelpTicketPreviewError';
 
 const chicagoTime=(value:string)=>new Date(value).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
@@ -19,9 +19,9 @@ function CollectionEvidence<K extends string>({name,collection,keys}:{name:strin
     <h4>{name}</h4>
     <p>Collection kinds across sampled tickets: {kindSummary(collection.kinds)}.</p>
     <p>{collection.emptyArrays} empty arrays · {collection.nonemptyArrays} nonempty arrays · {collection.totalEntries} array entries within sampled tickets · {collection.sampledEntries} nested entries sampled.</p>
-    <p>Nested entry kinds: {kindSummary(collection.entryKinds)}. Field counts below cover only those {collection.sampledEntries} sampled entries.</p>
+    <p>Nested entry kinds: {kindSummary(collection.entryKinds)}.{keys.length>0&&<> Field counts below cover only those {collection.sampledEntries} sampled entries.</>}</p>
     {collection.sampledEntries===0&&<p>No nested entries were available to inspect in this sample.</p>}
-    <EvidenceFields caption={`${name} sampled nested field shapes`} fields={collection.fields} keys={keys}/>
+    {keys.length>0&&<EvidenceFields caption={`${name} sampled nested field shapes`} fields={collection.fields} keys={keys}/>}
   </section>;
 }
 function OperationalEvidence({evidence}:{evidence:TicketOperationalEvidence|undefined}){
@@ -40,6 +40,22 @@ function OperationalEvidence({evidence}:{evidence:TicketOperationalEvidence|unde
     </>:<p>Operational field evidence is unavailable in this response. Ticket counts and dictionaries remain available; work-text availability, schedule, readiness, site and equipment linkage are unverified.</p>}
   </section>;
 }
+export function MhelpTicketDetailEvidence({evidence}:{evidence:TicketDetailEvidence|undefined}){
+  return <section aria-label='mHelpDesk single-ticket detail structural evidence'>
+    <h4>Single-ticket detail evidence</h4>
+    {!evidence?<p>Single-ticket detail evidence is unavailable in this response. No detail read is established by these ticket counts or list-field shapes.</p>:evidence.state==='selection_unavailable'?<p>{evidence.reason==='empty_window'?'No tickets were found in the selected window.':'More than one ticket was found in the selected window.'} A unique ticket could not be selected. No ticket detail was read.</p>:<>
+      <p>One server-selected ticket detail was read from the same creation window. Only fixed field shapes and counts are shown. No ticket identifiers, text, contact details, billing values or nested values are displayed in this evidence.</p>
+      <p>{evidence.availability.description==='nonempty_text_present'?'Nonempty text is present in at least one of subject, summary or comment.':'No nonempty text was found in subject, summary or comment.'} This is structural availability only; the work description is not displayed or interpreted.</p>
+      <p>Site remains unresolved because no site join was performed. Schedule remains unverified: scheduledDate and neededBy are deprecated GET fields. These observations do not establish readiness or workflow routing.</p>
+      <EvidenceFields caption='Single-ticket detail field shapes' fields={evidence.fields} keys={ticketDetailEvidenceFields}/>
+      <p>Nested evidence covers at most 50 entries per collection from this one detail only. Collection totals do not establish equipment identity, assignment, or mapped operational meaning.</p>
+      <CollectionEvidence name='Detail items' collection={evidence.collections.items} keys={ticketDetailItemEvidenceFields}/>
+      <CollectionEvidence name='Detail custom fields' collection={evidence.collections.customFields} keys={ticketDetailCustomEvidenceFields}/>
+      <CollectionEvidence name='Detail equipment candidate' collection={evidence.collections.equipment} keys={[] as const}/>
+      <p>Equipment is only a POST/PUT write-model candidate; a GET equipment contract has not been verified. Only collection and entry counts are shown, with no equipment fields or linkage claims. Items and custom fields remain unmapped structures.</p>
+    </>}
+  </section>;
+}
 /** Rendered only inside the existing Owner mHelpDesk review. No request runs on mount. */
 export default function MhelpTicketPreview(){
   const [preview,setPreview]=useState<Preview|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -51,7 +67,7 @@ export default function MhelpTicketPreview(){
     pending.current=true;setBusy(true);setDay(requestedDay);setError('');setPreview(null);
     try{
       // Existing api.post obtains the signed-in parent session. Server selects a fixed Chicago day.
-      const result=checkedMhelpTicketPreview((await api.post('/api/mhelpdesk/partner/tickets/preview',{evidence:'operational_structure_v1',...(requestedDay==='previous'?{day:'previous'}:{})})).data);
+      const result=checkedMhelpTicketPreview((await api.post('/api/mhelpdesk/partner/tickets/preview',{evidence:ticketDetailEvidenceCapability,...(requestedDay==='previous'?{day:'previous'}:{})})).data);
       if(active.current)setPreview(result);
     }catch(cause){
       if(active.current)setError(mhelpTicketPreviewErrorMessage(cause));
@@ -63,10 +79,11 @@ export default function MhelpTicketPreview(){
     <p>Read today’s or the previous day’s ticket counts and type IDs in Central Time. This is a read-only preview. This preview does not change tickets or assignments.</p>
     <button className='secondary' disabled={busy} onClick={()=>void run('today')}>{busy&&day==='today'?'Reading today’s ticket types…':'Preview today’s ticket types'}</button>
     <button className='secondary' disabled={busy} onClick={()=>void run('previous')}>{busy&&day==='previous'?'Reading previous day’s ticket types…':'Preview previous day’s ticket types'}</button>
+    <p>Each explicit preview allows at most one additional ticket detail read, only when exactly one ticket is found. The server selects that ticket from the same window; you cannot enter or select a ticket ID. No detail is read automatically.</p>
     <p>The previous-day preview reads the prior Central Time calendar day for review. It does not import historical tickets.</p>
     {error&&<p className='operations-error' role='alert'>{error}</p>}
     {preview&&<>
-      <p role='status'><strong>{preview.previewCount} tickets</strong> read from verified mHelpDesk portal {preview.verifiedPortalId}.</p>
+      <p role='status'><strong>{preview.previewCount} ticket{preview.previewCount===1?'':'s'}</strong> read from verified mHelpDesk portal {preview.verifiedPortalId}.</p>
       <p>Preview: {day==='previous'?'previous day':'today'} (Central Time).</p>
       <p>Creation window: after {chicagoTime(preview.window.createdAfter)} and before {chicagoTime(preview.window.createdBefore)}. Read {chicagoTime(preview.readAt)}.</p>
       <p>{preview.metrics.assignedTickets} with a recorded assignee · {preview.metrics.missingAssignmentFields} with assignment unknown · {preview.metrics.deletedTickets} marked deleted in mHelpDesk.</p>
@@ -75,6 +92,7 @@ export default function MhelpTicketPreview(){
       {preview.statuses.length>0?<div className='unit-tracker-table-wrap'><table className='unit-tracker-table'><caption>Verified mHelpDesk statuses and counts</caption><thead><tr><th scope='col'>Status ID</th><th scope='col'>Status text</th><th scope='col'>Display text</th><th scope='col'>Parent ID</th><th scope='col'>Can be parent</th><th scope='col'>Ordinary status count</th><th scope='col'>Custom status count</th></tr></thead><tbody>{preview.statuses.map(status=><tr key={status.statusId}><td>{status.statusId}</td><td>{status.statusText}</td><td>{status.displayText}</td><td>{status.parentId??'None'}</td><td>{status.canBeParent?'Yes':'No'}</td><td>{status.statusCount}</td><td>{status.customStatusCount}</td></tr>)}</tbody></table></div>:<p>No status dictionary entries were returned.</p>}
       <p>Status labels and parent relationships are source dictionary evidence; they do not establish COS workflow meaning or readiness.</p>
       <OperationalEvidence evidence={preview.operationalEvidence}/>
+      <MhelpTicketDetailEvidence evidence={preview.detailEvidence}/>
       {gaps.length>0?<><h4>Fields needing review</h4><ul>{gaps.map(gap=><li key={gap}>{gap}</li>)}</ul></>:<p>No missing or unrecognized fields were flagged by this preview.</p>}
       <p>Workflow routing uses separately reviewed type and technician mappings. Check Automatic ticket intake for saved configuration and polling status.</p>
     </>}
