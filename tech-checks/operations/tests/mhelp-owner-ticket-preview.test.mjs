@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
-import {mhelpTodayPreviewWindow} from '../../supabase/functions/cos-operations-pages/mhelpTicketDay.ts';
+import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from '../../supabase/functions/cos-operations-pages/mhelpTicketDay.ts';
 const endpoint='/api/mhelpdesk/partner/tickets/preview',portal='224643',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1';
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status});
@@ -19,7 +19,7 @@ function fixture(change={}) {
   if(url.endsWith('/tickettypes'))return change.invalidTypes?json({private:'synthetic-mhelp'}):json({totalRows:1,data:[{portalId:Number(portal),typeId:1,typeName:'Service',isActive:true}]});
   if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true}]);
   if(url.includes('/Tickets?')){
-   const u=new URL(url);assert.equal(u.searchParams.get('createStart'),'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),'2026-10-09T22:00:00.000Z');
+   const u=new URL(url);assert.equal(u.searchParams.get('createStart'),change.previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),change.previous?'2026-10-09T05:00:00.000Z':'2026-10-09T22:00:00.000Z');
    if(change.providerError)return json({private:'synthetic-mhelp'},change.providerError===true?429:change.providerError);
    return json({totalRows:0,data:[],private:'do-not-export'});
   }
@@ -40,7 +40,7 @@ test('IT, Service, unmapped, inactive and revoked sessions fail before mHelp con
  }
 });
 test('Owner preview rejects caller windows, identities, credentials, URLs and activation before provider access',async()=>{
- for(const body of [{createdAfter:'2020-01-01T00:00:00Z'},{createdBefore:'2027-01-01T00:00:00Z'},{maxTickets:500},{actorId:actor},{portalId:portal},{token:'private'},{url:'https://elsewhere.invalid'},{activate:true}]){
+ for(const body of [{createdAfter:'2020-01-01T00:00:00Z'},{createdBefore:'2027-01-01T00:00:00Z'},{maxTickets:500},{actorId:actor},{portalId:portal},{token:'private'},{url:'https://elsewhere.invalid'},{activate:true},{day:'today'},{day:'2020-01-01'},{day:null},{day:'previous',createdAfter:'2020-01-01T00:00:00Z'}]){
   const f=fixture();assert.equal((await f.handler(request(body))).status,400);assert.equal(f.configReads(),0);assert.deepEqual(f.diagnostics,[]);
  }
  const f=fixture();assert.equal((await f.handler(request({},'GET'))).status,405);assert.equal(f.configReads(),0);
@@ -48,16 +48,35 @@ test('Owner preview rejects caller windows, identities, credentials, URLs and ac
 });
 test('provider failure is a sanitized failed read, without leaking a token or reporting intake activation',async()=>{
  const f=fixture({providerError:true}),r=await f.handler(request());assert.equal(r.status,429);const data=await r.json();assert.equal(data.error,'MHELP_PREVIEW_RATE_LIMIT');assert(!JSON.stringify(data).includes('synthetic-mhelp'));assert(!('previewCount'in data));
- assert.deepEqual(f.diagnostics,[{event:'mhelp_ticket_preview_failed',code:'RATE_LIMIT',httpStatus:429,operation:'ticket_read',providerHttpStatus:429}]);
+ assert.deepEqual(f.diagnostics.map(({schema,...entry})=>entry),[{event:'mhelp_ticket_preview_failed',code:'RATE_LIMIT',httpStatus:429,operation:'ticket_read',providerHttpStatus:429}]);
+ assert.equal(f.diagnostics[0].schema.ticketTypes.data.length,1);assert.equal(f.diagnostics[0].schema.tickets,undefined);assert(!JSON.stringify(f.diagnostics).includes('synthetic-mhelp'));
 });
 test('real parser failures expose a fixed category and log no source response or request details',async()=>{
  for(const [change,code,operation,providerHttpStatus] of [[{invalidTypes:true},'TYPE_DICTIONARY_INCOMPLETE',null,null],[{providerError:403},'PROVIDER_HTTP','ticket_read',403],[{configFailure:true},'CONFIG_UNAVAILABLE',null,null],[{invalidTypes:true,logFailure:true},'TYPE_DICTIONARY_INCOMPLETE',null,null]]){
   const f=fixture(change),r=await f.handler(request());assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'MHELP_PREVIEW_'+code});
-  assert.deepEqual(f.diagnostics,[{event:'mhelp_ticket_preview_failed',code,httpStatus:503,operation,providerHttpStatus}]);
+  assert.deepEqual(f.diagnostics.map(({schema,...entry})=>entry),[{event:'mhelp_ticket_preview_failed',code,httpStatus:503,operation,providerHttpStatus}]);
+  if(change.invalidTypes){assert.equal(f.diagnostics[0].schema.ticketTypes.data.kind,'absent');assert.equal(f.diagnostics[0].schema.tickets.data.length,0);}
+  if(change.configFailure)assert.equal(f.diagnostics[0].schema,undefined);
   assert(!JSON.stringify(f.diagnostics).includes('synthetic-mhelp'));assert(!JSON.stringify(f.diagnostics).includes('private'));assert(!f.calls.some(c=>c.method!=='GET'));
  }
 });
 test('Chicago today start is DST-safe and independent of the executor timezone',()=>{
  for(const [now,start] of [['2026-10-09T22:00:00Z','2026-10-09T05:00:00.000Z'],['2026-01-09T22:00:00Z','2026-01-09T06:00:00.000Z'],['2026-03-08T22:00:00Z','2026-03-08T06:00:00.000Z'],['2026-11-01T22:00:00Z','2026-11-01T05:00:00.000Z'],['2026-10-10T02:00:00Z','2026-10-09T05:00:00.000Z']])assert.equal(mhelpTodayPreviewWindow(new Date(now)).createdAfter,start);
  assert.throws(()=>mhelpTodayPreviewWindow(new Date('invalid')));assert.throws(()=>mhelpTodayPreviewWindow(new Date('2026-10-09T05:00:00Z')));
+});
+
+test('explicit previous-day request is fixed server-side and protected by the same Owner gate',async()=>{
+ const f=fixture({previous:true}),r=await f.handler(request({day:'previous'}));assert.equal(r.status,200);
+ const data=await r.json();assert.deepEqual(data.window,{createdAfter:'2026-10-08T05:00:00.000Z',createdBefore:'2026-10-09T05:00:00.000Z'});
+ for(const change of [{role:'it'},{role:'service'},{invalid:true}]){
+ const blocked=fixture(change),response=await blocked.handler(request({day:'previous'}));assert([401,403].includes(response.status));assert.equal(blocked.configReads(),0);
+ }
+});
+test('previous Chicago calendar day handles DST, month/year boundaries and exact midnight',()=>{
+ for(const [now,start,end] of [
+ ['2026-03-09T12:00:00Z','2026-03-08T06:00:00.000Z','2026-03-09T05:00:00.000Z'],
+ ['2026-11-02T12:00:00Z','2026-11-01T05:00:00.000Z','2026-11-02T06:00:00.000Z'],
+ ['2026-01-01T12:00:00Z','2025-12-31T06:00:00.000Z','2026-01-01T06:00:00.000Z'],
+ ['2026-10-10T05:00:00Z','2026-10-09T05:00:00.000Z','2026-10-10T05:00:00.000Z']])assert.deepEqual(mhelpPreviousDayPreviewWindow(new Date(now)),{createdAfter:start,createdBefore:end});
+ assert.throws(()=>mhelpPreviousDayPreviewWindow(new Date('invalid')));
 });

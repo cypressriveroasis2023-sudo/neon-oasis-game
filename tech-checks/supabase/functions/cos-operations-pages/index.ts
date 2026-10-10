@@ -2,7 +2,7 @@ import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
-import {mhelpTodayPreviewWindow} from './mhelpTicketDay.ts';
+import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from './mhelpTicketDay.ts';
 import {mhelpTicketDiagnostic} from './mhelpTicketDiagnostics.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
@@ -475,9 +475,11 @@ export function createOperationsHandler(options) {
         if (method === 'POST' && body === null) body = await requestBody(request);
         if(path==='/api/mhelpdesk/partner/tickets/preview') {
           if(method!=='POST')fail('Method not supported.',405);
-          allowedFields(body || {},[],'Ticket preview request');
+          allowedFields(body || {},['day'],'Ticket preview request');
+          if(body?.day!==undefined && body.day!=='previous')fail('Ticket preview day is unsupported.');
           try {
-            const window=mhelpTodayPreviewWindow(options.now ? options.now() : new Date());
+            const now=options.now ? options.now() : new Date();
+            const window=body?.day==='previous'?mhelpPreviousDayPreviewWindow(now):mhelpTodayPreviewWindow(now);
             return json(projectMhelpTicketPreview(await mhelpTickets.preview(window)));
           } catch(cause) {
             const diagnostic=mhelpTicketDiagnostic(cause);

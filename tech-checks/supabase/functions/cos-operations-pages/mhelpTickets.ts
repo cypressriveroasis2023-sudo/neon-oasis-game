@@ -3,6 +3,7 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
+import {describeMhelpTicketSchema} from './mhelpTicketSchema.ts';
 export const MHELP_TICKET_CONTRACT = 'cos-mhelpdesk-ticket-preview-v1';
 const API = 'https://connect.mhelpdesk.com/api/v1.0';
 const CURRENT_USER = API + '/users/me';
@@ -12,6 +13,7 @@ type Row = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
 type Operation = 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
 export class MhelpTicketError extends Error {
+  schema?: Record<string,unknown>;
   constructor(message: string, public status = 503, public provider?: {operation: Operation; httpStatus: number}) { super(message); }
 }
 function fail(message: string, status = 503): never { throw new MhelpTicketError(message, status); }
@@ -130,6 +132,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
     busy=true;
     const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),20000);
     let budget=3*1048576;
+    const schema:Record<string,unknown>={};
     try {
       let config:Config;
       try { config=await options.getConfig(); } catch { return fail('mHelpDesk ticket configuration is unavailable.'); }
@@ -173,8 +176,6 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       const account=object(await read(CURRENT_USER,'account_read',16384)), portalId=identity(account.portalId);
       if((configuredPortalId && configuredPortalId!==portalId) || (config.portalId && config.portalId!==portalId))fail('The mHelpDesk account does not match the saved portal.');
       const prefix=API+'/portal/'+portalId;
-      const typeRows=types(await read(prefix+'/tickettypes','ticket_types_read'),portalId);
-      const statusRows=statuses(await read(prefix+'/ticketstatus','ticket_statuses_read'));
       const url=new URL(prefix+'/Tickets');
       // Published createStart/createEnd semantics are strictly greater/less than.
       // Future polling must overlap windows and deduplicate portalId+ticketId; adjacent
@@ -182,6 +183,15 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       url.searchParams.set('createStart',window.createdAfter);url.searchParams.set('createEnd',window.createdBefore);
       url.searchParams.set('pageSize',String(PAGE_SIZE));url.searchParams.set('sort','ticketId');
       // Ticket docs do not advertise fields shaping. Never assume Equipment's Fields contract applies.
+      // Inspect only already-authorized bounded reads. Gather fixed structural counts
+      // before strict parsing so one failed dictionary does not hide later contract gaps.
+      const rawTypes=await read(prefix+'/tickettypes','ticket_types_read');
+      schema.ticketTypes=describeMhelpTicketSchema(rawTypes,'ticketTypes');
+      const rawStatuses=await read(prefix+'/ticketstatus','ticket_statuses_read');
+      schema.ticketStatuses=describeMhelpTicketSchema(rawStatuses,'ticketStatuses');
+      const rawTickets=await read(url.href,'ticket_read');
+      schema.tickets=describeMhelpTicketSchema(rawTickets,'tickets');
+      const typeRows=types(rawTypes,portalId),statusRows=statuses(rawStatuses);
       let total:number|undefined,indexBase=0,boundaryChecked=false;
       const tickets:PartnerTicket[]=[],seen=new Set<string>();
       const pageOf=(value:unknown)=>{
@@ -195,7 +205,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         if(rows.some((row,i)=>i>0 && Number(row.ticketId)<=Number(rows[i-1].ticketId)))fail('mHelpDesk did not return tickets in stable identity order.');
         return rows;
       };
-      let page=pageOf(await read(url.href,'ticket_read'));
+      let page=pageOf(rawTickets);
       while(true){
         if(tickets.length && (!page.length || Number(page[0].ticketId)<=Number(tickets[tickets.length-1].ticketId)))fail('mHelpDesk returned overlapping or incomplete ticket pages.');
         if(page.some(row=>seen.has(row.ticketId)) || tickets.length+page.length>total!)fail('mHelpDesk returned duplicate ticket identities.');
@@ -225,6 +235,9 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
           ticketsWithUnknownFields:tickets.filter(row=>row.unknownFieldCount>0).length,unknownFieldOccurrences:tickets.reduce((n,row)=>n+row.unknownFieldCount,0),
           typeLabelMismatches:tickets.filter(row=>row.typeName!==null&&typeRows.some(type=>type.typeId===row.typeId&&type.typeName!==row.typeName)).length,
           duplicateTypeNames:typeRows.length-new Set(typeRows.map(row=>row.typeName)).size}};
+    } catch(error) {
+      if(error instanceof MhelpTicketError && Object.keys(schema).length)error.schema=schema;
+      throw error;
     } finally {clearTimeout(timer);controller.abort();busy=false;}
   }};
 }

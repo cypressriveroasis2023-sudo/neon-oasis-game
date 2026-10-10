@@ -1,4 +1,5 @@
 import {MhelpTicketError} from './mhelpTickets.ts';
+import {projectMhelpTicketSchema} from './mhelpTicketSchema.ts';
 
 // Match only our own fixed parser messages. Never log a caught message, stack,
 // response body, URL, request, identity or credential, even for unknown errors.
@@ -64,5 +65,6 @@ export function mhelpTicketDiagnostic(cause: unknown) {
     }
   }
   return {error:'MHELP_PREVIEW_'+code,httpStatus,
-    log:{event:'mhelp_ticket_preview_failed',code,httpStatus,operation,providerHttpStatus}};
+    log:{event:'mhelp_ticket_preview_failed',code,httpStatus,operation,providerHttpStatus,
+      ...(cause instanceof MhelpTicketError && cause.schema?{schema:projectMhelpTicketSchema(cause.schema)}:{})}};
 }

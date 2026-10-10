@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {ticketPreviewFixture} from './fixtures/mhelpTicketPreview.mjs';
 const origin='http://127.0.0.1:4173',path='/api/mhelpdesk/partner/tickets/preview';
+const dayButton=(preview,day='today')=>preview.getByRole('button',{name:day==='previous'?/^(?:Preview|Reading) previous day’s ticket types/:/^(?:Preview|Reading) today’s ticket types/});
 async function mount(page,{role='owner'}={}){
   const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewFixture()};
   // Only local test assets may reach a server. Specific mocks registered below
@@ -34,29 +35,51 @@ async function mount(page,{role='owner'}={}){
 test('today ticket preview is explicit, aggregate-only and preserves equipment controls',async({page})=>{
   const {frame,preview,calls}=await mount(page);await expect(preview).toBeVisible();expect(calls.some(call=>call.path===path)).toBe(false);
   await expect(frame.getByRole('button',{name:'Check mHelpDesk connection'})).toBeVisible();
-  await preview.getByRole('button',{name:'Preview today’s ticket types'}).click();
+  await dayButton(preview).click();
   await expect(preview.getByRole('status')).toContainText('3 tickets');await expect(preview).toContainText('Type ID 11');await expect(preview).toContainText('Installation');
   await expect(preview).toContainText('assignment unknown');await expect(preview).toContainText('1 ticket missing a service-location ID');await expect(preview).toContainText('Automatic intake is paused');
   await expect(preview).toContainText('12:00 AM CDT');await expect(preview).toContainText('3:00 PM CDT');
   expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
+test('previous-day read is explicit, shares the busy guard and clears stale results across day switches',async({page})=>{
+  const {preview,calls,state}=await mount(page);await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
+  await expect(preview).toContainText('Preview: today (Central Time).');
+  state.preview.window={createdAfter:'2026-10-08T05:00:00.000Z',createdBefore:'2026-10-09T05:00:00.000Z'};
+  let release;state.delay=new Promise(resolve=>{release=resolve});await dayButton(preview,'previous').click();
+  await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();
+  await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);
+  await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});
+  await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
+  release();state.delay=null;await expect(preview.getByRole('status')).toContainText('3 tickets');
+  await expect(preview).toContainText('Preview: previous day (Central Time).');
+  await expect(preview).toContainText('after Oct 8, 2026');await expect(preview).toContainText('before Oct 9, 2026');
+  await expect(preview.getByRole('columnheader',{name:'mHelpDesk type'})).toBeVisible();
+  await expect(preview.getByRole('columnheader',{name:'mHelpDesk type'})).toHaveAttribute('scope','col');
+  await expect(preview.getByRole('columnheader',{name:'Tickets in window'})).toBeVisible();
+  await expect(preview.getByRole('columnheader',{name:'Tickets in window'})).toHaveAttribute('scope','col');
+  await expect(preview).toContainText('does not import historical tickets');
+  expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+  state.bad=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');
+  await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('Preview: previous day');
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{}},{path,body:{day:'previous'}},{path,body:{}}]);
+});
 test('repeated clicks issue one request and a failed refresh clears previous counts',async({page})=>{
   const {preview,calls,state}=await mount(page);let release;state.delay=new Promise(resolve=>{release=resolve});
-  const button=preview.getByRole('button',{name:'Preview today’s ticket types'});await button.click();await expect(preview.getByRole('button')).toBeDisabled();
-  await preview.getByRole('button').evaluate(button=>{button.click();button.click();});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
+  const button=dayButton(preview);await button.click();await expect(dayButton(preview)).toBeDisabled();
+  await dayButton(preview).evaluate(button=>{button.click();button.click();});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
   release();await expect(preview.getByRole('status')).toContainText('3 tickets');state.delay=null;state.bad=true;
-  await preview.getByRole('button').click();await expect(preview.getByRole('alert')).toContainText('could not be verified');await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);
+  await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);
 });
 test('transport failures describe a read failure and retry requires another click',async({page})=>{
-  const {preview,calls,state}=await mount(page);state.fail=true;await preview.getByRole('button').click();await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
+  const {preview,calls,state}=await mount(page);state.fail=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
   await expect(preview).not.toContainText('save could not be confirmed');expect(calls.filter(call=>call.path===path)).toHaveLength(1);
   state.fail=false;state.preview.window.createdBefore='2026-10-09T21:00:00.000Z';state.preview.readAt='2026-10-09T21:00:01.000Z';
-  await preview.getByRole('button').click();await expect(preview).toContainText('4:00 PM CDT');expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+  await dayButton(preview).click();await expect(preview).toContainText('4:00 PM CDT');expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });
-test('navigating away discards an unfinished preview and does not auto-read when returning',async({page})=>{
+for(const day of ['today','previous'])test(`${day}: navigating away discards an unfinished preview and does not auto-read when returning`,async({page})=>{
   const {frame,preview,calls,state}=await mount(page);let release;state.delay=new Promise(resolve=>{release=resolve});
-  await preview.getByRole('button').click();await expect(preview.getByRole('button')).toBeDisabled();
+  await dayButton(preview,day).click();await expect(dayButton(preview,day)).toBeDisabled();
   await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
   await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(preview).toHaveCount(0);
   await frame.locator('body').evaluate(()=>{location.hash='#unit-tracker';});await expect(preview).toBeVisible();
@@ -66,21 +89,21 @@ test('navigating away discards an unfinished preview and does not auto-read when
   await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(preview.getByRole('status')).toHaveCount(0);expect(calls.filter(call=>call.path===path)).toHaveLength(1);
 });
-test('an expired Owner session clears old aggregates and does not display provider text',async({page})=>{
-  const {preview,calls,state}=await mount(page);await preview.getByRole('button').click();await expect(preview.getByRole('status')).toContainText('3 tickets');
-  state.denied=true;await preview.getByRole('button').click();
+for(const day of ['today','previous'])test(`${day}: an expired Owner session clears old aggregates and does not display provider text`,async({page})=>{
+  const {preview,calls,state}=await mount(page);await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
+  state.denied=true;await dayButton(preview,day).click();
   await expect(preview.getByRole('alert')).toHaveText('Your Owner session could not be verified. Return to Tech Check and sign in again.');
   await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });
 test('known safe diagnostic explains the read failure, clears old counts and redacts unknown codes',async({page})=>{
-  const {preview,calls,state}=await mount(page);await preview.getByRole('button').click();await expect(preview.getByRole('status')).toContainText('3 tickets');
-  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE';await preview.getByRole('button').click();
+  const {preview,calls,state}=await mount(page);await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
+  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket timestamps do not include a supported timezone. Review the source date format before retrying. Reference: MHELP_PREVIEW_TIMESTAMP_TIMEZONE.');
   await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);
   await expect(preview).toContainText('Automatic intake is paused');await expect(preview).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
-  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await preview.getByRole('button').click();
+  state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
   await expect(preview).not.toContainText('MHELP_PREVIEW_');await expect(preview).not.toContainText('synthetic private');
   expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{}})));

@@ -30,7 +30,7 @@ try{
     await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#111827;color:#f3f6fb;font:15px Arial,sans-serif}button{padding:12px;max-width:100%;white-space:normal}section{max-width:100%}${css}</style><div id="root"></div>`);
     await page.evaluate(value=>{window.fixtureCalls=[];window.fixtureMode='success';window.fixtureValue=value;},ticketPreviewFixture());
     await page.addScriptTag({content:result.outputFiles[0].text});
-    const region=page.getByRole('region',{name:'mHelpDesk ticket type preview'}),button=region.getByRole('button');
+    const region=page.getByRole('region',{name:'mHelpDesk ticket type preview'}),button=region.getByRole('button',{name:/^(?:Preview|Reading) today’s ticket types/});
     await button.waitFor();assert.equal((await page.evaluate(()=>window.fixtureCalls)).length,0,'mount must not read');
     assert.match(await region.innerText(),/Automatic intake is paused/);
     await page.evaluate(()=>{window.fixtureMode='hold';});
