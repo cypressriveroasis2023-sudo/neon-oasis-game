@@ -35,7 +35,7 @@ test('a failed dictionary records all three bounded read shapes but never accept
  const calls=[];const json=x=>new Response(JSON.stringify(x));
  const reader=createMhelpTicketReader({getConfig:()=>({portalId:'224643',accessToken:secret}),fetch:async url=>{
  calls.push(url);if(url.endsWith('/users/me'))return json({portalId:224643});
- if(url.endsWith('/tickettypes'))return json({totalRows:1,results:[{typeId:11,portalId:224643,typeName:secret,isActive:true}]});
+ if(url.endsWith('/tickettypes'))return json({totalRows:2,results:[{typeId:11,portalId:224643,typeName:secret,isActive:true}]});
  if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:secret,displayText:secret,parentId:null,canBeParent:true}]);
  return json({totalRows:1,results:[ticket]});}});
  await assert.rejects(reader.preview({createdAfter:'2026-10-09T05:00:00Z',createdBefore:'2026-10-10T04:00:00Z'}),error=>{
