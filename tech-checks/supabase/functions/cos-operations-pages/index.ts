@@ -487,11 +487,11 @@ export function createOperationsHandler(options) {
           if(method!=='POST')fail('Method not supported.',405);
           allowedFields(body || {},['day','evidence'],'Ticket preview request');
           if(body?.day!==undefined && body.day!=='previous')fail('Ticket preview day is unsupported.');
-          if(body?.evidence!==undefined && body.evidence!=='operational_structure_v1')fail('Ticket preview evidence capability is unsupported.');
+          if(body?.evidence!==undefined && body.evidence!=='operational_structure_v1' && body.evidence!=='ticket_detail_structure_v1')fail('Ticket preview evidence capability is unsupported.');
           try {
             const now=options.now ? options.now() : new Date();
             const window=body?.day==='previous'?mhelpPreviousDayPreviewWindow(now):mhelpTodayPreviewWindow(now);
-            const evidence=body?.evidence==='operational_structure_v1'?'operational_structure_v1':undefined;
+            const evidence=body?.evidence==='ticket_detail_structure_v1'?'ticket_detail_structure_v1':body?.evidence==='operational_structure_v1'?'operational_structure_v1':undefined;
             return json(projectMhelpTicketPreview(await mhelpTickets.preview(window,evidence),evidence));
           } catch(cause) {
             const diagnostic=mhelpTicketDiagnostic(cause);

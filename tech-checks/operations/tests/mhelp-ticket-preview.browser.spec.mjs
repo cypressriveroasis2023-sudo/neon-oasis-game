@@ -1,13 +1,14 @@
 import {test,expect} from '@playwright/test';
-import {ticketPreviewFixture,ticketPreviewEvidenceFixture} from './fixtures/mhelpTicketPreview.mjs';
+import {ticketPreviewFixture,ticketPreviewEvidenceFixture,ticketPreviewDetailFixture} from './fixtures/mhelpTicketPreview.mjs';
 const origin='http://127.0.0.1:4173',path='/api/mhelpdesk/partner/tickets/preview';
 const dayButton=(preview,day='today')=>preview.getByRole('button',{name:day==='previous'?/^(?:Preview|Reading) previous day’s ticket types/:/^(?:Preview|Reading) today’s ticket types/});
 async function expectNoDiagnostics(preview){
   await expect(preview.getByRole('region',{name:'mHelpDesk operational structural evidence'})).toHaveCount(0);
+  await expect(preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'})).toHaveCount(0);
   await expect(preview.getByRole('table',{name:'Verified mHelpDesk statuses and counts'})).toHaveCount(0);
 }
 async function mount(page,{role='owner'}={}){
-  const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewEvidenceFixture()};
+  const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewDetailFixture({ticketCount:3})};
   // Only local test assets may reach a server. Specific mocks registered below
   // take precedence, including the production-shaped API URL with synthetic data.
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -50,7 +51,7 @@ test('today ticket preview is explicit, aggregate-only and preserves equipment c
   await expect(preview.getByRole('table',{name:'Sampled ticket field shapes'}).getByRole('row',{name:'subject string: 3 2 nonempty · 1 empty Other string: 3',exact:true})).toBeVisible();
   await expect(preview).toContainText('scheduledDate and neededBy are deprecated');await expect(preview).toContainText('equipment linkage remains unverified');
   await expect(preview).toContainText('12:00 AM CDT');await expect(preview).toContainText('3:00 PM CDT');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'operational_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1'}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('previous-day read is explicit, shares the busy guard and clears stale results across day switches',async({page})=>{
@@ -74,7 +75,7 @@ test('previous-day read is explicit, shares the busy guard and clears stale resu
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
   state.bad=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');
   await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('Preview: previous day');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'operational_structure_v1'}},{path,body:{evidence:'operational_structure_v1',day:'previous'}},{path,body:{evidence:'operational_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1'}},{path,body:{evidence:'ticket_detail_structure_v1',day:'previous'}},{path,body:{evidence:'ticket_detail_structure_v1'}}]);
 });
 test('repeated clicks issue one request and a failed refresh clears previous counts',async({page})=>{
   const {preview,calls,state}=await mount(page);let release;state.delay=new Promise(resolve=>{release=resolve});
@@ -121,7 +122,7 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
   await expect(preview).not.toContainText('MHELP_PREVIEW_');await expect(preview).not.toContainText('synthetic private');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'operational_structure_v1'}})));
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'ticket_detail_structure_v1'}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
   const {preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
@@ -130,6 +131,7 @@ test('legacy success explicitly marks operational evidence unavailable and repla
   const {preview,calls,state}=await mount(page);state.preview=ticketPreviewFixture();
   await dayButton(preview).click();await expect(preview.getByRole('status')).toContainText('3 tickets');
   await expect(preview).toContainText('Operational field evidence is unavailable in this response');
+  await expect(preview).toContainText('Single-ticket detail evidence is unavailable in this response');
   await expect(preview.getByRole('table',{name:'Verified mHelpDesk statuses and counts'})).toBeVisible();
   await expect(preview.getByRole('table',{name:'Sampled ticket field shapes'})).toHaveCount(0);
   state.preview=ticketPreviewEvidenceFixture({ticketCount:80,itemEntries:124,customEntries:72});
@@ -175,5 +177,111 @@ test('a late abandoned evidence response cannot replace a newer explicit result 
   release();await (await response).finished();
   await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(preview.getByRole('status')).toContainText('80 tickets');await expect(preview).toContainText('124 array entries within sampled tickets');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+
+for(const day of ['today','previous'])test(`${day}: explicit singleton detail renders fixed shapes and bounded nested counts only`,async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  state.preview=ticketPreviewDetailFixture({itemEntries:124,customEntries:72,equipmentEntries:51});
+  if(day==='previous')state.preview.window={createdAfter:'2026-10-08T05:00:00.000Z',createdBefore:'2026-10-09T05:00:00.000Z'};
+  await expect(preview).toContainText('at most one additional ticket detail read');
+  await expect(preview).toContainText('cannot enter or select a ticket ID');
+  await expect(preview).toContainText('No detail is read automatically');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(0);
+  await dayButton(preview,day).click();
+  await expect(preview.getByRole('status')).toContainText('1 ticket');
+  const detail=preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'});
+  await expect(detail).toContainText('One server-selected ticket detail was read from the same creation window');
+  await expect(detail).toContainText('Nonempty text is present in at least one of subject, summary or comment');
+  await expect(detail).toContainText('Site remains unresolved');await expect(detail).toContainText('Schedule remains unverified');
+  await expect(detail.getByRole('table',{name:'Single-ticket detail field shapes'}).getByRole('row',{name:'subject string: 1 1 nonempty · 0 empty Other string: 1',exact:true})).toBeVisible();
+  await expect(detail.getByRole('table',{name:'Detail items sampled nested field shapes'}).getByRole('row',{name:'ticketId integer: 50 0 nonempty · 0 empty No string observations',exact:true})).toBeVisible();
+  await expect(detail).toContainText('124 array entries within sampled tickets · 50 nested entries sampled');
+  await expect(detail).toContainText('72 array entries within sampled tickets · 50 nested entries sampled');
+  const equipment=detail.getByRole('region',{name:'Detail equipment candidate structural evidence'});
+  await expect(equipment).toContainText('51 array entries within sampled tickets · 50 nested entries sampled');
+  await expect(equipment.getByRole('table')).toHaveCount(0);
+  await expect(detail).toContainText('POST/PUT write-model candidate');await expect(detail).toContainText('a GET equipment contract has not been verified');
+  await expect(detail).toContainText('Items and custom fields remain unmapped structures');
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'ticket_detail_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+});
+test('zero or multiple tickets show explicit unavailable detail reasons while list evidence stays available',async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  for(const ticketCount of [0,3]){
+    state.preview=ticketPreviewDetailFixture({ticketCount});await dayButton(preview,ticketCount?'previous':'today').click();
+    const detail=preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'});
+    await expect(preview.getByRole('status')).toContainText(`${ticketCount} tickets`);
+    await expect(detail).toContainText(ticketCount?'More than one ticket was found':'No tickets were found');
+    await expect(detail).toContainText('No ticket detail was read');await expect(detail.getByRole('table')).toHaveCount(0);
+    await expect(preview.getByRole('table',{name:'Sampled ticket field shapes',exact:true})).toBeVisible();
+  }
+  expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+test('single-detail absent text and empty nested samples do not imply operational availability',async({page})=>{
+  const {preview,state}=await mount(page);state.preview=ticketPreviewDetailFixture({hasDescription:false,itemEntries:0,customEntries:0,equipmentEntries:0});
+  await dayButton(preview).click();
+  const detail=preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'});
+  await expect(detail).toContainText('No nonempty text was found in subject, summary or comment');
+  await expect(detail.getByText('No nested entries were available to inspect in this sample.',{exact:true})).toHaveCount(3);
+  await expect(detail).toContainText('No observations');await expect(detail).toContainText('No string observations');
+});
+test('detail busy guard clears old evidence through day changes, repeated clicks and access denial',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewDetailFixture();
+  await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();
+  let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewDetailFixture({hasDescription:false});
+  await dayButton(preview,'previous').click();
+  await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();
+  await expectNoDiagnostics(preview);await expect(preview.getByRole('status')).toHaveCount(0);
+  await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});
+  await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
+  release();state.delay=null;await expect(preview).toContainText('No nonempty text was found');
+  await expect(preview).not.toContainText('Nonempty text is present');await expect(preview).toContainText('Preview: previous day');
+  state.denied=true;await dayButton(preview).click();
+  await expect(preview.getByRole('alert')).toHaveText('Your Owner session could not be verified. Return to Tech Check and sign in again.');
+  await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
+  expect(calls.filter(call=>call.path===path)).toHaveLength(3);
+});
+test('malformed or private detail evidence fails closed at every level and requires explicit retry',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewDetailFixture();
+  await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();
+  const mutations=[
+    d=>{d.ticketId='synthetic private ticket';},d=>{d.fields.customerId.value='synthetic private customer';},
+    d=>{d.collections.items.fields.notes.raw='synthetic private secret@example.test';},
+    d=>{d.collections.customFields.fields.fieldValue.formats['synthetic private']=1;},
+    d=>{d.collections.equipment.fields.serialNumber={value:'synthetic private equipment'};},
+    d=>{d.availability.site='synthetic private address';},d=>{d.collections.items.sampledEntries=50;},
+    d=>{d.availability.description='nonempty_text_absent';},
+  ];
+  for(const mutate of mutations){
+    state.preview=ticketPreviewDetailFixture();mutate(state.preview.detailEvidence);await dayButton(preview,'previous').click();
+    await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
+    await expectNoDiagnostics(preview);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);
+    await expect(preview).not.toContainText('synthetic private');
+  }
+  state.preview=ticketPreviewDetailFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();
+  expect(calls.filter(call=>call.path===path)).toHaveLength(mutations.length+2);
+});
+for(const diagnostic of ['DETAIL_IDENTITY_MISMATCH','DETAIL_CHANGED','DETAIL_WINDOW_MISMATCH','DETAIL_SCHEMA','DETAIL_PROJECTION_INVALID'])test(`${diagnostic}: a fixed detail diagnostic clears old evidence without exposing provider text`,async({page})=>{
+  const {preview,state}=await mount(page);state.preview=ticketPreviewDetailFixture();await dayButton(preview).click();
+  await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();
+  state.diagnostic='MHELP_PREVIEW_'+diagnostic;await dayButton(preview,'previous').click();
+  await expect(preview.getByRole('alert')).toContainText('Reference: MHELP_PREVIEW_'+diagnostic+'.');
+  await expectNoDiagnostics(preview);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');
+});
+test('a late single-ticket detail cannot restore evidence after navigation or replace a newer window',async({page})=>{
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewDetailFixture();
+  let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();
+  await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
+  await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(preview).toHaveCount(0);
+  await frame.locator('body').evaluate(()=>{location.hash='#unit-tracker';});await expect(preview).toBeVisible();await expectNoDiagnostics(preview);
+  expect(calls.filter(call=>call.path===path)).toHaveLength(1);
+  state.delay=null;state.preview=ticketPreviewDetailFixture({ticketCount:0});await dayButton(preview,'previous').click();
+  await expect(preview).toContainText('No ticket detail was read');
+  const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST'&&response.request().postDataJSON()?.path===path);
+  release();await (await response).finished();
+  await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(preview.getByRole('status')).toContainText('0 tickets');await expect(preview).toContainText('No ticket detail was read');
+  await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toHaveCount(0);
   expect(calls.filter(call=>call.path===path)).toHaveLength(2);
 });

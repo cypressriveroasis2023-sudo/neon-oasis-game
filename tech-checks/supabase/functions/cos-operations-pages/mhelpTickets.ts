@@ -3,6 +3,7 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
+import {MHELP_TICKET_DETAIL_EVIDENCE,describeMhelpTicketDetail,projectMhelpTicketDetailEvidence,unavailableMhelpTicketDetail,describeMhelpTicketDetailFailure} from './mhelpTicketDetail.ts';
 import {describeMhelpTicketSchema,describeMhelpOperationalEvidence,projectMhelpOperationalEvidence,MHELP_OPERATIONAL_EVIDENCE} from './mhelpTicketSchema.ts';
 export const MHELP_TICKET_CONTRACT = 'cos-mhelpdesk-ticket-preview-v1';
 const API = 'https://connect.mhelpdesk.com/api/v1.0';
@@ -11,9 +12,10 @@ const PAGE_SIZE = 50, MAX_TICKETS = 500, MAX_DICTIONARY_ROWS = 500;
 const MAX_WINDOW_MS = 31 * 86400000;
 type Row = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
-type Operation = 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
+type Operation = 'ticket_detail_read' | 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
 export class MhelpTicketError extends Error {
   schema?: Record<string,unknown>;
+  detailSchema?: Record<string,unknown>;
   constructor(message: string, public status = 503, public provider?: {operation: Operation; httpStatus: number}) { super(message); }
 }
 function fail(message: string, status = 503): never { throw new MhelpTicketError(message, status); }
@@ -109,8 +111,9 @@ function windowOf(value: unknown) {
 }
 const METRICS = ['deletedTickets','assignedTickets','missingAssignmentFields','missingTypeIds','unknownTypeIds','unknownStatusIds','unknownCustomStatusIds','missingCustomerIds','missingServiceLocationIds','ticketsWithUnknownFields','unknownFieldOccurrences','typeLabelMismatches','duplicateTypeNames'] as const;
 /** Defense-in-depth allowlist for maintenance. Never spread an untrusted reader result. */
-export function projectMhelpTicketPreview(value: unknown, evidence?:typeof MHELP_OPERATIONAL_EVIDENCE) {
-  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
+export type MhelpTicketEvidenceCapability=typeof MHELP_OPERATIONAL_EVIDENCE|typeof MHELP_TICKET_DETAIL_EVIDENCE;
+export function projectMhelpTicketPreview(value: unknown, evidence?:MhelpTicketEvidenceCapability) {
+  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
   const row=object(value);
   if(row.contract!==MHELP_TICKET_CONTRACT || row.state!=='preview_verified' || row.liveAccessVerified!==true || row.automaticSync!==false || row.ticketWrites!==false || row.partial!==false)fail('Unsupported mHelpDesk ticket preview.');
   const portalId=identity(row.verifiedPortalId),window=windowOf(row.window);
@@ -132,19 +135,24 @@ export function projectMhelpTicketPreview(value: unknown, evidence?:typeof MHELP
   return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
     verifiedPortalId:portalId,readAt:timestamp(row.readAt),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
     totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics,
-    ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:projectMhelpOperationalEvidence(row.operationalEvidence,totalRows)}:{})};
+    ...(evidence!==undefined?{operationalEvidence:projectMhelpOperationalEvidence(row.operationalEvidence,totalRows)}:{}),
+    ...(evidence===MHELP_TICKET_DETAIL_EVIDENCE?{detailEvidence:projectDetailEvidence(row.detailEvidence,totalRows)}:{})};
+}
+function projectDetailEvidence(value:unknown,totalTickets:number){
+  try {return projectMhelpTicketDetailEvidence(value,totalTickets);}catch {return fail('Unsupported mHelpDesk ticket detail evidence.');}
 }
 /** Instantiate once and call only behind the existing protected maintenance/Owner gate. */
 export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Config>;renewAccess?:()=>Promise<Config>;fetch:typeof fetch}) {
   let busy=false;
-  return {preview:async(value:TicketPreviewWindow,evidence?:typeof MHELP_OPERATIONAL_EVIDENCE)=>{
+  return {preview:async(value:TicketPreviewWindow,evidence?:MhelpTicketEvidenceCapability)=>{
     const window=windowOf(value);
-    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
+    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE&&evidence!==MHELP_TICKET_DETAIL_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
     if(busy)fail('A mHelpDesk ticket preview is already running.',409);
     busy=true;
     const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),20000);
     let budget=3*1048576;
     const schema:Record<string,unknown>={};
+    let detailSchema:Record<string,unknown>|undefined;
     try {
       let config:Config;
       try { config=await options.getConfig(); } catch { return fail('mHelpDesk ticket configuration is unavailable.'); }
@@ -156,34 +164,57 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       // Retain the configured portal constraint across renewal; renewed config cannot silently change it.
       const configuredPortalId=config.portalId;
       let renewed=false;
+      // Bound fetch and body reads even when a transport ignores AbortSignal.
+      // Existing token renewal retains its own bounded server-side lifecycle.
+      const withinDeadline=<T>(start:()=>Promise<T>):Promise<T>=>new Promise((resolve,reject)=>{
+        const abort=()=>reject(new MhelpTicketError('The mHelpDesk ticket preview timed out.'));
+        if(controller.signal.aborted){abort();return;}
+        controller.signal.addEventListener('abort',abort,{once:true});
+        let pending:Promise<T>;
+        try {pending=start();}catch(error){controller.signal.removeEventListener('abort',abort);reject(error);return;}
+        pending.then(resolve,reject).finally(()=>controller.signal.removeEventListener('abort',abort));
+      });
+      // Cleanup must never extend the deadline or retain the overlap guard.
+      // Some transports return a cancellation promise that never settles (or
+      // throws synchronously); do not await it or let it mask the fixed error.
+      const cancel=(stream:{cancel:()=>Promise<unknown>}|null|undefined)=>{
+        try {void stream?.cancel().catch(()=>{});}catch { /* best-effort cleanup */ }
+      };
       const read=async(url:string,operation:Operation,maxBytes=1048576):Promise<unknown>=>{
+        if(controller.signal.aborted)fail('The mHelpDesk ticket preview timed out.');
         let response:Response;
-        try {response=await options.fetch(url,{method:'GET',headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:controller.signal});}
-        catch {return fail('mHelpDesk could not complete the ticket preview.');}
+        try {response=await withinDeadline(async()=>{
+          const result=await options.fetch(url,{method:'GET',headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:controller.signal});
+          // A transport may resolve after the deadline despite receiving abort.
+          // Dispose that late body without processing it or starting another read.
+          if(controller.signal.aborted){cancel(result.body);fail('The mHelpDesk ticket preview timed out.');}
+          return result;
+        });}
+        catch(error) {if(error instanceof MhelpTicketError)throw error;return fail('mHelpDesk could not complete the ticket preview.');}
         if(response.status===401 && operation==='account_read' && options.renewAccess && !renewed){
-          renewed=true;await response.body?.cancel().catch(()=>{});
+          renewed=true;cancel(response.body);
           try {config=await options.renewAccess();} catch {return fail('mHelpDesk could not renew its existing server token.');}
           validConfig();
           if(configuredPortalId && config.portalId && config.portalId!==configuredPortalId)fail('The renewed mHelpDesk account does not match the saved portal.');
           return read(url,operation,maxBytes);
         }
         if(!response.ok){
-          await response.body?.cancel().catch(()=>{});
+          cancel(response.body);
           throw new MhelpTicketError(response.status===429?'mHelpDesk is limiting ticket reads. Retry later.':'mHelpDesk denied or could not complete the ticket read.',response.status===429?429:503,{operation,httpStatus:response.status});
         }
-        if(!response.body || Number(response.headers.get('Content-Length'))>maxBytes){await response.body?.cancel().catch(()=>{});return fail('mHelpDesk returned an oversized ticket response.');}
+        if(!response.body || Number(response.headers.get('Content-Length'))>maxBytes){cancel(response.body);return fail('mHelpDesk returned an oversized ticket response.');}
         const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let size=0,raw='';
         try {
           while(true){
             if(controller.signal.aborted)fail('The mHelpDesk ticket preview timed out.');
-            const {value,done}=await reader.read();if(done)break;
+            const {value,done}=await withinDeadline(()=>reader.read());if(done)break;
             size+=value.byteLength;budget-=value.byteLength;
-            if(size>maxBytes || budget<0){await reader.cancel();fail('mHelpDesk returned an oversized ticket response.');}
+            if(size>maxBytes || budget<0)fail('mHelpDesk returned an oversized ticket response.');
             raw+=decoder.decode(value,{stream:true});
           }
           raw+=decoder.decode();return JSON.parse(raw);
         }catch(error){if(error instanceof MhelpTicketError)throw error;return fail('mHelpDesk returned an incomplete ticket response.');}
-        finally {await reader.cancel().catch(()=>{});reader.releaseLock();}
+        finally {cancel(reader);try {reader.releaseLock();}catch { /* never mask the safe read result */ }}
       };
       const account=object(await read(CURRENT_USER,'account_read',16384)), portalId=identity(account.portalId);
       if((configuredPortalId && configuredPortalId!==portalId) || (config.portalId && config.portalId!==portalId))fail('The mHelpDesk account does not match the saved portal.');
@@ -233,11 +264,38 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         }
         boundaryChecked=true;
       }
+      let detailEvidence;
+      if(evidence===MHELP_TICKET_DETAIL_EVIDENCE){
+        detailEvidence=total===1?undefined:unavailableMhelpTicketDetail(total!);
+        if(total===1){
+          // The sole selected identity comes from the complete, validated bounded
+          // preview. Never accept a caller ID, URL, field expansion or filter.
+          const selected=tickets[0],rawDetail=await read(prefix+'/Tickets/'+selected.ticketId,'ticket_detail_read');
+          detailSchema=describeMhelpTicketDetailFailure(rawDetail);
+          if(!rawDetail||typeof rawDetail!=='object'||Array.isArray(rawDetail)||['portalId','ticketId','ticketNumber'].some(key=>!Object.hasOwn(rawDetail,key)))fail('mHelpDesk returned an unsupported flat ticket detail.');
+          const detailObject=rawDetail as Row;
+          let detailPortal:string,detailId:string,detailNumber:string;
+          try {detailPortal=identity(detailObject.portalId);detailId=identity(detailObject.ticketId);detailNumber=identity(detailObject.ticketNumber);}
+          catch {fail('mHelpDesk detail does not match the selected ticket.');}
+          if(detailPortal!==selected.portalId||detailId!==selected.ticketId||detailNumber!==selected.ticketNumber)fail('mHelpDesk detail does not match the selected ticket.');
+          let detail:PartnerTicket;
+          try {detail=projectPartnerTicket(rawDetail,portalId);}
+          catch {fail('mHelpDesk returned an unsupported flat ticket detail.');}
+          if(detail.portalId!==selected.portalId||detail.ticketId!==selected.ticketId||detail.ticketNumber!==selected.ticketNumber)fail('mHelpDesk detail does not match the selected ticket.');
+          if(Date.parse(detail.creationDate)<=Date.parse(window.createdAfter)||Date.parse(detail.creationDate)>=Date.parse(window.createdBefore))fail('mHelpDesk detail is outside the verified creation window.');
+          // Do not combine two different source snapshots, including assignment
+          // changes. Unknown field counts may differ between list and detail.
+          const snapshotKeys=['creationDate','lastModDate','typeId','typeName','statusId','customStatusId','deleted','customerId','serviceLocationId','assignedTo','assignmentState'] as const;
+          if(snapshotKeys.some(key=>detail[key]!==selected[key]))fail('mHelpDesk ticket changed during the detail preview.');
+          try {detailEvidence=describeMhelpTicketDetail(rawDetail);} catch {fail('Unsupported mHelpDesk ticket detail evidence.');}
+        }
+      }
       const typeIds=new Set(typeRows.map(row=>row.typeId)),statusIds=new Set(statusRows.map(row=>row.statusId));
       return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
         verifiedPortalId:portalId,readAt:new Date().toISOString(),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
         totalRows:total!,previewCount:tickets.length,partial:false,
-        ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:describeMhelpOperationalEvidence(collectionRows(object(rawTickets))!,total!)}:{}),
+        ...(evidence!==undefined?{operationalEvidence:describeMhelpOperationalEvidence(collectionRows(object(rawTickets))!,total!)}:{}),
+        ...(evidence===MHELP_TICKET_DETAIL_EVIDENCE?{detailEvidence}:{}),
         types:typeRows.map(row=>({...row,count:tickets.filter(ticket=>ticket.typeId===row.typeId).length})),
         statuses:statusRows.map(row=>({...row,statusCount:tickets.filter(ticket=>ticket.statusId===row.statusId).length,customStatusCount:tickets.filter(ticket=>ticket.customStatusId===row.statusId).length})),
         metrics:{deletedTickets:tickets.filter(row=>row.deleted).length,assignedTickets:tickets.filter(row=>row.assignmentState==='assigned').length,
@@ -249,7 +307,10 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
           typeLabelMismatches:tickets.filter(row=>row.typeName!==null&&typeRows.some(type=>type.typeId===row.typeId&&type.typeName!==row.typeName)).length,
           duplicateTypeNames:typeRows.length-new Set(typeRows.map(row=>row.typeName)).size}};
     } catch(error) {
-      if(error instanceof MhelpTicketError && Object.keys(schema).length)error.schema=schema;
+      if(error instanceof MhelpTicketError){
+        if(Object.keys(schema).length)error.schema=schema;
+        if(detailSchema)error.detailSchema=detailSchema;
+      }
       throw error;
     } finally {clearTimeout(timer);controller.abort();busy=false;}
   }};

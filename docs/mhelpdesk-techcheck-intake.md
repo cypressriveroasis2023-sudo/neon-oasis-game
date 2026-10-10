@@ -108,3 +108,33 @@ The frontend displays the already-verified complete status dictionary, including
 ## Non-destructive stop and rollback
 
 Disable the private portal configuration to stop new intake; its begin gate returns disabled before source reads. Preserve receipts, assignments, checkpoints and technician edits. If the background hook regresses provider behavior, restore only that scoped source change after checking for concurrent deployments. Do not drop the ledger, delete imported work, remove attribution protections, or force assigned_by back to NOT NULL while service-attributed records exist. The review panel must report disabled/error/held states honestly, and an all-held scan is not proof of working assignment creation.
+
+## Consolidated single-ticket structural diagnostic (local implementation)
+
+A separate, explicit Owner capability, `evidence: "ticket_detail_structure_v1"`, is available on the same protected preview action. The caller can still choose only the server-defined current or previous Chicago day. It cannot pass a ticket ID, portal, date, URL, query, field expansion, credential or activation option. Old clients with no capability or `operational_structure_v1` retain the same aggregate DTO and exact same vendor reads; neither causes a hidden detail read.
+
+The new capability first completes the existing bounded account, dictionaries and ticket-list validation. If and only if `totalRows === 1`, it selects that validated row server-side and performs exactly one `GET /portal/{portal_id}/Tickets/{ticket_id}` with no query parameters. Zero tickets returns `selection_unavailable / empty_window`; multiple tickets returns `selection_unavailable / ambiguous_window`. Neither case performs a detail read or guesses a ticket. Invalid or incomplete list results also stop before detail access.
+
+The verified local copy of the official [models](https://www.mhelpdesk.com/partner-api/models.html) and its endpoint index documents the flat Ticket Get response and [single-ticket endpoint](https://www.mhelpdesk.com/partner-api/ticket.html#ep-get-portal-portal-id-tickets-ticket-id). The implementation accepts only that flat object. It verifies portal, internal ticket ID, printed ticket number, creation-window membership, normalized creation/modification timestamps and the previously validated type/status/assignment/customer/site/deletion snapshot. Changed, mismatched, missing or malformed identity fails closed. Undocumented `data` or `results` detail wrappers are diagnosed, never silently accepted.
+
+The aggregate response adds the existing `operationalEvidence` and a separate `detailEvidence` union:
+
+- Contract `cos-mhelpdesk-ticket-detail-evidence-v1`, scope `single_server_selected_ticket`
+- Unavailable: `state: selection_unavailable`, `reason: empty_window | ambiguous_window`, `sampledTickets: 0`
+- Verified: `state: detail_verified`, `sampledTickets: 1`, `nestedSampleLimit: 50`, fixed `fields`, `collections` and `availability`
+
+The verified diagnostic contains only field-kind distributions, string-format categories, empty/nonempty string counts, collection kinds/counts and fixed availability states. It includes operational description, type/status/assignment, customer/site-reference, source-timestamp and documented legacy schedule fields in one pass. Item entries include documented nonfinancial identity, description, quantity, labor-time/status and ordering shapes. Custom fields include the documented ID/value/label/order/required shapes. Each nested collection samples at most 50 entries, while separately reporting its total count. No actual identifier, source text, custom label/value, contact, billing, attachment, credential, arbitrary source key or response body is returned or logged.
+
+Important contract limits remain explicit:
+
+- `scheduledDate`, `neededBy`, `appointmentCount`, `estimatedTime`, `lastCalledDate` and `nextCallDate` are marked deprecated in Ticket Get. Present shapes do not establish a valid operational schedule. Availability remains `unverified_deprecated_get_fields`.
+- `equipment: array[number]` appears in Ticket Post/Put, not in Ticket Get. The diagnostic reports only a candidate collection kind/count, sampled entry kinds and an empty field map. Even populated numeric entries remain `unverified_write_model_candidate`; they are not validated GET equipment, an asset manifest or a supported mapper input.
+- Site availability remains `unresolved_no_join`. A service-location ID is not a resolved site or address. The local endpoint index names a customer ServiceLocations list, but does not establish the complete identity-matching model needed for a safe join.
+- The local Appointments index does not establish verified bounded ticket filters. No appointment, service-location, equipment, customer, contact, billing, attachment or exploratory join is added.
+- Nonempty description text only establishes `nonempty_text_present`. It is never parsed to guess equipment, site, people, date or workflow labels. Item/custom-field structures remain `unmapped_structures_only`.
+
+The extra detail response shares the existing 20-second provider deadline, 1 MiB per-response cap and 3 MiB cumulative body budget. There is no timeout reset, new token retrieval, detail retry, detail-401 renewal, expanded account scope or second ticket selection. Only the existing account-read 401 renewal is allowed once; its existing separately bounded token lifecycle is unchanged. Fetch and body waits now enforce the shared deadline even if a transport ignores AbortSignal. The same busy guard excludes overlapping legacy and detail previews.
+
+Failures use fixed references for detail schema, identity mismatch, changed snapshot and creation-window mismatch. Provider errors retain fixed status/category diagnostics with the allowlisted `ticket_detail_read` operation. A failed flat detail may log only fixed root/data/results container kinds and core-field kinds. Error messages, stacks, raw keys, values, URLs, headers and bodies are discarded. The server and client revalidate the response shape, counts, selection state and 16,000-byte detail-evidence ceiling.
+
+This patch is a read-only diagnostic, not live source verification. It performs no vendor requests during local tests, makes no database changes, creates no tickets or notifications and does not register a source adapter. The source registry remains empty. The risk-denied migration remains unapplied. After an authorized actual detail result, absent or unverified operational site/equipment/schedule facts must become a concrete blocker; do not compensate with speculative joins or automatic intake.
