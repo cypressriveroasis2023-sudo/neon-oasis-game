@@ -1,6 +1,7 @@
 /** Runtime-only bindings. This module never retrieves, stores, prints or copies a secret. */
 import {IntakeFault,type Rpc,type Window,type FaultCode} from './mhelpIntakeRuntime.ts';
 import {readBoundedJson} from './mhelpIntakeHandlers.ts';
+import {DEFAULT_RETRY_AFTER_SECONDS,isRetryAfterSeconds,parseRetryAfter} from './mhelpIntakeRetry.ts';
 const NATIVE_SOURCE='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-mhelp-ticket-source';
 const LEGACY='https://goqrnolcvqnirjmzaeyk.supabase.co';
 const TRANSIENT=new Set([408,429,500,502,503,504]);
@@ -20,8 +21,21 @@ export function createExistingCredentialSourceRead(options:{projectUrl:string;re
     try{response=await options.fetch(NATIVE_SOURCE,{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'ticket_batch',createdAfter:window.createdAfter,createdBefore:window.createdBefore}),redirect:'error',cache:'no-store',signal});}
     catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
     if(!response.ok){
-      let code:FaultCode='SOURCE_UNAVAILABLE';try{const failure=await readBoundedJson(response.body,512,signal) as {code?:unknown};if(failure&&typeof failure.code==='string'&&['SOURCE_UNAVAILABLE','SOURCE_INVALID','BATCH_LIMIT','DEADLINE','CONFIGURATION','INTERNAL'].includes(failure.code))code=failure.code as FaultCode;}catch{/* Ignore untrusted error details. */}
-      throw new IntakeFault(code,['SOURCE_UNAVAILABLE','DEADLINE'].includes(code)&&TRANSIENT.has(response.status));
+      let failure:unknown;try{failure=await readBoundedJson(response.body,512,signal);}catch{/* Ignore untrusted error details. */}
+      if(failure&&typeof failure==='object'&&!Array.isArray(failure)){
+        const value=failure as Record<string,unknown>;
+        if(typeof value.code==='string'&&['SOURCE_UNAVAILABLE','SOURCE_INVALID','BATCH_LIMIT','DEADLINE','CONFIGURATION','INTERNAL'].includes(value.code)){
+          const code=value.code as FaultCode,valid=Object.keys(value).every(k=>['code','retryable','retryAfterSeconds'].includes(k))&&typeof value.retryable==='boolean'&&(!('retryAfterSeconds' in value)||isRetryAfterSeconds(value.retryAfterSeconds));
+          const retryable=valid&&value.retryable===true&&['SOURCE_UNAVAILABLE','DEADLINE'].includes(code),headerDelay=retryable?parseRetryAfter(response.headers.get('Retry-After')):undefined;
+          let cooldown=valid?value.retryAfterSeconds as number|undefined:undefined;
+          if(headerDelay!==undefined)cooldown=Math.max(cooldown??0,headerDelay);
+          if(retryable&&response.status===429&&cooldown===undefined)cooldown=DEFAULT_RETRY_AFTER_SECONDS;
+          // A malformed/old error DTO must never upgrade a permanent fault to a retry.
+          throw new IntakeFault(code,retryable,cooldown);
+        }
+      }
+      const retryable=TRANSIENT.has(response.status);
+      throw new IntakeFault('SOURCE_UNAVAILABLE',retryable,retryable?(parseRetryAfter(response.headers.get('Retry-After'))??DEFAULT_RETRY_AFTER_SECONDS):undefined);
     }
     try{return await readBoundedJson(response.body,3*1048576,signal);}catch{throw new IntakeFault('SOURCE_INVALID');}
   };

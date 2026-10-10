@@ -596,9 +596,15 @@ begin
       raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
     return cos_mhelp_intake.finish_intake_v1((p_request->>'leaseId')::uuid,p_request->'expectedTicketIds',(p_request->>'total')::integer);
   elsif v_action='fail' then
-    if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','code','retryable'])) then
+    if exists(select 1 from jsonb_object_keys(p_request) k where k<>all(array['action','leaseId','code','retryable','retryAfterSeconds'])) then
       raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
-    return cos_mhelp_intake.fail_intake_v1((p_request->>'leaseId')::uuid,p_request->>'code',(p_request->>'retryable')::boolean);
+    if p_request ? 'retryAfterSeconds' and (
+      jsonb_typeof(p_request->'retryAfterSeconds') is distinct from 'number'
+      or (p_request->>'retryAfterSeconds') !~ '^\d+$'
+      or (p_request->>'retryAfterSeconds')::numeric>86400) then
+      raise exception 'MHELP_INTAKE_INVALID_REQUEST'; end if;
+    return cos_mhelp_intake.fail_intake_v1((p_request->>'leaseId')::uuid,p_request->>'code',
+      (p_request->>'retryable')::boolean,coalesce(p_request->>'retryAfterSeconds','0')::integer);
   end if;
   raise exception 'MHELP_INTAKE_INVALID_REQUEST';
 end;

@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { crypto } from "jsr:@std/crypto@1";
 import {projectReconProviderInventory} from '../_shared/reconProviderInventory.ts';
+import {scheduleCameraMhelpIntake} from '../../../operations/intake/mhelpIntakeBackground.ts';
 
 const cors={"content-type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-camera-cron-secret","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const json=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:cors});
@@ -382,6 +383,7 @@ async function witnessInventory(db:any){
 }
 
 Deno.serve(async(req)=>{
+  const requestStarted=Date.now();
   if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
   if(req.method!=="POST")return json({error:"POST required"},405);
   const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -394,6 +396,11 @@ Deno.serve(async(req)=>{
     const {data:profile}=await db.from("profiles").select("role,active").eq("user_id",auth.user.id).maybeSingle();
     if(!profile?.active||!["owner","it"].includes(String(profile.role).toLowerCase()))return json({error:"Forbidden"},403);
   }
+  // Only the existing server cron path may start intake. Its own durable begin
+  // gate throttles the 3/3/9-minute opportunities before any vendor access.
+  scheduleCameraMhelpIntake({request:req,cronAuthenticated:valid===true,
+    projectUrl:Deno.env.get("SUPABASE_URL"),db,fetch,startedAt:requestStarted,
+    waitUntil:task=>EdgeRuntime.waitUntil(task)});
   const body=await req.json().catch(()=>({}));
   const mode=String(body.mode||"all").toLowerCase();
   try{

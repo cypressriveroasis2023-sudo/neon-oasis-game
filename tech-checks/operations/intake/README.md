@@ -61,13 +61,20 @@ the former owns the only exposed service-role-only wrapper.
   forward-only watermark. Repeating the identical finish after an uncertain response
   is safe; a different manifest is rejected. A lost finish acknowledgement is marked
   `completionUncertain` if retries do not establish the result.
-- `fail`: `{leaseId,code,retryable}`; no cursor advance, only a safe allowlisted code
-  and persisted exponential cooldown. Stale workers cannot clear a newer lease.
+- `fail`: `{leaseId,code,retryable,retryAfterSeconds?}`; no cursor advance, only a
+  safe allowlisted code and persisted cooldown. Optional provider seconds must be
+  an integer from 0 through 86,400; SQL uses at least the existing backoff and the
+  requested delay. Stale workers cannot clear a newer lease.
 - Private state includes last attempt/success times, failure count, retry time,
   last safe error code, completed lease and its exact expected manifest.
 
-The intended cadence is five minutes. A run advances at most 15 minutes to catch
-up after short outages, overlapping the last ten minutes; each complete source
+The fixed minimum poll interval is five minutes, enforced durably by the private
+begin action before source access. The prepared provider-reconcile hook reuses
+its three existing cron opportunities at :03, :06 and :09 in every 15-minute
+block. Their 3/3/9-minute spacing normally yields eligible polls six and nine
+minutes apart (at most eight per hour); the middle +3-minute request is idle.
+This is not an exact five-minute polling schedule. A run advances at most 15
+minutes to catch up after short outages, overlapping the last ten minutes; each complete source
 batch is at most 500 tickets, 50 per page and ten pages. Reads are strictly within
 an independently checked 25-minute-plus-1ms window and never before activation.
 The initial strict lower bound is activation minus one millisecond so a ticket at
@@ -75,8 +82,19 @@ the exact activation millisecond is included. Store activation in canonical UTC
 with millisecond precision; do not set an arbitrary historic floor.
 
 A run has a 120-second maximum budget including a short failure-recording reserve.
-At most three attempts use bounded exponential delay plus jitter. Persistent
-failures move to a 30-second–30-minute database cooldown. Empty complete scans can
+Transient failures without a cooldown have at most three attempts with bounded
+exponential delay plus jitter. Source errors preserve their explicit retryable
+flag across the native HTTP boundary: a vendor 403 or post-renewal 401 cannot turn
+into an immediate retry just because that boundary returns 503. A Retry-After
+integer or HTTP-date is reduced to bounded numeric seconds (maximum 24 hours);
+missing/invalid values on 429 fall back to 300 seconds. Any supplied cooldown,
+including zero, ends immediate attempts and is persisted by the same fail action.
+Opaque failures from the unchanged token manager also defer 300 seconds instead
+of repeatedly attempting renewal. Its hidden provider response is not parsed.
+SQL retains its 30-second–30-minute exponential/permanent backoff and never uses
+less than the supplied provider delay. If failure persistence itself is unavailable,
+the lease still fences writes, but the provider cooldown cannot be guaranteed;
+the next scheduled run may resume after lease expiry. Empty complete scans can
 advance; missing/incomplete/duplicate/reordered/changing-total/over-limit scans
 cannot. Receipts commit before watermark movement, so a crash retries unchanged
 source keys rather than recreating claimed/completed/manually edited work.
@@ -100,6 +118,45 @@ silently skipped. Production activation needs actual source guarantees or a
 separately reviewed reconciliation approach for those cases.
 
 ## Remaining activation gates
+
+### Existing cron runtime hook (prepared, not deployed)
+
+The local `camera-provider-reconcile` handler registers one background intake
+pass only after its existing cron verification succeeds. Requests with Origin or
+Authorization headers never start intake; the existing Owner/IT provider fallback
+and provider response remain unchanged. Names-only production inspection confirmed
+that cron jobs 3/4/5 target this function with the cron header and no Origin or
+Authorization header. No cron job, frequency or additional camera work is added.
+
+`mhelpIntakeBackground.ts` reuses that invocation's existing SDK service client
+and the existing-credential native source transport. It does not read Vault,
+look up a credential, make a loopback request or create a grant. The protected
+restricted intake RPC remains the only new data capability, separately reviewed.
+The database policy still decides whether intake is enabled; the production
+source adapter remains unregistered. This hook cannot enable either one.
+
+`EdgeRuntime.waitUntil` receives a caught promise; provider success or failure
+does not gate intake and intake is never awaited by the provider response.
+Registration failure starts no untracked work. Each pass has at most the existing
+120-second budget including cleanup, additionally capped at invocation start plus
+140 seconds as a conservative invocation ceiling. Hosted wall-clock limits apply
+to a worker that may serve multiple requests, so this does not guarantee remaining
+worker lifetime; the platform may still interrupt it earlier. Background transport uses its own run
+signal, so sending or cancelling the provider response does not cancel intake.
+Camera-health-sweep and its 52-second deadline are unchanged. These tasks still
+share platform/database resources; production timing requires verification and
+background execution is not a durable queue. The next eligible cron request and
+existing lease/replay semantics recover interrupted work without moving its cursor.
+
+The durable five-minute poll guard follows busy/backoff checks and precedes lease
+creation. It does not change the 180-second lease, receipt protection, provider
+cooldown or 15-minute-forward catch-up bound. A throttled request returns `idle`
+without updating attempt timestamps or the watermark and without vendor reads.
+Failure retries respect the later of their backoff and the minimum poll interval.
+Intake output does not enter the provider response or logs; safe status remains
+in the existing restricted review projection.
+
+### Deployment prerequisites
 
 1. Inspect the real read-only schema evidence and register a production adapter
    with matching evidence for the authorized fixed portal and new-only bounds.

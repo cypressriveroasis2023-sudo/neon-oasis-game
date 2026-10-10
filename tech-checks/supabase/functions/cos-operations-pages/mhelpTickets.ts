@@ -3,7 +3,7 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
-import {describeMhelpTicketSchema} from './mhelpTicketSchema.ts';
+import {describeMhelpTicketSchema,describeMhelpOperationalEvidence,projectMhelpOperationalEvidence,MHELP_OPERATIONAL_EVIDENCE} from './mhelpTicketSchema.ts';
 export const MHELP_TICKET_CONTRACT = 'cos-mhelpdesk-ticket-preview-v1';
 const API = 'https://connect.mhelpdesk.com/api/v1.0';
 const CURRENT_USER = API + '/users/me';
@@ -64,10 +64,19 @@ export function projectPartnerTicket(value: unknown, portalId: string): PartnerT
 }
 type TicketType = {typeId:string; portalId:string; typeName:string; isActive:boolean};
 type TicketStatus = {statusId:string; statusText:string; displayText:string; parentId:string|null; canBeParent:boolean};
+/** Accept the documented data collection or the results collection observed by the
+ * authorized Owner preview. Never guess between both, fall back from malformed
+ * data, or infer ticket-row/timezone/pagination semantics from an empty sample. */
+function collectionRows(page: Row): unknown[] | null {
+  const hasData=Object.hasOwn(page,'data'),hasResults=Object.hasOwn(page,'results');
+  if (hasData===hasResults) return null;
+  const rows=hasData?page.data:page.results;
+  return Array.isArray(rows)?rows:null;
+}
 function types(value: unknown, portalId: string): TicketType[] {
-  const page=object(value);
-  if (!Number.isSafeInteger(page.totalRows) || !Array.isArray(page.data) || page.totalRows!==page.data.length || page.data.length>MAX_DICTIONARY_ROWS) fail('mHelpDesk returned an incomplete ticket type dictionary.');
-  const result=page.data.map(value=>{
+  const page=object(value),rows=collectionRows(page);
+  if (!Number.isSafeInteger(page.totalRows) || !rows || page.totalRows!==rows.length || rows.length>MAX_DICTIONARY_ROWS) fail('mHelpDesk returned an incomplete ticket type dictionary.');
+  const result=rows.map(value=>{
     const row=object(value);
     if (identity(row.portalId)!==portalId || typeof row.isActive!=='boolean') fail('mHelpDesk returned an invalid ticket type dictionary.');
     return {typeId:identity(row.typeId),portalId,typeName:text(row.typeName)!,isActive:row.isActive};
@@ -100,7 +109,8 @@ function windowOf(value: unknown) {
 }
 const METRICS = ['deletedTickets','assignedTickets','missingAssignmentFields','missingTypeIds','unknownTypeIds','unknownStatusIds','unknownCustomStatusIds','missingCustomerIds','missingServiceLocationIds','ticketsWithUnknownFields','unknownFieldOccurrences','typeLabelMismatches','duplicateTypeNames'] as const;
 /** Defense-in-depth allowlist for maintenance. Never spread an untrusted reader result. */
-export function projectMhelpTicketPreview(value: unknown) {
+export function projectMhelpTicketPreview(value: unknown, evidence?:typeof MHELP_OPERATIONAL_EVIDENCE) {
+  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
   const row=object(value);
   if(row.contract!==MHELP_TICKET_CONTRACT || row.state!=='preview_verified' || row.liveAccessVerified!==true || row.automaticSync!==false || row.ticketWrites!==false || row.partial!==false)fail('Unsupported mHelpDesk ticket preview.');
   const portalId=identity(row.verifiedPortalId),window=windowOf(row.window);
@@ -121,13 +131,15 @@ export function projectMhelpTicketPreview(value: unknown) {
   for(const key of METRICS)metrics[key]=count(inputMetrics[key],key==='unknownFieldOccurrences'?1000000:key==='duplicateTypeNames'?typeRows.length:totalRows);
   return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
     verifiedPortalId:portalId,readAt:timestamp(row.readAt),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
-    totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics};
+    totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics,
+    ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:projectMhelpOperationalEvidence(row.operationalEvidence,totalRows)}:{})};
 }
 /** Instantiate once and call only behind the existing protected maintenance/Owner gate. */
 export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Config>;renewAccess?:()=>Promise<Config>;fetch:typeof fetch}) {
   let busy=false;
-  return {preview:async(value:TicketPreviewWindow)=>{
+  return {preview:async(value:TicketPreviewWindow,evidence?:typeof MHELP_OPERATIONAL_EVIDENCE)=>{
     const window=windowOf(value);
+    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
     if(busy)fail('A mHelpDesk ticket preview is already running.',409);
     busy=true;
     const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),20000);
@@ -195,12 +207,12 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       let total:number|undefined,indexBase=0,boundaryChecked=false;
       const tickets:PartnerTicket[]=[],seen=new Set<string>();
       const pageOf=(value:unknown)=>{
-        const page=object(value);
-        if(!Number.isSafeInteger(page.totalRows) || Number(page.totalRows)<0 || !Array.isArray(page.data) || page.data.length>PAGE_SIZE || page.data.length>Number(page.totalRows))fail('mHelpDesk returned an unsupported ticket page.');
+        const page=object(value),collection=collectionRows(page);
+        if(!Number.isSafeInteger(page.totalRows) || Number(page.totalRows)<0 || !collection || collection.length>PAGE_SIZE || collection.length>Number(page.totalRows))fail('mHelpDesk returned an unsupported ticket page.');
         if(Number(page.totalRows)>window.maxTickets)fail('The ticket preview exceeds its maximum count. Use a smaller creation window.');
         if(total!==undefined && page.totalRows!==total)fail('mHelpDesk ticket totals changed during the preview. Retry.');
         total=Number(page.totalRows);
-        const rows=page.data.map(row=>projectPartnerTicket(row,portalId));
+        const rows=collection.map(row=>projectPartnerTicket(row,portalId));
         if(rows.some(row=>Date.parse(row.creationDate)<=Date.parse(window.createdAfter) || Date.parse(row.creationDate)>=Date.parse(window.createdBefore)))fail('mHelpDesk returned tickets outside the requested creation window.');
         if(rows.some((row,i)=>i>0 && Number(row.ticketId)<=Number(rows[i-1].ticketId)))fail('mHelpDesk did not return tickets in stable identity order.');
         return rows;
@@ -225,6 +237,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
         verifiedPortalId:portalId,readAt:new Date().toISOString(),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
         totalRows:total!,previewCount:tickets.length,partial:false,
+        ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:describeMhelpOperationalEvidence(collectionRows(object(rawTickets))!,total!)}:{}),
         types:typeRows.map(row=>({...row,count:tickets.filter(ticket=>ticket.typeId===row.typeId).length})),
         statuses:statusRows.map(row=>({...row,statusCount:tickets.filter(ticket=>ticket.statusId===row.statusId).length,customStatusCount:tickets.filter(ticket=>ticket.customStatusId===row.statusId).length})),
         metrics:{deletedTickets:tickets.filter(row=>row.deleted).length,assignedTickets:tickets.filter(row=>row.assignmentState==='assigned').length,

@@ -1,10 +1,12 @@
 /** Local-only orchestration. No secrets, vendor URLs, user identities or transport are accepted by HTTP callers. */
+import {isRetryAfterSeconds} from './mhelpIntakeRetry.ts';
 export const INTAKE_CONTRACT='cos-mhelp-ticket-intake-run-v1';
 export const BATCH_CONTRACT='cos-mhelp-ticket-operational-batch-v1';
 export const INTAKE_LIMITS=Object.freeze({cadenceSeconds:300,leaseSeconds:180,deadlineMs:120000,pageSize:50,maxTickets:500,maxPages:10,overlapMs:600000,maxForwardMs:900000,maxWindowMs:1500001,maxResponseBytes:3*1048576});
 export type FaultCode='SOURCE_UNAVAILABLE'|'SOURCE_INVALID'|'BATCH_LIMIT'|'WRITE_UNAVAILABLE'|'RECEIPT_INVALID'|'DEADLINE'|'CONFIGURATION'|'INTERNAL';
 export class IntakeFault extends Error {
-  constructor(public readonly code:FaultCode, public readonly retryable=false) {super(code);}
+  public readonly retryAfterSeconds?:number;
+  constructor(public readonly code:FaultCode, public readonly retryable=false,retryAfterSeconds?:number) {super(code);if(isRetryAfterSeconds(retryAfterSeconds))this.retryAfterSeconds=retryAfterSeconds;}
 }
 type Row=Record<string,unknown>;
 export type Window={createdAfter:string;createdBefore:string};
@@ -70,7 +72,7 @@ export async function runMhelpIntake(options:{enabled:boolean;rpc:Rpc;readSource
   const now=options.now??Date.now,controller=new AbortController(),duration=Math.min(INTAKE_LIMITS.deadlineMs,Math.max(1,options.deadlineMs??INTAKE_LIMITS.deadlineMs));
   const timer=setTimeout(()=>controller.abort(),Math.max(1,duration-2000));let lease:Lease|undefined,finishAttempted=false;
   const sleep=options.sleep??((ms:number,signal:AbortSignal)=>new Promise<void>((resolve,reject)=>{const id=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve();},ms);const abort=()=>{clearTimeout(id);reject(new IntakeFault('DEADLINE',true));};signal.addEventListener('abort',abort,{once:true});}));
-  const retry=async<T>(work:()=>Promise<T>):Promise<T>=>{for(let attempt=0;;attempt++){try{return await deadline(work,controller.signal);}catch(error){if(controller.signal.aborted)throw new IntakeFault('DEADLINE',true);if(!(error instanceof IntakeFault)||!error.retryable||attempt>=2)throw error;await deadline(()=>sleep(250*2**attempt+Math.floor(Math.max(0,Math.min(1,(options.random??Math.random)()))*125),controller.signal),controller.signal);}}};
+  const retry=async<T>(work:()=>Promise<T>):Promise<T>=>{for(let attempt=0;;attempt++){try{return await deadline(work,controller.signal);}catch(error){if(controller.signal.aborted)throw new IntakeFault('DEADLINE',true);if(!(error instanceof IntakeFault)||!error.retryable||error.retryAfterSeconds!==undefined||attempt>=2)throw error;await deadline(()=>sleep(250*2**attempt+Math.floor(Math.max(0,Math.min(1,(options.random??Math.random)()))*125),controller.signal),controller.signal);}}};
   try {
     const started=row(await retry(()=>options.rpc({action:'begin'},controller.signal)));
     if(['disabled','busy','backoff','idle'].includes(String(started.state))){result.state=started.state as RunResult['state'];return result;}
@@ -91,7 +93,7 @@ export async function runMhelpIntake(options:{enabled:boolean;rpc:Rpc;readSource
     result.state='complete';result.watermarkAdvanced=true;return result;
   }catch(error){
     const failure=error instanceof IntakeFault?error:new IntakeFault('INTERNAL');result.state='failed';result.code=failure.code;if(finishAttempted)result.completionUncertain=true;
-    if(lease){const cleanup=new AbortController(),limit=setTimeout(()=>cleanup.abort(),2000);try{await deadline(()=>options.rpc({action:'fail',leaseId:lease!.leaseId,code:failure.code,retryable:failure.retryable},cleanup.signal),cleanup.signal);}catch{/* Lost cleanup must never advance a watermark; the fenced lease expires. */}finally{clearTimeout(limit);}}
+    if(lease){const cleanup=new AbortController(),limit=setTimeout(()=>cleanup.abort(),2000);try{await deadline(()=>options.rpc({action:'fail',leaseId:lease!.leaseId,code:failure.code,retryable:failure.retryable,...(failure.retryAfterSeconds!==undefined?{retryAfterSeconds:failure.retryAfterSeconds}:{})},cleanup.signal),cleanup.signal);}catch{/* Lost cleanup must never advance a watermark; the fenced lease expires. */}finally{clearTimeout(limit);}}
     return result;
   }finally{clearTimeout(timer);controller.abort();}
 }

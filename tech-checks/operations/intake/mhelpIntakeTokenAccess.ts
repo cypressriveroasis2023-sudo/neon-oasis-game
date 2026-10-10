@@ -2,16 +2,18 @@
 import {nativeMhelpTokens} from '../../supabase/functions/cos-operations-pages/mhelpTokenRuntime.ts';
 import {INTAKE_LIMITS,IntakeFault,identity,row,type Window} from './mhelpIntakeRuntime.ts';
 import {readBoundedJson} from './mhelpIntakeHandlers.ts';
+import {DEFAULT_RETRY_AFTER_SECONDS,parseRetryAfter} from './mhelpIntakeRetry.ts';
 const API='https://connect.mhelpdesk.com/api/v1.0';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co';
 const transient=(status:number)=>[408,429,500,502,503,504].includes(status);
-export function createNativeMhelpTicketAccess(options:{env:(name:string)=>string|undefined;fetch:typeof fetch;tokens?:ReturnType<typeof nativeMhelpTokens>}){
+export function createNativeMhelpTicketAccess(options:{env:(name:string)=>string|undefined;fetch:typeof fetch;tokens?:ReturnType<typeof nativeMhelpTokens>;now?:()=>number}){
   // Instantiate once per native function instance, sharing its existing manager's
   // single-flight renewal and durable DB rotation lease with ordinary maintenance.
   const tokens=options.tokens??nativeMhelpTokens(options.env,options.fetch);
+  const responseFault=(response:Response)=>{const retryable=transient(response.status);return new IntakeFault('SOURCE_UNAVAILABLE',retryable,retryable?(parseRetryAfter(response.headers.get('Retry-After'),(options.now??Date.now)())??(response.status===429?DEFAULT_RETRY_AFTER_SECONDS:undefined)):undefined);};
   return {begin:async(portalId:string,signal:AbortSignal)=>{
     if(options.env('SUPABASE_URL')!==NATIVE)throw new IntakeFault('CONFIGURATION');identity(portalId);
-    let config:{accessToken?:string;portalId?:string};try{config=await tokens.getPartnerConfig();}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
+    let config:{accessToken?:string;portalId?:string};try{config=await tokens.getPartnerConfig();}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true,DEFAULT_RETRY_AFTER_SECONDS);}
     const validate=()=>{if(typeof config.accessToken!=='string'||!config.accessToken||/\s/.test(config.accessToken)||config.accessToken.length>16384||config.portalId!==portalId)throw new IntakeFault('CONFIGURATION');};validate();
     const get=async(path:string,max:number)=>{
       let response:Response;try{response=await options.fetch(API+path,{method:'GET',headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal});}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
@@ -20,15 +22,15 @@ export function createNativeMhelpTicketAccess(options:{env:(name:string)=>string
     let account=await get('/users/me',16384);
     if(account.response.status===401){
       await account.response.body?.cancel().catch(()=>{});
-      try{const renewed=await tokens.renewAccess();if(!renewed)throw new IntakeFault('SOURCE_UNAVAILABLE',true);config=renewed;}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}validate();
+      try{const renewed=await tokens.renewAccess();if(!renewed)throw new IntakeFault('SOURCE_UNAVAILABLE');config=renewed;}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true,DEFAULT_RETRY_AFTER_SECONDS);}validate();
       if(signal.aborted)throw new IntakeFault('DEADLINE',true);
       account=await get('/users/me',16384);
     }
-    if(!account.response.ok){await account.response.body?.cancel().catch(()=>{});throw new IntakeFault('SOURCE_UNAVAILABLE',transient(account.response.status));}
+    if(!account.response.ok){await account.response.body?.cancel().catch(()=>{});throw responseFault(account.response);}
     const value=row(await account.read());
     const verifiedPortal=typeof value.portalId==='number'&&Number.isSafeInteger(value.portalId)?String(value.portalId):value.portalId;
     if(verifiedPortal!==portalId)throw new IntakeFault('CONFIGURATION');
-    const fixedRead=async(path:string)=>{const v=await get('/portal/'+portalId+path,1048576);if(!v.response.ok){await v.response.body?.cancel().catch(()=>{});throw new IntakeFault('SOURCE_UNAVAILABLE',transient(v.response.status));}return v.read();};
+    const fixedRead=async(path:string)=>{const v=await get('/portal/'+portalId+path,1048576);if(!v.response.ok){await v.response.body?.cancel().catch(()=>{});throw responseFault(v.response);}return v.read();};
     return {
       readTypes:()=>fixedRead('/tickettypes'),readStatuses:()=>fixedRead('/ticketstatus'),
       readTicketPage:(input:Window&{offset:number;pageSize:50})=>{

@@ -39,6 +39,6 @@ export function createNativeIntakeSourceHandler(options:{authenticate:(req:Reque
       if(typeof value.schemaContract!=='string')throw new IntakeFault('SOURCE_INVALID');
       const projected=validateBatch(value,{state:'leased',leaseId:'',portalId:value.portalId as string,schemaContract:value.schemaContract,activationFloor:new Date(Date.parse(window.createdAfter)+1).toISOString(),leaseUntil:window.createdBefore,...window});
       return response(projected);
-    }catch(error){return response({error:'Intake source unavailable',code:error instanceof IntakeFault?error.code:'INTERNAL'},503);}
+    }catch(error){const failure=error instanceof IntakeFault?error:new IntakeFault('INTERNAL');return response({code:failure.code,retryable:failure.retryable,...(failure.retryAfterSeconds!==undefined?{retryAfterSeconds:failure.retryAfterSeconds}:{})},503);}
   };
 }

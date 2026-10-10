@@ -35,6 +35,9 @@ begin
   if s.watermark<c.activated_at or s.watermark>t then raise exception 'MHELP_INTAKE_CONFIGURATION'; end if;
   if s.lease_until>t then return jsonb_build_object('state','busy'); end if;
   if s.retry_after>t then return jsonb_build_object('state','backoff'); end if;
+  -- Durable minimum poll cadence, including failed/expired runs. An idle
+  -- trigger does not move last_attempt_at or postpone the next eligible run.
+  if s.last_attempt_at+interval '5 minutes'>t then return jsonb_build_object('state','idle'); end if;
   -- Up to 15 minutes forward per successful run, plus 10 minutes overlap.
   -- The initial strict lower bound is floor minus 1ms to include the activation instant.
   next_end:=least(t,s.watermark+interval '15 minutes');
@@ -94,16 +97,17 @@ begin
   return jsonb_build_object('state','complete','total',p_total,'watermarkAdvanced',true);
 end $function$;
 
-create function cos_mhelp_intake.fail_intake_v1(p_lease uuid,p_code text,p_retryable boolean)
+create function cos_mhelp_intake.fail_intake_v1(p_lease uuid,p_code text,p_retryable boolean,p_retry_after_seconds integer default 0)
 returns jsonb language plpgsql security invoker set search_path='' as $function$
 declare s cos_mhelp_intake.scheduler_state%rowtype; failures integer; delay_seconds integer;
 begin
-  if p_code is null or p_code<>all(array['SOURCE_UNAVAILABLE','SOURCE_INVALID','BATCH_LIMIT','WRITE_UNAVAILABLE','RECEIPT_INVALID','DEADLINE','CONFIGURATION','INTERNAL']) or p_retryable is null then
+  if p_code is null or p_code<>all(array['SOURCE_UNAVAILABLE','SOURCE_INVALID','BATCH_LIMIT','WRITE_UNAVAILABLE','RECEIPT_INVALID','DEADLINE','CONFIGURATION','INTERNAL']) or p_retryable is null
+    or p_retry_after_seconds is null or p_retry_after_seconds<0 or p_retry_after_seconds>86400 then
     raise exception 'MHELP_INTAKE_INVALID_FAILURE'; end if;
   select * into s from cos_mhelp_intake.scheduler_state where lease_id=p_lease for update;
   if not found then return jsonb_build_object('state','lease_lost'); end if;
   failures:=least(16,s.failure_count+1);
-  delay_seconds:=case when p_retryable then least(1800,30*power(2,least(failures-1,6))::integer) else 1800 end;
+  delay_seconds:=greatest(p_retry_after_seconds,case when p_retryable then least(1800,30*power(2,least(failures-1,6))::integer) else 1800 end);
   update cos_mhelp_intake.scheduler_state set lease_id=null,lease_until=null,failure_count=failures,
     retry_after=clock_timestamp()+make_interval(secs=>delay_seconds),last_error_code=p_code where portal_id=s.portal_id;
   return jsonb_build_object('state','backoff','retryAfterSeconds',delay_seconds);
@@ -112,5 +116,5 @@ end $function$;
 revoke all on function cos_mhelp_intake.begin_intake_v1() from public,anon,authenticated,service_role;
 revoke all on function cos_mhelp_intake.validate_intake_lease_v1(uuid) from public,anon,authenticated,service_role;
 revoke all on function cos_mhelp_intake.finish_intake_v1(uuid,jsonb,integer) from public,anon,authenticated,service_role;
-revoke all on function cos_mhelp_intake.fail_intake_v1(uuid,text,boolean) from public,anon,authenticated,service_role;
+revoke all on function cos_mhelp_intake.fail_intake_v1(uuid,text,boolean,integer) from public,anon,authenticated,service_role;
 commit;

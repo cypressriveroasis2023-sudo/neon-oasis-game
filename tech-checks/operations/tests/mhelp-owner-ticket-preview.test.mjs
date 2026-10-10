@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from '../../supabase/functions/cos-operations-pages/mhelpTicketDay.ts';
+const evidence='operational_structure_v1';
 const endpoint='/api/mhelpdesk/partner/tickets/preview',portal='224643',org='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const owner='e4abc521-1ef3-45a6-9829-b87faff78210',actor='3f073784-96e7-43d8-b9e0-33ab31c3c8b1';
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status});
@@ -40,7 +41,7 @@ test('IT, Service, unmapped, inactive and revoked sessions fail before mHelp con
  }
 });
 test('Owner preview rejects caller windows, identities, credentials, URLs and activation before provider access',async()=>{
- for(const body of [{createdAfter:'2020-01-01T00:00:00Z'},{createdBefore:'2027-01-01T00:00:00Z'},{maxTickets:500},{actorId:actor},{portalId:portal},{token:'private'},{url:'https://elsewhere.invalid'},{activate:true},{day:'today'},{day:'2020-01-01'},{day:null},{day:'previous',createdAfter:'2020-01-01T00:00:00Z'}]){
+ for(const body of [{createdAfter:'2020-01-01T00:00:00Z'},{createdBefore:'2027-01-01T00:00:00Z'},{maxTickets:500},{actorId:actor},{portalId:portal},{token:'private'},{url:'https://elsewhere.invalid'},{activate:true},{day:'today'},{day:'2020-01-01'},{day:null},{day:'previous',createdAfter:'2020-01-01T00:00:00Z'},{evidence:'all'},{evidence:null},{evidence:true},{evidence:{fields:['summary']}},{evidence,fields:['summary']},{evidence,maxTickets:1}]){
   const f=fixture();assert.equal((await f.handler(request(body))).status,400);assert.equal(f.configReads(),0);assert.deepEqual(f.diagnostics,[]);
  }
  const f=fixture();assert.equal((await f.handler(request({},'GET'))).status,405);assert.equal(f.configReads(),0);
@@ -79,4 +80,21 @@ test('previous Chicago calendar day handles DST, month/year boundaries and exact
  ['2026-01-01T12:00:00Z','2025-12-31T06:00:00.000Z','2026-01-01T06:00:00.000Z'],
  ['2026-10-10T05:00:00Z','2026-10-09T05:00:00.000Z','2026-10-10T05:00:00.000Z']])assert.deepEqual(mhelpPreviousDayPreviewWindow(new Date(now)),{createdAfter:start,createdBefore:end});
  assert.throws(()=>mhelpPreviousDayPreviewWindow(new Date('invalid')));
+});
+
+
+test('operational capability is explicitly opted in on the same bounded Owner route and never expands reads',async()=>{
+ for(const previous of [false,true]){
+  const base=fixture({previous}),extended=fixture({previous}),body=previous?{day:'previous'}:{};
+  const legacy=await (await base.handler(request(body))).json();
+  const response=await extended.handler(request({...body,evidence})),value=await response.json();
+  assert.equal(response.status,200);assert.equal(legacy.operationalEvidence,undefined);
+  const {operationalEvidence,...aggregate}=value;assert.deepEqual({...aggregate,readAt:legacy.readAt},legacy);
+  assert.equal(operationalEvidence.contract,'cos-mhelpdesk-operational-evidence-v1');assert.equal(operationalEvidence.sampledTickets,0);assert.equal(operationalEvidence.scope,'first_ticket_page');
+  assert.deepEqual(extended.calls,base.calls);assert.deepEqual(extended.diagnostics,[]);
+  assert(!JSON.stringify(value).includes('do-not-export'));assert(!JSON.stringify(value).includes('synthetic-mhelp'));
+ }
+ for(const change of [{role:'it'},{role:'service'},{invalid:true},{revoked:true}]){
+  const f=fixture(change),response=await f.handler(request({evidence}));assert([401,403].includes(response.status));assert.equal(f.configReads(),0);assert(!f.calls.some(c=>c.url.includes('mhelpdesk.com')));
+ }
 });

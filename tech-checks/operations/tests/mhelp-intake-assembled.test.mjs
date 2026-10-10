@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,payload,rows,receipt,service,it} from '../legacy/mhelp-intake-fixture.mjs';
-import {BATCH_CONTRACT,IntakeFault,runMhelpIntake} from '../intake/mhelpIntakeRuntime.ts';
+import {BATCH_CONTRACT,IntakeFault,runMhelpIntake,validateOperationalTicket} from '../intake/mhelpIntakeRuntime.ts';
 import {createBoundedMhelpSource} from '../intake/mhelpIntakeSource.ts';
 import {createExistingServiceRpc} from '../intake/mhelpIntakeTransport.ts';
 import {projectIntakeReview} from '../../supabase/functions/cos-operations-pages/mhelpIntakeReview.ts';
@@ -36,7 +36,7 @@ test('assembled partial batch preserves receipts, retries without duplicate jobs
   const failed=await run();assert.equal(failed.state,'failed');assert.equal(failed.code,'WRITE_UNAVAILABLE');assert.equal(failed.watermarkAdvanced,false);
   assert.equal((await rows(db)).length,1);assert.equal((await receipt(db)).length,1);
   const held=await state();assert.equal(held.watermark.toISOString(),'2026-10-10T00:00:00.000Z');assert.equal(held.lease_id,null);assert.equal(held.failure_count,1);
-  await db.exec("drop trigger synthetic_batch_lock on public.job_assignments;update cos_mhelp_intake.scheduler_state set retry_after=clock_timestamp()-interval '1 second'");
+  await db.exec("drop trigger synthetic_batch_lock on public.job_assignments;update cos_mhelp_intake.scheduler_state set retry_after=clock_timestamp()-interval '1 second',last_attempt_at=clock_timestamp()-interval '5 minutes'");
   const complete=await run();assert.equal(complete.state,'complete');assert.equal(complete.existing,1);assert.equal(complete.created,1);
   assert.equal((await rows(db)).length,2);assert.equal((await receipt(db)).length,2);assert.equal(await size(db,'public.workflow_checkpoints'),2);assert.equal(await size(db,'public.app_notifications'),0);
   assert((await state()).watermark>held.watermark);
@@ -158,4 +158,43 @@ test('source-changed never-created holds remain latched even when original paylo
   await db.exec("update cos_mhelp_intake.type_mappings set enabled=true where type_id='5'");
   const replay=await call({action:'record',leaseId:lease.leaseId,ticket:original});assert.equal(replay.state,'review_needed');assert.deepEqual(replay.reasonCodes,['source_changed_review_required']);
   const saved=(await receipt(db))[0];assert.deepEqual(saved.first_payload,original);assert.equal(saved.review_required,true);assert.equal(saved.state,'review_needed');assert.equal((await rows(db)).length,0);
+});
+
+
+test('fail RPC validates optional provider cooldown as bounded JSON integer before touching lease state',async()=>{
+  const {call,state}=await assembled();const lease=await call({action:'begin'}),before=await state();
+  for(const retryAfterSeconds of [null,'60',1.5,-1,86401,true,[],{},1e100]){
+    await assert.rejects(call({action:'fail',leaseId:lease.leaseId,code:'SOURCE_UNAVAILABLE',retryable:true,retryAfterSeconds}),e=>e.code==='WRITE_UNAVAILABLE'&&!e.retryable);
+    assert.deepEqual(await state(),before);
+  }
+  assert.deepEqual(await call({action:'fail',leaseId:lease.leaseId,code:'SOURCE_UNAVAILABLE',retryable:true}),{state:'backoff',retryAfterSeconds:30});
+  assert.equal((await state()).watermark.toISOString(),before.watermark.toISOString());
+});
+
+test('same service-only fail action persists provider minimum without shortening exponential or permanent backoff',async()=>{
+  for(const [provider,retryable,expected]of [[0,true,30],[1,true,30],[90,true,90],[86400,true,86400],[1,false,1800],[7200,false,7200]]){
+    const {db,call,state}=await assembled();const lease=await call({action:'begin'}),before=await state();
+    const result=await call({action:'fail',leaseId:lease.leaseId,code:'SOURCE_UNAVAILABLE',retryable,retryAfterSeconds:provider});assert.deepEqual(result,{state:'backoff',retryAfterSeconds:expected});
+    const saved=await state();assert(saved.retry_after.getTime()>=Date.now()+expected*1000-1000);assert.equal(saved.failure_count,1);assert.equal(saved.lease_id,null);assert.equal(saved.watermark.toISOString(),before.watermark.toISOString());
+    assert.deepEqual(await call({action:'begin'}),{state:'backoff'});
+    for(const role of ['anon','authenticated','service_role'])assert.equal((await db.query("select has_function_privilege($1,'cos_mhelp_intake.fail_intake_v1(uuid,text,boolean,integer)','EXECUTE') f",[role])).rows[0].f,false);
+  }
+});
+
+test('canonical minimal hold omits unknown containers and durably accounts for the source without creating work',async()=>{
+  const {db,call,tickets,state}=await assembled();const lease=await call({action:'begin'});
+  const original=tickets[0];const minimal={contract:original.contract,schemaContract:original.schemaContract,source:{portalId:original.source.portalId,ticketId:original.source.ticketId,ticketNumber:original.source.ticketNumber,createdAt:original.source.createdAt},request:null};
+  assert.deepEqual(validateOperationalTicket(minimal,lease),minimal);
+  const result=await call({action:'record',leaseId:lease.leaseId,ticket:minimal});assert.equal(result.state,'review_needed');assert(result.reasonCodes.includes('source_scope_or_route_invalid'));assert(result.reasonCodes.includes('type_mapping_unverified'));assert(result.reasonCodes.includes('source_status_incomplete_or_deleted'));assert(result.reasonCodes.includes('ticket_lead_unverified'));
+  assert.deepEqual((await receipt(db))[0].first_payload,minimal);assert.equal((await rows(db)).length,0);assert.equal(await size(db,'public.workflow_checkpoints'),0);
+  assert.equal((await state()).watermark.toISOString(),'2026-10-10T00:00:00.000Z');
+  assert.equal((await call({action:'finish',leaseId:lease.leaseId,expectedTicketIds:['42'],total:1})).state,'complete');
+});
+
+test('unknown optional facts must be omitted: JSON null containers and null type/status remain rejected before retention',async()=>{
+  const {db,call,tickets}=await assembled();const lease=await call({action:'begin'});
+  for(const change of [t=>{t.source.typeId=null;},t=>{t.source.statusId=null;},t=>{t.source.assignment=null;},t=>{t.ticketLead=null;},t=>{t.sourceEvidence=null;},t=>{t.departmentAssignments=null;}]){
+    const ticket=structuredClone(tickets[0]);change(ticket);await assert.rejects(call({action:'record',leaseId:lease.leaseId,ticket}));
+  }
+  assert.equal((await receipt(db)).length,0);assert.equal((await rows(db)).length,0);
 });

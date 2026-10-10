@@ -10,17 +10,17 @@ const ticket=(overrides={})=>({portalId:Number(portalId),ticketId:10,ticketNumbe
 const typeRows=[{portalId:Number(portalId),typeId:11,typeName:'Installation',isActive:true}];
 const statusRows=[{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true},{statusId:12,statusText:'Scheduled',displayText:'New: Scheduled',parentId:1,canBeParent:false}];
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
-function fixture({config={portalId,accessToken:token},rows=[ticket()],types=typeRows,statuses=statusRows,indexBase=0,fetcher,renewAccess,getConfig}={}){
+function fixture({config={portalId,accessToken:token},rows=[ticket()],types=typeRows,statuses=statusRows,indexBase=0,envelope='data',typesEnvelope=envelope,fetcher,renewAccess,getConfig}={}){
   const calls=[];
   const reader=createMhelpTicketReader({getConfig:getConfig||(()=>config),renewAccess,fetch:async(url,init)=>{
     calls.push({url,init});
     const override=await fetcher?.(url,init,calls);if(override)return override;
     if(url.endsWith('/users/me'))return json({portalId:Number(portalId),email:'synthetic-private-profile@example.test'});
-    if(url.endsWith('/tickettypes'))return json({totalRows:types.length,data:types});
+    if(url.endsWith('/tickettypes'))return json({totalRows:types.length,[typesEnvelope]:types});
     if(url.endsWith('/ticketstatus'))return json(statuses);
     const parsed=new URL(url);assert.equal(parsed.pathname,'/api/v1.0/portal/'+portalId+'/Tickets');
     const start=Math.max(0,Number(parsed.searchParams.get('rowIndex'))-indexBase);
-    return json({totalRows:rows.length,data:rows.slice(start,start+50)});
+    return json({totalRows:rows.length,[envelope]:rows.slice(start,start+50)});
   }});
   return {...reader,calls};
 }
@@ -61,28 +61,88 @@ test('an absent assignment field is unknown, distinct from an explicit unassigne
 test('empty creation window returns a complete zero count with real dictionaries',async()=>{
   const result=await fixture({rows:[]}).preview(window);assert.equal(result.totalRows,0);assert.equal(result.types[0].count,0);assert.equal(result.partial,false);
 });
+test('observed results-envelope shape accepts all 60 synthetic types, 24 statuses and an empty ticket day',async()=>{
+  const types=Array.from({length:60},(_,i)=>({...typeRows[0],typeId:i+1,typeName:'Synthetic type '+(i+1)}));
+  const statuses=Array.from({length:24},(_,i)=>({...statusRows[0],statusId:i+1,statusText:'Synthetic status '+(i+1),displayText:'Synthetic status '+(i+1)}));
+  const f=fixture({rows:[],types,statuses,envelope:'results'}),result=await f.preview(window);
+  assert.equal(result.totalRows,0);assert.equal(result.previewCount,0);assert.equal(result.partial,false);
+  assert.equal(result.types.length,60);assert.equal(result.types[59].typeId,'60');assert(result.types.every(row=>row.count===0));
+  assert.equal(result.statuses.length,24);assert(result.statuses.every(row=>row.statusCount===0&&row.customStatusCount===0));
+  assert.equal(f.calls.length,4);assert.deepEqual(projectMhelpTicketPreview(result),result);
+});
+test('each supported dictionary/ticket envelope combination preserves synthetic nonempty projection',async()=>{
+  const expected=await fixture().preview(window);
+  for(const envelope of ['data','results'])for(const typesEnvelope of ['data','results']){
+    const result=await fixture({envelope,typesEnvelope}).preview(window);
+    assert.deepEqual({...result,readAt:expected.readAt},expected);
+    assert.deepEqual(projectMhelpTicketPreview(result),result);
+  }
+});
+test('collection adapter rejects ambiguous, missing or malformed collections without fallback',async()=>{
+  for(const endpoint of ['/tickettypes','/Tickets']){
+    const rows=endpoint==='/tickettypes'?typeRows:[ticket()];
+    const invalid=[{totalRows:1},{totalRows:1,items:rows},{totalRows:1,data:rows,results:rows},
+      {totalRows:1,data:rows,results:null},{totalRows:1,data:null,results:rows},
+      ...['data','results'].flatMap(key=>[null,{},'rows',1,true].map(value=>({totalRows:1,[key]:value}))),
+      ...['data','results'].flatMap(key=>[undefined,null,'1',-1,0,1.5,Number.MAX_SAFE_INTEGER+1].map(totalRows=>({totalRows,[key]:rows})))];
+    for(const value of invalid){
+      const f=fixture({fetcher:url=>new URL(url).pathname.endsWith(endpoint)?json(value):undefined});
+      await assert.rejects(f.preview(window),MhelpTicketError,endpoint+' '+JSON.stringify(value));
+    }
+  }
+});
+test('results dictionaries validate every row beyond the 50-row diagnostic sample and require complete totals',async()=>{
+  const types=Array.from({length:60},(_,i)=>({...typeRows[0],typeId:i+1}));
+  for(const last of [{...types[59],portalId:999},{...types[59],isActive:'true'},{...types[59],typeName:null},{...types[59],typeId:1}]){
+    await assert.rejects(fixture({rows:[],types:[...types.slice(0,59),last],envelope:'results'}).preview(window),MhelpTicketError);
+  }
+  for(const totalRows of [59,61])await assert.rejects(fixture({fetcher:url=>url.endsWith('/tickettypes')?json({totalRows,results:types}):undefined}).preview(window),/incomplete ticket type dictionary/);
+  await assert.rejects(fixture({fetcher:url=>url.endsWith('/tickettypes')?json({totalRows:60,results:types.slice(0,50)}):undefined}).preview(window),/incomplete ticket type dictionary/);
+});
+test('results ticket rows retain required field, status and timezone validation',async()=>{
+  for(const overrides of [{ticketId:0},{ticketNumber:0},{deleted:undefined},{statusId:undefined},{statusId:-1},
+    {creationDate:'2026-10-09T00:00:00'},{creationDate:'2026-02-30T00:00:00Z'},
+    {lastModDate:'2026-10-08T00:00:00Z'},{assignedTo:['someone']}]){
+    await assert.rejects(fixture({rows:[ticket(overrides)],envelope:'results'}).preview(window),MhelpTicketError);
+  }
+});
+test('500-row ticket and dictionary bounds apply to both collection variants',async()=>{
+  const rows=Array.from({length:500},(_,i)=>ticket({ticketId:i+1,ticketNumber:i+1}));
+  const types=Array.from({length:500},(_,i)=>({...typeRows[0],typeId:i+1}));
+  const statuses=Array.from({length:500},(_,i)=>({...statusRows[0],statusId:i+1}));
+  for(const envelope of ['data','results']){
+    const result=await fixture({rows,types,statuses,envelope}).preview(window);
+    assert.equal(result.totalRows,500);assert.equal(result.types.length,500);assert.equal(result.statuses.length,500);
+    await assert.rejects(fixture({types:[...types,{...typeRows[0],typeId:501}],envelope}).preview(window),/incomplete ticket type dictionary/);
+    await assert.rejects(fixture({statuses:[...statuses,{...statusRows[0],statusId:501}],envelope}).preview(window),/unsupported ticket status dictionary/);
+    await assert.rejects(fixture({rows:[...rows,ticket({ticketId:501,ticketNumber:501})],envelope}).preview(window),/maximum count/);
+    await assert.rejects(fixture({rows:rows.slice(0,3),envelope}).preview({...window,maxTickets:2}),/maximum count/);
+  }
+});
 test('complete bounded pagination accepts verified zero and one based row indexes',async()=>{
   const rows=Array.from({length:103},(_,i)=>ticket({ticketId:i+1,ticketNumber:i+1}));
-  for(const indexBase of [0,1]){
-    const f=fixture({rows,indexBase}),result=await f.preview(window);assert.equal(result.previewCount,103);assert.equal(result.types[0].count,103);
+  for(const envelope of ['data','results'])for(const indexBase of [0,1]){
+    const f=fixture({rows,indexBase,envelope}),result=await f.preview(window);assert.equal(result.previewCount,103);assert.equal(result.types[0].count,103);
     assert.equal(f.calls.filter(v=>v.url.includes('/Tickets')).length,indexBase?4:3);
   }
 });
-test('repeated pages, changed totals, truncation, unsupported envelope, sorting and cross-portal data fail closed',async()=>{
+test('both supported envelopes preserve page completeness, counts, identity order and portal/window guards',async()=>{
   const rows=Array.from({length:51},(_,i)=>ticket({ticketId:i+1,ticketNumber:i+1}));
-  for(const mode of ['repeat','changed','empty','unordered','envelope','crossportal','outofwindow']){
+  for(const envelope of ['data','results'])for(const mode of ['repeat','changed','empty','unordered','duplicate','partial','oversized','crossportal','outofwindow']){
     let pages=0;
-    const f=fixture({rows,fetcher:url=>{
+    const f=fixture({rows,envelope,fetcher:url=>{
       if(!url.includes('/Tickets'))return;pages++;
       let data=pages===1?rows.slice(0,50):rows.slice(50),totalRows=rows.length;
       if(mode==='repeat'&&pages>1)data=rows.slice(0,50);
       if(mode==='changed'&&pages>1)totalRows++;
       if(mode==='empty'&&pages>1)data=[];
       if(mode==='unordered')data=[...data].reverse();
-      if(mode==='envelope')return json({totalRows,results:data});
+      if(mode==='duplicate')data=[data[0],...data.slice(0,-1)];
+      if(mode==='partial'&&pages===1)data=data.slice(0,49);
+      if(mode==='oversized'&&pages===1)data=rows;
       if(mode==='crossportal'&&pages>1)data=data.map(row=>({...row,portalId:999}));
       if(mode==='outofwindow')data=data.map(row=>({...row,creationDate:'2026-10-07T00:00:00Z'}));
-      return json({totalRows,data});
+      return json({totalRows,[envelope]:data});
     }});
     await assert.rejects(f.preview(window),MhelpTicketError,mode);
   }
@@ -98,7 +158,7 @@ test('maximum count stops before incomplete results can be reported',async()=>{
   await assert.rejects(fixture({fetcher:url=>url.includes('/Tickets')?json({totalRows:501,data:[]}):undefined}).preview(window),/maximum count/);
 });
 test('creation window follows the documented strict greater-than and less-than bounds',async()=>{
-  for(const creationDate of [window.createdAfter,window.createdBefore])await assert.rejects(fixture({rows:[ticket({creationDate,lastModDate:'2026-10-10T01:00:00Z'})]}).preview(window),/outside the requested creation window/);
+  for(const envelope of ['data','results'])for(const creationDate of [window.createdAfter,window.createdBefore])await assert.rejects(fixture({envelope,rows:[ticket({creationDate,lastModDate:'2026-10-10T01:00:00Z'})]}).preview(window),/outside the requested creation window/);
 });
 test('portal mismatch and bad server config stop before ticket reads',async()=>{
   for(const config of [{},{accessToken:'bad token'},{accessToken:token,portalId:'001'},{accessToken:token,portalId:'999'}]){
@@ -109,8 +169,8 @@ test('portal mismatch and bad server config stop before ticket reads',async()=>{
 test('missing or malformed required ticket identities, timestamps, statuses and assignees are rejected',()=>{
   for(const overrides of [{portalId:999},{ticketId:0},{ticketId:1.5},{ticketId:'001'},{ticketNumber:0},{creationDate:'2026-10-09T00:00:00'},{creationDate:'2026-02-30T00:00:00Z'}, {lastModDate:'2026-10-08T00:00:00Z'}, {statusId:undefined}, {statusId:-1},{deleted:undefined},{deleted:'false'},{assignedTo:['someone']},{assignedTo:'line\nbreak'},{typeId:'10/other'}])assert.throws(()=>projectPartnerTicket(ticket(overrides),portalId),MhelpTicketError);
 });
-test('dictionary reads require exact documented envelopes, unique IDs and consistent portal/status parents',async()=>{
-  for(const options of [{types:[...typeRows,...typeRows]},{types:[{...typeRows[0],portalId:999}]},{types:[{...typeRows[0],isActive:'true'}]},{statuses:[...statusRows,...statusRows]},{statuses:[{...statusRows[1],parentId:999}]}, {fetcher:url=>url.endsWith('/tickettypes')?json({totalRows:2,data:typeRows}):undefined},{fetcher:url=>url.endsWith('/tickettypes')?json({totalRows:1,results:typeRows}):undefined},{fetcher:url=>url.endsWith('/ticketstatus')?json({data:statusRows}):undefined}])await assert.rejects(fixture(options).preview(window));
+test('dictionary reads require complete supported envelopes, unique IDs and consistent portal/status parents',async()=>{
+  for(const envelope of ['data','results'])for(const options of [{types:[...typeRows,...typeRows]},{types:[{...typeRows[0],portalId:999}]},{types:[{...typeRows[0],isActive:'true'}]},{statuses:[...statusRows,...statusRows]},{statuses:[{...statusRows[1],parentId:999}]}, {fetcher:url=>url.endsWith('/tickettypes')?json({totalRows:2,[envelope]:typeRows}):undefined},{fetcher:url=>url.endsWith('/ticketstatus')?json({[envelope]:statusRows}):undefined}])await assert.rejects(fixture({envelope,...options}).preview(window));
 });
 test('expired account read renews existing credentials once before further reads',async()=>{
   let renewals=0;const f=fixture({renewAccess:async()=>{renewals++;return {portalId,accessToken:'synthetic-renewed'};},fetcher:(url,init)=>url.endsWith('/users/me')&&init.headers.Authorization.endsWith(token)?json({secret:token},401):undefined});

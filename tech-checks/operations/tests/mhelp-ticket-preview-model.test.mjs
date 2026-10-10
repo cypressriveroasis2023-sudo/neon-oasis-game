@@ -8,8 +8,9 @@ import {mhelpPreviewDiagnosticMessages,mhelpTicketPreviewErrorMessage} from '../
 import {OperationsApiError} from '../src/api.ts';
 import MhelpTicketPreview from '../src/MhelpTicketPreview.tsx';
 import {projectMhelpTicketPreview} from '../../supabase/functions/cos-operations-pages/mhelpTickets.ts';
+import {describeMhelpOperationalEvidence} from '../../supabase/functions/cos-operations-pages/mhelpTicketSchema.ts';
 import {MHELP_PREVIEW_DIAGNOSTIC_CODES} from '../../supabase/functions/cos-operations-pages/mhelpTicketDiagnostics.ts';
-import {ticketPreviewFixture} from './fixtures/mhelpTicketPreview.mjs';
+import {ticketPreviewFixture,ticketPreviewEvidenceFixture} from './fixtures/mhelpTicketPreview.mjs';
 
 test('client validates the server-projected aggregate without importing backend code into the client',()=>{
   const result=projectMhelpTicketPreview(ticketPreviewFixture());assert.deepEqual(checkedMhelpTicketPreview(result),result);
@@ -85,4 +86,80 @@ test('missing assignments stay unknown and metric sums cannot imply complete cov
 test('zero-ticket preview retains the verified dictionary without inventing missing work',()=>{
   const v=ticketPreviewFixture();v.totalRows=0;v.previewCount=0;v.types=v.types.map(type=>({...type,count:0}));v.statuses=v.statuses.map(status=>({...status,statusCount:0,customStatusCount:0}));
   v.metrics=Object.fromEntries(Object.keys(v.metrics).map(key=>[key,0]));assert.equal(checkedMhelpTicketPreview(v).previewCount,0);assert.deepEqual(ticketPreviewGaps(v),[]);
+});
+test('optional operational evidence is validated independently and legacy success stays unchanged',()=>{
+  const legacy=ticketPreviewFixture(),current=ticketPreviewEvidenceFixture();
+  assert.deepEqual(checkedMhelpTicketPreview(legacy),legacy);
+  assert.equal(Object.hasOwn(checkedMhelpTicketPreview(legacy),'operationalEvidence'),false);
+  assert.deepEqual(checkedMhelpTicketPreview(current),current);
+  assert.equal(checkedMhelpTicketPreview(current).statuses[1].parentId,'1');
+  for(const operationalEvidence of [undefined,null,false,[],{},'synthetic private'])assert.throws(()=>checkedMhelpTicketPreview({...legacy,operationalEvidence}),/could not be verified/);
+});
+test('client accepts real server-generated structural evidence for zero, mixed and capped first pages',()=>{
+  for(const ticketCount of [0,3,51]){
+    const preview=ticketPreviewEvidenceFixture({ticketCount});
+    const rows=Array.from({length:ticketCount},(_,index)=>({subject:index%2?'synthetic private work text':'',summary:null,comment:[],scheduledDate:'2026-10-09T12:30:00Z',neededBy:'/Date(1791547200000)/',serviceLocationId:index+1,
+      items:index===0?Array.from({length:60},(_,n)=>({ticketItemId:n+1,priceListId:100+n,priceListTypeId:1,name:'synthetic private item text',description:null,quantity:1.5})):[],
+      customFields:index%2?[{customFieldId:1,fieldValue:'synthetic private custom value',fieldLabel:'synthetic private label'},null]:[]
+    }));
+    preview.operationalEvidence=describeMhelpOperationalEvidence(rows,ticketCount);
+    assert.deepEqual(checkedMhelpTicketPreview(preview),preview);
+    assert.equal(preview.operationalEvidence.sampledTickets,Math.min(ticketCount,50));
+    assert.equal(preview.operationalEvidence.collections.items.sampledEntries,ticketCount?50:0);
+    assert.doesNotMatch(JSON.stringify(checkedMhelpTicketPreview(preview)),/synthetic private/);
+  }
+});
+test('first-page evidence and nested samples enforce independent limits, including empty samples',()=>{
+  for(const ticketCount of [0,1,49,50,51,500])for(const itemEntries of [0,1,49,50,51,1000000]){
+    const value=ticketPreviewEvidenceFixture({ticketCount,itemEntries,customEntries:itemEntries});
+    const checked=checkedMhelpTicketPreview(value).operationalEvidence;
+    assert.deepEqual(checked,value.operationalEvidence);assert.equal(checked.sampledTickets,Math.min(ticketCount,50));
+    assert.equal(checked.collections.items.sampledEntries,ticketCount?Math.min(itemEntries,50):0);
+    assert.equal(checked.collections.items.totalEntries,ticketCount?itemEntries:0);
+    assert(new TextEncoder().encode(JSON.stringify(checked)).length<=12000);
+  }
+});
+test('all fixed kind and string-format categories roundtrip without exposing values',()=>{
+  const value=ticketPreviewEvidenceFixture({ticketCount:9}),field=value.operationalEvidence.fields.subject;
+  field.kinds={absent:1,null:1,boolean:1,integer:1,number:1,string:1,array:1,object:1,other:1};
+  field.formats={numeric:1};field.emptyStrings=0;field.nonemptyStrings=1;
+  assert.deepEqual(checkedMhelpTicketPreview(value),value);
+  field.kinds={string:9};field.formats={numeric:1,iso_with_zone:2,iso_without_zone:3,dotnet:1,other:2};field.emptyStrings=2;field.nonemptyStrings=7;
+  assert.deepEqual(checkedMhelpTicketPreview(value),value);
+});
+test('malformed operational evidence fails closed at every level with a generic redacted error',()=>{
+  const cases=[
+    e=>{e.contract='synthetic private';},e=>{e.scope='full_window';},e=>{e.ticketSampleLimit=51;},e=>{e.nestedSampleLimit=51;},
+    e=>{e.sampledTickets=2;},e=>{e.sampledTickets=51;},e=>{e.siteIdTickets=4;},e=>{e.siteIdTickets=-1;},e=>{e.siteIdTickets=1.5;},
+    e=>{e.fields.serviceLocationId.kinds={null:3};},
+    e=>{e.secret='synthetic private';},e=>{delete e.scope;},e=>{e.fields.secret='synthetic private';},e=>{delete e.fields.comment;},
+    e=>{e.fields.subject.raw='synthetic private';},e=>{delete e.fields.subject.formats;},
+    e=>{e.fields.subject.kinds={private:3};},e=>{e.fields.subject.kinds={string:3,absent:0};},
+    e=>{e.fields.subject.kinds={string:2};},e=>{e.fields.subject.kinds={string:51};},e=>{e.fields.subject.kinds={string:1.5,absent:1.5};},e=>{e.fields.subject.kinds={string:'3'};},
+    e=>{e.fields.subject.kinds={string:4,absent:-1};},e=>{e.fields.subject.kinds=[];},
+    e=>{e.fields.subject.formats={private:3};},e=>{e.fields.subject.formats={other:2};},e=>{e.fields.subject.formats={other:3,numeric:0};},
+    e=>{e.fields.subject.emptyStrings=0;},e=>{e.fields.subject.nonemptyStrings=51;},e=>{e.fields.subject.nonemptyStrings='2';},
+    e=>{e.collections.secret='synthetic private';},e=>{delete e.collections.customFields;},
+    e=>{e.collections.items.raw='synthetic private';},e=>{delete e.collections.items.entryKinds;},e=>{e.collections.items.kinds={array:2};},
+    e=>{e.collections.items.emptyArrays=0;},e=>{e.collections.items.nonemptyArrays=0;},e=>{e.collections.items.totalEntries=0;},
+    e=>{e.collections.items.totalEntries=1000001;},e=>{e.collections.items.totalEntries=1.5;},e=>{e.collections.items.totalEntries='2';},
+    e=>{e.collections.items.sampledEntries=1;},e=>{e.collections.items.sampledEntries=51;},e=>{e.collections.items.entryKinds={object:1};},e=>{e.collections.items.entryKinds={secret:2};},
+    e=>{e.collections.items.fields.equipmentId='synthetic private';},e=>{delete e.collections.items.fields.priceListTypeId;},
+    e=>{e.collections.items.fields.name.value='synthetic private';},e=>{e.collections.items.fields.name.nonemptyStrings=1;},
+    e=>{e.collections.customFields.fields.fieldValue.formats={other:1,private:'synthetic private'};},
+    e=>{e.collections.customFields.fields.fieldLabel.kinds={string:50};},e=>{e.collections.customFields.fields.fieldValue.raw='synthetic private'.repeat(13000);}
+  ];
+  for(const mutate of cases){
+    const value=ticketPreviewEvidenceFixture();mutate(value.operationalEvidence);
+    assert.throws(()=>checkedMhelpTicketPreview(value),error=>error.message==='The ticket preview response could not be verified. Try again.');
+  }
+});
+test('collection totals cannot claim entries without nonempty arrays or fewer entries than arrays',()=>{
+  for(const mutate of [
+    c=>{c.emptyArrays=3;c.nonemptyArrays=0;},
+    c=>{c.emptyArrays=0;c.nonemptyArrays=3;},
+    c=>{c.totalEntries=51;c.sampledEntries=49;},
+  ]){const value=ticketPreviewEvidenceFixture();mutate(value.operationalEvidence.collections.items);assert.throws(()=>checkedMhelpTicketPreview(value));}
+  const empty=ticketPreviewEvidenceFixture({ticketCount:0});empty.operationalEvidence.fields.subject.kinds={absent:1};
+  assert.throws(()=>checkedMhelpTicketPreview(empty));
 });

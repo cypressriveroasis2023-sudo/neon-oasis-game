@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import {scheduleCameraMhelpIntake} from '../intake/mhelpIntakeBackground.ts';
 import {identityDigest,nativeIdentityKey,nativeIdentityTuple,healthResourceKey,healthSourceUnitKey,verifiedHealthIdentities} from '../../supabase/functions/cos-operations-pages/verifiedHealthIdentity.ts';
 import {fieldRecorderObservationGuards,fieldRecorderHealthGuards,projectFieldRecorderAuthority,REVIEWED_FIELD_RECORDER_PROOFS} from '../../supabase/functions/cos-operations-pages/fieldRecorderObservation.ts';
 import {addressDigest} from '../../supabase/functions/cos-operations-pages/censusAddress.ts';
@@ -104,7 +105,7 @@ test('actual producer authentication failure updates integration status and leav
  const db={rpc:async(name)=>{assert.equal(name,'verify_camera_health_cron_secret');return {data:true};},from(table){
   assert.equal(table,'camera_integrations','authentication fails before any camera write');return {update(patch){return {eq:async(column,value)=>{assert.equal(column,'provider');assert.equal(value,'vigilant');writes.push({table,patch});Object.assign(f.integrations[0],patch);return {error:null};}};}};
  }};
- vm.runInNewContext(javascript,{Deno:{env:{get:()=> 'synthetic-test-only'},serve:callback=>{handle=callback;}},createClient:()=>db,Response,Request,AbortSignal,TextEncoder,URL,fetch:async(url)=>{requests.push(url);return new Response(JSON.stringify({message:'Synthetic authorization rejected'}),{status:401});},console:{error:()=>{}},setTimeout,clearTimeout});
+ vm.runInNewContext(javascript,{scheduleCameraMhelpIntake,Deno:{env:{get:()=> 'synthetic-test-only'},serve:callback=>{handle=callback;}},createClient:()=>db,Response,Request,AbortSignal,TextEncoder,URL,fetch:async(url)=>{requests.push(url);return new Response(JSON.stringify({message:'Synthetic authorization rejected'}),{status:401});},console:{error:()=>{}},setTimeout,clearTimeout});
  const response=await handle(new Request('https://synthetic.invalid',{method:'POST',headers:{'x-camera-cron-secret':'synthetic-test-only','Content-Type':'application/json'},body:JSON.stringify({mode:'vigilant'})}));
  assert.equal(response.status,500);assert.equal(requests.length,1);assert.equal(writes.length,1);assert.equal(f.integrations[0].last_sync_status,'failed');assert.deepEqual(f.sources.devices,cached);
  const projected=await project(f);assert.equal(projected.result.state,'unknown');assert.equal(projected.result.rows[0].evidence.status,'online');assert.equal(projected.result.rows[0].evidence.observedAt,at);
