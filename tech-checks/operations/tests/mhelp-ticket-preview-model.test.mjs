@@ -32,6 +32,12 @@ test('session and rate-limit responses keep their existing messages without expo
     assert.equal(mhelpTicketPreviewErrorMessage(new OperationsApiError(value,429)),'mHelpDesk is limiting ticket reads. Wait a moment, then try again.');
   }
 });
+test('window diagnostics describe the selected window for both supported days',()=>{
+  for(const code of ['COUNT_LIMIT','WINDOW_MISMATCH','WINDOW_INVALID']){
+    const message=mhelpTicketPreviewErrorMessage(new OperationsApiError('MHELP_PREVIEW_'+code,503));
+    assert.match(message,/selected window/);assert.doesNotMatch(message,/today|previous day/i);
+  }
+});
 test('private, unknown, forged and wrong-status diagnostic errors stay generic',()=>{
   const generic='The ticket preview could not be verified. Try again.',known='MHELP_PREVIEW_TIMESTAMP_TIMEZONE';
   for(const value of ['private@example.test secret','MHELP_PREVIEW_UNKNOWN','MHELP_PREVIEW___proto__','MHELP_PREVIEW_constructor',known+' private',known+'\n',known.toLowerCase(),' '+known,known+'<script>private</script>'])assert.equal(mhelpTicketPreviewErrorMessage(new OperationsApiError(value,503)),generic);
@@ -44,10 +50,15 @@ test('diagnostic rendering ignores extra response fields and generic transport s
   assert.equal(mhelpTicketPreviewErrorMessage(cause),mhelpPreviewDiagnosticMessages.TIMESTAMP_TIMEZONE+' Reference: MHELP_PREVIEW_TIMESTAMP_TIMEZONE.');
   assert.equal(mhelpTicketPreviewErrorMessage(new OperationsApiError('The save could not be confirmed. Refresh this workspace before trying again.',503)),'The ticket preview could not be verified. Try again.');
 });
-test('ticket preview is an explicit read button with automatic intake paused',()=>{
+test('ticket previews offer only explicit today and previous-day reads with automatic intake paused',()=>{
   const html=renderToStaticMarkup(React.createElement(MhelpTicketPreview));
-  assert.match(html,/Preview today’s ticket types/);assert.match(html,/Automatic intake is paused/);assert.match(html,/does not change tickets or assignments/);
+  assert.match(html,/Preview today’s ticket types/);assert.match(html,/Preview previous day’s ticket types/);assert.match(html,/Automatic intake is paused/);assert.match(html,/does not change tickets or assignments/);
+  assert.match(html,/prior Central Time calendar day/);assert.match(html,/does not import historical tickets/);assert.equal((html.match(/<button\b/g)||[]).length,2);
   assert(!html.includes('Verified mHelpDesk type IDs and counts'));assert(!html.includes('<input'));assert(!html.includes('<select'));
+});
+test('client accepts a completed prior-day window without inventing a local date or changing its bounds',()=>{
+  const fixture=ticketPreviewFixture();fixture.window={createdAfter:'2026-10-08T05:00:00.000Z',createdBefore:'2026-10-09T05:00:00.000Z'};
+  const checked=checkedMhelpTicketPreview(fixture);assert.deepEqual(checked.window,fixture.window);assert.equal(checked.readAt,fixture.readAt);
 });
 test('client rejects partial reads, inactive safety flags, invalid portals and inconsistent totals',()=>{
   const v=ticketPreviewFixture();

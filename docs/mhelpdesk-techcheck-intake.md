@@ -76,3 +76,9 @@ These checks do not establish live ticket-schema compatibility or actionable tec
 - [Ticket statuses](https://www.mhelpdesk.com/partner-api/ticket-status.html)
 - [Ticket model](https://www.mhelpdesk.com/partner-api/models.html#model-ticket-get-object)
 - [Request formats](https://www.mhelpdesk.com/partner-api/request-formats.html)
+
+## Structural failure evidence
+
+When strict parsing fails, the existing diagnostic log may include only fixed expected-field kinds and string-format categories, bounded total/array counts, and at most 50 sampled rows per already-authorized endpoint. No source values, row identities, arbitrary field names, labels, request details or credentials are logged. The account is verified before the same bounded type/status/first-ticket-page GETs; strict validation and all byte/time/count bounds remain in force. This evidence distinguishes a different response envelope from a truncated dictionary without guessing an adapter change. It is diagnostic evidence, never successful intake or complete ticket counts.
+
+The Owner panel separately offers the prior Central Time calendar day for explicit read-only schema review after midnight. Only `{day:'previous'}` is accepted; arbitrary dates and other modes are rejected before vendor access. Today's existing empty-body contract is unchanged. Returned timestamps disclose the actual window, and both buttons share one in-flight guard. Neither choice imports tickets.
