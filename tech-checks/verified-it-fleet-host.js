@@ -58,7 +58,11 @@ window.addEventListener('message',async event=>{if(event.origin!==location.origi
  if(d.type==='COS_OPERATIONS_WORKSPACE_ACTIVE'&&typeof d.workspace==='string'&&d.workspace.length<=80){if(d.workspace!==assignmentView){assignmentView=d.workspace;assignmentRevision++;assignmentsPending=null;}return;}
  if(d.type==='COS_IT_ASSIGNMENTS_REQUEST'&&typeof d.requestId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(d.requestId)){
   const requested=subject,target=frame.contentWindow,revision=epoch,viewRevision=assignmentRevision;
-  const current=()=>revision===epoch&&viewRevision===assignmentRevision&&target===frame?.contentWindow&&active()===requested&&subject===requested&&allowed;
+  const matchingFrame=()=>revision===epoch&&target===frame?.contentWindow&&subject===requested&&allowed;
+  const current=()=>matchingFrame()&&viewRevision===assignmentRevision&&active()===requested;
+  // A lost profile can precede the DOM/auth observers. Close only the captured
+  // frame; a stale read must never close a replacement session or dialog.
+  const closeIfRevoked=()=>{if(matchingFrame()&&active()!==requested){allowed=false;close();return true;}return false;};
   const scoped=()=>current()&&context()?.getProfile()?.user_id===requested&&!document.body.classList.contains('owner-test-role-preview');
   const respond=payload=>{if(current())target.postMessage({type:'COS_IT_ASSIGNMENTS_RESPONSE',requestId:d.requestId,...payload},location.origin);};
   const fresh=async()=>{const result=await context().db.auth.getSession();return scoped()&&!result?.error&&result?.data?.session?.user?.id===requested&&typeof result.data.session.access_token==='string'&&Boolean(result.data.session.access_token.trim());};
@@ -79,10 +83,10 @@ window.addEventListener('message',async event=>{if(event.origin!==location.origi
     void pendingRead.then(()=>{if(assignmentsPending===pendingRead)assignmentsPending=null;},()=>{if(assignmentsPending===pendingRead)assignmentsPending=null;});
    }
    const result=await assignmentsPending;
-   if(!current())return;
+   if(closeIfRevoked()||!current())return;
    respond(result);
    if(result.error==='forbidden'){allowed=false;close();}
-  }catch{respond({error:'unavailable'});}
+  }catch{if(!closeIfRevoked())respond({error:'unavailable'});}
   return;
  }
  if(d.type==='COS_OPERATIONS_TOKEN_REQUEST'&&typeof d.requestId==='string'&&d.requestId.length<=100){const requested=subject,target=frame.contentWindow,revision=epoch;let token=null;try{const s=await context().db.auth.getSession();if(await verify()&&active()===requested&&s.data?.session?.user?.id===requested&&target===frame?.contentWindow)token=s.data.session.access_token;}catch{}

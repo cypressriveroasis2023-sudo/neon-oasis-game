@@ -130,3 +130,32 @@ test('an expired fresh-session read cannot start the assignment RPC after the de
     change(f);await f.refresh();assert.equal(f.frame(),undefined);assert.equal(frame.isConnected,false);assert.equal(queueCalls(f).length,calls);
   }
  });
+
+
+test('pending assignment reads close their own frame on profile drift without waiting for a DOM observer',async()=>{
+  for(const change of [f=>f.state.profile.user_id=other,f=>f.state.profile.active=false,f=>f.state.profile.archived_at='2026-10-10',f=>f.state.role='service']){
+    for(const failed of [false,true]){
+      const f=await fixture(),frame=f.frame(),gate=deferred();
+      f.state.rpc=name=>name==='my_available_assignments'?gate.promise:{data:{fleetRead:true}};
+      const read=f.read();await tick();change(f);
+      gate.resolve(failed?{error:{message:'synthetic denied'}}:{data:[row()]});await read;
+      assert.equal(f.frame(),undefined);assert.equal(frame.isConnected,false);assert.equal(f.responses(frame).length,0);
+    }
+  }
+});
+
+
+test('rejected pending RPCs close only their captured revoked frame, never a replacement',async()=>{
+  for(const replace of [false,true]){
+    const f=await fixture(),oldFrame=f.frame();let reject;
+    const gate=new Promise((_,fail)=>{reject=fail;});
+    f.state.rpc=name=>name==='my_available_assignments'?gate:{data:{fleetRead:true}};
+    const read=f.read();await tick();
+    let replacement;
+    if(replace){f.close();f.open();replacement=f.frame();}
+    else f.state.profile.user_id=other;
+    reject(new Error('synthetic RPC failure'));await read;
+    assert.equal(f.responses(oldFrame).length,0);
+    assert.equal(f.frame(),replace?replacement:undefined);
+  }
+});

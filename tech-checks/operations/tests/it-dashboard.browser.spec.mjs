@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {auditDarkPresentation} from './dark-presentation-audit.mjs';
 import {readFileSync,existsSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -413,4 +414,23 @@ for(const action of ['profile mismatch','Owner preview'])test('settled assignmen
   else document.body.classList.add('owner-test-role-preview');
  },action);
  await expect(page.locator('dialog,iframe')).toHaveCount(0);await assertAssignmentReads(page,state);
+});
+
+test('IT work board prioritizes field and cameras with an independent assigned-checks panel',async({page},info)=>{
+  const {frame,state}=await mount(page);await ready(frame);await expect(queueCount(frame)).toHaveText('2');
+  const contrast=await auditDarkPresentation(dashboard(frame));expect(contrast.failures).toEqual([]);
+  await page.screenshot({path:info.outputPath('it-work-board.png')});
+  const cards=dashboard(frame).locator('[data-source]');
+  expect(await cards.evaluateAll(items=>items.map(item=>item.dataset.source))).toEqual(['field','cameras','routers','victron','tracker','mhelp']);
+  await expect(queueSummary(frame)).toContainText('SYN-NULL-LEAD');await expect(queueSummary(frame)).not.toContainText('SYN-DEPARTMENT');
+  await expect(queueSummary(frame)).toContainText('Select equipment in Tech Checks after reviewing instructions.');
+  await expect(queueSummary(frame)).not.toContainText('RAW_');
+  const fieldBox=await card(frame,'field').boundingBox(),cameraBox=await card(frame,'cameras').boundingBox(),queueBox=await queueSummary(frame).boundingBox();
+  if(info.project.name==='desktop-1440'){expect(Math.abs(fieldBox.y-cameraBox.y)).toBeLessThan(2);expect(queueBox.x).toBeGreaterThan(cameraBox.x);expect(Math.abs(fieldBox.y-queueBox.y)).toBeLessThan(2);}
+  if(info.project.name==='mobile-390')expect(queueBox.y).toBeLessThan(fieldBox.y);
+  await queueSummary(frame).getByRole('button',{name:'View all assignments and ticket info',exact:true}).click();
+  await expect(queueWorkspace(frame).locator('.it-assignment-ticket')).toHaveCount(2);
+  await traverseIframeHistory(frame,'back','#it-dashboard');await ready(frame);
+  await dashboard(frame).getByRole('button',{name:'Open unit checks →',exact:true}).click();
+  await expect(page.locator('dialog,iframe')).toHaveCount(0);await assertAssignmentReads(page,state);
 });
