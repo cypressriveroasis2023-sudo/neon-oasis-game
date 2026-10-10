@@ -18,7 +18,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true } = {}) {
-  const listeners = new Set(), timers = new Map(), requests = [], handshakes = [];
+  const invalidations=[], listeners = new Set(), timers = new Map(), requests = [], handshakes = [];
   const location = { origin: 'https://synthetic.example', search: mode ? '?mode=' + mode : '' };
   let timerId = 0, requestId = 0;
   const state = { role, token, autoReply };
@@ -32,6 +32,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   } };
   const window = {
     parent,
+    dispatchEvent(event){invalidations.push(event.type);return true;},
     addEventListener(type, fn) { assert.equal(type, 'message'); listeners.add(fn); },
     removeEventListener(type, fn) { assert.equal(type, 'message'); listeners.delete(fn); },
     setTimeout(fn, delay) { timers.set(++timerId, { fn, delay }); return timerId; },
@@ -46,7 +47,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   }
   const exports = {};
   vm.runInNewContext(source, {
-    exports, window, location, URLSearchParams, AbortController,
+    exports, window, location, URLSearchParams, AbortController, Event,
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -57,7 +58,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
     },
   }, { filename: 'api.ts' });
   return {
-    api: exports.api, requests, handshakes, state, location, window, timers, listeners, reply,
+    api: exports.api, invalidations, requests, handshakes, state, location, window, timers, listeners, reply,
     answer(index, data = { items: [] }, responseStatus = 200) {
       requests[index].result.resolve(new Response(JSON.stringify(data), { status: responseStatus }));
     },
@@ -354,4 +355,38 @@ test('legacy Victron snapshots retain separate same-session deduplication', asyn
  await flush();assert.deepEqual(f.requests.map(request=>request.envelope.path),['/api/vrm-portal','/api/vrm-fleet']);
  f.answer(0,{source:'legacy'});f.answer(1,{source:'dynamic'});
  assert.deepEqual((await Promise.all(reads)).map(result=>result.data.source),['legacy','legacy','dynamic']);
+});
+
+
+test('pending schedule opt-in is the only allowed query path and never shares status reads',async()=>{
+ const path='/api/mhelpdesk/intake/status?capability=pending_schedule_v1',f=fixture();
+ const first=f.api.get(path),second=f.api.get(path);await flush();assert.equal(f.requests.length,2);
+ for(const entry of f.requests)assert.deepEqual(entry.envelope,{path,method:'GET',body:null});
+ f.answer(0,{saved:true});f.answer(1,{saved:true});await Promise.all([first,second]);
+ for(const invalid of ['/api/jobs?capability=pending_schedule_v1','/api/mhelpdesk/intake/status?capability=other',path+'&portalId=17',path+'&capability=pending_schedule_v1',path+'#ignored','/api/mhelpdesk/intake/status?evidenceCapability=pending_schedule_v1'])await assert.rejects(f.api.get(invalid),status(400));
+ await assert.rejects(f.api.post(path,{}),status(400));assert.equal(f.requests.length,2);
+ const tech=fixture({mode:'production-assignments',role:'it'});await assert.rejects(tech.api.get(path),status(403));assert.equal(tech.requests.length,0);assert.equal(tech.handshakes.length,0);
+});
+
+test('explicit private read cancellation prevents a late handshake from starting transport',async()=>{
+ const f=fixture({autoReply:false}),controller=new AbortController();
+ const pending=f.api.post('/api/mhelpdesk/partner/tickets/preview',{evidence:'ticket_private_sample_v1'}, {signal:controller.signal});
+ const rejected=assert.rejects(pending,status(499));controller.abort();f.reply();await rejected;assert.equal(f.requests.length,0);
+ const cancelled=new AbortController();cancelled.abort();await assert.rejects(f.api.post('/api/mhelpdesk/partner/tickets/preview',{}, {signal:cancelled.signal}),status(499));assert.equal(f.handshakes.length,1);
+});
+test('private read abort cancels only its own transport and does not share or replay results',async()=>{
+ const f=fixture(),controller=new AbortController(),pending=f.api.post('/api/mhelpdesk/partner/tickets/preview',{}, {signal:controller.signal});await flush();
+ const other=f.api.get('/api/jobs');await flush();assert.equal(f.requests.length,2);
+ const rejected=assert.rejects(pending,status(503));controller.abort();await rejected;assert(f.requests[0].init.signal.aborted);assert(!f.requests[1].init.signal.aborted);
+ f.answer(1);await other;assert.equal(f.requests.length,2);assert.equal(f.timers.size,0);
+});
+
+test('observed session and HTTP auth failures invalidate private views without source data',async()=>{
+ const denied=fixture(),read=denied.api.get('/api/jobs');await flush();denied.answer(0,{error:'private'},403);await assert.rejects(read,status(403));assert.deepEqual(denied.invalidations,['cos-private-data-invalidated']);
+ const expired=fixture({role:'it'});await assert.rejects(expired.api.post('/api/mhelpdesk/partner/tickets/preview',{}),status(401));assert.deepEqual(expired.invalidations,['cos-private-data-invalidated']);assert.equal(expired.requests.length,0);
+});
+test('verified parent credential changes and malformed auth responses still invalidate private data',async()=>{
+ const f=fixture(),first=f.api.get('/api/jobs');await flush();f.answer(0);await first;assert.deepEqual(f.invalidations,[]);
+ f.state.token='synthetic-session-b';const second=f.api.get('/api/jobs');await flush();assert.deepEqual(f.invalidations,['cos-private-data-invalidated']);f.answer(1);await second;
+ const third=f.api.get('/api/jobs');await flush();f.requests[2].result.resolve({ok:false,status:401,json:async()=>{throw Error('synthetic malformed response');}});await assert.rejects(third,status(401));assert.deepEqual(f.invalidations,['cos-private-data-invalidated','cos-private-data-invalidated']);
 });

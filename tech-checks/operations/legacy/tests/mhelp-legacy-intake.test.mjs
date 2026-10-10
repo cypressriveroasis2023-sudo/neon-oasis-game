@@ -26,7 +26,7 @@ test('one approved service-only RPC leaves private helpers/table access revoked 
     const tables=(await db.query("select relrowsecurity from pg_class where relnamespace='cos_mhelp_intake'::regnamespace and relkind='r'")).rows;
     assert.equal((await db.query("select has_function_privilege('service_role','public.camera_mhelp_ticket_intake_v1(jsonb)','EXECUTE') f")).rows[0].f,true);
     for(const role of ['anon','authenticated'])assert.equal((await db.query("select has_function_privilege($1,'public.camera_mhelp_ticket_intake_v1(jsonb)','EXECUTE') f",[role])).rows[0].f,false);
-    assert.equal(tables.length,6);assert(tables.every(r=>r.relrowsecurity));
+    assert.equal(tables.length,5);assert(tables.every(r=>r.relrowsecurity));
   }finally{await db.close();}
 });
 

@@ -45,7 +45,7 @@ function fixture() {
     './unitTracker': tracker,
     '../../supabase/functions/cos-operations-pages/routers': routers,
     '../../supabase/functions/cos-operations-pages/vrm': vrm,
-    './itMhelpBridge': { readITMhelpInfo() { const next = deferred(); calls.push({ path: 'parent:mhelp', ...next }); return next.promise; } },
+    './itMhelpBridge': { readITMhelpInfo() { const next = deferred(); calls.push({ path: 'parent:mhelp', ...next }); return next.promise; }, readITAssignments() { const next = deferred(); calls.push({ path: 'parent:assignments', ...next }); return next.promise; } },
     './itDashboard.css': {},
   };
   vm.runInNewContext(compiled, {
@@ -81,27 +81,32 @@ test('six cards render immediately without reading sources during render', () =>
   for (const label of ['Field View', 'InHand Routers', 'Camera Health', 'Victron', 'Unit Tracker', 'MHelp information']) assert.ok(html.includes('Open ' + label));
   assert.equal((html.match(/Checking authorized records/g) || []).length, 6);
   assert.equal(f.calls.length, 0);
+  assert.ok(html.indexOf('data-source="field"') < html.indexOf('data-source="cameras"'));
+  assert.ok(html.indexOf('data-source="cameras"') < html.indexOf('data-source="routers"'));
+  assert.match(html, /Open unit checks/);
+  assert.match(html, /Your assigned work/);
+  assert.match(html, /View all assignments and ticket info/);
   assert.doesNotMatch(html, /<iframe|<canvas|leaflet|\bhealthy\b/i);
   assert.doesNotMatch(source, /Promise\.all|api\.post\(|\/refresh['"]|getVrmFleet/);
 });
 
 test('enabled dashboard reads each source independently and never waits for a global gate', async () => {
   const f = fixture(); f.render(); f.connect(); await flush();
-  assert.deepEqual(f.calls.map(call => call.path), ['/api/field-map', '/api/routers', '/api/camera-health/summary-v3', '/api/vrm-fleet', '/api/unit-tracker', 'parent:mhelp']);
+  assert.deepEqual(f.calls.map(call => call.path), ['/api/field-map', '/api/camera-health/summary-v3', '/api/routers', '/api/vrm-fleet', '/api/unit-tracker', 'parent:mhelp', 'parent:assignments']);
   f.calls[0].resolve({ data: field() });
-  f.calls[1].reject(new Error('Synthetic router outage'));
+  f.calls[2].reject(new Error('Synthetic router outage'));
   f.calls[5].resolve({ items: [], generatedAt: fresh });
   await flush();
   assert.equal(f.readers[0].getSnapshot().data.items.length, 2);
   assert.equal(f.readers[0].getSnapshot().loading, false);
-  assert.match(f.readers[1].getSnapshot().error, /router outage/);
-  assert.equal(f.readers[2].getSnapshot().loading, true, 'camera can remain pending while other sources display');
+  assert.match(f.readers[2].getSnapshot().error, /router outage/);
+  assert.equal(f.readers[1].getSnapshot().loading, true, 'camera can remain pending while other sources display');
   assert.equal(f.readers[5].getSnapshot().loading, false, 'MHelp is independent of all remote fleet reads');
-  const retry = f.readers[1].refresh(); await flush();
-  assert.equal(f.calls.length, 7);
-  assert.equal(f.calls[6].path, '/api/routers');
-  f.calls[6].resolve({ data: routerSnapshot() }); await retry;
-  assert.equal(f.readers[1].getSnapshot().error, '');
+  const retry = f.readers[2].refresh(); await flush();
+  assert.equal(f.calls.length, 8);
+  assert.equal(f.calls[7].path, '/api/routers');
+  f.calls[7].resolve({ data: routerSnapshot() }); await retry;
+  assert.equal(f.readers[2].getSnapshot().error, '');
   f.cleanup();
 });
 
@@ -113,7 +118,7 @@ test('Victron and Unit Tracker use exact existing session gates and do not read 
     assert.match(html, /disabled=""[^>]*>Open Victron/);
     f.connect(); await flush();
     assert.equal(f.calls.some(call => ['/api/vrm-fleet', '/api/unit-tracker'].includes(call.path)), false);
-    assert.equal(f.calls.length, 4);
+    assert.equal(f.calls.length, 5);
     f.cleanup();
   }
 });
@@ -173,9 +178,9 @@ test('a changed session creates fresh stores before any effect can run', () => {
   const f = fixture(); f.render({ authorized: true, role: 'IT', features: { unitTracker: true, vrmRead: true } });
   const first = f.readers.slice();
   f.render({ authorized: true, role: 'IT', features: { unitTracker: true, vrmRead: true } });
-  for (let index = 0; index < 6; index++) {
-    assert.notEqual(f.readers[index + 6], first[index]);
-    assert.equal(f.readers[index + 6].getSnapshot().data, null);
+  for (let index = 0; index < 7; index++) {
+    assert.notEqual(f.readers[index + 7], first[index]);
+    assert.equal(f.readers[index + 7].getSnapshot().data, null);
   }
   assert.match(source, /\[source, session, enabled\]/);
 });
@@ -249,6 +254,37 @@ test('malformed successful reads are failures with a per-card retry rather than 
   assert.equal(f.readers[0].getSnapshot().data, null);
   assert.match(f.readers[0].getSnapshot().error, /incomplete/);
   assert.equal(f.readers[0].getSnapshot().loading, false);
-  assert.equal(f.readers[2].getSnapshot().loading, true);
+  assert.equal(f.readers[1].getSnapshot().loading, true);
+  f.cleanup();
+});
+
+
+test('assignment count stays distinct from Ticket Lead references and its failures are independent', async () => {
+  for (const failing of ['parent:mhelp', 'parent:assignments']) {
+    const f = fixture(); f.render(); f.connect(); await flush();
+    const references = f.calls.find(call => call.path === 'parent:mhelp');
+    const queue = f.calls.find(call => call.path === 'parent:assignments');
+    const assignments = { items: [{ audience: 'mine', status: 'assigned' }, { audience: 'department', status: 'assigned' }], generatedAt: fresh };
+    if (failing === 'parent:mhelp') { references.reject(new Error('References unavailable')); queue.resolve(assignments); }
+    else { references.resolve({ items: [], generatedAt: fresh }); queue.reject(new Error('Queue unavailable')); }
+    await flush();
+    assert.equal(Boolean(f.readers[5].getSnapshot().error), failing === 'parent:mhelp');
+    assert.equal(Boolean(f.readers[6].getSnapshot().error), failing === 'parent:assignments');
+    if (failing === 'parent:mhelp') {
+      const summary = f.summarizeITAssignments(f.readers[6].getSnapshot().data);
+      assert.equal(summary.count, 2); assert.equal(summary.metrics[0].value, 1); assert.equal(summary.metrics[1].value, 1);
+      assert.match(summary.label, /IT assignments/); assert.match(summary.note, /Ticket Lead is not required/);
+    }
+    f.cleanup();
+  }
+});
+
+test('queue refresh clears stale assignments while its sibling references stay available', async () => {
+  const f = fixture(); f.render(); f.connect(); await flush();
+  f.calls[5].resolve({ items: [], generatedAt: fresh }); f.calls[6].resolve({ items: [{ audience: 'mine' }], generatedAt: fresh }); await flush();
+  const refresh = f.readers[6].refresh();
+  assert.equal(f.readers[6].getSnapshot().data, null); assert.notEqual(f.readers[5].getSnapshot().data, null);
+  f.calls[7].reject(new Error('Queue unavailable')); await refresh;
+  assert.equal(f.readers[6].getSnapshot().data, null); assert.equal(f.readers[6].getSnapshot().readAt, null);
   f.cleanup();
 });

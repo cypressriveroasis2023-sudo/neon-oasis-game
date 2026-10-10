@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { openLegacy } from './api';
 import { readITMhelpInfo, type ITMhelpInfo } from './itMhelpBridge';
 import './itMhelpWorkspace.css';
+import ITAssignmentQueue from './ITAssignmentQueue';
 
 function dateLabel(value: string) {
   return value ? new Date(value + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not scheduled';
@@ -70,10 +71,11 @@ export default function ITMhelpWorkspace() {
           <header><h3>MHelpDesk #{item.ticketNumber}</h3><span className={'it-mhelp-status ' + (item.finished ? 'is-finished' : '')}>{item.finished ? 'Tech Check finished' : 'Open Tech Check work'}</span></header>
           <h4>{item.site || 'Site not recorded'}</h4>
           <dl><div><dt>Work type</dt><dd>{item.workType || 'Not recorded'}</dd></div><div><dt>Scheduled date</dt><dd>{dateLabel(item.scheduledFor)}</dd></div><div><dt>Scheduled time</dt><dd>{item.scheduledTime ? item.scheduledTime.slice(0, 5) + ' · as recorded' : 'Not recorded'}</dd></div></dl>
-          <div className='it-mhelp-equipment'><b>Recorded equipment</b>{item.equipment.length ? <ul>{item.equipment.map((equipment, index) => <li key={index}>{equipment}</li>)}</ul> : <p>No equipment listed.</p>}</div>
+          <div className='it-mhelp-equipment'><b>Recorded equipment</b>{item.equipment.length ? <ul>{item.equipment.map((equipment, index) => <li key={index}>{equipment}</li>)}</ul> : <p>Equipment not yet specified.</p>}</div>
         </article>)}
       </div>}
     </>}
+    <ITAssignmentQueue />
     <footer className='it-mhelp-footer'><p>Continue checklists and review the original work in Tech Checks.</p><button type='button' onClick={() => openLegacy('it')}>Open existing IT Tech Checks →</button></footer>
   </section>;
 }

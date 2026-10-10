@@ -17,6 +17,7 @@ const sharedReadPaths = new Set([
 ]);
 const pendingReads = new Map<string, Promise<ApiResponse>>();
 let tokenRequest: Promise<ParentSession> | null = null;
+let lastVerifiedSession: ParentSession | null = null;
 function requestParentToken(): Promise<ParentSession> {
   if (window.parent === window || location.origin === 'null') {
     return Promise.reject(new OperationsApiError('Open Operations from the Tech Check platform to use your existing account.', 401));
@@ -34,7 +35,15 @@ function requestParentToken(): Promise<ParentSession> {
       const queueMode = new URLSearchParams(location.search).get('mode') === 'production-assignments';
       if (!(queueMode ? ['it','service'].includes(message.role) : new URLSearchParams(location.search).get('mode') === 'fleet' ? message.role === 'it' : message.role === 'owner') || typeof message.accessToken !== 'string' || !message.accessToken.trim()) {
         reject(new OperationsApiError('Your existing Tech Check session is unavailable. Return to Tech Check and sign in again.', 401));
-      } else resolve({ token: message.accessToken, role: message.role });
+      } else {
+        const session = { token: message.accessToken, role: message.role };
+        if (lastVerifiedSession && (lastVerifiedSession.token !== session.token || lastVerifiedSession.role !== session.role)) {
+          pendingReads.clear();
+          window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
+        }
+        lastVerifiedSession = session;
+        resolve(session);
+      }
     };
     window.addEventListener('message', receive);
     timer = window.setTimeout(() => {
@@ -52,20 +61,24 @@ export function permitsTechnicianRequest(method: string, path: string, body?: un
   return method === 'POST' && /^\/api\/tech\/it-queue\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/i.test(path) &&
     (body == null || typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
 }
-async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResponse<T>> {
+async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<ApiResponse<T>> {
+  if (options?.signal?.aborted) throw new OperationsApiError('The read was cancelled.', 499);
   const mode = new URLSearchParams(location.search).get('mode');
-  if (!/^\/api\/[a-zA-Z0-9_\-\/]+$/.test(path)) throw new OperationsApiError('This Operations request is unavailable.', 400);
+  if (!/^\/api\/[a-zA-Z0-9_\-\/]+$/.test(path) && !(method === 'GET' && path === '/api/mhelpdesk/intake/status?capability=pending_schedule_v1')) throw new OperationsApiError('This Operations request is unavailable.', 400);
   if (mode === 'production-assignments' && !permitsTechnicianRequest(method, path, body)) throw new OperationsApiError('This assignment view permits technician reads and taking an available IT queue visit only.', 403);
   // Always verify the current parent session before consulting pending reads.
   // A path-only promise could otherwise expose a previous account's response.
-  const session = await requestParentToken();
+  let session: ParentSession;
+  try { session = await requestParentToken(); }
+  catch (cause) { if (cause instanceof OperationsApiError && [401,403].includes(cause.response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated')); throw cause; }
+  if (options?.signal?.aborted) throw new OperationsApiError('The read was cancelled.', 499);
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.
     // Forget their lookup entries without cancelling their existing callers.
     pendingReads.clear();
-    try { return await sendRequest<T>(method, path, session.token, body); }
+    try { return await sendRequest<T>(method, path, session.token, body, options?.signal); }
     finally { pendingReads.clear(); }
   }
   if (!sharedReadPaths.has(path)) return sendRequest<T>(method, path, session.token, body);
@@ -77,8 +90,11 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   try { return await pending; }
   finally { if (pendingReads.get(key) === pending) pendingReads.delete(key); }
 }
-async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown): Promise<ApiResponse<T>> {
+async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<ApiResponse<T>> {
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  signal?.addEventListener('abort', cancel, { once: true });
+  if (signal?.aborted) controller.abort();
   const timer = window.setTimeout(() => controller.abort(), 30000);
   try {
     let response: Response;
@@ -95,15 +111,16 @@ async function sendRequest<T>(method: 'GET' | 'POST', path: string, token: strin
         ? 'The save could not be confirmed. Refresh this workspace before trying again.'
         : 'Operations could not connect. Retry to verify the current records.', 503);
     }
+    if (!response.ok && [401,403].includes(response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated'));
     let data: any;
     try { data = await response.json(); } catch { throw new OperationsApiError('Operations returned an incomplete response. Please refresh.', response.status || 503); }
     if (!response.ok) throw new OperationsApiError(typeof data?.error === 'string' ? data.error : 'Operations request failed.', response.status);
     return { data };
-  } finally { window.clearTimeout(timer); }
+  } finally { window.clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
 }
 export const api = {
   get: <T = any>(path: string) => request<T>('GET', path),
-  post: <T = any>(path: string, body?: unknown) => request<T>('POST', path, body),
+  post: <T = any>(path: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', path, body, options),
 };
 const legacyRoutes = new Set(['today', 'calendar', 'attention', 'review', 'assign', 'team', 'units', 'handoffs', 'history', 'activity', 'accounts', 'more', 'testcenter', 'it', 'service', 'vision', 'camera-health', 'logout', 'operations', 'production-return']);
 export function openLegacy(route: string) {

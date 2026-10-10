@@ -3,6 +3,7 @@ import { api } from './api';
 import { chicagoDay } from './dailyBoardData';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import JobEvidence from './JobEvidence';
+import LegacyInstallEvidence from './LegacyInstallEvidence';
 import { DeliveryGoBackDialog, DeliveryGoBackSummary } from './DeliveryGoBack';
 import { canRequestGoBack, confirmedGoBack, emptyGoBackDraft, goBackBlockedReason, hasOpenGoBack, validGoBackDraft, type GoBackDraft } from './deliveryGoBackData';
 import { assignmentTechnicians, canDispatch, confirmedDispatch, confirmedQueueRelease, confirmedReview, confirmedSchedule, createJobActionSaver, jobDepartment, isItQueue, jobItems, recordItems, statusKey, technicianLocationUrl, visibleJobs, type JobsMode, type OperationsRecord } from './operationsWorkflowData';
@@ -17,10 +18,10 @@ function useModalDialog(ref:RefObject<HTMLDialogElement|null>,visible:unknown) {
     return()=>{if(dialog.open)dialog.close();if(previous instanceof HTMLElement&&previous.isConnected)previous.focus();};
   },[visible,ref]);
 }
-type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string;clearFocusedJob?:()=>void;openLifecycle?:(id:string)=>void};
+type Props={mode:JobsMode;show:(message:string)=>void;initialJobId?:string;clearFocusedJob?:()=>void;openLifecycle?:(id:string)=>void;legacyInstallEvidenceEnabled?:boolean};
 type ScheduleDraft={date:string;startTime:string;endTime:string;technician:string;department:string;assignmentMode:'it_queue'|'technician'};
 const message=(cause:unknown,fallback:string)=>cause instanceof Error?cause.message:fallback;
-export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJob,openLifecycle}:Props) {
+export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJob,openLifecycle,legacyInstallEvidenceEnabled=false}:Props) {
   const [search,setSearch]=useState('');
   const [focusedId,setFocusedId]=useState(initialJobId);
   useEffect(()=>setFocusedId(initialJobId),[initialJobId]);
@@ -167,6 +168,7 @@ export default function OperationsJobs({mode,show,initialJobId='',clearFocusedJo
   const refresh=()=>{if(saver.busy||activeReads.current>0)return;void load(true);void loadTeam();};
   const label=mode==='review'?'Owner Review':mode==='dispatch'?'Dispatch':mode==='unscheduled'?'Unscheduled COS Jobs':'COS Jobs';
   return <div className='ops-workflows' aria-label={label} aria-busy={loading}>
+    {mode==='review'&&legacyInstallEvidenceEnabled&&<LegacyInstallEvidence/>}
     <div className='purchase-actions'><span>{mode==='jobs'?'COS Jobs are the authoritative operational records.':mode==='review'?'Completed field work waiting for Owner closeout.':mode==='unscheduled'?'Schedule and assign work before dispatch.':'Only properly scheduled work can be dispatched.'}</span><span>{rows?visible.length+' '+(mode==='jobs'?'authoritative job records':'jobs'):'Counts unavailable'}</span><button className='secondary' disabled={loading||saving} onClick={refresh}>{loading?'Refreshing…':'Refresh jobs'}</button></div>
     {focusedId&&<div className='purchase-actions'><span>Selected job</span><button className='secondary' onClick={()=>{setFocusedId('');clearFocusedJob?.();}}>Show all jobs</button></div>}
     <div className='operations-job-filters'><label>Find a job<input type='search' placeholder='Job, customer, site, unit or technician' value={search} onChange={event=>setSearch(event.target.value)}/></label><label>Status<select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value=''>All statuses</option>{statuses.map(status=><option value={status} key={status}>{status}</option>)}</select></label></div>

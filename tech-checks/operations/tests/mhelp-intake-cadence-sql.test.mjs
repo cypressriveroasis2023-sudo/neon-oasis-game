@@ -21,7 +21,7 @@ async function fixture() {
     create table cos_mhelp_intake.portal_config(portal_id text primary key,enabled boolean,
       activated_at timestamptz,schema_contract text,schema_evidence text);
     create table cos_mhelp_intake.receipts(portal_id text,ticket_id text,source_created_at timestamptz,
-      state text,first_payload jsonb,primary key(portal_id,ticket_id));
+      state text,first_payload jsonb,reason_codes text[] not null default '{}',primary key(portal_id,ticket_id));
     insert into cos_mhelp_intake.portal_config values('17',true,'2026-10-10T11:00:00Z',
       'synthetic-only','Synthetic schema evidence');
     create schema synthetic_clock;
@@ -37,12 +37,13 @@ async function fixture() {
     [new Date(base+elapsed).toISOString()]);
   const state=async()=>(await db.query('select * from cos_mhelp_intake.scheduler_state')).rows[0];
   const begin=async()=>(await db.query('select cos_mhelp_intake.begin_intake_v1() value')).rows[0].value;
-  const finish=async(id,ids=[])=>(await db.query('select cos_mhelp_intake.finish_intake_v1($1,$2::jsonb,$3) value',
-    [id,JSON.stringify(ids),ids.length])).rows[0].value;
+  const commit=async(id,ids=[])=>(await db.query('select cos_mhelp_intake.commit_discovery_v1($1,$2::jsonb,$3) value',[id,JSON.stringify(ids),ids.length])).rows[0].value;
+  const release=async id=>(await db.query('select cos_mhelp_intake.finish_intake_v1($1) value',[id])).rows[0].value;
+  const finish=async(id,ids=[])=>{const result=await commit(id,ids);await release(id);return result;};
   const fail=async(id,seconds=0,retryable=true)=>(await db.query(
     "select cos_mhelp_intake.fail_intake_v1($1,'SOURCE_UNAVAILABLE',$2,$3) value",
     [id,retryable,seconds])).rows[0].value;
-  return {db,clock,state,begin,finish,fail};
+  return {db,clock,state,begin,finish,commit,release,fail};
 }
 
 test('SQL durable cadence turns repeating 3/3/9-minute triggers into eight source reads per hour',async()=>{
@@ -52,7 +53,8 @@ test('SQL durable cadence turns repeating 3/3/9-minute triggers into eight sourc
   const rpc=async input=>{
     actions.push(input.action);
     if(input.action==='begin')return f.begin();
-    if(input.action==='finish')return f.finish(input.leaseId,input.expectedTicketIds);
+    if(input.action==='commit_discovery')return f.commit(input.leaseId,input.expectedTicketIds);
+    if(input.action==='finish')return f.release(input.leaseId);
     assert.fail('Empty successful scans must not record or fail');
   };
   for(let hour=0;hour<2;hour++)for(const offset of [3,6,9,18,21,24,33,36,39,48,51,54]){
@@ -68,7 +70,7 @@ test('SQL durable cadence turns repeating 3/3/9-minute triggers into eight sourc
     assert.equal(result.watermarkAdvanced,eligible);
     if(eligible){
       completed.push(hour*60+offset);
-      assert.deepEqual(actions.slice(start),['begin','finish']);
+      assert.deepEqual(actions.slice(start),['begin','commit_discovery','finish']);
       assert.equal((await f.state()).last_attempt_at.getTime(),base+elapsed);
     }else{
       assert.deepEqual(actions.slice(start),['begin']);
@@ -113,7 +115,8 @@ test('lost begin acknowledgement cannot repeat vendor work or bypass lease and d
         if(loseBegin){loseBegin=false;throw new IntakeFault('WRITE_UNAVAILABLE',true);}
         return value;
       }
-      if(input.action==='finish')return f.finish(input.leaseId,input.expectedTicketIds);
+      if(input.action==='commit_discovery')return f.commit(input.leaseId,input.expectedTicketIds);
+    if(input.action==='finish')return f.release(input.leaseId);
       assert.fail('Lost begin acknowledgement must not record or clear an unknown lease');
     },
     readSource:async window=>{sourceReads++;return {contract:BATCH_CONTRACT,portalId:'17',
@@ -156,7 +159,7 @@ test('SQL disabled, live lease and persisted backoff retain priority over minimu
 
 test('SQL crash with no failure persistence waits through lease expiry and cadence before replay',async()=>{
   const f=await fixture(),first=await f.begin(),saved=await f.state();
-  await f.db.query(`insert into cos_mhelp_intake.receipts values('17','42',
+  await f.db.query(`insert into cos_mhelp_intake.receipts(portal_id,ticket_id,source_created_at,state,first_payload) values('17','42',
     $1::timestamptz+interval '1 second','review_needed','{"schemaContract":"synthetic-only"}')`,[first.activationFloor]);
   await f.clock(3*minute);
   assert.deepEqual(await f.begin(),{state:'idle'});

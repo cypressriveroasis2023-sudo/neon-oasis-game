@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
+import {privateTicketSampleFixture,privateSampleNow,privateSampleRequest} from './fixtures/mhelpTicketPrivateSample.mjs';
 import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 import {ticketPreviewAppointmentFixture} from './fixtures/mhelpAppointmentTicketPreview.mjs';
+import {ticketPreviewAppointmentVariantFixture,syntheticVariantAppointment} from './fixtures/mhelpAppointmentVariantPreview.mjs';
 import {syntheticAppointment} from './fixtures/mhelpAppointmentPreview.mjs';
 import {ticketPreviewFixture,ticketPreviewEvidenceFixture,ticketPreviewDetailFixture} from './fixtures/mhelpTicketPreview.mjs';
 const origin='http://127.0.0.1:4173',path='/api/mhelpdesk/partner/tickets/preview';
@@ -9,10 +11,12 @@ async function expectNoDiagnostics(preview){
   await expect(preview.getByRole('region',{name:'mHelpDesk operational structural evidence'})).toHaveCount(0);
   await expect(preview.getByRole('region',{name:'mHelpDesk single-ticket detail structural evidence'})).toHaveCount(0);
   await expect(preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'})).toHaveCount(0);
+  await expect(preview.getByRole('region',{name:'mHelpDesk appointment field-variant diagnostics'})).toHaveCount(0);
   await expect(preview.getByRole('table',{name:'Verified mHelpDesk statuses and counts'})).toHaveCount(0);
 }
-async function mount(page,{role='owner'}={}){
-  const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewDetailFixture({ticketCount:3})};
+async function mount(page,{role='owner',privateClock=false}={}){
+  if(privateClock)await page.clock.install({time:new Date(privateSampleNow)});
+  const calls=[],state={bad:false,fail:false,denied:false,diagnostic:null,delay:null,preview:ticketPreviewDetailFixture({ticketCount:3}),privateSample:privateTicketSampleFixture()};
   // Only local test assets may reach a server. Specific mocks registered below
   // take precedence, including the production-shaped API URL with synthetic data.
   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -27,7 +31,7 @@ async function mount(page,{role='owner'}={}){
     if(request.path===path){
       // Capture this request's response before waiting, so later fixture changes
       // cannot accidentally turn a stale-response test into a fresh response.
-      const {delay,fail,denied,diagnostic}=state,payload=structuredClone({...state.preview,...(state.bad?{automaticSync:true}:{})});
+      const {delay,fail,denied,diagnostic}=state,payload=structuredClone({...(request.body?.evidence==='ticket_private_sample_v1'?state.privateSample:state.preview),...(state.bad?{automaticSync:true}:{})});
       if(delay)await delay;
       if(fail)return route.abort('failed');
       if(denied)return route.fulfill({status:403,headers,contentType:'application/json',body:JSON.stringify({error:'synthetic private provider text'})});
@@ -55,7 +59,7 @@ test('today ticket preview is explicit, aggregate-only and preserves equipment c
   await expect(preview.getByRole('table',{name:'Sampled ticket field shapes'}).getByRole('row',{name:'subject string: 3 2 nonempty · 1 empty Other string: 3',exact:true})).toBeVisible();
   await expect(preview).toContainText('scheduledDate and neededBy are deprecated');await expect(preview).toContainText('equipment linkage remains unverified');
   await expect(preview).toContainText('12:00 AM CDT');await expect(preview).toContainText('3:00 PM CDT');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_variants_v1'}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('previous-day read is explicit, shares the busy guard and clears stale results across day switches',async({page})=>{
@@ -79,7 +83,7 @@ test('previous-day read is explicit, shares the busy guard and clears stale resu
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
   state.bad=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('could not be verified');
   await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview).not.toContainText('Preview: previous day');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1'}},{path,body:{evidence:'appointment_structure_v1',day:'previous'}},{path,body:{evidence:'appointment_structure_v1'}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_variants_v1'}},{path,body:{evidence:'appointment_variants_v1',day:'previous'}},{path,body:{evidence:'appointment_variants_v1'}}]);
 });
 test('repeated clicks issue one request and a failed refresh clears previous counts',async({page})=>{
   const {preview,calls,state}=await mount(page);let release;state.delay=new Promise(resolve=>{release=resolve});
@@ -126,10 +130,10 @@ test('known safe diagnostic explains the read failure, clears old counts and red
   state.diagnostic='MHELP_PREVIEW_TIMESTAMP_TIMEZONE synthetic private';await dayButton(preview).click();
   await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');
   await expect(preview).not.toContainText('MHELP_PREVIEW_');await expect(preview).not.toContainText('synthetic private');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'appointment_structure_v1'}})));
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual(Array.from({length:3},()=>({path,body:{evidence:'appointment_variants_v1'}})));
 });
 test('verified IT has no ticket preview button and makes no ticket request',async({page})=>{
-  const {preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
+  const {frame,preview,calls}=await mount(page,{role:'it'});await expect(preview).toHaveCount(0);await expect(frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true})).toHaveCount(0);expect(calls.some(call=>call.path===path)).toBe(false);
 });
 test('legacy success explicitly marks operational evidence unavailable and replacement evidence stays bounded',async({page})=>{
   const {preview,calls,state}=await mount(page);state.preview=ticketPreviewFixture();
@@ -207,7 +211,7 @@ for(const day of ['today','previous'])test(`${day}: explicit singleton detail re
   await expect(equipment.getByRole('table')).toHaveCount(0);
   await expect(detail).toContainText('POST/PUT write-model candidate');await expect(detail).toContainText('a GET equipment contract has not been verified');
   await expect(detail).toContainText('Items and custom fields remain unmapped structures');
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_variants_v1',...(day==='previous'?{day:'previous'}:{})}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('zero or multiple tickets show explicit unavailable detail reasons while list evidence stays available',async({page})=>{
@@ -310,7 +314,7 @@ for(const day of ['today','previous'])test(`${day}: appointment preview disclose
   await expect(evidence.getByRole('row',{name:'StartUTC string: 1 1 nonempty · 0 empty ISO with timezone: 1',exact:true})).toBeVisible();
   await expect(evidence).not.toContainText('synthetic-private');await expect(evidence).not.toContainText('2026-10-11T12:00');await expect(evidence).not.toContainText('781234');
   await expect(preview.getByRole('table',{name:'Single-ticket detail field shapes'})).toBeVisible();await expect(preview.getByRole('table',{name:'Sampled ticket field shapes',exact:true})).toBeVisible();
-  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_structure_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_variants_v1',...(day==='previous'?{day:'previous'}:{})}}]);
   expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });
 test('appointment evidence distinguishes unavailable selection, no match, incomplete and ambiguous without claiming no schedule',async({page})=>{
@@ -370,4 +374,135 @@ test('appointment evidence cannot return from an abandoned request or Back/Forwa
   const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST'&&response.request().postDataJSON()?.path===path);release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(preview).toContainText('No match was found within this inspected schedule window');await expect(preview).not.toContainText('One structural match was found');
   await traverseIframeHistory(frame,'forward','#field-map');await expect(preview).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+
+for(const day of ['today','previous'])test(`${day}: appointment variants render fixed descriptors, suppression counts and unresolved identity formats only`,async({page})=>{
+  const {preview,calls,state}=await mount(page);
+  state.preview=ticketPreviewAppointmentVariantFixture(day==='previous'?{createdAfter:'2026-10-08T05:00:00.000Z'}:{});
+  await expect(preview).toContainText('fixed appointment field-name variants and envelope shapes');await expect(preview).toContainText('similar spellings do not verify mappings');
+  await expect(preview.getByRole('button')).toHaveCount(2);await expect(preview.locator('input,select,textarea')).toHaveCount(0);expect(calls.filter(call=>call.path===path)).toHaveLength(0);
+  await dayButton(preview,day).click();
+  const evidence=preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'}),diagnostics=evidence.getByRole('region',{name:'mHelpDesk appointment field-variant diagnostics'});
+  await expect(diagnostics).toContainText('field-name and envelope contract remains unresolved');await expect(diagnostics).toContainText('similar names are not verified aliases');await expect(diagnostics).toContainText('do not establish appointment existence, absence, schedule, technician identity, or a source-to-COS mapping');
+  await expect(diagnostics).toContainText('Suppressed envelope keys: 1 · Suppressed row-key occurrences: 1');await expect(diagnostics).toContainText('Inspected row kinds: object: 1. Empty object rows: 0. Root array entries: not an array.');
+  const variants=diagnostics.getByRole('table',{name:'Inspected appointment field-variant shapes'});
+  await expect(variants.getByRole('row')).toHaveCount(37);
+  await expect(variants.getByRole('row',{name:'ticketId integer: 1 0 nonempty · 0 empty No string observations',exact:true})).toBeVisible();
+  await expect(variants.getByRole('row',{name:'startUtc string: 1 1 nonempty · 0 empty ISO with timezone: 1',exact:true})).toBeVisible();
+  await expect(variants.getByRole('row',{name:'recurrenceParentId absent: 1 0 nonempty · 0 empty No string observations',exact:true})).toBeVisible();
+  const envelope=diagnostics.getByRole('table',{name:'Fixed appointment envelope descriptors'});
+  await expect(envelope.getByRole('row')).toHaveCount(9);await expect(envelope.getByRole('row',{name:'TotalRows integer 1 Not inspected',exact:true})).toBeVisible();await expect(envelope.getByRole('row',{name:'results array Unavailable 1',exact:true})).toBeVisible();
+  const users=diagnostics.getByRole('table',{name:'Fixed appointment user-reference string formats'});
+  await expect(users.getByRole('row',{name:'UserID UUID-like string: 1',exact:true})).toBeVisible();await expect(users.getByRole('row',{name:'userId Email-like string: 1',exact:true})).toBeVisible();await expect(users.getByRole('row',{name:'userID Numeric string: 1',exact:true})).toBeVisible();
+  const pairs=diagnostics.getByRole('table',{name:'Fixed appointment ticket-and-portal candidate comparisons'});await expect(pairs.getByRole('row')).toHaveCount(17);await expect(pairs.getByRole('row',{name:'ticketId portalId 1 1',exact:true})).toBeVisible();await expect(diagnostics).toContainText('unverified candidate comparisons using positive integers only');await expect(diagnostics).toContainText('Equality does not verify field meaning, appointment linkage, schedule, or identity');
+  await expect(evidence).toContainText('Ticket-to-appointment linkage remains unverified');await expect(diagnostics).toContainText('No source reference, email address, or verified identity mapping is shown');
+  for(const text of ['synthetic-private','781234','991234','aaaaaaaa-bbbb','2026-10-11T12:00','One structural match was found','No match was found','unscheduled'])await expect(evidence).not.toContainText(text);
+  expect(calls.filter(call=>call.method==='POST').map(call=>({path:call.path,body:call.body}))).toEqual([{path,body:{evidence:'appointment_variants_v1',...(day==='previous'?{day:'previous'}:{})}}]);
+  expect(await preview.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+});
+test('appointment variants distinguish empty objects, alternate envelopes and unavailable selection without inferring schedule',async({page})=>{
+  const {preview,calls,state}=await mount(page),evidence=preview.getByRole('region',{name:'mHelpDesk appointment structural evidence'}),diagnostics=preview.getByRole('region',{name:'mHelpDesk appointment field-variant diagnostics'});
+  state.preview=ticketPreviewAppointmentVariantFixture({source:{TotalRows:2,results:[{},null]}});await dayButton(preview).click();
+  await expect(diagnostics).toContainText('Inspected row kinds: null: 1 · object: 1. Empty object rows: 1.');await expect(diagnostics.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toContainText('absent: 2');
+  state.preview=ticketPreviewAppointmentVariantFixture({source:{totalRows:1,Results:[syntheticVariantAppointment()],data:[],Data:[{}]}});await dayButton(preview,'previous').click();
+  await expect(evidence).toContainText('0 appointment rows inspected; reported total: unverified');await expect(diagnostics).toContainText('Alternate envelope collections are counted only');
+  await expect(diagnostics.getByRole('table',{name:'Fixed appointment envelope descriptors'}).getByRole('row',{name:'Results array Unavailable 1',exact:true})).toBeVisible();
+  await expect(diagnostics.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toContainText('No observations');await expect(evidence).not.toContainText('No match was found');
+  for(const count of [0,3]){state.preview=ticketPreviewAppointmentVariantFixture({count});await dayButton(preview).click();await expect(evidence).toContainText('No appointments were read');await expect(diagnostics).toHaveCount(0);await expect(evidence.getByRole('table')).toHaveCount(0);}
+  expect(calls.filter(call=>call.path===path)).toHaveLength(4);
+});
+test('appointment variants reject private fields and forged states, clear old diagnostics, and recover only on explicit read',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();
+  const mutations=[
+    e=>{e.diagnostics.fields.ticketId.raw='synthetic private@example.test';},e=>{e.diagnostics.fields['synthetic private']={};},e=>{e.diagnostics.envelope.Results.value='synthetic private';},
+    e=>{e.diagnostics.userReferenceFormats.userId={'synthetic private@example.test':1};},e=>{e.diagnostics.userReferenceFormats.userId={email_like:2};},e=>{e.diagnostics.emptyObjectRows=1;},
+    e=>{e.diagnostics.candidatePairs.matching[10]=2;},e=>{e.diagnostics.candidatePairs.ticketAliasConflicts=1;},
+    e=>{e.diagnostics.suppressedRowKeys=1000001;},e=>{e.diagnostics.rowKinds={object:2};},e=>{e.diagnostics.envelope.results.arrayEntries=2;},e=>{e.diagnostics.contractState='verified';},e=>{e.completeness='complete';},e=>{e.linkage='no_match_in_window';},
+  ];
+  for(const mutation of mutations){state.preview=ticketPreviewAppointmentVariantFixture();mutation(state.preview.appointmentEvidence);await dayButton(preview,'previous').click();await expect(preview.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');await expectNoDiagnostics(preview);await expect(preview.getByRole('table')).toHaveCount(0);await expect(preview.getByRole('status')).toHaveCount(0);await expect(preview).not.toContainText('synthetic private');}
+  state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();expect(calls.filter(call=>call.path===path)).toHaveLength(mutations.length+2);
+});
+test('appointment variants busy guard clears diagnostics through repeated clicks and access denial',async({page})=>{
+  const {preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();await dayButton(preview).click();await expect(preview.getByRole('table',{name:'Inspected appointment field-variant shapes'})).toBeVisible();
+  let release;state.delay=new Promise(resolve=>{release=resolve;});state.preview=ticketPreviewAppointmentVariantFixture({source:{TotalRows:1,results:[{}]}});await dayButton(preview,'previous').click();
+  await expectNoDiagnostics(preview);await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();await preview.getByRole('button').evaluateAll(buttons=>{for(const button of buttons){button.click();button.click();}});await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(2);
+  release();state.delay=null;await expect(preview).toContainText('Empty object rows: 1');await expect(preview).not.toContainText('Email-like string: 1');
+  state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');await expectNoDiagnostics(preview);await expect(preview.getByRole('status')).toHaveCount(0);expect(calls.filter(call=>call.path===path)).toHaveLength(3);
+});
+test('appointment variants cannot return from an abandoned request or Back/Forward navigation',async({page})=>{
+  const {frame,preview,calls,state}=await mount(page);state.preview=ticketPreviewAppointmentVariantFixture();let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(call=>call.path===path).length).toBe(1);
+  await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(preview).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(1);
+  state.delay=null;state.preview=ticketPreviewAppointmentVariantFixture({source:{TotalRows:1,results:[{}]}});await dayButton(preview,'previous').click();await expect(preview).toContainText('Empty object rows: 1');
+  const response=page.waitForResponse(response=>response.url().endsWith('/functions/v1/cos-operations-pages')&&response.request().method()==='POST'&&response.request().postDataJSON()?.path===path);release();await (await response).finished();await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(preview).toContainText('Empty object rows: 1');await expect(preview).not.toContainText('Email-like string: 1');
+  await traverseIframeHistory(frame,'forward','#field-map');await expect(preview).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(preview).toBeVisible();await expectNoDiagnostics(preview);expect(calls.filter(call=>call.path===path)).toHaveLength(2);
+});
+
+async function openPrivateInspection(frame){
+ const region=frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true});
+ await region.getByRole('button',{name:'Open private ticket inspection',exact:true}).click();
+ await region.getByRole('textbox',{name:'Ticket number',exact:true}).fill(privateSampleRequest.ticketNumber);
+ await region.getByLabel('Appointment day (America/Chicago)',{exact:true}).fill(privateSampleRequest.appointmentDay);
+ return region;
+}
+const privateRead=region=>region.getByRole('button',{name:/^(?:Inspect ticket privately|Reading private ticket…)/});
+test('private Owner inspection is explicit and shows literal mixed operational values only',async({page})=>{
+ const {frame,calls}=await mount(page,{privateClock:true}),region=frame.getByRole('region',{name:'Private mHelpDesk ticket inspection',exact:true});
+ await expect(region).toBeVisible();await expect(region.locator('input')).toHaveCount(0);expect(calls.filter(c=>c.path===path)).toHaveLength(0);
+ await openPrivateInspection(frame);await expect(region.locator('input')).toHaveCount(2);expect(calls.filter(c=>c.path===path)).toHaveLength(0);await privateRead(region).click();
+ const result=region.getByRole('region',{name:'Private ticket inspection result',exact:true});await expect(result).toBeVisible();
+ await expect(result).toContainText('Schema, staff identity and source-to-COS mapping remain unverified');await expect(result).toContainText('Recorded quantity (unclassified)');await expect(result).toContainText('Recorded durationSeconds (unclassified)');
+ const item=result.getByRole('region',{name:'Recorded item 1',exact:true});expect(await item.locator('.mhelp-private-literal').filter({hasText:'First line'}).evaluate(element=>element.textContent)).toBe('First line\n  Keep indentation & <tag> literally.\r\nLast line');await expect(item.locator('tag')).toHaveCount(0);
+ await expect(result).toContainText('operator.synthetic@example.test');await expect(result).toContainText('Coverage: unverified');await expect(result.getByRole('region',{name:'Appointment source row 1',exact:true})).toBeVisible();await expect(result).toContainText('no value is chosen as authoritative');
+ await result.getByText('All-row structural descriptors',{exact:true}).click();await expect(result.getByRole('table',{name:'Private sample appointment field shapes'}).getByRole('row')).toHaveCount(58);await expect(result.getByRole('table',{name:'Private sample fixed envelope descriptors'})).toContainText('totalRows');await expect(result).toContainText('Empty object rows: 0');
+ for(const forbidden of ['excluded-rate','excluded-amount','excluded-tax','excluded-cost','excluded-total','excluded-contact','unmatched-private-content','conflicting-private-content'])await expect(result).not.toContainText(forbidden);
+ expect(calls.filter(c=>c.path===path).map(c=>c.body)).toEqual([{evidence:'ticket_private_sample_v1',...privateSampleRequest}]);expect(await region.evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+});
+test('private selection unavailable shows bounded counts without values or fallback reads',async({page})=>{
+ const {frame,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);
+ for(const [reason,selection] of [['ticket_not_found',{pageLimit:500,sampledTickets:1,reportedTotal:1,matchingTickets:0}],['ambiguous_ticket_number',{pageLimit:500,sampledTickets:2,reportedTotal:2,matchingTickets:2}],['incomplete_ticket_page',{pageLimit:500,sampledTickets:1,reportedTotal:3,matchingTickets:1}]]){
+  state.privateSample=privateTicketSampleFixture({reason,selection});await privateRead(region).click();await expect(region.getByRole('status')).toContainText('No ticket detail or appointments were read');await expect(region).toContainText(`matching ticket numbers: ${selection.matchingTickets}`);await expect(region.locator('.mhelp-private-literal')).toHaveCount(0);
+ }
+ expect(calls.filter(c=>c.path===path)).toHaveLength(3);
+});
+test('private fields and dates stay bounded; new input removes earlier private values',async({page})=>{
+ const {frame,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);await privateRead(region).click();await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toBeVisible();
+ await region.getByRole('textbox',{name:'Ticket number'}).fill('61043');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);await expect(region).not.toContainText('Synthetic equipment item');
+ await region.getByRole('textbox',{name:'Ticket number'}).fill('1e3');await privateRead(region).click();expect(calls.filter(c=>c.path===path)).toHaveLength(1);
+ await region.getByRole('textbox',{name:'Ticket number'}).fill(privateSampleRequest.ticketNumber);await region.getByLabel('Appointment day (America/Chicago)').fill('2026-06-01');await privateRead(region).click();expect(calls.filter(c=>c.path===path)).toHaveLength(1);
+ await region.getByLabel('Appointment day (America/Chicago)').fill(privateSampleRequest.appointmentDay);state.privateSample=privateTicketSampleFixture();await privateRead(region).click();await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toBeVisible();expect(calls.filter(c=>c.path===path)).toHaveLength(2);
+});
+test('private and aggregate reads share the busy guard; Close aborts and clears the private view',async({page})=>{
+ const {frame,preview,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);let release;state.delay=new Promise(resolve=>{release=resolve;});await privateRead(region).click();await expect.poll(()=>calls.filter(c=>c.path===path).length).toBe(1);
+ await expect(dayButton(preview)).toBeDisabled();await expect(dayButton(preview,'previous')).toBeDisabled();await expect(privateRead(region)).toBeDisabled();await privateRead(region).evaluate(button=>{button.click();button.click();});expect(calls.filter(c=>c.path===path)).toHaveLength(1);
+ await region.getByRole('button',{name:'Close private inspection'}).click();await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();await expect(region.locator('input')).toHaveCount(0);await expect(region).not.toContainText('Synthetic equipment item');
+ release();state.delay=null;await expect(dayButton(preview)).toBeEnabled();await openPrivateInspection(frame);await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);
+ await privateRead(region).click();await expect(region).toContainText('Synthetic equipment item');expect(calls.filter(c=>c.path===path)).toHaveLength(2);
+});
+test('private inspection clears on verified parent hide and ignores untrusted messages',async({page})=>{
+ const {frame,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);await privateRead(region).click();await expect(region).toContainText('Synthetic equipment item');
+ await frame.locator('body').evaluate(()=>window.dispatchEvent(new MessageEvent('message',{origin:'https://untrusted.invalid',source:window.parent,data:{type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'}})));await expect(region).toContainText('Synthetic equipment item');
+ await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE'},location.origin));await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();await expect(region).not.toContainText('Synthetic equipment item');await expect(region.locator('input')).toHaveCount(0);expect(calls.filter(c=>c.path===path)).toHaveLength(1);
+});
+test('private failure and malformed value payloads clear prior data without displaying source error text',async({page})=>{
+ const {frame,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);await privateRead(region).click();await expect(region).toContainText('Synthetic equipment item');
+ for(const mutate of [v=>v.items.rows[0].fields.rate={state:'value',value:'hidden-price'},v=>v.appointments.rows[0].fields.ticketId.value=88002,v=>v.items.rows[0].fields.notes={state:'value',value:'Bearer hidden-secret'},v=>v.schema='verified']){
+  state.privateSample=privateTicketSampleFixture();mutate(state.privateSample);await privateRead(region).click();await expect(region.getByRole('alert')).toHaveText('The ticket preview could not be verified. Try again.');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);for(const text of ['hidden-price','hidden-secret','Synthetic equipment item'])await expect(region).not.toContainText(text);
+ }
+ state.privateSample=privateTicketSampleFixture();state.denied=true;await privateRead(region).click();await expect(region.getByRole('alert')).toContainText('Your Owner session could not be verified');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);await expect(region).not.toContainText('synthetic private provider text');expect(calls.filter(c=>c.path===path)).toHaveLength(6);
+});
+test('private stale responses cannot survive input edits, navigation or Back/Forward',async({page})=>{
+ const {frame,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);let release;state.delay=new Promise(resolve=>{release=resolve;});await privateRead(region).click();await expect.poll(()=>calls.filter(c=>c.path===path).length).toBe(1);
+ await region.getByRole('textbox',{name:'Ticket number'}).fill('61043');await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);release();state.delay=null;await expect(privateRead(region)).toBeEnabled();await expect(region).not.toContainText('Synthetic equipment item');
+ state.privateSample=privateTicketSampleFixture({request:{...privateSampleRequest,ticketNumber:'61043'}});await privateRead(region).click();await expect(region).toContainText('ticket number 61043');
+ await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(region).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();await expect(region.getByRole('region',{name:'Private ticket inspection result'})).toHaveCount(0);
+ await traverseIframeHistory(frame,'forward','#field-map');await expect(region).toHaveCount(0);await traverseIframeHistory(frame,'back','#unit-tracker');await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();expect(calls.filter(c=>c.path===path)).toHaveLength(2);
+});
+
+test('aggregate-first reads block private transport and any observed auth denial wipes the open private result',async({page})=>{
+ const {frame,preview,state,calls}=await mount(page,{privateClock:true}),region=await openPrivateInspection(frame);
+ let release;state.delay=new Promise(resolve=>{release=resolve;});await dayButton(preview).click();await expect.poll(()=>calls.filter(c=>c.path===path).length).toBe(1);
+ await expect(privateRead(region)).toBeDisabled();await privateRead(region).evaluate(button=>button.click());expect(calls.filter(c=>c.path===path)).toHaveLength(1);
+ release();state.delay=null;await expect(privateRead(region)).toBeEnabled();await privateRead(region).click();await expect(region).toContainText('Synthetic equipment item');
+ state.denied=true;await dayButton(preview).click();await expect(preview.getByRole('alert')).toContainText('Your Owner session could not be verified');
+ await expect(region.getByRole('button',{name:'Open private ticket inspection'})).toBeVisible();await expect(region.locator('input')).toHaveCount(0);await expect(region).not.toContainText('Synthetic equipment item');expect(calls.filter(c=>c.path===path)).toHaveLength(3);
 });

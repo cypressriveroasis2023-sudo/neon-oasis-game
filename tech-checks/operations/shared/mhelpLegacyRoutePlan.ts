@@ -1,7 +1,7 @@
 /**
  * Pure proposal for the original Tech Check database. This never calls a database,
  * creates a prep, sets a Ticket Lead, claims work, or changes vendor/local status.
- * `ready` means source-complete routing proposal, not permission to execute it.
+ * `ready` means a validated non-executing proposal, not permission to execute it.
  * A future adapter must verify the live RPC contract, Owner identity, Ticket Lead
  * semantics, and atomically deduplicate before using the proposed arguments.
  *
@@ -14,6 +14,9 @@
  */
 export const LEGACY_TECH_CHECK_PROJECT = 'goqrnolcvqnirjmzaeyk';
 export const LEGACY_ROUTE_CONTRACT = 'cos-mhelp-legacy-route-plan-v1';
+export const TECHNICIAN_EQUIPMENT_SELECTION_POLICY = 'technician_equipment_selection_v1';
+/** Local workflow intent, never a claim about vendor equipment or assignment facts. */
+export type LocalWorkflowPolicy = {policy: typeof TECHNICIAN_EQUIPMENT_SELECTION_POLICY};
 export type LegacyWorkType = 'service' | 'delivery' | 'swap' | 'pickup';
 export type LegacyDepartment = 'it' | 'service';
 export const LEGACY_PART_FIELDS = [
@@ -28,6 +31,7 @@ export type AssignmentFact = {
   evidence: string;
 };
 export type LegacyRouteInput = {
+  localWorkflowPolicy?: never;
   source: {
     portalId: string; ticketId: string; ticketNumber: string; typeId: string;
     statusId: string; customStatusId: string | null; deleted: boolean;
@@ -55,10 +59,17 @@ export type LegacyRouteInput = {
   notes: string;
   unitSummary: string;
 };
+export type DeferredLegacyRouteInput = Omit<LegacyRouteInput, 'localWorkflowPolicy' | 'equipment' | 'parts' | 'site'> & {
+  localWorkflowPolicy: LocalWorkflowPolicy;
+  site?: LegacyRouteInput['site'] | null;
+  /** Deferred selection must not silently discard an existing structured scope. */
+  equipment?: never;
+  parts?: never;
+};
 export type LegacyBundleRequest = {
-  ticket_no: string; site: string; work_type: LegacyWorkType;
+  ticket_no: string; site: string | null; work_type: LegacyWorkType;
   targets: Array<{role: LegacyDepartment; assignee_user_id: string | null; requires_it_handoff: boolean}>;
-  requested_unit_count: number; unit_summary: string; job_description: string; notes: string;
+  requested_unit_count: number | null; unit_summary: string; job_description: string; notes: string;
   equipment_manifest: Array<{category: 'device' | 'stand'; label: string; qty: number}>;
   scheduled_for: string; scheduled_time: string | null;
 } & Record<PartField, number>;
@@ -78,6 +89,9 @@ export type LegacyRoutePlan = {
   ticketLead: 'requires_verified_it_lead' | 'not_assigned_by_plan';
   requiresAtomicDuplicateCheck: true;
   executionEnabled: false;
+  /** Present only for the explicit local deferred-selection mode. */
+  localWorkflowPolicy?: LocalWorkflowPolicy;
+  targetProvenance?: Array<{role: LegacyDepartment; kind: 'source_assignment' | 'source_department_queue' | 'local_workflow_queue'}>;
   request: {p_request: LegacyBundleRequest} | null;
 };
 const EQUIPMENT: Record<string, 'device' | 'stand'> = {
@@ -111,6 +125,10 @@ function assignment(value: unknown): AssignmentFact | null {
 export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
   const input = obj(value), source = obj(input.source), reasons: string[] = [];
   const add = (reason: string) => { if (!reasons.includes(reason)) reasons.push(reason); };
+  const deferred = Object.hasOwn(input, 'localWorkflowPolicy');
+  const policy = obj(input.localWorkflowPolicy);
+  if (deferred && (policy.policy !== TECHNICIAN_EQUIPMENT_SELECTION_POLICY || Object.keys(policy).some(key => key !== 'policy'))) add('local_workflow_policy_invalid');
+  if (deferred && (Object.hasOwn(input, 'equipment') || Object.hasOwn(input, 'parts'))) add('deferred_scope_conflict');
   const globalAssignment = assignment(source.assignment);
   const originalSource: LegacyRoutePlan['originalSource'] = {
     portalId: id(source.portalId), ticketId: id(source.ticketId), ticketNumber: id(source.ticketNumber),
@@ -122,6 +140,7 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
   if (source.deleted === true) add('source_ticket_deleted');
   if (!globalAssignment || globalAssignment.state === 'unknown') add('source_assignment_unknown');
   if (globalAssignment && globalAssignment.identities.length > 1) add('source_assignment_ambiguous');
+  if (deferred && globalAssignment?.state !== 'assigned') add('scheduled_assignee_required');
 
   const mappings = Array.isArray(input.typeMappings) ? input.typeMappings.map(obj).filter(row =>
     row.portalId === source.portalId && row.typeId === source.typeId) : [];
@@ -132,10 +151,10 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
   else workType = mappings[0].workType as LegacyWorkType;
 
   const manifest: LegacyBundleRequest['equipment_manifest'] = [], equipment = obj(input.equipment);
-  if (equipment.complete !== true || equipment.reviewed !== true || !evidence(equipment.evidence) || !Array.isArray(equipment.items) || equipment.items.length > 100) add('equipment_scope_incomplete');
-  else {
+  if (!deferred && (equipment.complete !== true || equipment.reviewed !== true || !evidence(equipment.evidence) || !Array.isArray(equipment.items) || equipment.items.length > 100)) add('equipment_scope_incomplete');
+  else if (!deferred) {
     const seen = new Set<string>();
-    for (const raw of equipment.items) {
+    for (const raw of equipment.items as unknown[]) {
       const item = obj(raw), label = item.label;
       if (typeof label !== 'string' || !Object.hasOwn(EQUIPMENT, label) || item.category !== EQUIPMENT[label] ||
           typeof item.qty !== 'number' || !Number.isSafeInteger(item.qty) || item.qty < 1 || item.qty > 1000000) { add('equipment_item_unsupported'); continue; }
@@ -144,34 +163,60 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
     }
   }
   const parts = obj(input.parts), rawQuantities = obj(parts.quantities), quantities = {} as Record<PartField, number>;
-  if (parts.complete !== true || parts.reviewed !== true || !evidence(parts.evidence) ||
-      Object.keys(rawQuantities).some(key => !(LEGACY_PART_FIELDS as readonly string[]).includes(key))) add('parts_scope_incomplete');
+  if (!deferred && (parts.complete !== true || parts.reviewed !== true || !evidence(parts.evidence) ||
+      Object.keys(rawQuantities).some(key => !(LEGACY_PART_FIELDS as readonly string[]).includes(key)))) add('parts_scope_incomplete');
   for (const key of LEGACY_PART_FIELDS) {
+    // The legacy nonnull columns need placeholders; the policy and complete:false
+    // envelope explicitly distinguish these from source-confirmed zero quantities.
+    if (deferred) { quantities[key] = 0; continue; }
     const count = rawQuantities[key];
     if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0 || count > 1000000) add('part_quantity_invalid_or_missing');
     else quantities[key] = count;
   }
   const hasPrep = manifest.length > 0 || LEGACY_PART_FIELDS.some(key => quantities[key] > 0);
-  if (workType && ['delivery', 'swap', 'pickup'].includes(workType) && manifest.length === 0) add('equipment_required');
+  if (!deferred && workType && ['delivery', 'swap', 'pickup'].includes(workType) && manifest.length === 0) add('equipment_required');
   if (workType === 'delivery' && manifest.some(row => row.label === 'Solar Spotter') && manifest.some(row => row.label === 'Solar Stand')) add('automatic_service_solar_stand_conflict');
   const departments: LegacyDepartment[] = workType === 'pickup' ? ['service', 'it'] :
     workType === 'delivery' || workType === 'swap' || (workType === 'service' && hasPrep) ? ['it', 'service'] : workType === 'service' ? ['service'] : [];
 
   const site = obj(input.site), description = obj(input.description), schedule = obj(input.schedule);
-  if (site.reviewed !== true || !evidence(site.evidence) || !str(site.value, 500)) add('site_review_required');
-  if (description.reviewed !== true || !evidence(description.evidence) || !bodyText(description.value, 10000, true)) add('description_review_required');
+  if ((!deferred || input.site != null) && (site.reviewed !== true || !evidence(site.evidence) || !str(site.value, 500))) add('site_review_required');
+  if (description.reviewed !== true || !evidence(description.evidence) || !bodyText(description.value, 10000, !deferred) ||
+      (deferred && !String(description.value || '').trim() && !bodyText(input.notes, 10000, true))) add('description_review_required');
   if (schedule.reviewed !== true || !evidence(schedule.evidence) || !date(schedule.date) ||
       !(schedule.time === null || (typeof schedule.time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(schedule.time)))) add('schedule_review_required');
   if (!bodyText(input.notes, 10000) || !bodyText(input.unitSummary, 2000)) add('notes_or_unit_summary_invalid');
   const crosswalk = Array.isArray(input.identityCrosswalk) ? input.identityCrosswalk.map(obj) : [];
   const deptFacts = input.departmentAssignments === undefined ? [] : Array.isArray(input.departmentAssignments) ? input.departmentAssignments.map(obj) : null;
   if (deptFacts === null || deptFacts.some(row => !['it','service'].includes(String(row.department)))) add('department_assignment_invalid');
+  if (deferred) for (const row of deptFacts || []) {
+    const fact = assignment(row);
+    if (!fact) add('department_assignment_invalid');
+    else if (fact.state === 'unknown') add('department_assignment_unknown');
+    if ((deptFacts || []).filter(other => other.department === row.department).length > 1) add('department_assignment_ambiguous');
+  }
   const targets: LegacyBundleRequest['targets'] = [];
+  const targetProvenance: NonNullable<LegacyRoutePlan['targetProvenance']> = [];
   const routedSourceIdentities = new Set<string>();
+  // A scheduled source identity belongs only to its verified department. The
+  // explicit local policy can supply a counterpart queue, never vendor facts.
+  const scheduledMatches = deferred && globalAssignment?.state === 'assigned'
+    ? crosswalk.filter(row => row.portalId === source.portalId && row.sourceIdentity === globalAssignment.identities[0]) : [];
   for (const department of departments) {
     const candidates = (deptFacts || []).filter(row => row.department === department);
     if (candidates.length > 1) { add('department_assignment_ambiguous'); continue; }
-    const fact = candidates.length ? assignment(candidates[0]) : globalAssignment;
+    let fact = candidates.length ? assignment(candidates[0]) : globalAssignment;
+    let localQueue = false;
+    if (deferred && !candidates.length && globalAssignment?.state === 'assigned' && scheduledMatches.length === 1 &&
+        ['it','service'].includes(String(scheduledMatches[0].department)) && scheduledMatches[0].department !== department) {
+      localQueue = true;
+      fact = null;
+    }
+    if (localQueue) {
+      targets.push({role: department, assignee_user_id: null, requires_it_handoff: department === 'service' && departments[0] === 'it'});
+      targetProvenance.push({role: department, kind: 'local_workflow_queue'});
+      continue;
+    }
     if (!fact || fact.state === 'unknown') { add('department_assignment_unknown'); continue; }
     if (fact.identities.length > 1) { add('department_assignment_ambiguous'); continue; }
     if (candidates.length && globalAssignment?.state === 'unassigned' && fact.state === 'assigned') {
@@ -189,6 +234,7 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
       routedSourceIdentities.add(fact.identities[0]);
     }
     targets.push({role: department, assignee_user_id: userId, requires_it_handoff: department === 'service' && departments[0] === 'it'});
+    if (deferred) targetProvenance.push({role: department, kind: userId ? 'source_assignment' : 'source_department_queue'});
   }
   if (globalAssignment?.state === 'assigned' && globalAssignment.identities.some(identity => !routedSourceIdentities.has(identity))) add('source_assignee_not_routed');
   if (targets.some((target, index) => target.assignee_user_id !== null && targets.some((other, otherIndex) => otherIndex !== index &&
@@ -196,8 +242,8 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
   if ((deptFacts || []).some(row => !departments.includes(row.department as LegacyDepartment) && assignment(row)?.state === 'assigned')) add('assignment_for_unrouted_department');
   // No name, vendor status, account creation or workflow completion enters this object.
   const request = reasons.length || !workType ? null : {p_request: {
-    ticket_no: source.ticketNumber as string, site: site.value as string, work_type: workType, targets,
-    requested_unit_count: manifest.filter(row => row.category === 'device').reduce((sum, row) => sum + row.qty, 0),
+    ticket_no: source.ticketNumber as string, site: deferred && input.site == null ? null : site.value as string, work_type: workType, targets,
+    requested_unit_count: deferred ? null : manifest.filter(row => row.category === 'device').reduce((sum, row) => sum + row.qty, 0),
     unit_summary: input.unitSummary as string, job_description: description.value as string, notes: input.notes as string,
     equipment_manifest: manifest, scheduled_for: schedule.date as string, scheduled_time: schedule.time as string | null,
     ...quantities,
@@ -205,7 +251,8 @@ export function planMhelpLegacyRoute(value: unknown): LegacyRoutePlan {
   return {
     contract: LEGACY_ROUTE_CONTRACT, state: request ? 'ready' : 'review_needed', reasonCodes: reasons,
     originalSource, workType, firstDepartment: departments[0] || null, intakeRequired: workType === 'swap' || workType === 'pickup',
-    ticketLead: departments.includes('it') ? 'requires_verified_it_lead' : 'not_assigned_by_plan',
+    ticketLead: !deferred && departments.includes('it') ? 'requires_verified_it_lead' : 'not_assigned_by_plan',
+    ...(deferred ? {localWorkflowPolicy:{policy:TECHNICIAN_EQUIPMENT_SELECTION_POLICY},targetProvenance} : {}),
     requiresAtomicDuplicateCheck: true, executionEnabled: false, request,
   };
 }

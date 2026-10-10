@@ -1,6 +1,6 @@
 /** Intake piggybacks on an authenticated provider cron request, never on a browser action. */
 import {INTAKE_LIMITS,runMhelpIntake} from './mhelpIntakeRuntime.ts';
-import {createExistingCredentialSourceRead,createExistingServiceRpc} from './mhelpIntakeTransport.ts';
+import {createExistingCredentialSourceRead,createExistingCredentialPendingRead,createExistingServiceRpc} from './mhelpIntakeTransport.ts';
 
 const LEGACY='https://goqrnolcvqnirjmzaeyk.supabase.co';
 // Conservative invocation ceiling, ten seconds below the lowest hosted worker
@@ -37,6 +37,7 @@ export function scheduleCameraMhelpIntake(options:Options):boolean {
     await (options.run??runMhelpIntake)({enabled:true,deadlineMs,
       rpc:createExistingServiceRpc(options.db),
       readSource:createExistingCredentialSourceRead({projectUrl:LEGACY,request:req,fetch:options.fetch}),
+      readPending:createExistingCredentialPendingRead({projectUrl:LEGACY,request:req,fetch:options.fetch}),
     });
   }).catch(()=>{/* Provider result is independent. Durable intake state carries safe status only. */});
   try{options.waitUntil(task);registered=true;return true;}

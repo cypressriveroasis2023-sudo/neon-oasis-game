@@ -137,7 +137,51 @@ The extra detail response shares the existing 20-second provider deadline, 1 MiB
 
 Failures use fixed references for detail schema, identity mismatch, changed snapshot and creation-window mismatch. Provider errors retain fixed status/category diagnostics with the allowlisted `ticket_detail_read` operation. A failed flat detail may log only fixed root/data/results container kinds and core-field kinds. Error messages, stacks, raw keys, values, URLs, headers and bodies are discarded. The server and client revalidate the response shape, counts, selection state and 16,000-byte detail-evidence ceiling.
 
-This patch is a read-only diagnostic, not live source verification. It performs no vendor requests during local tests, makes no database changes, creates no tickets or notifications and does not register a source adapter. The source registry remains empty. The risk-denied migration remains unapplied. After an authorized actual detail result, absent or unverified operational site/equipment/schedule facts must become a concrete blocker; do not compensate with speculative joins or automatic intake.
+This patch is a read-only diagnostic, not live source verification. It performs no vendor requests during local tests, makes no database changes, creates no tickets or notifications and does not register a source adapter. The source registry remains empty. The risk-denied migration remains unapplied. After an authorized actual detail result, scheduling and technician identity must be verified through the bounded appointment contract before intake. Missing upfront site or equipment is not a prerequisite for the scheduled-ticket shell; technicians select equipment in the existing workflow. Do not compensate for unknown source identity or scheduling with speculative joins.
+
+### Read-only IT instruction handoff
+
+`it-ticket-instructions-host.js` displays the assignment's original
+`job_description` and `notes` to the actual signed-in active IT technician. It
+uses the existing `TechCheckContext` session and a fixed, limited
+`job_assignments` select under the existing RLS. It accepts only the exact
+current technician's active assignment or an unclaimed department assignment
+already available to IT. No grant, identity, credential, RPC, ticket write or
+workflow action is added.
+
+The panel appears in these existing legacy surfaces:
+
+- IT job lookup: the ticket in `.wl-it-ticket-number` must match the current
+  `wlITJobSearch` input and have the real `.wl-it-job-type` result marker.
+- Job Setup: the visible `itTicket` card must contain the visible
+  `wlCreateHead` and `wlCreateNav`. Instructions remain available while IT
+  selects equipment for an imported ticket with an empty manifest.
+- Resumed equipment prep: the visible `wlItWizardOnly` must have exactly one
+  direct `.wl-head`, containing exactly one direct `.small` label with the
+  exact `MHelpDesk Ticket #…` format. This is the protected `progress()`
+  helper's current `activeItPrep.ticket_no` display, not a remembered previous
+  selection or a search through arbitrary body text.
+
+The selector contract fails closed if a prep header is missing, duplicated,
+malformed, hidden or changed. Leaving the view, changing identity, entering a
+new ticket, closing instructions or replacing a header clears existing text
+and cancels pending results. Page hiding also disables observer-driven remounts;
+restoring the page starts a new session-verified read for the current ticket.
+Reopening or refreshing rereads the current assignment. No instructions are stored in browser storage or sent to an iframe.
+All original text is rendered with `textContent`, preserving line breaks;
+missing instructions and failed reads have explicit states. These notes do not
+change equipment choices, claim/start gates, prep validation, pickup sequence,
+handoff or completion. All protected workflow files remain identical to the
+existing preservation baseline.
+
+Regression coverage uses synthetic data only: a VM host suite checks narrow
+reads, assignment scope, exact literal notes, missing/failed data, stale
+responses, login changes, Close and header drift. The browser suite runs the
+actual protected lookup, assignment-start/gate, Job Setup, `showItPrep` and
+`renderItUnitStep`, with the complete IT prep view, wizard and rule helpers and
+synthetic persistence/evidence clients, across the configured device sizes. Its
+screenshots and exact-head hosted CI results must be reviewed before release;
+local test-runner startup failures are not a browser pass.
 
 ## Bounded appointment linkage evidence
 

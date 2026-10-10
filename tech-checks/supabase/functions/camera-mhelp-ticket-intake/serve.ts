@@ -2,7 +2,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createCameraMhelpTicketIntakeHandler} from './index.ts';
 import {verifyLegacyOwner} from './authorization.ts';
 import {runMhelpIntake} from '../../../operations/intake/mhelpIntakeRuntime.ts';
-import {createExistingServiceRpc,createExistingCredentialSourceRead} from '../../../operations/intake/mhelpIntakeTransport.ts';
+import {createExistingServiceRpc,createExistingCredentialSourceRead,createExistingCredentialPendingRead} from '../../../operations/intake/mhelpIntakeTransport.ts';
 const LEGACY='https://goqrnolcvqnirjmzaeyk.supabase.co';
 Deno.serve(async(req:Request)=>{
   const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -14,7 +14,8 @@ Deno.serve(async(req:Request)=>{
   return createCameraMhelpTicketIntakeHandler({
     verifyCron:async(candidate,signal)=>{const {data,error}=await db.rpc('verify_camera_health_cron_secret',{candidate}).abortSignal(signal);return !error&&data===true;},
     verifyOwner:(authorization,signal)=>verifyLegacyOwner(db,authorization,signal),
-    run:request=>runMhelpIntake({enabled:true,rpc,readSource:createExistingCredentialSourceRead({projectUrl:LEGACY,request,fetch})}),
+    run:request=>runMhelpIntake({enabled:true,rpc,readSource:createExistingCredentialSourceRead({projectUrl:LEGACY,request,fetch}),readPending:createExistingCredentialPendingRead({projectUrl:LEGACY,request,fetch})}),
     review:signal=>rpc({action:'review_status'},signal),
+    pendingStatus:signal=>rpc({action:'pending_status'},signal),
   })(req);
 });

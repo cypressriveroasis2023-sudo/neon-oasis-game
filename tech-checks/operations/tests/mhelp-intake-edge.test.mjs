@@ -63,3 +63,22 @@ test('entrypoints pin existing SDK/project/service RPC and avoid auth mutation o
  const server=await readFile(new URL('../../supabase/functions/camera-mhelp-ticket-intake/serve.ts',import.meta.url),'utf8');assert.match(server,/npm:@supabase\/supabase-js@2\.57\.4/);assert.match(server,/verifyLegacyOwner\(db,authorization,signal\)/);assert.match(server,/createExistingServiceRpc\(db\)/);assert.doesNotMatch(server,/setSession|set_config|user_metadata|console\./);
  const native=await readFile(new URL('../../supabase/functions/cos-mhelp-ticket-source/index.ts',import.meta.url),'utf8');assert.match(native,/productionAdapterFor\(policy,access\)/);assert.match(native,/nativeMhelpTokens/);assert.doesNotMatch(native,/console\.|SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+const pendingStatus=()=>({contract:'cos-mhelp-pending-status-v1',waitingCount:1,dueCount:0,oldestWaitingCreatedAt:time,lastRefreshAt:null,lastRefreshState:null,lastRefreshCode:null});
+const ownerPendingRequest={action:'review_status',evidenceCapability:'pending_schedule_v1'};
+test('only verified Owner opt-in reads independent pending status; unchanged Owner v1 never calls it',async()=>{
+ let pendingCalls=0;const {h,calls}=handler({pendingStatus:async()=>{pendingCalls++;return pendingStatus();}});
+ const old=await h(request({action:'review_status'},owner));assert.equal(pendingCalls,0);assert.equal(await old.text(),JSON.stringify(projectIntakeReview(review())));
+ assert.deepEqual(await (await h(request(ownerPendingRequest,owner))).json(),{contract:'cos-mhelp-intake-status-pending-v1',review:projectIntakeReview(review()),pendingSchedule:pendingStatus()});assert.equal(pendingCalls,1);assert.deepEqual(calls,['owner-auth','review','owner-auth','review']);
+ for(const body of [ownerPendingRequest,{action:'run',evidenceCapability:'pending_schedule_v1'},{action:'pending_status'}])assert.equal((await h(request(body,cron))).status,400);
+ for(const body of [{action:'pending_status'},{...ownerPendingRequest,evidenceCapability:'unknown'},{...ownerPendingRequest,evidenceCapability:null},{...ownerPendingRequest,ticketId:'PRIVATE'},{...ownerPendingRequest,actorId:id},{...ownerPendingRequest,portalId:'17'},{...ownerPendingRequest,url:'https://other.invalid'}])assert.equal((await h(request(body,owner))).status,400);
+ assert.equal(pendingCalls,1);assert(!calls.includes('run'));
+ const denied=handler({verifyOwner:async()=>false,pendingStatus:async()=>{throw Error('must not read');}}),req=request(ownerPendingRequest,owner);assert.equal((await denied.h(req)).status,403);assert.equal(req.bodyUsed,false);assert.deepEqual(denied.calls,[]);
+});
+import {projectIntakeReview} from '../intake/mhelpIntakeReview.ts';
+test('unavailable or malformed pending status preserves verified v1 and explicitly marks enrichment unknown',async()=>{
+ for(const pendingStatus of [undefined,async()=>{throw Error('PRIVATE SQL source');},async()=>({contract:'cos-mhelp-pending-status-v1',private:'PRIVATE'})]){
+  const {h,calls}=handler({pendingStatus});const r=await h(request(ownerPendingRequest,owner));assert.equal(r.status,200);assert.deepEqual(await r.json(),{contract:'cos-mhelp-intake-status-pending-v1',review:projectIntakeReview(review()),pendingSchedule:null});assert(!calls.includes('run'));
+ }
+ let pendingCalls=0;const {h}=handler({review:async()=>{throw Error('PRIVATE');},pendingStatus:async()=>{pendingCalls++;return pendingStatus();}});const r=await h(request(ownerPendingRequest,owner));assert.equal(r.status,503);assert(!(await r.text()).includes('PRIVATE'));assert.equal(pendingCalls,0);
+});

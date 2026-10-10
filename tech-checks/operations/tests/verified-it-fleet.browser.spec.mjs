@@ -9,7 +9,7 @@ async function mount(page,role='it',linked=true,options={}){
  await page.route('**/*',async route=>{
   const url=route.request().url();
   if(new URL(url).origin===origin&&new URL(url).pathname==='/fleet-fixture')return route.fulfill({contentType:'text/html',body:itHomeFixture(role,linked,options)});
-  if(url===origin+'/it-mhelp-projection.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../it-mhelp-projection.js',import.meta.url),'utf8')});
+  if(url===origin+'/it-mhelp-projection.js?v=it-assignment-queue-20261010')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../it-mhelp-projection.js',import.meta.url),'utf8')});
   if(url===origin+'/field-map-display-host.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../field-map-display-host.js',import.meta.url),'utf8')});
   if(url.startsWith(origin+'/resources/fonts/'))return route.fulfill({path:new URL('../../resources/fonts/'+url.split('/').pop(),import.meta.url).pathname});
   if(url===origin+'/techcheck-eye-favicon-32.png')return route.fulfill({path:new URL('../../techcheck-eye-favicon-32.png',import.meta.url).pathname});

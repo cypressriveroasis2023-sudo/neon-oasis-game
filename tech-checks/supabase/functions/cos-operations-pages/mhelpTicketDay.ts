@@ -31,3 +31,15 @@ export function mhelpAppointmentPreviewWindow(createdAfter:string) {
   if (!Number.isFinite(start.getTime()) || localMidnight(start)!==start.getTime()) throw new Error('The appointment schedule window is not available.');
   return {startDateUtc:start.toISOString(),endDateUtc:new Date(localMidnight(start,7)).toISOString(),timeZone:'America/Chicago' as const,calendarDays:7 as const};
 }
+
+/** A caller chooses only a calendar day near server-now. Bounds are solved in
+ * Chicago independently, so DST days retain their actual 23/25-hour length. */
+export function mhelpPrivateAppointmentDay(appointmentDay:unknown,now=new Date()) {
+  if(typeof appointmentDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDay)||!Number.isFinite(now.getTime()))throw new Error('Provide a valid appointment day within 31 Chicago calendar days.');
+  const [year,month,day]=appointmentDay.split('-').map(Number),target=Date.UTC(year,month-1,day);
+  if(year<1900||month<1||month>12||day<1||new Date(target).toISOString().slice(0,10)!==appointmentDay)throw new Error('Provide a valid appointment day within 31 Chicago calendar days.');
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
+  const offset=(target-Date.UTC(parts.year,parts.month-1,parts.day))/86400000;
+  if(!Number.isInteger(offset)||Math.abs(offset)>31)throw new Error('Provide a valid appointment day within 31 Chicago calendar days.');
+  return {startDateUtc:new Date(localMidnight(now,offset)).toISOString(),endDateUtc:new Date(localMidnight(now,offset+1)).toISOString(),timeZone:'America/Chicago' as const,calendarDays:1 as const};
+}

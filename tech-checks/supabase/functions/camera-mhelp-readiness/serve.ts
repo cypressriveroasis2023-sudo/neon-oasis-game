@@ -16,5 +16,6 @@ Deno.serve(async(req:Request)=>{
       const {data,error}=await client().rpc('verify_camera_health_cron_secret',{candidate});return !error&&data===true;
     },
     intakePolicy:signal=>createExistingServiceRpc(client())({action:'policy'},signal),
+    pendingScope:(leaseId,signal)=>createExistingServiceRpc(client())({action:'pending_scope',leaseId},signal),
   })(req);
 });

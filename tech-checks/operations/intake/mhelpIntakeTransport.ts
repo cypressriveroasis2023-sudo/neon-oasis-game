@@ -1,6 +1,6 @@
 /** Runtime-only bindings. This module never retrieves, stores, prints or copies a secret. */
 import {IntakeFault,type Rpc,type Window,type FaultCode} from './mhelpIntakeRuntime.ts';
-import {readBoundedJson} from './mhelpIntakeHandlers.ts';
+import {readBoundedJson,fetchBounded,cancelBody} from './mhelpIntakeHandlers.ts';
 import {DEFAULT_RETRY_AFTER_SECONDS,isRetryAfterSeconds,parseRetryAfter} from './mhelpIntakeRetry.ts';
 const NATIVE_SOURCE='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-mhelp-ticket-source';
 const LEGACY='https://goqrnolcvqnirjmzaeyk.supabase.co';
@@ -13,12 +13,12 @@ export function createExistingServiceRpc(db:{rpc:(name:string,args:Record<string
   };
 }
 /** Reuses the already-authenticated incoming Camera Health credential in the deployed runtime only. */
-export function createExistingCredentialSourceRead(options:{projectUrl:string;request:Request;fetch:typeof fetch}){
+function createExistingCredentialSourceTransport(options:{projectUrl:string;request:Request;fetch:typeof fetch}){
   const candidate=options.request.headers.get('x-camera-cron-secret');
   if(options.projectUrl!==LEGACY||!candidate||candidate.length>1024||/\s/.test(candidate))throw new IntakeFault('CONFIGURATION');
-  return async(window:Window,signal:AbortSignal)=>{
+  return async(body:Record<string,unknown>,signal:AbortSignal)=>{
     let response:Response;
-    try{response=await options.fetch(NATIVE_SOURCE,{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'ticket_batch',createdAfter:window.createdAfter,createdBefore:window.createdBefore}),redirect:'error',cache:'no-store',signal});}
+    try{response=await fetchBounded(options.fetch,NATIVE_SOURCE,{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify(body),redirect:'error',cache:'no-store',signal},signal);}
     catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
     if(!response.ok){
       let failure:unknown;try{failure=await readBoundedJson(response.body,512,signal);}catch{/* Ignore untrusted error details. */}
@@ -40,13 +40,34 @@ export function createExistingCredentialSourceRead(options:{projectUrl:string;re
     try{return await readBoundedJson(response.body,3*1048576,signal);}catch{throw new IntakeFault('SOURCE_INVALID');}
   };
 }
+export function createExistingCredentialSourceRead(options:Parameters<typeof createExistingCredentialSourceTransport>[0]){
+  const send=createExistingCredentialSourceTransport(options);
+  return (window:Window,signal:AbortSignal)=>send({action:'ticket_batch',createdAfter:window.createdAfter,createdBefore:window.createdBefore},signal);
+}
+export function createExistingCredentialPendingRead(options:Parameters<typeof createExistingCredentialSourceTransport>[0]){
+  const send=createExistingCredentialSourceTransport(options);
+  return (leaseId:string,signal:AbortSignal)=>send({action:'ticket_refresh',leaseId},signal);
+}
 /** Fixed policy read via the original verifier, after its existing Camera Health check. */
 export function createExistingCredentialPolicyRead(options:{projectUrl:string;request:Request;fetch:typeof fetch}){
   const candidate=options.request.headers.get('x-camera-cron-secret');
   if(options.projectUrl!=='https://tughscoxralhofrckvxy.supabase.co'||!candidate||candidate.length>1024||/\s/.test(candidate))throw new IntakeFault('CONFIGURATION');
   return async(signal:AbortSignal)=>{
-    let response:Response;try{response=await options.fetch(LEGACY+'/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'intake_policy'}),redirect:'error',cache:'no-store',signal});}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
-    if(!response.ok){await response.body?.cancel().catch(()=>{});throw new IntakeFault('SOURCE_UNAVAILABLE',TRANSIENT.has(response.status));}
+    let response:Response;try{response=await fetchBounded(options.fetch,LEGACY+'/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'intake_policy'}),redirect:'error',cache:'no-store',signal},signal);}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
+    if(!response.ok){cancelBody(response.body);throw new IntakeFault('SOURCE_UNAVAILABLE',TRANSIENT.has(response.status));}
     try{return await readBoundedJson(response.body,4096,signal);}catch{throw new IntakeFault('CONFIGURATION');}
+  };
+}
+
+/** Same fixed verifier and existing cron identity; no arbitrary IDs cross HTTP. */
+export function createExistingCredentialPendingScopeRead(options:{projectUrl:string;request:Request;fetch:typeof fetch}){
+  const candidate=options.request.headers.get('x-camera-cron-secret');
+  if(options.projectUrl!=='https://tughscoxralhofrckvxy.supabase.co'||!candidate||candidate.length>1024||/\s/.test(candidate))throw new IntakeFault('CONFIGURATION');
+  return async(leaseId:string,signal:AbortSignal)=>{
+    let response:Response;
+    try{response=await fetchBounded(options.fetch,LEGACY+'/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':candidate},body:JSON.stringify({action:'intake_pending_scope',leaseId}),redirect:'error',cache:'no-store'},signal);}
+    catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true);}
+    if(!response.ok){cancelBody(response.body);throw new IntakeFault('SOURCE_UNAVAILABLE',TRANSIENT.has(response.status));}
+    return readBoundedJson(response.body,4096,signal);
   };
 }

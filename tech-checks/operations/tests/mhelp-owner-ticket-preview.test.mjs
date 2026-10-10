@@ -19,10 +19,10 @@ function fixture(change={}) {
   if(url==='https://connect.mhelpdesk.com/api/v1.0/users/me')return json({portalId:Number(portal),private:'do-not-export'});
   if(url.endsWith('/tickettypes'))return change.invalidTypes?json({private:'synthetic-mhelp'}):json({totalRows:1,data:[{portalId:Number(portal),typeId:1,typeName:'Service',isActive:true}]});
   if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true}]);
-  if(url.includes('/Appointments?'))return json({TotalRows:0,results:[]});
+  if(url.includes('/Appointments?'))return json(change.appointments||{TotalRows:0,results:[]});
   if(url.includes('/Tickets/'))return change.detailHttp?json({private:'synthetic-mhelp'},change.detailHttp):json(change.detail||change.rows?.[0]);
   if(url.includes('/Tickets?')){
-   const u=new URL(url);assert.equal(u.searchParams.get('createStart'),change.previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),change.previous?'2026-10-09T05:00:00.000Z':'2026-10-09T22:00:00.000Z');
+   const u=new URL(url);if(change.privateSample){assert.equal(u.searchParams.get('appointmentStart'),'2026-10-10T05:00:00.000Z');assert.equal(u.searchParams.get('appointmentEnd'),'2026-10-11T05:00:00.000Z');assert.equal(u.searchParams.get('pageSize'),'500');assert(!u.searchParams.has('createStart'));}else {assert.equal(u.searchParams.get('createStart'),change.previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');assert.equal(u.searchParams.get('createEnd'),change.previous?'2026-10-09T05:00:00.000Z':'2026-10-09T22:00:00.000Z');}
    if(change.providerError)return json({private:'synthetic-mhelp'},change.providerError===true?429:change.providerError);
    return json({totalRows:change.rows?.length||0,data:change.rows||[],private:'do-not-export'});
   }
@@ -144,11 +144,10 @@ test('detail failures return only fixed reference codes and log sanitized operat
  }
 });
 
-const appointmentCapability='appointment_structure_v1';
-test('appointment capability uses the same active same-person Owner gate and rejects all caller scope overrides',async()=>{
+for(const appointmentCapability of ['appointment_structure_v1','appointment_variants_v1'])test(`${appointmentCapability} uses the same active same-person Owner gate and rejects all caller scope overrides`,async()=>{
  for(const previous of [false,true]){
   const f=fixture({previous,rows:[singleTicket(previous)]}),response=await f.handler(request({evidence:appointmentCapability,...(previous?{day:'previous'}:{})})),value=await response.json();
-  assert.equal(response.status,200);assert.equal(value.appointmentEvidence.state,'window_reviewed');assert.equal(value.appointmentEvidence.linkage,'no_match_in_window');
+  assert.equal(response.status,200);assert.equal(value.appointmentEvidence.state,'window_reviewed');assert.equal(value.appointmentEvidence.linkage,appointmentCapability==='appointment_structure_v1'?'no_match_in_window':'unverified');
   assert.equal(value.appointmentEvidence.window.startDateUtc,previous?'2026-10-08T05:00:00.000Z':'2026-10-09T05:00:00.000Z');
   assert.equal(value.appointmentEvidence.window.endDateUtc,previous?'2026-10-15T05:00:00.000Z':'2026-10-16T05:00:00.000Z');
   assert.equal(f.calls.filter(call=>call.url.includes('/Appointments?')).length,1);assert(f.calls.every(call=>call.method==='GET'));assert.deepEqual(f.diagnostics,[]);
@@ -163,4 +162,23 @@ test('appointment capability uses the same active same-person Owner gate and rej
   const f=fixture({rows:Array.from({length:count},(_,i)=>({...singleTicket(),ticketId:781234+i,ticketNumber:891234+i}))}),value=await(await f.handler(request({evidence:appointmentCapability}))).json();
   assert.equal(value.appointmentEvidence.state,'selection_unavailable');assert(!f.calls.some(call=>call.url.includes('/Appointments?')||call.url.includes('/Tickets/')));
  }
+});
+
+const privateCapability='ticket_private_sample_v1',privateRequest={evidence:privateCapability,ticketNumber:'891234',appointmentDay:'2026-10-10'};
+test('private operational sample is explicit and uses the same active mapped Owner boundary without dictionary or native writes',async()=>{
+ const row={...singleTicket(),creationDate:'2026-07-01T12:00:00Z'},detail={...row,items:[{name:'Synthetic source item',description:'First line\nSecond source line',notes:'Literal note',quantity:6,durationSeconds:21600,rate:100,amount:600,contacts:['private contact'],attachments:['private attachment']}]};
+ const f=fixture({privateSample:true,rows:[row],detail,appointments:{results:[{TicketId:row.ticketId,PortalId:Number(portal),StartUtc:'2026-10-10T12:00:00Z',UserID:'synthetic-technician@example.invalid',Subject:'Synthetic appointment'}]}}),response=await f.handler(request(privateRequest)),value=await response.json();
+ assert.equal(response.status,200);assert.equal(value.contract,'cos-mhelpdesk-ticket-private-sample-v1');assert.equal(value.state,'sample_reviewed');assert.equal(value.items.rows[0].fields.description.value,detail.items[0].description);assert.equal(value.appointments.rows.length,1);assert.equal(value.appointments.completeness,'unverified');assert.equal(value.schema,'unverified');assert.equal(value.automaticSync,false);assert.equal(value.ticketWrites,false);assert.equal(f.configReads(),1);assert.deepEqual(f.diagnostics,[]);
+ const vendor=f.calls.filter(c=>c.url.includes('mhelpdesk.com'));assert.equal(vendor.length,4);assert(vendor.every(c=>c.method==='GET'));assert(!f.calls.some(c=>c.url.includes('/rpc/')||c.url.includes('/tickettypes')||c.url.includes('/ticketstatus')||c.url.includes('/Staff')||c.url.includes('/History')));for(const valueToHide of ['private contact','private attachment','synthetic-mhelp','rate','amount'])assert(!JSON.stringify(value).includes(valueToHide));
+});
+test('private sample rejects IT, Service, unmapped, inactive, archived and revoked Owner sessions before source access',async()=>{
+ for(const change of [{role:'it'},{role:'service'},{id:'4f7044b5-86b6-411f-8898-39bb64b4ddbc'},{id:'78e54fbd-c2db-4d18-8e3d-a9740adcf285'},{id:'22222222-2222-2222-2222-222222222222'},{invalid:true},{inactive:true},{archived:true},{nativeInactive:true},{revoked:true}]){const f=fixture(change),response=await f.handler(request(privateRequest));assert([401,403].includes(response.status));assert.equal(f.configReads(),0);assert(!f.calls.some(c=>c.url.includes('mhelpdesk.com')));assert.deepEqual(f.diagnostics,[]);}
+});
+test('private sample refuses caller credentials, API IDs, endpoints, arbitrary dates and fields before any configuration read',async()=>{
+ for(const extra of [{ticketId:781234},{portalId:portal},{url:'https://elsewhere.invalid'},{actorId:actor},{token:'private'},{fields:['Subject']},{day:'previous'},{appointmentId:123},{pageSize:500},{createdAfter:'2026-10-01T00:00:00Z'},{activate:true},{appointmentDay:'2026-11-10'},{ticketNumber:891234},{ticketNumber:'891234/other'}]){const f=fixture(),response=await f.handler(request({...privateRequest,...extra}));assert.equal(response.status,400,JSON.stringify(extra));assert.equal(f.configReads(),0);assert.deepEqual(f.diagnostics,[]);}
+ for(const body of [{ticketNumber:'891234',appointmentDay:'2026-10-10'},{evidence:privateCapability},{...privateRequest,evidence:'appointment_variants_v1'}]){const f=fixture(),response=await f.handler(request(body));assert.equal(response.status,400);assert.equal(f.configReads(),0);}
+ const f=fixture();assert.equal((await f.handler(request(privateRequest,'GET'))).status,400);assert.equal(f.configReads(),0);
+});
+test('private sample failures log fixed diagnostic categories only, never ticket number, day or source values',async()=>{
+ const row=singleTicket(),f=fixture({privateSample:true,rows:[row],detail:{...row,ticketId:781235}}),response=await f.handler(request(privateRequest));assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'MHELP_PREVIEW_DETAIL_IDENTITY_MISMATCH'});assert.equal(f.diagnostics.length,1);for(const value of ['891234','781234','2026-10-10','synthetic-mhelp','synthetic-private-detail','Authorization','https://'])assert(!JSON.stringify(f.diagnostics).includes(value));assert(!f.calls.some(c=>c.url.includes('/Appointments')));
 });

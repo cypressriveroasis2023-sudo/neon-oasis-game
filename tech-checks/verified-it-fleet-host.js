@@ -1,11 +1,11 @@
 import {setFieldMapDisplay} from './field-map-display-host.js';
-import {projectITMhelpTickets} from './it-mhelp-projection.js';
+import {projectITMhelpTickets,projectITAssignments} from './it-mhelp-projection.js?v=it-assignment-queue-20261010';
 // Separate fleet-only frame; existing Owner shell and technician queues are untouched.
 const context=()=>window.TechCheckContext;
 const ids=new Set(['4f7044b5-86b6-411f-8898-39bb64b4ddbc','b7cc3cbf-d11e-4d4a-9742-c07701857911']);
-let subject=null,allowed=false,pending=false,frame=null,dialog=null,button=null,trackerButton=null,opener=null,trackerAllowed=false,trackerChecked=false,trackerPending=false,dashboardButton=null,mhelpPending=null,epoch=0,authObserved=false,deepLinkOpened=false;
-const active=()=>{const c=context(),p=c?.getProfile(),id=c?.getSession()?.user?.id;return c?.getRole()==='it'&&c?.getEffectiveRole()==='it'&&p?.active===true&&!p?.archived_at&&ids.has(id)&&!document.getElementById('appView')?.classList.contains('hidden')?id:null;};
-function close(restoreFocus=true){setFieldMapDisplay(frame,false);frame?.remove();dialog?.remove();frame=null;dialog=null;if(restoreFocus&&(opener||button)?.isConnected)(opener||button).focus();opener=null;}
+let subject=null,allowed=false,pending=false,frame=null,dialog=null,button=null,trackerButton=null,opener=null,trackerAllowed=false,trackerChecked=false,trackerPending=false,dashboardButton=null,mhelpPending=null,assignmentsPending=null,assignmentView=null,assignmentRevision=0,epoch=0,authObserved=false,deepLinkOpened=false;
+const active=()=>{const c=context(),p=c?.getProfile(),id=c?.getSession()?.user?.id;return c?.getRole()==='it'&&c?.getEffectiveRole()==='it'&&p?.active===true&&!p?.archived_at&&p?.user_id===id&&!document.body.classList.contains('owner-test-role-preview')&&ids.has(id)&&!document.getElementById('appView')?.classList.contains('hidden')?id:null;};
+function close(restoreFocus=true){assignmentsPending=null;assignmentView=null;assignmentRevision++;setFieldMapDisplay(frame,false);frame?.remove();dialog?.remove();frame=null;dialog=null;if(restoreFocus&&(opener||button)?.isConnected)(opener||button).focus();opener=null;}
 function reset(){epoch++;allowed=false;pending=false;deepLinkOpened=false;trackerAllowed=false;trackerChecked=false;trackerPending=false;close(false);button?.remove();trackerButton?.remove();dashboardButton?.remove();button=null;trackerButton=null;dashboardButton=null;mhelpPending=null;}
 async function verify(){const id=active();if(!id)return false;try{const r=await context().db.rpc('cos_verified_fleet_capabilities_v1');return active()===id&&!r.error&&r.data?.fleetRead===true;}catch{return false;}}
 async function verifyTracker(){const id=active();if(!id)return false;const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{const session=(await context().db.auth.getSession()).data?.session;if(active()!==id||session?.user?.id!==id||!session?.access_token)return false;const response=await fetch('https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({method:'GET',path:'/api/session',body:null}),cache:'no-store',signal:controller.signal});if(!response.ok)return false;const data=await response.json();return active()===id&&data?.authorized===true&&data?.legacyOwner===false&&data?.role==='IT'&&data?.features?.unitTracker===true;}catch{return false;}finally{clearTimeout(timer);}}
@@ -53,6 +53,40 @@ window.addEventListener('message',async event=>{if(event.origin!==location.origi
    if(!verified){respond({error:'forbidden'});allowed=false;close();return;}
    respond({items:projectITMhelpTickets(result.data),generatedAt:new Date().toISOString()});
   }catch{respond({error:'unavailable'});}
+  return;
+ }
+ if(d.type==='COS_OPERATIONS_WORKSPACE_ACTIVE'&&typeof d.workspace==='string'&&d.workspace.length<=80){if(d.workspace!==assignmentView){assignmentView=d.workspace;assignmentRevision++;assignmentsPending=null;}return;}
+ if(d.type==='COS_IT_ASSIGNMENTS_REQUEST'&&typeof d.requestId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(d.requestId)){
+  const requested=subject,target=frame.contentWindow,revision=epoch,viewRevision=assignmentRevision;
+  const matchingFrame=()=>revision===epoch&&target===frame?.contentWindow&&subject===requested&&allowed;
+  const current=()=>matchingFrame()&&viewRevision===assignmentRevision&&active()===requested;
+  // A lost profile can precede the DOM/auth observers. Close only the captured
+  // frame; a stale read must never close a replacement session or dialog.
+  const closeIfRevoked=()=>{if(matchingFrame()&&active()!==requested){allowed=false;close();return true;}return false;};
+  const scoped=()=>current()&&context()?.getProfile()?.user_id===requested&&!document.body.classList.contains('owner-test-role-preview');
+  const respond=payload=>{if(current())target.postMessage({type:'COS_IT_ASSIGNMENTS_RESPONSE',requestId:d.requestId,...payload},location.origin);};
+  const fresh=async()=>{const result=await context().db.auth.getSession();return scoped()&&!result?.error&&result?.data?.session?.user?.id===requested&&typeof result.data.session.access_token==='string'&&Boolean(result.data.session.access_token.trim());};
+  try{
+   if(!scoped()){respond({error:'forbidden'});allowed=false;close();return;}
+   if(!assignmentsPending){
+    let timer,expired=false;
+    const read=async()=>{
+     if(!await fresh()||expired)return {error:'forbidden'};
+     const result=await context().db.rpc('my_available_assignments',{p_role:'it'});
+     if(expired||!scoped())return {error:'forbidden'};
+     if(result?.error)throw new Error('unavailable');
+     if(!await fresh()||expired||!await verify()||expired||!scoped())return {error:'forbidden'};
+     return {items:projectITAssignments(result.data,requested),generatedAt:new Date().toISOString()};
+    };
+    const pendingRead=Promise.race([read(),new Promise(resolve=>{timer=setTimeout(()=>{expired=true;resolve({error:'timeout'});},12000);})]).finally(()=>clearTimeout(timer));
+    assignmentsPending=pendingRead;
+    void pendingRead.then(()=>{if(assignmentsPending===pendingRead)assignmentsPending=null;},()=>{if(assignmentsPending===pendingRead)assignmentsPending=null;});
+   }
+   const result=await assignmentsPending;
+   if(closeIfRevoked()||!current())return;
+   respond(result);
+   if(result.error==='forbidden'){allowed=false;close();}
+  }catch{if(!closeIfRevoked())respond({error:'unavailable'});}
   return;
  }
  if(d.type==='COS_OPERATIONS_TOKEN_REQUEST'&&typeof d.requestId==='string'&&d.requestId.length<=100){const requested=subject,target=frame.contentWindow,revision=epoch;let token=null;try{const s=await context().db.auth.getSession();if(await verify()&&active()===requested&&s.data?.session?.user?.id===requested&&target===frame?.contentWindow)token=s.data.session.access_token;}catch{}

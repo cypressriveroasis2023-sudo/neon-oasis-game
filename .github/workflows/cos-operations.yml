@@ -8,6 +8,7 @@ on:
       - 'tech-checks/operations-host.*'
       - 'tech-checks/verified-it-fleet-host.js'
       - 'tech-checks/it-mhelp-projection.js'
+      - 'tech-checks/it-ticket-instructions-host.js'
       - 'tech-checks/vision-platform.css'
       - 'tech-checks/vision-workspace.js'
       - 'tech-checks/index.html'
@@ -46,6 +47,7 @@ on:
       - 'tech-checks/operations-host.*'
       - 'tech-checks/verified-it-fleet-host.js'
       - 'tech-checks/it-mhelp-projection.js'
+      - 'tech-checks/it-ticket-instructions-host.js'
       - 'tech-checks/vision-platform.css'
       - 'tech-checks/vision-workspace.js'
       - 'tech-checks/index.html'
@@ -125,8 +127,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - name: Verify mHelp Owner interactions before the full browser suite
-        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs
+      - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()

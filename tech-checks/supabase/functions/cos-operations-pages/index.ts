@@ -1,8 +1,10 @@
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
+import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
+import {MHELP_TICKET_PRIVATE_SAMPLE,validateMhelpPrivateSampleRequest,projectMhelpPrivateSample} from './mhelpTicketPrivateSample.ts';
 import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from './mhelpTicketDay.ts';
 import {mhelpTicketDiagnostic} from './mhelpTicketDiagnostics.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
@@ -234,7 +236,7 @@ export function createOperationsHandler(options) {
     const roleCode = legacyOwner ? 'owner' : link.roleCode;
     const roles = await platformRead('user_roles?select=role_id,roles!inner(code,organization_id)&user_id=eq.' + actorId + '&roles.organization_id=eq.' + ORGANIZATION_ID + '&roles.code=eq.' + roleCode + '&limit=1');
     if (!Array.isArray(roles) || !roles.some(row => row.roles?.code === roleCode && row.roles?.organization_id === ORGANIZATION_ID)) fail('Your linked COS production role is not active.', 403);
-    return context;
+    return {...context,ownerRoleId:legacyOwner?roles.find(row=>row.roles?.code==='owner'&&row.roles?.organization_id===ORGANIZATION_ID)?.role_id:null};
   };
   const fleetPlacementAudits = async (context) => {
     const rows=[]; let cursor=null;
@@ -364,7 +366,7 @@ export function createOperationsHandler(options) {
         const envelopeLimit = envelope.path === '/api/mhelpdesk/imports/stage' ? MHELP_JSON_LIMIT : String(envelope.path || '').startsWith('/api/mhelpdesk/imports/') ? 524288 : 65536;
         if (envelopeBytes > envelopeLimit) fail('Request body is too large.', 413);
         if (Object.keys(envelope).some(k => !['path', 'method', 'body'].includes(k))) fail('Unsupported transport fields.');
-        if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path)) fail('COS endpoint not found.', 404);
+        if (typeof envelope.path !== 'string' || !/^\/api\/[a-zA-Z0-9/_-]+$/.test(envelope.path) && !(envelope.method==='GET' && envelope.path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1')) fail('COS endpoint not found.', 404);
         if (!['GET', 'POST'].includes(envelope.method)) fail('Method not supported.', 405);
         path = envelope.path.replace(/\/$/, '');
         method = envelope.method;
@@ -464,19 +466,36 @@ export function createOperationsHandler(options) {
       });
       if (method === 'GET' && path === '/api/session') return json({
         authorized: Boolean(context.actorId), legacyOwner: true, role: 'Owner', name: context.name,
-        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId) },
+        features: { unitTracker: Boolean(context.actorId), fleetAccess: Boolean(context.actorId), fleetPlacementEdit: Boolean(context.actorId), fleetConnectionEdit: Boolean(context.actorId), cameraHealthV2: Boolean(context.actorId), fieldLocationVerification: Boolean(context.actorId), ownerIdentityReview: Boolean(context.actorId), mhelpTicketImport: Boolean(context.actorId), deliveryGoBack: Boolean(context.actorId), legacyInstallEvidence: Boolean(context.actorId) },
         productionOwnerUserId: context.actorId || null,
         provisioningNeeded: context.actorId ? null : 'same_person_platform_auth_identity_and_owner_role',
         reason: context.actorId ? null : 'This Owner has no linked same-person COS production account. An Owner must provision that identity and its existing Owner role before linking it. Existing Tech Check tools remain available.',
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
-      if(path==='/api/mhelpdesk/intake/status') {
+      if(path==='/api/owner-review/legacy-evidence'){
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method!=='GET')fail('Method not supported.',405);
+        if(new URL(request.url).search)fail('Evidence query parameters are unsupported.');
+        allowedFields(body||{},[],'Legacy evidence request');
+        // Check the same existing job-view permission as the private evidence reader,
+        // with a bounded native metadata read. Legacy evidence never uses the service key.
+        try{
+          const roleId=idValue(context.ownerRoleId,'Owner role');
+          const permission=await legacyEvidenceTransport(requestFetch,platformUrl,platformHeaders(),request.signal)('role_permissions?select=role_id,permission_code&role_id=eq.'+roleId+'&permission_code=eq.job.view_all&limit=2');
+          if(!Array.isArray(permission)||permission.length!==1||permission[0]?.role_id!==roleId||permission[0]?.permission_code!=='job.view_all')throw new LegacyInstallEvidenceError(403);
+          return json(await createLegacyInstallEvidenceReader(legacyEvidenceTransport(requestFetch,LEGACY_URL,context.headers,request.signal))());
+        }
+        catch(cause){const error=cause instanceof LegacyInstallEvidenceError?cause:new LegacyInstallEvidenceError();return json({error:error.message},error.status);}
+      }
+      if(path==='/api/mhelpdesk/intake/status'||path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1') {
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
         if(method!=='GET')fail('Method not supported.',405);
         allowedFields(body || {},[],'Intake status request');
-        if(new URL(request.url).search)fail('Intake status query parameters are unsupported.');
-        try{return json(await readMhelpIntakeReview(context.authorization,request.signal));}
+        const query=new URL(request.url).search,transportOptIn=path==='/api/mhelpdesk/intake/status?capability=pending_schedule_v1';
+        if(query!==''&&(query!=='?capability=pending_schedule_v1'||transportOptIn))fail('Intake status query parameters are unsupported.');
+        const capability=transportOptIn||query==='?capability=pending_schedule_v1'?'pending_schedule_v1':undefined;
+        try{return json(await readMhelpIntakeReview(context.authorization,request.signal,capability));}
         catch(cause){const failure=cause instanceof MhelpIntakeReviewError?cause:new MhelpIntakeReviewError();return json({error:failure.message},failure.status);}
       }
       if (path.startsWith('/api/mhelpdesk/partner/')) {
@@ -485,13 +504,24 @@ export function createOperationsHandler(options) {
         if (method === 'POST' && body === null) body = await requestBody(request);
         if(path==='/api/mhelpdesk/partner/tickets/preview') {
           if(method!=='POST')fail('Method not supported.',405);
+          if(body?.evidence===MHELP_TICKET_PRIVATE_SAMPLE){
+            allowedFields(body,['evidence','ticketNumber','appointmentDay'],'Private ticket sample request');
+            const now=options.now ? options.now() : new Date(),sample={ticketNumber:body.ticketNumber,appointmentDay:body.appointmentDay};
+            try {validateMhelpPrivateSampleRequest(sample,now);}catch {fail('Enter a ticket number and an appointment day within 31 Chicago calendar days.');}
+            try {return json(projectMhelpPrivateSample(await mhelpTickets.sample(sample,now,request.signal)));}
+            catch(cause){
+              const diagnostic=mhelpTicketDiagnostic(cause);
+              try {(options.reportTicketPreviewFailure || (entry=>console.warn(JSON.stringify(entry))))(diagnostic.log);}catch { /* Never log source values. */ }
+              return json({error:diagnostic.error},diagnostic.httpStatus);
+            }
+          }
           allowedFields(body || {},['day','evidence'],'Ticket preview request');
           if(body?.day!==undefined && body.day!=='previous')fail('Ticket preview day is unsupported.');
-          if(body?.evidence!==undefined && body.evidence!=='operational_structure_v1' && body.evidence!=='ticket_detail_structure_v1' && body.evidence!=='appointment_structure_v1')fail('Ticket preview evidence capability is unsupported.');
+          if(body?.evidence!==undefined && body.evidence!=='operational_structure_v1' && body.evidence!=='ticket_detail_structure_v1' && body.evidence!=='appointment_structure_v1' && body.evidence!=='appointment_variants_v1')fail('Ticket preview evidence capability is unsupported.');
           try {
             const now=options.now ? options.now() : new Date();
             const window=body?.day==='previous'?mhelpPreviousDayPreviewWindow(now):mhelpTodayPreviewWindow(now);
-            const evidence=body?.evidence==='appointment_structure_v1'?'appointment_structure_v1':body?.evidence==='ticket_detail_structure_v1'?'ticket_detail_structure_v1':body?.evidence==='operational_structure_v1'?'operational_structure_v1':undefined;
+            const evidence=body?.evidence==='appointment_variants_v1'?'appointment_variants_v1':body?.evidence==='appointment_structure_v1'?'appointment_structure_v1':body?.evidence==='ticket_detail_structure_v1'?'ticket_detail_structure_v1':body?.evidence==='operational_structure_v1'?'operational_structure_v1':undefined;
             return json(projectMhelpTicketPreview(await mhelpTickets.preview(window,evidence),evidence));
           } catch(cause) {
             const diagnostic=mhelpTicketDiagnostic(cause);

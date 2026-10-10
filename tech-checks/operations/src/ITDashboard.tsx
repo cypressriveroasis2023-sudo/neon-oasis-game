@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { api } from './api';
+import { api, openLegacy } from './api';
 import { checkedFieldMap } from './gpsPersistence';
 import { isCurrentFieldPin, type FieldLocation } from './fieldLocations';
 import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { checkedTrackerSnapshot, trackerAccess } from './unitTracker';
 import { readRouterSnapshot, summarizeRouters } from '../../supabase/functions/cos-operations-pages/routers';
 import { readVrmFleetConfig } from '../../supabase/functions/cos-operations-pages/vrm';
-import { readITMhelpInfo } from './itMhelpBridge';
+import { readITMhelpInfo, readITAssignments } from './itMhelpBridge';
 import './itDashboard.css';
 
 type ReadState<T> = { data: T | null; loading: boolean; error: string; readAt: number | null };
@@ -18,7 +18,7 @@ type Summary = {
 /** A card owns its pending read. No global gate, settled cache, or write retry.
  * Deferring connect's first read avoids StrictMode's discarded setup request.
  * Every completion is tied to the exact connection and request generation. */
-export function createITSourceReader<T>(load: () => Promise<T>, enabled = true) {
+export function createITSourceReader<T>(load: () => Promise<T>, enabled = true, keepPrevious = true) {
   let state: ReadState<T> = { data: null, loading: enabled, error: '', readAt: null };
   let connected = false, revision = 0, pending: number | null = null;
   const listeners = new Set<() => void>();
@@ -27,7 +27,7 @@ export function createITSourceReader<T>(load: () => Promise<T>, enabled = true) 
     if (!connected || !enabled || pending !== null) return;
     const request = ++revision;
     pending = request;
-    publish({ ...state, loading: true, error: '' });
+    publish({ ...state, ...(!keepPrevious ? { data: null, readAt: null } : {}), loading: true, error: '' });
     try {
       const data = await load();
       if (connected && request === revision) publish({ data, loading: false, error: '', readAt: Date.now() });
@@ -116,6 +116,36 @@ export function summarizeITMhelp(value: Awaited<ReturnType<typeof readITMhelpInf
   note: 'MHelp ticket information already available to your signed-in IT account.' };
 }
 
+export function summarizeITAssignments(value: Awaited<ReturnType<typeof readITAssignments>>): Summary {
+  return { count: value.items.length, label: 'active IT assignments', metrics: [
+    { label: 'Assigned to you', value: value.items.filter(item => item.audience === 'mine').length },
+    { label: 'Department queue', value: value.items.filter(item => item.audience === 'department').length },
+  ], note: 'Your assigned or started work and unclaimed IT department work. A Ticket Lead is not required.' };
+}
+
+function ITAssignmentSummary({ session, navigate }: { session: Record<string, any>; navigate: (workspace: string) => void }) {
+  const reader = useMemo(() => createITSourceReader(readITAssignments, true, false), [session]);
+  const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
+  useEffect(() => reader.connect(), [reader]);
+  const summary = state.data ? summarizeITAssignments(state.data) : null;
+  return <section className='it-dashboard-assignment-summary' aria-label='IT assignment queue summary' aria-busy={state.loading}>
+    <p className='it-dashboard-eyebrow'>UNIT CHECKS</p><h2>Your assigned work</h2><p className='it-dashboard-note'>Review your scheduled work here, then open Tech Checks to choose the ticket and complete its unit checklist.</p>
+    {summary ? <><div className='it-dashboard-assignment-count'><strong>{summary.count.toLocaleString()}</strong> {summary.label}</div><dl className='it-dashboard-metrics'>{summary.metrics.map(metric => <div key={metric.label}><dd>{metric.value}</dd><dt>{metric.label}</dt></div>)}</dl><p className='it-dashboard-note'>{summary.note}</p><p className='it-dashboard-note'>Queue read {new Date(state.data!.generatedAt).toLocaleString()}</p></> : <p className='it-dashboard-note' role='status'>{state.loading ? 'Loading IT assignment queue…' : 'IT assignment count unavailable.'}</p>}
+    {state.data && <ul className='it-dashboard-work-list'>{state.data.items.filter(item => item.audience === 'mine').slice(0, 5).map(item => <li key={item.assignmentId}>
+      <div><strong>Ticket #{item.ticketNumber}</strong><span className='it-dashboard-work-status'>{item.status === 'started' ? 'Started' : 'Assigned'}</span></div>
+      <p>{item.site || 'Site not recorded'}</p>
+      <p className='it-dashboard-note'>{item.workType || 'Work type not recorded'} · {item.scheduledFor || 'Not scheduled'}{item.scheduledTime ? ' · ' + item.scheduledTime.slice(0, 5) + ' (as recorded)' : ''}</p>
+      <p className='it-dashboard-note'>{item.equipment.length ? item.equipment.join(' · ') : item.unitSummary || 'Select equipment in Tech Checks after reviewing instructions.'}</p>
+    </li>)}</ul>}
+    {state.data && !state.data.items.some(item => item.audience === 'mine') && <p className='it-dashboard-note'>No active work is assigned to you in this snapshot. You can review the unclaimed department queue below.</p>}
+    {state.data && state.data.items.filter(item => item.audience === 'mine').length > 5 && <p className='it-dashboard-note'>Showing 5 assigned tickets. Open all assignments for the full list.</p>}
+    {state.error && <p className='it-dashboard-error' role='alert'>{state.error}</p>}
+    <div className='it-dashboard-actions'><button type='button' className='it-dashboard-open' onClick={() => openLegacy('it')}>Open IT Tech Checks →</button></div>
+    <div className='it-dashboard-actions'><button type='button' className='it-dashboard-refresh' onClick={() => navigate('MHelp')}>View all assignments and ticket info</button></div>
+    <div className='it-dashboard-actions'><button type='button' className='it-dashboard-refresh' disabled={state.loading} onClick={() => void reader.refresh()}>{state.loading ? 'Loading IT queue…' : 'Refresh IT queue'}</button></div>
+  </section>;
+}
+
 type Source = {
   id: string; label: string; route: string; description: string; icon: string;
   read: () => Promise<unknown>; summarize: (value: any, now: number) => Summary;
@@ -124,8 +154,8 @@ type Source = {
 const read = (path: string) => async () => (await api.get(path)).data;
 const sources: Source[] = [
   { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read: read('/api/field-map'), summarize: summarizeITFieldMap },
-  { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read: read('/api/camera-health/summary-v3'), summarize: summarizeITCameras },
+  { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'victron', label: 'Victron', route: 'Victron VRM', description: 'Solar, battery and power dashboards for your fleet.', icon: 'power', read: read('/api/vrm-fleet'), summarize: summarizeITVrm,
     allowed: session => session.features?.vrmRead === true, unavailable: 'Victron access is not enabled for this account.' },
   { id: 'tracker', label: 'Unit Tracker', route: 'Unit Tracker', description: 'Unit records and pending changes for the 2027 tracker.', icon: 'units', read: read('/api/unit-tracker'), summarize: summarizeITTracker,
@@ -191,8 +221,8 @@ export default function ITDashboard({ session, navigate }: { session: Record<str
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', age); };
   }, []);
   return <section className='it-dashboard' aria-label='IT Dashboard'>
-    <header className='it-dashboard-heading'><div><p className='it-dashboard-eyebrow'>CAMERAS ONSITE · IT</p><h1>Your IT dashboard</h1><p>Fleet views, connection checks and ticket information in one place.</p></div><span className='it-dashboard-mode'>Read-only overview</span></header>
-    <div className='it-dashboard-grid'>{sources.map(source => <ITSourceCard key={source.id} source={source} session={session} now={now} navigate={navigate}/>)}</div>
+    <header className='it-dashboard-heading'><div><p className='it-dashboard-eyebrow'>CAMERAS ONSITE · IT</p><h1>Your IT dashboard</h1><p>Monitor the field and camera health. Keep your assigned unit checks close at hand.</p></div><div className='it-dashboard-actions'><button type='button' className='it-dashboard-open' onClick={() => openLegacy('it')}>Open unit checks →</button></div></header>
+    <div className='it-dashboard-workspace'><div className='it-dashboard-grid' aria-label='Fleet monitoring and tools'>{sources.map(source => <ITSourceCard key={source.id} source={source} session={session} now={now} navigate={navigate}/>)}</div><ITAssignmentSummary session={session} navigate={navigate}/></div>
     <p className='it-dashboard-footnote'>Each source loads independently. Refresh reads saved records; it does not run device probes. Opening a view keeps its existing permissions.</p>
   </section>;
 }
