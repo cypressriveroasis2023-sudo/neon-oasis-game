@@ -76,3 +76,10 @@ test('vendor 403 and post-renewal 401 stay permanent through the native 503 wrap
   assert.equal(f.counts.renew,spec.renew);assert.equal(f.counts.account,spec.status===401&&!spec.renewReject?2:1);assert.equal(f.counts.tickets,0);
  }
 });
+
+test('an unavailable synchronous renewal result remains a bounded sanitized source failure',async()=>{
+ let accountReads=0,renewals=0;
+ const access=createNativeMhelpTicketAccess({env:key=>key==='SUPABASE_URL'?'https://tughscoxralhofrckvxy.supabase.co':undefined,tokens:{getPartnerConfig:async()=>({accessToken:'synthetic-only',portalId:'17'}),renewAccess:()=>{renewals++;return null;}},fetch:async()=>{accountReads++;return new Response('synthetic unavailable',{status:401});}});
+ await assert.rejects(access.begin('17',signal()),error=>error.code==='SOURCE_UNAVAILABLE'&&error.retryable===true&&error.retryAfterSeconds===300&&error.message==='SOURCE_UNAVAILABLE');
+ assert.equal(accountReads,1);assert.equal(renewals,1);
+});

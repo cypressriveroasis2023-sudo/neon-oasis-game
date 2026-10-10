@@ -22,7 +22,7 @@ export function createNativeMhelpTicketAccess(options:{env:(name:string)=>string
     let account=await get('/users/me',16384);
     if(account.response.status===401){
       cancelBody(account.response.body);
-      try{const renewed=await deadline(()=>tokens.renewAccess(),signal);if(!renewed)throw new IntakeFault('SOURCE_UNAVAILABLE');config=renewed;}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true,DEFAULT_RETRY_AFTER_SECONDS);}validate();
+      try{const renewed=await deadline(async()=>tokens.renewAccess(),signal);if(!renewed)throw new IntakeFault('SOURCE_UNAVAILABLE');config=renewed;}catch{throw new IntakeFault('SOURCE_UNAVAILABLE',true,DEFAULT_RETRY_AFTER_SECONDS);}validate();
       if(signal.aborted)throw new IntakeFault('DEADLINE',true);
       account=await get('/users/me',16384);
     }
