@@ -3,7 +3,7 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
-import {describeMhelpTicketSchema} from './mhelpTicketSchema.ts';
+import {describeMhelpTicketSchema,describeMhelpOperationalEvidence,projectMhelpOperationalEvidence,MHELP_OPERATIONAL_EVIDENCE} from './mhelpTicketSchema.ts';
 export const MHELP_TICKET_CONTRACT = 'cos-mhelpdesk-ticket-preview-v1';
 const API = 'https://connect.mhelpdesk.com/api/v1.0';
 const CURRENT_USER = API + '/users/me';
@@ -109,7 +109,8 @@ function windowOf(value: unknown) {
 }
 const METRICS = ['deletedTickets','assignedTickets','missingAssignmentFields','missingTypeIds','unknownTypeIds','unknownStatusIds','unknownCustomStatusIds','missingCustomerIds','missingServiceLocationIds','ticketsWithUnknownFields','unknownFieldOccurrences','typeLabelMismatches','duplicateTypeNames'] as const;
 /** Defense-in-depth allowlist for maintenance. Never spread an untrusted reader result. */
-export function projectMhelpTicketPreview(value: unknown) {
+export function projectMhelpTicketPreview(value: unknown, evidence?:typeof MHELP_OPERATIONAL_EVIDENCE) {
+  if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('Unsupported mHelpDesk ticket preview.');
   const row=object(value);
   if(row.contract!==MHELP_TICKET_CONTRACT || row.state!=='preview_verified' || row.liveAccessVerified!==true || row.automaticSync!==false || row.ticketWrites!==false || row.partial!==false)fail('Unsupported mHelpDesk ticket preview.');
   const portalId=identity(row.verifiedPortalId),window=windowOf(row.window);
@@ -130,13 +131,15 @@ export function projectMhelpTicketPreview(value: unknown) {
   for(const key of METRICS)metrics[key]=count(inputMetrics[key],key==='unknownFieldOccurrences'?1000000:key==='duplicateTypeNames'?typeRows.length:totalRows);
   return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
     verifiedPortalId:portalId,readAt:timestamp(row.readAt),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
-    totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics};
+    totalRows,previewCount:totalRows,partial:false,types:typeRows,statuses:statusRows,metrics,
+    ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:projectMhelpOperationalEvidence(row.operationalEvidence,totalRows)}:{})};
 }
 /** Instantiate once and call only behind the existing protected maintenance/Owner gate. */
 export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Config>;renewAccess?:()=>Promise<Config>;fetch:typeof fetch}) {
   let busy=false;
-  return {preview:async(value:TicketPreviewWindow)=>{
+  return {preview:async(value:TicketPreviewWindow,evidence?:typeof MHELP_OPERATIONAL_EVIDENCE)=>{
     const window=windowOf(value);
+    if(evidence!==undefined&&evidence!==MHELP_OPERATIONAL_EVIDENCE)fail('The ticket preview request contains unsupported fields.',400);
     if(busy)fail('A mHelpDesk ticket preview is already running.',409);
     busy=true;
     const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),20000);
@@ -234,6 +237,7 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
       return {contract:MHELP_TICKET_CONTRACT,state:'preview_verified' as const,liveAccessVerified:true,automaticSync:false,ticketWrites:false,
         verifiedPortalId:portalId,readAt:new Date().toISOString(),window:{createdAfter:window.createdAfter,createdBefore:window.createdBefore},
         totalRows:total!,previewCount:tickets.length,partial:false,
+        ...(evidence===MHELP_OPERATIONAL_EVIDENCE?{operationalEvidence:describeMhelpOperationalEvidence(collectionRows(object(rawTickets))!,total!)}:{}),
         types:typeRows.map(row=>({...row,count:tickets.filter(ticket=>ticket.typeId===row.typeId).length})),
         statuses:statusRows.map(row=>({...row,statusCount:tickets.filter(ticket=>ticket.statusId===row.statusId).length,customStatusCount:tickets.filter(ticket=>ticket.customStatusId===row.statusId).length})),
         metrics:{deletedTickets:tickets.filter(row=>row.deleted).length,assignedTickets:tickets.filter(row=>row.assignmentState==='assigned').length,

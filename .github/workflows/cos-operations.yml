@@ -31,6 +31,11 @@ on:
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
       - 'tech-checks/supabase/functions/cos-vrm-fleet-sync/**'
       - 'tech-checks/supabase/functions/cos-mhelp-readiness/**'
+      - 'tech-checks/supabase/functions/camera-mhelp-readiness/**'
+      - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
+      - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
+      - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
       - '.github/workflows/cos-operations.yml'
@@ -64,6 +69,11 @@ on:
       - 'tech-checks/supabase/functions/cos-operations-pages/**'
       - 'tech-checks/supabase/functions/cos-vrm-fleet-sync/**'
       - 'tech-checks/supabase/functions/cos-mhelp-readiness/**'
+      - 'tech-checks/supabase/functions/camera-mhelp-readiness/**'
+      - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
+      - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
+      - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
       - '.github/workflows/cos-operations.yml'
@@ -75,6 +85,20 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: cos_mhelp_intake_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cos_mhelp_intake_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: tech-checks/operations
@@ -91,9 +115,18 @@ jobs:
         run: git diff --exit-code f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3 -- ../app.js ../technician-wizard-owner-dashboard-v5.js ../tech-check-rules.js ../it-prep-rules-v1.js ../it-prep-shared-v1.js ../it-prep-view-v1.js ../it-prep-wizard-v1.js ../it-intake-wizard-v1.js ../truck-spares-shared-v1.js ../supabase/migrations
       - run: npm install --no-audit --no-fund
       - run: npm test
+      - name: Verify real PostgreSQL intake concurrency
+        timeout-minutes: 5
+        env:
+          COS_MHELP_POSTGRES_CI: '1'
+        run: |
+          command -v psql
+          node --import tsx legacy/tests/mhelp-postgres-concurrency.ci.mjs
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - name: Verify mHelp Owner interactions before the full browser suite
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()

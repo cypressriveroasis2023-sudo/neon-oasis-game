@@ -72,3 +72,96 @@ export function projectMhelpTicketSchema(value:unknown) {
   }
   return result;
 }
+
+/** Owner opt-in success evidence. Keys below come from the vendor's Ticket Get,
+ * Ticket Item Get and Ticket Custom Field models; never enumerate source keys.
+ * https://www.mhelpdesk.com/partner-api/models.html
+ * These are shapes of an already-read sample, not operational readiness claims.
+ */
+export const MHELP_OPERATIONAL_EVIDENCE = 'operational_structure_v1' as const;
+const OPERATIONAL_FIELDS = ['subject','summary','comment','scheduledDate','neededBy','serviceLocationId'] as const;
+const NESTED_FIELDS = {
+  items:['ticketItemId','priceListId','priceListTypeId','name','description','quantity'],
+  customFields:['customFieldId','fieldValue','fieldLabel'],
+} as const;
+const SAMPLE_LIMIT=50, MAX_EVIDENCE_BYTES=12000;
+type Counts<T extends string> = Partial<Record<T,number>>;
+type FieldEvidence = {kinds:Counts<Kind>;formats:Counts<Format>;emptyStrings:number;nonemptyStrings:number};
+type CollectionEvidence = {kinds:Counts<Kind>;emptyArrays:number;nonemptyArrays:number;totalEntries:number;sampledEntries:number;entryKinds:Counts<Kind>;fields:Record<string,FieldEvidence>};
+export type MhelpOperationalEvidence = {
+  contract:'cos-mhelpdesk-operational-evidence-v1';scope:'first_ticket_page';ticketSampleLimit:50;nestedSampleLimit:50;
+  sampledTickets:number;siteIdTickets:number;fields:Record<typeof OPERATIONAL_FIELDS[number],FieldEvidence>;
+  collections:Record<keyof typeof NESTED_FIELDS,CollectionEvidence>;
+};
+const own=(row:unknown,key:string):unknown=>plain(row)&&Object.hasOwn(row,key)?row[key]:undefined;
+function distribution<T extends string>(values:readonly unknown[],classify:(value:unknown)=>T):Counts<T> {
+  const result:Counts<T>={};for(const value of values){const key=classify(value);result[key]=(result[key]||0)+1;}return result;
+}
+function fieldEvidence(values:readonly unknown[]):FieldEvidence {
+  const strings=values.filter((value):value is string=>typeof value==='string');
+  const emptyStrings=strings.filter(value=>!value.trim()).length;
+  return {kinds:distribution(values,kind),formats:distribution(strings,value=>format(value as string)),emptyStrings,nonemptyStrings:strings.length-emptyStrings};
+}
+function operationalCollection(rows:readonly unknown[],key:keyof typeof NESTED_FIELDS):CollectionEvidence {
+  const values=rows.map(row=>own(row,key)),arrays=values.filter(Array.isArray),entries:unknown[]=[];
+  let totalEntries=0;
+  for(const array of arrays){totalEntries+=array.length;entries.push(...array.slice(0,SAMPLE_LIMIT-entries.length));}
+  return {kinds:distribution(values,kind),emptyArrays:arrays.filter(array=>array.length===0).length,nonemptyArrays:arrays.filter(array=>array.length>0).length,
+    totalEntries,sampledEntries:entries.length,entryKinds:distribution(entries,kind),
+    fields:Object.fromEntries(NESTED_FIELDS[key].map(field=>[field,fieldEvidence(entries.map(row=>own(row,field)))]))};
+}
+/** Receives only the first validated ticket page. It never fetches or expands rows. */
+export function describeMhelpOperationalEvidence(firstPage:readonly unknown[],totalTickets:number):MhelpOperationalEvidence {
+  const rows=firstPage.slice(0,SAMPLE_LIMIT);
+  const result={contract:'cos-mhelpdesk-operational-evidence-v1',scope:'first_ticket_page',ticketSampleLimit:SAMPLE_LIMIT,nestedSampleLimit:SAMPLE_LIMIT,
+    sampledTickets:rows.length,siteIdTickets:rows.filter(row=>{
+      const value=own(row,'serviceLocationId');return typeof value==='number'?Number.isSafeInteger(value)&&value>0:typeof value==='string'&&/^[1-9]\d{0,14}$/.test(value)&&Number.isSafeInteger(Number(value));
+    }).length,
+    fields:Object.fromEntries(OPERATIONAL_FIELDS.map(field=>[field,fieldEvidence(rows.map(row=>own(row,field)))])),
+    collections:{items:operationalCollection(rows,'items'),customFields:operationalCollection(rows,'customFields')}};
+  return projectMhelpOperationalEvidence(result,totalTickets);
+}
+/** Rebuild every level and reject malformed counters, source keys and unbounded
+ * evidence. Unlike failure diagnostics, success must be complete, not truncated.
+ */
+export function projectMhelpOperationalEvidence(value:unknown,totalTickets:number):MhelpOperationalEvidence {
+  const invalid=():never=>{throw Error('Unsupported mHelpDesk operational evidence.');};
+  const exact=(value:unknown,keys:readonly string[]):Record<string,unknown>=>{
+    if(!plain(value)||Object.keys(value).length!==keys.length||Object.keys(value).some(key=>!keys.includes(key)))invalid();
+    return value as Record<string,unknown>;
+  };
+  const integer=(value:unknown,max=SAMPLE_LIMIT):number=>{
+    if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0||value>max)invalid();return value as number;
+  };
+  const counters=<T extends string>(value:unknown,keys:readonly T[],size:number):Counts<T>=>{
+    if(!plain(value)||Object.keys(value).some(key=>!keys.includes(key as T)))invalid();
+    const source=value as Record<string,unknown>,result:Counts<T>={};
+    for(const key of keys)if(Object.hasOwn(source,key)){const n=integer(source[key],size);if(n===0)invalid();result[key]=n;}
+    if(Object.values(result).reduce((sum:number,n)=>sum+Number(n),0)!==size)invalid();return result;
+  };
+  const descriptor=(value:unknown,size:number):FieldEvidence=>{
+    const row=exact(value,['kinds','formats','emptyStrings','nonemptyStrings']),kinds=counters(row.kinds,KINDS,size),formats=counters(row.formats,FORMATS,kinds.string||0);
+    const emptyStrings=integer(row.emptyStrings,size),nonemptyStrings=integer(row.nonemptyStrings,size);
+    if(emptyStrings+nonemptyStrings!==(kinds.string||0))invalid();
+    return {kinds,formats,emptyStrings,nonemptyStrings};
+  };
+  const row=exact(value,['contract','scope','ticketSampleLimit','nestedSampleLimit','sampledTickets','siteIdTickets','fields','collections']);
+  if(row.contract!=='cos-mhelpdesk-operational-evidence-v1'||row.scope!=='first_ticket_page'||row.ticketSampleLimit!==SAMPLE_LIMIT||row.nestedSampleLimit!==SAMPLE_LIMIT)invalid();
+  const sampledTickets=integer(row.sampledTickets),siteIdTickets=integer(row.siteIdTickets,sampledTickets);
+  if(sampledTickets!==Math.min(integer(totalTickets,500),SAMPLE_LIMIT))invalid();
+  const inputFields=exact(row.fields,OPERATIONAL_FIELDS);
+  const fields=Object.fromEntries(OPERATIONAL_FIELDS.map(field=>[field,descriptor(inputFields[field],sampledTickets)])) as MhelpOperationalEvidence['fields'];
+  if(siteIdTickets>(fields.serviceLocationId.kinds.integer||0)+(fields.serviceLocationId.kinds.string||0))invalid();
+  const inputCollections=exact(row.collections,['items','customFields']);
+  const collections=Object.fromEntries((['items','customFields'] as const).map(key=>{
+    const source=exact(inputCollections[key],['kinds','emptyArrays','nonemptyArrays','totalEntries','sampledEntries','entryKinds','fields']);
+    const kinds=counters(source.kinds,KINDS,sampledTickets),emptyArrays=integer(source.emptyArrays,sampledTickets),nonemptyArrays=integer(source.nonemptyArrays,sampledTickets);
+    const totalEntries=integer(source.totalEntries,1000000),sampledEntries=integer(source.sampledEntries),entryKinds=counters(source.entryKinds,KINDS,sampledEntries);
+    if(emptyArrays+nonemptyArrays!==(kinds.array||0)||totalEntries<nonemptyArrays||(totalEntries===0)!==(nonemptyArrays===0)||sampledEntries!==Math.min(totalEntries,SAMPLE_LIMIT))invalid();
+    const input=exact(source.fields,NESTED_FIELDS[key]);
+    return [key,{kinds,emptyArrays,nonemptyArrays,totalEntries,sampledEntries,entryKinds,fields:Object.fromEntries(NESTED_FIELDS[key].map(field=>[field,descriptor(input[field],sampledEntries)]))}];
+  })) as MhelpOperationalEvidence['collections'];
+  const result:MhelpOperationalEvidence={contract:'cos-mhelpdesk-operational-evidence-v1',scope:'first_ticket_page',ticketSampleLimit:SAMPLE_LIMIT,nestedSampleLimit:SAMPLE_LIMIT,sampledTickets,siteIdTickets,fields,collections};
+  if(new TextEncoder().encode(JSON.stringify(result)).length>MAX_EVIDENCE_BYTES)invalid();
+  return result;
+}
