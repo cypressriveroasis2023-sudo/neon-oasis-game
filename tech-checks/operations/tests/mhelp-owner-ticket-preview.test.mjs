@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {MhelpTokenRenewalError} from '../../supabase/functions/cos-operations-pages/mhelpTokenSession.ts';
 import {createOperationsHandler} from '../../supabase/functions/cos-operations-pages/index.ts';
 import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from '../../supabase/functions/cos-operations-pages/mhelpTicketDay.ts';
 const evidence='operational_structure_v1';
@@ -10,13 +11,13 @@ const request=(body={},method='POST',origin='https://cos-vision-integration-prev
 function fixture(change={}) {
  const calls=[],diagnostics=[];let configReads=0;
  const technician=change.id==='4f7044b5-86b6-411f-8898-39bb64b4ddbc'?{actor:'d0757b64-9623-4adc-afff-21cc7853e88a',name:'Teddy Hopper',department:'it',code:'it_technician'}:change.id==='78e54fbd-c2db-4d18-8e3d-a9740adcf285'?{actor:'7b3b8561-5dc1-46ff-8cdd-129ce2a2afb8',name:'Abel Cervantes',department:'service',code:'service_technician'}:null;
- const handler=createOperationsHandler({platformUrl:'https://native.example',serviceKey:'synthetic-server',now:()=>new Date('2026-10-09T22:00:00Z'),reportTicketPreviewFailure:entry=>{diagnostics.push(entry);if(change.logFailure)throw Error('private logger failure');},mhelpPartner:{getConfig:()=>{configReads++;if(change.configFailure)throw Error('private synthetic-mhelp configuration');return {portalId:portal,accessToken:'synthetic-mhelp'};}},fetch:async(url,init={})=>{
+ const handler=createOperationsHandler({platformUrl:'https://native.example',serviceKey:'synthetic-server',now:()=>new Date('2026-10-09T22:00:00Z'),reportTicketPreviewFailure:entry=>{diagnostics.push(entry);if(change.logFailure)throw Error('private logger failure');},mhelpPartner:{renewAccess:change.renewAccess,getConfig:()=>{configReads++;if(change.configFailure)throw Error('private synthetic-mhelp configuration');return {portalId:portal,accessToken:'synthetic-mhelp'};}},fetch:async(url,init={})=>{
   calls.push({url,method:init.method||'GET'});
   if(url.includes('/auth/v1/user'))return change.invalid?json({},401):json({id:change.id||owner});
   if(url.includes('/rest/v1/profiles?'))return json([{user_id:change.id||owner,full_name:technician?.name||'Synthetic',role:change.role||technician?.department||'owner',active:!change.inactive,archived_at:change.archived?'2026-01-01':null}]);
   if(url.includes('/rest/v1/user_profiles?'))return json([{user_id:technician?.actor||actor,display_name:technician?.name||'Synthetic',department:technician?.department||'owner',active:!change.nativeInactive}]);
   if(url.includes('/rest/v1/user_roles?'))return json(change.revoked?[]:[{role_id:'11111111-1111-1111-1111-111111111111',roles:{code:technician?.code||'owner',organization_id:org}}]);
-  if(url==='https://connect.mhelpdesk.com/api/v1.0/users/me')return json({portalId:Number(portal),private:'do-not-export'});
+  if(url==='https://connect.mhelpdesk.com/api/v1.0/users/me')return json({portalId:Number(portal),private:'do-not-export'},change.accountHttp||200);
   if(url.endsWith('/tickettypes'))return change.invalidTypes?json({private:'synthetic-mhelp'}):json({totalRows:1,data:[{portalId:Number(portal),typeId:1,typeName:'Service',isActive:true}]});
   if(url.endsWith('/ticketstatus'))return json([{statusId:1,statusText:'New',displayText:'New',parentId:null,canBeParent:true}]);
   if(url.includes('/Appointments?'))return json(change.appointments||{TotalRows:0,results:[]});
@@ -181,4 +182,14 @@ test('private sample refuses caller credentials, API IDs, endpoints, arbitrary d
 });
 test('private sample failures log fixed diagnostic categories only, never ticket number, day or source values',async()=>{
  const row=singleTicket(),f=fixture({privateSample:true,rows:[row],detail:{...row,ticketId:781235}}),response=await f.handler(request(privateRequest));assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'MHELP_PREVIEW_DETAIL_IDENTITY_MISMATCH'});assert.equal(f.diagnostics.length,1);for(const value of ['891234','781234','2026-10-10','synthetic-mhelp','synthetic-private-detail','Authorization','https://'])assert(!JSON.stringify(f.diagnostics).includes(value));assert(!f.calls.some(c=>c.url.includes('/Appointments')));
+});
+
+test('renewal details stay in fixed server diagnostics; aggregate and private Owner responses retain the existing category',async()=>{
+ for(const body of [{},{evidence:'ticket_private_sample_v1',ticketNumber:'22835',appointmentDay:'2026-10-10'}]){
+  let renewals=0;const f=fixture({accountHttp:401,renewAccess:async()=>{renewals++;throw new MhelpTokenRenewalError('token_response','http_error',400,'invalid_grant');}});
+  const r=await f.handler(request(body));assert.equal(r.status,503);assert.deepEqual(await r.json(),{error:'MHELP_PREVIEW_RENEWAL_FAILED'});
+  assert.equal(renewals,1);assert.equal(f.diagnostics.length,1);
+  assert.deepEqual(f.diagnostics[0].renewal,{stage:'token_response',reason:'http_error',httpStatus:400,oauthError:'invalid_grant'});
+  assert.equal(f.diagnostics[0].code,'RENEWAL_FAILED');assert(!JSON.stringify(f.diagnostics).includes('synthetic-mhelp'));
+ }
 });

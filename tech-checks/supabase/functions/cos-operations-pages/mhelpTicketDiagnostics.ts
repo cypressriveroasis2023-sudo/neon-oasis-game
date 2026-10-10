@@ -1,3 +1,4 @@
+import {projectMhelpTokenRenewalDiagnostic} from './mhelpTokenSession.ts';
 import {projectMhelpTicketDetailFailure} from './mhelpTicketDetail.ts';
 import {MhelpTicketError} from './mhelpTickets.ts';
 import {projectMhelpTicketSchema} from './mhelpTicketSchema.ts';
@@ -73,8 +74,10 @@ export function mhelpTicketDiagnostic(cause: unknown) {
       operation=cause.provider.operation;providerHttpStatus=cause.provider.httpStatus;
     }
   }
+  const renewal=code==='RENEWAL_FAILED'&&cause instanceof MhelpTicketError?projectMhelpTokenRenewalDiagnostic(cause.renewal):undefined;
   return {error:'MHELP_PREVIEW_'+code,httpStatus,
     log:{event:'mhelp_ticket_preview_failed',code,httpStatus,operation,providerHttpStatus,
+      ...(renewal?{renewal}:{}),
       ...(cause instanceof MhelpTicketError && cause.schema?{schema:projectMhelpTicketSchema(cause.schema)}:{}),
       ...(cause instanceof MhelpTicketError && cause.detailSchema?{detailSchema:projectMhelpTicketDetailFailure(cause.detailSchema)}:{})}};
 }

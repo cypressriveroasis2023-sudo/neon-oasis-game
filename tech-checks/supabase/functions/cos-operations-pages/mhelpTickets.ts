@@ -3,6 +3,7 @@
  * ticket-type.html, ticket-status.html, models.html and request-formats.html.
  * This module has no persistence, scheduling, native workflow or vendor-write capability.
  */
+import {MhelpTokenRenewalError,projectMhelpTokenRenewalDiagnostic,type MhelpTokenRenewalDiagnostic} from './mhelpTokenSession.ts';
 import {validateMhelpPrivateSampleRequest,describeMhelpPrivateSample,unavailableMhelpPrivateSample,projectMhelpPrivateSample,MHELP_PRIVATE_APPOINTMENT_FIELDS,type MhelpPrivateSampleRequest} from './mhelpTicketPrivateSample.ts';
 import {MHELP_APPOINTMENT_VARIANTS,MHELP_APPOINTMENT_DIAGNOSTIC_FIELDS,describeMhelpAppointmentVariants,unavailableMhelpAppointmentVariants,projectMhelpAppointmentVariants} from './mhelpAppointmentVariants.ts';
 import {MHELP_APPOINTMENT_EVIDENCE,MHELP_APPOINTMENT_PAGE_LIMIT,MHELP_APPOINTMENT_FIELDS,describeMhelpAppointments,unavailableMhelpAppointments,projectMhelpAppointmentEvidence} from './mhelpAppointments.ts';
@@ -18,6 +19,7 @@ type Row = Record<string, unknown>;
 type Config = {portalId?: string; accessToken?: string};
 type Operation = 'appointment_read' | 'ticket_detail_read' | 'account_read' | 'ticket_read' | 'ticket_types_read' | 'ticket_statuses_read';
 export class MhelpTicketError extends Error {
+  renewal?: MhelpTokenRenewalDiagnostic;
   schema?: Record<string,unknown>;
   detailSchema?: Record<string,unknown>;
   constructor(message: string, public status = 503, public provider?: {operation: Operation; httpStatus: number}) { super(message); }
@@ -214,7 +216,11 @@ export function createMhelpTicketReader(options:{getConfig:()=>Config|Promise<Co
         catch(error) {if(error instanceof MhelpTicketError)throw error;return fail('mHelpDesk could not complete the ticket preview.');}
         if(response.status===401 && operation==='account_read' && options.renewAccess && !renewed){
           renewed=true;cancel(response.body);
-          try {config=await options.renewAccess();} catch {return fail('mHelpDesk could not renew its existing server token.');}
+          try {config=await options.renewAccess();} catch(cause) {
+            const failure=new MhelpTicketError('mHelpDesk could not renew its existing server token.');
+            if(cause instanceof MhelpTokenRenewalError)failure.renewal=projectMhelpTokenRenewalDiagnostic(cause.diagnostic);
+            throw failure;
+          }
           validConfig();credentialValues.push(config.accessToken!);
           if(configuredPortalId && config.portalId && config.portalId!==configuredPortalId)fail('The renewed mHelpDesk account does not match the saved portal.');
           return read(url,operation,maxBytes);
