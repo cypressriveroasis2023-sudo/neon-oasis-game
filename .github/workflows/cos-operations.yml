@@ -124,6 +124,11 @@ jobs:
         run: |
           command -v psql
           node --import tsx legacy/tests/mhelp-postgres-concurrency.ci.mjs
+      - name: Verify real PostgreSQL reconnect rotation and replay
+        timeout-minutes: 5
+        env:
+          COS_MHELP_POSTGRES_CI: '1'
+        run: node --import tsx legacy/tests/mhelp-reconnect-postgres.ci.mjs
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium

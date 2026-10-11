@@ -8,6 +8,7 @@ import {MHELP_TICKET_PRIVATE_SAMPLE,validateMhelpPrivateSampleRequest,projectMhe
 import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from './mhelpTicketDay.ts';
 import {mhelpTicketDiagnostic} from './mhelpTicketDiagnostics.ts';
 import {nativeMhelpTokens} from './mhelpTokenRuntime.ts';
+import {MhelpReconnectError} from './mhelpReconnect.ts';
 import {readSourceRecordedCoordinates,projectSourceRecordedCoordinates} from './sourceRecordedCoordinates.ts';
 import {projectArchivedRepresentations,projectArchivedEquipmentRegistry} from './archivedRepresentationProjection.ts';
 import { projectFallbackGeocodes } from './fallbackGeocodeProjection.ts';
@@ -498,6 +499,26 @@ export function createOperationsHandler(options) {
         try{return json(await readMhelpIntakeReview(context.authorization,request.signal,capability));}
         catch(cause){const failure=cause instanceof MhelpIntakeReviewError?cause:new MhelpIntakeReviewError();return json({error:failure.message},failure.status);}
       }
+      if(path==='/api/mhelpdesk/partner/reconnect'||path==='/api/mhelpdesk/partner/reconnect/status'){
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method!=='POST'||request.method!=='POST')fail('Reconnect requires an explicit POST.',405);
+        // Bearer-only auth is not ambient. Require the production UI origin and JSON as well;
+        // Only the existing official app origins qualify; absent/null origins and arbitrary previews cannot configure credentials.
+        if(!ALLOWED_ORIGINS.has(origin))fail('Open reconnect from the production COS Owner workspace.',403);
+        if(!/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers.get('Content-Type')||''))fail('Reconnect requires a JSON request.',415);
+        if(new URL(request.url).search)fail('Reconnect query parameters are unsupported.');
+        if(!options.mhelpReconnect)fail('Secure reconnect is not available.',503);
+        if(body===null)body=await readMhelpAwareJson(request,36000);
+        if(new TextEncoder().encode(JSON.stringify(body)).byteLength>36000)fail('Request body is too large.',413);
+        const reauthorize=async()=>{
+          try{
+            const fresh=await authenticate(request);
+            if(!fresh.legacyOwner||!fresh.actorId||fresh.legacyId!==context.legacyId||fresh.actorId!==context.actorId||fresh.ownerRoleId!==context.ownerRoleId)throw new MhelpReconnectError(403);
+          }catch{throw new MhelpReconnectError(403);}
+        };
+        try{return json(await (path.endsWith('/status')?options.mhelpReconnect.status(body):options.mhelpReconnect.reconnect(body,reauthorize)));}
+        catch(cause){const error=cause instanceof MhelpReconnectError?cause:new MhelpReconnectError();return json({error:error.message},error.status);}
+      }
       if (path.startsWith('/api/mhelpdesk/partner/')) {
         // This owner-only review does not expand the verified IT route allowlist.
         if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
@@ -977,6 +998,7 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     vrm: { getAccessToken: () => Deno.env.get('COS_VRM_ACCESS_TOKEN') },
     inhandPilot: { enabled: true, contractReviewed: true, getAccessToken: () => Deno.env.get('COS_INHAND_PILOT_ACCESS_TOKEN') },
     mhelpPartner: { getConfig:mhelpTokens.getPartnerConfig,renewAccess:mhelpTokens.renewAccess },
+    mhelpReconnect:mhelpTokens.reconnect,
     googleSheets: { getServiceAccountJson:()=>Deno.env.get('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion:signSheetsAssertion },
   }));
 }
