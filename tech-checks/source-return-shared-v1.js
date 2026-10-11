@@ -7,7 +7,7 @@ export const isSourceAssignment=row=>row?.created_from==='mhelpdesk_service_inta
 export const PICKUP_SERVICE_CONFIRMATION='I confirm this is the complete actual returned-unit set for this Pickup. Send this set to the assigned IT team for intake.';
 export const PICKUP_IT_CONFIRMATION='I confirm every item in this exact sealed returned-unit set has completed its required IT intake disposition.';
 export function logicalSession(session){
- try{const actor=uuid(session?.user?.id),parts=session?.access_token?.split('.');if(parts?.length!==3)return null;
+ try{const actor=uuid(session?.user?.id),token=session?.access_token;if(typeof token!=='string'||token.length>16384)return null;const parts=token.split('.');if(parts.length!==3||parts.some(part=>!part.length||!/^[A-Za-z0-9_-]+$/.test(part)))return null;
   const claims=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
   return claims.sub===actor&&UUID.test(claims.session_id||'')?{actor,session:claims.session_id}:null;
  }catch{return null;}
@@ -26,7 +26,12 @@ export function captureSourceReturnScope({context,role,view,isCurrent=()=>true,w
  const events=['popstate','hashchange','pagehide','cos-private-data-invalidated'];for(const event of events)win?.addEventListener?.(event,invalidate);
  const onNavigation=event=>{if(event.target?.closest?.('[data-wl-home],[data-wl-mode],[data-wl-menu-go],[data-wl-menu-signout]'))invalidate();};doc?.addEventListener?.('click',onNavigation,true);
  const subscription=db?.auth?.onAuthStateChange?.((event,session)=>{if(event==='SIGNED_OUT'||!same(identity,logicalSession(session)))invalidate();})?.data?.subscription;
- const Observer=win?.MutationObserver;const observer=Observer?new Observer(()=>{if(!current())invalidate();}):null;observer?.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden']});
+ const Observer=win?.MutationObserver;const observer=Observer?new Observer(records=>{
+  const affects=node=>Boolean(node===view||node?.contains?.(view));
+  const interrupted=records.some(record=>record.type==='childList'&&[...(record.removedNodes||[])].some(affects)
+   ||record.type==='attributes'&&affects(record.target)&&['hidden','aria-hidden','style','class'].includes(record.attributeName));
+  if(interrupted||!current())invalidate();
+ }):null;observer?.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeOldValue:true,attributeFilter:['class','style','hidden','aria-hidden']});
  const assert=()=>{if(!current())throw changed();};
  async function assertFresh(){assert();let result;try{result=await db.auth.getSession();}catch{invalidate();throw changed();}if(result?.error||!same(identity,logicalSession(result?.data?.session))){invalidate();throw changed();}assert();}
  function dispose(){disposed=true;subscription?.unsubscribe?.();observer?.disconnect();for(const event of events)win?.removeEventListener?.(event,invalidate);doc?.removeEventListener?.('click',onNavigation,true);}
@@ -34,11 +39,17 @@ export function captureSourceReturnScope({context,role,view,isCurrent=()=>true,w
  if(!current()){dispose();throw changed();}return scope;
 }
 export function canonicalJSON(value){
- if(value===null||typeof value==='boolean'||typeof value==='string')return JSON.stringify(value);
- if(typeof value==='number'&&Number.isFinite(value))return JSON.stringify(value);
- if(Array.isArray(value))return '['+value.map(canonicalJSON).join(',')+']';
- if(value&&Object.getPrototypeOf(value)===Object.prototype)return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonicalJSON(value[key])).join(',')+'}';
- throw Error('Only bounded JSON values may be saved in a source request.');
+ let nodes=0;
+ function encode(v,depth){
+  if(depth>16||++nodes>10000)throw Error('Source request exceeds the bounded JSON structure.');
+  if(v===null||typeof v==='boolean')return JSON.stringify(v);
+  if(typeof v==='string'){if(v.length>20000)throw Error('Source request text is too long.');return JSON.stringify(v);}
+  if(typeof v==='number'&&Number.isFinite(v))return JSON.stringify(v);
+  if(Array.isArray(v))return '['+v.map(item=>encode(item,depth+1)).join(',')+']';
+  if(v&&Object.getPrototypeOf(v)===Object.prototype)return '{'+Object.keys(v).sort().map(key=>encode(key,depth+1)+':'+encode(v[key],depth+1)).join(',')+'}';
+  throw Error('Only bounded JSON values may be saved in a source request.');
+ }
+ const result=encode(value,0);if(new TextEncoder().encode(result).length>65536)throw Error('Source request exceeds 64 KiB.');return result;
 }
 // Journal keys contain actor and exact assignment/return identifiers, never a
 // session token. Compare-and-swap prevents a late operation clearing new work.
@@ -60,14 +71,24 @@ export async function prepareSourceUploadIntent(scope,{returnId,files,stage='ser
 }
 export async function uploadSourceEvidence(scope,{intent,files,bucket='handoff-evidence'}){
  if(bucket!=='handoff-evidence'||!Array.isArray(intent)||intent.length!==files.length)throw Error('The exact saved evidence intent is required.');
- for(let i=0;i<intent.length;i++){
-  const entry=intent[i];if(!entry.path.startsWith(scope.actorId+'/'))throw Error('This evidence belongs to another actor.');
-  await scope.assertFresh();const result=await scope.db.storage.from(bucket).upload(entry.path,files[i],{upsert:false,contentType:entry.type});await scope.assertFresh();
+ if(intent.length<1||intent.length>20)throw Error('One to twenty saved evidence photos are required.');
+ // Rehash the actual immutable File bytes before every transport, including
+ // retries. An actor prefix alone is not proof of the saved upload intent.
+ const paths=[],savedIntent=structuredClone(intent),savedFiles=files.slice();
+ for(let i=0;i<savedIntent.length;i++){
+  const entry=savedIntent[i],file=savedFiles[i],parts=String(entry?.path||'').split('/');
+  if(parts.length!==5||parts[0]!==scope.actorId||!UUID.test(parts[1])||parts[2]!=='returns'||!['service','intake'].includes(parts[3]))throw Error('This saved evidence path is invalid.');
+  await prepareSourceUploadIntent(scope,{returnId:parts[1],stage:parts[3],files:[file],save:()=>{},existing:null}).then(single=>{
+   const expected={...single[0],path:single[0].path.replace('/1-','/'+(i+1)+'-')};
+   if(canonicalJSON(expected)!==canonicalJSON(entry))throw Error('The actual evidence file does not match the saved immutable intent.');
+  });
+  await scope.assertFresh();const result=await scope.db.storage.from(bucket).upload(entry.path,file,{upsert:false,contentType:entry.type});await scope.assertFresh();
   if(result?.error&&Number(result.error.statusCode||result.error.status)!==409)throw result.error;
+  paths.push(entry.path);
   // 409 is provisional only. The backend must prove current object ownership,
   // identity, metadata and linkage before accepting a source return or intake.
  }
- return intent.map(entry=>entry.path);
+ return paths;
 }
 export function prepareSourceRequest({requestId,action,expectedRevision,...payload}){
  uuid(requestId);if(typeof action!=='string'||!action||action.length>64)throw Error('An exact source action is required.');

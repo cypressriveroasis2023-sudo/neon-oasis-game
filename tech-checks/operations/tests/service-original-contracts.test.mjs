@@ -1,0 +1,3 @@
+import{test}from'node:test';import assert from'node:assert/strict';import{readFileSync}from'node:fs';import{createHash}from'node:crypto';
+const c=JSON.parse(readFileSync(new URL('../legacy/service-original-contracts.json',import.meta.url),'utf8'));
+test('fresh original Service definitions retain exact body hashes and only catalog metadata',()=>{assert.equal(c.project,'goqrnolcvqnirjmzaeyk');assert.equal(c.readOnly,true);for(const f of c.functions){assert.equal(createHash('md5').update(f.definition.match(/AS \$function\$([\s\S]*?)\$function\$/)[1]).digest('hex'),f.body_md5,f.name);assert.deepEqual(Object.keys(f).sort(),['acl','body_md5','definition','name','owner','security_definer','signature']);}});

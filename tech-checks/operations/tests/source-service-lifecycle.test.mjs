@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {captureSourceITScope,sourceITSessionIdentity,StaleSourceITView} from '../../source-it-lifecycle.js';
+import {captureSourceServiceScope,StaleSourceServiceView} from '../../source-service-lifecycle.js';
+import {sourceITSessionIdentity as sourceServiceSessionIdentity} from '../../source-it-lifecycle.js';
 const uid=n=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const token=(actor=uid(1),session=uid(2),generation=1)=>[Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),Buffer.from(JSON.stringify({sub:actor,session_id:session,iat:generation})).toString('base64url'),'synthetic'].join('.');
 function session(actor=uid(1),id=uid(2),generation=1){return {user:{id:actor},access_token:token(actor,id,generation)};}
@@ -10,16 +11,16 @@ function fixture(){
   const body=new Node(),view=new Node(body),card=new Node(view),input=new Node(card);let records=[],observer,authHandler,unsubscribed=0,invalidations=0,generation=0;
   const environment=new EventTarget();environment.document=Object.assign(new EventTarget(),{body,hidden:false});environment.location={href:'https://synthetic.invalid/tech-checks',origin:'https://synthetic.invalid'};environment.getComputedStyle=node=>node.style;environment.parent=environment;
   environment.MutationObserver=class{constructor(callback){this.callback=callback;observer=this;}observe(){}disconnect(){this.disconnected=true;}takeRecords(){const list=records;records=[];return list;}};
-  let cached=session(),fresh=cached,profile={user_id:uid(1),role:'it',active:true,archived_at:null},effective={id:uid(1),role:'it',owner_test:false},transport=async()=>({data:{session:fresh}});
+  let cached=session(),fresh=cached,profile={user_id:uid(1),role:'service',active:true,archived_at:null},effective={id:uid(1),role:'service',owner_test:false},transport=async()=>({data:{session:fresh}});
   const db={auth:{getSession:()=>transport(),onAuthStateChange:handler=>{authHandler=handler;return {data:{subscription:{unsubscribe(){unsubscribed++;}}}};}}};
   const context={db,getSession:()=>cached,getProfile:()=>profile,getRole:()=>profile.role,getEffectiveRole:()=>effective.role,getEffectiveIdentity:()=>effective};
-  const capture=extra=>captureSourceITScope({context,view,getGeneration:()=>generation,environment,onInvalidate:()=>invalidations++,...extra});
+  const capture=extra=>captureSourceServiceScope({context,view,getGeneration:()=>generation,environment,onInvalidate:()=>invalidations++,...extra});
   return {capture,context,environment,view,card,input,body,get cached(){return cached;},setCached:value=>cached=value,setFresh:value=>fresh=value,setProfile:value=>profile={...profile,...value},setEffective:value=>effective={...effective,...value},setTransport:fn=>transport=fn,navigate:()=>generation++,records:value=>records.push(...value),flush:()=>observer.callback(observer.takeRecords()),auth:(event,value)=>authHandler(event,value),counts:()=>({unsubscribed,invalidations}),Node};
 }
 test('session correlation requires strict JWT shape, matching subject and stable logical session',()=>{
-  assert.deepEqual(sourceITSessionIdentity(session()),{actor:uid(1),sessionId:uid(2)});
-  assert.deepEqual(sourceITSessionIdentity(session(uid(1),uid(2),2)),sourceITSessionIdentity(session()));
-  for(const value of [null,{user:{id:uid(1)},access_token:'opaque'},{user:{id:uid(3)},access_token:token()},{...session(),session_id:uid(4)},{...session(),access_token:token().split('.').slice(0,2).join('.')},{...session(),access_token:token(uid(1),'malformed')}])assert.equal(sourceITSessionIdentity(value),null);
+  assert.deepEqual(sourceServiceSessionIdentity(session()),{actor:uid(1),sessionId:uid(2)});
+  assert.deepEqual(sourceServiceSessionIdentity(session(uid(1),uid(2),2)),sourceServiceSessionIdentity(session()));
+  for(const value of [null,{user:{id:uid(1)},access_token:'opaque'},{user:{id:uid(3)},access_token:token()},{...session(),session_id:uid(4)},{...session(),access_token:token().split('.').slice(0,2).join('.')},{...session(),access_token:token(uid(1),'malformed')}])assert.equal(sourceServiceSessionIdentity(value),null);
 });
 test('matching INITIAL_SESSION and refresh remain usable; replacement login permanently invalidates',async()=>{
   const f=fixture(),scope=f.capture();f.auth('INITIAL_SESSION',f.cached);assert(scope.isCurrent());
@@ -39,7 +40,7 @@ for(const name of ['cached-session','fresh-session','actor','inactive','archived
   if(name==='href')f.environment.location.href+='#replacement';
   if(name==='input')f.input.value='replacement';
   held.resolve({data:{session:name==='fresh-session'?session(uid(1),uid(3)):f.cached}});
-  await assert.rejects(pending,StaleSourceITView);assert.equal(scope.isCurrent(),false);scope.dispose();
+  await assert.rejects(pending,StaleSourceServiceView);assert.equal(scope.isCurrent(),false);scope.dispose();
 });
 test('same-task hide/restore and detach/reattach records permanently cancel the captured card',()=>{
   for(const record of ['attribute','remove']){
@@ -67,7 +68,7 @@ test('only verified same-origin parent private-hide messages invalidate embedded
   send({},f.environment.location.origin);send(f.environment.parent,'https://unrelated.invalid');assert(scope.isCurrent());
   send(f.environment.parent,f.environment.location.origin);assert.equal(scope.isCurrent(),false);scope.dispose();
 });
-test('fresh-auth error or unavailable auth fails closed; capture rejects inactive actual IT',async()=>{
-  const f=fixture(),scope=f.capture();f.setTransport(async()=>({error:new Error('synthetic')}));await assert.rejects(scope.assertFresh(),StaleSourceITView);scope.dispose();
-  const inactive=fixture();inactive.setProfile({active:false});assert.throws(()=>inactive.capture(),StaleSourceITView);
+test('fresh-auth error or unavailable auth fails closed; capture rejects inactive actual Service',async()=>{
+  const f=fixture(),scope=f.capture();f.setTransport(async()=>({error:new Error('synthetic')}));await assert.rejects(scope.assertFresh(),StaleSourceServiceView);scope.dispose();
+  const inactive=fixture();inactive.setProfile({active:false});assert.throws(()=>inactive.capture(),StaleSourceServiceView);
 });

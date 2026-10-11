@@ -1,0 +1,3015 @@
+{
+  "capturedAt": "2026-10-11T02:23:00Z",
+  "project": "goqrnolcvqnirjmzaeyk",
+  "readOnly": true,
+  "columns": [
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "recipient_user_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "kind",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "title",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "body",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "assignment_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "ticket_no",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "read_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "app_notifications",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "ticket_no",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "site",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "unit_tag",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "equipment_type",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "service_tech_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "original_problem",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "service_power_verified",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "service_troubleshooting_notes",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "service_started_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "it_tech_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "it_tech_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "it_troubleshooting_notes",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "status",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'waiting_it'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "backup_prep_item_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "backup_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "backup_equipment_type",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "backup_authorized_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "failed_return_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_summary",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_notified_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_resolution",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_resolved_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_resolved_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "owner_resolved_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "resolved_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "field_escalations",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "prep_ticket_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "stage",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "kind",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "storage_path",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "original_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "created_by_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "handoff_evidence",
+      "column_name": "prep_item_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "ticket_no",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "site",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assigned_role",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assignee_user_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assignee_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'Unassigned Department'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "notes",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "status",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'assigned'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "prep_ticket_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assigned_by",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assigned_by_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assigned_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "started_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "completed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "cancelled_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "unit_summary",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "job_description",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "solar_panel_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "battery_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "camera_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "sim_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "micro_sd_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "assignment_scope",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'technician'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "claimed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "requires_it_handoff",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "equipment_manifest",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'[]'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "requested_unit_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "scheduled_for",
+      "data_type": "date",
+      "not_null": true,
+      "default_expression": "CURRENT_DATE"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "work_type",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'service'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "return_equipment_manifest",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'[]'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "scheduled_time",
+      "data_type": "time without time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "job_lead_user_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "job_lead_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "job_lead_role",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "job_assignments",
+      "column_name": "created_from",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "mhelp_reviewed",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "truck_checks",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "taking_trailer",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "trailer_checks",
+      "data_type": "jsonb",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "closed_ticket_nos",
+      "data_type": "text[]",
+      "not_null": true,
+      "default_expression": "'{}'::text[]"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "submitted_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "is_test",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "truck_12v_110ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "truck_12v_110ah_charged",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "truck_litime_12v_100ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "truck_litime_12v_100ah_charged",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "backup_unit_type",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "backup_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "morning_checks",
+      "column_name": "backup_it_checkout_verified",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "prep_ticket_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "item_order",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "equipment_type",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "purpose",
+      "data_type": "prep_purpose",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "battery_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "power_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "functions_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "safe_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "verified_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "verified_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "service_battery_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "service_unit_confirmed",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "service_verified_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "service_verified_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "required_battery_count",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_sim_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_camera_app_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_batteries_charged_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_monitoring_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_ticket_count_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_sd_formatted_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_recording_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "solar_mppt_updated_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "solar_mppt_tested_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "solar_pv_charging_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "solar_panels_match_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ticket_item_match_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "photo_tag_match_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "delivery_customer_email_app_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_camera1_ports_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_camera2_ports_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_ptz_ports_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_speaker_ports_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_outcome",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_outcome_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_outcome_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_outcome_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_checked_out_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_checked_out_to",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_checked_out_to_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_it_checked_out_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_it_checked_out_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "spare_it_checked_out_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_status",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_detected",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_expected",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_confidence",
+      "data_type": "numeric",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_engine",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ai_tag_scan_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_camera1_hardware_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_camera2_hardware_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_ptz_assembly_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_proxicast_4x4_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_router_sim_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_speaker_24v_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_cameras_12v_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_ptz_plate_4bolts_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_cerbo_network_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_cerbo_vrm_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_rear_unit_tag_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_battery_box_installed_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_battery_120v_charged_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_camera_router_programming_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_alibi_vigilant_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "helios_3x1tb_sd_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "camera_port_81_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "camera_port_554_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "unit_programmed_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "recon_camera_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ranger_field_victron_updated_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ranger_field_victron_updated_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ranger_field_victron_updated_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "ranger_field_victron_updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_outcome",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_outcome_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_outcome_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_outcome_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_installed_site",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_site_registration_status",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_site_registered_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_site_registered_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_items",
+      "column_name": "swap_site_registered_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "ticket_no",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "site",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "status",
+      "data_type": "prep_status",
+      "not_null": true,
+      "default_expression": "'draft'::prep_status"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "released_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "closed_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "closed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "released_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "released_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "closed_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "is_test",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "expected_unit_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "solar_panel_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "battery_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "camera_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "sim_replacement_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "micro_sd_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "service_parts_confirmed",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "service_parts_confirmed_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "service_parts_confirmed_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "service_parts_confirmed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "equipment_manifest",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'[]'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "requested_unit_count",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "prep_tickets",
+      "column_name": "work_type",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'service'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "full_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "role",
+      "data_type": "app_role",
+      "not_null": true,
+      "default_expression": "'pending'::app_role"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "active",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "true"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "email",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "username",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "must_change_password",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "password_changed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "archived_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "archived_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "archived_reason",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "notification_email",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "email_job_assignments",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "true"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "email_handoff_updates",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "true"
+    },
+    {
+      "schema": "public",
+      "table_name": "profiles",
+      "column_name": "email_owner_copies",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "id",
+      "data_type": "bigint",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "kind",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "actor_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "actor_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "ticket_no",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "text",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "is_test",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "reports",
+      "column_name": "reason",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "prep_ticket_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "assignment_id",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "service_tech_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "stand_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "stand_verified",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "mppt_updated_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "mppt_tested_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "cerbo_updated_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "cerbo_online_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "solar_panel_count",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "solar_panels_verified",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "battery_count",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "batteries_charged_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "solar_charging_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "completed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "battery_configuration",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "battery_description",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_battery_box_charging_ok",
+      "data_type": "boolean",
+      "not_null": false,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_pv_connected_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_switch_pv_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_victron_bluetooth_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_updates_status_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_solar_charging_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_ptz_wrapped_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "handoff_accepted_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "handoff_accepted_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "handoff_accepted_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_box_mounted_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_pv_connected_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_ptz_secured_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_switch_pv_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_unit_battery_on_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_it_online_verified_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_cameras_aimed_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_recording_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_tower_20ft_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_mast_lock_bolt_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_panel_45deg_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_panel_bolt_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_4_sandbags_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_completed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_completed_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_field_completed_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_owner_verified_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_owner_verified_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_owner_verified_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_checks",
+      "column_name": "helios_yard_alibi_visible_ok",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "prep_ticket_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "category",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "kind",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "storage_path",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "original_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "created_by",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "created_by_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_solar_evidence",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "check_date",
+      "data_type": "date",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "unit_confirmations",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'{}'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "recon_battery_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "agm_12v_110ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "litime_12v_100ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "ready",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "missing_items",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'[]'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "submitted_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "sim_confirmations",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'{}'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_inventory_checks",
+      "column_name": "battery_12v_35ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "service_tech_name",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "item_kind",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "item_type",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "qty_needed",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "1"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "qty_issued",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "used_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "original_ticket_no",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "old_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "reason",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "status",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'requested'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "replacement_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "prep_checks",
+      "data_type": "jsonb",
+      "not_null": true,
+      "default_expression": "'{}'::jsonb"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "requested_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "prepared_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "prepared_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "prepared_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "issued_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "sim_slot_no",
+      "data_type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "used_sim_number",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_restock_requests",
+      "column_name": "replacement_sim_number",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "slot_no",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "sim_number",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "status",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'unassigned'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "last_used_ticket_no",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "last_used_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "assigned_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "assigned_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "assigned_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_sims",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "recon_battery_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "agm_12v_110ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "litime_12v_100ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "updated_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "updated_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_stock",
+      "column_name": "battery_12v_35ah_qty",
+      "data_type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "service_tech_id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "equipment_type",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "status",
+      "data_type": "text",
+      "not_null": true,
+      "default_expression": "'unassigned'::text"
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "last_used_ticket_no",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "last_used_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "old_unit_tag",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "assigned_by",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "assigned_by_name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "assigned_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "public",
+      "table_name": "service_truck_units",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "id",
+      "data_type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "bucket_id",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "name",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "owner",
+      "data_type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "last_accessed_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": "now()"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "metadata",
+      "data_type": "jsonb",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "path_tokens",
+      "data_type": "text[]",
+      "not_null": false,
+      "default_expression": "string_to_array(name, '/'::text)"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "version",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "owner_id",
+      "data_type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "user_metadata",
+      "data_type": "jsonb",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "archived_at",
+      "data_type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "is_delete_marker",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    },
+    {
+      "schema": "storage",
+      "table_name": "objects",
+      "column_name": "is_versioned",
+      "data_type": "boolean",
+      "not_null": true,
+      "default_expression": "false"
+    }
+  ]
+}
