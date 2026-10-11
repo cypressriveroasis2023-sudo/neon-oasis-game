@@ -8,6 +8,15 @@ const origin = 'http://127.0.0.1:4173';
 const appPath = '/tech-checks/';
 const repo = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
+// Use actual legacy render functions, not handwritten replacement cards. Only
+// account/data side effects are stubbed; no real account or workflow is changed.
+const legacySource = readFileSync(resolve(repo, 'tech-checks/app.js'), 'utf8');
+const renderNames = new Set(['esc','ownerAppHeader','ownerAppEmpty','ownerGlobalSearchBarHtml','ownerDefaultTestTicket','ownerAppTestCenter','ownerAppAccounts']);
+const legacyRenderers = [...renderNames].map(name => {
+  const match=legacySource.match(new RegExp('^function '+name+'\\([^]*?^}', 'm'));
+  if(!match)throw new Error('Missing legacy renderer: '+name);
+  return match[0];
+}).join('\n');
 // Exercise the real parent DOM, all its CSS and the unchanged auth bridge.
 // Only the legacy application scripts/session are replaced with synthetic data.
 const parentHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8')
@@ -21,7 +30,13 @@ const parentHtml = readFileSync(resolve(repo, 'tech-checks/index.html'), 'utf8')
       getSession:()=>({user:{id:'fixture-owner'}}),db:{auth:{onAuthStateChange:()=>({}),
       getSession:async()=>({data:{session:{user:{id:'fixture-owner'},access_token:'synthetic-only'}}})}}};
     window.show=()=>{};
-    window.ownerAppNavigate=()=>{};
+    const state={preps:[]};
+    function ensureStartFreshCard(){} function renderPasswordResetRequests(){} function renderUsers(){}
+    ${legacyRenderers}
+    window.ownerAppNavigate=(route)=>{
+      document.getElementById('view-owner').dataset.ownerRoute=route;
+      document.getElementById('ownerRouteView').innerHTML=ownerGlobalSearchBarHtml()+(route==='accounts'?ownerAppAccounts():route==='testcenter'?ownerAppTestCenter():ownerAppHeader('TECH CHECKS',route,'Existing check workspace'));
+    };
   </script><script type="module" src="./operations-host.js"></script></body>`);
 const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.svg':'image/svg+xml', '.jpeg':'image/jpeg', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp' };
 
@@ -203,3 +218,39 @@ test('approved Today workspace uses the available screen width at normal browser
   }
   await page.screenshot({path:testInfo.outputPath('approved-fluid-screen.png'),fullPage:true});
 });
+
+for (const colorScheme of ['light','dark']) {
+  test(`Tech Checks real account and test forms stay readable with ${colorScheme} device settings`, async ({page}, testInfo) => {
+    await page.emulateMedia({colorScheme});
+    const {frame}=await mount(page);
+    for (const [label,heading] of [['Technician accounts','Technician Accounts'],['Owner test center','Test Center']]) {
+      await frame.getByRole('button',{name:'More',exact:true}).click();
+      await frame.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).click();
+      await frame.getByRole('button',{name:new RegExp(label)}).click();
+      await expect(page.locator('#ownerAppPage h1')).toHaveText(heading);
+      const contentWidth=await page.locator('#ownerAppPage').evaluate(e=>e.getBoundingClientRect().width);
+      expect(contentWidth).toBeGreaterThan(page.viewportSize().width-80);
+      const paints=await page.locator('#ownerAppPage').evaluate(root=>{
+        const selectors=['h1','.ownerAppPageHeader p','.ownerGlobalSearchBar','.ownerGlobalSearchTop b','#ownerGlobalSearchInput','.ownerGlobalSearchInputWrap button','label','input:not([type=search])'];
+        return selectors.map(selector=>{const e=root.querySelector(selector),s=getComputedStyle(e),b=e.getBoundingClientRect();return{selector,color:s.color,background:s.backgroundColor,x:b.x,right:b.right,width:b.width,viewport:innerWidth}});
+      });
+      for(const p of paints){expect(p.x,p.selector).toBeGreaterThanOrEqual(0);expect(p.right,p.selector).toBeLessThanOrEqual(p.viewport);}
+      expect(paints[0].color).toBe('rgb(230, 237, 247)');
+      expect(paints[1].color).toBe('rgb(163, 179, 202)');
+      expect(paints[2].background).toBe('rgb(17, 27, 42)');
+      expect(paints[3].color).toBe('rgb(230, 237, 247)');
+      expect(paints[4].background).toBe('rgb(17, 27, 42)');
+      expect(paints[4].color).toBe('rgb(230, 237, 247)');
+      expect(paints[5].background).toBe('rgb(49, 95, 223)');
+      expect(paints[5].color).toBe('rgb(255, 255, 255)');
+      expect(paints[6].color).toBe('rgb(230, 237, 247)');
+      expect(paints[7].background).toBe('rgb(17, 27, 42)');
+      await page.locator('#ownerGlobalSearchInput').focus();
+      await expect(page.locator('#ownerGlobalSearchInput')).toHaveCSS('outline-color','rgb(145, 176, 255)');
+      await page.screenshot({path:testInfo.outputPath(`${label.replaceAll(' ','-')}-${colorScheme}.png`),fullPage:true});
+      await page.locator('#cosOperationsReturn').click();
+      await expect(page.locator('#cosOperationsLegacy')).toBeHidden();
+      await fillsViewport(page);
+    }
+  });
+}

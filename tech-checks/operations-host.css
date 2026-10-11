@@ -54,3 +54,75 @@ html body.cos-operations-legacy #appView #view-owner #ownerApp>.ownerAppWorkspac
 html body.cos-operations-legacy #cosOperationsLegacy>.cos-tech-check-header{position:relative;z-index:1;margin:0;background:#111B2A!important;color:#E6EDF7!important}
 html body.cos-operations-legacy .cos-tech-check-header .mini{width:auto;min-height:44px;background:#172337!important;color:#C5D2E4!important;border:1px solid #617895!important;border-radius:7px}
 html body.cos-operations-legacy #appView #view-owner :is(#ownerAppPage,#ownerRouteView,#ownerPersistentControls,#ownerPersistentAccounts){background:#0B111C!important;color:#E6EDF7!important}
+
+/* VISION Tech Checks tools are dark regardless of the device's saved/system
+   theme. The legacy light media queries must not paint white cards or black
+   headings inside this dark host. Scope everything to the owner tool mount;
+   technician screens, visibility, event handlers and workflow state are owned
+   by the original application. */
+html body.cos-operations-legacy #appView #view-owner #ownerApp {
+  color-scheme:dark;
+  --oa-bg:#0B111C;--oa-panel:#111B2A;--oa-panel2:#172337;
+  --oa-text:#E6EDF7;--oa-muted:#A3B3CA;--oa-line:#2C3B51;
+  --oa-red:#315FDF;--oa-blue:#315FDF;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp :is(#ownerAppPage,#ownerRouteView,#ownerPersistentControls,#ownerPersistentAccounts) {
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;
+  background:#0B111C!important;color:#E6EDF7!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage {
+  padding:8px 0 32px!important;overflow-x:visible!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage * {
+  color:#E6EDF7!important;border-color:#2C3B51!important;
+  text-shadow:none!important;box-sizing:border-box;min-width:0;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(section,article,header,details,summary,table,thead,tbody,tr,th,td,[class^="owner"],[class*=" owner"],.card,.panel,.item,.warn,.ok,.bad) {
+  background:#111B2A!important;box-shadow:none!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.ownerAppPageHeader,.ownerAppGroup,.ownerTestForm,.ownerTestWorkflowActions,.ownerGlobalSearchTop,.ownerGlobalSearchTop>div,.ownerGlobalSearchInputWrap) {
+  background:transparent!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(h1,h2,h3,h4,label,b,strong,legend) {
+  color:#E6EDF7!important;opacity:1!important;overflow-wrap:anywhere;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(p,small,.small,.muted,.ownerAppPageHeader>span,.ownerTestWarning>span,.ownerAppEmpty>span) {
+  color:#A3B3CA!important;opacity:1!important;overflow-wrap:anywhere;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(input,textarea,select,select option) {
+  background:#111B2A!important;color:#E6EDF7!important;color-scheme:dark!important;
+  border-color:#617895!important;max-width:100%;font-size:16px!important;box-shadow:none!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(input,textarea)::placeholder {
+  color:#A3B3CA!important;opacity:1!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(button,.btn) {
+  background:#172337!important;color:#E6EDF7!important;border-color:#617895!important;
+  box-shadow:none!important;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(button,.btn):hover {
+  background:#203456!important;border-color:#91B0FF!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.btn,button.primary,button.active,button.selected,button[aria-pressed="true"],.ownerTestCreateButton,.ownerGlobalSearchInputWrap button) {
+  background:#315FDF!important;color:#fff!important;border-color:#91B0FF!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(button,a,input,textarea,select,summary):focus-visible {
+  outline:2px solid #91B0FF!important;outline-offset:3px!important;border-color:#91B0FF!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.warn,.ownerTestWarning) {
+  background:#3B2D18!important;border-color:#60492B!important;
+}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.warn,.ownerTestWarning) * {color:#EDC27B!important}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.ok,.complete) {background:#15352D!important;color:#83D6AD!important;border-color:#2B5948!important}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.danger,.bad,.missing) {background:#3E202B!important;color:#F4A2AC!important;border-color:#673746!important}
+@media(max-width:700px) {
+  html body.cos-operations-legacy #appView #view-owner #ownerApp>.ownerAppWorkspace {padding:12px!important;box-sizing:border-box!important}
+  html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.grid4,.ownerTestForm) {grid-template-columns:minmax(0,1fr)!important}
+  html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage .ownerGlobalSearchTop {flex-wrap:wrap;gap:12px}
+  html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage :is(.ownerGlobalSearchBar,.ownerTestCreate,.ownerAppAccountCreate) {padding:16px!important;max-width:100%!important}
+}
+/* The old desktop shell reserves a sidebar column even after its navigation
+   is hidden. Remove that column only while VISION owns the tool navigation. */
+html body.cos-operations-legacy #appView #view-owner #ownerApp {display:block!important}
+html body.cos-operations-legacy #appView #view-owner #ownerApp #ownerAppPage .ownerAppGroup>h2>span {background:#172337!important;color:#E6EDF7!important}
