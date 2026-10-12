@@ -153,7 +153,10 @@ function present() {
     const mapParams = new URLSearchParams(window.location.search);
     const fieldUnit = mapParams.get('fieldUnit');
     const fieldRoute = fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#field-map?unitLabel=' + encodeURIComponent(fieldUnit) : mapParams.get('fieldView') === '1' ? '#field-map' : '';
-    frame.src = './operations/dist/index.html?v=operations-v100-phase2-20261004' + fieldRoute;
+    const tvLaunch = mapParams.get('tvBoard') === '1';
+    const tvParams = new URLSearchParams();
+    if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
+    frame.src = './operations/dist/index.html?v=tech-check-tv-20261012' + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
     frame.referrerPolicy = 'same-origin';
     frame.addEventListener('load', () => {setFieldMapDisplay(frame,false); if (toolFromHash()) showTechCheckHome(); });
@@ -226,6 +229,13 @@ window.addEventListener('hashchange', restoreToolRoute);
 window.addEventListener('message', async event => {
   if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || !owner()) return;
   const data = event.data;
+  if(data?.type==='COS_TV_BOARD_DISPLAY_MODE'&&typeof data.active==='boolean'&&context()?.getEffectiveRole()==='owner'){
+    setFieldMapDisplay(frame,data.active);
+    if(!data.active&&new URLSearchParams(location.search).get('tvBoard')==='1'){
+      const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
+    }
+    return;
+  }
   if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof data.active==='boolean'){setFieldMapDisplay(frame,data.active);return;}
   if (!data || typeof data !== 'object') return;
   if (data.type === 'COS_OPERATIONS_TOKEN_REQUEST' && typeof data.requestId === 'string' && data.requestId.length <= 100) {
@@ -290,3 +300,4 @@ if (serviceView) new MutationObserver(presentServiceOwnerContext).observe(servic
   childList:true, subtree:true, attributes:true, attributeFilter:['class','style']
 });
 present();
+

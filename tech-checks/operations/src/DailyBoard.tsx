@@ -5,8 +5,10 @@ import { boardDateLabel, chicagoDay, dailyBoardCards, isTestRecord, readinessSum
 import './dailyBoard.css';
 import { createBoardReader, createBoardAssignmentSaver, type BoardSnapshot } from './boardPersistence';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
+import TechCheckTvBoard from './TechCheckTvBoard';
+import { TV_REFRESH_MS, TV_ROTATION_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 
-type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void };
+type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
 const statusKey=(value:unknown)=>String(value||'').trim().toLowerCase().replaceAll('_',' ');
 const plusTwoHours=(value:string)=>{
@@ -20,7 +22,8 @@ const jobNotes=(card:BoardCard)=>{
   return String(notes.at(-1)?.text||card.record.instructions||card.record.siteAddress||'');
 };
 
-export default function DailyBoard({api,openWorkspace}:Props) {
+export default function DailyBoard({api,openWorkspace,onTvChange}:Props) {
+  const launch = useMemo(() => tvBoardOptions(location.search), []);
   const [snapshot,setSnapshot]=useState<BoardSnapshot>({jobs:[],tasks:[],readiness:[]});
   const [lastSuccess,setLastSuccess]=useState<Date|null>(null);
   const [error,setError]=useState('');
@@ -31,10 +34,10 @@ export default function DailyBoard({api,openWorkspace}:Props) {
   const [refreshRequired,setRefreshRequired]=useState(false);
   const [now,setNow]=useState(()=>new Date());
   const [person,setPerson]=useState('');
-  const [department,setDepartment]=useState('');
-  const [scope,setScope]=useState<BoardScope>('day');
+  const [department,setDepartment]=useState(launch.department);
+  const [scope,setScope]=useState<BoardScope>(launch.scope);
   const [showTest,setShowTest]=useState(false);
-  const [tv,setTv]=useState(false);
+  const [tv,setTv]=useState(launch.enabled);
   const [rotation,setRotation]=useState(0);
   const [selected,setSelected]=useState<BoardCard|null>(null);
   const [dragged,setDragged]=useState<BoardCard|null>(null);
@@ -42,6 +45,7 @@ export default function DailyBoard({api,openWorkspace}:Props) {
   const [assignment,setAssignment]=useState<AssignmentDraft>({date:'',startTime:'08:00',endTime:'10:00',technician:''});
   const running=useRef(0);
   const mounted=useRef(false);
+  const generation=useRef(0);
   const detail=useRef<HTMLDialogElement|null>(null);
   const assignDialog=useRef<HTMLDialogElement|null>(null);
 
@@ -50,14 +54,16 @@ export default function DailyBoard({api,openWorkspace}:Props) {
 
   const readBoard = useMemo(() => createBoardReader(api), [api]);
   const load = useCallback(async (fresh = false): Promise<BoardSnapshot | null> => {
+    const currentGeneration = generation.current;
     running.current += 1;
     if (mounted.current) setBusy(true);
     try {
       const data = await readBoard(fresh);
+      if (currentGeneration !== generation.current) return null;
       if (mounted.current) { setSnapshot(data); setLastSuccess(new Date()); setError(''); }
       return data;
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : 'The daily board could not refresh.');
+      if (mounted.current && currentGeneration === generation.current) setError(cause instanceof Error ? cause.message : 'The daily board could not refresh.');
       return null;
     } finally {
       running.current -= 1;
@@ -77,15 +83,27 @@ export default function DailyBoard({api,openWorkspace}:Props) {
 
   useEffect(()=>{
     mounted.current=true;void load();
-    const timer=window.setInterval(()=>void load(),60000);
+    const timer=window.setInterval(()=>void load(),TV_REFRESH_MS);
     const clock=window.setInterval(()=>setNow(new Date()),10000);
-    const focus=()=>void load(true);window.addEventListener('focus',focus);
-    return()=>{mounted.current=false;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);};
+    const focus=()=>void load(true);
+    const visible=()=>{if(!document.hidden)focus();};
+    const invalidated=()=>{generation.current+=1;setSnapshot({jobs:[],tasks:[],readiness:[]});setLastSuccess(null);setSelected(null);setAssigning(null);setError('Return to Tech Check and sign in again.');};
+    window.addEventListener('focus',focus);window.addEventListener('online',focus);window.addEventListener('cos-board-updated',focus);window.addEventListener('cos-private-data-invalidated',invalidated);document.addEventListener('visibilitychange',visible);
+    return()=>{mounted.current=false;generation.current+=1;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('cos-board-updated',focus);window.removeEventListener('cos-private-data-invalidated',invalidated);document.removeEventListener('visibilitychange',visible);};
   },[load]);
 
   useEffect(()=>{
+    onTvChange?.(tv);
+    if(!tv&&new URLSearchParams(location.search).get('tvBoard')==='1'){
+      const url=new URL(location.href);for(const key of ['tvBoard','tvScope','tvDepartment'])url.searchParams.delete(key);history.replaceState(history.state,'',url);
+    }
+    if(window.parent!==window)window.parent.postMessage({type:'COS_TV_BOARD_DISPLAY_MODE',active:tv},location.origin);
+    return()=>{if(tv&&window.parent!==window)window.parent.postMessage({type:'COS_TV_BOARD_DISPLAY_MODE',active:false},location.origin);};
+  },[tv,onTvChange]);
+
+  useEffect(()=>{
     if(!tv)return;
-    const timer=window.setInterval(()=>setRotation(n=>n+1),15000);
+    const timer=window.setInterval(()=>setRotation(n=>n+1),TV_ROTATION_MS);
     const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!detail.current?.open&&!assignDialog.current?.open)setTv(false);};
     window.addEventListener('keydown',escape);
     const previous=document.body.style.overflow;document.body.style.overflow='hidden';
@@ -111,6 +129,11 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     review:visible.filter(c=>statusKey(c.status)==='owner review').length,
     complete:visible.filter(c=>c.lane==='complete').length
   }),[visible]);
+  const tvLink=tvBoardLink(window.parent!==window?window.parent.location.href:location.href,scope,department);
+  const copyTvLink=async()=>{
+    try{await navigator.clipboard.writeText(tvLink);setNotice('TV link copied. Open it on the display computer and sign in to Tech Check.');}
+    catch{setNotice('Open the TV link below on the display computer and sign in to Tech Check.');}
+  };
 
   const open=(name:string)=>{setTv(false);setSelected(null);openWorkspace(name);};
   const canManage=(card:BoardCard)=>{
@@ -176,11 +199,14 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
   };
 
-  return <section className={'cos-daily-board'+(tv?' cos-daily-board-tv':'')} aria-label='COS Daily Board'>
+  if(tv)return <TechCheckTvBoard cards={visible} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} exit={()=>setTv(false)} refresh={()=>void refresh()}/>;
+  return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
-      <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(v=>!v);setRotation(0);setSelected(null);}}>{tv?'Exit TV View':'TV View'}</button>{!tv&&<button onClick={()=>open('Owner Tasks')}>+ Assign Task</button>}</div>
+      <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(true);setRotation(0);setSelected(null);}}>TV View</button><button className='secondary' onClick={()=>void copyTvLink()}>Copy TV link</button><button onClick={()=>open('Owner Tasks')}>+ Assign Task</button></div>
     </header>
+
+    <div className='daily-board-tv-setup'><strong>Update here. Show it on the TV.</strong><p>Save job changes in Jobs, or add shop work and instructions in Owner Tasks. The TV refreshes saved changes every minute. Open this link on the TV computer, sign in to Tech Check, then select Full screen.</p><a href={tvLink} target='_blank' rel='noopener'>Open Tech Check TV Board</a><button className='secondary' onClick={()=>open('Owner Tasks')}>Update shop tasks</button></div>
 
     <div className='daily-board-range' aria-label='Board range'><button className={scope==='day'?'active':''} onClick={()=>setScope('day')}>Day</button><button className={scope==='week'?'active':''} onClick={()=>setScope('week')}>Week</button><span>{scope==='day'?'Today + overdue / unscheduled work':'Next 7 days + overdue / unscheduled work'}</span></div>
 
@@ -263,3 +289,4 @@ export default function DailyBoard({api,openWorkspace}:Props) {
     </section></dialog>}
   </section>;
 }
+
