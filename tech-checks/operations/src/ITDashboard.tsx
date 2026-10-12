@@ -45,6 +45,7 @@ export function createITSourceReader<T>(load: (force?:boolean) => Promise<T>, en
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     refresh,
     invalidate:()=>{revision++;pending=null;publish({data:null,loading:false,error:'Your fleet session changed. Reload this view.',readAt:null});},
+    unavailable:()=>{revision++;pending=null;publish({...state,loading:false,error:'The shared fleet refresh failed. Retry to verify current status.'});},
     connect: () => {
       connected = true;
       const connection = ++revision;
@@ -190,7 +191,7 @@ export function ITSourceCard({ source, session, now, navigate }: { source: Sourc
   }, enabled), [source, session, enabled]);
   const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
   useEffect(() => reader.connect(), [reader]);
-  useEffect(()=>{if(!['field','cameras'].includes(source.id))return;const update=()=>{void reader.refresh();};const clear=()=>reader.invalidate();window.addEventListener?.('cos-fleet-snapshot-updated',update);window.addEventListener?.('cos-private-data-invalidated',clear);return()=>{window.removeEventListener?.('cos-fleet-snapshot-updated',update);window.removeEventListener?.('cos-private-data-invalidated',clear);};},[reader,source.id]);
+  useEffect(()=>{if(!['field','cameras'].includes(source.id))return;const update=()=>{void reader.refresh();};const clear=()=>reader.invalidate();const fail=()=>reader.unavailable();window.addEventListener?.('cos-fleet-snapshot-updated',update);window.addEventListener?.('cos-private-data-invalidated',clear);window.addEventListener?.('cos-fleet-snapshot-failed',fail);return()=>{window.removeEventListener?.('cos-fleet-snapshot-updated',update);window.removeEventListener?.('cos-private-data-invalidated',clear);window.removeEventListener?.('cos-fleet-snapshot-failed',fail);};},[reader,source.id]);
   const summary = useMemo(() => state.data === null ? null : source.summarize(state.data, now), [source, state.data, now]);
   const status = !enabled ? 'Access not enabled' : state.loading ? summary ? 'Refreshing' : 'Loading' : state.error ? summary ? 'Previous snapshot' : 'Unavailable' : summary?.caution ? 'Review details' : 'Snapshot loaded';
   return <article className={'it-dashboard-card it-dashboard-card-' + source.id} aria-labelledby={'it-card-' + source.id} data-source={source.id}>

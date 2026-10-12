@@ -146,7 +146,7 @@ export const api = {
     const read=Promise.all([sendRequest('GET','/api/camera-health/summary-v3',session.token),sendRequest('GET','/api/field-map',session.token)]).then(([health,map])=>{
       if(revision!==fleetRevision||lastVerifiedSession?.token!==session.token||mode!==new URLSearchParams(location.search).get('mode'))throw new OperationsApiError('Your fleet session or records changed. Reload the shared view.',409);
       const value=reconcileFleetSnapshot(health.data,map.data);fleetSnapshots.set(key,{value,at:Date.now()});window.dispatchEvent?.(new Event('cos-fleet-snapshot-updated'));return value;
-    }).finally(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);});
+    }).catch(cause=>{if(revision===fleetRevision&&lastVerifiedSession?.token===session.token&&mode===new URLSearchParams(location.search).get('mode')){fleetSnapshots.delete(key);window.dispatchEvent?.(new Event('cos-fleet-snapshot-failed'));}throw cause;}).finally(()=>{if(pendingFleetSnapshots.get(key)===read)pendingFleetSnapshots.delete(key);});
     pendingFleetSnapshots.set(key,read);return read;
   },
 };

@@ -187,7 +187,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
 
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
-  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
+  const currentCameraData=error?null:cameras.data;
+  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,currentCameraData,cameras.now)])),[items,currentCameraData,cameras.now]);
+  const previousHealthById=useMemo(()=>error||cameras.error?new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.fleet?.health||null,cameras.now)])):healthById,[items,error,cameras.error,cameras.fleet,cameras.now,healthById]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
   for(const observation of healthById.values()){if(observation.state==='online')onlineBasis[observation.basis||'provider']++;if(observation.state==='offline')offlineBasis[observation.basis||'provider']++;}
@@ -204,11 +206,11 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return items.filter(unit=>{
       const text=[unit.unitNumber,unit.modelName,unit.customer,unit.site,unit.activeJobNumber,unit.address].filter(Boolean).join(' ').toLowerCase();
       const statusOk=status==='all'||(status==='field'&&['field','assigned','in_transit','installed','returning'].includes(unit.status))||status==='tracker'&&unit.readOnly===true||status===unit.status||status==='missing'&&!hasCoords(unit);
-      const healthOk=health==='all'||(health==='operational'?['online','offline','support'].includes(healthById.get(unit.id)?.state||'unknown'):healthById.get(unit.id)?.state===health);
+      const healthOk=health==='all'||(health==='operational'?['online','offline','support'].includes(previousHealthById.get(unit.id)?.state||'unknown'):healthById.get(unit.id)?.state===health);
       const miles=distance(unit);
       return statusOk&&healthOk&&(!nearby||miles!==null&&miles<=radius)&&(!q||text.includes(q));
     });
-  },[items,search,status,health,health==='all'?null:healthById,nearbyId,radius]);
+  },[items,search,status,health,health==='all'?null:healthById,previousHealthById,nearbyId,radius]);
 
   useEffect(()=>{
     if(!selected)return;
@@ -512,7 +514,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector or recorder observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{data&&cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
     </details>
     {cameras.error&&!error&&<p className='field-map-error' role='alert'>Camera Health unavailable: {cameras.error}</p>}
-    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error}</span> <button className='secondary' disabled={busy} onClick={()=>void load(true)}>Retry map load</button></div>}
+    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error} Camera Health unavailable until the shared snapshot is verified.</span> <button className='secondary' disabled={busy} onClick={()=>void load(true)}>Retry map load</button></div>}
     {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
     {gpsMessage&&<p role='status'>{gpsMessage}</p>}
     <div className={'field-map-layout'+(selected?' has-selection':'')}>

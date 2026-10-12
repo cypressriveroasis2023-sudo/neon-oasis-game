@@ -392,11 +392,11 @@ test('fleet consumers share a complete paired snapshot and re-authorize before u
  f.state.role='service';await assert.rejects(f.api.fleet(),status(401));
 });
 test('one failed source never installs a partial fleet snapshot and a POST invalidates both halves',async()=>{
- const f=fixture(),a=f.api.fleet();const checked=assert.rejects(a,status(503));await flush();f.answer(0,fleetHealth);f.answer(1,{error:'Map read unavailable'},503);await checked;
+ const f=fixture(),a=f.api.fleet();const checked=assert.rejects(a,status(503));await flush();f.answer(0,fleetHealth);f.answer(1,{error:'Map read unavailable'},503);await checked;assert.deepEqual(f.invalidations,['cos-fleet-snapshot-failed']);
  const fresh=f.api.fleet();await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await fresh;
  const post=f.api.post('/api/owner-tasks',{});await flush();f.answer(4,{saved:true});await post;
  const next=f.api.fleet();await flush();assert.equal(f.requests.length,7);f.answer(5,fleetHealth);f.answer(6,fleetMap);await next;
 });
 test('a fleet read started under a previous account is rejected after an account change',async()=>{
- const f=fixture(),old=f.api.fleet();const rejected=assert.rejects(old,status(409));await flush();f.state.token='synthetic-session-b';const current=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await rejected;f.answer(2,fleetHealth);f.answer(3,fleetMap);await current;
+ const f=fixture(),old=f.api.fleet();const rejected=assert.rejects(old,status(409));await flush();f.state.token='synthetic-session-b';const current=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await rejected;assert(!f.invalidations.includes('cos-fleet-snapshot-failed'),'old-session failures cannot invalidate the new account');f.answer(2,fleetHealth);f.answer(3,fleetMap);await current;
 });
