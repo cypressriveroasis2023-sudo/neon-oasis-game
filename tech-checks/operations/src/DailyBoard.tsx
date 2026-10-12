@@ -45,6 +45,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
   const [showTest,setShowTest]=useState(false);
   const [tv,setTv]=useState(launch.enabled);
   const [rotation,setRotation]=useState(0);
+  useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(',')]);
   const [selected,setSelected]=useState<BoardCard|null>(null);
   const [dragged,setDragged]=useState<BoardCard|null>(null);
   const [assigning,setAssigning]=useState<BoardCard|null>(null);

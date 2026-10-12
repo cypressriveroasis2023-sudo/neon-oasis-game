@@ -1,5 +1,6 @@
 -- Additive shared Owner TV settings. Existing jobs, checklists and permissions are unchanged.
 begin;
+grant usage on schema app_private to service_role;
 create table if not exists app_private.cos_tv_board_settings (
  organization_id uuid primary key references public.organizations(id),
  sections text[] not null default array['today','pickup','swap','delivery','service','shop','camera','map'],
@@ -21,10 +22,10 @@ grant insert on app_private.cos_tv_board_settings_history to service_role;
 create or replace function app_private.cos_tv_board_assert_owner(p_actor uuid,p_org uuid)
 returns void language plpgsql security invoker set search_path='' as $$
 begin
- perform app_private.appdeploy_assume_actor(p_actor,p_org);
- if p_org is distinct from 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid or not app_private.has_permission(p_org,'job.override')
+ if p_org is distinct from 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid
  or not exists(select 1 from public.user_profiles p join public.user_roles ur on ur.user_id=p.user_id
  join public.roles r on r.id=ur.role_id and r.organization_id=p.organization_id
+ join public.role_permissions rp on rp.role_id=r.id and rp.permission_code='job.override'
  where p.user_id=p_actor and p.organization_id=p_org and p.active and p.department='owner' and r.code='owner')
  then raise exception 'An active existing COS Owner is required.' using errcode='42501'; end if;
 end $$;
