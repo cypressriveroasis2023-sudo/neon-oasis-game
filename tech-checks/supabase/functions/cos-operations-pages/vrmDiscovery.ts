@@ -1,3 +1,4 @@
+import { collectHeliosPower } from './vrmPower.ts';
 import { heliosVrmUnits, validInstallationId, validVrmName, VRM_MAX_INSTALLATIONS, vrmPortalConfig, type VrmFleetConfig, type VrmInstallation, type VrmSync } from './vrm.ts';
 
 const API = 'https://vrmapi.victronenergy.com/v2';
@@ -19,7 +20,7 @@ export type DiscoveryResult = { userId: number; items: VrmInstallation[] };
 export type VrmDiscoveryOptions = {
   fetch?: typeof fetch; getAccessToken: () => string | undefined;
   rpc: (name: string, payload: Record<string,unknown>) => Promise<unknown>;
-  embeds?: string; now?: () => number;
+  embeds?: string; now?: () => number; collectPower?: boolean;
 };
 type Snapshot = {
   items: VrmInstallation[]; lastAttemptAt: string | null; lastSuccessAt: string | null;
@@ -104,7 +105,7 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
     if (!lease || typeof lease.leaseId !== 'string' || !/^[0-9a-f-]{36}$/i.test(lease.leaseId)) throw new VrmDiscoveryError('storage');
     try {
       const result = await discoverVrmInstallations(token!, options.fetch);
-      const saved = await options.rpc('cos_vrm_fleet_finish', { p_lease_id: lease.leaseId, p_user_id: result.userId, p_items: result.items });
+      const saved = await options.rpc('cos_vrm_fleet_finish', { p_lease_id: lease.leaseId, p_user_id: result.userId, p_items: options.collectPower ? await collectHeliosPower(result.items,token!,options.fetch,now()) : result.items });
       if (saved !== true) throw new VrmDiscoveryError(saved === 'account_changed' ? 'account_changed' : 'storage');
     } catch (error) {
       const safe = error instanceof VrmDiscoveryError ? error : new VrmDiscoveryError('storage');
