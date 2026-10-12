@@ -5,15 +5,17 @@ const TRANSIENT = new Set([408, 429, 500, 502, 503, 504]);
 const DEFAULT_DELAY = 500;
 const MAX_DELAY = 2000;
 
-type ReadOutcome = 'verified' | 'transport' | 'request_timeout' | 'deadline' | 'response_unreadable' | 'identity_unverified' | 'http';
+type ReadOutcome = 'verified' | 'transport' | 'request_timeout' | 'deadline' | 'cooldown_deferred' | 'response_unreadable' | 'identity_unverified' | 'http';
 export type CustomerReadAttempt = {attempt: number; outcome: ReadOutcome; status?: number; retryAfterMs?: number | null};
 /** Aggregate codes only: no IDs, names, headers, response bodies or exception messages. */
 export function createCustomerReadDiagnostics() {
   let attempts = 0, verified = 0;
   const failures: Record<string, number> = {};
   const rateLimitDelays: Record<string, number> = {};
+  const skipped: Record<string, number> = {};
   return {
     record(event: CustomerReadAttempt) {
+      if (event.attempt === 0) { skipped[event.outcome] = (skipped[event.outcome] ?? 0) + 1; return; }
       attempts++;
       if (event.outcome === 'verified') { verified++; return; }
       const code = event.outcome === 'http' ? 'http_' + event.status : event.outcome;
@@ -23,7 +25,7 @@ export function createCustomerReadDiagnostics() {
         rateLimitDelays[delay] = (rateLimitDelays[delay] ?? 0) + 1;
       }
     },
-    snapshot: () => ({attempts, verified, failures: {...failures}, rateLimitDelays: {...rateLimitDelays}}),
+    snapshot: () => ({attempts, verified, failures: {...failures}, rateLimitDelays: {...rateLimitDelays}, skipped: {...skipped}}),
   };
 }
 
@@ -88,12 +90,14 @@ export async function readPlacementCustomer(id: string, options: {
   beforeAttempt?: () => Promise<boolean>;
   onRateLimit?: (delay: number | null) => void;
 }) {
-  if (options.portalId !== PORTAL || !/^[1-9]\d{0,14}$/.test(id) || options.signal.aborted) return null;
+  if (options.portalId !== PORTAL || !/^[1-9]\d{0,14}$/.test(id)) return null;
+  const skip = () => { options.onAttempt?.({attempt: 0, outcome: options.signal.aborted ? 'deadline' : 'cooldown_deferred'}); return null; };
+  if (options.signal.aborted) return skip();
   const pause = options.pause ?? waitForCustomerRetry;
   const url = 'https://connect.mhelpdesk.com/api/v1.0/portal/' + PORTAL + '/customers/' + id + '?fields=customerId,portalId,name,isServiceLocation';
   for (let attempt = 0; attempt < 2 && !options.signal.aborted; attempt++) {
-    if (options.beforeAttempt && !await options.beforeAttempt()) return null;
-    if (options.signal.aborted) return null;
+    if (options.beforeAttempt && !await options.beforeAttempt()) return skip();
+    if (options.signal.aborted) return skip();
     const signal = AbortSignal.any([options.signal, AbortSignal.timeout(10000)]);
     const report = (outcome: ReadOutcome, status?: number, retryAfterMs?: number | null) => options.onAttempt?.({attempt: attempt + 1, outcome, ...(status === undefined ? {} : {status}), ...(retryAfterMs === undefined ? {} : {retryAfterMs})});
     let response: Response;

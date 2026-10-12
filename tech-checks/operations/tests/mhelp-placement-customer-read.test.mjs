@@ -50,7 +50,7 @@ test('batch diagnostics distinguish failures and recovery without retaining prov
   await reader([ok({...record, portalId: '9'})], overrides).read();
   assert.deepEqual(diagnostics.snapshot(), {attempts: 6, verified: 1, failures: {
     http_429: 1, transport: 1, http_401: 1, response_unreadable: 1, identity_unverified: 1,
-  }, rateLimitDelays: {unspecified: 1}});
+  }, rateLimitDelays: {unspecified: 1}, skipped: {}});
   const snapshot = diagnostics.snapshot(); snapshot.failures.http_401 = 999;
   assert.equal(diagnostics.snapshot().failures.http_401, 1);
   assert.doesNotMatch(JSON.stringify(diagnostics.snapshot()), /private|synthetic-token|Example Builder|customerId/);
@@ -147,7 +147,7 @@ test('all batch workers and retries share spaced starts and a rate-limit cooldow
   assert.equal(observations.filter(o => o.state === 'confirmed').length, 6);
   assert.equal(starts.length, 13); assert.ok(starts[1] >= 2000);
   assert.ok(starts.slice(1).every((start, i) => start - starts[i] >= 400));
-  assert.deepEqual(diagnostics.snapshot(), {attempts: 13, verified: 12, failures: {http_429: 1}, rateLimitDelays: {'1000': 1}});
+  assert.deepEqual(diagnostics.snapshot(), {attempts: 13, verified: 12, failures: {http_429: 1}, rateLimitDelays: {'1000': 1}, skipped: {}});
 });
 
 test('a long vendor cooldown stops fresh workers, and abort stops queued starts', async () => {
@@ -160,4 +160,13 @@ test('a long vendor cooldown stops fresh workers, and abort stops queued starts'
   assert.equal(await stopped.acquire(), true);
   const waiting = stopped.acquire(); controller.abort();
   assert.equal(await waiting, false); assert.equal(await stopped.acquire(), false);
+});
+
+test('deadline and deferred queue skips are reported separately from actual GET failures', async () => {
+  const diagnostics = createCustomerReadDiagnostics(), controller = new AbortController(); controller.abort();
+  const deadline = reader([ok()], {signal: controller.signal, onAttempt: diagnostics.record});
+  assert.equal(await deadline.read(), null); assert.equal(deadline.calls.length, 0);
+  const deferred = reader([ok()], {beforeAttempt: async () => false, onAttempt: diagnostics.record});
+  assert.equal(await deferred.read(), null); assert.equal(deferred.calls.length, 0);
+  assert.deepEqual(diagnostics.snapshot(), {attempts: 0, verified: 0, failures: {}, rateLimitDelays: {}, skipped: {deadline: 1, cooldown_deferred: 1}});
 });

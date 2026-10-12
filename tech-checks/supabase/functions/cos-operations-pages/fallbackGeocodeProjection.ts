@@ -1,4 +1,5 @@
 import {addressDigest} from './censusAddress.ts';
+import {parseOwnerInstallationAddress} from '../_shared/ownerInstallationAddress.ts';
 import {fullMatchedParts,matchesInstallation,geocodeRejectionReasons} from './importedAddressContract.ts';
 type Row=Record<string,any>;
 const object=(v:unknown):v is Row=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
@@ -15,7 +16,7 @@ export async function projectFallbackGeocodes(snapshot:Row,records:unknown):Prom
   const r=byAudit.get(row.placementAuditId);
   if(!r||r.unitKey!==row.placementUnitKey||r.addressSha256!==await addressDigest(row.address)||!statuses.has(r.status)||r.provider!=='geocodio'||r.verified!==false||r.liveGps!==false||r.confidence!=='estimate')return row;
   if(r.status==='success'){
-   const original=fullMatchedParts(row.address);
+   const original=parseOwnerInstallationAddress(row.address,fullMatchedParts)?.installation;
    if(!original||!matchesInstallation(original,r.matchedAddress)||!coord(r.latitude,90)||!coord(r.longitude,180)||typeof r.geocodedAt!=='string'||!Number.isFinite(Date.parse(r.geocodedAt))||Date.parse(r.geocodedAt)>Date.now()
     ||!['rooftop','range_interpolation'].includes(r.accuracyType)||typeof r.accuracy!=='number'||!Number.isFinite(r.accuracy)||r.accuracy<0.9||r.accuracy>1||![null,'building_centroid','parcel_centroid'].includes(r.matchType??null)||r.accuracyType==='range_interpolation'&&r.matchType!=null)return row;
   }

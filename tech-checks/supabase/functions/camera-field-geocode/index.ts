@@ -1,6 +1,6 @@
 import {processImportedGeocodes,importedGeocodeFailure} from './importedGeocodeSweep.ts';
 import {processGeocodioFallback} from './geocodioFallback.ts';
-import {censusAddress} from './censusAddress.ts';
+import {censusOwnerAddress as censusAddress} from './ownerCensusAddress.ts';
 const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 const origins=new Set(['https://cypressriveroasis2023-sudo.github.io','https://cos-vision-integration-preview.pages.dev']);
 type Options={rpc:(name:string,args:Record<string,unknown>)=>Promise<any>;verifyFleetActor:(authorization:string)=>Promise<boolean>;fetch?:typeof fetch;geocodioApiKey?:string;sourceReadKey?:string;now?:()=>number};

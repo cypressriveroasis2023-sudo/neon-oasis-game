@@ -12,7 +12,8 @@ async function json(response:Response,max=262144){
  finally{try{void reader.cancel().catch(()=>{});}catch{}}
 }
 Deno.serve(async request=>{
-const deadline=AbortSignal.timeout(90000);
+// Keep fifteen seconds inside the existing scheduler's 120-second timeout for the final RPC.
+const deadline=AbortSignal.timeout(105000);
 const diagnostics=createCustomerReadDiagnostics();
 const gate=createCustomerReadGate({signal:deadline});
 let config:{accessToken?:string;portalId?:string}|null=null;
@@ -29,7 +30,6 @@ return createPlacementSyncHandler({authenticate:async req=>{
  if(result.partial||!result.liveAccessVerified||result.verifiedPortalId!==PORTAL||result.items.length!==result.totalRows)throw Error('Incomplete inventory');
  config=await tokens.getPartnerConfig();return result.items;
 },customer:async id=>{
- if(deadline.aborted)return null;
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
  return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited});
 },readDiagnostics:diagnostics.snapshot})(request);

@@ -77,7 +77,7 @@ test('frontend new estimates stay honest EST-only and do not become verified uni
  for(const accuracyType of ['rooftop','range_interpolation']){const u={...unit(),locationGeocode:await record({accuracyType})};const e=await checkedAddressEstimate(u);assert.equal(e.provider,'geocodio');assert.match(addressEstimateLabel(e),/Geocodio/);assert.equal(isCurrentFieldPin(u),false);assert.equal(e.accuracyType,accuracyType);}
  const u={...unit(),locationGeocode:await record()};for(const patch of [{placement:'UNKNOWN'},{placementStatus:'needs_identity_review'},{placementAuditId:'42'},{address:'101 Example Road, Test City, TX 77001'},{locationVerification:'owner_verified'}])assert.equal(await checkedAddressEstimate({...u,...patch}),null);
 });
-test('deferred free-only queue has safe explanation',()=>{const u={...unit(),locationGeocode:{status:'deferred'}};assert.equal(locationTag(u),'LOOKUP DELAYED');assert.match(locationExplanation(u),/without paid lookups/);});
+test('deferred free-only queue with an unchanged address has safe explanation',()=>{const u={...unit(),locationVerification:'address_only',locationGeocode:{status:'deferred'}};assert.equal(locationTag(u),'LOOKUP DELAYED');assert.match(locationExplanation(u),/without paid lookups/);});
 test('legacy auth and Census adapter unchanged; no logging or vendor query credentials',()=>{
  for(const [name,sha] of Object.entries(legacyBaselineHashes))assert.equal(createHash('sha256').update(readFileSync(new URL('../../supabase/functions/camera-field-geocode/'+name,import.meta.url))).digest('hex'),sha);
  const code=readFileSync(new URL('../../supabase/functions/camera-field-geocode/geocodioAddress.ts',import.meta.url),'utf8');assert.doesNotMatch(code,/console\.|api_key|Deno\.env/);
