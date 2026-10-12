@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, openLegacy } from './api';
+import {IT_DAILY_ONLY} from '../../it-feature-availability';
 import { confirmedItClaim, productionDay, productionItQueue, productionTasks, productionVisit, queueStatus, queueTime, type ItQueue } from './productionQueueData';
 type Row = Record<string, any>;
 const message = (cause: unknown) => cause instanceof Error ? cause.message : 'Operations could not verify these records.';
@@ -30,6 +31,7 @@ export default function ProductionAssignments() {
       if (request !== sequence.current) return null;
       if (!identity || identity.legacyTechnician !== true || typeof identity.authorized !== 'boolean' || !['it','service'].includes(identity.department))
         throw new Error('Your technician identity could not be verified.');
+      if (IT_DAILY_ONLY && identity.department === 'it') { clear(); setErrors({ session: 'IT assignment workflows are paused until further notice. Return to the four daily views.' }); return null; }
       const actorId = String(identity.productionTechnicianUserId || '');
       const identityKey = identity.department + ':' + actorId;
       if (identityRef.current !== identityKey) { setDay(null); setTasks(null); setSharedQueue(null); setClaimNotice(''); }

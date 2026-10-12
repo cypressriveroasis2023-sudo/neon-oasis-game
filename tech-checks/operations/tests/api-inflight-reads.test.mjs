@@ -48,6 +48,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   const exports = {};
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
+    require: name => { assert.equal(name, '../../it-feature-availability'); return { IT_DAILY_ONLY: true }; },
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -125,27 +126,16 @@ test('bearer rollover never shares the preceding account or session response', a
   assert.equal((await oldRead).data.actor, 'synthetic-old-account');
 });
 
-test('technician reads and claim writes retain independent request execution', async () => {
+test('paused IT assignment reads and claim writes never reach transport; Service reads remain independent', async () => {
   const f = fixture({ mode: 'production-assignments', role: 'it' });
-  const reads = [f.api.get('/api/tech/tasks'), f.api.get('/api/tech/tasks')];
-  await flush();
-  assert.equal(f.requests.length, 2, 'technician routes are outside the snapshot allowlist');
-  f.state.role = 'service';
-  reads.push(f.api.get('/api/tech/tasks'));
-  await flush();
-  assert.equal(f.requests.length, 3, 'a different valid technician role is also independent');
-  f.answer(0); f.answer(1); f.answer(2);
-  await Promise.all(reads);
-  f.state.role = 'it';
   const claim = '/api/tech/it-queue/11111111-1111-4111-8111-111111111111/claim';
-  const claims = [f.api.post(claim, {}), f.api.post(claim, {})];
-  await flush();
-  assert.equal(f.requests.length, 5);
-  for (const index of [3, 4]) {
-    assert.deepEqual(f.requests[index].envelope, { path: claim, method: 'POST', body: {} });
-    f.answer(index);
-  }
-  await Promise.all(claims);
+  await Promise.all([assert.rejects(f.api.get('/api/tech/tasks'),status(403)), assert.rejects(f.api.post(claim,{}),status(403))]);
+  assert.equal(f.requests.length,0);
+  const session=f.api.get('/api/tech/session'); await flush(); f.answer(0); await session;
+  f.state.role='service';
+  const reads=[f.api.get('/api/tech/tasks'),f.api.get('/api/tech/tasks')]; await flush();
+  assert.equal(f.requests.length,3);
+  f.answer(1);f.answer(2);await Promise.all(reads);
 });
 
 test('mode is part of read identity even with the same valid role, bearer and path', async () => {

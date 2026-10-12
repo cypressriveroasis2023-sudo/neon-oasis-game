@@ -152,7 +152,7 @@ type Source = {
   allowed?: (session: Record<string, any>) => boolean; unavailable?: string;
 };
 const read = (path: string) => async () => (await api.get(path)).data;
-const sources: Source[] = [
+export const sources: Source[] = [
   { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read: read('/api/field-map'), summarize: summarizeITFieldMap },
   { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read: read('/api/camera-health/summary-v3'), summarize: summarizeITCameras },
   { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
@@ -176,7 +176,7 @@ function DashboardIcon({ name }: { name: string }) {
   return <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><path d={paths[name]}/></svg>;
 }
 
-function ITSourceCard({ source, session, now, navigate }: { source: Source; session: Record<string, any>; now: number; navigate: (workspace: string) => void }) {
+export function ITSourceCard({ source, session, now, navigate }: { source: Source; session: Record<string, any>; now: number; navigate: (workspace: string) => void }) {
   const enabled = !source.allowed || source.allowed(session);
   // A different verified session gets a new, empty store synchronously. An old
   // account's late response can never populate the new account's cards.

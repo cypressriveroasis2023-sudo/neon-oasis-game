@@ -1,4 +1,7 @@
 import {test,expect} from '@playwright/test';
+
+import {IT_DAILY_ONLY} from '../../it-feature-availability.js';
+test.skip(IT_DAILY_ONLY, 'Extended IT workflows are intentionally paused; it-daily-mode.browser.spec.mjs verifies the active release.');
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../../production-assignments-host.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../../operations-host.css',import.meta.url),'utf8');

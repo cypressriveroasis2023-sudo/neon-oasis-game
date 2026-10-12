@@ -1,3 +1,4 @@
+import {itDailyCameraUrl} from '../../it-feature-availability';
 import {fieldRecorderObservation,type FieldRecorderContext,type FieldRecorderGuardEnvelope} from './fieldRecorderObservation';
 import {validateIdentityEnvelope,resolveVerifiedUnitIdentity,linkedUnitObservation,legacyIdentityConflict,type VerifiedUnitIdentity,type IdentityWarning,type LinkedUnitObservation} from './verifiedUnitIdentity';
 import { cameraTimestamp, cameraRecord, cameraState, combinedState, classifyCameraUnit, type CameraRow, type UnitEvidence } from './cameraEvidence';
@@ -107,5 +108,5 @@ export function unitHealthLabel(info:UnitCameraHealth|null|undefined){
 export function unitDiagnosticsPath(unit:FieldHealthUnit,rows:CameraRow[]=[]){
   const source=new Set(rows.map(row=>row.unit));
   const label=canonicalCameraUnit(unit.unitNumber)?unit.unitNumber:source.size===1&&canonicalCameraUnit(rows[0]?.unit||'')?rows[0].unit:null;
-  return label?'../../camera-health.html?q='+encodeURIComponent(label):null;
+  return label?itDailyCameraUrl('../../camera-health.html?q='+encodeURIComponent(label)):null;
 }

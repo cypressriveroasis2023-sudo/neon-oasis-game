@@ -1,3 +1,4 @@
+import {itDailyCameraUrl} from '../../it-feature-availability';
 import {cameraTimestamp,type CameraRow} from './cameraEvidence';
 import {cameraResourcePath} from './cameraHealthCounts';
 /** Saved destinations, never credentials or a claim of verified video. */
@@ -19,6 +20,6 @@ export function cameraCardTimes(rows:CameraRow[],now:number){
   return {checked:latest('checked'),success:latest('success')};
 }
 export function unitCardPath(unit:string,action?:'edit-field'){
-  return '../../camera-health.html?unit='+encodeURIComponent(unit)+(action?'&action='+action:'');
+  return itDailyCameraUrl('../../camera-health.html?unit='+encodeURIComponent(unit)+(action?'&action='+action:''));
 }
 export function cameraIpEditLinks(rows:CameraRow[]){return rows.filter(r=>r.evidence?.source!=='Reconeyez').flatMap(row=>{const url=cameraResourcePath(row);return url?[{url:url+'&action=edit-ip',name:row.name}]:[];});}

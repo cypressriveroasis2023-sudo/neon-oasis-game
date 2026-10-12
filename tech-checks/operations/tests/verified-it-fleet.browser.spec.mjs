@@ -39,7 +39,10 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
- await frame.getByRole('button',{name:'More',exact:true}).first().click();await nav.getByRole('button',{name:'InHand Routers',exact:true}).click();await expect.poll(()=>calls.some(c=>c.path==='/api/routers')).toBe(true);
+ // Field View has already read saved router observations; opening More must not mount the paused Router workspace.
+ const routerReads=calls.filter(c=>c.path==='/api/routers').length;
+ expect(routerReads).toBeGreaterThan(0);
+ await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
  expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(c.path))).toBe(true);
  expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Field View'})).toBeFocused();
 });
@@ -107,11 +110,13 @@ test('Owner Home Field View supports keyboard, browser Back and repeated entry w
  await page.evaluate(()=>history.back());await expect(entry).toBeVisible();expect(calls.every(c=>c.method==='GET')).toBe(true);
 });
 
-test('IT entry uses touch activation and the existing Tech Checks return',async({browser})=>{
+test('IT entry uses touch activation and daily views without paused Tech Checks',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,baseURL:origin});const page=await context.newPage();
  try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
-  await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true}).tap();
-  await frame.getByRole('button',{name:'Return to my IT Tech Checks',exact:true}).tap();await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(entry).toBeFocused();
+  await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
+  await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Daily views',exact:true}).tap();
+  await expect(frame.getByRole('region',{name:'IT daily dashboard',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Return to IT Tech Checks'}).tap();await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(entry).toBeFocused();
  }finally{await context.close();}
 });
 

@@ -1,3 +1,4 @@
+import {IT_DAILY_ONLY} from '../../it-feature-availability';
 export type ApiResponse<T = any> = { data: T };
 export class OperationsApiError extends Error {
   response: { status: number; data: { error: string } };
@@ -73,6 +74,7 @@ async function request<T = any>(method: 'GET' | 'POST', path: string, body?: unk
   catch (cause) { if (cause instanceof OperationsApiError && [401,403].includes(cause.response.status)) window.dispatchEvent?.(new Event('cos-private-data-invalidated')); throw cause; }
   if (options?.signal?.aborted) throw new OperationsApiError('The read was cancelled.', 499);
   if (mode !== new URLSearchParams(location.search).get('mode')) throw new OperationsApiError('The Operations view changed. Refresh to verify the current session.', 401);
+  if (IT_DAILY_ONLY && session.role === 'it' && path.startsWith('/api/tech/') && path !== '/api/tech/session') throw new OperationsApiError('IT assignment workflows are paused until further notice.', 403);
   if (method === 'POST' && path.startsWith('/api/tech/') && session.role !== 'it') throw new OperationsApiError('Only an IT technician can take shared IT work.', 403);
   if (method === 'POST') {
     // Reads started before or during a save cannot satisfy its fresh readback.

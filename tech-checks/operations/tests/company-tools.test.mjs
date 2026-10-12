@@ -34,10 +34,13 @@ const markupHashes = {
 const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.url),'utf8');
 for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
-    const html=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
+    const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
+    const html=original.replace('<script type="module" src="./it-daily-camera-host.js"></script>\n','');
+    if(['camera-health','camera-detail'].includes(name))assert.equal(original.split('it-daily-camera-host.js').length-1,1);
     assert.equal(html.split('cos-eye-branding.js?v=20261006b').length-1,1);
     if(['camera-health','camera-detail'].includes(name))assert.ok(html.includes('camera-placement-controls.js?v=20261008-fleet-identity-placement'));
-    const preserved=html.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
+    const availabilityPreserved=name==='it-send-repair'?html.replace(/async function dailyFeatureAvailable\(\)\{[\s\S]*?\n\}\n/,'').replace('async function load(){ if(!await dailyFeatureAvailable())return; ', 'async function load(){ ').replace('async function send(id,no){if(!await dailyFeatureAvailable())return;', 'async function send(id,no){'):html;
+    const preserved=availabilityPreserved.replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').replace('camera-health-overview.js?v=20261006b"','camera-health-overview.js?v=20261006"');
     const scripts=[...preserved.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]).join('\n');
     assert.equal(createHash('sha256').update(scripts).digest('hex'),hash);
     const originalMarkup=preserved.replace(/<meta name="(?:theme-color|color-scheme)"[^>]+>/g,'')

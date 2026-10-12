@@ -1670,7 +1670,8 @@ function renderProviderHealth(){
 }
 window.addEventListener('resize',()=>syncMobileCameraLayout(),{passive:true});
 boot().catch(error=>{console.error(error);const el=document.getElementById('empty');if(el){el.style.display='block';el.textContent='STARTUP ERROR: '+(error?.message||error)}});
-</script></body></html>
+</script><script type="module" src="./it-daily-camera-host.js"></script>
+</body></html>
 <style id="camera-health-unit-polish">
 .unitcards{gap:18px!important}
 .unitcard{padding:18px!important;border-radius:16px!important}
