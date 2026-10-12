@@ -1,3 +1,4 @@
+import { checkedTvSections } from './tv-board-settings/index.ts';
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
 import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
@@ -623,6 +624,7 @@ export function createOperationsHandler(options) {
           try { return json(readVrmFleet ? await readVrmFleet(path.endsWith('/refresh')) : vrmPortalConfig(options.vrmEmbeds)); }
           catch { fail('VRM dashboard configuration is unavailable.', 503); }
         }
+        if(path==='/api/tv-board/settings')return json(await rpc('cos_tv_board_settings_snapshot',actorPayload));
         const snapshots = {
           '/api/handoffs': 'appdeploy_handoffs_snapshot',
           '/api/customers': 'appdeploy_customers_snapshot',
@@ -931,6 +933,12 @@ export function createOperationsHandler(options) {
         if (body.shopPrep != null && typeof body.shopPrep !== 'boolean') fail('Shop prep must be true or false.');
         return json(await rpc('appdeploy_owner_create_manual_job', { p_actor_user_id: context.actorId, p_site_id: id, p_job_type: jobType, p_title: textValue(body.title, 'Title', true, 250), p_description: textValue(body.description, 'Description', false, 12000), p_priority: priority, p_requires_shop_prep: body.shopPrep === true }), 201);
       }
+      if(path==='/api/tv-board/settings'){
+        allowedFields(body,['sections','expectedRevision'],'TV settings');
+        let sections;try{sections=checkedTvSections(body.sections);}catch{fail('Choose valid TV board sections.');}
+        if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail('Refresh TV settings before saving.');
+        return json(await rpc('cos_tv_board_settings_save',{...actorPayload,p_sections:sections,p_expected_revision:body.expectedRevision}));
+      }
       const truck = /^\/api\/owner\/truck-checks\/([^/]+)\/approve$/.exec(path);
       if (truck) {
         allowedFields(body,['note'],'Truck approval request');
@@ -1008,5 +1016,6 @@ if (typeof Deno !== 'undefined' && import.meta.main) {
     googleSheets: { getServiceAccountJson:()=>Deno.env.get('COS_GOOGLE_SERVICE_ACCOUNT_JSON'),signAssertion:signSheetsAssertion },
   }));
 }
+
 
 

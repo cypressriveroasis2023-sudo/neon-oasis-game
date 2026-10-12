@@ -12,6 +12,9 @@ const harness = `<!doctype html><html><head><meta name="viewport" content="width
 async function setup(page, { many = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
   await page.clock.install({ time: new Date(time) });
+  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;
+  if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
+  const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if(url.origin===origin){
@@ -25,12 +28,23 @@ async function setup(page, { many = false } = {}) {
     if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'}});
     const {path,method,body}=request.postDataJSON();
     expect(await request.headerValue('authorization')).toBe('Bearer synthetic-owner-session');
+    if(path==='/api/tv-board/settings'){
+      if(method==='POST'){
+        state.writes.push({path,method,body});
+        if(body.expectedRevision!==state.settings.revision)return route.fulfill({status:409,headers:cors,json:{error:'Settings changed. Refresh before saving.'}});
+        state.settings={sections:body.sections,revision:state.settings.revision+1,updatedAt:time};
+      }
+      return route.fulfill({headers:cors,json:state.settings});
+    }
     if(method!=='GET'){state.writes.push({path,method,body});return route.fulfill({status:403,headers:cors,json:{error:'Display cannot write'}});}
     if(path==='/api/daily-board'){
       state.reads++;
       if(state.fail)return route.fulfill({status:state.fail,headers:cors,json:{error:state.fail===401?'Sign-in required':'Connection unavailable'}});
       return route.fulfill({headers:cors,json:{jobs:state.jobs,tasks:state.tasks,readiness:state.readiness,asOf:time}});
     }
+    if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:1,missingGps:0},generatedAt:time}});}
+    if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
+    if(path==='/api/camera-health/summary-v3'){state.fleetReads++;return route.fulfill({headers:cors,json:{totalDevices:1,online:1,offline:0,review:0,shopRoot:0,healthRows:1,fieldDevices:1,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:1,activeFieldRecords:1,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}]}});}
     return route.fulfill({headers:cors,json:path==='/api/session'?{authorized:true,name:'Fixture Owner',role:'Owner',features:{}}:{items:[]}});
   });
   await page.goto('/tv-harness?tvBoard=1');
@@ -80,4 +94,54 @@ test('network failure marks delayed data and authentication failure clears priva
   await expect(frame.getByRole('alert')).toContainText('BOARD UNAVAILABLE');
   await expect(frame.getByText('Inspect the return rack',{exact:true})).toHaveCount(0);
   expect(state.writes).toEqual([]);
+});
+
+test('remote choices rotate all pending types, including future and unscheduled jobs',async({page})=>{
+ const {state,frame}=await setup(page);
+ state.jobs=['PICKUP','SWAP','DELIVERY','SERVICE'].map((jobType,index)=>({id:'pending-'+index,customer:'Pending '+jobType,jobType,status:'scheduled',scheduled:index%2?'':'2026-11-01 08:00',instructions:'Saved '+jobType+' instructions'}));
+ state.settings={sections:['pickup','swap','delivery','service'],revision:1,updatedAt:time};
+ await page.clock.fastForward(60000);
+ for(const [index,key] of ['pickup','swap','delivery','service'].entries()){
+  if(index)await page.clock.fastForward(15000);
+  await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section',key);
+  await expect(frame.getByText('Pending '+key.toUpperCase(),{exact:true})).toBeVisible();
+ }
+ expect(state.writes).toEqual([]);
+});
+
+test('Owner saves switches and can turn every TV section off without changing work records',async({page})=>{
+ const {state,frame}=await setup(page);
+ await frame.getByRole('button',{name:'Exit TV',exact:true}).click();
+ const controls=frame.getByRole('region',{name:'TV board settings'});
+ await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).check();
+ await controls.getByRole('button',{name:'Save TV sections',exact:true}).click();
+ await expect(controls.getByText('TV sections saved and verified.',{exact:true})).toBeVisible();
+ expect(state.settings.sections).toEqual(['pickup','shop']);
+ await controls.getByRole('checkbox',{name:'Pending pickups',exact:true}).uncheck();await controls.getByRole('checkbox',{name:'Shop updates',exact:true}).uncheck();
+ await controls.getByRole('button',{name:'Save TV sections',exact:true}).click();
+ await expect(controls.getByText('TV sections saved and verified.',{exact:true})).toBeVisible();
+ await frame.getByRole('button',{name:'TV View',exact:true}).click();
+ await expect(frame.getByText('TV sections turned off',{exact:true})).toBeVisible();
+ expect(state.writes.every(write=>write.path==='/api/tv-board/settings')).toBe(true);
+});
+
+test('Teddy and Victor have no inspection fields and Camera Health rotates with the verified map',async({page},testInfo)=>{
+ const {state,frame}=await setup(page);
+ state.readiness=['Teddy Hopper','Victor Garcia'].map((name,index)=>({userId:'staff-'+index,name,department:'it',status:'not_started',result:{}}));
+ state.settings={sections:['readiness'],revision:1,updatedAt:time};await page.clock.fastForward(60000);
+ await expect(frame.getByText('No company vehicle · truck and trailer inspections do not apply.').first()).toBeVisible();
+ await expect(frame.getByText('Truck inspection',{exact:true})).toHaveCount(0);await expect(frame.getByText('Trailer inspection',{exact:true})).toHaveCount(0);
+ state.settings={sections:['camera','map'],revision:2,updatedAt:time};await page.clock.fastForward(60000);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','camera');
+ await expect(frame.getByText('19017 Lee Rd, Humble, TX 77032',{exact:true})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('tv-camera-health.png')});
+ const reads=state.fleetReads;expect(reads).toBe(3);await page.clock.fastForward(15000);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
+ await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
+ await page.clock.fastForward(60000);expect(state.fleetReads).toBe(reads);
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>state.fleetReads).toBe(reads+3);
+ state.fail=401;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
 });

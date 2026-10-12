@@ -31,6 +31,7 @@ async function mount(page,workspace='daily-board',authorized=true,overrides={}){
    if(path==='/api/camera-health/summary-v3')return answer({totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:new Date().toISOString(),rows:[]});
    if(path==='/api/session')return answer({authorized,name:'Fixture Owner',role:'Owner'});
    if(path==='/api/jobs')return answer({items:state.jobs});
+   if(path==='/api/tv-board/settings')return answer({sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null});
    if(path==='/api/owner/control-data')return answer(state.control);
    if(path==='/api/daily-board')return answer({jobs:state.jobs,tasks:state.tasks,readiness:[],asOf:now});
    if(path==='/api/owner-tasks')return answer({items:state.tasks.map(task=>({...task,...(state.taskMismatch?{relatedJobId:null,relatedSiteId:null,ownerNotes:'old note'}:{}),...(state.taskAssignedMismatch?{assignedUserId:checkId}:{})}))});
@@ -457,3 +458,4 @@ test('late contact response cannot restore a prior customer selection',async({pa
  await controls.getByRole('combobox',{name:'Search customers'}).fill('Imported Customer');await controls.getByRole('option',{name:/Imported Customer Without Site/}).click();release();
  const panel=controls.getByRole('region',{name:'Customer contacts',exact:true});await expect(panel.getByRole('status')).toContainText('No saved customer contacts');await expect(panel.getByText('Fixture Contact',{exact:true})).toHaveCount(0);expect(state.writes).toHaveLength(0);
 });
+

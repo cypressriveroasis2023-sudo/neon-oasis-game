@@ -64,6 +64,7 @@ async function fixturePage(page,{locationWritesEnabled=true}={}) {
       else if (path === '/api/routers') data = { items: [], source: 'camera_health', gpsAvailable: false, generatedAt: new Date().toISOString() };
       else if (path === '/api/camera-health/summary-v3') data = {totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:now,rows:[]};
       else if (path === '/api/jobs') data = { items: state.jobs };
+      else if (path === '/api/tv-board/settings') data = {sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null};
       else if (path === '/api/team-production') data = { items: [] };
       else if (path === '/api/owner-tasks') data = { items: state.tasks };
       else if (['/api/quotes', '/api/ar', '/api/purchasing', '/api/vrm-portal', '/api/vrm-fleet', '/api/equipment', '/api/team-production', '/api/customers', '/api/sites'].includes(path)) data = { items: [] };
@@ -421,3 +422,4 @@ test('Field View never offers GPS writes before verified projection capability i
  await expect(frame.getByLabel('Latitude',{exact:true})).toHaveCount(0);
  expect(state.writes).toEqual([]);
 });
+

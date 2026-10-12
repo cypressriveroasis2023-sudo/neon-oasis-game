@@ -1,4 +1,5 @@
-import type { BoardCard, BoardScope, ReadinessRow } from './dailyBoardData';
+import { chicagoDay,type BoardCard,type BoardScope,type ReadinessRow } from './dailyBoardData';
+import {TV_SECTIONS,type TvSection} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
 
 export const TV_ROTATION_MS = 15000;
 export const TV_REFRESH_MS = 60000;
@@ -22,6 +23,19 @@ export function tvBoardLink(current: string, scope: BoardScope, department: stri
 
 export type TvLane = { name: string; cards: BoardCard[] };
 export type TvPage = { kind: 'work'; lanes: TvLane[] } | { kind: 'readiness'; rows: ReadinessRow[] };
+export type ConfiguredTvPage = (TvPage | {kind:'camera'|'map'|'empty'}) & {section:TvSection|null;title:string};
+export function configuredTvPages(cards:BoardCard[],names:string[],readiness:ReadinessRow[],sections:TvSection[],width:number,height:number,today:string):ConfiguredTvPage[]{
+  const pages:ConfiguredTvPage[]=[];
+  for(const {key,label} of TV_SECTIONS.filter(section=>sections.includes(section.key))){
+    if(key==='camera'||key==='map'){pages.push({kind:key,section:key,title:label});continue;}
+    const chosen=key==='shop'?cards.filter(card=>card.kind==='task'&&(!chicagoDay(card.date)||chicagoDay(card.date)<=today||card.lane==='complete')):
+      key==='today'?cards.filter(card=>card.kind==='job'&&(chicagoDay(card.date)===today||card.lane==='complete')):
+      cards.filter(card=>card.kind==='job'&&card.lane!=='complete'&&String(card.record.jobType||'').toLowerCase()===key);
+    const group=key==='readiness'?tvBoardPages([],names,readiness,width,height):tvBoardPages(chosen,names,[],width,height);
+    pages.push(...group.map(page=>({...page,section:key,title:label})));
+  }
+  return pages.length?pages:[{kind:'empty',section:null,title:'TV sections turned off'}];
+}
 export function tvBoardPages(cards: BoardCard[], names: string[], readiness: ReadinessRow[], width: number, height: number): TvPage[] {
   const laneCount = width >= 1500 ? 3 : width >= 900 ? 2 : 1;
   const cardCount = height >= 900 ? 2 : 1;

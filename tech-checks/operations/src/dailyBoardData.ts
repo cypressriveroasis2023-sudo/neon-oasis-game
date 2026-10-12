@@ -1,3 +1,4 @@
+import { vehicleInspectionExempt } from './vehicleInspectionPolicy';
 export type BoardRecord = Record<string, any>;
 export type ReadinessRow = {userId:string;name:string;department:string;checkId?:string;status:string;startedAt?:string;completedAt?:string;result:BoardRecord};
 export type ReadinessStatus = {label:string;state:'good'|'pending'|'attention'|'neutral'};
@@ -22,7 +23,8 @@ export function readinessSummary(row:ReadinessRow): {truck:ReadinessStatus;trail
     else inventory={label:row.status==='completed'?'Record incomplete':'Pending record',state:row.status==='completed'?'attention':'pending'};
   }
   const trailer:ReadinessStatus=row.department==='it'?{label:'Not in IT checklist',state:'neutral'}:result.taking_trailer===false?{label:'Not taking trailer',state:'neutral'}:result.taking_trailer===true?section('trailer',7):pending;
-  return {truck:section('truck',8),trailer,inventory};
+  const exempt:ReadinessStatus={label:'No company vehicle',state:'neutral'};
+  return {truck:vehicleInspectionExempt(row)?exempt:section('truck',8),trailer:vehicleInspectionExempt(row)?exempt:trailer,inventory};
 }
 export function isTestRecord(record:BoardRecord):boolean {
   return record.isTest===true||[record.customer,record.site,record.siteName,record.jobNumber].some(v=>/^TEST(?:\b|[-_])/i.test(String(v||'')))||/^(?:\[TEST\]|TEST[-_:]|TEST E2E\b)/i.test(String(record.title||''));
@@ -56,7 +58,7 @@ const addIsoDays=(day:string,days:number)=>{
   const value=new Date(Date.UTC(year,month-1,date+days));
   return value.toISOString().slice(0,10);
 };
-export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now = new Date(), scope:BoardScope='day'): BoardCard[] {
+export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now = new Date(), scope:BoardScope='day', includeFuture=false): BoardCard[] {
   const today = chicagoDay(now);
   const horizon=addIsoDays(today,6);
   const cards: BoardCard[] = [];
@@ -69,7 +71,7 @@ export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now =
       const completedDay = chicagoDay(record.completedAt || record.closedAt || '');
       const date = String(kind === 'job' ? record.scheduled || '' : record.dueAt || '');
       const day = chicagoDay(date);
-      if (done ? completedDay !== today : scope==='day' ? Boolean(day && day > today) : Boolean(day && day > horizon)) continue;
+      if (done ? completedDay !== today : !includeFuture && (scope==='day' ? Boolean(day && day > today) : Boolean(day && day > horizon))) continue;
       const overdue = !done && Boolean(day && day < today);
       const needsAttention = overdue || record.goBack?.required === true || Boolean(record.needsAttention) || ['blocked','needs correction','correction required','owner review','on hold'].includes(status);
       const lane: BoardLane = done ? 'complete' : needsAttention ? 'attention' : ['in progress','dispatched','en route','on site','working','accepted'].includes(status) ? 'progress' : 'todo';
@@ -80,3 +82,4 @@ export function dailyBoardCards(jobs: BoardRecord[], tasks: BoardRecord[], now =
   }
   return cards.sort((a,b) => Number(b.priority==='high')-Number(a.priority==='high') || Number(b.overdue)-Number(a.overdue) || a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
+
