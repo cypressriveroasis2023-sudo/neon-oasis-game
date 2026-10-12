@@ -33,3 +33,10 @@ test('unverified and expired customer reads never seed the same-run cache',async
  const result=await readPlacementCustomer('2',{portalId:'224643',accessToken:'synthetic-token',signal:controller.signal,onVerified:r=>cache.remember('2',r),readJson:async r=>{controller.abort();return r.json();},fetch:async()=>Response.json(parent)});
  assert.equal(result,null);assert.equal(cache.read(path),null);
 });
+
+test('location diagnostics report fixed review categories without record data',async()=>{
+ for(const [list,expected] of [[{results:[],totalRows:1},'service_inventory'],[{results:[],totalRows:0},'service_membership'],[{results:[{...service,zip:null}],totalRows:1},'address_validation']]){
+  const codes=[];const reader=createFleetLocationReader(async p=>p.includes('servicelocations')?list:parent,async()=>{throw Error('Unexpected geocoder');},'224643',code=>codes.push(code));
+  await assert.rejects(reader({customerId:'2',serviceLocationId:'3'},null));assert.deepEqual(codes,[expected]);assert.doesNotMatch(JSON.stringify(codes),/Private|Synthetic|123 Main/);
+ }
+});
