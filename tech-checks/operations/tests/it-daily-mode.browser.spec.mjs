@@ -120,14 +120,14 @@ async function mount(page, options = {}) {
     await state.held.get(call.path)?.promise;
     if (state.fail[call.path]) return route.fulfill({status: 503, headers, contentType: 'application/json', body: JSON.stringify({error: 'Synthetic source unavailable'})});
     const now = new Date().toISOString(), owner = state.role === 'owner';
-    const unit = {id: '11111111-1111-4111-8111-111111111111', unitNumber: 'Synthetic Helios 001', modelName: 'Helios', status: 'installed', currentLocationType: 'site', site: 'Synthetic north site', address: '100 Synthetic Road, Houston TX 77001', latitude: 29.76, longitude: -95.37, locationVerification: 'owner_verified', gpsRecordedAt: now, locationVerifiedAt: now, coordinateSource: 'site', hasUnitGps: true};
+    const unit = {id: '11111111-1111-4111-8111-111111111111', unitNumber: 'Helios 001', modelName: 'Helios', status: 'installed', currentLocationType: 'site', site: 'Synthetic north site', address: '100 Synthetic Road, Houston TX 77001', latitude: 29.76, longitude: -95.37, locationVerification: 'owner_verified', gpsRecordedAt: now, locationVerifiedAt: now, coordinateSource: 'site', hasUnitGps: true};
     const data = {
       '/api/session': {authorized: true, legacyOwner: owner, role: owner ? 'Owner' : 'IT', name: 'Synthetic Technician', features: {fleetAccess: true, unitTracker: options.unitTracker !== false, vrmRead: options.vrmRead !== false, importedUnitAddressEdit: false}},
       '/api/tech/session': {authorized: true, legacyTechnician: true, department: 'it', productionTechnicianUserId: '22222222-2222-4222-8222-222222222222'},
       '/api/field-map': {items: [unit], inventoryItems: [unit], summary: {fieldUnits: 1, mappedUnits: 1, unitGps: 1, missingGps: 0}, generatedAt: now},
       // Field View reads saved router observations without opening the paused Router workspace.
       '/api/routers': {items: [], source: 'camera_health', gpsAvailable: false, generatedAt: now},
-      '/api/camera-health/summary-v3': snapshot([resource(1, 'Synthetic Helios 001', {name: 'Synthetic camera', status: 'online', checkedAt: now, evidence: {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'online', observedAt: now, lastOnlineAt: now}})]),
+      '/api/camera-health/summary-v3': snapshot([resource(1, 'Helios 001', {name: 'Synthetic camera', status: 'online', checkedAt: now, evidence: {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'online', observedAt: now, lastOnlineAt: now}})]),
       '/api/vrm-fleet': {items: [{installationId: 9100001, name: 'Synthetic power site', portalUrl: 'https://vrm.victronenergy.com/installation/9100001/dashboard', embedUrl: null}], sync: {state: 'current', lastAttemptAt: now, lastSuccessAt: now, nextSyncAt: now, error: null, scheduleActive: true}},
       '/api/unit-tracker': {contract: 'COS_UNIT_TRACKER_OUTBOX_V1', workbookId: '1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA', connector: {enabled: false, state: 'awaiting_sheets_connection'}, queueEnabled: false, availability: options.trackerUnavailable ? 'unavailable' : 'available', sources: [], requests: [], sourcesHeld: 0, sourcesTruncated: false, requestsTruncated: false},
     }[call.path];
@@ -142,7 +142,8 @@ async function ready(frame, except) {
   await expect(daily(frame).getByRole('heading', {name: 'Daily views', exact: true})).toBeVisible();
   await expect(daily(frame).locator('[data-source]')).toHaveCount(4);
   expect(await daily(frame).locator('[data-source]').evaluateAll(nodes => nodes.map(node => node.dataset.source))).toEqual(sources);
-  for (const source of sources.filter(source => source !== except)) await expect(card(frame, source).locator('time')).toHaveCount(1);
+  const waiting=['cameras','field'].includes(except)?['cameras','field']:[except];
+  for (const source of sources.filter(source => !waiting.includes(source))) await expect(card(frame, source).locator('time')).toHaveCount(1);
 }
 async function assertReads(page, state) {
   expect(state.errors).toEqual([]); expect(state.unexpected).toEqual([]);
@@ -256,14 +257,15 @@ test('daily view opens independently of a stalled old IT Home loader', async ({p
   await expect(page.locator('#wlItHome')).toContainText('Loading Home'); await assertReads(page, state);
 });
 
-for (const source of sources) test(source + ' slow and failed source does not block the other three views', async ({page}) => {
+for (const source of sources) test(source + ' slow and failed read preserves independent views and keeps the shared fleet paired', async ({page}) => {
   const {frame, state} = await mount(page, {holdSource: source}); await ready(frame, source);
-  await expect(card(frame, source).locator('.it-dashboard-status')).toHaveText('Loading');
+  const waiting=['cameras','field'].includes(source)?['cameras','field']:[source];
+  for(const id of waiting){await expect(card(frame,id).locator('.it-dashboard-status')).toHaveText('Loading');await expect(card(frame,id).locator('time')).toHaveCount(0);}
   state.fail[sourcePaths[source]] = true; state.release(source);
-  await expect(card(frame, source).locator('.it-dashboard-status')).toHaveText('Unavailable');
+  for(const id of waiting){await expect(card(frame,id).locator('.it-dashboard-status')).toHaveText('Unavailable');await expect(card(frame,id).locator('time')).toHaveCount(0);}
   const before = state.calls.length; delete state.fail[sourcePaths[source]];
   await card(frame, source).getByRole('button', {name: /^Retry /}).click(); await ready(frame);
-  expect(state.calls.slice(before).map(call => call.path)).toEqual([sourcePaths[source]]); await assertReads(page, state);
+  expect(state.calls.slice(before).map(call => call.path).sort()).toEqual(waiting.map(id=>sourcePaths[id]).sort()); await assertReads(page, state);
 });
 
 test('late capability cannot reopen a signed-out session; relogin restores only daily views', async ({page}) => {
