@@ -82,7 +82,7 @@ async function mount(page, label, units = defaultUnits, {
       });
       return route.abort();
     }
-    if (/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(u.href)) return route.fulfill({
+    if (/^https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\//.test(u.href)) return route.fulfill({
       contentType: 'image/svg+xml',
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#34495b"/></svg>'
     });

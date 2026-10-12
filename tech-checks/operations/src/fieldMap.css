@@ -24,7 +24,7 @@
 
 /* Approved targeting-reticle style. Only the tile pane is darkened; markers,
    attribution, controls and status evidence remain independent of the map art. */
-.field-map-canvas .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.85) contrast(.75) sepia(.6) hue-rotate(165deg) saturate(1.5)}
+.field-map-canvas .leaflet-tile-pane,.tv-fleet-map .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.85) contrast(.75) sepia(.6) hue-rotate(165deg) saturate(1.5)}
 .field-map-workspace .cos-field-pin,.field-map-workspace .cos-field-cluster,
 .field-map-workspace .cos-field-pin.cos-field-pin-estimate,.field-map-workspace .cos-field-pin.cos-field-pin-historical{
   position:relative;display:grid;place-items:center;width:44px;min-width:44px;max-width:44px;height:44px;padding:0;left:auto;transform:none;
@@ -135,3 +135,4 @@
 
 /* Keep pending/error context visible above the mobile basemap. */
 #root .operations-shell .field-map-display-bar>div>span.field-map-load-state{display:block}
+

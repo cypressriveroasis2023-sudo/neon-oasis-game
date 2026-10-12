@@ -4,6 +4,7 @@ import { TV_ROTATION_MS, configuredTvPages } from './tvBoardData';
 import type {TvSection} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
 import TvFleetView from './TvFleetView';
+import AnimatedEye from './AnimatedEye';
 import './techCheckTvBoard.css';
 
 type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; scope: BoardScope; now: Date; lastSuccess: Date | null; error: string; stale: boolean; busy: boolean; rotation: number; exit: () => void; refresh: () => void;sections:TvSection[];settingsError:string;api:{get:(path:string)=>Promise<{data:any}>} };
@@ -25,7 +26,7 @@ export default function TechCheckTvBoard({ cards, names, readiness, scope, now, 
   const leave = () => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); exit(); };
   return <section className='tech-check-tv' aria-label='Tech Check TV Board' data-page={pageIndex + 1} data-section={page.section||'empty'}>
     <header className='tech-check-tv-header'>
-      <div className='tech-check-tv-brand'><span className='tech-check-tv-eye' aria-hidden='true'><i /></span><div><small>CAMERAS ONSITE</small><h1>TECH CHECK <span>TV BOARD</span></h1></div></div>
+      <div className='tech-check-tv-brand'><span className='tech-check-tv-eye'><AnimatedEye variant='brand'/></span><div><small>CAMERAS ONSITE</small><h1>TECH CHECK <span>TV BOARD</span></h1></div></div>
       <div className='tech-check-tv-clock'><b>{now.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' })}</b><span>{now.toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'short', day: 'numeric' })} · CT</span></div>
     </header>
     {page.kind==='work'&&<div className='tech-check-tv-totals' aria-label='TV work summary'>
