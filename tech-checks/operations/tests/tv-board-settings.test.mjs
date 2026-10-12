@@ -42,6 +42,8 @@ test('SQL persists shared choices, refuses stale overwrites and denies technicia
  create function app_private.has_permission(o uuid,p text) returns boolean language sql as $$select current_setting('request.jwt.claim.sub',true)='${owner}'$$;
  `);
  await db.exec(await readFile(new URL('../../database-maintenance/tech-check-tv-settings.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../database-maintenance/tech-check-tv-display-settings.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../database-maintenance/tech-check-tv-timing-compatibility.sql',import.meta.url),'utf8'));
  const call=(name,args)=>db.query(`select public.${name}(${args}) as value`);
  await db.exec('set role service_role');
  assert.equal((await call('cos_tv_board_settings_snapshot',`'${owner}','${org}'`)).rows[0].value.revision,0);
@@ -50,7 +52,18 @@ test('SQL persists shared choices, refuses stale overwrites and denies technicia
  await assert.rejects(call('cos_tv_board_settings_save',`'${owner}','${org}',array['camera'],0`),/changed on another computer/);
  await assert.rejects(call('cos_tv_board_settings_snapshot',`'${tech}','${org}'`),/active existing COS Owner/);
  assert.deepEqual((await call('cos_tv_board_settings_save',`'${owner}','${org}',array[]::text[],1`)).rows[0].value.sections,[]);
+ const timed=(await call('cos_tv_board_settings_save_v2',`'${owner}','${org}',array['camera','map'],2,30`)).rows[0].value;
+ assert.equal(timed.rotationSeconds,30);assert.equal(timed.revision,3);
+ assert.equal((await call('cos_tv_board_settings_save',`'${owner}','${org}',array['map'],3`)).rows[0].value.rotationSeconds,30);
+ for(const value of [4,301,'null'])await assert.rejects(call('cos_tv_board_settings_save_v2',`'${owner}','${org}',array['map'],4,${value}`),/Invalid TV settings/);
+ await assert.rejects(call('cos_tv_board_settings_save_v2',`'${owner}','${org}',array['map'],3,60`),/changed on another computer/);
+ await assert.rejects(call('cos_tv_board_settings_save_v2',`'${tech}','${org}',array['map'],4,60`),/active existing COS Owner/);
+ const compatible=(await call('cos_tv_board_settings_save',`'${owner}','${org}',array['map'],1000004045`)).rows[0].value;
+ assert.equal(compatible.rotationSeconds,45);assert.equal(compatible.revision,5);
+ await assert.rejects(call('cos_tv_board_settings_save',`'${owner}','${org}',array['map'],1000004045`),/changed on another computer/);
+ await assert.rejects(call('cos_tv_board_settings_save',`'${owner}','${org}',array['map'],1000005301`),/Invalid TV settings/);
  await db.exec('set role authenticated');await assert.rejects(call('cos_tv_board_settings_snapshot',`'${owner}','${org}'`),/permission denied/);
+ await assert.rejects(call('cos_tv_board_settings_save_v2',`'${owner}','${org}',array['map'],4,60`),/permission denied/);
  await db.exec('set role anon');await assert.rejects(db.query('select * from app_private.cos_tv_board_settings'),/permission denied/);
  await db.close();
 });

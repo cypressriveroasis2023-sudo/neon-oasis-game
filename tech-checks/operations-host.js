@@ -157,7 +157,7 @@ function present() {
     const tvParams = new URLSearchParams();
     if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
     const locationParams=new URLSearchParams();if(mapParams.get('locationImport')==='1'&&/^HELIOS\s+\d{1,3}$/i.test(mapParams.get('locationUnit')||'')&&/^[a-f0-9-]{36}$/i.test(mapParams.get('locationNonce')||'')){for(const key of ['locationImport','locationUnit','locationNonce'])locationParams.set(key,mapParams.get(key));}
-    frame.src = './operations/dist/index.html?v=' + (locationParams.size?'mhelp-location-import-20261012':'tech-check-tv-map-20261012') + (locationParams.size?'&'+locationParams:'') + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
+    frame.src = './operations/dist/index.html?v=' + (locationParams.size?'mhelp-location-import-20261012':'tech-check-tv-tour-20261012') + (locationParams.size?'&'+locationParams:'') + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
     frame.referrerPolicy = 'same-origin';
     frame.addEventListener('load', () => {setFieldMapDisplay(frame,false); if (toolFromHash()) showTechCheckHome(); });

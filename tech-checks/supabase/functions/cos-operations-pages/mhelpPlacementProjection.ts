@@ -21,7 +21,7 @@ function protectedByHistory(r:Row,audits:Row[],identity?:Row){
  const proof=[...(identity?.unitIdentities||[]),...(identity?.ownerConfirmedUnitIdentities||[])].filter(p=>p.unitId===r.nativeUnitId);
  const labels=[r.nativeLabel,r.trackerLabel,...proof.flatMap(p=>p.unitKeys||[])].filter(Boolean).map(concern);
  const devices=proof.flatMap(p=>p.deviceIds||[]);
- return audits.some(a=>labels.includes(concern(a.unit_key))||a.control_id===r.nativeUnitId||a.control_id===r.trackerId||Array.isArray(a.device_ids)&&a.device_ids.some((id:unknown)=>devices.includes(String(id))));
+ return audits.some(a=>labels.includes(concern(a.unit_key))||uuid(a.control_id)&&(a.control_id===r.nativeUnitId||a.control_id===r.trackerId)||Array.isArray(a.device_ids)&&a.device_ids.some((id:unknown)=>devices.includes(String(id))));
 }
 export function projectMhelpFieldPlacement(snapshot:Row,receipt:unknown,audits:Row[],identity?:Row,now=Date.now()):Row {
  const links=checkedMhelpPlacements(receipt,now);
