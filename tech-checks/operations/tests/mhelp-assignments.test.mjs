@@ -6,6 +6,7 @@ test('customer rule uses exact name and excludes address, notes and secrets',()=
  const row={customerId:1,portalId:224643,name:'Cameras Onsite',isServiceLocation:false,address1:'private',notes:'secret'};
  assert.deepEqual(projectCustomer(row,'1','224643'),{customerId:'1',name:'Cameras Onsite',isServiceLocation:false,placement:'SHOP'});
  assert.equal(projectCustomer({...row,name:'Cameras Onsite Customer'},'1','224643').placement,'FIELD');
+ assert.equal(projectCustomer({...row,name:'Cameras Onsite LLC'},'1','224643').placement,'SHOP');
  assert.throws(()=>projectCustomer({...row,portalId:2},'1','224643'));
 });
 test('authentication precedes parsing or vendor calls',async()=>{let calls=0;const h=createAssignmentHandler({authenticate:async()=>false,equipment:async()=>{calls++},customers:async()=>{calls++}});assert.equal((await h(req({action:'equipment'}))).status,403);assert.equal(calls,0);});

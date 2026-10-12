@@ -1,7 +1,7 @@
 /** Protected, read-only maintenance review. Never returns credentials or billing addresses. */
 export const projectCustomer = (row:any, id:string, portalId:string) => {
   if (!row || String(row.customerId)!==id || String(row.portalId)!==portalId || typeof row.name!=='string' || !row.name.trim() || row.name.length>180 || /[\x00-\x1f\x7f]/.test(row.name) || typeof row.isServiceLocation!=='boolean') throw Error('Unsupported customer identity');
-  const shop = row.name.trim().toLowerCase()==='cameras onsite';
+  const shop = ['cameras onsite','cameras onsite llc'].includes(row.name.trim().toLowerCase());
   return {customerId:id,name:row.name,isServiceLocation:row.isServiceLocation,placement:shop?'SHOP':'FIELD'};
 };
 export async function readAssignmentRequest(req:Request) {
