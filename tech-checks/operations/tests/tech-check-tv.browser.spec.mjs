@@ -140,6 +140,8 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
  await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
  await page.clock.fastForward(60000);expect(state.fleetReads).toBe(reads);
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>state.fleetReads).toBe(reads+3);
  state.fail=401;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
 });
