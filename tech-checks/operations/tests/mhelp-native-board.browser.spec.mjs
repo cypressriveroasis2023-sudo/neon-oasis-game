@@ -17,6 +17,7 @@ async function mount(page,authorized=true,importEnabled=true){
     if(method==='POST'){writes.push({path,body});return route.fulfill({headers,status:503,contentType:'application/json',body:'{"error":"Synthetic backend unavailable"}'});}
     if(path==='/api/session')return answer({authorized,name:'Fixture Owner',role:'Owner',features:{mhelpTicketImport:importEnabled}});
     if(path==='/api/jobs')return answer({items:[]});
+    if(path==='/api/tv-board/settings')return answer({sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null});
     if(path==='/api/owner/control-data')return answer({sites:[],truckChecks:[],itTechnicians:[],serviceTechnicians:[]});
     if(path==='/api/daily-board')return answer({jobs:[],tasks:[],readiness:[],asOf:new Date().toISOString()});
     if(path==='/api/customers')return answer({items:[{id:customer,name:'Fixture Builders',status:'active'}]});
@@ -53,3 +54,4 @@ test('native board with an older backend never exposes import actions before cap
  await expect(frame.getByRole('heading',{name:'Import mHelpDesk ticket',exact:true})).toHaveCount(0);
  expect(writes).toEqual([]);
 });
+

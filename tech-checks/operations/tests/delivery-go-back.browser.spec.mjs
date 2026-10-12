@@ -48,6 +48,7 @@ async function openFixture(page,workspace) {
         if(state.holdJobsRead)await new Promise(resolve=>{state.releaseJobsRead=resolve;});
       }
       else if(path==='/api/daily-board')data={jobs:state.jobs,tasks:[],readiness:[],asOf:now};
+      else if(path==='/api/tv-board/settings')data={sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null};
       else if(path==='/api/owner/control-data')data={sites:[],truckChecks:[],serviceTechnicians:[],itTechnicians:[]};
       else if(path==='/api/owner-review')data={items:state.jobs.filter(row=>row.status==='Owner Review')};
       else if(path==='/api/team-production')data={items:state.team};
@@ -229,3 +230,4 @@ test('unverified completed return remains open and cannot be approved in Owner R
   await expect(card.getByRole('button',{name:'Go-back required',exact:true})).toHaveCount(0);
   expect(state.writes).toHaveLength(0);
 });
+
