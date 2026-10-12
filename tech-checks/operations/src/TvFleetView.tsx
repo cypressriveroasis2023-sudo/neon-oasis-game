@@ -3,10 +3,11 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
 import './tvBoardExtensions.css';
-import {checkedFieldMap} from './gpsPersistence';
-import {validateCameraHealth,fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';
+import {fieldCameraHealth,cameraTime,type Health,type FieldHealthUnit} from './fieldCameraHealth';
 import {fieldReachability,fieldReachabilityLabels,isCurrentFieldPin,locationTag,type FieldLocation} from './fieldLocations';
-import {readRouterSnapshot,type RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
+import type {RouterSnapshot} from '../../supabase/functions/cos-operations-pages/routers';
+import {addFieldMapBasemap} from './fieldMapBasemap';
+import {loadTvFleetFeeds} from './tvFleetFeeds';
 import {automaticRefreshDue} from './refreshCadence';
 import {mapReticleMarkup} from './fieldMapMarkers';
 import {checkedAddressEstimate,addressEstimateLabel,type AddressEstimate} from './fieldAddressEstimates';
@@ -21,11 +22,17 @@ export default function TvFleetView({api,enabled,mode,rotation,height,refreshId}
     if(running.current)return;
     running.current=true;lastAttempt.current=Date.now();const request=generation.current;
     try{
-      const [field,health,routers]=await Promise.all([api.get('/api/field-map'),api.get('/api/camera-health/summary-v3'),api.get('/api/routers')]);
-      const units=checkedFieldMap(field.data).items as Unit[];
-      const points=await Promise.all(units.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)})));
-      const next={units,health:validateCameraHealth(health.data),routers:readRouterSnapshot(routers.data),readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))};
-      if(alive.current&&request===generation.current){setData(next);setClock(Date.now());setError('');}
+      const current=()=>alive.current&&request===generation.current;
+      const errors=await loadTvFleetFeeds(api,{
+        field:async field=>{
+          const units=field.items as Unit[];
+          const points=await Promise.all(units.map(async unit=>({id:unit.id,point:await checkedAddressEstimate(unit)})));
+          if(current())setData(previous=>({...previous,units,readAt:Date.now(),estimates:new Map(points.filter(row=>row.point!==null).map(row=>[row.id,row.point!]))}));
+        },
+        health:health=>{if(current())setData(previous=>({...previous,health}));},
+        routers:routers=>{if(current())setData(previous=>({...previous,routers}));}
+      });
+      if(current()){setClock(Date.now());setError(errors.join(' '));}
     }catch(cause){if(alive.current&&request===generation.current)setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}
     finally{running.current=false;}
   },[api]);
@@ -44,7 +51,7 @@ export default function TvFleetView({api,enabled,mode,rotation,height,refreshId}
   useEffect(()=>{
     if(!enabled||!mapNode.current)return;
     const map=L.map(mapNode.current,{zoomControl:false,attributionControl:true}).setView([31,-99],6);mapRef.current=map;
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+    addFieldMapBasemap(map);
     layer.current=L.layerGroup().addTo(map);
     return()=>{map.remove();mapRef.current=null;layer.current=null;};
   },[enabled]);

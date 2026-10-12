@@ -17,6 +17,7 @@ import { useRouters } from './useRouters';
 import { RouterBadge, routerTime } from './RouterWorkspace';
 import { routerLabels, routerStatus } from '../../supabase/functions/cos-operations-pages/routers';
 import L from 'leaflet';
+import {addFieldMapBasemap} from './fieldMapBasemap';
 import 'leaflet/dist/leaflet.css';
 import './fieldMap.css';
 import './fieldLocationVerification.css';
@@ -241,10 +242,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const view=popupPanView.current;popupPanView.current=null;
       if(view&&view.zoom===map.getZoom())moveViewport(()=>map.panTo(view.center,{animate:false}));
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      maxZoom:19,
-      attribution:'&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    addFieldMapBasemap(map);
     mapRef.current=map;
     layerRef.current=L.layerGroup().addTo(map);
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize());
@@ -592,3 +590,4 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     <footer className='field-map-footer'>Map tiles © OpenStreetMap contributors. Unit GPS is operational location data only and never changes equipment lifecycle placement automatically.</footer>
   </section>;
 }
+
