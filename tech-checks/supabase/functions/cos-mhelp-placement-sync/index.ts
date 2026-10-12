@@ -39,10 +39,11 @@ export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>
    if(start.leaseId===null)return reply({state:'busy_or_disabled'});
    if(typeof start.leaseId!=='string'||!Array.isArray(start.links))throw Error('Invalid lease');lease=start.leaseId;
    const equipment=await options.equipment();const observations=await collectPlacementObservations(start.links,equipment,options.customer);
-   const locations=options.locations?await options.locations(equipment):null;
+   let locations:Row[]|null=null,locationError:string|null=null;
+   if(options.locations)try{locations=await options.locations(equipment);}catch(cause){locationError=cause instanceof Error&&cause.message==='Source read timed out'?'service_location_read_timeout':'service_location_refresh_unavailable';}
    const result=await options.rpc(locations?'cos_mhelp_fleet_finish':'cos_mhelp_placement_finish',{p_lease_id:lease,p_observations:observations,...(locations?{p_locations:locations}:{})});
    if(!object(result)||result.committed!==true)throw Error('Lost lease');
-   return reply({state:'current',...result,...(options.readDiagnostics?{customerReads:options.readDiagnostics()}: {})});
+   return reply({state:'current',...result,...(locationError?{locationError}:{}),...(options.readDiagnostics?{customerReads:options.readDiagnostics()}: {})});
   }catch{if(lease)try{await options.rpc('cos_mhelp_placement_fail',{p_lease_id:lease});}catch{}return reply({error:'mHelpDesk placement sync unavailable'},503);}
  };
 }
