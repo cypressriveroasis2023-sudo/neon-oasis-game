@@ -165,7 +165,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
 
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
-  assert.equal(h.frame().src, './operations/dist/index.html?v=tech-check-tv-map-20261012');
+  assert.equal(h.frame().src, './operations/dist/index.html?v=tech-check-tv-tour-20261012');
   assert.equal(h.frame().allow, 'geolocation; fullscreen');assert.equal(h.frame().allowFullscreen,true);
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);

@@ -480,3 +480,12 @@ Synthetic tests cover host launch/reload/exit, 60-second cross-display updates,
 rotation without missing cards, small/large screens, network and auth failures,
 absence of writes, and canonical links without unrelated query/session state.
 
+
+
+### TV map tour and display timing
+
+TV Camera Health displays only confirmed offline field units, with every outage included in responsive pages. The map retains the full field view, then visits geographic close-ups with outage areas first. Each close-up has a maximum pairwise distance of 25 km; unknown health is never relabeled as an outage. Historical coordinates remain excluded by the existing location validators.
+
+Owners can set 5–300 seconds per page or map area in Dispatch Board → Choose what the TV shows → Save TV settings. The default is 15 seconds. Shared settings are read every minute; fleet reads still run every 15 minutes. Apply tech-check-tv-display-settings.sql and then tech-check-tv-timing-compatibility.sql.
+
+Timing saves use the existing authenticated settings route. For a timing change, tvTimingSaveRevision encodes 1,000,000,000 + actualRevision * 1000 + seconds in the existing int4 expectedRevision parameter. The compatibility RPC decodes this before the existing locked revision comparison and normal audit increment. Plain revisions keep the original section-save behavior and preserve stored timing. Client encoding is capped to the int4 range; server timing remains constrained to 5–300 seconds. No caller identity or organization is accepted from the browser.

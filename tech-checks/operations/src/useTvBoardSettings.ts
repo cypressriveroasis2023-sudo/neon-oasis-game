@@ -1,8 +1,8 @@
 import { useCallback,useEffect,useRef,useState } from 'react';
-import { checkedTvSettings,checkedTvSections,DEFAULT_TV_SECTIONS,type TvSettings,type TvSection } from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
+import { checkedTvSettings,checkedTvSections,checkedTvRotationSeconds,tvTimingSaveRevision,DEFAULT_TV_ROTATION_SECONDS,DEFAULT_TV_SECTIONS,type TvSettings,type TvSection } from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
 type Api={get:(path:string)=>Promise<{data:any}>;post:(path:string,body:any)=>Promise<{data:any}>};
 export function useTvBoardSettings(api:Api){
-  const [settings,setSettings]=useState<TvSettings>({sections:[...DEFAULT_TV_SECTIONS],revision:0,updatedAt:null});
+  const [settings,setSettings]=useState<TvSettings>({sections:[...DEFAULT_TV_SECTIONS],revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});
   const [verified,setVerified]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState(false),[needsRefresh,setNeedsRefresh]=useState(false);
   const revision=useRef(0),alive=useRef(false),running=useRef(false);
   const refresh=useCallback(async()=>{
@@ -12,18 +12,20 @@ export function useTvBoardSettings(api:Api){
   },[api]);
   useEffect(()=>{
     alive.current=true;void refresh();const timer=window.setInterval(()=>{if(!running.current)void refresh();},60000);
-    const invalid=()=>{revision.current++;setVerified(false);setSettings({sections:[],revision:0,updatedAt:null});setError('Sign in again to load TV settings.');};
+    const invalid=()=>{revision.current++;setVerified(false);setSettings({sections:[],revision:0,updatedAt:null,rotationSeconds:DEFAULT_TV_ROTATION_SECONDS});setError('Sign in again to load TV settings.');};
     window.addEventListener('cos-private-data-invalidated',invalid);
     return()=>{alive.current=false;revision.current++;window.clearInterval(timer);window.removeEventListener('cos-private-data-invalidated',invalid);};
   },[refresh]);
-  const save=async(sections:TvSection[],expectedRevision:number)=>{
+  const save=async(sections:TvSection[],expectedRevision:number,rotationSeconds:number=settings.rotationSeconds)=>{
     if(running.current||!verified||needsRefresh)return false;
     running.current=true;revision.current++;setSaving(true);
     try{
       const chosen=checkedTvSections(sections);
-      await api.post('/api/tv-board/settings',{sections:chosen,expectedRevision});
+      const seconds=checkedTvRotationSeconds(rotationSeconds);
+      const saveRevision=seconds===settings.rotationSeconds?expectedRevision:tvTimingSaveRevision(expectedRevision,seconds);
+      await api.post('/api/tv-board/settings',{sections:chosen,expectedRevision:saveRevision});
       const fresh=await refresh();
-      if(!fresh||fresh.revision!==expectedRevision+1||JSON.stringify(fresh.sections)!==JSON.stringify(chosen))throw new Error('The TV settings save could not be confirmed. Refresh before saving again.');
+      if(!fresh||fresh.revision!==expectedRevision+1||JSON.stringify(fresh.sections)!==JSON.stringify(chosen)||fresh.rotationSeconds!==seconds)throw new Error('The TV settings save could not be confirmed. Refresh before saving again.');
       window.dispatchEvent(new Event('cos-tv-settings-updated'));return true;
     }catch(cause){if(alive.current){setNeedsRefresh(true);setError(cause instanceof Error?cause.message:'The save could not be confirmed. Refresh before saving again.');}return false;}
     finally{running.current=false;if(alive.current)setSaving(false);}
