@@ -39,6 +39,7 @@ on:
       - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
       - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
@@ -81,6 +82,7 @@ on:
       - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
       - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
       - 'tech-checks/supabase/functions/cos-geocode-sources/**'
@@ -138,8 +140,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - name: Verify IT daily navigation and camera scope
-        run: npm run test:browser -- tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
+      - name: Verify Tech Check TV and IT daily navigation and camera scope
+        run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
         run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs
       - run: npm run test:browser
