@@ -1,0 +1,74 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {collectPlacementObservations,createPlacementSyncHandler} from '../../supabase/functions/cos-mhelp-placement-sync/index.ts';
+import {projectMhelpFieldPlacement,projectMhelpCameraPlacement,checkedMhelpPlacements} from '../../supabase/functions/cos-operations-pages/mhelpPlacementProjection.ts';
+const native='11111111-1111-4111-8111-111111111111',tracker='22222222-2222-4222-8222-222222222222';
+const now=Date.parse('2026-10-12T18:00:00Z');
+const link={equipmentId:'123',fullLabel:'Spotter 023.1',model:null};
+const equipment={...link,name:link.fullLabel,active:null,customerId:'2',serviceLocationId:'3'};
+const customers={2:{customerId:'2',name:'Example Builder',isServiceLocation:false,placement:'FIELD'},3:{customerId:'3',name:'North Job',isServiceLocation:true,placement:'FIELD'}};
+const read=id=>Promise.resolve(customers[id]||null);
+const entry={trackerId:tracker,nativeUnitId:native,trackerLabel:'Spotter 023.1',nativeLabel:'Spotter 023.1',state:'confirmed',placement:'SHOP',customerLabel:'Cameras Onsite',siteLabel:'SHOP',observedAt:new Date(now).toISOString(),locationReview:false};
+const receipt=(row={})=>({contract:'COS_MHELP_PLACEMENT_V1',lastSuccessAt:new Date(now).toISOString(),items:[{...entry,...row}]});
+const snapshot=(row={})=>({items:[{id:native,unitNumber:entry.nativeLabel,latitude:30,longitude:-95}],inventoryItems:[{id:native,unitNumber:entry.nativeLabel,_sourceField:true,readOnly:false,latitude:30,longitude:-95,address:'Original address',site:'Original job',...row}],summary:{fieldUnits:1}});
+const proof={identityVersion:1,unitIdentities:[{unitId:native,unitNumber:entry.nativeLabel,kind:'native_provider',deviceIds:['1','2'],unitKeys:['Spotter 023.1']}],identityWarnings:[]};
+test('exact live IDs retain decimal identities and resolve customer/service-location separately',async()=>{
+ const result=await collectPlacementObservations([link],[equipment],read);
+ assert.deepEqual(result,[{equipmentId:'123',state:'confirmed',customerId:'2',serviceLocationId:'3',placement:'FIELD',customerLabel:'Example Builder',siteLabel:'North Job'}]);
+ assert.equal((await collectPlacementObservations([link],[{...equipment,name:'Spotter 023'}],read))[0].state,'held');
+ assert.equal((await collectPlacementObservations([link],[{...equipment,model:'new model'}],read))[0].state,'held');
+});
+test('shop rule checks the assigned customer, and unknown/invalid field locations remain held',async()=>{
+ const shop=await collectPlacementObservations([link],[equipment],id=>Promise.resolve(id==='2'?{customerId:'2',name:'Cameras Onsite LLC',isServiceLocation:false,placement:'SHOP'}:null));
+ assert.equal(shop[0].placement,'SHOP');assert.equal(shop[0].siteLabel,'SHOP');
+ const held=await collectPlacementObservations([link],[equipment],id=>Promise.resolve(id==='2'?customers[2]:null));
+ assert.equal(held[0].reason,'service_location_unverified');
+ assert.equal((await collectPlacementObservations([link],[{...equipment,active:false}],read))[0].reason,'identity_or_lifecycle_changed');
+});
+test('one failed customer cannot block independently verified assignments; reads use a bounded shared pool',async()=>{
+ let active=0,max=0;
+ const links=Array.from({length:12},(_,i)=>({...link,equipmentId:String(i+1)}));
+ const rows=links.map((l,i)=>({...equipment,...l,customerId:String(i+100),serviceLocationId:String(i+200)}));
+ const result=await collectPlacementObservations(links,rows,async id=>{active++;max=Math.max(max,active);await new Promise(r=>setTimeout(r,1));active--;if(id==='100')throw Error('private');return {customerId:id,name:'Synthetic '+id,isServiceLocation:+id>=200,placement:'FIELD'};});
+ assert.ok(max<=3);assert.equal(result.filter(r=>r.state==='held').length,1);assert.equal(result.filter(r=>r.state==='confirmed').length,11);
+});
+test('Shop removes field pins and preserves the original snapshots',()=>{
+ const s=snapshot(),before=structuredClone(s),result=projectMhelpFieldPlacement(s,receipt(),[],proof,now);
+ assert.deepEqual(s,before);assert.equal(result.items.length,0);assert.equal(result.inventoryItems[0].placement,'SHOP');assert.equal(result.inventoryItems[0].latitude,null);
+});
+test('new assignment clears displayed old address/pin while keeping historical coordinates',()=>{
+ const s=snapshot({historicalLatitude:30,historicalLongitude:-95});
+ const result=projectMhelpFieldPlacement(s,receipt({placement:'FIELD',siteLabel:'New job',locationReview:true}),[],proof,now);
+ assert.equal(result.items[0].address,null);assert.equal(result.items[0].latitude,null);assert.equal(result.items[0].site,'New job');assert.equal(result.items[0].historicalLatitude,30);assert.equal(s.inventoryItems[0].address,'Original address');
+});
+test('Owner/technician history, GPS, installed-site authority and changed labels are protected',()=>{
+ for(const row of [{placementSource:'owner'},{hasUnitGps:true},{installedSiteId:tracker},{unitNumber:'Spotter 023'},{placementReviewReason:'Identity held'}]){
+  const s=snapshot(row);assert.deepEqual(projectMhelpFieldPlacement(s,receipt(),[],proof,now).inventoryItems,s.inventoryItems);
+ }
+ const s=snapshot();assert.deepEqual(projectMhelpFieldPlacement(s,receipt(),[{unit_key:'Spotter 023.1',device_ids:['1']}],proof,now).inventoryItems,s.inventoryItems);
+});
+test('stale, future, held and duplicate observations cannot establish placement',()=>{
+ for(const observedAt of [new Date(now-41*60*1000).toISOString(),new Date(now+1).toISOString()])assert.equal(checkedMhelpPlacements(receipt({observedAt}),now).length,0);
+ assert.equal(checkedMhelpPlacements(receipt({state:'held'}),now).length,0);
+ const r=receipt();r.items.push({...r.items[0]});assert.throws(()=>checkedMhelpPlacements(r,now));
+});
+test('camera scope uses complete verified native resource sets and leaves all provider telemetry unchanged',()=>{
+ const devices=[{id:'1',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'online',battery_percent:80},{id:'2',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'offline'}];
+ const before=structuredClone(devices),result=projectMhelpCameraPlacement(devices,receipt(),[],proof,now);
+ assert.deepEqual(devices,before);assert.equal(result[0].organization,'ROOT');assert.equal(result[0].source_status,'online');assert.equal(result[1].source_status,'offline');assert.equal(result[0].battery_percent,80);
+ assert.deepEqual(projectMhelpCameraPlacement(devices.slice(0,1),receipt(),[],proof,now),devices.slice(0,1));
+ assert.deepEqual(projectMhelpCameraPlacement(devices,receipt(),[{unit_key:'Spotter 023.1'}],proof,now),devices);
+});
+test('authentication and strict action parsing happen before storage/provider work; failures are sanitized',async()=>{
+ let calls=0;const rpc=async()=>{calls++;throw Error('private credential');};
+ const request=body=>new Request('https://example.test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const denied=createPlacementSyncHandler({authenticate:async()=>false,rpc,equipment:async()=>[],customer:read});
+ assert.equal((await denied(request({action:'run'}))).status,403);assert.equal(calls,0);
+ const h=createPlacementSyncHandler({authenticate:async()=>true,rpc,equipment:async()=>[],customer:read});
+ for(const body of [{action:'run',url:'https://evil.test'},{action:'run',token:'private'},{action:'other'}])assert.equal((await h(request(body))).status,400);
+ assert.equal(calls,0);const response=await h(request({action:'run'}));assert.equal(response.status,503);assert.equal((await response.text()).includes('private'),false);
+});
+test('lease refusal makes no provider calls; committed receipts report holds without claiming Google publication',async()=>{
+ let reads=0;const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async name=>name.endsWith('begin')?{leaseId:null}:null,equipment:async()=>{reads++;return[];},customer:read});
+ await h(new Request('https://example.test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"action":"run"}'}));assert.equal(reads,0);
+});
