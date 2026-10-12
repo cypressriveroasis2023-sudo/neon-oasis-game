@@ -6,7 +6,7 @@ import './dailyBoard.css';
 import { createBoardReader, createBoardAssignmentSaver, type BoardSnapshot } from './boardPersistence';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import TechCheckTvBoard from './TechCheckTvBoard';
-import { TV_REFRESH_MS, TV_ROTATION_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
+import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
 import TicketActions from './TicketActions';
@@ -45,7 +45,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
   const [showTest,setShowTest]=useState(false);
   const [tv,setTv]=useState(launch.enabled);
   const [rotation,setRotation]=useState(0);
-  useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(',')]);
+  useEffect(()=>setRotation(0),[tvSettings.settings.sections.join(','),tvSettings.settings.rotationSeconds]);
   const [selected,setSelected]=useState<BoardCard|null>(null);
   const [dragged,setDragged]=useState<BoardCard|null>(null);
   const [assigning,setAssigning]=useState<BoardCard|null>(null);
@@ -112,12 +112,12 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
 
   useEffect(()=>{
     if(!tv)return;
-    const timer=window.setInterval(()=>setRotation(n=>n+1),TV_ROTATION_MS);
+    const timer=window.setInterval(()=>setRotation(n=>n+1),tvSettings.settings.rotationSeconds*1000);
     const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!detail.current?.open&&!assignDialog.current?.open)setTv(false);};
     window.addEventListener('keydown',escape);
     const previous=document.body.style.overflow;document.body.style.overflow='hidden';
     return()=>{window.clearInterval(timer);window.removeEventListener('keydown',escape);document.body.style.overflow=previous;};
-  },[tv]);
+  },[tv,tvSettings.settings.rotationSeconds]);
 
   const today=chicagoDay(now);
   const cards=useMemo(()=>dailyBoardCards(snapshot.jobs,snapshot.tasks,now,scope),[snapshot,today,scope]);
@@ -209,7 +209,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
     } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
   };
 
-  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
+  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>

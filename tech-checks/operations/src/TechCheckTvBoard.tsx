@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback,useEffect, useMemo, useState } from 'react';
 import { boardDateLabel,chicagoDay, readinessSummary, type BoardCard, type ReadinessRow, type BoardScope } from './dailyBoardData';
-import { TV_ROTATION_MS, configuredTvPages } from './tvBoardData';
+import {configuredTvPages,type FleetPages} from './tvBoardData';
 import type {TvSection} from '../../supabase/functions/cos-operations-pages/tv-board-settings/index';
 import {vehicleInspectionExempt} from './vehicleInspectionPolicy';
 import TvFleetView from './TvFleetView';
 import AnimatedEye from './AnimatedEye';
 import './techCheckTvBoard.css';
 
-type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; scope: BoardScope; now: Date; lastSuccess: Date | null; error: string; stale: boolean; busy: boolean; rotation: number; exit: () => void; refresh: () => void;sections:TvSection[];settingsError:string;api:{get:(path:string)=>Promise<{data:any}>} };
+type Props = { cards: BoardCard[]; names: string[]; readiness: ReadinessRow[]; scope: BoardScope; now: Date; lastSuccess: Date | null; error: string; stale: boolean; busy: boolean; rotation: number;rotationSeconds:number; exit: () => void; refresh: () => void;sections:TvSection[];settingsError:string;api:{get:(path:string)=>Promise<{data:any}>} };
 const normalized = (status: string) => status.toLowerCase().replaceAll('_', ' ');
-export default function TechCheckTvBoard({ cards, names, readiness, scope, now, lastSuccess, error, stale, busy, rotation, exit, refresh,sections,settingsError,api }: Props) {
+export default function TechCheckTvBoard({ cards, names, readiness, scope, now, lastSuccess, error, stale, busy, rotation,rotationSeconds, exit, refresh,sections,settingsError,api }: Props) {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const [fullscreenError, setFullscreenError] = useState('');
   const [fleetRefreshId,setFleetRefreshId]=useState(0);
+  const [fleetPages,setFleetPages]=useState<FleetPages>({camera:1,map:['All field units']});
+  const updateFleetPages=useCallback((next:FleetPages)=>setFleetPages(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next),[]);
   useEffect(() => { const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize); }, []);
-  const pages = useMemo(() => configuredTvPages(cards,names,readiness,sections,size.width,size.height,chicagoDay(now)), [cards,names,readiness,sections,size,chicagoDay(now)]);
+  const pages = useMemo(() => configuredTvPages(cards,names,readiness,sections,size.width,size.height,chicagoDay(now),fleetPages), [cards,names,readiness,sections,size,chicagoDay(now),fleetPages]);
   const pageIndex = rotation % pages.length, page = pages[pageIndex];
   const summaryCards=Array.from(new Map(pages.flatMap(page=>page.kind==='work'?page.lanes.flatMap(lane=>lane.cards):[]).map(card=>[card.id,card])).values());
   const attention = summaryCards.filter(card => card.lane === 'attention').length;
@@ -47,9 +49,9 @@ export default function TechCheckTvBoard({ cards, names, readiness, scope, now, 
         </article>)}</div></section>)}
         {!page.lanes.length && <div className='tech-check-tv-empty'>No jobs or shop tasks in this view.</div>}
       </div> : page.kind==='readiness'?<div className='tech-check-tv-readiness'>{page.rows.map(row => { const summary = readinessSummary(row),exempt=vehicleInspectionExempt(row); return <article key={row.userId}><h3>{row.name}<span>{row.department.toUpperCase()}</span></h3>{exempt?<p>No company vehicle · truck and trailer inspections do not apply.</p>:(['truck','trailer'] as const).map(key => <div key={key}><span>{key === 'truck' ? 'Truck inspection' : 'Trailer inspection'}</span><b className={'tv-readiness-' + summary[key].state}>{summary[key].label}</b></div>)}<div><span>{exempt?'IT shop inventory':'Inventory record'}</span><b className={'tv-readiness-'+summary.inventory.state}>{summary.inventory.label}</b></div><small>{row.completedAt ? 'Completed ' + boardDateLabel(row.completedAt) : row.startedAt ? 'Started ' + boardDateLabel(row.startedAt) : 'No check recorded today'}</small></article>; })}</div>:page.kind==='empty'?<div className='tech-check-tv-empty'>Exit TV and turn on a section in TV board settings.</div>:null}
-      <TvFleetView api={api} enabled={Boolean(lastSuccess)&&sections.some(section=>section==='camera'||section==='map')} mode={lastSuccess&&(page.kind==='camera'||page.kind==='map')?page.kind:null} rotation={Math.floor(rotation/pages.length)} height={size.height} refreshId={fleetRefreshId}/>
+      <TvFleetView api={api} enabled={Boolean(lastSuccess)&&sections.some(section=>section==='camera'||section==='map')} mode={lastSuccess&&(page.kind==='camera'||page.kind==='map')?page.kind:null} page={page.kind==='camera'||page.kind==='map'?page.fleetPage||0:0} width={size.width} height={size.height} refreshId={fleetRefreshId} onPages={updateFleetPages}/>
     </main>
-    <footer className='tech-check-tv-footer'><div><span className={'tech-check-tv-live' + (error || stale ? ' delayed' : '')} /><b>{error || stale ? 'UPDATES DELAYED' : lastSuccess ? 'LIVE BOARD' : 'CONNECTING'}</b><span>{lastSuccess ? 'Updated ' + lastSuccess.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }) + ' CT' : 'Waiting for first update'} · Refresh 60s · Rotate {TV_ROTATION_MS / 1000}s</span></div><nav aria-label='TV controls'><button type='button' onClick={()=>{refresh();setFleetRefreshId(value=>value+1);}} aria-busy={busy}>Refresh</button><button type='button' onClick={() => void fullscreen()}>Full screen</button><button type='button' onClick={leave}>Exit TV</button></nav></footer>
+    <footer className='tech-check-tv-footer'><div><span className={'tech-check-tv-live' + (error || stale ? ' delayed' : '')} /><b>{error || stale ? 'UPDATES DELAYED' : lastSuccess ? 'LIVE BOARD' : 'CONNECTING'}</b><span>{lastSuccess ? 'Updated ' + lastSuccess.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }) + ' CT' : 'Waiting for first update'} · Refresh 60s · Rotate {rotationSeconds}s</span></div><nav aria-label='TV controls'><button type='button' onClick={()=>{refresh();setFleetRefreshId(value=>value+1);}} aria-busy={busy}>Refresh</button><button type='button' onClick={() => void fullscreen()}>Full screen</button><button type='button' onClick={leave}>Exit TV</button></nav></footer>
     {fullscreenError && <p className='tech-check-tv-fullscreen-note' role='status'>{fullscreenError}</p>}
   </section>;
 }

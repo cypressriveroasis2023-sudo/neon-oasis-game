@@ -23,11 +23,13 @@ export function tvBoardLink(current: string, scope: BoardScope, department: stri
 
 export type TvLane = { name: string; cards: BoardCard[] };
 export type TvPage = { kind: 'work'; lanes: TvLane[] } | { kind: 'readiness'; rows: ReadinessRow[] };
-export type ConfiguredTvPage = (TvPage | {kind:'camera'|'map'|'empty'}) & {section:TvSection|null;title:string};
-export function configuredTvPages(cards:BoardCard[],names:string[],readiness:ReadinessRow[],sections:TvSection[],width:number,height:number,today:string):ConfiguredTvPage[]{
+export type FleetPages={camera:number;map:string[]};
+export type ConfiguredTvPage = (TvPage | {kind:'camera'|'map'|'empty';fleetPage?:number}) & {section:TvSection|null;title:string};
+export function configuredTvPages(cards:BoardCard[],names:string[],readiness:ReadinessRow[],sections:TvSection[],width:number,height:number,today:string,fleet:FleetPages={camera:1,map:['All field units']}):ConfiguredTvPage[]{
   const pages:ConfiguredTvPage[]=[];
   for(const {key,label} of TV_SECTIONS.filter(section=>sections.includes(section.key))){
-    if(key==='camera'||key==='map'){pages.push({kind:key,section:key,title:label});continue;}
+    if(key==='camera'){for(let index=0;index<Math.max(1,fleet.camera);index++)pages.push({kind:key,section:key,title:'Camera Health · Down units',fleetPage:index});continue;}
+    if(key==='map'){for(const [index,area] of (fleet.map.length?fleet.map:['All field units']).entries())pages.push({kind:key,section:key,title:'Field Map · '+area,fleetPage:index});continue;}
     const chosen=key==='shop'?cards.filter(card=>card.kind==='task'&&(!chicagoDay(card.date)||chicagoDay(card.date)<=today||card.lane==='complete')):
       key==='today'?cards.filter(card=>card.kind==='job'&&(chicagoDay(card.date)===today||card.lane==='complete')):
       cards.filter(card=>card.kind==='job'&&card.lane!=='complete'&&String(card.record.jobType||'').toLowerCase()===key);
