@@ -1,0 +1,32 @@
+name: Verify Tech Check TV
+on:
+  push:
+    branches: [verify/tech-check-tv-smoke]
+permissions:
+  contents: read
+jobs:
+  tv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package.json
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tech-check-tv-results
+          path: |
+            tech-checks/operations/test-results
+            tech-checks/operations/playwright-report
+          if-no-files-found: ignore
