@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower.ts';
+const at='2026-10-12T18:00:00Z',now=Date.parse(at),items=[{installationId:1,name:'HELIOS 010'},{installationId:2,name:'Other unit'}];
+const m={metric:'battery_soc',unit:'%',value:0,instance:0,source:'battery',observedAt:at};
+const row={installationId:1,name:'HELIOS 010',measurements:[m],lastAttemptAt:at,errorCode:null};
+test('saved Helios zero readings retain timestamps and strip credentials and vendor metadata',()=>{const result=safeVrmPower([{...row,credential:'synthetic-secret',metadata:{private:true},measurements:[{...m,raw:{secret:'no'}}]}],items,now);assert.deepEqual(result,[row]);assert.equal(result[0].measurements[0].value,0);});
+test('unsupported families and mismatched installation identities never inherit a Helios battery',()=>{assert.deepEqual(safeVrmPower([{...row,installationId:2,name:'Other unit'}],items,now),[]);assert.deepEqual(safeVrmPower([{...row,installationId:3}],items,now),[]);assert.deepEqual(safeVrmPower([{...row,name:'HELIOS 011'}],items,now),[]);});
+test('non-numeric, invalid, duplicate and out-of-range observations fail rather than becoming healthy readings',()=>{for(const value of [null,'90',101,-1,NaN])assert.throws(()=>safeVrmPower([{...row,measurements:[{...m,value}]}],items,now));for(const change of [{unit:'V'},{instance:-1},{source:'metadata'},{metric:'secret'},{observedAt:'bad'}])assert.throws(()=>safeVrmPower([{...row,measurements:[{...m,...change}]}],items,now));assert.throws(()=>safeVrmPower([row,row],items,now));});

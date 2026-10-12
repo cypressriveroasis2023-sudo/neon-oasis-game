@@ -14,7 +14,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
   const [stageFilter, setStageFilter] = useState<CompanyStageId | null>(null);
   const revision = useRef(0), running = useRef(false);
   const jobsSection = useRef<HTMLDivElement>(null);
-  const refresh = async () => {
+  const refresh = async (force=false) => {
     if (running.current) return;
     running.current = true;
     const request = ++revision.current;
@@ -23,7 +23,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
     setEquipment(null);
     await Promise.all([
       loadTodayDashboard(api, next => { if (request === revision.current) setData(next); }),
-      loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(next); }),
+      loadCompanyEquipment(api, next => { if (request === revision.current) setEquipment(next); },force),
     ]);
     if (request !== revision.current) return;
     running.current = false;
@@ -47,7 +47,7 @@ export default function LiveTodayDashboard({ setActive, openJob, openUnit, selec
       <CompanyOverview data={data} equipment={equipment} openWorkspace={setActive} openJob={openJob} browseStage={browseStage} stageFilter={stageFilter}/>
       <div className='company-source-status'>
         <span role='status'>{loading ? 'Checking overview sources. Each section appears when verified; missing values are not zero.' : complete ? 'Connected sources loaded. Agreement and signature tracking is not connected.' : 'Overview partially unavailable. Missing values are not zero.'}</span>
-        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
+        <button type='button' className='secondary' disabled={loading} onClick={() => void refresh(true)}>{loading ? 'Refreshing…' : complete ? 'Refresh Overview' : 'Retry dashboard'}</button>
       </div>
       {failed.length > 0 && <section className='company-source-error' role='alert' aria-label='Dashboard data unavailable'>
         <h2>Some dashboard information is unavailable</h2>

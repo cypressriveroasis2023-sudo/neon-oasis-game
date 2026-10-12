@@ -20,7 +20,7 @@ async function mount(page,{workspace='field-map'}={}){
   const request=route.request().postDataJSON();state.calls.push(request);expect(request.method).toBe('GET');
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
-  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1),resource(2,'Helios 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
+  const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.goto('/progressive-map-fixture');
@@ -46,7 +46,7 @@ test('basemap renders while field records wait, with no invented pins or empty f
  await canvas.evaluate(node=>node.dataset.persistentMap='yes');
  await page.screenshot({path:info.outputPath('basemap-before-field-records.png'),fullPage:true});
  state.release();
- await expect(frame.locator('.field-map-list>button')).toHaveCount(3);
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  await expect(frame.getByRole('button',{name:'TV / fullscreen map'})).toBeEnabled();
@@ -61,24 +61,18 @@ test('initial field failure preserves the basemap and retry fills the same canva
  await expect(canvas).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
  await expect(frame.locator('.field-map-kpis article b')).toHaveText(['—','—','—','—','—']);
  state.fail=false;await frame.getByRole('button',{name:'Retry map load'}).click();
- await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await expect(frame.locator('.cos-field-pin')).toHaveCount(2);
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  state.fail=true;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(frame.getByRole('alert')).toContainText('Map refresh failed. Showing the last successfully loaded units.');
- await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(canvas).toHaveAttribute('data-persistent-map','yes');
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  expect(state.errors).toEqual([]);
 });
 
-test('Camera Health remains useful before and after the independent field read fails',async({page})=>{
- const {frame,state}=await mount(page,{workspace:'camera-health'});
- const health=frame.getByRole('region',{name:'Camera Health',exact:true});
- await expect(health.getByRole('button',{name:/Provider systems online/})).toContainText('2');
- await expect(health.getByText('Loading Camera Health…')).toHaveCount(0);
- state.fail=true;state.release();
- await expect(health.getByRole('alert')).toContainText('Field locations unavailable: Synthetic field read unavailable');
- await expect(health.getByRole('alert')).toContainText('Saved Camera Health observations load separately.');
- await expect(health.getByRole('button',{name:/Provider systems online/})).toContainText('2');
- state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();
- await expect(health.getByText(/Field locations unavailable/)).toHaveCount(0);
- expect(state.errors).toEqual([]);
+test('Camera Health publishes only a complete paired snapshot and retries both sources together',async({page})=>{
+ const {frame,state}=await mount(page,{workspace:'camera-health'}),health=frame.getByRole('region',{name:'Camera Health',exact:true});
+ await expect(health.getByText('Loading Camera Health…')).toBeVisible();await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
+ state.fail=true;state.release();await expect(health.getByRole('alert')).toContainText('Synthetic field read unavailable');await expect(health.locator('.camera-unit-kpis')).toHaveCount(0);
+ state.fail=false;await health.getByRole('button',{name:'Reload saved results'}).click();await expect(health.getByRole('button',{name:/Field units online/})).toContainText('2');
+ await expect(health.locator('.camera-overview-card')).toHaveCount(2);expect(state.errors).toEqual([]);
 });

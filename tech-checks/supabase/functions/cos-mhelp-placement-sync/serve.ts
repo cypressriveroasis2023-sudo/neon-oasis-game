@@ -1,5 +1,7 @@
+import {collectFleetLocations} from './fleetLocations.ts';
+import {createFleetLocationReader} from './locationReader.ts';
 import {createPlacementSyncHandler} from './index.ts';
-import {readPlacementCustomer,createCustomerReadDiagnostics,createCustomerReadGate} from './customerRead.ts';
+import {readPlacementCustomer,createCustomerReadDiagnostics,createCustomerReadGate,customerRetryDelay} from './customerRead.ts';
 import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts';
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co',PORTAL='224643';
@@ -17,20 +19,33 @@ const deadline=AbortSignal.timeout(105000);
 const diagnostics=createCustomerReadDiagnostics();
 const gate=createCustomerReadGate({signal:deadline});
 let config:{accessToken?:string;portalId?:string}|null=null;
+const rpc=async(name,body)=>{
+ const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!key)throw Error('Backend unavailable');
+ return json(await fetch(NATIVE+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)}),1048576);
+};
+const reads=new Map<string,Promise<any>>();
+const read=async(path:string)=>{if(!reads.has(path))reads.set(path,(async()=>{
+ if(deadline.aborted||!config?.accessToken||config.portalId!==PORTAL||!await gate.acquire())throw Error('Read unavailable');
+ const response=await fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+PORTAL+path,{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(10000)])});
+ if(response.status===429)gate.rateLimited(customerRetryDelay(response.headers.get('Retry-After')));
+ return json(response);
+})());return reads.get(path)!;};
 return createPlacementSyncHandler({authenticate:async req=>{
  if(Deno.env.get('SUPABASE_URL')!==NATIVE)return false;
  const secret=req.headers.get('x-camera-cron-secret');if(!secret||secret.length>1024||/\s/.test(secret))return false;
  const v=await json(await fetch('https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/camera-mhelp-readiness',{method:'POST',headers:{'Content-Type':'application/json','x-camera-cron-secret':secret},body:'{"action":"authenticate"}',redirect:'error',signal:AbortSignal.timeout(10000)}),128);
  return v?.authenticated===true&&Object.keys(v).length===1;
-},rpc:async(name,body)=>{
- const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!key)throw Error('Backend unavailable');
- return json(await fetch(NATIVE+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)}),1048576);
-},equipment:async()=>{
+},rpc,equipment:async()=>{
  const result=await partner('/api/mhelpdesk/partner/preview','POST',{});
  if(result.partial||!result.liveAccessVerified||result.verifiedPortalId!==PORTAL||result.items.length!==result.totalRows)throw Error('Incomplete inventory');
  config=await tokens.getPartnerConfig();return result.items;
 },customer:async id=>{
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
  return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited});
+},locations:async equipment=>{
+ const candidates=await rpc('cos_mhelp_location_candidates',{});
+ const boundedFetch:typeof fetch=(url,init={})=>fetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
+ const result=await collectFleetLocations(candidates,equipment,createFleetLocationReader(read,boundedFetch,PORTAL));
+ if(deadline.aborted)throw Error('Source read timed out');return result;
 },readDiagnostics:diagnostics.snapshot})(request);
 });

@@ -32,7 +32,8 @@ async function mount(page) {
       : request.path === '/api/daily-board' ? { jobs: [], tasks: [], readiness: [], asOf: stamp } : { items: [] };
     return route.fulfill({ headers, contentType: 'application/json', body: JSON.stringify(data) });
   });
-  await page.goto('/field-map-viewport-fixture');
+  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
+ await page.goto('/field-map-viewport-fixture');
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
   await openWorkspace(frame, 'Field Map');

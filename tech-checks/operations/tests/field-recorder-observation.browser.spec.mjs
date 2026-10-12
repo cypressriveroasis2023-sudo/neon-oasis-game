@@ -25,6 +25,7 @@ async function mount(page){
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/field-recorder-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(3);return {frame,state};
 }
 test('Field cards and selected troubleshooting retain recorder wording and separate outage counts',async({page},info)=>{

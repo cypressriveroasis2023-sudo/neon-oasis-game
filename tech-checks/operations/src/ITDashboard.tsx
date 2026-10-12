@@ -18,18 +18,18 @@ type Summary = {
 /** A card owns its pending read. No global gate, settled cache, or write retry.
  * Deferring connect's first read avoids StrictMode's discarded setup request.
  * Every completion is tied to the exact connection and request generation. */
-export function createITSourceReader<T>(load: () => Promise<T>, enabled = true, keepPrevious = true) {
+export function createITSourceReader<T>(load: (force?:boolean) => Promise<T>, enabled = true, keepPrevious = true) {
   let state: ReadState<T> = { data: null, loading: enabled, error: '', readAt: null };
   let connected = false, revision = 0, pending: number | null = null;
   const listeners = new Set<() => void>();
   const publish = (next: ReadState<T>) => { state = next; listeners.forEach(listener => listener()); };
-  const refresh = async () => {
+  const refresh = async (force=false) => {
     if (!connected || !enabled || pending !== null) return;
     const request = ++revision;
     pending = request;
     publish({ ...state, ...(!keepPrevious ? { data: null, readAt: null } : {}), loading: true, error: '' });
     try {
-      const data = await load();
+      const data = await load(force);
       if (connected && request === revision) publish({ data, loading: false, error: '', readAt: Date.now() });
     } catch (cause) {
       if (connected && request === revision) {
@@ -44,6 +44,8 @@ export function createITSourceReader<T>(load: () => Promise<T>, enabled = true, 
     getSnapshot: () => state,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     refresh,
+    invalidate:()=>{revision++;pending=null;publish({data:null,loading:false,error:'Your fleet session changed. Reload this view.',readAt:null});},
+    unavailable:()=>{revision++;pending=null;publish({...state,loading:false,error:'The shared fleet refresh failed. Retry to verify current status.'});},
     connect: () => {
       connected = true;
       const connection = ++revision;
@@ -75,11 +77,11 @@ export function summarizeITRouters(value: unknown, now = Date.now()): Summary {
 export function summarizeITCameras(value: unknown, now = Date.now()): Summary {
   const cameras = cameraDashboardSummary(value, now);
   if (!cameras.available || !cameras.coverage) throw new Error('Source-separated Camera Health could not be verified.');
-  const coverage = cameras.coverage;
-  return { count: coverage.total, label: 'active / unresolved units', metrics: [
-    { label: 'Provider online', value: coverage.online },
-    { label: 'Provider offline', value: coverage.offline },
-    { label: 'Provider review', value: coverage.review },
+  const coverage = cameras.coverage,shared=Boolean((value as Record<string,unknown>)?.fleetFieldUnits);
+  return { count: coverage.total, label: shared?'active / unresolved field units':'provider units · placement pending', metrics: [
+    { label: shared?'Field online':'Provider online', value: coverage.online },
+    { label: shared?'Field offline':'Provider offline', value: coverage.offline },
+    { label: shared?'Health / placement review':'Provider review', value: coverage.review },
   ], caution: (cameras.attention ?? 0) > 0, detail: cameras.cameraCoverage,
   note: 'Reported resources do not verify every camera or video. Older observations stay unverified.' };
 }
@@ -127,6 +129,7 @@ function ITAssignmentSummary({ session, navigate }: { session: Record<string, an
   const reader = useMemo(() => createITSourceReader(readITAssignments, true, false), [session]);
   const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
   useEffect(() => reader.connect(), [reader]);
+
   const summary = state.data ? summarizeITAssignments(state.data) : null;
   return <section className='it-dashboard-assignment-summary' aria-label='IT assignment queue summary' aria-busy={state.loading}>
     <p className='it-dashboard-eyebrow'>UNIT CHECKS</p><h2>Your assigned work</h2><p className='it-dashboard-note'>Review your scheduled work here, then open Tech Checks to choose the ticket and complete its unit checklist.</p>
@@ -142,20 +145,20 @@ function ITAssignmentSummary({ session, navigate }: { session: Record<string, an
     {state.error && <p className='it-dashboard-error' role='alert'>{state.error}</p>}
     <div className='it-dashboard-actions'><button type='button' className='it-dashboard-open' onClick={() => openLegacy('it')}>Open IT Tech Checks →</button></div>
     <div className='it-dashboard-actions'><button type='button' className='it-dashboard-refresh' onClick={() => navigate('MHelp')}>View all assignments and ticket info</button></div>
-    <div className='it-dashboard-actions'><button type='button' className='it-dashboard-refresh' disabled={state.loading} onClick={() => void reader.refresh()}>{state.loading ? 'Loading IT queue…' : 'Refresh IT queue'}</button></div>
+    <div className='it-dashboard-actions'><button type='button' className='it-dashboard-refresh' disabled={state.loading} onClick={() => void reader.refresh(true)}>{state.loading ? 'Loading IT queue…' : 'Refresh IT queue'}</button></div>
   </section>;
 }
 
 type Source = {
   id: string; label: string; route: string; description: string; icon: string;
-  read: () => Promise<unknown>; summarize: (value: any, now: number) => Summary;
+  read: (force?:boolean) => Promise<unknown>; summarize: (value: any, now: number) => Summary;
   allowed?: (session: Record<string, any>) => boolean; unavailable?: string;
   sourceLink?: { href: string; label: string }; openLabel?: string; summaryUnavailable?: string;
 };
 const read = (path: string) => async () => (await api.get(path)).data;
 export const sources: Source[] = [
-  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read: read('/api/field-map'), summarize: summarizeITFieldMap },
-  { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read: read('/api/camera-health/summary-v3'), summarize: summarizeITCameras },
+  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
+  { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('health',force):(await api.get('/api/camera-health/summary-v3')).data, summarize: summarizeITCameras },
   { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'victron', label: 'Victron', route: 'Victron VRM', description: 'Solar, battery and power dashboards for your fleet.', icon: 'power', read: read('/api/vrm-fleet'), summarize: summarizeITVrm,
     allowed: session => session.features?.vrmRead === true, unavailable: 'Victron access is not enabled for this account.' },
@@ -181,13 +184,14 @@ export function ITSourceCard({ source, session, now, navigate }: { source: Sourc
   const enabled = !source.allowed || source.allowed(session);
   // A different verified session gets a new, empty store synchronously. An old
   // account's late response can never populate the new account's cards.
-  const reader = useMemo(() => createITSourceReader(async () => {
-    const value = await source.read();
+  const reader = useMemo(() => createITSourceReader(async (force=false) => {
+    const value = await source.read(force);
     source.summarize(value, Date.now());
     return value;
   }, enabled), [source, session, enabled]);
   const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
   useEffect(() => reader.connect(), [reader]);
+  useEffect(()=>{if(!['field','cameras'].includes(source.id))return;const update=()=>{void reader.refresh();};const clear=()=>reader.invalidate();window.addEventListener?.('cos-fleet-snapshot-updated',update);window.addEventListener?.('cos-private-data-invalidated',clear);return()=>{window.removeEventListener?.('cos-fleet-snapshot-updated',update);window.removeEventListener?.('cos-private-data-invalidated',clear);};},[reader,source.id]);
   const summary = useMemo(() => state.data === null ? null : source.summarize(state.data, now), [source, state.data, now]);
   const status = !enabled ? 'Access not enabled' : state.loading ? summary ? 'Refreshing' : 'Loading' : state.error ? summary ? 'Previous snapshot' : 'Unavailable' : summary?.caution ? 'Review details' : 'Snapshot loaded';
   return <article className={'it-dashboard-card it-dashboard-card-' + source.id} aria-labelledby={'it-card-' + source.id} data-source={source.id}>
@@ -208,7 +212,7 @@ export function ITSourceCard({ source, session, now, navigate }: { source: Sourc
       {enabled && source.sourceLink && <div className='it-dashboard-actions it-dashboard-source-action'><a className='it-dashboard-open' href={source.sourceLink.href} target='_blank' rel='noopener noreferrer'>{source.sourceLink.label}<span aria-hidden='true'>↗</span></a></div>}
       <div className='it-dashboard-actions'>
         <button type='button' className='it-dashboard-open' disabled={!enabled} onClick={() => navigate(source.route)}>{source.openLabel || 'Open ' + source.label}<span aria-hidden='true'>↗</span></button>
-        {enabled && <button type='button' className='it-dashboard-refresh' aria-label={(state.error ? 'Retry ' : 'Refresh ') + source.label} disabled={state.loading} onClick={() => void reader.refresh()}>{state.loading ? 'Checking…' : state.error ? 'Retry' : 'Refresh'}</button>}
+        {enabled && <button type='button' className='it-dashboard-refresh' aria-label={(state.error ? 'Retry ' : 'Refresh ') + source.label} disabled={state.loading} onClick={() => void reader.refresh(true)}>{state.loading ? 'Checking…' : state.error ? 'Retry' : 'Refresh'}</button>}
       </div>
     </div>
   </article>;

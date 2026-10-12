@@ -87,3 +87,12 @@ test('aggregate read diagnostics appear only in an authenticated completed run',
  const denied=createPlacementSyncHandler({authenticate:async()=>false,rpc:async()=>{throw Error();},equipment:async()=>[],customer:read,readDiagnostics:()=>{snapshots++;return diagnostics;}});
  assert.equal((await denied(request('run'))).status,403);assert.equal(snapshots,1);
 });
+
+
+test('optional all-unit service-location failure preserves its prior cache and completes verified legacy placement reads',async()=>{
+ const calls=[];const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async(name,body)=>{calls.push({name,body});return name.endsWith('begin')?{leaseId:'synthetic-lease',links:[link]}:name.endsWith('finish')?{committed:true,confirmed:1,held:0}:{};},equipment:async()=>[equipment],customer:read,locations:async()=>{throw Error('Synthetic bounded address failure; source details must remain private');}});
+ const response=await h(new Request('https://synthetic.example/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'run'})}));const body=await response.json();
+ assert.equal(response.status,200);assert.equal(body.state,'current');assert.equal(body.locationError,'service_location_refresh_unavailable');assert(!JSON.stringify(body).includes('source details'));
+ const finish=calls.find(c=>c.name==='cos_mhelp_placement_finish');assert(finish);assert.equal(finish.body.p_observations.length,1);assert.equal(finish.body.p_observations[0].state,'confirmed');assert.equal('p_locations' in finish.body,false);
+ assert(!calls.some(c=>['cos_mhelp_fleet_finish','cos_mhelp_placement_fail'].includes(c.name)),'a failed optional address read cannot overwrite location receipts or stop working placement evidence');
+});
