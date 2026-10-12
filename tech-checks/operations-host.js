@@ -156,7 +156,7 @@ function present() {
     const tvLaunch = mapParams.get('tvBoard') === '1';
     const tvParams = new URLSearchParams();
     if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
-    frame.src = './operations/dist/index.html?v=tech-check-tv-config-20261012' + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
+    frame.src = './operations/dist/index.html?v=tech-check-tv-eye-20261012' + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
     frame.referrerPolicy = 'same-origin';
     frame.addEventListener('load', () => {setFieldMapDisplay(frame,false); if (toolFromHash()) showTechCheckHome(); });
