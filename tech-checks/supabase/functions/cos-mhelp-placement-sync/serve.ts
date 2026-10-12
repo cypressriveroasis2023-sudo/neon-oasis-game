@@ -1,5 +1,5 @@
 import {createPlacementSyncHandler} from './index.ts';
-import {projectCustomer} from '../cos-mhelp-assignments/index.ts';
+import {readPlacementCustomer} from './customerRead.ts';
 import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts';
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co',PORTAL='224643';
@@ -29,7 +29,6 @@ return createPlacementSyncHandler({authenticate:async req=>{
 },customer:async id=>{
  if(deadline.aborted)return null;
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
- const response=await fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+PORTAL+'/customers/'+id+'?fields=customerId,portalId,name,isServiceLocation',{headers:{Authorization:'Bearer '+current.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(10000)])});
- return projectCustomer(await json(response),id,PORTAL);
+ return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json});
 }})(request);
 });
