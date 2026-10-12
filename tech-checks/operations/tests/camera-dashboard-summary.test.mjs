@@ -22,5 +22,6 @@ test('confirmed empty v2 inventory is distinct from unavailable and never claims
 
 
 test('all new consumers use the versioned route and never fall back to old aggregate semantics',()=>{
- for(const file of ['useCameraHealth.ts','todayDashboardData.ts','VisionAreas.tsx']){const source=readFileSync(new URL('../src/'+file,import.meta.url),'utf8');assert.match(source,/\/api\/camera-health\/summary-v3/);assert.doesNotMatch(source,/['"]\/api\/camera-health\/summary['"]/);}
+ assert.match(readFileSync(new URL('../src/useCameraHealth.ts',import.meta.url),'utf8'),/api\.fleet\(/);
+ for(const file of ['api.ts','todayDashboardData.ts','VisionAreas.tsx']){const source=readFileSync(new URL('../src/'+file,import.meta.url),'utf8');assert.match(source,/\/api\/camera-health\/summary-v3/);assert.doesNotMatch(source,/['"]\/api\/camera-health\/summary['"]/);}
 });

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { setImmediate } from 'node:timers/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
+import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
 
 // Execute the exact production module in an isolated browser-shaped context.
 // All tokens, responses and timers are synthetic; no network is available here.
@@ -18,7 +19,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', autoReply = true } = {}) {
-  const invalidations=[], listeners = new Set(), timers = new Map(), requests = [], handshakes = [];
+  const invalidations=[], listeners = new Set(), otherListeners=new Map(), timers = new Map(), requests = [], handshakes = [];
   const location = { origin: 'https://synthetic.example', search: mode ? '?mode=' + mode : '' };
   let timerId = 0, requestId = 0;
   const state = { role, token, autoReply };
@@ -32,9 +33,9 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   } };
   const window = {
     parent,
-    dispatchEvent(event){invalidations.push(event.type);return true;},
-    addEventListener(type, fn) { assert.equal(type, 'message'); listeners.add(fn); },
-    removeEventListener(type, fn) { assert.equal(type, 'message'); listeners.delete(fn); },
+    dispatchEvent(event){invalidations.push(event.type);for(const fn of otherListeners.get(event.type)||[])fn(event);return true;},
+    addEventListener(type,fn){if(type==='message')listeners.add(fn);else{if(!otherListeners.has(type))otherListeners.set(type,new Set());otherListeners.get(type).add(fn);}},
+    removeEventListener(type,fn){if(type==='message')listeners.delete(fn);else otherListeners.get(type)?.delete(fn);},
     setTimeout(fn, delay) { timers.set(++timerId, { fn, delay }); return timerId; },
     clearTimeout(id) { timers.delete(id); },
   };
@@ -48,7 +49,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   const exports = {};
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
-    require: name => { assert.equal(name, '../../it-feature-availability'); return { IT_DAILY_ONLY: true }; },
+    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -187,11 +188,11 @@ test('parent origin, source and request identity are still required before any s
   f.reply(undefined, undefined, { source: {} });
   f.reply({ requestId: 'synthetic-wrong-request' });
   await flush();
-  assert.equal(f.listeners.size, 1, 'untrusted responses did not complete authorization');
+  assert.equal(f.listeners.size, 2, 'untrusted responses did not complete authorization');
   assert.equal(f.requests.length, 1);
   f.reply();
   await flush();
-  assert.equal(f.listeners.size, 0);
+  assert.equal(f.listeners.size, 1);
   assert.equal(f.requests.length, 1);
   f.answer(0);
   await Promise.all([first, second]);
@@ -210,8 +211,8 @@ test('parent timeout is not bypassed by a pending read, and later authorization 
   const retry = f.api.get('/api/jobs');
   await flush();
   assert.equal(f.handshakes.length, 3);
-  assert.equal(f.requests.length, 1, 'freshly authorized retry can join a still-pending safe read');
-  f.answer(0);
+  assert.equal(f.requests.length, 2, 'authorization interruption invalidates earlier shared entries');
+  f.answer(0);f.answer(1);
   await Promise.all([first, retry]);
 });
 
@@ -379,4 +380,23 @@ test('verified parent credential changes and malformed auth responses still inva
  const f=fixture(),first=f.api.get('/api/jobs');await flush();f.answer(0);await first;assert.deepEqual(f.invalidations,[]);
  f.state.token='synthetic-session-b';const second=f.api.get('/api/jobs');await flush();assert.deepEqual(f.invalidations,['cos-private-data-invalidated']);f.answer(1);await second;
  const third=f.api.get('/api/jobs');await flush();f.requests[2].result.resolve({ok:false,status:401,json:async()=>{throw Error('synthetic malformed response');}});await assert.rejects(third,status(401));assert.deepEqual(f.invalidations,['cos-private-data-invalidated','cos-private-data-invalidated']);
+});
+
+const fleetHealth={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:'2026-10-12T18:00:00Z',rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
+const fleetMap={items:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-12T18:00:00Z'};
+test('fleet consumers share a complete paired snapshot and re-authorize before using its 15-minute cache',async()=>{
+ const f=fixture(),a=f.api.fleet(),b=f.api.fleet();await flush();assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
+ f.answer(0,fleetHealth);f.answer(1,fleetMap);const values=await Promise.all([a,b]);assert.equal(values[0],values[1]);
+ const cached=await f.api.fleet();assert.equal(cached,values[0]);assert.equal(f.requests.length,2);assert.equal(f.handshakes.length,2);
+ const forced=f.api.fleet(true);await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await forced;
+ f.state.role='service';await assert.rejects(f.api.fleet(),status(401));
+});
+test('one failed source never installs a partial fleet snapshot and a POST invalidates both halves',async()=>{
+ const f=fixture(),a=f.api.fleet();const checked=assert.rejects(a,status(503));await flush();f.answer(0,fleetHealth);f.answer(1,{error:'Map read unavailable'},503);await checked;
+ const fresh=f.api.fleet();await flush();assert.equal(f.requests.length,4);f.answer(2,fleetHealth);f.answer(3,fleetMap);await fresh;
+ const post=f.api.post('/api/owner-tasks',{});await flush();f.answer(4,{saved:true});await post;
+ const next=f.api.fleet();await flush();assert.equal(f.requests.length,7);f.answer(5,fleetHealth);f.answer(6,fleetMap);await next;
+});
+test('a fleet read started under a previous account is rejected after an account change',async()=>{
+ const f=fixture(),old=f.api.fleet();const rejected=assert.rejects(old,status(409));await flush();f.state.token='synthetic-session-b';const current=f.api.fleet();await flush();f.answer(0,fleetHealth);f.answer(1,fleetMap);await rejected;f.answer(2,fleetHealth);f.answer(3,fleetMap);await current;
 });

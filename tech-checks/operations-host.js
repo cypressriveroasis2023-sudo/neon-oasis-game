@@ -152,7 +152,7 @@ function present() {
     frame.title = 'COS Operations';
     const mapParams = new URLSearchParams(window.location.search);
     const fieldUnit = mapParams.get('fieldUnit');
-    const fieldRoute = fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#field-map?unitLabel=' + encodeURIComponent(fieldUnit) : mapParams.get('fieldView') === '1' ? '#field-map' : '';
+    const fieldRoute = mapParams.get('cameraView')==='1'?'#camera-health':fieldUnit && fieldUnit.length <= 120 && !/[\u0000-\u001f]/.test(fieldUnit) ? '#field-map?unitLabel=' + encodeURIComponent(fieldUnit) : mapParams.get('fieldView') === '1' ? '#field-map' : '';
     const tvLaunch = mapParams.get('tvBoard') === '1';
     const tvParams = new URLSearchParams();
     if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}

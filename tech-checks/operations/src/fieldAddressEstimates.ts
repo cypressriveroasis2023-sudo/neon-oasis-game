@@ -15,9 +15,10 @@ export type AutomaticGeocodioEstimate = {
  latitude:number;longitude:number;matchedAddress:string;geocodedAt:string;confidence:'automatic_address_estimate';
  inferredComponents?:string[]; originalAddress?:string; source:'geocodio_automatic_address_estimate';provider:'geocodio';accuracyType:'rooftop'|'range_interpolation';accuracy:number;matchType:'building_centroid'|'parcel_centroid'|null;
 };
-export type AddressEstimate = CensusAddressEstimate | ReviewedAddressEstimate | AutomaticGeocodioEstimate | SourceRecordedPoint;
-export const addressEstimateLabel = (estimate:AddressEstimate) => estimate.confidence==='source_recorded_unverified'?'Tracker-recorded coordinates (unverified)':estimate.confidence==='approximate_property_location'?'Geocodio approximate property estimate':estimate.confidence==='automatic_address_estimate'?(estimate.accuracyType==='rooftop'?'Geocodio rooftop address estimate':'Geocodio address-range estimate'):'U.S. Census address-range estimate';
-export const addressEstimateTimestamp = (estimate:AddressEstimate) => estimate.confidence==='source_recorded_unverified'?estimate.sourceObservedAt:estimate.confidence==='approximate_property_location'?estimate.retrievedAt:estimate.geocodedAt;
+export type MhelpLocationPoint={latitude:number;longitude:number;matchedAddress:string;sourceObservedAt:string;confidence:'mhelp_service_unverified';coordinateSource:'mHelpDesk service location'|'Census address estimate'};
+export type AddressEstimate = MhelpLocationPoint | CensusAddressEstimate | ReviewedAddressEstimate | AutomaticGeocodioEstimate | SourceRecordedPoint;
+export const addressEstimateLabel = (estimate:AddressEstimate) => estimate.confidence==='mhelp_service_unverified'?estimate.coordinateSource+' (unverified)':estimate.confidence==='source_recorded_unverified'?'Tracker-recorded coordinates (unverified)':estimate.confidence==='approximate_property_location'?'Geocodio approximate property estimate':estimate.confidence==='automatic_address_estimate'?(estimate.accuracyType==='rooftop'?'Geocodio rooftop address estimate':'Geocodio address-range estimate'):'U.S. Census address-range estimate';
+export const addressEstimateTimestamp = (estimate:AddressEstimate) => (estimate.confidence==='mhelp_service_unverified'||estimate.confidence==='source_recorded_unverified')?estimate.sourceObservedAt:estimate.confidence==='approximate_property_location'?estimate.retrievedAt:estimate.geocodedAt;
 export const reviewedDifferenceExplanation = (estimate:ReviewedAddressEstimate) => ({approved_city_label_equivalence:'Reviewed city-label difference; original street, state and ZIP retained.',approved_state_route_alias:'Reviewed state-route alias; original house number, city, state and ZIP retained.',approved_missing_street_suffix:'Reviewed street-suffix completion; original house number, street name, city, state and ZIP retained.'})[estimate.approvedDifference];
 type EstimateRow = FieldLocation & { status?:string; currentLocationType?:string; importedPlacement?:string|null };
 const object = (value:unknown):value is Record<string,unknown> => Boolean(value&&typeof value==='object'&&!Array.isArray(value));
@@ -44,6 +45,8 @@ function addressParts(value:string) {
 
 /** An address estimate is a separate, unverified presentation; it never passes isCurrentFieldPin. */
 export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Promise<AddressEstimate|null> {
+  const mhelp=unit.mhelpLocation;
+  if(mhelp?.contract==='COS_MHELP_FLEET_LOCATIONS_V1'&&mhelp.unitId===unit.id&&mhelp.unitNumber===unit.unitNumber&&mhelp.placement==='FIELD'&&mhelp.verified===false&&mhelp.address===unit.address&&unit.currentLocationType==='field'&&!isCurrentFieldPin(unit)&&!unit.hasUnitGps&&date(mhelp.observedAt,now)&&now-Date.parse(mhelp.observedAt)<=40*60*1000&&Array.isArray(mhelp.point)&&mhelp.point.length===2&&hasGpsCoordinates({latitude:mhelp.point[0],longitude:mhelp.point[1]})&&['mHelpDesk service location','Census address estimate'].includes(mhelp.coordinateSource))return {latitude:mhelp.point[0],longitude:mhelp.point[1],matchedAddress:mhelp.address,sourceObservedAt:mhelp.observedAt,confidence:'mhelp_service_unverified',coordinateSource:mhelp.coordinateSource};
   // Preserve a fully validated reviewed property estimate ahead of automatic
   // imported results, including pending/no-match and lower-quality range points.
   if(unit.locationNote?.startsWith(reviewedEstimatePrefix)||unit.coordinateSource===reviewedEstimateSource||unit.historicalCoordinateSource===reviewedEstimateSource){
