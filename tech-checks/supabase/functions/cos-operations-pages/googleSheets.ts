@@ -37,6 +37,8 @@ function account(raw:unknown):Account|null {
   fail('Use a Google service-account JSON key, not a password, API key, or mHelpDesk token.');
  return {client_email:v.client_email,private_key:v.private_key,private_key_id:v.private_key_id};
 }
+// Shared server-side validation; callers still choose and restrict their own scope.
+export {account as parseSheetsAccount,boundedJson as readSheetsJson};
 async function boundedJson(response:Response,limit:number,signal:AbortSignal):Promise<Row> {
  if(signal.aborted)fail('The Sheets connection check timed out. Retry the check.');
  const declared=Number(response.headers.get('Content-Length'));

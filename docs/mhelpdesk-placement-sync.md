@@ -12,7 +12,7 @@ Assignment changes clear the displayed old address/pin and request location veri
 
 ## Google tracker boundary
 
-The existing Google service account is a Viewer with a read-only OAuth scope. This feed does **not** publish Google Sheet changes. Its receipts explicitly report `sheetsPublisher:false`. Google writeback requires Editor access plus the separately implemented exact-cell publisher, manual-change conflict checks, idempotent receipts and verified readback. Do not advertise this source feed as a Google publisher or activate the existing default-off ticket intake/pending queue.
+This source feed does **not** publish Google Sheet changes. Its receipts explicitly report `sheetsPublisher:false`. The separately implemented [guarded publisher](google-placement-publisher.md) requires workbook-scoped Editor access, reviewed exact-cell baselines, its own enabled control and verified readback. The connection panel's existing OAuth scope remains read-only; the isolated publisher uses the write scope on the fixed workbook. Do not advertise this source feed as a Google publisher or activate the existing default-off ticket intake/pending queue.
 
 ## Release
 

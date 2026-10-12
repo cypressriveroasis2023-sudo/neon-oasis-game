@@ -21,7 +21,7 @@ async function main(){
  assertCiContext();
  const server=lastJson(await exec("select json_build_object('db',current_database(),'user',current_user,'port',inet_server_port());"));
  assert.equal(server.db,connection.database);assert.equal(server.user,'postgres');assert.equal(server.port,5432);
- await exec('drop schema if exists cos_mhelp_placement_private cascade;drop schema if exists app_private cascade;drop schema public cascade;create schema public;grant usage on schema public to anon,authenticated,service_role;'+schema);
+ await exec('drop schema if exists cos_sheets_placement_private cascade;drop schema if exists cos_mhelp_placement_private cascade;drop schema if exists app_private cascade;drop schema public cascade;create schema public;grant usage on schema public to anon,authenticated,service_role;'+schema);
  await exec(await readFile(new URL('../db/20261012173408_cos_mhelp_placement_sync.sql',import.meta.url),'utf8'));
  await exec('update cos_mhelp_placement_private.control set enabled=true;');
  const first=session('begin;set local role service_role;select public.cos_mhelp_placement_begin();',true,'placement-first');let second;
@@ -35,6 +35,19 @@ async function main(){
   const expired=lastJson(await exec("set role service_role;select public.cos_mhelp_placement_finish('"+a.leaseId+"'::uuid,'[]'::jsonb);"));assert.equal(expired.committed,false);
   assert.equal(lastJson(await exec("reset role;select json_build_object('receipts',(select count(*) from cos_mhelp_placement_private.receipts));")).receipts,0);
  }finally{await first.release().catch(()=>first.abort());if(second)await second.done.catch(()=>second.abort());}
- console.log('Real PostgreSQL placement lease contention and expired-publication checks passed.');
+ await exec(await readFile(new URL('../db/20261012184453_cos_sheets_placement_publisher.sql',import.meta.url),'utf8'));
+ await exec('update cos_sheets_placement_private.control set enabled=true;');
+ const publisherFirst=session('begin;set local role service_role;select public.cos_sheets_placement_begin();',true,'publisher-first');let publisherSecond;
+ try{
+  await publisherFirst.ready;publisherSecond=session('begin;set local role service_role;select public.cos_sheets_placement_begin();commit;',false,'publisher-second');
+  let blocked=false;
+  for(let i=0;i<40&&!blocked;i++){blocked=lastJson(await exec("select json_build_object('blocked',exists(select 1 from pg_stat_activity where application_name='publisher-second' and wait_event_type='Lock'));" )).blocked;if(!blocked)await sleep(50);}
+  assert.equal(blocked,true,'Publisher workers must contend on the real control row');
+  const a=lastJson(await publisherFirst.release()),b=lastJson(await publisherSecond.done);assert(a.leaseId);assert.equal(b.leaseId,null);
+  await exec("update cos_sheets_placement_private.control set lease_until=clock_timestamp()-interval '1 second';");
+  assert.equal(lastJson(await exec("set role service_role;select public.cos_sheets_placement_stage('"+a.leaseId+"'::uuid,'[]'::jsonb);")).committed,false);
+  assert.equal(lastJson(await exec("set role service_role;select public.cos_sheets_placement_finish('"+a.leaseId+"'::uuid,'[]'::jsonb);")).committed,false);
+ }finally{await publisherFirst.release().catch(()=>publisherFirst.abort());if(publisherSecond)await publisherSecond.done.catch(()=>publisherSecond.abort());}
+ console.log('Real PostgreSQL placement and Sheet publisher lease contention and expired-publication checks passed.');
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;});
