@@ -150,6 +150,7 @@ type Source = {
   id: string; label: string; route: string; description: string; icon: string;
   read: () => Promise<unknown>; summarize: (value: any, now: number) => Summary;
   allowed?: (session: Record<string, any>) => boolean; unavailable?: string;
+  sourceLink?: { href: string; label: string }; openLabel?: string; summaryUnavailable?: string;
 };
 const read = (path: string) => async () => (await api.get(path)).data;
 export const sources: Source[] = [
@@ -199,13 +200,14 @@ export function ITSourceCard({ source, session, now, navigate }: { source: Sourc
         <dl className='it-dashboard-metrics'>{summary.metrics.map(metric => <div key={metric.label}><dd>{typeof metric.value === 'number' ? metric.value.toLocaleString() : metric.value}</dd><dt>{metric.label}</dt></div>)}</dl>
         {summary.detail && <p className='it-dashboard-detail'>{summary.detail}</p>}
         <p className='it-dashboard-note'>{summary.note}</p>
-      </> : <p className='it-dashboard-empty'>{state.loading ? 'Checking authorized records…' : 'Summary unavailable. Open this view or retry.'}</p>}
+      </> : <p className='it-dashboard-empty'>{state.loading ? 'Checking authorized records…' : source.summaryUnavailable || 'Summary unavailable. Open this view or retry.'}</p>}
       {state.error && <p className='it-dashboard-error' role='alert'>{state.error}{summary ? ' Showing the last successful snapshot.' : ''}</p>}
     </div>
     <div className='it-dashboard-card-bottom'>
       <span className='it-dashboard-read-time'>{state.readAt ? <>Read <time dateTime={new Date(state.readAt).toISOString()}>{new Date(state.readAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</time></> : 'Source status kept separate'}</span>
+      {enabled && source.sourceLink && <div className='it-dashboard-actions it-dashboard-source-action'><a className='it-dashboard-open' href={source.sourceLink.href} target='_blank' rel='noopener noreferrer'>{source.sourceLink.label}<span aria-hidden='true'>↗</span></a></div>}
       <div className='it-dashboard-actions'>
-        <button type='button' className='it-dashboard-open' disabled={!enabled} onClick={() => navigate(source.route)}>Open {source.label}<span aria-hidden='true'>↗</span></button>
+        <button type='button' className='it-dashboard-open' disabled={!enabled} onClick={() => navigate(source.route)}>{source.openLabel || 'Open ' + source.label}<span aria-hidden='true'>↗</span></button>
         {enabled && <button type='button' className='it-dashboard-refresh' aria-label={(state.error ? 'Retry ' : 'Refresh ') + source.label} disabled={state.loading} onClick={() => void reader.refresh()}>{state.loading ? 'Checking…' : state.error ? 'Retry' : 'Refresh'}</button>}
       </div>
     </div>
