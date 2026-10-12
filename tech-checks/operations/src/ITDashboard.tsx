@@ -157,8 +157,8 @@ type Source = {
 };
 const read = (path: string) => async () => (await api.get(path)).data;
 export const sources: Source[] = [
-  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleet==='function'?(await api.fleet(force)).fieldMap:(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
-  { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read:async(force=false)=>typeof api.fleet==='function'?(await api.fleet(force)).health:(await api.get('/api/camera-health/summary-v3')).data, summarize: summarizeITCameras },
+  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
+  { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('health',force):(await api.get('/api/camera-health/summary-v3')).data, summarize: summarizeITCameras },
   { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'victron', label: 'Victron', route: 'Victron VRM', description: 'Solar, battery and power dashboards for your fleet.', icon: 'power', read: read('/api/vrm-fleet'), summarize: summarizeITVrm,
     allowed: session => session.features?.vrmRead === true, unavailable: 'Victron access is not enabled for this account.' },
@@ -191,7 +191,7 @@ export function ITSourceCard({ source, session, now, navigate }: { source: Sourc
   }, enabled), [source, session, enabled]);
   const state = useSyncExternalStore(reader.subscribe, reader.getSnapshot, reader.getSnapshot);
   useEffect(() => reader.connect(), [reader]);
-  useEffect(()=>{if(!['field','cameras'].includes(source.id))return;const update=()=>{void reader.refresh();};const clear=()=>reader.invalidate();const fail=()=>reader.unavailable();window.addEventListener?.('cos-fleet-snapshot-updated',update);window.addEventListener?.('cos-private-data-invalidated',clear);window.addEventListener?.('cos-fleet-snapshot-failed',fail);return()=>{window.removeEventListener?.('cos-fleet-snapshot-updated',update);window.removeEventListener?.('cos-private-data-invalidated',clear);window.removeEventListener?.('cos-fleet-snapshot-failed',fail);};},[reader,source.id]);
+  useEffect(()=>{if(!['field','cameras'].includes(source.id))return;const update=()=>{void reader.refresh();};const clear=()=>reader.invalidate();window.addEventListener?.('cos-fleet-snapshot-updated',update);window.addEventListener?.('cos-private-data-invalidated',clear);return()=>{window.removeEventListener?.('cos-fleet-snapshot-updated',update);window.removeEventListener?.('cos-private-data-invalidated',clear);};},[reader,source.id]);
   const summary = useMemo(() => state.data === null ? null : source.summarize(state.data, now), [source, state.data, now]);
   const status = !enabled ? 'Access not enabled' : state.loading ? summary ? 'Refreshing' : 'Loading' : state.error ? summary ? 'Previous snapshot' : 'Unavailable' : summary?.caution ? 'Review details' : 'Snapshot loaded';
   return <article className={'it-dashboard-card it-dashboard-card-' + source.id} aria-labelledby={'it-card-' + source.id} data-source={source.id}>

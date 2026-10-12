@@ -5,6 +5,8 @@ import { setImmediate } from 'node:timers/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
+import {validateCameraHealth} from '../src/fieldCameraHealth.ts';
+import {checkedFieldMap} from '../src/gpsPersistence.ts';
 
 // Execute the exact production module in an isolated browser-shaped context.
 // All tokens, responses and timers are synthetic; no network is available here.
@@ -49,7 +51,7 @@ function fixture({ mode = '', role = 'owner', token = 'synthetic-session-a', aut
   const exports = {};
   vm.runInNewContext(source, {
     exports, window, location, URLSearchParams, AbortController, Event,
-    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
+    require:name=>name==='./fleetSnapshot'?{reconcileFleetSnapshot}:name==='./fieldCameraHealth'?{validateCameraHealth}:name==='./gpsPersistence'?{checkedFieldMap}:name==='../../it-feature-availability'?{IT_DAILY_ONLY:true}:(()=>{throw Error('Unexpected module '+name);})(),
     crypto: { randomUUID: () => 'synthetic-request-' + ++requestId },
     fetch(url, init) {
       assert.equal(url, 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages');
@@ -384,6 +386,22 @@ test('verified parent credential changes and malformed auth responses still inva
 
 const fleetHealth={totalDevices:0,online:0,offline:0,review:0,shopRoot:0,healthRows:0,fieldDevices:0,refreshedAt:'2026-10-12T18:00:00Z',rows:[],evidenceVersion:2,inventory:{allRecords:0,activeFieldRecords:0,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0}};
 const fleetMap={items:[],summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0},generatedAt:'2026-10-12T18:00:00Z'};
+test('a verified dashboard source arrives before its slow peer and survives its non-auth failure',async()=>{
+ const f=fixture(),field=f.api.fleetSource('fieldMap'),health=f.api.fleetSource('health');const failed=assert.rejects(health,status(503));
+ await flush();assert.equal(f.requests.length,2);f.answer(1,fleetMap);assert.deepEqual(await field,fleetMap);
+ f.answer(0,{error:'Camera source unavailable'},503);await failed;
+ const fresh=f.api.fleet();await flush();assert.equal(f.requests.length,4,'a partial source did not enter the paired cache');
+ f.answer(2,fleetHealth);f.answer(3,fleetMap);await fresh;
+});
+test('source-only fleet completions cannot cross an account change or a save invalidation',async()=>{
+ for(const action of ['account','save']){
+  const f=fixture(),source=f.api.fleetSource('fieldMap');const denied=assert.rejects(source,status(409));await flush();
+  let other;
+  if(action==='account'){f.state.token='synthetic-session-b';other=f.api.get('/api/jobs');}
+  else other=f.api.post('/api/owner-tasks',{});
+  await flush();f.answer(2,{saved:true});await other;f.answer(1,fleetMap);f.answer(0,fleetHealth);await denied;
+ }
+});
 test('fleet consumers share a complete paired snapshot and re-authorize before using its 15-minute cache',async()=>{
  const f=fixture(),a=f.api.fleet(),b=f.api.fleet();await flush();assert.deepEqual(f.requests.map(r=>r.envelope.path),['/api/camera-health/summary-v3','/api/field-map']);
  f.answer(0,fleetHealth);f.answer(1,fleetMap);const values=await Promise.all([a,b]);assert.equal(values[0],values[1]);

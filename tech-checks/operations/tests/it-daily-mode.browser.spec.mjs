@@ -142,8 +142,7 @@ async function ready(frame, except) {
   await expect(daily(frame).getByRole('heading', {name: 'Daily views', exact: true})).toBeVisible();
   await expect(daily(frame).locator('[data-source]')).toHaveCount(4);
   expect(await daily(frame).locator('[data-source]').evaluateAll(nodes => nodes.map(node => node.dataset.source))).toEqual(sources);
-  const waiting=['cameras','field'].includes(except)?['cameras','field']:[except];
-  for (const source of sources.filter(source => !waiting.includes(source))) await expect(card(frame, source).locator('time')).toHaveCount(1);
+  for (const source of sources.filter(source => source !== except)) await expect(card(frame, source).locator('time')).toHaveCount(1);
 }
 async function assertReads(page, state) {
   expect(state.errors).toEqual([]); expect(state.unexpected).toEqual([]);
@@ -257,15 +256,16 @@ test('daily view opens independently of a stalled old IT Home loader', async ({p
   await expect(page.locator('#wlItHome')).toContainText('Loading Home'); await assertReads(page, state);
 });
 
-for (const source of sources) test(source + ' slow and failed read preserves independent views and keeps the shared fleet paired', async ({page}) => {
+for (const source of sources) test(source + ' slow and failed source does not block the other three views', async ({page}) => {
   const {frame, state} = await mount(page, {holdSource: source}); await ready(frame, source);
-  const waiting=['cameras','field'].includes(source)?['cameras','field']:[source];
-  for(const id of waiting){await expect(card(frame,id).locator('.it-dashboard-status')).toHaveText('Loading');await expect(card(frame,id).locator('time')).toHaveCount(0);}
+  await expect(card(frame,source).locator('.it-dashboard-status')).toHaveText('Loading');await expect(card(frame,source).locator('time')).toHaveCount(0);
   state.fail[sourcePaths[source]] = true; state.release(source);
-  for(const id of waiting){await expect(card(frame,id).locator('.it-dashboard-status')).toHaveText('Unavailable');await expect(card(frame,id).locator('time')).toHaveCount(0);}
+  await expect(card(frame,source).locator('.it-dashboard-status')).toHaveText('Unavailable');await expect(card(frame,source).locator('time')).toHaveCount(0);
   const before = state.calls.length; delete state.fail[sourcePaths[source]];
   await card(frame, source).getByRole('button', {name: /^Retry /}).click(); await ready(frame);
-  expect(state.calls.slice(before).map(call => call.path).sort()).toEqual(waiting.map(id=>sourcePaths[id]).sort()); await assertReads(page, state);
+  // A fresh fleet retry rechecks both inputs; a healthy source stays available.
+  const refreshed=['cameras','field'].includes(source)?['cameras','field']:[source];
+  expect(state.calls.slice(before).map(call => call.path).sort()).toEqual(refreshed.map(id=>sourcePaths[id]).sort()); await assertReads(page, state);
 });
 
 test('late capability cannot reopen a signed-out session; relogin restores only daily views', async ({page}) => {
