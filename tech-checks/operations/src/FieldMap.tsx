@@ -478,7 +478,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     <div className='field-map-toolbar'>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search unit, customer, site, job…' aria-label='Search field units'/>
       <button className='secondary' aria-expanded={filtersOpen} aria-controls='field-map-filters' onClick={()=>setFiltersOpen(value=>!value)}>Filters{status!=='field'||health!=='all'||nearbyId||showHistorical?' · active':''}</button>
-      <button className='secondary' disabled={busy} onClick={()=>{void load();void routers.refresh();void cameras.refresh()}}>Refresh</button>
+      <button className='secondary' disabled={busy} onClick={()=>{void load(true);void routers.refresh()}}>Refresh</button>
       <button className='secondary' aria-label={estimates.size?'Show all map pins':'Show all verified pins'} disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations}>Fit pins</button>
     </div>
 

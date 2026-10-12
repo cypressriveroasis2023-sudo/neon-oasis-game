@@ -25,3 +25,11 @@ test('all new consumers use the versioned route and never fall back to old aggre
  assert.match(readFileSync(new URL('../src/useCameraHealth.ts',import.meta.url),'utf8'),/api\.fleet\(/);
  for(const file of ['api.ts','todayDashboardData.ts','VisionAreas.tsx']){const source=readFileSync(new URL('../src/'+file,import.meta.url),'utf8');assert.match(source,/\/api\/camera-health\/summary-v3/);assert.doesNotMatch(source,/['"]\/api\/camera-health\/summary['"]/);}
 });
+
+import {reconcileFleetSnapshot} from '../src/fleetSnapshot.ts';
+test('paired home summaries use the same field unit status as the map and exclude confirmed Shop',()=>{
+ const units=[1,2,3].map(n=>({id:'80000000-0000-4000-8000-'+String(n).padStart(12,'0'),unitNumber:'Helios '+n,modelName:'Helios',status:'field',currentLocationType:n===3?'shop':'field',placement:n===3?'SHOP':'FIELD'}));
+ const data=snapshot([resource(1),withStatus(resource(2,'Helios 2'),'offline'),resource(3,'Helios 3')]);
+ const pair=reconcileFleetSnapshot(data,{items:units.slice(0,2),inventoryItems:units,summary:{fieldUnits:2,mappedUnits:0,unitGps:0,missingGps:2},generatedAt:new Date(now).toISOString()},now),v=cameraDashboardSummary(pair.health,now);
+ assert.equal(v.systems,'Field units: 1 online · 1 offline · 0 need review');assert.equal(v.coverage.online,1);assert.equal(v.coverage.offline,1);assert.equal(v.scopes.shop,1);
+});

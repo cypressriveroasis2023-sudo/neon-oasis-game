@@ -4,7 +4,7 @@ import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { getVrmFleet } from './vrmFleetApi';
 import './visionAreas.css';
 
-type Api = { get(path: string): Promise<{ data: any }> };
+type Api = { fleet?:(force?:boolean)=>Promise<{health:any;fieldMap:any}>;get(path: string): Promise<{ data: any }> };
 export function AreaIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
@@ -55,7 +55,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
   const [healthNow,setHealthNow]=useState(Date.now());
   const revision = useRef(0), running = useRef(false);
   const loading = visionAreas.some(area => !Object.hasOwn(values, area.workspace));
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force=false) => {
     if (running.current) return;
     running.current = true;
     const request = ++revision.current;
@@ -63,7 +63,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
     setHealthNow(Date.now());
     await Promise.all(visionAreas.map(async area => {
       let value: unknown = null;
-      try { const data=(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
+      try { const data=api.fleet&&['Camera Health','Field Map'].includes(area.workspace)?(await api.fleet(force))[area.workspace==='Camera Health'?'health':'fieldMap']:(await (area.workspace==='Victron VRM'?getVrmFleet(api):api.get(sources[area.workspace]))).data;summary(area.workspace,data);value=data; }
       catch { /* Keep this card unavailable without hiding other settled sources. */ }
       if (request !== revision.current) return;
       setValues(previous => request === revision.current ? { ...previous, [area.workspace]: value } : previous);
@@ -73,7 +73,7 @@ export default function VisionAreas({ api, navigate }: { api: Api; navigate(work
   useEffect(() => { void refresh(); return () => { revision.current += 1; running.current = false; }; }, [refresh]);
   useEffect(() => { const timer=window.setInterval(()=>setHealthNow(Date.now()),60000);const visible=()=>{if(!document.hidden)setHealthNow(Date.now());};document.addEventListener('visibilitychange',visible);return () => { window.clearInterval(timer);document.removeEventListener('visibilitychange',visible); }; }, []);
   return <section className='vision-areas' aria-label='VISION dashboard'>
-    <header className='vision-areas-heading'><div><small>CAMERAS ONSITE</small><h1>VISION Operations</h1><p>Your fleet, power, locations and team in one place.</p></div><button className='secondary' disabled={loading} onClick={() => void refresh()}>{loading ? 'Checking fleet…' : 'Refresh fleet'}</button></header>
+    <header className='vision-areas-heading'><div><small>CAMERAS ONSITE</small><h1>VISION Operations</h1><p>Your fleet, power, locations and team in one place.</p></div><button className='secondary' disabled={loading} onClick={() => void refresh(true)}>{loading ? 'Checking fleet…' : 'Refresh fleet'}</button></header>
     <div className='vision-area-grid'>{visionAreas.map(area => <button type='button' className='vision-area-card' key={area.workspace} onClick={() => navigate(area.workspace)}>
       <span className='vision-area-icon'><AreaIcon name={area.icon}/></span><span className='vision-area-arrow' aria-hidden='true'>↗</span>
       <strong>{area.label}</strong><span>{area.description}</span><small role='status' aria-busy={!Object.hasOwn(values, area.workspace)}>{!Object.hasOwn(values, area.workspace) ? 'Checking connected records…' : values[area.workspace]?summary(area.workspace,values[area.workspace],healthNow):'Status unavailable · open to check'}</small>

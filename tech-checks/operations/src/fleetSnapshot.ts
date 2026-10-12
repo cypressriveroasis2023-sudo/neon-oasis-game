@@ -30,5 +30,5 @@ export function reconcileFleetSnapshot(rawHealth:unknown,rawMap:unknown,now=Date
  const count=(scope:string)=>rows.filter(r=>r.scope===scope).length;
  const next=health.evidenceVersion===2?{...health,rows,online:rows.filter(r=>r.scope==='field'&&r.status==='online').length,offline:rows.filter(r=>r.scope==='field'&&r.status==='offline').length,review:rows.filter(r=>r.scope==='field'&&r.status==='review').length,fieldDevices:count('field'),shopRoot:count('shop'),inventory:{allRecords:rows.length,activeFieldRecords:count('field'),activeShopRecords:count('shop'),inactiveRecords:count('inactive'),unknownScopeRecords:count('unknown')}}:health;
  validateCameraHealth(next);
- return {health:next,fieldMap,readAt:new Date(now).toISOString()};
+ return {health:{...next,fleetFieldUnits:inventory},fieldMap,readAt:new Date(now).toISOString()};
 }

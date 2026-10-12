@@ -72,11 +72,11 @@ export default function CameraHealthOverview({health,now,units,createTicket,canE
   const mappingAmbiguous=Boolean(selected&&units&&canonicalCameraUnit(selected.name)&&units.filter(unit=>canonicalCameraUnit(unit.unitNumber)===canonicalCameraUnit(selected.name)).length>1);
   const groups=overview.groups.filter(group=>{
     const active=['field','unknown'].includes(group.scope);
-    const inFilter=filter==='unlinked'?!group.linkedIdentity:!group.linkedIdentity?Boolean(group.identityConflict&&filter==='all'):
+    const inFilter=filter==='unlinked'?!group.linkedIdentity:!group.linkedIdentity?Boolean(group.identityConflict&&['all','unknown'].includes(filter)):
       filter==='shop'||filter==='inactive'?group.scope===filter:
       filter==='placement'?group.scope==='unknown':!active?false:
       filter==='operational'?group.scope==='field'&&['online','offline'].includes(cameraUnitDisplayState(group)||''):
-      filter==='all'?true:filter==='unknown'?!['online','offline'].includes(cameraUnitDisplayState(group)||''):
+      filter==='all'?true:filter==='unknown'?group.scope==='unknown'||!['online','offline'].includes(cameraUnitDisplayState(group)||''):
       filter==='service'?group.serviceState==='online':filter==='service-failed'?group.serviceState==='offline':
       filter==='mixed'?group.providerState==='degraded':group.scope==='field'&&cameraUnitDisplayState(group)===filter;
     return inFilter&&cameraFamily(group.rows,family)&&[group.name,group.unitIdentity?.unitNumber,group.site,...group.rows.map(row=>row.name)].join(' ').toLowerCase().includes(search.trim().toLowerCase());
