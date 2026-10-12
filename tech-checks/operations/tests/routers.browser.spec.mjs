@@ -1,9 +1,10 @@
 import { openWorkspace } from './navigation-helper.mjs';
+import {revealMapFilters} from './field-map-controls.mjs';
 import {test,expect} from '@playwright/test';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 const records=frame=>frame.getByLabel('Router records',{exact:true});
 const card=frame=>frame.locator('.company-health-card').filter({has:frame.getByRole('heading',{name:'InHand Routers',exact:true})});
-async function openMap(frame){await openWorkspace(frame,'Field Map');await frame.locator('.field-map-list>button').first().click();}
+async function openMap(frame){await openWorkspace(frame,'Field Map');await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');await frame.locator('.field-map-list>button').first().click();}
 test('router overview, filtering, IP drilldown and stored map context remain read-only',async({page})=>{
  const {frame,state}=await mountRouterFixture(page);
  await expect(card(frame)).toBeVisible();
@@ -68,7 +69,7 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await openMap(frame);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(1);
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-circle')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
  await frame.getByLabel('COS field unit map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('COS field unit map').boundingBox();
  await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
@@ -81,6 +82,6 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await page.clock.fastForward(15*60*1000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
- await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(216, 223, 233)');await expect(frame.locator('.cos-reticle-circle')).toHaveCount(1);
+ await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
  expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
 });

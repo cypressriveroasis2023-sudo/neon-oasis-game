@@ -47,8 +47,10 @@ async function mount(page,{sourceCases=false,overview=false}={}){
    :{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(result)});
  });
+ await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:history.state?.cosFieldMapView?.health||'all'}},'');});
  await page.goto('/verified-health-identity-fixture');
  const frame=page.frameLocator('iframe');
+ if(overview)await frame.getByLabel('Camera Health unit filter').selectOption('all');
  await expect(frame.locator(overview?'.camera-overview-card':'.field-map-list>button')).toHaveCount(overview?(sourceCases?5:1):state.units.length);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/camera-health/summary-v3').length).toBeGreaterThan(0);
  return {frame,state};
@@ -222,8 +224,8 @@ test('one missing Owner IPC observation keeps the complete unit gray and out of 
  const owner=frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+labels.owner});
  await expect(owner.locator('.camera-status-pill')).not.toContainText('ONLINE');
  await expect(owner).toContainText('3 camera/detector records online · 0 offline · 1 unverified');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Provider systems online$/})}).locator('b')).toHaveText('0');
- await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Provider review$/})}).locator('b')).toHaveText('1');
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Field units online$/})}).locator('b')).toHaveText('0');
+ await expect(frame.locator('.camera-unit-kpi').filter({has:frame.locator('span').filter({hasText:/^Health / placement review$/})}).locator('b')).toHaveText('1');
  await owner.locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});
  await expect(detail.locator('.camera-device-cards article')).toHaveCount(4);

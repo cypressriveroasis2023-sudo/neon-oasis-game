@@ -98,6 +98,7 @@ async function fixturePage(page,{locationWritesEnabled=true}={}) {
   });
   // Chromium may send the preflight through routing; Playwright fulfills the
   // intercepted cross-origin fetch directly, so no backend request is emitted.
+  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
   await page.goto('/harness');
   const frame = page.frameLocator('#operations');
   await expect(frame.getByRole('heading', { name: 'Company overview', exact: true })).toBeVisible();

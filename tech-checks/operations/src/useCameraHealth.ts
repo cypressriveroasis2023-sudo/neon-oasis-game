@@ -13,7 +13,7 @@ export function useCameraHealth(){
     if(running.current)return;
     running.current=true;lastAttemptAt.current=Date.now(); const request=++revision.current;setLoading(true);
     try {const next=await api.fleet(force);validateCameraHealth(next.health);if(request===revision.current){setFleet(next);setError('');updateClock();}}
-    catch(cause){if(request===revision.current){setFleet(null);setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
+    catch(cause){if(request===revision.current){setError(cause instanceof Error?cause.message:'Camera Health could not be loaded.');}}
     finally{if(request===revision.current){running.current=false;setLoading(false);}}
   },[updateClock]);
   useEffect(()=>{void refresh();const timer=window.setInterval(()=>{setNow(Date.now());if(automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden))void refresh();},60000);const visible=()=>{setNow(Date.now());if(automaticRefreshDue(lastAttemptAt.current,Date.now(),document.hidden))void refresh();};document.addEventListener('visibilitychange',visible);return()=>{revision.current++;running.current=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
