@@ -1,6 +1,7 @@
 import {checkedSourceRecordedCoordinates,type SourceRecordedPoint} from '../../supabase/functions/cos-operations-pages/sourceRecordedCoordinates';
 import {checkedImportedBinding} from '../../supabase/functions/cos-operations-pages/importedSourceProjection';
 import {matchesInstallation,fullMatchedParts} from '../../supabase/functions/cos-operations-pages/importedAddressContract';
+import {parseOwnerInstallationAddress,type OwnerSuite} from '../../supabase/functions/_shared/ownerInstallationAddress';
 import { checkedReviewedAddressEstimate, reviewedEstimatePrefix, reviewedEstimateSource, type ReviewedAddressEstimate } from '../shared/reviewedAddressEstimates';
 import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { isCurrentFieldPin, normalizeLocationAddress, type FieldLocation } from './fieldLocations';
@@ -9,11 +10,11 @@ export const addressEstimateSource = 'us_census_address_range_estimate';
 export const addressEstimatePrefix = 'COS_ADDRESS_ESTIMATE_V1|';
 export type CensusAddressEstimate = {
   latitude:number; longitude:number; matchedAddress:string; geocodedAt:string;
-  inferredComponents?:string[]; originalAddress?:string; confidence:'address_range_interpolation'; source:typeof addressEstimateSource; providerMatchQuality:'Exact'|'Non_Exact';
+  inferredComponents?:string[]; originalAddress?:string; secondaryUnit?:OwnerSuite; secondaryUnitVerified?:false; confidence:'address_range_interpolation'; source:typeof addressEstimateSource; providerMatchQuality:'Exact'|'Non_Exact';
 };
 export type AutomaticGeocodioEstimate = {
  latitude:number;longitude:number;matchedAddress:string;geocodedAt:string;confidence:'automatic_address_estimate';
- inferredComponents?:string[]; originalAddress?:string; source:'geocodio_automatic_address_estimate';provider:'geocodio';accuracyType:'rooftop'|'range_interpolation';accuracy:number;matchType:'building_centroid'|'parcel_centroid'|null;
+ inferredComponents?:string[]; originalAddress?:string; secondaryUnit?:OwnerSuite; secondaryUnitVerified?:false; source:'geocodio_automatic_address_estimate';provider:'geocodio';accuracyType:'rooftop'|'range_interpolation';accuracy:number;matchType:'building_centroid'|'parcel_centroid'|null;
 };
 export type MhelpLocationPoint={latitude:number;longitude:number;matchedAddress:string;sourceObservedAt:string;confidence:'mhelp_service_unverified';coordinateSource:'mHelpDesk service location'|'Census address estimate'};
 export type AddressEstimate = MhelpLocationPoint | CensusAddressEstimate | ReviewedAddressEstimate | AutomaticGeocodioEstimate | SourceRecordedPoint;
@@ -79,19 +80,25 @@ export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Pr
       ||!['rooftop','range_interpolation'].includes(automatic.accuracyType)||typeof automatic.accuracy!=='number'||!Number.isFinite(automatic.accuracy)||automatic.accuracy<0.9||automatic.accuracy>1
       ||![null,'building_centroid','parcel_centroid'].includes(automatic.matchType??null)||automatic.accuracyType==='range_interpolation'&&automatic.matchType!=null
       ||!text(automatic.matchedAddress,600)||!date(automatic.geocodedAt,now)||!hasGpsCoordinates(automatic)||typeof automatic.latitude!=='number'||typeof automatic.longitude!=='number')return null;
-    const original=fullMatchedParts(unit.address);
-    if(!original||!matchesInstallation(original,automatic.matchedAddress))return null;
+    const parsedOwner=parseOwnerInstallationAddress(unit.address,fullMatchedParts);
+    if(!parsedOwner||!matchesInstallation(parsedOwner.installation,automatic.matchedAddress))return null;
     const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalizeLocationAddress(unit.address)))),x=>x.toString(16).padStart(2,'0')).join('');
     if(digest!==automatic.addressSha256)return null;
-    return {latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'automatic_address_estimate',source:'geocodio_automatic_address_estimate',provider:'geocodio',accuracyType:automatic.accuracyType,accuracy:automatic.accuracy,matchType:automatic.matchType??null};
+    return {...(parsedOwner.secondaryUnit?{originalAddress:parsedOwner.originalAddress,secondaryUnit:parsedOwner.secondaryUnit,secondaryUnitVerified:false as const}:{}),latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'automatic_address_estimate',source:'geocodio_automatic_address_estimate',provider:'geocodio',accuracyType:automatic.accuracyType,accuracy:automatic.accuracy,matchType:automatic.matchType??null};
   }
   if(automatic?.status==='success'&&!isCurrentFieldPin(unit)&&unit.status==='field'&&unit.currentLocationType==='field'&&unit.address?.trim()){
     if(automatic.auditId!==unit.placementAuditId||automatic.unitKey!==unit.placementUnitKey||automatic.provider!=='us_census_address_range'||automatic.benchmark!=='Public_AR_Current'||!text(automatic.matchedAddress,300)||!date(automatic.geocodedAt,now)||!hasGpsCoordinates(automatic)||typeof automatic.latitude!=='number'||typeof automatic.longitude!=='number')return null;
-    const original=addressParts(unit.address),matched=addressParts(automatic.matchedAddress);
-    if(!original||!matched||JSON.stringify(original)!==JSON.stringify(matched))return null;
+    const parsedOwner=parseOwnerInstallationAddress(unit.address,fullMatchedParts);
+    if(!parsedOwner&&/\b(?:suite|ste)\b/i.test(unit.address))return null;
+    if(parsedOwner?.secondaryUnit){
+      if(unit.placementSource!=='owner'||unit.placement!=='FIELD'||unit.placementStatus==='needs_identity_review'||unit.locationVerification==='owner_verified'||unit.hasUnitGps===true||!matchesInstallation(parsedOwner.installation,automatic.matchedAddress))return null;
+    }else{
+      const original=addressParts(unit.address),matched=addressParts(automatic.matchedAddress);
+      if(!original||!matched||JSON.stringify(original)!==JSON.stringify(matched))return null;
+    }
     const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalizeLocationAddress(unit.address)))),x=>x.toString(16).padStart(2,'0')).join('');
     if(digest!==automatic.addressSha256)return null;
-    return {latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'address_range_interpolation',source:addressEstimateSource,providerMatchQuality:'Exact'};
+    return {...(parsedOwner?.secondaryUnit?{originalAddress:parsedOwner.originalAddress,secondaryUnit:parsedOwner.secondaryUnit,secondaryUnitVerified:false as const}:{}),latitude:automatic.latitude,longitude:automatic.longitude,matchedAddress:automatic.matchedAddress,geocodedAt:automatic.geocodedAt,confidence:'address_range_interpolation',source:addressEstimateSource,providerMatchQuality:'Exact'};
   }
   if (isCurrentFieldPin(unit)||unit.hasUnitGps===true||unit.status!=='field'||!unit.address?.trim()||unit.locationVerification==='address_changed') return null;
   // Registered units use their equipment ID. Only the server's exact, unique FIELD tracker

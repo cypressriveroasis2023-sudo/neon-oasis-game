@@ -1,5 +1,6 @@
 import {validInstallation,matchesInstallation,fullMatchedParts,usPostalCode,type Installation,type GeocodeRejectionReason} from './importedAddress.ts';
-import {parseAddress, type Parts} from './censusAddress.ts';
+import {type Parts} from './censusAddress.ts';
+import {parseOwnerInstallationAddress} from '../_shared/ownerInstallationAddress.ts';
 /** Only ordinary saved installation address parts are sent. No notes, identity, or raw response is retained. */
 export type GeocodioResult = {
  status:'success'|'no_match'|'provider_error'; reason:null|GeocodeRejectionReason|'no_match'|'provider_timeout'|'provider_unavailable'|'invalid_response'|'provider_forbidden'|'provider_rate_limited';
@@ -9,11 +10,7 @@ const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'
 const text=(v:unknown,max=200):v is string=>typeof v==='string'&&v.length>0&&v.length<=max&&!/[\x00-\x1f\x7f<>@=]/.test(v);
 const coord=(v:unknown,max:number)=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=max;
 export function safeGeocodioParts(value:unknown):Parts|null {
- const parts=parseAddress(value);
- // Secondary units and annotations require review rather than silently falling back to a building.
- if(!parts||/\b(?:apt|apartment|suite|ste|unit|floor|bldg|building|contact|call|customer|phone|telephone|tel|email|login|username|password|passwd|token|secret|credential|code|note|notes)\b|\d{3}[-.]\d{3}[-.]\d{4}/i.test(String(value)))return null;
- const zip=/(\d{5}(?:-\d{4})?)\s*$/.exec(String(value))?.[1];
- return zip?{...parts,zip}:null;
+ return parseOwnerInstallationAddress(value,fullMatchedParts)?.installation??null;
 }
 const none=(reason:GeocodeRejectionReason):GeocodioResult=>({status:'no_match',reason});
 /** One unambiguous US result; exact supplied components at basic postal precision and an allowed method. */
