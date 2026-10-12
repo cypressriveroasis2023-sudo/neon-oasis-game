@@ -165,7 +165,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
 
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
-  assert.equal(h.frame().src, './operations/dist/index.html?v=operations-v100-phase2-20261004');
+  assert.equal(h.frame().src, './operations/dist/index.html?v=tech-check-tv-20261012');
   assert.equal(h.frame().allow, 'geolocation; fullscreen');assert.equal(h.frame().allowFullscreen,true);
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);
@@ -552,3 +552,4 @@ test('TV presentation is origin/source checked and restores frame styling on exi
  await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});frame.emit('load');assert.equal(h.body.style.overflow,'auto');assert.equal(frame.style.cssText,'height:70vh');
  await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});h.state.role='service';h.state.effectiveRole='service';h.nodes.get('appView').classList.add('hidden');h.flushMutations();assert.equal(h.body.style.overflow,'auto');
 });
+

@@ -424,3 +424,29 @@ hides OnSite Vision and ticket/assignment entry controls for IT and for Owner
 opened from the daily view, including dynamic branding links and new tabs. Normal
 Owner camera pages retain their existing controls. This does not change backend
 authorization, camera probing, saved records or background schedules.
+
+
+### Tech Check TV Board (2026-10-12)
+
+Open the authenticated Tech Check host with `?tvBoard=1`. It opens Daily Board
+in a display that fills the host and rotates jobs/shop tasks and daily truck
+readiness every 15 seconds. Saved `/api/daily-board` records refresh every minute;
+network/visibility recovery and local saved-work events request a fresh read.
+`tvScope=week` and `tvDepartment=it|service` are optional presentation filters.
+The normal board has **Copy TV link**, **Open Tech Check TV Board**, and
+**Update shop tasks**. Owner Tasks holds editable shop instructions; Jobs retains
+its existing scheduling/assignment workflow. Each display computer signs in with
+an existing authorized Owner account. Chrome Remote Desktop can open or maintain
+the display computer, but routine board updates use the shared saved records.
+
+TV cards are presentation-only: no card actions, task/job mutations, dispatch
+controls or vendor calls. It does not introduce a public feed, kiosk credentials,
+new roles, backend changes or local-only synchronization. Session invalidation
+clears private cards and ignores late reads from the previous session generation.
+Network failure preserves the previous snapshot with an explicit delayed warning.
+Exit restores the host's previous presentation and removes the TV launch options.
+
+Synthetic tests cover host launch/reload/exit, 60-second cross-display updates,
+rotation without missing cards, small/large screens, network and auth failures,
+absence of writes, and canonical links without unrelated query/session state.
+
