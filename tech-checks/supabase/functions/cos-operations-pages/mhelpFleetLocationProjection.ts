@@ -15,6 +15,10 @@ export function projectMhelpFleetLocations(snapshot:Row,receipt:Row|null,now=Dat
   if(!current||r.state!=='confirmed')return {...unit,mhelpLocationReviewReason:!current?'Current mHelpDesk location evidence is unavailable':String(r.reason||'mHelpDesk equipment identity needs review').replaceAll('_',' ')};
   if(!['FIELD','SHOP'].includes(r.placement)||!safe(r.customer,250)||!safe(r.site,250)||r.address!==null&&!safe(r.address))throw Error('Invalid service location');
   if(r.point!==null&&(!Array.isArray(r.point)||r.point.length!==2||r.point.some((n:unknown)=>typeof n!=='number'||!Number.isFinite(n))||Math.abs(r.point[0])>90||Math.abs(r.point[1])>180))throw Error('Invalid service point');
+  const assignmentAt=Date.parse(unit.mhelpObservedAt);
+  if(unit.placementSource==='mhelpdesk'&&Number.isFinite(assignmentAt)&&assignmentAt>time
+    &&(unit.placement!==r.placement||unit.customer!==r.customer||unit.site!==r.site))
+    return {...unit,mhelpLocationReviewReason:'A newer mHelpDesk assignment supersedes this saved service location. Refresh its address evidence.'};
   const evidence={contract:receipt.contract,placement:r.placement,customer:r.customer,site:r.site,unitId:unit.id,unitNumber:unit.unitNumber,address:r.address,point:r.point,coordinateSource:r.coordinateSource,observedAt:r.observedAt,verified:false};
   // Explicit Owner installation/placement remains protected. The current vendor
   // address is still shown for review instead of being silently discarded.

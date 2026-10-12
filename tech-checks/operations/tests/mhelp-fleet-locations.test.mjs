@@ -48,3 +48,13 @@ test('database receipts protect source guards, retain last good evidence and den
  for(const role of ['anon','authenticated']){await db.exec('set role '+role);await assert.rejects(db.query('select public.cos_mhelp_location_candidates()'));await assert.rejects(db.query('select * from cos_mhelp_placement_private.locations'));await db.exec('reset role');}
  }finally{await db.close();}
 });
+test('older location evidence cannot undo a newer Shop move or restore a previous Field site',()=>{
+ const old={...location,unitId:id,unitNumber:'Helios 010',observedAt:at,guardCurrent:true};
+ const newer='2026-10-12T18:05:00Z',receipt={contract:'COS_MHELP_FLEET_LOCATIONS_V1',items:[old],lastSuccessAt:newer};
+ const shop={id,unitNumber:old.unitNumber,placement:'SHOP',currentLocationType:'shop',placementSource:'mhelpdesk',customer:'Cameras Onsite',site:'SHOP',address:null,mhelpObservedAt:newer};
+ const snapshot=unit=>({items:unit.placement==='FIELD'?[unit]:[],inventoryItems:[unit],summary:{fieldUnits:unit.placement==='FIELD'?1:0,mappedUnits:0,unitGps:0,missingGps:0}});
+ const held=projectMhelpFleetLocations(snapshot(shop),receipt,Date.parse(newer));assert.equal(held.items.length,0);assert.equal(held.inventoryItems[0].placement,'SHOP');assert.equal(held.inventoryItems[0].address,null);assert.match(held.inventoryItems[0].mhelpLocationReviewReason,/newer/);
+ const field={...shop,placement:'FIELD',currentLocationType:'field',customer:'Synthetic new builder',site:'New installation',address:null};
+ const changed=projectMhelpFleetLocations(snapshot(field),receipt,Date.parse(newer));assert.equal(changed.items[0].site,'New installation');assert.equal(changed.items[0].address,null);assert.match(changed.items[0].mhelpLocationReviewReason,/newer/);
+ const same={...field,customer:location.customer,site:location.site};assert.equal(projectMhelpFleetLocations(snapshot(same),receipt,Date.parse(newer)).items[0].address,location.address);
+});
