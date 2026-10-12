@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 const source = await readFile(new URL('../../sw.js', import.meta.url), 'utf8');
-const cacheName = 'tech-check-service-direct-20260928g';
+const cacheName = 'tech-check-tv-20261012';
 const scopes = [
   'https://cos.example/',
   'https://cypressriveroasis2023-sudo.github.io/neon-oasis-game/tech-checks/',
@@ -274,3 +274,4 @@ for (const [name, path, extra] of [
     assert.equal(h.calls.open.length, 0);
   });
 }
+
