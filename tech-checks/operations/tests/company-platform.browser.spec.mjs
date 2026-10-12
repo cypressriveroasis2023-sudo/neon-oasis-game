@@ -26,6 +26,7 @@ async function mount(page, denied = false) {
       : request.path === '/api/routers' ? { items:[], source:'camera_health', gpsAvailable:false, generatedAt:stamp }
       : request.path === '/api/camera-health/summary-v3' ? { totalDevices:0, online:0, offline:0, review:0, shopRoot:0, healthRows:0, fieldDevices:0, refreshedAt:stamp, rows:[] }
       : request.path === '/api/daily-board' ? { jobs:[], tasks:[], readiness:[], asOf:stamp }
+      : request.path === '/api/tv-board/settings' ? {sections:['today','pickup','swap','delivery','service','shop','camera','map'],revision:0,updatedAt:null}
       : request.path === '/api/field-map' ? { items:[], summary:{fieldUnits:0,mappedUnits:0,unitGps:0,missingGps:0}, generatedAt:stamp }
       : request.path === '/api/owner/control-data' ? { sites:[], truckChecks:[], serviceTechnicians:[], itTechnicians:[] }
       : { items:[] };
@@ -70,3 +71,4 @@ test('denied company access retains readable legacy exits without loading compan
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);
 });
+
