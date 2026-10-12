@@ -154,7 +154,7 @@ jobs:
       - name: Verify Tech Check TV and IT daily navigation and camera scope
         run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/it-daily-mode.browser.spec.mjs tests/it-daily-camera.browser.spec.mjs tests/verified-it-fleet.browser.spec.mjs
       - name: Verify mHelp Owner, IT and Service interactions before the full browser suite
-        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs
+        run: npm run test:browser -- tests/mhelp-intake-review.browser.spec.mjs tests/mhelp-ticket-preview.browser.spec.mjs tests/it-ticket-instructions.browser.spec.mjs tests/service-ticket-instructions.browser.spec.mjs tests/legacy-install-evidence.browser.spec.mjs tests/mhelp-location-import.browser.spec.mjs tests/field-map-progressive.browser.spec.mjs
       - run: npm run test:browser
       - name: Browser test artifacts
         if: always()

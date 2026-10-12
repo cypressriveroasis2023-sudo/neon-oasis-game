@@ -13,7 +13,7 @@ async function mount(page,{workspace='field-map'}={}){
   const url=route.request().url();
   if(url===origin+'/progressive-map-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#${workspace}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-progressive-only'},location.origin)})</script>`});
   if(url.startsWith(origin+'/'))return route.continue();
-  if(/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(url)){state.tiles++;return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#d5e5db"/><path d="M0 64H256M64 0V256" stroke="#fff" stroke-width="8"/></svg>'});}
+  if(/^https:\/\/tile\.openstreetmap\.org\//.test(url)){state.tiles++;return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#d5e5db"/><path d="M0 64H256M64 0V256" stroke="#fff" stroke-width="8"/></svg>'});}
   if(!url.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
