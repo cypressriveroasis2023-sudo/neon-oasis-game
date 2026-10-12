@@ -10,6 +10,8 @@ The native reader rechecks a commitment to the full existing tracker/native rows
 
 Assignment changes clear the displayed old address/pin and request location verification. Original operational addresses and GPS/history are retained. Observation age is capped at 40 minutes. The existing UI refresh cadence remains unchanged; the source scheduler runs every 15 minutes. Only one four-minute database lease can start a source run, incomplete inventory reads fail, customer failures are isolated, and expired leases cannot commit. Scheduled responses return aggregate counts only.
 
+Customer and service-location GETs retry once after a transport failure or HTTP 408/429/500/502/503/504, inside the same three-worker pool and 90-second run deadline. Retry-After is honored for waits up to two seconds; longer delays hold the assignment for a later scheduled run. Authorization/not-found responses, malformed records and mismatched identities are not retried. A failed read never falls back to an old customer or site assignment.
+
 ## Google tracker boundary
 
 This source feed does **not** publish Google Sheet changes. Its receipts explicitly report `sheetsPublisher:false`. The separately implemented [guarded publisher](google-placement-publisher.md) requires workbook-scoped Editor access, reviewed exact-cell baselines, its own enabled control and verified readback. The connection panel's existing OAuth scope remains read-only; the isolated publisher uses the write scope on the fixed workbook. Do not advertise this source feed as a Google publisher or activate the existing default-off ticket intake/pending queue.
