@@ -14,7 +14,7 @@ type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
 type Snapshot={units:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>};
 type Api={get:(path:string)=>Promise<{data:any}>};
 const empty:Snapshot={units:[],health:null,routers:null,readAt:null,estimates:new Map()};
-export default function TvFleetView({api,enabled,mode,rotation,height}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;rotation:number;height:number}){
+export default function TvFleetView({api,enabled,mode,rotation,height,refreshId}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;rotation:number;height:number;refreshId:number}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),alive=useRef(false);
   const refresh=useCallback(async()=>{
@@ -35,10 +35,10 @@ export default function TvFleetView({api,enabled,mode,rotation,height}:{api:Api;
     const tick=()=>{setClock(Date.now());if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh();};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;setData(empty);setError('Sign in again to load fleet information.');};
-    const manual=()=>void refresh();
-    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);window.addEventListener('cos-tv-fleet-refresh',manual);
-    return()=>{alive.current=false;generation.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);window.removeEventListener('cos-tv-fleet-refresh',manual);};
+    document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);
+    return()=>{alive.current=false;generation.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);};
   },[enabled,refresh]);
+  useEffect(()=>{if(enabled&&refreshId>0)void refresh();},[refreshId,enabled,refresh]);
   const rows=useMemo(()=>data.units.map(unit=>({unit,health:fieldCameraHealth(unit,data.units,data.health,clock),router:fieldReachability(unit,data.routers?.items,clock),point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),estimate:data.estimates.get(unit.id)})).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]-{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber)),[data,clock]);
   const mapNode=useRef<HTMLDivElement|null>(null),mapRef=useRef<L.Map|null>(null),layer=useRef<L.LayerGroup|null>(null);
   useEffect(()=>{
