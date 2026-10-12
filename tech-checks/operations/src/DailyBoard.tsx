@@ -209,7 +209,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange,createTicket}:P
     } finally { setSaving(false); setRefreshRequired(assignmentSaver.needsRefresh); }
   };
 
-  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();window.dispatchEvent(new Event('cos-tv-fleet-refresh'));}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
+  if(tv)return <TechCheckTvBoard cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} api={api}/>;
   return <section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
