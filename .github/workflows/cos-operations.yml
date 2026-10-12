@@ -41,6 +41,7 @@ on:
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
       - 'tech-checks/supabase/functions/reconeyez-webhook/**'
       - 'tech-checks/database-maintenance/reconeyez-event-ordering.sql'
+      - 'tech-checks/database-maintenance/tech-check-tv-settings.sql'
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
@@ -86,6 +87,7 @@ on:
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
       - 'tech-checks/supabase/functions/reconeyez-webhook/**'
       - 'tech-checks/database-maintenance/reconeyez-event-ordering.sql'
+      - 'tech-checks/database-maintenance/tech-check-tv-settings.sql'
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
@@ -225,3 +227,4 @@ jobs:
         run: node run-ci.mjs
       - name: Verify actual concurrent PostgreSQL clients
         run: node concurrency.mjs
+

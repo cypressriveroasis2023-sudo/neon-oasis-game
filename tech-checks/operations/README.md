@@ -439,6 +439,36 @@ its existing scheduling/assignment workflow. Each display computer signs in with
 an existing authorized Owner account. Chrome Remote Desktop can open or maintain
 the display computer, but routine board updates use the shared saved records.
 
+### Configurable Tech Check TV sections
+
+The Daily Board has **Choose what the TV shows** with separate switches for
+today’s jobs, pending pickups, swaps, deliveries and service calls, shop updates,
+team readiness, Camera Health and Field Map. **Save TV sections** stores the shared
+Owner selection; existing TV browsers read it every minute. Saving uses a revision
+and fresh read-back so concurrent computers cannot silently overwrite choices.
+All sections may be turned off. The TV has no job mutation controls.
+
+**Add jobs for the day** opens the existing four native ticket workflows; schedule
+the resulting job for today and assign its technician through Schedule / Reassign.
+Pending type pages include future and unscheduled unfinished jobs. Completed or
+cancelled jobs do not remain in the pending queues. Today’s page shows dated work
+and work completed today. Test records stay excluded on the TV.
+
+Teddy Hopper and Victor Garcia do not drive company vehicles. Their readiness
+cards omit truck/trailer inspection fields and display **No company vehicle**;
+they are never marked inspected or complete by this exception. IT shop inventory
+remains a separate record. Other staff’s vehicle checks are unchanged.
+
+Fleet TV sections reuse the existing Camera Health, router and field-map read
+contracts. Their saved data refreshes every 15 minutes while visible; rotation
+does not start new reads. Connection/camera/recorder evidence remains distinct
+from location confidence. Verified current pins, checked address estimates (EST)
+and checked tracker-recorded coordinates (SRC) use the existing validation rules.
+Historical locations do not become current pins. Auth invalidation clears fleet
+records and markers. Shared preferences use additive private tables and
+service-only RPCs in `database-maintenance/tech-check-tv-settings.sql`; the
+existing Owner authentication and production permissions remain authoritative.
+
 TV cards are presentation-only: no card actions, task/job mutations, dispatch
 controls or vendor calls. It does not introduce a public feed, kiosk credentials,
 new roles, backend changes or local-only synchronization. Session invalidation
