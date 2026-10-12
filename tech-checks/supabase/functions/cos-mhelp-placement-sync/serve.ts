@@ -1,5 +1,6 @@
 import {collectFleetLocations} from './fleetLocations.ts';
 import {createFleetLocationReader} from './locationReader.ts';
+import {createPlacementParentReadCache} from './parentReadCache.ts';
 import {createPlacementSyncHandler} from './index.ts';
 import {readPlacementCustomer,createCustomerReadDiagnostics,createCustomerReadGate,customerRetryDelay} from './customerRead.ts';
 import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts';
@@ -18,13 +19,14 @@ Deno.serve(async request=>{
 const deadline=AbortSignal.timeout(105000);
 const diagnostics=createCustomerReadDiagnostics();
 const gate=createCustomerReadGate({signal:deadline});
+const parentCache=createPlacementParentReadCache();
 let config:{accessToken?:string;portalId?:string}|null=null;
 const rpc=async(name,body)=>{
  const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');if(!key)throw Error('Backend unavailable');
  return json(await fetch(NATIVE+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)}),1048576);
 };
 const reads=new Map<string,Promise<any>>();
-const read=async(path:string)=>{if(!reads.has(path))reads.set(path,(async()=>{
+const read=async(path:string)=>{if(deadline.aborted)throw Error('Read unavailable');const cachedParent=parentCache.read(path);if(cachedParent)return cachedParent;if(!reads.has(path))reads.set(path,(async()=>{
  if(deadline.aborted||!config?.accessToken||config.portalId!==PORTAL||!await gate.acquire())throw Error('Read unavailable');
  const response=await fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+PORTAL+path,{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',signal:AbortSignal.any([deadline,AbortSignal.timeout(10000)])});
  if(response.status===429)gate.rateLimited(customerRetryDelay(response.headers.get('Retry-After')));
@@ -41,11 +43,13 @@ return createPlacementSyncHandler({authenticate:async req=>{
  config=await tokens.getPartnerConfig();return result.items;
 },customer:async id=>{
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
- return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited});
+ return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited,includeActive:true,onVerified:row=>parentCache.remember(id,row)});
 },locations:async equipment=>{
  const candidates=await rpc('cos_mhelp_location_candidates',{});
  const boundedFetch:typeof fetch=(url,init={})=>fetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
  const result=await collectFleetLocations(candidates,equipment,createFleetLocationReader(read,boundedFetch,PORTAL));
- if(deadline.aborted)throw Error('Source read timed out');return result;
+ // The collector returns every candidate, holding individual reads that could
+ // not finish. Keep verified addresses and explicit holds in one full receipt.
+ return result;
 },readDiagnostics:diagnostics.snapshot})(request);
 });
