@@ -141,7 +141,7 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await page.screenshot({path:testInfo.outputPath('tv-field-map.png')});
  await page.clock.fastForward(60000);expect(state.fleetReads).toBe(reads);
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- try{await expect.poll(()=>state.fleetReads).toBe(reads+3);}finally{console.log('TV refresh diagnostic',JSON.stringify({reads:state.fleetReads,refresh:await frame.getByRole('region',{name:'Tech Check TV Board'}).getAttribute('data-fleet-refresh'),enabled:await frame.locator('.tv-fleet-view').getAttribute('data-enabled'),running:await frame.locator('.tv-fleet-view').getAttribute('data-running')}));}
+ await expect.poll(()=>state.fleetReads).toBe(reads+3);
  state.fail=401;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
 });
