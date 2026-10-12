@@ -32,11 +32,12 @@ test('SQL persists shared choices, refuses stale overwrites and denies technicia
  const db=new PGlite();
  await db.exec(`create schema auth;create schema app_private;create role anon;create role authenticated;create role service_role bypassrls;
  create table auth.users(id uuid primary key);create table public.organizations(id uuid primary key);
- create table public.user_profiles(user_id uuid,organization_id uuid,active boolean,department text);create table public.roles(id uuid,organization_id uuid,code text);create table public.user_roles(user_id uuid,role_id uuid);
+ create table public.user_profiles(user_id uuid,organization_id uuid,active boolean,department text);create table public.roles(id uuid,organization_id uuid,code text);create table public.user_roles(user_id uuid,role_id uuid);create table public.role_permissions(role_id uuid,permission_code text);
  insert into auth.users values('${owner}'),('${tech}');insert into organizations values('${org}');
  insert into user_profiles values('${owner}','${org}',true,'owner'),('${tech}','${org}',true,'it');
  insert into roles values('${owner}','${org}','owner'),('${tech}','${org}','it_technician');insert into user_roles values('${owner}','${owner}'),('${tech}','${tech}');
- grant usage on schema app_private,auth to service_role;grant select on user_profiles,user_roles,roles to service_role;
+ insert into role_permissions values('${owner}','job.override');
+ grant usage on schema auth to service_role;grant select on user_profiles,user_roles,roles,role_permissions to service_role;
  create function app_private.appdeploy_assume_actor(a uuid,o uuid) returns void language plpgsql as $$begin perform set_config('request.jwt.claim.sub',a::text,true);end$$;
  create function app_private.has_permission(o uuid,p text) returns boolean language sql as $$select current_setting('request.jwt.claim.sub',true)='${owner}'$$;
  `);
