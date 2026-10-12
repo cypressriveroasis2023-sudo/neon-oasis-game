@@ -25,7 +25,7 @@ export function cameraOverview(health:Health,now=Date.now(),fieldUnits:FieldHeal
     const fieldUnit=identity&&fieldUnits.filter(unit=>unit.id===identity.unitId).length===1?fieldUnits.find(unit=>unit.id===identity.unitId):undefined;
     const fieldRecorder=identity&&fieldUnit?fieldRecorderObservation(fieldUnit,identity,rows,health,now):null;
     const observation=identity?fieldRecorder||linkedUnitObservation(rows,now):undefined;
-    const associated=identity&&observation?{unitIdentity:identity,observation,...(fieldRecorder?{fieldRecorderVerified:true,recorderOffline:fieldRecorder.state==='offline'}:{}),...(['field','unknown'].includes(classification.scope)?{state:observation.providerState!=='verifying'?observation.providerState:observation.serviceState==='online'?'service' as const:classification.state==='mapping'?'mapping' as const:'verifying' as const,providerState:observation.providerState,cameraState:observation.cameraState,serviceState:observation.serviceState}: {})}:{};
+    const associated=identity&&observation?{unitIdentity:identity,observation,...(fieldRecorder?{scope:'field' as const,fieldRecorderVerified:true,recorderOffline:fieldRecorder.state==='offline'}:{}),...(['field','unknown'].includes(classification.scope)?{state:observation.providerState!=='verifying'?observation.providerState:observation.serviceState==='online'?'service' as const:classification.state==='mapping'?'mapping' as const:'verifying' as const,providerState:observation.providerState,cameraState:observation.cameraState,serviceState:observation.serviceState}: {})}:{};
     const keyIdentity=canonicalCameraUnit(rows[0].unit||''),matches=identity?fieldUnits.filter(unit=>unit.id===identity.unitId&&unit.unitNumber===identity.unitNumber):keyIdentity?fieldUnits.filter(unit=>canonicalCameraUnit(unit.unitNumber)===keyIdentity):[];
     const shared=matches.length===1?fieldCameraHealth(matches[0],fieldUnits,health,now):null;
     const placement=matches[0] as any;
@@ -59,7 +59,7 @@ export function cameraResourcePath(row:CameraRow) {
 
 export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
   if(group.identityConflict)return 'verifying';
-  if(group.scope==='shop'||group.scope==='inactive')return group.scope;
+  if((group as CameraUnitGroup).sharedState&&(group.scope==='shop'||group.scope==='inactive'))return group.scope;
   const shared=(group as CameraUnitGroup).sharedState;if(shared)return shared==='unknown'?'verifying':shared;
   if(group.observation)return group.observation.state;
   const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));
@@ -67,7 +67,7 @@ export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];obs
 }
 export function cameraUnitStatusLabel(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {
   if(group.identityConflict)return 'EQUIPMENT LINK UNVERIFIED';
-  if(group.scope==='shop')return 'SHOP / ROOT';if(group.scope==='inactive')return 'INACTIVE';
+  if((group as CameraUnitGroup).sharedState&&group.scope==='shop')return 'SHOP / ROOT';if((group as CameraUnitGroup).sharedState&&group.scope==='inactive')return 'INACTIVE';
   if((group as CameraUnitGroup).sharedLabel)return (group as CameraUnitGroup).sharedLabel!;
   if(group.observation)return group.observation.label;
   const direct=group.rows&&(cameraFamily(group.rows,'sniper')||cameraFamily(group.rows,'camv'));
