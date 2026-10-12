@@ -77,3 +77,13 @@ test('lease refusal makes no provider calls; committed receipts report holds wit
  let reads=0;const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async name=>name.endsWith('begin')?{leaseId:null}:null,equipment:async()=>{reads++;return[];},customer:read});
  await h(new Request('https://example.test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"action":"run"}'}));assert.equal(reads,0);
 });
+test('aggregate read diagnostics appear only in an authenticated completed run',async()=>{
+ const diagnostics={attempts:3,verified:2,failures:{http_401:1}};
+ let snapshots=0;
+ const h=createPlacementSyncHandler({authenticate:async()=>true,rpc:async name=>name.endsWith('begin')?{leaseId:'synthetic-lease',links:[link]}:name.endsWith('finish')?{committed:true,confirmed:1,held:0}:{enabled:true},equipment:async()=>[equipment],customer:read,readDiagnostics:()=>{snapshots++;return diagnostics;}});
+ const request=action=>new Request('https://example.test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+ assert.deepEqual(await (await h(request('status'))).json(),{enabled:true});assert.equal(snapshots,0);
+ assert.deepEqual((await (await h(request('run'))).json()).customerReads,diagnostics);assert.equal(snapshots,1);
+ const denied=createPlacementSyncHandler({authenticate:async()=>false,rpc:async()=>{throw Error();},equipment:async()=>[],customer:read,readDiagnostics:()=>{snapshots++;return diagnostics;}});
+ assert.equal((await denied(request('run'))).status,403);assert.equal(snapshots,1);
+});

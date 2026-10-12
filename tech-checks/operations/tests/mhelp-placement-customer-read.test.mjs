@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readPlacementCustomer, customerRetryDelay, waitForCustomerRetry} from '../../supabase/functions/cos-mhelp-placement-sync/customerRead.ts';
+import {readPlacementCustomer, customerRetryDelay, waitForCustomerRetry, createCustomerReadDiagnostics, createCustomerReadGate} from '../../supabase/functions/cos-mhelp-placement-sync/customerRead.ts';
 import {collectPlacementObservations} from '../../supabase/functions/cos-mhelp-placement-sync/index.ts';
 
 const record = {customerId: '2', portalId: '224643', name: 'Example Builder', isServiceLocation: false};
@@ -39,6 +39,21 @@ test('a transport failure can recover, while repeated failures stop after two at
     const held = reader([new Response(null, {status}), new Response(null, {status}), ok()]);
     assert.equal(await held.read(), null); assert.equal(held.calls.length, 2); assert.deepEqual(held.delays, [500]);
   }
+});
+
+test('batch diagnostics distinguish failures and recovery without retaining provider secrets or record data', async () => {
+  const diagnostics = createCustomerReadDiagnostics();
+  const overrides = {onAttempt: diagnostics.record};
+  await reader([new Response('private provider body', {status: 429}), ok()], overrides).read();
+  await reader([new Error('private exception with bearer token'), new Response(null, {status: 401})], overrides).read();
+  await reader([new Response('private malformed body')], overrides).read();
+  await reader([ok({...record, portalId: '9'})], overrides).read();
+  assert.deepEqual(diagnostics.snapshot(), {attempts: 6, verified: 1, failures: {
+    http_429: 1, transport: 1, http_401: 1, response_unreadable: 1, identity_unverified: 1,
+  }, rateLimitDelays: {unspecified: 1}});
+  const snapshot = diagnostics.snapshot(); snapshot.failures.http_401 = 999;
+  assert.equal(diagnostics.snapshot().failures.http_401, 1);
+  assert.doesNotMatch(JSON.stringify(diagnostics.snapshot()), /private|synthetic-token|Example Builder|customerId/);
 });
 
 test('authorization, missing records and unsupported responses are held without retries', async () => {
@@ -101,4 +116,48 @@ test('retries stay inside three source workers and cannot verify a field assignm
   assert.ok(maximum <= 3); assert.ok([...attempts.values()].every(value => value === 2));
   assert.equal(observations.filter(o => o.state === 'confirmed').length, 7);
   assert.equal(observations.find(o => o.equipmentId === '1').reason, 'service_location_unverified');
+});
+
+test('all batch workers and retries share spaced starts and a rate-limit cooldown', async () => {
+  let time = 0, tickScheduled = false;
+  const waits = [], starts = [], attempts = new Map(), diagnostics = createCustomerReadDiagnostics();
+  const pause = milliseconds => new Promise(resolve => {
+    waits.push({at: time + milliseconds, resolve});
+    if (!tickScheduled) {
+      tickScheduled = true;
+      setImmediate(() => {
+        tickScheduled = false;
+        time = Math.min(...waits.map(w => w.at));
+        for (let i = waits.length - 1; i >= 0; i--) if (waits[i].at <= time) waits.splice(i, 1)[0].resolve(true);
+      });
+    }
+  });
+  const signal = new AbortController().signal, gate = createCustomerReadGate({signal, now: () => time, pause});
+  const links = Array.from({length: 6}, (_, i) => ({equipmentId: String(i + 1), fullLabel: 'Synthetic Unit ' + i, model: null}));
+  const equipment = links.map((l, i) => ({...l, name: l.fullLabel, active: true, customerId: String(100 + i), serviceLocationId: String(200 + i)}));
+  const observations = await collectPlacementObservations(links, equipment, id => readPlacementCustomer(id, {
+    accessToken: 'synthetic-token', portalId: '224643', signal, pause, now: () => time,
+    readJson: response => response.json(), beforeAttempt: gate.acquire, onRateLimit: gate.rateLimited, onAttempt: diagnostics.record,
+    fetch: async () => {
+      starts.push(time); const count = (attempts.get(id) ?? 0) + 1; attempts.set(id, count);
+      if (starts.length === 1) return new Response(null, {status: 429, headers: {'Retry-After': '1'}});
+      return ok({...record, customerId: id, isServiceLocation: Number(id) >= 200});
+    },
+  }));
+  assert.equal(observations.filter(o => o.state === 'confirmed').length, 6);
+  assert.equal(starts.length, 13); assert.ok(starts[1] >= 2000);
+  assert.ok(starts.slice(1).every((start, i) => start - starts[i] >= 400));
+  assert.deepEqual(diagnostics.snapshot(), {attempts: 13, verified: 12, failures: {http_429: 1}, rateLimitDelays: {'1000': 1}});
+});
+
+test('a long vendor cooldown stops fresh workers, and abort stops queued starts', async () => {
+  const signal = new AbortController().signal, gate = createCustomerReadGate({signal});
+  const r = reader([new Response(null, {status: 429, headers: {'Retry-After': '60'}}), ok()], {
+    beforeAttempt: gate.acquire, onRateLimit: gate.rateLimited,
+  });
+  assert.equal(await r.read(), null); assert.equal(r.calls.length, 1); assert.equal(await gate.acquire(), false);
+  const controller = new AbortController(), stopped = createCustomerReadGate({signal: controller.signal});
+  assert.equal(await stopped.acquire(), true);
+  const waiting = stopped.acquire(); controller.abort();
+  assert.equal(await waiting, false); assert.equal(await stopped.acquire(), false);
 });

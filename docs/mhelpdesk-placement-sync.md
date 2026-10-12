@@ -12,6 +12,8 @@ Assignment changes clear the displayed old address/pin and request location veri
 
 Customer and service-location GETs retry once after a transport failure or HTTP 408/429/500/502/503/504, inside the same three-worker pool and 90-second run deadline. Retry-After is honored for waits up to two seconds; longer delays hold the assignment for a later scheduled run. Authorization/not-found responses, malformed records and mismatched identities are not retried. A failed read never falls back to an old customer or site assignment.
 
+All customer workers and retries share a request-start gate with at least 400 milliseconds between starts. Any HTTP 429 pauses the whole pool for at least two seconds; a longer unsupported Retry-After stops new customer requests for that run. This prevents another worker from immediately consuming the same vendor rate limit. The authenticated completed-run response includes aggregate attempt, verification, HTTP/transport/validation failure codes and bounded rate-limit delay counts. It includes no customer IDs, names, response bodies, headers or credentials.
+
 ## Google tracker boundary
 
 This source feed does **not** publish Google Sheet changes. Its receipts explicitly report `sheetsPublisher:false`. The separately implemented [guarded publisher](google-placement-publisher.md) requires workbook-scoped Editor access, reviewed exact-cell baselines, its own enabled control and verified readback. The connection panel's existing OAuth scope remains read-only; the isolated publisher uses the write scope on the fixed workbook. Do not advertise this source feed as a Google publisher or activate the existing default-off ticket intake/pending queue.

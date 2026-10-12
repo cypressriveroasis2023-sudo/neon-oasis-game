@@ -20,7 +20,7 @@ export async function collectPlacementObservations(links:Row[],equipment:Row[],r
    placement:customer.placement,customerLabel:customer.name.trim(),siteLabel:customer.placement==='SHOP'?'SHOP':site!.name.trim()};
  });
 }
-export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>Promise<boolean>;rpc:(name:string,body:Row)=>Promise<any>;equipment:()=>Promise<Row[]>;customer:(id:string)=>Promise<Row|null>}){
+export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>Promise<boolean>;rpc:(name:string,body:Row)=>Promise<any>;equipment:()=>Promise<Row[]>;customer:(id:string)=>Promise<Row|null>;readDiagnostics?:()=>{attempts:number;verified:number;failures:Record<string,number>}}){
  return async(req:Request)=>{
   const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   if(req.method!=='POST'||new URL(req.url).search||req.headers.has('origin'))return reply({error:'Scheduled request required'},405);
@@ -41,7 +41,7 @@ export function createPlacementSyncHandler(options:{authenticate:(req:Request)=>
    const observations=await collectPlacementObservations(start.links,await options.equipment(),options.customer);
    const result=await options.rpc('cos_mhelp_placement_finish',{p_lease_id:lease,p_observations:observations});
    if(!object(result)||result.committed!==true)throw Error('Lost lease');
-   return reply({state:'current',...result});
+   return reply({state:'current',...result,...(options.readDiagnostics?{customerReads:options.readDiagnostics()}: {})});
   }catch{if(lease)try{await options.rpc('cos_mhelp_placement_fail',{p_lease_id:lease});}catch{}return reply({error:'mHelpDesk placement sync unavailable'},503);}
  };
 }
