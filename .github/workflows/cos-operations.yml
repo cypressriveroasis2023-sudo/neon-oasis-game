@@ -39,6 +39,7 @@ on:
       - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
       - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/functions/reconeyez-webhook/**'
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
@@ -82,6 +83,7 @@ on:
       - 'tech-checks/supabase/functions/cos-mhelp-ticket-source/**'
       - 'tech-checks/supabase/functions/camera-mhelp-ticket-intake/**'
       - 'tech-checks/supabase/functions/camera-provider-reconcile/**'
+      - 'tech-checks/supabase/functions/reconeyez-webhook/**'
       - 'tech-checks/supabase/functions/vigilant-sync/**'
       - 'tech-checks/supabase/database.types.ts'
       - 'tech-checks/supabase/functions/camera-field-geocode/**'
@@ -179,3 +181,45 @@ jobs:
               git diff --exit-code "origin/$publishing_branch" -- tech-checks/operations/dist tech-checks/operations/package-lock.json
             fi
           fi
+
+  verify-recon-ordering:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: recon_ordering_test_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d recon_ordering_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: tech-checks/operations/legacy/tests/recon-ordering
+    env:
+      RECON_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-only@127.0.0.1:5432/recon_ordering_test_ci
+      RECON_WEBHOOK_SOURCE: ../../../../supabase/functions/reconeyez-webhook/index.ts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/legacy/tests/recon-ordering/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify ordered webhook handoff
+        run: node --disable-warning=ExperimentalWarning edge-handler.test.mjs
+      - name: Verify actual PostgreSQL 17.6 transactions and permissions
+        run: node run-ci.mjs
+      - name: Verify actual concurrent PostgreSQL clients
+        run: node concurrency.mjs
