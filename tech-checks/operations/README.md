@@ -395,3 +395,32 @@ credential suppression, cancellation and legacy compatibility. The existing earl
 hosted browser spec includes the Owner form, IT exclusion, cross-view busy guards,
 malformed responses, stale results, authentication clearing, Close and Back/Forward.
 No local browser gate or authorization bypass is added.
+
+
+### IT daily-only availability (2026-10-12)
+
+IT currently opens only Camera Health, Field View, Victron View and the 2027 Unit
+Tracker. `it-feature-availability.js` holds the explicit reversible UI switch;
+mHelp connectivity does not change it. The legacy IT dashboard, ticket entry,
+checks, assignments, preparation, inventory and handoff entry points are paused.
+Old Operations hashes resolve to the daily dashboard without mounting their
+workspaces. The separate repair page checks availability before loading or
+releasing a ticket. This is frontend product availability, not a replacement for
+backend authorization or a revocation of API permissions.
+
+Normal Owner tools and Service workflows remain available. Owner opening the IT
+tab sees the same daily layout with the existing Owner session. An Owner test
+persona must exit preview before opening these real-data views. Existing profile,
+capability and same-subject checks remain in force; no identity or permission is
+created or expanded. Legacy source modules and saved records are preserved.
+
+To restore additional IT features later, explicitly review this switch and the
+related entry gates; successful mHelp reads never restore them automatically.
+Historical independent apps under `cameras-on-site/` are outside this release.
+
+Daily Camera Health keeps the existing diagnostics, history, device/provider
+links and authorized camera IP/placement controls. Its scoped presentation guard
+hides OnSite Vision and ticket/assignment entry controls for IT and for Owner
+opened from the daily view, including dynamic branding links and new tabs. Normal
+Owner camera pages retain their existing controls. This does not change backend
+authorization, camera probing, saved records or background schedules.

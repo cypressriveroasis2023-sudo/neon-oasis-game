@@ -140,6 +140,7 @@ function observeQueueAuth() {
 function queueIdentity() {
   const c = queueContext(), role = c?.getRole(), id = c?.getSession()?.user?.id;
   const profile = c?.getProfile();
+  if (window.COS_IT_DAILY_ONLY && role === 'it') return null;
   if (!['it','service'].includes(role) || c?.getEffectiveRole() !== role || !id ||
       (queueAuthSubject !== undefined && queueAuthSubject !== id) || profile?.user_id !== id || profile?.active !== true || profile?.archived_at ||
       !queueApp || queueApp.classList.contains('hidden') ||

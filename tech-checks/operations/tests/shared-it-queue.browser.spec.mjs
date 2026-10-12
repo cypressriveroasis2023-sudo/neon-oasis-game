@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+
+import {IT_DAILY_ONLY} from '../../it-feature-availability.js';
+test.beforeEach(({},info)=>{test.skip(IT_DAILY_ONLY && !info.title.startsWith('Service accounts'), 'IT queue claims are paused; active daily-mode tests prove they are inaccessible.');});
 const origin=process.env.COS_TEST_ORIGIN||'http://127.0.0.1:4173';
 const endpoint='https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const visitId='22222222-2222-4222-8222-222222222222';

@@ -1,3 +1,4 @@
+import {itDailyCameraUrl} from '../../it-feature-availability';
 import {fieldRecorderObservation} from './fieldRecorderObservation';
 import {groupIdentityForRows,linkedUnitObservation,resolveVerifiedUnitIdentity,type VerifiedUnitIdentity,type LinkedUnitObservation} from './verifiedUnitIdentity';
 import { cameraTimestamp,unitEvidenceLabel,cameraState,providerState,serviceState,resourceKind,classifyCameraUnit,evidenceCoverage,type UnitEvidence,type ResourceKind,type CameraRow } from './cameraEvidence';
@@ -44,7 +45,7 @@ export function cameraFamily(rows:CameraRow[],family:string) {
 }
 /** Source-device IDs are the existing authenticated diagnostics identity. */
 export function cameraResourcePath(row:CameraRow) {
-  return !row.trackerOnly&&/^[1-9]\d*$/.test(String(row.id))&&Number.isSafeInteger(Number(row.id))?'../../camera-detail.html?id='+encodeURIComponent(row.id):null;
+  return !row.trackerOnly&&/^[1-9]\d*$/.test(String(row.id))&&Number.isSafeInteger(Number(row.id))?itDailyCameraUrl('../../camera-detail.html?id='+encodeURIComponent(row.id)):null;
 }
 
 export function cameraUnitDisplayState(group:UnitEvidence&{rows?:CameraRow[];observation?:LinkedUnitObservation;identityConflict?:string}) {

@@ -13,6 +13,7 @@ const validTicket = value => typeof value === 'string' && value.length > 0 && va
 const visible = node => Boolean(node?.isConnected && node.getClientRects().length);
 function identity() {
   const c = context(), id = c?.getSession()?.user?.id, profile = c?.getProfile(), role = c?.getRole();
+  if (window.COS_IT_DAILY_ONLY && role === 'it') return null;
   return pageActive && id && ['it', 'service'].includes(role) && c?.getEffectiveRole() === role &&
     profile?.user_id === id && profile.active === true && !profile.archived_at &&
     (authSubject === undefined || authSubject === id) &&
