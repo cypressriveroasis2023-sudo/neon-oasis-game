@@ -11,7 +11,7 @@ export function createVrmScheduledHandler(options: Options) {
     if (!response.ok) throw new Error('Registry unavailable');
     return response.json();
   };
-  const sync = createVrmFleetReader({fetch:fetcher,rpc,getAccessToken:options.getAccessToken});
+  const sync = createVrmFleetReader({fetch:fetcher,rpc,getAccessToken:options.getAccessToken,collectPower:true});
   return async (request: Request): Promise<Response> => {
     const reply = (data: unknown,status=200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
     if (request.method !== 'POST' || new URL(request.url).search || request.headers.has('origin')) return reply({error:'Scheduled request required'},405);

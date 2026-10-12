@@ -1,5 +1,6 @@
 import { checkedTvSections } from './tv-board-settings/index.ts';
 import {createMhelpIntakeReviewBridge,MhelpIntakeReviewError} from './mhelpIntakeReviewBridge.ts';
+import {projectMhelpFieldPlacement,projectMhelpCameraPlacement} from './mhelpPlacementProjection.ts';
 import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallEvidenceError} from './legacyInstallEvidence.ts';
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
@@ -175,6 +176,7 @@ export function createOperationsHandler(options) {
   const rpc = (name, payload) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
     method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload),
   }, 'COS workflow could not be completed. Please retry.');
+  const readMhelpPlacements=async actorPayload=>options.mhelpPlacementEnabled===true?rpc('cos_mhelp_placement_snapshot',actorPayload):null;
   const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
@@ -727,7 +729,9 @@ export function createOperationsHandler(options) {
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{fail('Imported address lookup results are unavailable. The map could not be refreshed.',503);}
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
-          return json(await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity));
+          const mhelpReceipt=await readMhelpPlacements(actorPayload);
+          projected=await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity);
+          return json(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity):projected);
         }
         if (snapshots[path]) return json(await rpc(snapshots[path], actorPayload));
         if (path === '/api/jobs') {
@@ -815,7 +819,9 @@ export function createOperationsHandler(options) {
           const witnessIntegrations=providerIntegrations.filter(row=>row.provider==='witness');
           const recon=await projectReconProviderIdentities(reconSources.units,devices,reconSources.integrations)
             .catch(()=>projectReconProviderIdentities([],devices,[]));
-          return json({...placementCameraSummary(projectCameraOwnerPlacement(devices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations)});
+          const mhelpReceipt=await readMhelpPlacements(actorPayload);
+          const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
+          return json({...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})});
         }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([

@@ -143,6 +143,11 @@ jobs:
         env:
           COS_MHELP_POSTGRES_CI: '1'
         run: node --import tsx legacy/tests/mhelp-reconnect-postgres.ci.mjs
+      - name: Verify real PostgreSQL placement sync lease contention
+        timeout-minutes: 5
+        env:
+          COS_MHELP_POSTGRES_CI: '1'
+        run: node --import tsx tests/mhelp-placement-postgres.ci.mjs
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium

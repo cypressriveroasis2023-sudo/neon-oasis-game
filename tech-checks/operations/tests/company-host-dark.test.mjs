@@ -11,11 +11,11 @@ test('dark host preserves script bodies and URLs except reviewed extensions and 
   assert.equal(html.split('verified-it-fleet-host.js?v=it-assignment-queue-20261010').length-1,1);
   assert.equal(html.split('it-ticket-instructions-host.js?v=service-ticket-instructions-20261010').length-1,1);
   assert.equal(html.split('it-daily-host.js?v=it-daily-four-20261012').length-1,1);
-  assert.equal(html.split('operations-host.js?v=tech-check-tv-config-20261012').length-1,1);
+  assert.equal(html.split('operations-host.js?v=tech-check-tv-map-20261012').length-1,1);
   const scripts=[...html.replace('<script type="module" src="./it-daily-host.js?v=it-daily-four-20261012"></script>','').replace('<script type="module" src="./it-ticket-instructions-host.js?v=service-ticket-instructions-20261010"></script>','').replace('<script type="module" src="./verified-it-fleet-host.js?v=it-assignment-queue-20261010"></script>','').replace('production-assignments-host.js?v=operations-assigned-prep-20261006','production-assignments-host.js?v=operations-v100-phase2-20261004').replace('<link rel="stylesheet" href="./cos-eye-branding.css?v=20261006b">\n<script defer src="./cos-eye-branding.js?v=20261006b"></script>\n','').matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]);
   assert.equal(scripts.length,8);
   // Baseline main 9af5916e: includes full inline bodies and external module URLs.
-  const baselineScripts=scripts.join('\n').replace('operations-host.js?v=tech-check-tv-config-20261012','operations-host.js?v=operations-v100-phase2-20261004');
+  const baselineScripts=scripts.join('\n').replace('operations-host.js?v=tech-check-tv-map-20261012','operations-host.js?v=operations-v100-phase2-20261004');
   assert.equal(createHash('sha256').update(baselineScripts).digest('hex'),'3794b35dcb29cf38aeacc107c543259c5b53ccde8e454e4b3aa294463319682d');
 });
 test('dark host selects dark browser chrome before blocking styles and preserves state ownership',()=>{

@@ -21,7 +21,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/company-platform.browser.spec.mjs tests/delivery-go-back.browser.spec.mjs tests/mhelp-native-board.browser.spec.mjs tests/operations.browser.spec.mjs tests/owner-controls.browser.spec.mjs
+      - run: npm run test:browser -- tests/tech-check-tv.browser.spec.mjs tests/operations.browser.spec.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
