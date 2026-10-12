@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-12",
+  "purpose": "Camera accuracy guard source manifest; documentation only, not a deployment input.",
+  "base_commit": "b60cf0a7cb3e2438e5ec3bc7daa37e1551b91cdd",
+  "scope": [
+    "Unique durable-identity joins and persistent identity-conflict quarantine for Star4Live producers.",
+    "Unknown/conflicting observations cannot manufacture online or offline evidence.",
+    "Direct service diagnostics remain separate from authoritative provider camera status.",
+    "Repository-only follow-on: contradictory same-serial observations cannot certify provider-only unit or account totals; raw provider diagnostics remain unchanged."
+  ],
+  "deployment_boundary": {
+    "deploy_from_repository": false,
+    "automatic_edge_deployment": false,
+    "repository_reconciler_contains_existing_mhelp_intake_scheduling": true,
+    "live_reconciler_contains_mhelp_intake_scheduling": false,
+    "intake_activation_authorized_by_this_change": false,
+    "paused_it_workflows": "Remain OFF. Retain the four-view daily gate from PR #123.",
+    "instructions": "Do not deploy the full repository reconciler as the live function. Its existing intake-scheduling code differs from the exact live source recorded below. Any future deployment must start from a freshly read live bundle, preserve the OFF boundary and require separate authorization. This publication changes no Edge deployment, cron, credential, database row or workflow flag."
+  },
+  "verified_live_bundles": [
+    {
+      "function": "camera-provider-reconcile",
+      "version": 33,
+      "verify_jwt": false,
+      "authorization": "Existing custom authentication unchanged.",
+      "source_readback": "Exact uploaded bundle matched.",
+      "files": [
+        {
+          "path": "camera-provider-reconcile/index.ts",
+          "sha256": "c2dcec8a91a86c01e43bd93c9426f095ed497bc41686fe11750de2a17cc96ffc"
+        },
+        {
+          "path": "camera-provider-reconcile/star-resource-identity.js",
+          "sha256": "c14b6d46a06b206773c57caa51910ee5911a48a96f2f1881ac67bbef2e8d30f9"
+        },
+        {
+          "path": "camera-provider-reconcile/unmapped-resource-diagnostics.js",
+          "sha256": "206b636bd6b72a151d8ca0689967d6e1cf8dc92ff3431a587784a5beebe67739"
+        },
+        {
+          "path": "_shared/reconProviderInventory.ts",
+          "sha256": "6bd2b82f0b6e63347db20f59d778cf1ada4c4cec5a1630965f725af9a6b60393"
+        }
+      ]
+    },
+    {
+      "function": "vigilant-sync",
+      "version": 22,
+      "verify_jwt": true,
+      "authorization": "Existing JWT verification unchanged.",
+      "source_readback": "Exact uploaded bundle matched.",
+      "files": [
+        {
+          "path": "vigilant-sync/index.ts",
+          "sha256": "f8b346401549d2d42ecc445461855e51a106e89bca8a1ac7158c1865ff47e28d"
+        },
+        {
+          "path": "vigilant-sync/star-resource-identity.js",
+          "sha256": "c14b6d46a06b206773c57caa51910ee5911a48a96f2f1881ac67bbef2e8d30f9"
+        }
+      ]
+    }
+  ],
+  "repository_guard_sources": {
+    "camera-provider-reconcile/index.ts": {
+      "sha256": "eb14a89885eebee5608e0b762cda83d870933102e9c29aa0db9e693a524c4a2a",
+      "matches_live_entrypoint": false,
+      "difference": "Preserves already-tracked intake scheduling and adds follow-on conflict-safe provider-only/account totals. Do not replace live v33 with this file."
+    },
+    "vigilant-sync/index.ts": {
+      "sha256": "f8b346401549d2d42ecc445461855e51a106e89bca8a1ac7158c1865ff47e28d",
+      "matches_live_entrypoint": true
+    },
+    "both star-resource-identity.js copies": {
+      "sha256": "d1e17fe3cae349ec733a1876da54fbdd233c9b0e78dd62b2cde10311963262bc",
+      "matches_live_helpers": false,
+      "difference": "Only same-serial status-disagreement aggregation metadata is added; durable identity matching and persistent collision quarantine are unchanged. This follow-on metadata lets provider-only unit and account totals remain unknown without altering raw diagnostics. It is not included in the recorded live v33/v22 bundles."
+    }
+  },
+  "privacy": "Synthetic regression data only. No production camera rows, addresses, IPs, serials, vendor responses or deployment response payloads are included."
+}
