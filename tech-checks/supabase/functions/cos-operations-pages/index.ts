@@ -25,6 +25,7 @@ import { withDeliveryGoBacks } from './deliveryGoBack.ts';
 import { createMhelpImportHandler, readMhelpAwareJson, readMhelpAwareJsonWithSize, MHELP_JSON_LIMIT, MhelpImportError } from './mhelpImport.ts';
 import { cameraSummary } from './cameraEvidence.ts';
 import { cameraSummary as placementCameraSummary } from './cameraPlacementEvidence.ts';
+import {currentTrackerShopScope} from './cameraTrackerShopScope.ts';
 import {createOwnerIdentityReview} from './ownerIdentityReview.ts';
 import {OwnerIdentityError,validateOwnerIdentitySnapshot} from './ownerIdentityCrosswalk.ts';
 import { verifiedHealthIdentities } from './verifiedHealthIdentity.ts';
@@ -153,8 +154,8 @@ export function createOperationsHandler(options) {
     apikey: serviceKey, Authorization: 'Bearer ' + serviceKey,
     Accept: 'application/json', 'Content-Type': 'application/json',
   });
-  const platformRead = path => readJson(platformUrl + '/rest/v1/' + path, {
-    headers: platformHeaders(),
+  const platformRead = (path, signal = undefined) => readJson(platformUrl + '/rest/v1/' + path, {
+    headers: platformHeaders(), ...(signal ? {signal} : {}),
   }, 'COS production data is unavailable. Please retry.');
   const readPrivateOwnerEvidence = createPrivateEvidenceReader({
     organizationId: ORGANIZATION_ID,
@@ -164,20 +165,20 @@ export function createOperationsHandler(options) {
       redirect: 'error', cache: 'no-store', signal,
     }),
   });
-  const platformAll = async path => {
+  const platformAll = async (path, signal = undefined) => {
     const items = [];
     for (let offset = 0; offset < 100000; offset += 1000) {
-      const page = await platformRead(path + '&limit=1000&offset=' + offset);
+      const page = await platformRead(path + '&limit=1000&offset=' + offset, signal);
       if (!Array.isArray(page)) fail('COS production returned an invalid collection.', 503);
       items.push(...page);
       if (page.length < 1000) return items;
     }
     fail('COS production collection exceeds the supported page limit.', 503);
   };
-  const rpc = (name, payload) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
-    method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload),
+  const rpc = (name, payload, signal = undefined) => readJson(platformUrl + '/rest/v1/rpc/' + name, {
+    method: 'POST', headers: platformHeaders(), body: JSON.stringify(payload), ...(signal ? {signal} : {}),
   }, 'COS workflow could not be completed. Please retry.');
-  const readMhelpPlacements=async actorPayload=>options.mhelpPlacementEnabled===true?rpc('cos_mhelp_placement_snapshot',actorPayload):null;
+  const readMhelpPlacements=async(actorPayload,signal=undefined)=>options.mhelpPlacementEnabled===true?rpc('cos_mhelp_placement_snapshot',actorPayload,signal):null;
   const readVrmFleet = options.vrm ? createVrmFleetReader({ fetch: requestFetch, rpc, embeds: options.vrmEmbeds, getAccessToken: options.vrm.getAccessToken }) : null;
   const mhelpImport = createMhelpImportHandler({ rpc, organizationId: ORGANIZATION_ID });
   const sheetsConnection=createSheetsConnection({fetch:requestFetch,getServiceAccountJson:options.googleSheets?.getServiceAccountJson||(()=>undefined),signAssertion:options.googleSheets?.signAssertion});
@@ -244,12 +245,12 @@ export function createOperationsHandler(options) {
     if (!Array.isArray(roles) || !roles.some(row => row.roles?.code === roleCode && row.roles?.organization_id === ORGANIZATION_ID)) fail('Your linked COS production role is not active.', 403);
     return {...context,ownerRoleId:legacyOwner?roles.find(row=>row.roles?.code==='owner'&&row.roles?.organization_id===ORGANIZATION_ID)?.role_id:null};
   };
-  const fleetPlacementAudits = async (context) => {
+  const fleetPlacementAudits = async (context, signal = undefined) => {
     const rows=[]; let cursor=null;
     for(let page=0;page<200;page++) {
       const result=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_fleet_placement_evidence_v1', {
         method:'POST', headers:{...context.headers,'Content-Type':'application/json'},
-        body:JSON.stringify({p_before_id:cursor,p_limit:500}),
+        body:JSON.stringify({p_before_id:cursor,p_limit:500}), ...(signal ? {signal} : {}),
       },'Fleet placement evidence is unavailable.');
       if(!Array.isArray(result)||result.length>500)fail('Fleet placement page is invalid.',503);
       let previous=cursor;
@@ -269,10 +270,10 @@ export function createOperationsHandler(options) {
     if (!Array.isArray(records) || !records.length) fail('COS record not found.', 404);
     return records[0];
   };
-  const legacyAll = async (path, headers) => {
+  const legacyAll = async (path, headers, signal = undefined) => {
     const items = [];
     for (let offset = 0; offset < 100000; offset += 1000) {
-      const rows = await readJson(LEGACY_URL + '/rest/v1/' + path + '&limit=1000&offset=' + offset, { headers }, 'Camera Health could not be loaded.');
+      const rows = await readJson(LEGACY_URL + '/rest/v1/' + path + '&limit=1000&offset=' + offset, { headers, ...(signal ? {signal} : {}) }, 'Camera Health could not be loaded.');
       if (!Array.isArray(rows)) fail('Camera Health returned an invalid collection.', 503);
       items.push(...rows);
       if (rows.length < 1000) return items;
@@ -280,26 +281,26 @@ export function createOperationsHandler(options) {
     fail('Camera Health collection exceeds the supported page limit.', 503);
   };
   // Same existing bridge authorization; private claim evidence/serials never enter DTOs.
-  const readIdentitySources = async (context, reviewKey = null) => {
+  const readIdentitySources = async (context, reviewKey = null, signal = undefined) => {
     const actorPayload={p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID};
-    const crosswalk=await rpc('cos_owner_identity_snapshot',actorPayload);
+    const crosswalk=await rpc('cos_owner_identity_snapshot',actorPayload,signal);
     validateOwnerIdentitySnapshot(crosswalk);
     const keys=[...new Set([...crosswalk.claims.map(c=>c.legacy_unit_key),...(reviewKey?[reviewKey]:[])])].sort();
     const readEpochs=async()=>{
       if(!keys.length)return [];
       return readJson(LEGACY_URL+'/rest/v1/rpc/cos_camera_identity_epochs_v1',{
-        method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_unit_keys:keys}),
+        method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_unit_keys:keys}), ...(signal ? {signal} : {}),
       },'Camera identity incarnations are unavailable.');
     };
     const before=await readEpochs();
     const [devices,units,matches,providers,audits]=await Promise.all([
-      legacyAll('camera_devices?select=id,external_device_id,device_serial,device_name,device_type,organization,unit_key,public_ip,expected_ports,connection_revision,source,source_status,source_last_seen_at,last_online_at,last_probe_online_at,activation_state,recon_battery_percent:source_metadata->battery_percent,recon_battery_updated_at:source_metadata->>battery_updated_at,recon_battery_status:source_metadata->>battery_status,recon_battery_status_updated_at:source_metadata->>battery_status_updated_at&order=id.asc',context.headers),
-      platformAll('equipment_units?select=id,organization_id,unit_number,status&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc'),
-      platformAll('vision_vigilant_unit_matches?select=id,organization_id,equipment_unit_id,vigilant_device_id,camera_key,match_method,confidence&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc'),
-      platformAll('vision_vigilant_devices?select=id,organization_id,external_device_id,device_name,device_type,source&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc'),
-      fleetPlacementAudits(context),
+      legacyAll('camera_devices?select=id,external_device_id,device_serial,device_name,device_type,organization,unit_key,public_ip,expected_ports,connection_revision,source,source_status,source_last_seen_at,last_online_at,last_probe_online_at,activation_state,recon_battery_percent:source_metadata->battery_percent,recon_battery_updated_at:source_metadata->>battery_updated_at,recon_battery_status:source_metadata->>battery_status,recon_battery_status_updated_at:source_metadata->>battery_status_updated_at&order=id.asc',context.headers,signal),
+      platformAll('equipment_units?select=id,organization_id,unit_number,status&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc',signal),
+      platformAll('vision_vigilant_unit_matches?select=id,organization_id,equipment_unit_id,vigilant_device_id,camera_key,match_method,confidence&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc',signal),
+      platformAll('vision_vigilant_devices?select=id,organization_id,external_device_id,device_name,device_type,source&organization_id=eq.'+ORGANIZATION_ID+'&order=id.asc',signal),
+      fleetPlacementAudits(context,signal),
     ]);
-    const [after,current]=await Promise.all([readEpochs(),rpc('cos_owner_identity_snapshot',actorPayload)]);
+    const [after,current]=await Promise.all([readEpochs(),rpc('cos_owner_identity_snapshot',actorPayload,signal)]);
     validateOwnerIdentitySnapshot(current);
     if(crosswalk.revision!==current.revision)fail('Owner identity commitments changed while loading. Reload.',409);
     // Any bracketing change denies all affected proofs. Missing source data does
@@ -827,7 +828,33 @@ export function createOperationsHandler(options) {
             .catch(()=>projectReconProviderIdentities([],devices,[]));
           const mhelpReceipt=await readMhelpPlacements(actorPayload);
           const placedDevices=mhelpReceipt?projectMhelpCameraPlacement(devices,mhelpReceipt,placementAudits,identity):devices;
-          return json({...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})});
+          const summary={...placementCameraSummary(projectCameraOwnerPlacement(placedDevices,placementAudits), health, Date.now(), tracker, witnessIntegrations),...appendReconProviderIdentities(identity,recon),...fieldRecorderHealthGuards(bundle.sources,identity,providerIntegrations),...(mhelpReceipt?{mhelpPlacementSync:{lastSuccessAt:mhelpReceipt.lastSuccessAt,sheetsPublisher:false}}:{})};
+          // Current guarded source placement only classifies synthetic PDF inventory.
+          // This is optional, bounded, read-only and never changes a camera resource.
+          const shopRead=(inventory,current,mhelpReceipt)=>({inventory,mhelpReceipt:mhelpReceipt??(options.mhelpPlacementEnabled===true?{}:null),nativeUnits:current.sources.units,devices:current.sources.devices,audits:current.sources.audits,identity:current.identity,matches:current.sources.matches,ownerClaims:current.sources.ownerCrosswalk.claims});
+          return json(await currentTrackerShopScope(summary,tracker,shopRead(reconSources.units,bundle,mhelpReceipt),{
+            onFallback:reason=>console.warn('camera_shop_scope_fallback',reason),
+            readSources:async(inventory,signal)=>{
+              const identities=inventory.map(row=>({entityKind:row.readOnly===true?'tracker':'equipment_unit',nativeUnitId:row.id})),seen=new Set();
+              if(identities.length>100000||identities.some(row=>!UUID.test(String(row.nativeUnitId||'')))||new Set(identities.map(row=>row.entityKind+'|'+row.nativeUnitId)).size!==identities.length)throw Error('SHOP inventory identities are invalid.');
+              const pages=new Array(Math.ceil(identities.length/250));let next=0;
+              const worker=async()=>{for(;;){
+                signal.throwIfAborted();const pageIndex=next++;if(pageIndex>=pages.length)return;
+                const pageIds=identities.slice(pageIndex*250,(pageIndex+1)*250),expected=new Set(pageIds.map(row=>row.entityKind+'|'+row.nativeUnitId));
+                const page=await rpc('cos_geocode_sources_map_projection',{p_organization_id:ORGANIZATION_ID,p_identities:pageIds},signal);
+                if(!Array.isArray(page)||page.length>pageIds.length)throw Error('SHOP source page is unavailable.');
+                for(const row of page){const key=row?.entityKind+'|'+row?.nativeUnitId;if(!expected.has(key)||seen.has(key))throw Error('SHOP source identity changed.');seen.add(key);}
+                pages[pageIndex]=page;
+              }};
+              await Promise.all(Array.from({length:Math.min(4,pages.length)},worker));
+              signal.throwIfAborted();return pages.flat();
+            },
+            readCurrent:async(signal)=>{
+              const [snapshot,current,mhelpReceipt]=await Promise.all([rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readMhelpPlacements(actorPayload,signal)]);
+              if(!Array.isArray(snapshot?.inventoryItems))throw Error('Current SHOP inventory is unavailable.');
+              return shopRead(snapshot.inventoryItems,current,mhelpReceipt);
+            },
+          }));
         }
         if (path === '/api/camera-health/summary') {
           const [devices, health] = await Promise.all([
