@@ -125,12 +125,12 @@ test('automatic address lookup displays pending, approximate pin, new address in
  const {frame,state}=await mount(page,{registered:true});
  state.units[0]={...state.units[0],currentLocationType:'field',locationVerification:'address_changed',placementAuditId:'41',placementUnitKey:'SNIPER 901',locationGeocode:{status:'pending'}};
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
- await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('lookup is pending');
+ await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('recorded address changed');
  const geocode={status:'success',auditId:'41',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'100 EXAMPLE RD, TEST CITY, TX, 77001',geocodedAt:fresh,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex')};
  state.units[0]={...state.units[0],locationGeocode:geocode};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('30, -95');await expect.poll(()=>estimatedCount(frame)).toBe(2);
  state.units[0]={...state.units[0],address:'101 Example Road, Test City, TX 77001',placementAuditId:'42',locationGeocode:{status:'invalid_address'}};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
- await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('complete installation street, city, state and ZIP');expect(state.writes).toHaveLength(0);
+ await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('recorded address changed');expect(state.writes).toHaveLength(0);
 });
 test('automatic Geocodio estimates show precise provider method, EST and manual GPS priority',async({page})=>{
  const {frame,state}=await mount(page,{registered:true});
@@ -141,7 +141,7 @@ test('automatic Geocodio estimates show precise provider method, EST and manual 
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(0);
  state.units[0].locationGeocode={...geocode,accuracyType:'rooftop',matchType:'building_centroid'};await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.locator('.field-map-detail')).toContainText('Geocodio rooftop address estimate');await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('building_centroid');
  state.units[0]={...state.units[0],locationVerification:'owner_verified',latitude:30.5,longitude:-95.5,gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'manual'};await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);await expect.poll(()=>estimatedCount(frame)).toBe(1);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(1);
- state.units[0]={...state.units[0],locationVerification:'address_changed',latitude:null,longitude:null,locationGeocode:{status:'deferred',provider:'geocodio'}};await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('without paid lookups');expect(state.writes).toHaveLength(0);
+ state.units[0]={...state.units[0],locationVerification:'address_changed',latitude:null,longitude:null,locationGeocode:{status:'deferred',provider:'geocodio'}};await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect(frame.getByRole('region',{name:'Automatic address lookup'})).toContainText('recorded address changed');expect(state.writes).toHaveLength(0);
 });
 test('imported partial source shows EST and inferred locality while later source revision removes old pin',async({page})=>{
  const {frame,state}=await mount(page,{registered:true});const row=state.units[0],sourceAddress='123 Main St, TX 77002';
@@ -179,4 +179,54 @@ test('eight V2 tracker poles share an EST site with distinct support identities 
  state.units[0]={...state.units[0],importedInstallation:{...state.units[0].importedInstallation,sourceRevision:'30000000-0000-4000-8000-000000000001'}};
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();await expect.poll(()=>estimatedCount(frame)).toBe(7);expect(state.writes).toHaveLength(0);
  await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.field-map-center').screenshot({path:info.outputPath('typed-tracker-support-estimates.png')});
+});
+
+test('changed assignment address is explained before an old geocoder rejection and never restores its historical point',async({page})=>{
+ const {frame,state}=await mount(page,{noEstimates:true,noCameras:true});
+ state.units=Array.from({length:7},(_,i)=>({
+  ...state.units[0],id:`77777777-7777-4777-8777-${String(i+1).padStart(12,'0')}`,unitNumber:`Synthetic changed ${i+1}`,
+  address:`${i+101} Changed Fixture Road, Test City, TX 77001`,readOnly:false,
+  placementSource:'mhelpdesk_assignment',locationVerification:'address_changed',
+  locationImportedGeocode:{status:i%2?'invalid_address':'no_match'},
+  latitude:null,longitude:null,historicalLatitude:30+i/100,historicalLongitude:-95-i/100,
+  historicalCoordinateSource:'legacy_tracker',locationNote:'Historical location retained for review'
+ }));
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(7);
+ await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
+ for(let i=0;i<7;i++){
+  const row=frame.locator('.field-map-list>button').filter({hasText:`Synthetic changed ${i+1}`});
+  await expect(row).toContainText('ADDRESS CHANGED');await expect(row).not.toContainText('ADDRESS NEEDS REVIEW');
+  await row.click();await expect(frame.locator('.field-map-detail')).toContainText('Verify the new location before placing it on the map');
+  await expect(frame.getByRole('region',{name:'Automatic address lookup'})).not.toContainText('No single exact address matched');
+  await expect(frame.getByRole('region',{name:'Automatic address lookup'})).not.toContainText('Add a complete installation street');
+ }
+ await page.reload();await expect(frame.locator('.field-map-list>button')).toHaveCount(7);
+ await expect(frame.locator('.field-map-list>button').first()).toContainText('ADDRESS CHANGED');
+ await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);expect(state.writes).toHaveLength(0);
+});
+
+test('Owner suite estimate preserves the complete address, discloses building precision and rejects a later suite revision',async({page})=>{
+ const {frame,state}=await mount(page,{registered:true});
+ const original='12345 Fixture Road, Ste#700, Test City, TX 77001-1234';
+ const lookup={status:'success',auditId:'901',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'12345 FIXTURE RD, TEST CITY, TX, 77001',geocodedAt:fresh,addressSha256:createHash('sha256').update(original.toLowerCase()).digest('hex')};
+ state.units[0]={...state.units[0],address:original,currentLocationType:'field',placement:'FIELD',placementSource:'owner',locationVerification:'address_changed',placementAuditId:'901',placementUnitKey:'SNIPER 901',locationGeocode:lookup};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
+ const estimate=frame.getByRole('region',{name:'Address estimate'});
+ await expect(estimate).toContainText(original);
+ await expect(estimate).toContainText('This estimate locates the building address; the suite and installed unit position remain unverified.');
+ await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(0);
+ await page.reload();await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
+ await expect(estimate).toContainText(original);await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ state.units[0]={...state.units[0],address:original.replace('700','701')};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(estimate).toHaveCount(0);await expect.poll(()=>estimatedCount(frame)).toBe(1);
+ await expect(frame.locator('.field-map-detail')).toContainText('ADDRESS CHANGED');
+ state.units[0]={...state.units[0],address:original,locationVerification:'owner_verified',latitude:30.5,longitude:-95.5,coordinateSource:'manual',gpsRecordedAt:fresh,locationVerifiedAt:fresh};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(estimate).toHaveCount(0);await expect(frame.locator('.field-map-detail')).toContainText('VERIFIED PIN');
+ await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(1);
+ expect(state.units[0].address).toBe(original);expect(state.writes).toHaveLength(0);
 });

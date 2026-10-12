@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, webcrypto } from 'node:crypto';
-import {locationTag,installationAddressLink,fieldReachability,locationVerificationNote,normalizeLocationAddress,isCurrentFieldPin,historicalFieldCoordinates,parseLocationCoordinates} from '../src/fieldLocations.ts';
+import {locationTag,locationExplanation,installationAddressLink,fieldReachability,locationVerificationNote,normalizeLocationAddress,isCurrentFieldPin,historicalFieldCoordinates,parseLocationCoordinates} from '../src/fieldLocations.ts';
 import {createGpsSaver} from '../src/gpsPersistence.ts';
 const id='11111111-1111-4111-8111-111111111111', historyId='22222222-2222-4222-8222-222222222222';
 const stamp='2026-10-06T16:00:00Z';
@@ -65,4 +65,23 @@ test('coordinate paste accepts explicit pairs and point queries, not addresses, 
  assert.deepEqual(parseLocationCoordinates('https://www.google.com/maps/search/?api=1&query=29.99%2C-95.3'),{latitude:29.99,longitude:-95.3});
  assert.deepEqual(parseLocationCoordinates('https://www.google.com/maps/dir/?api=1&destination=29.99,-95.3'),{latitude:29.99,longitude:-95.3});
  for(const value of ['100 Example Road, Test City, TX 77001','https://www.google.com/maps/@29.99,-95.3,14z','https://www.google.com/maps/search/?api=1&query=100+Example+Road','https://maps.app.goo.gl/abc','https://evil.test/maps?q=29.99,-95.3','https://user:password@www.google.com/maps?q=29.99,-95.3','91,-95','29,181','(29,-95','29,-95)','NaN,-95','https://www.google.com/maps/dir/?query=29,-95&destination=40,-100','https://www.google.com/maps/search/?query=29,-95&query=40,-100','https://www.google.com/maps/search/?query=29,-95&query_place_id=other','https://www.google.com/maps/dir/?destination=29,-95&destination_place_id=other','https://www.google.com/maps/place/Another+Place?query=29,-95','https://www.google.com:8443/maps?q=29,-95'])assert.throws(()=>parseLocationCoordinates(value));
+});
+
+test('changed addresses take precedence over stale lookup outcomes without admitting a current pin',()=>{
+ const explanation='The recorded address changed after this pin was saved. Verify the new location before placing it on the map.';
+ for(const placementSource of ['owner','mhelpdesk_assignment',undefined]) for(const status of ['unavailable','not_requested','held','pending','no_match','invalid_address','deferred','provider_error','success']){
+  const changed={...unit,placementSource,locationVerification:'address_changed',latitude:30,longitude:-95,gpsRecordedAt:stamp,locationVerifiedAt:stamp,locationGeocode:{status},locationImportedGeocode:{status}};
+  assert.equal(locationTag(changed),'ADDRESS CHANGED');
+  assert.equal(locationExplanation(changed),explanation);
+  assert.equal(isCurrentFieldPin(changed),false);
+  assert.deepEqual(historicalFieldCoordinates(changed),{latitude:30,longitude:-95,source:'Stored source',recordedAt:stamp});
+ }
+});
+test('unchanged addresses keep lookup explanations and Owner results take precedence over imported results',()=>{
+ const owner={...unit,placementSource:'owner',locationVerification:'address_only',locationGeocode:{status:'pending'},locationImportedGeocode:{status:'no_match'}};
+ assert.equal(locationTag(owner),'LOCATING ADDRESS');assert.match(locationExplanation(owner),/lookup is pending/);
+ const imported={...owner,placementSource:'mhelpdesk_assignment'};
+ assert.equal(locationTag(imported),'ADDRESS NEEDS REVIEW');assert.match(locationExplanation(imported),/No single exact address matched/);
+ const reviewed={...unit,locationVerification:'owner_verified',latitude:30,longitude:-95,coordinateSource:'manual',gpsRecordedAt:stamp,locationVerifiedAt:stamp};
+ assert.equal(isCurrentFieldPin(reviewed),true);assert.equal(locationTag(reviewed),'VERIFIED PIN');
 });
