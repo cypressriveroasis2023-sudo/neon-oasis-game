@@ -46,6 +46,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange}:Props) {
   const running=useRef(0);
   const mounted=useRef(false);
   const generation=useRef(0);
+  const requireFreshRead=useRef(false);
   const detail=useRef<HTMLDialogElement|null>(null);
   const assignDialog=useRef<HTMLDialogElement|null>(null);
 
@@ -58,8 +59,9 @@ export default function DailyBoard({api,openWorkspace,onTvChange}:Props) {
     running.current += 1;
     if (mounted.current) setBusy(true);
     try {
-      const data = await readBoard(fresh);
+      const data = await readBoard(fresh || requireFreshRead.current);
       if (currentGeneration !== generation.current) return null;
+      requireFreshRead.current = false;
       if (mounted.current) { setSnapshot(data); setLastSuccess(new Date()); setError(''); }
       return data;
     } catch (cause) {
@@ -87,7 +89,7 @@ export default function DailyBoard({api,openWorkspace,onTvChange}:Props) {
     const clock=window.setInterval(()=>setNow(new Date()),10000);
     const focus=()=>void load(true);
     const visible=()=>{if(!document.hidden)focus();};
-    const invalidated=()=>{generation.current+=1;setSnapshot({jobs:[],tasks:[],readiness:[]});setLastSuccess(null);setSelected(null);setAssigning(null);setError('Return to Tech Check and sign in again.');};
+    const invalidated=()=>{generation.current+=1;requireFreshRead.current=true;setSnapshot({jobs:[],tasks:[],readiness:[]});setLastSuccess(null);setSelected(null);setAssigning(null);setError('Return to Tech Check and sign in again.');};
     window.addEventListener('focus',focus);window.addEventListener('online',focus);window.addEventListener('cos-board-updated',focus);window.addEventListener('cos-private-data-invalidated',invalidated);document.addEventListener('visibilitychange',visible);
     return()=>{mounted.current=false;generation.current+=1;window.clearInterval(timer);window.clearInterval(clock);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('cos-board-updated',focus);window.removeEventListener('cos-private-data-invalidated',invalidated);document.removeEventListener('visibilitychange',visible);};
   },[load]);
