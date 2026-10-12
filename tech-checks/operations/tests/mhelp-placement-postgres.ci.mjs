@@ -21,7 +21,7 @@ async function main(){
  assertCiContext();
  const server=lastJson(await exec("select json_build_object('db',current_database(),'user',current_user,'port',inet_server_port());"));
  assert.equal(server.db,connection.database);assert.equal(server.user,'postgres');assert.equal(server.port,5432);
- await exec('drop schema if exists cos_mhelp_placement_private cascade;drop schema if exists app_private cascade;drop schema public cascade;create schema public;'+schema);
+ await exec('drop schema if exists cos_mhelp_placement_private cascade;drop schema if exists app_private cascade;drop schema public cascade;create schema public;grant usage on schema public to anon,authenticated,service_role;'+schema);
  await exec(await readFile(new URL('../db/20261012173408_cos_mhelp_placement_sync.sql',import.meta.url),'utf8'));
  await exec('update cos_mhelp_placement_private.control set enabled=true;');
  const first=session('begin;set local role service_role;select public.cos_mhelp_placement_begin();',true,'placement-first');let second;

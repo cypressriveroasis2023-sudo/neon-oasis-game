@@ -28,10 +28,16 @@ export function projectMhelpFieldPlacement(snapshot:Row,receipt:unknown,audits:R
  if(!Array.isArray(snapshot.inventoryItems)||!Array.isArray(snapshot.items)||!object(snapshot.summary)||!Array.isArray(audits))throw Error('Invalid placement inputs');
  const byId=new Map<string,Row>();
  for(const link of links){if(protectedByHistory(link,audits,identity))continue;byId.set(link.trackerId,link);if(link.nativeUnitId)byId.set(link.nativeUnitId,link);}
+ // An unavailable/stale source must not resurrect an older imported field pin.
+ if((receipt as Row).enabled!==false)for(const r of (receipt as Row).items){
+  if(r.guardCurrent!==true||links.includes(r)||protectedByHistory(r,audits,identity))continue;
+  const held={...r,uncertain:true};byId.set(r.trackerId,held);if(r.nativeUnitId)byId.set(r.nativeUnitId,held);
+ }
  const fieldIds=new Set(snapshot.items.map((r:Row)=>r.id));
  const inventoryItems=snapshot.inventoryItems.map((row:Row)=>{
   const link=byId.get(row.id),label=link&&(row.id===link.nativeUnitId?link.nativeLabel:link.trackerLabel);
   if(!link||row.unitNumber!==label||row.placementSource==='owner'||row.placementReviewReason||row.hasUnitGps||row.installedSiteId)return row;
+  if(link.uncertain)return {...row,placement:'UNKNOWN',placementSource:'mhelpdesk',currentLocationType:'unknown',mhelpPlacementReview:'Current mHelpDesk assignment is unavailable; verify placement',latitude:null,longitude:null,coordinateSource:null,importedInstallation:null,addressEstimateTrackerId:null,addressEstimateUnitNumber:null};
   const locationReview=link.locationReview;
   return {...row,placement:link.placement,placementSource:'mhelpdesk',currentLocationType:link.placement.toLowerCase(),
    site:link.siteLabel,customer:link.customerLabel,mhelpObservedAt:link.observedAt,mhelpLocationReview:locationReview,

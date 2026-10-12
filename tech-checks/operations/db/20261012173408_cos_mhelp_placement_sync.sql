@@ -118,6 +118,7 @@ begin
  perform app_private.appdeploy_assume_actor(p_actor_user_id,p_organization_id);
  if p_organization_id<>'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5'::uuid or not app_private.has_permission(p_organization_id,'equipment.view') then raise exception 'Equipment view required' using errcode='42501';end if;
  select coalesce(jsonb_agg(jsonb_build_object('trackerId',tracker_id,'nativeUnitId',native_unit_id,'trackerLabel',tracker_label,'nativeLabel',native_label,
+  'guardCurrent',cos_mhelp_placement_private.guard(tracker_id,native_unit_id)=baseline_guard,
   'state',case when observation->>'state'='confirmed' and cos_mhelp_placement_private.guard(tracker_id,native_unit_id)=baseline_guard then 'confirmed' else 'held' end,
   'placement',observation->>'placement','customerLabel',observation->>'customerLabel','siteLabel',observation->>'siteLabel','observedAt',observed_at,
   'locationReview',observation->>'customerId' is distinct from baseline_customer_id or observation->>'serviceLocationId' is distinct from baseline_location_id) order by tracker_id),'[]') into items from cos_mhelp_placement_private.links;

@@ -52,6 +52,11 @@ test('stale, future, held and duplicate observations cannot establish placement'
  assert.equal(checkedMhelpPlacements(receipt({state:'held'}),now).length,0);
  const r=receipt();r.items.push({...r.items[0]});assert.throws(()=>checkedMhelpPlacements(r,now));
 });
+test('stale or failed source reads suppress older imported pins without hiding newer manual authority',()=>{
+ const r=receipt({guardCurrent:true,observedAt:new Date(now-41*60*1000).toISOString()});
+ const result=projectMhelpFieldPlacement(snapshot(),r,[],proof,now);assert.equal(result.items.length,0);assert.equal(result.inventoryItems[0].placement,'UNKNOWN');assert.equal(result.inventoryItems[0].latitude,null);
+ const manual=snapshot({placementSource:'owner'});assert.deepEqual(projectMhelpFieldPlacement(manual,r,[],proof,now).inventoryItems,manual.inventoryItems);
+});
 test('camera scope uses complete verified native resource sets and leaves all provider telemetry unchanged',()=>{
  const devices=[{id:'1',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'online',battery_percent:80},{id:'2',unit_key:'Spotter 023.1',activation_state:'active',organization:'Example',source_status:'offline'}];
  const before=structuredClone(devices),result=projectMhelpCameraPlacement(devices,receipt(),[],proof,now);
