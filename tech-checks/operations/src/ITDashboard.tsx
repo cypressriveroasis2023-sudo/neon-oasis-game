@@ -77,11 +77,11 @@ export function summarizeITRouters(value: unknown, now = Date.now()): Summary {
 export function summarizeITCameras(value: unknown, now = Date.now()): Summary {
   const cameras = cameraDashboardSummary(value, now);
   if (!cameras.available || !cameras.coverage) throw new Error('Source-separated Camera Health could not be verified.');
-  const coverage = cameras.coverage;
-  return { count: coverage.total, label: 'active / unresolved units', metrics: [
-    { label: 'Field online', value: coverage.online },
-    { label: 'Field offline', value: coverage.offline },
-    { label: 'Health / placement review', value: coverage.review },
+  const coverage = cameras.coverage,shared=Boolean((value as Record<string,unknown>)?.fleetFieldUnits);
+  return { count: coverage.total, label: shared?'active / unresolved field units':'provider units · placement pending', metrics: [
+    { label: shared?'Field online':'Provider online', value: coverage.online },
+    { label: shared?'Field offline':'Provider offline', value: coverage.offline },
+    { label: shared?'Health / placement review':'Provider review', value: coverage.review },
   ], caution: (cameras.attention ?? 0) > 0, detail: cameras.cameraCoverage,
   note: 'Reported resources do not verify every camera or video. Older observations stay unverified.' };
 }
