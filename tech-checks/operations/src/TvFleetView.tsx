@@ -63,7 +63,7 @@ export default function TvFleetView({api,enabled,mode,rotation,height,refreshId}
   useEffect(()=>{if(mode==='map')requestAnimationFrame(()=>{const map=mapRef.current;if(!map)return;map.invalidateSize();const points=rows.filter(row=>row.point).map(row=>[row.point!.latitude,row.point!.longitude] as L.LatLngTuple);if(points.length)map.fitBounds(L.latLngBounds(points),{padding:[32,32],maxZoom:13});});},[mode,height,rows]);
   const count=window.innerWidth<900?1:window.innerWidth<1500?4:height<900?3:6,parts=Math.max(1,Math.ceil(rows.length/count)),shown=rows.slice((rotation%parts)*count,(rotation%parts+1)*count);
   const totals={online:rows.filter(r=>r.health.state==='online').length,offline:rows.filter(r=>r.health.state==='offline').length,unknown:rows.filter(r=>r.health.state==='unknown').length,mapped:rows.filter(r=>isCurrentFieldPin(r.unit)).length};
-  return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
+  return <div className='tv-fleet-view' data-enabled={String(enabled)} data-running={String(running.current)} hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
     <div className='tv-fleet-summary'><b className='tv-online'>{totals.online} online</b><b className='tv-offline'>{totals.offline} offline</b><b>{totals.unknown} unverified</b><b>{totals.mapped} verified pins</b><small>Saved data · refresh 15 min{data.readAt?' · '+cameraTime(data.health?.refreshedAt,clock):''}</small></div>
     {error&&<p className='tv-fleet-warning' role='status'>Fleet updates delayed. {error}</p>}
     {!data.readAt&&<p className='tv-fleet-loading'>{error?'Fleet information is unavailable.':'Loading Camera Health and field locations…'}</p>}
