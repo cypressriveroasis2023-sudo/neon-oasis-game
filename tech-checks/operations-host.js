@@ -156,7 +156,8 @@ function present() {
     const tvLaunch = mapParams.get('tvBoard') === '1';
     const tvParams = new URLSearchParams();
     if(tvLaunch){tvParams.set('tvBoard','1');if(mapParams.get('tvScope')==='week')tvParams.set('tvScope','week');if(['it','service'].includes(mapParams.get('tvDepartment')))tvParams.set('tvDepartment',mapParams.get('tvDepartment'));}
-    frame.src = './operations/dist/index.html?v=tech-check-tv-tour-20261012' + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
+    const locationParams=new URLSearchParams();if(mapParams.get('locationImport')==='1'&&/^HELIOS\s+\d{1,3}$/i.test(mapParams.get('locationUnit')||'')&&/^[a-f0-9-]{36}$/i.test(mapParams.get('locationNonce')||'')){for(const key of ['locationImport','locationUnit','locationNonce'])locationParams.set(key,mapParams.get(key));}
+    frame.src = './operations/dist/index.html?v=' + (locationParams.size?'mhelp-location-import-20261012':'tech-check-tv-tour-20261012') + (locationParams.size?'&'+locationParams:'') + (tvLaunch?'&'+tvParams:'') + (tvLaunch?'#daily-board':fieldRoute);
     frame.allow = 'geolocation; fullscreen';frame.allowFullscreen=true;
     frame.referrerPolicy = 'same-origin';
     frame.addEventListener('load', () => {setFieldMapDisplay(frame,false); if (toolFromHash()) showTechCheckHome(); });
@@ -229,6 +230,11 @@ window.addEventListener('hashchange', restoreToolRoute);
 window.addEventListener('message', async event => {
   if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || !owner()) return;
   const data = event.data;
+  if(data?.type==='COS_MHELP_LOCATION_EXPORT'){
+    const launch=new URLSearchParams(window.location.search),value=data.location;
+    if(launch.get('locationImport')!=='1'||data.nonce!==launch.get('locationNonce')||!window.opener||value?.contract!=='COS_MHELP_UNIT_LOCATION_V1'||value.unitName?.toUpperCase()!==launch.get('locationUnit')?.toUpperCase())return;
+    window.opener.postMessage({type:'COS_MHELP_LOCATION_RESULT',nonce:data.nonce,location:value},'https://cos-camera-health-field-map.units581037.chatgpt.site');return;
+  }
   if(data?.type==='COS_TV_BOARD_DISPLAY_MODE'&&typeof data.active==='boolean'&&context()?.getEffectiveRole()==='owner'){
     setFieldMapDisplay(frame,data.active);
     if(!data.active&&new URLSearchParams(location.search).get('tvBoard')==='1'){

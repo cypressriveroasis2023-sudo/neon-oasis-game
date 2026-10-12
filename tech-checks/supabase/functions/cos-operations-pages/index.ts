@@ -5,6 +5,7 @@ import {createLegacyInstallEvidenceReader,legacyEvidenceTransport,LegacyInstallE
 import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
+import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
 import {MHELP_TICKET_PRIVATE_SAMPLE,validateMhelpPrivateSampleRequest,projectMhelpPrivateSample} from './mhelpTicketPrivateSample.ts';
 import {mhelpTodayPreviewWindow,mhelpPreviousDayPreviewWindow} from './mhelpTicketDay.ts';
@@ -189,6 +190,7 @@ export function createOperationsHandler(options) {
   });
   const readMhelpIntakeReview=createMhelpIntakeReviewBridge(requestFetch);
   const mhelpTickets=createMhelpTicketReader({fetch:requestFetch,getConfig:options.mhelpPartner?.getConfig || (()=>({})),renewAccess:options.mhelpPartner?.renewAccess});
+  const mhelpUnitLocation=createMhelpUnitLocationReader({fetch:requestFetch,getConfig:options.mhelpPartner?.getConfig || (()=>({})),renewAccess:options.mhelpPartner?.renewAccess});
   // This isolated control RPC is claimed once before the provider secret can be read.
   const readInhandPilot = createInhandPilotReader({
     ...options.inhandPilot,
@@ -527,6 +529,10 @@ export function createOperationsHandler(options) {
         // This owner-only review does not expand the verified IT route allowlist.
         if (!context.legacyOwner) fail('An active COS Owner account is required.', 403);
         if (method === 'POST' && body === null) body = await requestBody(request);
+        if(path==='/api/mhelpdesk/partner/unit-location'){
+          if(method!=='POST')fail('Method not supported.',405);
+          return json(await mhelpUnitLocation(body));
+        }
         if(path==='/api/mhelpdesk/partner/tickets/preview') {
           if(method!=='POST')fail('Method not supported.',405);
           if(body?.evidence===MHELP_TICKET_PRIVATE_SAMPLE){

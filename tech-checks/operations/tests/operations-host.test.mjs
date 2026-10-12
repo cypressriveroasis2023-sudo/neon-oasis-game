@@ -15,7 +15,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function harness({ role = 'owner', userId = ownerId } = {}) {
+function harness({ role = 'owner', userId = ownerId, search = '' } = {}) {
   const observers = [];
   const nodes = new Map();
   const calls = { auth: 0, tabs: [], shows: [], routes: [], locations: [], logout: 0, technicianHomes: [] };
@@ -94,7 +94,7 @@ function harness({ role = 'owner', userId = ownerId } = {}) {
   const accountControl = new Element('existingAccountControl');
   nodes.get('cosOperationsLegacy').replaceChildren(accountControl);
   const window = new Events();
-  window.location = { origin, pathname:'/tech-checks/', search:'', hash:'', assign: value => calls.locations.push(value) };
+  window.location = { origin, pathname:'/tech-checks/', search, hash:'', assign: value => calls.locations.push(value) };
   calls.history = [];
   window.history = { pushState:(state,_title,hash)=>{calls.history.push({state,hash});window.location.hash=hash;}, replaceState:(state,_title,url)=>{window.location.hash=url.includes('#')?url.slice(url.indexOf('#')):'';} };
   window.TechCheckContext = {
@@ -174,6 +174,15 @@ test('owner mounts isolated Operations and retains existing legacy controls', ()
   assert.equal(h.accountControl.parentElement, h.nodes.get('cosOperationsLegacy'));
   assert.equal(h.calls.auth, 0);
   assert.equal(h.nodes.get('cosOperationsTechReturn').hidden, true);
+});
+
+test('mHelp location launch and return require the matching frame, unit, nonce and fixed Site origin', async () => {
+  const nonce='12345678-1234-1234-1234-123456789012',h=harness({search:'?locationImport=1&locationUnit=Helios%20010&locationNonce='+nonce}),returned=[];
+  h.window.opener={postMessage:(value,targetOrigin)=>returned.push({value,targetOrigin})};
+  assert(h.frame().src.includes('locationImport=1'));assert(h.frame().src.includes('locationUnit=Helios+010'));
+  const message={type:'COS_MHELP_LOCATION_EXPORT',nonce,location:{contract:'COS_MHELP_UNIT_LOCATION_V1',unitName:'Helios 010'}};
+  await h.message({...message,nonce:'wrong'});await h.message(message,{});await h.message(message,undefined,'https://example.test');await h.message({...message,location:{...message.location,unitName:'Helios 011'}});assert.equal(returned.length,0);
+  await h.message(message);assert.equal(returned.length,1);assert.equal(returned[0].targetOrigin,'https://cos-camera-health-field-map.units581037.chatgpt.site');assert.equal(returned[0].value.type,'COS_MHELP_LOCATION_RESULT');assert.equal(returned[0].value.nonce,nonce);assert(!JSON.stringify(returned).includes('fresh-owner-token'));
 });
 
 test('real IT and Service accounts never receive Operations or owner navigation', async () => {
