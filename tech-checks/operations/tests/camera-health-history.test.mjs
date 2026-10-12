@@ -62,7 +62,7 @@ test('CSV refresh preserves success history and both views share source-aware fo
  const detail=readFileSync(new URL('../../camera-detail.html',import.meta.url),'utf8');
  assert.match(readFileSync(new URL('../../camera-health-overview.js',import.meta.url),'utf8'),/CameraHealthHistory\.strip\(\[d\],health,cameraGroup\)/);
  assert.match(list,/camera-health-history\.js\?v=20261007-connection-contract/);
- assert.match(detail,/camera-health-history\.js\?v=20261007/);
+ assert.match(detail,/camera-health-history\.js\?v=20261012-direct-diagnostic/);
  assert.doesNotMatch(list,/last_online_at:null|✓ LAST SUCCESS|No successful ping recorded/);
  assert.doesNotMatch(detail,/latestSuccessfulPing|Last successful live check/);
  assert.match(detail,/sourceStatusCard.*className='card '/);

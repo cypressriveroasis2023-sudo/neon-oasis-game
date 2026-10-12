@@ -64,9 +64,32 @@ function parseObservedAt(body: any) {
     "observed_at", "event_time", "eventTime", "timestamp", "time", "created_at", "date_time",
     "event.observed_at", "event.timestamp", "data.timestamp"
   ]);
-  if (!raw) return new Date().toISOString();
+  if (!raw) return null;
   const d = new Date(raw);
-  return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
+  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+}
+
+function canonicalJson(value: any): string {
+  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
+  if (value && typeof value === "object") return "{" + Object.keys(value).sort()
+    .map(key => JSON.stringify(key) + ":" + canonicalJson(value[key])).join(",") + "}";
+  return JSON.stringify(value);
+}
+
+async function reconEventKey(body: any) {
+  const providerGuid = typeof body?.event_guid === "string" ? body.event_guid.trim() : "";
+  if (providerGuid && providerGuid.length <= 256) return "guid:" + providerGuid;
+  // Hash the original body before archive timestamps or storage references are added.
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson(body)));
+  return "sha256:" + Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, "0")).join("");
+}
+
+function withOrderingKey(archivedPayload: any, originalBody: any, key: string) {
+  return { ...archivedPayload, cos_event_order_v1: {
+    key,
+    ...(Object.hasOwn(originalBody, "cos_event_order_v1")
+      ? { original_payload_value: originalBody.cos_event_order_v1 } : {})
+  } };
 }
 
 async function safeEqual(a: string, b: string) {
@@ -156,6 +179,7 @@ Deno.serve(async (req: Request) => {
     "data.device_guid", "data.deviceGuid", "data.guid"
   ]) || "");
   const observedAt = parseObservedAt(body);
+  const eventKey = await reconEventKey(body);
   const batteryPercent = parseBatteryPercent(body);
   const reconCloudUrl = parseCloudUrl(body);
   const signalStrengthDbmRaw = firstValue(body, ["signal_strength_dbm", "device_info.signal_strength_dbm"]);
@@ -213,21 +237,22 @@ Deno.serve(async (req: Request) => {
       event_type: eventType || null,
       event_code: eventCode || null,
       observed_at: observedAt,
-      payload: await archiveReconPayload(archiveDb, body),
-      processed: Boolean(camera && mapping),
+      payload: withOrderingKey(await archiveReconPayload(archiveDb, body), body, eventKey),
+      processed: false,
       processing_note: !externalId
         ? "Stored raw payload; device identifier was not recognized yet."
         : !camera
           ? "Stored raw payload; Reconeyez device is not mapped in Camera Health yet."
           : !mapping
             ? "Event stored; it does not change camera health."
-            : "Reconeyez health event applied."
+            : "Reconeyez event queued for ordered projection."
     })
     .select("id")
     .maybeSingle();
 
-  if (eventInsertError) {
+  if (eventInsertError || !eventRow?.id) {
     console.error("Reconeyez event log insert failed", eventInsertError);
+    return json({ error: "Reconeyez event could not be retained; health was not changed." }, 503);
   }
 
   if (!camera || !mapping) {
@@ -240,19 +265,8 @@ Deno.serve(async (req: Request) => {
     }, 202);
   }
 
-  const { data: prev } = await db
-    .from("camera_health_current")
-    .select("overall_status,consecutive_failures,first_failed_at")
-    .eq("camera_device_id", camera.id)
-    .maybeSingle();
-
-  const previous = String(prev?.overall_status || "unknown").toLowerCase();
   const now = observedAt;
   const metadata = {
-    ...(camera.source_metadata || {}),
-    last_event_type: eventType || null,
-    last_event_code: eventCode || null,
-    last_event_at: now,
     ...(batteryPercent !== null ? { battery_percent: batteryPercent, battery_updated_at: now } : {}),
     ...(batteryStatus ? { battery_status: batteryStatus, battery_status_updated_at: now } : {}),
     ...(Number.isFinite(signalStrengthDbm) ? { signal_strength_dbm: signalStrengthDbm, signal_updated_at: now } : {}),
@@ -261,69 +275,24 @@ Deno.serve(async (req: Request) => {
     ...(reconCloudUrl ? { cloud_url: reconCloudUrl, cloud_url_updated_at: now } : {})
   };
 
-  const devicePatch: any = {
-    source_status: mapping.source,
-    source_last_seen_at: now,
-    source_metadata: metadata,
-    last_health_checked_at: now,
-    updated_at: new Date().toISOString()
-  };
-  if (mapping.source === "online") {
-    devicePatch.last_online_at = now;
-    devicePatch.last_probe_online_at = now;
-    devicePatch.last_online_source_text = "Reconeyez cloud event";
+  const { data: projection, error: projectionError } = await db.rpc("cos_apply_recon_event_v1", {
+    p_event_id: eventRow.id,
+    p_event_key: eventKey,
+    p_metadata_patch: metadata
+  });
+  if (projectionError) {
+    console.error("Reconeyez ordered projection failed", projectionError);
+    return json({ error: "Reconeyez event retained; ordered health update could not be completed." }, 503);
   }
-
-  await db.from("camera_devices").update(devicePatch).eq("id", camera.id);
-
-  const healthPatch: any = {
-    camera_device_id: camera.id,
-    overall_status: mapping.health,
-    ip_reachable: null,
-    port_status: {},
-    checked_at: now,
-    detail: `Reconeyez cloud event: ${eventType || eventCode || "status update"}`,
-    confirmed_outage: mapping.health === "offline",
-    confirmation_reason: mapping.health === "offline" ? "Reconeyez reported a connection/power outage event" : null
-  };
-
-  if (mapping.health === "offline") {
-    healthPatch.consecutive_failures = Math.max(1, Number(prev?.consecutive_failures || 0) + 1);
-    healthPatch.first_failed_at = prev?.first_failed_at || now;
-  } else {
-    healthPatch.consecutive_failures = 0;
-    healthPatch.first_failed_at = null;
-    healthPatch.acknowledged_at = null;
-    healthPatch.acknowledged_by = null;
-    if (previous === "offline") healthPatch.last_recovered_at = now;
-  }
-
-  await db.from("camera_health_current").upsert(healthPatch, { onConflict: "camera_device_id" });
-
-  if (previous !== mapping.health || mapping.health !== "online") {
-    await db.from("camera_health_history").insert({
-      camera_device_id: camera.id,
-      status: mapping.health,
-      check_source: "reconeyez_webhook",
-      detail: {
-        previous_status: previous,
-        event_type: eventType || null,
-        event_code: eventCode || null,
-        external_device_id: externalId || null,
-        battery_percent: batteryPercent,
-        battery_status: batteryStatus,
-        cloud_url: reconCloudUrl
-      }
-    });
-  }
-
   return json({
     ok: true,
     event_id: eventRow?.id || null,
     matched: true,
-    health_changed: previous !== mapping.health,
+    applied: Boolean(projection?.applied),
+    outcome: projection?.outcome || "unknown",
+    health_changed: Boolean(projection?.health_changed),
     camera_device_id: camera.id,
-    status: mapping.health,
+    status: projection?.status || null,
     battery_percent: batteryPercent,
     battery_status: batteryStatus,
     cloud_url: reconCloudUrl

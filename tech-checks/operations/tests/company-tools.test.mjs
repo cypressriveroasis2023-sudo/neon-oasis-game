@@ -1,3 +1,4 @@
+// 2026-10-12 reviewed source-separated direct diagnostic wording; current daily four-view markers preserved.
 // 2026-10-08 reviewed read-only effective placement adapter; exact identity, stale read and actual-entry browser coverage.
 // 2026-10-08 reviewed SHOP/new-installation and incomplete-field repair cache tag; isolated regressions cover the flows.
 // 2026-10-08 reviewed address-editor cache version; authenticated prefill/no-op/race coverage is in camera-placement-prefill tests.
@@ -21,13 +22,13 @@ import test from 'node:test';
 // data, diagnostics, rules or action handlers in the four connected tools.
 const scriptHashes = {
   "camera-health": "eaea57f2fd5cc7a5544938675eda253ee7e36378a8650460edaf2630ac7195af",
-  "camera-detail": "049804704c26ca94eafd98b4caee7c99937366c8e8548f10bb8f39874716b4e0",
+  "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
   "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
 };
 const markupHashes = {
   "camera-health": "51a4a0d2fb522938fbc844d7f79b25aa585e4acc604f7aa0e6365e1ec196cce4",
-  "camera-detail": "732b46d9a3ee49f58c6a95dc7bd3fadee5c9f9a9225119f2d289409612326467",
+  "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "6b7a93fc2a2106fc98645f992f82c537e46bd96347b16ac57e2b17366bbd7432",
   "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
 };

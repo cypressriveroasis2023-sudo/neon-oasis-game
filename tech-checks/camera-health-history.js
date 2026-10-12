@@ -60,6 +60,38 @@
     return { state: result.online ? 'responding' : 'failed',
       label: result.online ? 'Responding' : 'No response', at: checked.at, latencyMs };
   }
+  // Describe the recorded direct attempt without turning an unconfirmed failure
+  // into camera OFFLINE. Provider availability is presented independently.
+  function directDiagnostic(device = {}, health = {}, now = Date.now()) {
+    health = health && typeof health === 'object' && !Array.isArray(health) ? health : {};
+    const meta = health.port_status?._connection;
+    const malformed = health.port_status && Object.prototype.hasOwnProperty.call(health.port_status, '_connection')
+      && (!meta || typeof meta !== 'object' || Array.isArray(meta));
+    const snapshot = malformed ? {} : connectionSnapshot(health, device);
+    const checked = timestamp(snapshot.checked_at, now);
+    const results = snapshot.port_status;
+    const attempts = results && typeof results === 'object' && !Array.isArray(results)
+      ? Object.keys(results).filter(key => /^[1-9]\d{0,4}$/.test(key) && Number(key) <= 65535)
+        .map(key => ({ port: Number(key), ...port(health, key, now, device) }))
+        // A differently timed port result must not be attributed to this attempt.
+        .filter(result => result.at && result.at === checked.at).sort((a, b) => a.port - b.port) : [];
+    const responding = attempts.some(result => result.state === 'responding');
+    const failed = attempts.some(result => result.state === 'failed');
+    const state = checked.state !== 'fresh' ? 'unverified'
+      : snapshot.ip_reachable === true && responding ? 'responding'
+      : snapshot.ip_reachable === false && failed && !responding
+        ? snapshot.confirmed_outage === true && snapshot.overall_status === 'offline' ? 'offline' : 'failed' : 'unverified';
+    const label = { responding: 'Service reachable', failed: 'Check failed',
+      offline: 'Confirmed service outage', unverified: 'Reachability unverified' }[state];
+    const note = state === 'failed' ? 'Reachability unverified; outage not confirmed.'
+      : state === 'responding' ? 'Service-port response only; video not verified.'
+      : state === 'offline' ? 'Direct-service outage; provider camera status is separate.'
+      : checked.state === 'stale' ? 'Previous result; not current.' : 'No recent verified direct result.';
+    const ports = attempts.map(result => result.port);
+    const detail = (ports.length ? (checked.state === 'stale' ? 'Previous attempted ports: ' : 'Attempted ports: ') + ports.join(', ') + '.' : 'No verified attempted ports.')
+      + ' Last direct check: ' + format(snapshot.checked_at, now) + '. ' + note;
+    return { state, label, checked, ports, detail };
+  }
   // Saved destinations remain available regardless of diagnostic state. A port
   // number is not proof of HTTP: Unity client/service ports stay plain endpoints.
   function connections(device = {}, health = {}, address) {
@@ -117,5 +149,5 @@
     };
     return '<div class="unit-time-strip" aria-label="Connection check history">' + cell(attemptRow, 'attempt') + cell(successRow, 'success') + '</div>';
   }
-  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip, connectionSnapshot };
+  root.CameraHealthHistory = { timestamp, format, port, connections, record, strip, connectionSnapshot, directDiagnostic };
 })(globalThis);
