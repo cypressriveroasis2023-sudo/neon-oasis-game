@@ -195,6 +195,31 @@ test('each allowed view survives Back, Forward and reload', async ({page}) => {
   await page.reload(); await ready(frame); await assertReads(page, state);
 });
 
+for (const role of ['it', 'owner']) test(role + ' daily menu stays on screen through header changes and phone rotation', async ({page}) => {
+  const {frame, state} = await mount(page, {role});
+  if (role === 'owner') await page.evaluate(() => window.show('it'));
+  await ready(frame);
+  for (const viewport of [{width:390,height:844},{width:390,height:640},{width:844,height:390}]) {
+    await page.setViewportSize(viewport);
+    await page.locator('#ownerTestAppBanner').evaluate(node => {node.style.paddingBottom='28px';});
+    await expect.poll(async () => {
+      const bounds = await frame.getByRole('button', {name:'More',exact:true}).first().boundingBox();
+      return Boolean(bounds && bounds.y >= 0 && bounds.y + bounds.height <= viewport.height && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width);
+    }).toBe(true);
+    const nav = await menu(frame);
+    await expect(nav).toBeVisible();
+    await nav.getByRole('button', {name:/Close menu/}).click();
+    await expect(nav).toHaveCount(0);
+    await page.locator('#ownerTestAppBanner').evaluate(node => {node.style.paddingBottom='0px';});
+  }
+  if (role === 'owner') {
+    await page.evaluate(() => window.show('owner'));
+    await expect(page.locator('#cosITDailyFrame')).toHaveCount(0);
+    await expect(page.locator('#fixtureOwnerControl')).toBeVisible();
+  }
+  await assertReads(page,state);
+});
+
 test('blocked direct and history routes cannot mount paused features', async ({page}) => {
   const {frame, state} = await mount(page, {deepLink: '?itHome=checks#tech-checks/it'}); await ready(frame);
   for (const hash of ['#mhelp', '#tech-check', '#inhand-routers', '#team', '#jobs', '#calendar']) {

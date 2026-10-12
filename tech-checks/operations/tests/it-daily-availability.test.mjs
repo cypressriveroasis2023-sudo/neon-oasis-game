@@ -37,3 +37,17 @@ test('legacy host adapters withhold extra IT entry points and their token bridge
   assert.doesNotMatch(host,/COS_IT_ASSIGNMENTS_REQUEST|COS_IT_MHELP_REQUEST|my_managed_tickets|my_available_assignments/);
   assert.ok(read('index.html').indexOf('it-daily-host.js')<read('index.html').indexOf('src=".\/app.js'));
 });
+test('daily frame follows available viewport height without resizing fullscreen or detached frames',()=>{
+  const host=read('it-daily-host.js');
+  const body=host.match(/function fitDailyFrame\(\) \{([\s\S]*?)\n\}/)[1];
+  const fit=new Function('frame','window',body);
+  const frame={isConnected:true,style:{},getBoundingClientRect:()=>({top:142})};
+  fit(frame,{innerHeight:844});assert.equal(frame.style.height,'690px');
+  fit(frame,{innerHeight:640});assert.equal(frame.style.height,'486px');
+  fit(frame,{innerHeight:844,visualViewport:{offsetTop:30,height:420}});assert.equal(frame.style.height,'296px');
+  frame.getBoundingClientRect=()=>({top:-90});fit(frame,{innerHeight:640});assert.equal(frame.style.height,'628px');
+  frame.getBoundingClientRect=()=>({top:NaN});fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
+  frame.style.position='fixed';fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
+  frame.style.position='';frame.isConnected=false;fit(frame,{innerHeight:390});assert.equal(frame.style.height,'628px');
+  assert.doesNotMatch(host,/min-height:(500|560)px/);
+});
