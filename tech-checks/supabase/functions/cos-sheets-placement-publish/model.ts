@@ -11,12 +11,14 @@ export function snapshotCell(v:any){
  return {entered:v?.userEnteredValue??{},validation:v?.dataValidation??null,rich:Boolean(v?.chipRuns?.length||v?.textFormatRuns?.length)};
 }
 export const cellText=(c:Row)=>typeof c?.entered?.stringValue==='string'?c.entered.stringValue:Object.keys(c?.entered??{}).length===0?'':null;
-export function trackerRanges(metadata:Row){
+export function trackerRanges(metadata:Row,bindings?:Row[]){
  if(metadata?.spreadsheetId!==UNIT_TRACKER_WORKBOOK||metadata?.properties?.title!=='2027 UNIT TRACKER'||!Array.isArray(metadata.sheets))throw Error('Wrong tracker workbook');
  const ranges:string[]=[];
  for(const tab of TRACKER_TABS){const matches=metadata.sheets.filter((s:Row)=>s?.properties?.sheetId===tab.id),p=matches[0]?.properties;
   if(matches.length!==1||p.title!==tab.title||p.sheetType!=='GRID'||p.hidden===true||!Number.isSafeInteger(p.gridProperties?.rowCount)||p.gridProperties.rowCount<2||p.gridProperties.rowCount>10000||p.gridProperties.columnCount<6)throw Error('Tracker layout changed');
-  for(const col of tabLayout(tab.id).columns)ranges.push("'"+tab.title.replaceAll("'","''")+"'!"+String.fromCharCode(65+col)+'1:'+String.fromCharCode(65+col)+p.gridProperties.rowCount);
+  const last=bindings?Math.min(p.gridProperties.rowCount,Math.max(1,...bindings.filter(b=>b.sheetId===tab.id).map(b=>b.row))):p.gridProperties.rowCount;
+  if(!Number.isSafeInteger(last)||last<1)throw Error('Invalid publisher bindings');
+  for(const col of tabLayout(tab.id).columns)ranges.push("'"+tab.title.replaceAll("'","''")+"'!"+String.fromCharCode(65+col)+'1:'+String.fromCharCode(65+col)+(col===0?p.gridProperties.rowCount:last));
  }
  return ranges;
 }

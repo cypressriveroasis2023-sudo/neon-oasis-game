@@ -39,6 +39,7 @@ test('ambiguous failed writes are recoverable only from exact intended readback;
 test('metadata reads only identity/placement/customer/site columns and reject layout changes and global duplicates',()=>{
  const metadata={spreadsheetId:UNIT_TRACKER_WORKBOOK,properties:{title:'2027 UNIT TRACKER'},sheets:TRACKER_TABS.map(t=>({properties:{sheetId:t.id,title:t.title,sheetType:'GRID',gridProperties:{rowCount:10,columnCount:12}}}))};
  const ranges=trackerRanges(metadata);assert.equal(ranges.length,40);assert(ranges.every(x=>!x.includes('!G')&&!x.includes('!H')));assert(ranges.includes("'SOLAR POLES & SKIDS'!F1:F10"));assert(!ranges.includes("'SOLAR POLES & SKIDS'!B1:B10"));
+ const narrow=trackerRanges(metadata,[binding]);assert(narrow.includes("'SPOTTERS'!A1:A10"));assert(narrow.includes("'SPOTTERS'!B1:B2"));assert(narrow.includes("'HELIOS'!B1:B1"));
  const grid={...metadata,sheets:metadata.sheets.map(s=>({...s,data:tabLayout(s.properties.sheetId).columns.map((col,i)=>({startColumn:col,rowData:[{values:[{userEnteredValue:{stringValue:tabLayout(s.properties.sheetId).headers[i]}}]},{values:[{userEnteredValue:{stringValue:i===0?'Duplicate label':'FIELD'}}]}]}))}))};
  assert.equal(projectTracker(metadata,grid).filter(x=>x.unique).length,0);
  assert.throws(()=>trackerRanges({...metadata,spreadsheetId:'other'}),/workbook/);

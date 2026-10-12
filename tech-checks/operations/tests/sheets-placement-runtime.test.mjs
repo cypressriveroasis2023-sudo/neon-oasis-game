@@ -32,6 +32,8 @@ function fixture({wrongAccount=false,googleDenied=false,nativeUrl=native}={}){
   const u=new URL(url);assert.equal(u.origin,'https://sheets.googleapis.com');assert.equal(u.pathname.split('/')[3],UNIT_TRACKER_WORKBOOK+(init.method==='POST'?':batchUpdate':''));
   if(googleDenied)return new Response('private provider content',{status:403});
   if(init.method==='POST'){const body=JSON.parse(init.body);assertPublishRequests(body.requests);liveCells=b.pending;return json({spreadsheetId:UNIT_TRACKER_WORKBOOK,replies:body.requests.map(()=>({}))});}
+  assert.equal(u.searchParams.get('prettyPrint'),'false');
+  if(u.searchParams.has('ranges')){assert(u.searchParams.getAll('ranges').includes("'SPOTTERS'!B1:B2"));assert(u.searchParams.getAll('ranges').includes("'SPOTTERS'!A1:A5"));}
   return json(u.searchParams.has('ranges')?grid():metadata);
  }});
  return {handler,calls};
