@@ -129,7 +129,7 @@ async function mount(page, options = {}) {
       '/api/routers': {items: [], source: 'camera_health', gpsAvailable: false, generatedAt: now},
       '/api/camera-health/summary-v3': snapshot([resource(1, 'Synthetic Helios 001', {name: 'Synthetic camera', status: 'online', checkedAt: now, evidence: {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'online', observedAt: now, lastOnlineAt: now}})]),
       '/api/vrm-fleet': {items: [{installationId: 9100001, name: 'Synthetic power site', portalUrl: 'https://vrm.victronenergy.com/installation/9100001/dashboard', embedUrl: null}], sync: {state: 'current', lastAttemptAt: now, lastSuccessAt: now, nextSyncAt: now, error: null, scheduleActive: true}},
-      '/api/unit-tracker': {contract: 'COS_UNIT_TRACKER_OUTBOX_V1', workbookId: '1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA', connector: {enabled: false, state: 'awaiting_sheets_connection'}, queueEnabled: false, availability: 'available', sources: [], requests: [], sourcesHeld: 0, sourcesTruncated: false, requestsTruncated: false},
+      '/api/unit-tracker': {contract: 'COS_UNIT_TRACKER_OUTBOX_V1', workbookId: '1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA', connector: {enabled: false, state: 'awaiting_sheets_connection'}, queueEnabled: false, availability: options.trackerUnavailable ? 'unavailable' : 'available', sources: [], requests: [], sourcesHeld: 0, sourcesTruncated: false, requestsTruncated: false},
     }[call.path];
     return route.fulfill({headers, contentType: 'application/json', body: JSON.stringify(data)});
   });
@@ -389,4 +389,38 @@ test('failed IT session verification never offers Owner or paused workflow contr
   delete state.fail['/api/session'];
   await frame.getByRole('button',{name:'Retry Operations access',exact:true}).click();
   await ready(frame); await assertReads(page,state);
+});
+
+for (const role of ['it', 'owner']) test(role + ' daily tracker opens the original sheet while COS summary is unavailable', async ({page}) => {
+  const {frame, state} = await mount(page, {role, trackerUnavailable: true});
+  if (role === 'owner') await page.evaluate(() => window.show('it'));
+  await ready(frame, 'tracker');
+  const tracker = card(frame, 'tracker');
+  await expect(tracker.locator('.it-dashboard-status')).toHaveText('Unavailable');
+  await expect(tracker).toContainText('COS summary is unavailable. Open the 2027 Google Sheet for current tracker records.');
+  await expect(tracker.locator('.it-dashboard-count')).toHaveCount(0);
+  const link = tracker.getByRole('link', {name: 'Open 2027 Google Sheet'});
+  await expect(link).toHaveAttribute('href', 'https://docs.google.com/spreadsheets/d/1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA/edit');
+  await expect(link).toHaveAttribute('target', '_blank');
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  const callsBefore = state.calls.length;
+  await page.context().route('https://docs.google.com/spreadsheets/**', route => route.fulfill({contentType: 'text/html', body: '<h1>Synthetic original tracker</h1>'}));
+  const popupPromise = page.waitForEvent('popup');
+  await link.click();
+  const popup = await popupPromise;
+  await expect(popup).toHaveURL('https://docs.google.com/spreadsheets/d/1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA/edit');
+  expect(state.calls.length).toBe(callsBefore);
+  await popup.close();
+  await expect(tracker.getByRole('button', {name: 'Open COS inventory'})).toBeEnabled();
+  await assertReads(page, state);
+});
+
+test('daily tracker source link is absent when the current account lacks tracker access', async ({page}) => {
+  const {frame, state} = await mount(page, {unitTracker: false});
+  await ready(frame, 'tracker');
+  await expect(card(frame, 'tracker').getByRole('link')).toHaveCount(0);
+  await expect(card(frame, 'tracker').getByRole('button', {name: 'Open COS inventory'})).toBeDisabled();
+  expect(state.calls.some(call => call.path === '/api/unit-tracker')).toBe(false);
+  await assertReads(page, state);
 });

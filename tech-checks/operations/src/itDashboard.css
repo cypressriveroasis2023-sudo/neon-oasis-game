@@ -28,11 +28,11 @@
 .it-dashboard-card-bottom{padding-top:20px;margin-top:auto}
 .it-dashboard-read-time{display:block;margin-bottom:12px;font-size:10px;line-height:1.4;color:var(--cos-muted,#a3b3ca)}
 .it-dashboard-actions{display:flex;align-items:stretch;gap:8px}
-#root .it-dashboard .it-dashboard-actions>button{min-width:0;min-height:44px;white-space:normal;box-sizing:border-box;padding:9px 11px!important;border:1px solid var(--cos-border,#2c3b51)!important;border-radius:8px!important;font-size:11px!important;line-height:1.5!important;font-weight:600!important;letter-spacing:0!important;box-shadow:none!important;cursor:pointer}
+#root .it-dashboard .it-dashboard-actions>:is(button,a){min-width:0;min-height:44px;white-space:normal;box-sizing:border-box;padding:9px 11px!important;border:1px solid var(--cos-border,#2c3b51)!important;border-radius:8px!important;font-size:11px!important;line-height:1.5!important;font-weight:600!important;letter-spacing:0!important;box-shadow:none!important;cursor:pointer}
 #root .it-dashboard .it-dashboard-actions>.it-dashboard-open{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:1;text-align:left;background:var(--cos-selected,#203456)!important;color:var(--cos-blue,#91b0ff)!important}
 #root .it-dashboard .it-dashboard-actions>.it-dashboard-refresh{flex:none;background:transparent!important;color:var(--cos-muted,#a3b3ca)!important}
-#root .it-dashboard .it-dashboard-actions>button:hover:not(:disabled){border-color:var(--cos-blue,#91b0ff)!important}
-#root .it-dashboard .it-dashboard-actions>button:focus-visible{outline:3px solid var(--cos-blue,#91b0ff)!important;outline-offset:3px}
+#root .it-dashboard .it-dashboard-actions>:is(button,a):hover:not(:disabled){border-color:var(--cos-blue,#91b0ff)!important}
+#root .it-dashboard .it-dashboard-actions>:is(button,a):focus-visible{outline:3px solid var(--cos-blue,#91b0ff)!important;outline-offset:3px}
 #root .it-dashboard .it-dashboard-actions>button:disabled{opacity:.55;cursor:default}
 .it-dashboard-footnote{margin:18px 0 0;color:var(--cos-muted,#a3b3ca);font-size:11px;line-height:1.6;max-width:100ch}
 @media(max-width:1100px){.it-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -61,3 +61,5 @@
 
 .it-daily-dashboard .it-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:650px){.it-daily-dashboard .it-dashboard-grid{grid-template-columns:minmax(0,1fr)}}
+
+.it-dashboard-source-action{margin-bottom:8px}.it-dashboard-source-action a{text-decoration:none}
