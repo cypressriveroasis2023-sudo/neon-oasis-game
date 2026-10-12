@@ -12,7 +12,7 @@ const harness = `<!doctype html><html><head><meta name="viewport" content="width
 async function setup(page, { many = false } = {}) {
   const state = { fail: 0, reads: 0, writes: [], tasks: [{id:'task-1',title:'Shop work update',instructions:'Inspect the return rack',assignedTo:'Tech 1',assignedDepartment:'it',status:'assigned',priority:'high'}], jobs: many ? Array.from({length:10}, (_, index) => ({id:'job-'+index,customer:'Work '+index,technician:'Tech '+index,department:'it',status:'assigned'})) : [], readiness: [] };
   await page.clock.install({ time: new Date(time) });
-  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;
+  state.settings={sections:['shop'],revision:0,updatedAt:null};state.fleetReads=0;state.fleetFailures={};
   if(many)state.tasks.push(...Array.from({length:10},(_,index)=>({id:'extra-'+index,title:'More shop work '+index,assignedTo:'Tech '+index,assignedDepartment:'it',status:'assigned',priority:'medium'})));
   const unit={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',unitNumber:'Sniper 312',modelName:'SNIPER',status:'installed',site:'Fixture field site',address:'19017 Lee Rd, Humble, TX 77032',latitude:29.986,longitude:-95.311,locationVerification:'owner_verified',locationVerifiedAt:time,gpsRecordedAt:time};
   await page.route('**/*', async route => {
@@ -42,6 +42,7 @@ async function setup(page, { many = false } = {}) {
       if(state.fail)return route.fulfill({status:state.fail,headers:cors,json:{error:state.fail===401?'Sign-in required':'Connection unavailable'}});
       return route.fulfill({headers:cors,json:{jobs:state.jobs,tasks:state.tasks,readiness:state.readiness,asOf:time}});
     }
+    if(state.fleetFailures[path]){state.fleetReads++;return route.fulfill({status:state.fleetFailures[path],headers:cors,json:{error:'Connection unavailable'}});}
     if(path==='/api/field-map'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:1,missingGps:0},generatedAt:time}});}
     if(path==='/api/routers'){state.fleetReads++;return route.fulfill({headers:cors,json:{items:[],generatedAt:time,source:'camera_health',gpsAvailable:false}});}
     if(path==='/api/camera-health/summary-v3'){state.fleetReads++;return route.fulfill({headers:cors,json:{totalDevices:1,online:1,offline:0,review:0,shopRoot:0,healthRows:1,fieldDevices:1,refreshedAt:time,evidenceVersion:2,inventory:{allRecords:1,activeFieldRecords:1,activeShopRecords:0,inactiveRecords:0,unknownScopeRecords:0},rows:[{id:'fixture-resource',name:'Sniper 312 connection',unit:'Sniper 312',status:'online',scope:'field',activationState:'active',serviceEvidence:{kind:'service_port',source:'Saved connection',status:'online',active:true,resource:'service',observedAt:time,lastOnlineAt:time,reachable:true}}]}});}
@@ -144,4 +145,18 @@ test('Teddy and Victor have no inspection fields and Camera Health rotates with 
  await expect.poll(()=>state.fleetReads).toBe(reads+3);
  state.fail=401;await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(0);
+});
+
+test('TV uses the Field Map background and retains pins when optional feeds fail',async({page})=>{
+ const {state,frame}=await setup(page);
+ state.settings={sections:['map'],revision:1,updatedAt:time};
+ state.fleetFailures={'/api/camera-health/summary-v3':503,'/api/routers':503};
+ await page.clock.fastForward(60000);
+ await expect(frame.getByRole('region',{name:'Tech Check TV Board'})).toHaveAttribute('data-section','map');
+ await expect(frame.locator('.tv-fleet-map .leaflet-marker-icon')).toHaveCount(1);
+ await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health: Connection unavailable');
+ await expect(frame.locator('.tv-fleet-warning')).toContainText('Routers: Connection unavailable');
+ await expect(frame.locator('.tv-fleet-summary')).toContainText('1 unverified');
+ await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/tile\.openstreetmap\.org\//);
+ expect(state.writes).toEqual([]);
 });
