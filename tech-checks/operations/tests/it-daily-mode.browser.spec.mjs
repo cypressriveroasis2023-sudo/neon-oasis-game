@@ -22,7 +22,7 @@ const card = (frame, id) => daily(frame).locator('[data-source="' + id + '"]');
 function fixture({ role = 'it', linked = true, holdCapability = false, slowLegacy = false, preview = false, ...options } = {}) {
   let html = itHomeFixture(role, linked, { dashboard: true, ...options });
   if (slowLegacy) html = html.replace('async function loadITManagedTickets(){return []};', 'async function loadITManagedTickets(){return new Promise(()=>{});};');
-  const setup = `<script>
+  const setup = `<script>(() => {
     window.fixtureEffectiveRole = ${JSON.stringify(preview ? 'it' : role)};
     window.fixturePreview = ${preview}; window.fixtureAuthenticated = true;
     window.fixtureRpcCalls = []; window.fixtureLegacyActions = 0; window.fixtureOwnerActions = 0;
@@ -34,7 +34,7 @@ function fixture({ role = 'it', linked = true, holdCapability = false, slowLegac
     const owner = document.createElement('section'); owner.id = 'view-owner'; owner.className = 'hidden'; owner.innerHTML = '<button id="fixtureOwnerControl">Owner account controls</button>'; app.append(owner);
     const service = document.createElement('section'); service.id = 'view-svc'; service.className = 'hidden'; service.innerHTML = '<button id="fixtureServiceControl">Service workflow</button>'; app.append(service);
     for (const name of ['it', 'svc', 'owner']) { const tab = document.createElement('button'); tab.id = 'tab-' + name; tab.textContent = name; tab.onclick = () => window.show(name); app.prepend(tab); }
-    const top = document.createElement('div'); top.className = 'mobileTop'; top.innerHTML = '<button id="techMenuButton">Legacy Menu</button><button id="fixtureLogout">Sign out fixture</button>'; app.prepend(top);
+    const mobileTop = document.createElement('div'); mobileTop.className = 'mobileTop'; mobileTop.innerHTML = '<button id="techMenuButton">Legacy Menu</button><button id="fixtureLogout">Sign out fixture</button>'; app.prepend(mobileTop);
     const banner = document.createElement('section'); banner.id = 'ownerTestAppBanner'; banner.innerHTML = '<button id="fixtureReturnOwner">Return to Owner</button>'; app.prepend(banner);
     const old = document.getElementById('existing-it-tool'); old.innerHTML = '<button id="fixtureOldAction">Create IT prep</button><form id="fixtureOldForm"><input><button>Save prep</button></form>';
     document.getElementById('fixtureOldAction').onclick = () => window.fixtureLegacyActions++;
@@ -81,7 +81,7 @@ function fixture({ role = 'it', linked = true, holdCapability = false, slowLegac
     c.db.auth.getSession = async () => { window.fixtureTokens++; return {data: {session: window.fixtureSession()}}; };
     window.addEventListener('message', event => { if (event.data?.type === 'COS_OPERATIONS_TOKEN_RESPONSE') window.fixtureTokenResponses.push(event.data); });
     window.fixtureSetRole(${JSON.stringify(role)}, ${preview});
-  </script>
+  })();</script>
   <script type="module" src="/it-daily-host.js"></script>
   <script type="module" src="/verified-it-fleet-host.js"></script>
   <script type="module" src="/production-assignments-host.js"></script>
@@ -112,7 +112,8 @@ async function mount(page, options = {}) {
     const headers = {'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type'};
     if (request.method() === 'OPTIONS') return route.fulfill({status: 204, headers});
     const call = request.postDataJSON(); state.calls.push(call);
-    if (call.method !== 'GET' || !['/api/session', '/api/tech/session', ...Object.values(sourcePaths)].includes(call.path)) {
+    const allowedReads = ['/api/session', '/api/tech/session', ...Object.values(sourcePaths), ...(options.fieldDiagnostics ? ['/api/routers'] : [])];
+    if (call.method !== 'GET' || !allowedReads.includes(call.path)) {
       state.unexpected.push(call);
       return route.fulfill({status: 405, headers, contentType: 'application/json', body: JSON.stringify({error: 'Synthetic fixture refuses this request'})});
     }
@@ -124,6 +125,8 @@ async function mount(page, options = {}) {
       '/api/session': {authorized: true, legacyOwner: owner, role: owner ? 'Owner' : 'IT', name: 'Synthetic Technician', features: {fleetAccess: true, unitTracker: options.unitTracker !== false, vrmRead: options.vrmRead !== false, importedUnitAddressEdit: false}},
       '/api/tech/session': {authorized: true, legacyTechnician: true, department: 'it', productionTechnicianUserId: '22222222-2222-4222-8222-222222222222'},
       '/api/field-map': {items: [unit], inventoryItems: [unit], summary: {fieldUnits: 1, mappedUnits: 1, unitGps: 1, missingGps: 0}, generatedAt: now},
+      // Field View reads saved router observations without opening the paused Router workspace.
+      '/api/routers': {items: [], source: 'camera_health', gpsAvailable: false, generatedAt: now},
       '/api/camera-health/summary-v3': snapshot([resource(1, 'Synthetic Helios 001', {name: 'Synthetic camera', status: 'online', checkedAt: now, evidence: {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'online', observedAt: now, lastOnlineAt: now}})]),
       '/api/vrm-fleet': {items: [{installationId: 9100001, name: 'Synthetic power site', portalUrl: 'https://vrm.victronenergy.com/installation/9100001/dashboard', embedUrl: null}], sync: {state: 'current', lastAttemptAt: now, lastSuccessAt: now, nextSyncAt: now, error: null, scheduleActive: true}},
       '/api/unit-tracker': {contract: 'COS_UNIT_TRACKER_OUTBOX_V1', workbookId: '1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA', connector: {enabled: false, state: 'awaiting_sheets_connection'}, queueEnabled: false, availability: 'available', sources: [], requests: [], sourcesHeld: 0, sourcesTruncated: false, requestsTruncated: false},
@@ -169,11 +172,13 @@ for (const secondVerified of [false, true]) test('daily mode has exactly four vi
   await nav.getByRole('button', {name: /Close menu/}).click();
   const fit = await frame.locator('body').evaluate(() => ({width: innerWidth, content: document.documentElement.scrollWidth}));
   expect(fit.content).toBeLessThanOrEqual(fit.width);
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
   await page.screenshot({path: info.outputPath('it-daily-four.png'), fullPage: true}); await assertReads(page, state);
 });
 
 test('each allowed view survives Back, Forward and reload', async ({page}) => {
-  const {frame, state} = await mount(page); await ready(frame);
+  const {frame, state} = await mount(page, {fieldDiagnostics: true}); await ready(frame);
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
   for (const source of sources) {
     await card(frame, source).getByRole('button', {name: /^Open /}).click();
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
@@ -197,11 +202,13 @@ test('blocked direct and history routes cannot mount paused features', async ({p
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#it-dashboard'); await ready(frame);
     await frame.locator('body').evaluate(() => history.back()); await ready(frame);
   }
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
   await assertReads(page, state);
 });
 
 test('legacy redraw, repeated clicks, synthetic events and old overlays remain unavailable', async ({page}) => {
-  const {frame, state} = await mount(page); await ready(frame);
+  const {frame, state} = await mount(page, {fieldDiagnostics: true}); await ready(frame);
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
   for (let index = 0; index < 3; index++) {
     await page.evaluate(() => { window.renderITHome(); window.fixtureAddLegacyOverlays(); });
     await ready(frame); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
