@@ -1,3 +1,4 @@
+import { resolveStarResources, starResourceStatus } from "./star-resource-identity.js";
 import { unmappedResourceDiagnostics } from "./unmapped-resource-diagnostics.js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -148,52 +149,56 @@ async function starInventory(db:any){
   if(queryResults.length>0&&failures.length===queryResults.length)throw new Error("Every Star4Live tracker lookup failed; refusing to publish a successful reconciliation.");
 
   const {data:locals,error}=await db.from("camera_devices")
-    .select("id,device_name,device_serial,external_device_id,monitoring_profile,unit_key,activation_state,organization")
+    .select("id,device_name,device_serial,external_device_id,monitoring_profile,unit_key,activation_state,organization,source_metadata")
     .eq("source","vigilant_control_center");
   if(error)throw error;
-  const bySerial=new Map<string,any>(),byExternal=new Map<string,any>(),byName=new Map<string,any>();
-  for(const d of locals||[]){
-    if(d.device_serial)bySerial.set(String(d.device_serial).toLowerCase(),d);
-    if(d.external_device_id)byExternal.set(String(d.external_device_id).toLowerCase(),d);
-    if(d.device_name)byName.set(String(d.device_name).toLowerCase(),d);
-  }
-  const now=new Date().toISOString();let matched=0,online=0,offline=0,unmatched=0;
-  const unmatchedResources:any[]=[];
+  // Resolve the whole batch before writing: independent aliases must not let
+  // different resources overwrite the same camera during a single sync.
+  const resolution=resolveStarResources(queryResults.flatMap(p=>p.resources),locals||[]);
+  const observedStatuses=new Map(resolution.resourceStatuses.map((row:any)=>[row.serial,row.status]));
+  const resolvedResourceStatus=(resource:any)=>observedStatuses.get(String(resource.deviceSerial||"").trim().toLowerCase())||starResourceStatus(resource.status);
+  const now=new Date().toISOString();let matched=0,online=0,offline=0,unknown=0;
+  const unmatchedResources=resolution.unmatched.map((v:any)=>({
+    device_name:String(v.deviceName||""),device_serial:String(v.deviceSerial||""),
+    status:resolvedResourceStatus(v),
+    organization:String(v.organizationName||v.orgName||v.organization||v.parentOrganizationName||""),
+    ...unmappedResourceDiagnostics(v,now),
+    query_tags:[...(resourceQueryTags.get(String(v.deviceSerial||v.deviceName||""))||new Set<string>())].sort()
+  }));
+  const unmatched=unmatchedResources.length;
+  const identityConflicts=resolution.conflicts.map((row:any)=>({camera_device_id:row.device.id,reasons:row.reasons,resources:row.resources}));
   const byProfile:any={},coveredTrackerUnits=new Map<string,any>();
-  for(const v of all){
-    const resourceKey=String(v.deviceSerial||v.deviceName||"");
-    let d=bySerial.get(String(v.deviceSerial||"").toLowerCase())||byExternal.get(String(v.deviceSerial||"").toLowerCase())||byName.get(String(v.deviceName||"").toLowerCase());
-    if(!d){
-      unmatched++;
-      unmatchedResources.push({
-        device_name:String(v.deviceName||""),
-        device_serial:String(v.deviceSerial||""),
-        status:Number(v.status)===1?"online":"offline",
-        organization:String(v.organizationName||v.orgName||v.organization||v.parentOrganizationName||""),
-        ...unmappedResourceDiagnostics(v, now),
-        query_tags:[...(resourceQueryTags.get(resourceKey)||new Set<string>())].sort()
-      });
-      continue
-    }
-    matched++;
-    const isOnline=Number(v.status)===1;isOnline?online++:offline++;
+  function countObservation(d:any,status:string,resourceName:any,identityConflict=false){
+    matched++;if(status==="online")online++;else if(status==="offline")offline++;else unknown++;
     const p=String(d.monitoring_profile||"unknown");
-    byProfile[p]??={matched:0,online:0,offline:0,field_units:new Set(),shop_units:new Set()};
-    byProfile[p].matched++;isOnline?byProfile[p].online++:byProfile[p].offline++;
+    byProfile[p]??={matched:0,online:0,offline:0,unknown:0,identity_conflicts:0,field_units:new Set(),shop_units:new Set()};
+    byProfile[p].matched++;byProfile[p][status]++;if(identityConflict)byProfile[p].identity_conflicts++;
     const shop=String(d.organization||"").trim().toLowerCase()==="root"||String(d.activation_state||"").toLowerCase()==="deactivated";
     (shop?byProfile[p].shop_units:byProfile[p].field_units).add(String(d.unit_key||d.device_name));
-    const tk=vigilantLocalTrackerKey(d,trackerKeySet,trackerLabelMap)||vigilantProviderTrackerKey(v.deviceName,trackerKeySet);
-    if(tk){
-      const cov=coveredTrackerUnits.get(tk)||{online:0,offline:0,rows:0};
-      cov.rows++;isOnline?cov.online++:cov.offline++;coveredTrackerUnits.set(tk,cov);
-    }
+    const tk=vigilantLocalTrackerKey(d,trackerKeySet,trackerLabelMap)||vigilantProviderTrackerKey(resourceName,trackerKeySet);
+    if(tk){const cov=coveredTrackerUnits.get(tk)||{online:0,offline:0,unknown:0,rows:0};cov.rows++;cov[status]++;coveredTrackerUnits.set(tk,cov);}
+  }
+  for(const conflict of resolution.conflicts){
+    countObservation(conflict.device,"unknown",null,true);
+    const {error:writeError}=await db.from("camera_devices").update({
+      vigilant_status:"Unknown",source_status:"unknown",source_last_seen_at:now,
+      source_metadata:{provider:"vigilant_star4live",syncedAt:now,identityStatus:"conflict",identityReasons:conflict.reasons,conflictingResources:conflict.resources}
+    }).eq("id",conflict.device.id);
+    if(writeError)throw new Error("Star4Live identity conflict write failed: "+writeError.message);
+  }
+  for(const match of resolution.matches){
+    const d=match.device,v=match.resource,status=match.status;
+    countObservation(d,status,v.deviceName);
+    const isOnline=status==="online";
     const {error:deviceWriteError}=await db.from("camera_devices").update({
-      vigilant_status:isOnline?"Online":"Offline",
-      source_status:isOnline?"online":"offline",
+      vigilant_status:isOnline?"Online":status==="offline"?"Offline":"Unknown",
+      source_status:status,
       source_last_seen_at:now,
       last_online_at:isOnline?now:undefined,
       source_metadata:{
-        provider:"vigilant_star4live",status:v.status,latestOnline:v.latestOnline,
+        provider:"vigilant_star4live",status:v.status??null,latestOnline:v.latestOnline,
+        identityStatus:"verified",matchedBy:match.matchedBy,resourceSerial:String(v.deviceSerial||""),resourceName:String(v.deviceName||""),
+        ...(status==="unknown"?{statusReason:"unrecognized_provider_status"}:{}),
         publicIp:v.publicIp,localIp:v.localIp,deviceModel:v.deviceModel,
         organizationName:v.organizationName||v.orgName||v.organization||v.parentOrganizationName||null,
         organizationId:v.organizationId||v.orgId||null,syncedAt:now
@@ -212,29 +217,30 @@ async function starInventory(db:any){
     if(!tk)continue;
     const t=trackerRowByKey.get(tk),hint=String(t?.health_provider||"").trim().toLowerCase();
     if(hint&&hint!=="vigilant")continue;
-    const cov=coveredTrackerUnits.get(tk)||{online:0,offline:0,rows:0,provider_only_rows:0};
+    const cov=coveredTrackerUnits.get(tk)||{online:0,offline:0,unknown:0,rows:0,provider_only_rows:0};
     cov.rows++;cov.provider_only_rows=Number(cov.provider_only_rows||0)+1;
-    String(r.status)==="online"?cov.online++:cov.offline++;
+    cov[r.status]++;
     coveredTrackerUnits.set(tk,cov);
   }
 
   const profOut:any={};
   for(const [k,v] of Object.entries(byProfile) as any){
-    profOut[k]={matched:v.matched,online:v.online,offline:v.offline,field_units:v.field_units.size,shop_units:v.shop_units.size};
+    profOut[k]={matched:v.matched,online:v.online,offline:v.offline,unknown:v.unknown,identity_conflicts:v.identity_conflicts,field_units:v.field_units.size,shop_units:v.shop_units.size};
   }
   const trackerByFamily:any={},trackerLiveCoverage:any={};
   for(const t of trackerRows){
     const f=String(t.canonical_family),state=String(t.tracker_state||"field_or_unknown"),k=vigilantTrackerKey(f,t.unit_tag),cov=coveredTrackerUnits.get(k);
     trackerByFamily[f]??={field_or_unknown:0,shop:0,retired:0,total:0};
     trackerByFamily[f].total++;trackerByFamily[f][state]=(trackerByFamily[f][state]||0)+1;
-    trackerLiveCoverage[f]??={tracker_total:0,field_or_unknown:0,shop:0,retired:0,live_matched_units:0,provider_only_live_units:0,field_live_matched_units:0,field_online_units:0,field_offline_units:0,field_degraded_units:0,field_other_provider_units:0,field_unresolved_provider_units:0,missing_field_units:[] as string[],other_provider_field_units:[] as string[],unresolved_provider_field_units:[] as string[]};
+    trackerLiveCoverage[f]??={tracker_total:0,field_or_unknown:0,shop:0,retired:0,live_matched_units:0,provider_only_live_units:0,field_live_matched_units:0,field_online_units:0,field_offline_units:0,field_degraded_units:0,field_unverified_units:0,unverified_field_units:[] as string[],field_other_provider_units:0,field_unresolved_provider_units:0,missing_field_units:[] as string[],other_provider_field_units:[] as string[],unresolved_provider_field_units:[] as string[]};
     const a=trackerLiveCoverage[f];a.tracker_total++;a[state]=(a[state]||0)+1;
     if(cov){
       a.live_matched_units++;
       if(Number(cov.provider_only_rows||0)>0)a.provider_only_live_units++;
       if(state==="field_or_unknown"){
         a.field_live_matched_units++;
-        if(cov.online>0&&cov.offline>0)a.field_degraded_units++;
+        if((cov.online>0&&cov.offline>0)||(cov.unknown>0&&(cov.online>0||cov.offline>0)))a.field_degraded_units++;
+        else if(cov.unknown>0){a.field_unverified_units++;a.unverified_field_units.push(String(t.source_label||t.unit_tag));}
         else if(cov.online>0)a.field_online_units++;
         else if(cov.offline>0)a.field_offline_units++;
       }
@@ -256,10 +262,10 @@ async function starInventory(db:any){
     provider:"vigilant",server_host:base.replace(/^https?:\/\//,""),server_port:443,enabled:true,
     last_sync_at:now,last_sync_status:failures.length||!accountInventoryComplete?"partial":"ok",
     last_error:failures.length?(failures.length+" lookup failures; affected observations were left unchanged."):(accountInventoryComplete?null:"Full inventory unavailable: "+accountInventoryError),
-    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,provider_account_summary:providerAccountSummary,account_listing_diagnostics:inventoryDiagnostics,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"combined_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
+    metadata:{...(intRow?.metadata||{}),source:"star4live",account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,provider_account_summary:providerAccountSummary,account_listing_diagnostics:inventoryDiagnostics,account_online:all.filter(v=>resolvedResourceStatus(v)==="online").length,account_offline:all.filter(v=>resolvedResourceStatus(v)==="offline").length,account_unknown:all.filter(v=>resolvedResourceStatus(v)==="unknown").length,inventory_scope:accountInventoryComplete?"account":"combined_search",tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,failed_query_tags:failures.slice(0,25).map(x=>x.q),provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,identity_conflicts:identityConflicts,online,offline,unknown,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage,reconciled_at:now}
   },{onConflict:"provider"});
   if(integrationWriteError)throw new Error("Star4Live sync summary write failed: "+integrationWriteError.message);
-  return {account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>Number(v.status)===1).length,account_offline:all.filter(v=>Number(v.status)!==1).length,inventory_scope:accountInventoryComplete?"account":"tracker_search",server:base.replace(/^https?:\/\//,""),tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,online,offline,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage};
+  return {account_inventory_complete:accountInventoryComplete,account_inventory_error:accountInventoryError,account_online:all.filter(v=>resolvedResourceStatus(v)==="online").length,account_offline:all.filter(v=>resolvedResourceStatus(v)==="offline").length,account_unknown:all.filter(v=>resolvedResourceStatus(v)==="unknown").length,inventory_scope:accountInventoryComplete?"account":"tracker_search",server:base.replace(/^https?:\/\//,""),tracker_queries:queries.length,successful_queries:queries.length-failures.length,failed_queries:failures.length,provider_resources_found:all.length,matched,unmatched,unmatched_resources:unmatchedResources,identity_conflicts:identityConflicts,online,offline,unknown,by_profile:profOut,tracker_by_family:trackerByFamily,tracker_live_coverage:trackerLiveCoverage};
 }
 async function reconInventory(db:any){
   const {data:secretRows,error:secretError}=await db.rpc("get_reconeyez_integration_secrets");

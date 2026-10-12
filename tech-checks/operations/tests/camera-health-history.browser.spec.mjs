@@ -17,6 +17,8 @@ const connectionFunction=section(detail,'function interfaceLinks()','\n');
 const connectionRender=section(detail,'  const actionLinks=',"\n  $('history')");
 const detailEffective=section(detail,'function effectiveHealth(d,h)','\n\nfunction sourceStatusText');
 const sourceFresh=section(detail,'function sourceFresh(d','\nfunction checkFresh');
+const sourceStatus=section(detail,'function sourceStatusText()','\nfunction respondingInterfaceSummary');
+const sourceDetail=section(detail,'function sourceDetailText()','\n\nfunction issueReason');
 const freshCheck=section(detail,'function checkFresh(h','\nfunction hasDirectLiveProof');
 const effective=section(list,'function effectiveHealth(d)','\nfunction isCountedCamera');
 const escape="const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#039;'}[c]));";
@@ -41,7 +43,9 @@ const listScript=`${shared}
 const detailScript=`${shared}
  ${sourceFresh}
  ${detailEffective}
- let device=fixture.device,current=fixture.current;const issueReason=()=>'',sourceStatusText=()=> 'Vigilant: '+String(device.source_status).toUpperCase(),sourceDetailText=()=> 'Provider observation; direct diagnostic is separate';
+ let device=fixture.device,current=fixture.current;const issueReason=()=>'',fmt=value=>CameraHealthHistory.format(value);
+ ${sourceStatus}
+ ${sourceDetail}
  ${detailRender}
  ${freshCheck}
  const effectivePublicIP=()=>fixture.device.public_ip;
@@ -140,4 +144,41 @@ test('saved IP and Unity endpoints remain visible through failed, stale and miss
   await expect(page.locator('#connectionNote')).toContainText('Links do not verify video');
  }
  await page.evaluate(()=>{fixture.device.public_ip=null;repaint();});await expect(actions.locator('a')).toHaveCount(0);await expect(page.locator('#connectionNote')).toContainText('No saved public IP');
+});
+
+
+test('actual provider detail distinguishes unconfirmed checks and displays only attempted ports/time',async({page},info)=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));await mount(page,'camera-detail');
+ await page.evaluate(()=>{
+  fixture.device={...fixture.device,device_name:'Synthetic Helios901',public_ip:'192.0.2.10',connection_revision:4,expected_ports:[80,443,1400,1500,1600,1700]};
+  fixture.current={checked_at:'2026-10-06T12:29:10Z',overall_status:'online',ip_reachable:true,port_status:{80:{online:false},443:{online:false},_connection:{
+   revision:4,ip:'192.0.2.10',checkedAt:'2026-10-06T12:25:10Z',status:'offline',reachable:false,confirmedOutage:false,consecutiveFailures:1
+  }}};repaint();
+ });
+ const source=page.locator('#sourceStatus'),detail=page.locator('#sourceDetail');
+ await expect(source).toHaveText('Vigilant: OFFLINE · Direct diagnostic: Check failed');
+ await expect(detail).toContainText('Attempted ports: 80, 443. Last direct check: Oct 6, 2026, 7:25:10 AM CDT');
+ await expect(detail).toContainText('Reachability unverified; outage not confirmed.');
+ await expect(detail).not.toContainText('1400');await expect(page.locator('#statusPill')).toHaveText('OFFLINE');
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:900});
+  const bounds=await page.locator('#sourceStatusCard').evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth,page:document.documentElement.scrollWidth,view:innerWidth}));
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.width+1);expect(bounds.page).toBeLessThanOrEqual(bounds.view+1);
+  if(width===390)await page.locator('#sourceStatusCard').screenshot({path:info.outputPath('direct-diagnostic-unconfirmed-mobile.png')});
+ }
+ await page.evaluate(()=>{fixture.device.source_status='online';repaint();});
+ await expect(source).toHaveText('Vigilant: ONLINE · Direct diagnostic: Check failed');await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ await expect(page.locator('#sourceStatusCard')).toHaveClass('card good');
+ await page.evaluate(()=>{fixture.current.port_status._connection.confirmedOutage=true;fixture.current.port_status._connection.consecutiveFailures=3;repaint();});
+ await expect(source).toContainText('Direct diagnostic: Confirmed service outage');await expect(page.locator('#statusPill')).toHaveText('ONLINE');
+ await page.evaluate(()=>{fixture.current.port_status._connection={...fixture.current.port_status._connection,status:'online',reachable:true,confirmedOutage:false};fixture.current.port_status[443].online=true;repaint();});
+ await expect(source).toContainText('Direct diagnostic: Service reachable');await expect(detail).toContainText('video not verified');
+ await page.evaluate(()=>{fixture.current.port_status._connection.checkedAt='2026-10-06T10:55:10Z';repaint();});
+ await expect(source).toContainText('Direct diagnostic: Reachability unverified');await expect(detail).toContainText('Previous attempted ports: 80, 443');
+ await expect(detail).toContainText('Last direct check: Oct 6, 2026, 5:55:10 AM CDT');
+ await page.evaluate(()=>{fixture.current.port_status._connection.checkedAt='2026-02-30T12:00:00Z';repaint();});
+ await expect(detail).toContainText('Unknown (invalid timestamp)');await expect(detail).toContainText('No verified attempted ports.');
+ await page.evaluate(()=>{fixture.current.port_status._connection.checkedAt='2026-10-06T12:25:10Z';fixture.device.connection_revision=5;repaint();});
+ await expect(source).toContainText('Direct diagnostic: Reachability unverified');await expect(detail).toContainText('No verified attempted ports.');
+ await expect(page.locator('#statusPill')).toHaveText('ONLINE');expect(errors).toEqual([]);
 });
