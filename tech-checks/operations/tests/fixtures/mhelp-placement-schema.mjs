@@ -1,0 +1,10 @@
+export const schema=`create schema app_private;
+ create table app_private.vision_tracker_locations(id uuid primary key,organization_id uuid,unit_number text,unit_key text,family text,placement text,customer text,site text,address text,latitude float8,longitude float8);
+ create table public.equipment_units(id uuid primary key,organization_id uuid,unit_number text,retired_at timestamptz,status text,installed_site_id uuid,current_location_ref uuid,current_location_type text,gps_latitude float8,gps_longitude float8,gps_recorded_at timestamptz);
+ create table app_private.cos_geocode_sources(tracker_id uuid,entity_kind text,native_unit_id uuid,product_id text,source_system text,source_revision uuid,unit_number text,tracker_unit_number text,active boolean);
+ create table app_private.cos_archived_representations(archived_tracker_id uuid,canonical_tracker_id uuid,archived_native_id uuid,canonical_native_id uuid);
+ create table public.equipment_unit_location_history(equipment_unit_id uuid);
+ create table app_private.cos_owner_identity_claims(native_unit_id uuid);
+ create function app_private.cos_source_label(text) returns text language sql immutable as $$select regexp_replace(lower($1),'[^a-z0-9]','','g')$$;
+ create function app_private.appdeploy_assume_actor(uuid,uuid) returns void language sql as $$select null::void$$;
+ create function app_private.has_permission(uuid,text) returns boolean language sql as $$select true$$;`;
