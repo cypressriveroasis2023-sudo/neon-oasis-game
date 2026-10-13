@@ -12,3 +12,22 @@
 @media(max-width:1100px){.cos-fleet-content{padding:20px}.cos-fleet-workspace{grid-template-columns:275px minmax(0,1fr)}.cos-fleet-stats{gap:8px}.cos-fleet-stats .cos-fleet-stat{padding:12px}.cos-fleet-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:750px){.cos-fleet-brand{gap:10px;padding:11px 13px}.cos-fleet-brand>div:first-child{gap:8px;font-size:11px;letter-spacing:1px}.cos-fleet-brand .company-eye{width:38px;height:38px}.cos-fleet-brand small{font-size:6px;letter-spacing:1px}.cos-fleet-private{font-size:7px;padding:3px 6px}.cos-fleet-clock time{font-size:17px}.cos-fleet-clock small{font-size:7px}.cos-fleet-tabs{padding:0 5px}.cos-fleet-tabs button{font-size:10px;padding:12px 10px}.cos-fleet-tabs button span{font-size:15px;margin-right:4px}.cos-fleet-content{padding:16px 12px}.cos-fleet-heading{gap:9px}.cos-fleet-heading h1{font-size:21px}.cos-fleet-heading p{font-size:10px}.cos-fleet-heading>div:last-child{max-width:140px;min-width:105px}.cos-fleet-heading .cos-fleet-refresh{font-size:10px;padding:8px 10px}.cos-fleet-heading small{font-size:8px}.cos-fleet-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.cos-fleet-stats .cos-fleet-stat{padding:10px}.cos-fleet-stat span{font-size:7px;letter-spacing:.6px}.cos-fleet-stat strong{font-size:24px}.cos-fleet-stat small{font-size:8px}.cos-fleet-filters{padding:10px}.cos-fleet-filter-row{gap:9px}.cos-fleet-filter-row>label{flex:1 1 42%;min-width:0}.cos-fleet-filter-row select{font-size:11px}.cos-fleet-workspace{display:flex;flex-direction:column-reverse;min-height:0}.cos-fleet-map-panel{min-height:390px}.cos-fleet-map-canvas{height:340px;min-height:300px}.cos-fleet-unit-panel{border-right:0;border-top:1px solid var(--fleet-line)}.cos-fleet-unit-list{height:280px}.cos-fleet-review-grid{grid-template-columns:1fr}.cos-fleet-section-heading{align-items:start;flex-wrap:wrap}.cos-fleet-drawer{padding:30px 14px}.cos-fleet-detail-signals{grid-template-columns:1fr 1fr}.cos-fleet-launch{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.cos-fleet-dashboard *{scroll-behavior:auto}}
+/* Keep the imported dashboard's neutral controls and signal colors inside the native theme. */
+#root#root .cos-fleet-dashboard button:not(:where(.camera-health-native button)){background:#19212d!important;border:1px solid #3b485c!important;color:#f4f7fc!important;box-shadow:none!important;text-shadow:none!important}
+#root#root .cos-fleet-dashboard .cos-fleet-tabs button{background:transparent!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;color:var(--fleet-muted)!important}
+#root#root .cos-fleet-dashboard .cos-fleet-tabs button[aria-current=page]{background:#21171f!important;border-bottom-color:#ff354e!important;color:#fff!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat{background:#111822!important;border:1px solid var(--fleet-line)!important;border-top:2px solid #596879!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat-online{border-top-color:#2bff35!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat-offline{border-top-color:#ff2734!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat-unknown{border-top-color:#94a3b8!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stats .cos-fleet-stat-verify{border-top-color:#15a8ff!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stat strong{color:#f4f7fc!important}
+#root#root .cos-fleet-dashboard :is(.cos-fleet-stat-online strong,.cos-signal-online){color:#2bff35!important}
+#root#root .cos-fleet-dashboard :is(.cos-fleet-stat-offline strong,.cos-signal-offline){color:#ff2734!important}
+#root#root .cos-fleet-dashboard :is(.cos-fleet-stat-unknown strong,.cos-signal-unknown){color:#cad5e2!important}
+#root#root .cos-fleet-dashboard .cos-signal-support{color:#15a8ff!important}
+#root#root .cos-fleet-dashboard .cos-fleet-stat-verify strong{color:#6fb6ff!important}
+#root#root .cos-fleet-dashboard .cos-fleet-unit-row{background:transparent!important;border-color:transparent!important;border-bottom-color:#263140!important}
+#root#root .cos-fleet-dashboard .cos-fleet-unit-row:hover{background:#1c293a!important;border-color:#74869e!important}
+#root#root .cos-fleet-dashboard .cos-fleet-search button{background:transparent!important;border:0!important}
+#root#root .cos-fleet-dashboard .cos-fleet-refresh{background:#e82840!important;border-color:#ff4157!important}
