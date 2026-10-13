@@ -1,3 +1,4 @@
+import {sameFieldMapSourceSnapshot} from './fieldMapSnapshot';
 import {ReconBatteryDetails} from './CameraHealthOverview';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import HeliosPowerDetails from './HeliosPowerDetails';
@@ -106,7 +107,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     });
     return()=>{current=false;};
   },[data]);
-  useEffect(()=>{if(cameras.fleet)setData(cameras.fleet.fieldMap as unknown as Snapshot);},[cameras.fleet]);
+  useEffect(()=>{if(cameras.fleet){const next=cameras.fleet.fieldMap as unknown as Snapshot,preserveActionSnapshot=working.current;if(preparationSnapshotLock.current&&!sameFieldMapSourceSnapshot(preparationSnapshotLock.current,next))preparationSnapshotLock.current=null;setData(previous=>(preserveActionSnapshot||previous===preparationSnapshotLock.current)&&sameFieldMapSourceSnapshot(previous,next)?previous:next);}},[cameras.fleet]);
   const [search,setSearch]=useState(restored.current.search||'');
   const [status,setStatus]=useState(restored.current.status||'field');
   const dismissedDeepLink=useRef('');
@@ -139,6 +140,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const gpsSaver = useRef(createGpsSaver(api));
   const censusAction=useRef(createOwnerCensusOnceAction(api));
   const censusPreparation=useRef(createOwnerCensusPreparation(api));
+  const preparationSnapshotLock=useRef<Snapshot|null>(null);
   const censusContext=useRef({data,selectedId,ownerCensusEnabled});censusContext.current={data,selectedId,ownerCensusEnabled};
   const censusMounted=useRef(true);
   const censusSessionRevision=useRef(0);
@@ -150,7 +152,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const [preparationReceipt,setPreparationReceipt]=useState<{snapshot:Snapshot;unitId:string;receipt:OwnerCensusPreparationReceipt}|null>(null);
   useEffect(()=>{
     censusMounted.current=true;
-    const invalidate=()=>{censusSessionRevision.current++;censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusSessionInvalid(true);setCensusReady(null);setCensusMessage(null);setPreparationReady(null);setPreparationMessage(null);setPreparationReceipt(null);};
+    const invalidate=()=>{preparationSnapshotLock.current=null;censusSessionRevision.current++;censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusSessionInvalid(true);setCensusReady(null);setCensusMessage(null);setPreparationReady(null);setPreparationMessage(null);setPreparationReceipt(null);};
     const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')invalidate();};
     window.addEventListener('cos-private-data-invalidated',invalidate);window.addEventListener('message',hidden);
     return()=>{censusMounted.current=false;censusAction.current.invalidate();censusPreparation.current.invalidate();window.removeEventListener('cos-private-data-invalidated',invalidate);window.removeEventListener('message',hidden);};
@@ -170,7 +172,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return()=>{current=false;};
   },[data,selectedId,censusSessionInvalid,ownerCensusEnabled]);
   useEffect(()=>{setPreparationReceipt(value=>ownerCensusEnabled&&!censusSessionInvalid&&value?.snapshot===data&&value.unitId===selectedId?value:null);},[data,selectedId,censusSessionInvalid,ownerCensusEnabled]);
-  useEffect(()=>{censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusMessage(null);setPreparationMessage(null);},[selectedId]);
+  useEffect(()=>{preparationSnapshotLock.current=null;censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusMessage(null);setPreparationMessage(null);},[selectedId]);
   const mapNode=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<L.Map|null>(null);
   const layerRef=useRef<L.LayerGroup|null>(null);
@@ -185,14 +187,17 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
 
   const load=async(force=false)=>{
     if (working.current) return;
+    const preservePreparation=Boolean(data&&!force&&preparationSnapshotLock.current===data);
+    if(!preservePreparation)preparationSnapshotLock.current=null;
     working.current = true;
     lastAttemptAt.current = Date.now();
     setBusy(true);
     setError('');
-    setCensusMessage(null);setPreparationReceipt(null);setPreparationMessage(null);
+    setCensusMessage(null);if(!preservePreparation){setPreparationReceipt(null);setPreparationMessage(null);}
     try{
       const snapshot = await api.fleetSource('fieldMap',force) as unknown as Snapshot;
-      setData(snapshot);
+      if(preservePreparation&&preparationSnapshotLock.current===data&&sameFieldMapSourceSnapshot(data,snapshot))setData(data);
+      else{preparationSnapshotLock.current=null;setPreparationReceipt(null);setPreparationMessage(null);setData(snapshot);}
       setCensusSessionInvalid(false);
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
@@ -530,11 +535,12 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     if(working.current||!preparationBinding||!data||!selected)return;
     const snapshot=data,unitId=selected.id,binding=preparationBinding,sessionRevision=censusSessionRevision.current;
     const current=()=>censusMounted.current&&sessionRevision===censusSessionRevision.current&&censusContext.current.ownerCensusEnabled&&censusContext.current.data===snapshot&&censusContext.current.selectedId===unitId;
+    preparationSnapshotLock.current=snapshot;
     working.current=true;setBusy(true);setPreparationReady(null);setPreparationReceipt(null);setPreparationMessage({snapshot,unitId,text:'Reading saved installation evidence…'});
     try{
       const result=await censusPreparation.current.prepare(binding,current);
       if(current()){
-        const fresh=result.snapshot as Snapshot;setData(fresh);setPreparationReceipt({snapshot:fresh,unitId,receipt:result.receipt});
+        const fresh=result.snapshot as Snapshot;preparationSnapshotLock.current=fresh;setData(fresh);setPreparationReceipt({snapshot:fresh,unitId,receipt:result.receipt});
         setPreparationMessage({snapshot:fresh,unitId,text:'Preparation is eligible for review. No lookup was started and no allowance was enrolled.'});
       }
     }catch(cause){
