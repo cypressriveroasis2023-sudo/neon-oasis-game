@@ -31,6 +31,24 @@ const date = (value:unknown,now:number):value is string => {
   const calendar=new Date(Date.UTC(Number(parts[1]),Number(parts[2])-1,Number(parts[3])));
   return calendar.getUTCFullYear()===Number(parts[1])&&calendar.getUTCMonth()+1===Number(parts[2])&&calendar.getUTCDate()===Number(parts[3]);
 };
+/** Only the server's Owner-move projection can suppress a strictly older native point.
+ * This admits a separate estimate, never the old point or current GPS. Missing proof fails closed.
+ */
+function historicalOwnerGpsOnly(unit:EstimateRow,geocodedAt:unknown,now:number) {
+  const stamp=(value:unknown):value is string=>typeof value==='string'
+    && /^\d{4}-\d{2}-\d{2}[T ](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(value)
+    && date(value.replace(' ','T').replace(/([+-]\d{2})$/,'$1:00'),now);
+  if(unit.readOnly!==false||unit.placementSource!=='owner'||unit.placement!=='FIELD'||unit.status!=='field'||unit.currentLocationType!=='field'
+    ||unit.placementStatus==='needs_identity_review'||typeof unit.placementAuditId!=='string'||!/^[1-9]\d*$/.test(unit.placementAuditId)
+    ||!text(unit.placementUnitKey,250)||unit.addressSource!=='Owner confirmed installation address'||unit.hasUnitGps!==true
+    ||unit.locationVerification!=='address_changed'||unit.latitude!==null||unit.longitude!==null||unit.coordinateSource!==null
+    ||unit.locationVerifiedAt!==null||unit.locationHistoryId!==null||!['manual','site'].includes(unit.historicalCoordinateSource||'')
+    ||typeof unit.historicalLatitude!=='number'||typeof unit.historicalLongitude!=='number'
+    ||!hasGpsCoordinates({latitude:unit.historicalLatitude,longitude:unit.historicalLongitude})
+    ||!stamp(unit.gpsRecordedAt)||unit.gpsRecordedAt!==unit.historicalRecordedAt
+    ||!stamp(unit.placementUpdatedAt)||unit.placementUpdatedAt!==unit.addressUpdatedAt||!stamp(geocodedAt))return false;
+  return Date.parse(unit.gpsRecordedAt)<Date.parse(unit.placementUpdatedAt)&&Date.parse(unit.placementUpdatedAt)<=Date.parse(geocodedAt);
+}
 /** Machine provenance is not human warning text; preserve every appended note even when validation fails. */
 export function addressEstimateHumanNote(note:string|null|undefined) {
   if(!note?.startsWith(addressEstimatePrefix)&&!note?.startsWith(reviewedEstimatePrefix))return note||'';
@@ -47,7 +65,7 @@ function addressParts(value:string) {
 /** An address estimate is a separate, unverified presentation; it never passes isCurrentFieldPin. */
 export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Promise<AddressEstimate|null> {
   const mhelp=unit.mhelpLocation;
-  if(mhelp?.contract==='COS_MHELP_FLEET_LOCATIONS_V1'&&mhelp.unitId===unit.id&&mhelp.unitNumber===unit.unitNumber&&mhelp.placement==='FIELD'&&mhelp.verified===false&&mhelp.address===unit.address&&unit.currentLocationType==='field'&&!isCurrentFieldPin(unit)&&!unit.hasUnitGps&&date(mhelp.observedAt,now)&&now-Date.parse(mhelp.observedAt)<=40*60*1000&&Array.isArray(mhelp.point)&&mhelp.point.length===2&&hasGpsCoordinates({latitude:mhelp.point[0],longitude:mhelp.point[1]})&&['mHelpDesk service location','Census address estimate'].includes(mhelp.coordinateSource))return {latitude:mhelp.point[0],longitude:mhelp.point[1],matchedAddress:mhelp.address,sourceObservedAt:mhelp.observedAt,confidence:'mhelp_service_unverified',coordinateSource:mhelp.coordinateSource};
+  if(unit.locationGeocode?.censusOnly!==true&&mhelp?.contract==='COS_MHELP_FLEET_LOCATIONS_V1'&&mhelp.unitId===unit.id&&mhelp.unitNumber===unit.unitNumber&&mhelp.placement==='FIELD'&&mhelp.verified===false&&mhelp.address===unit.address&&unit.currentLocationType==='field'&&!isCurrentFieldPin(unit)&&!unit.hasUnitGps&&date(mhelp.observedAt,now)&&now-Date.parse(mhelp.observedAt)<=40*60*1000&&Array.isArray(mhelp.point)&&mhelp.point.length===2&&hasGpsCoordinates({latitude:mhelp.point[0],longitude:mhelp.point[1]})&&['mHelpDesk service location','Census address estimate'].includes(mhelp.coordinateSource))return {latitude:mhelp.point[0],longitude:mhelp.point[1],matchedAddress:mhelp.address,sourceObservedAt:mhelp.observedAt,confidence:'mhelp_service_unverified',coordinateSource:mhelp.coordinateSource};
   // Preserve a fully validated reviewed property estimate ahead of automatic
   // imported results, including pending/no-match and lower-quality range points.
   if(unit.locationNote?.startsWith(reviewedEstimatePrefix)||unit.coordinateSource===reviewedEstimateSource||unit.historicalCoordinateSource===reviewedEstimateSource){
@@ -91,7 +109,8 @@ export async function checkedAddressEstimate(unit:EstimateRow,now=Date.now()):Pr
     const parsedOwner=parseOwnerInstallationAddress(unit.address,fullMatchedParts);
     if(!parsedOwner&&/\b(?:suite|ste)\b/i.test(unit.address))return null;
     if(parsedOwner?.secondaryUnit){
-      if(unit.placementSource!=='owner'||unit.placement!=='FIELD'||unit.placementStatus==='needs_identity_review'||unit.locationVerification==='owner_verified'||unit.hasUnitGps===true||!matchesInstallation(parsedOwner.installation,automatic.matchedAddress))return null;
+      if(unit.placementSource!=='owner'||unit.placement!=='FIELD'||unit.placementStatus==='needs_identity_review'||unit.locationVerification==='owner_verified'
+        ||unit.hasUnitGps===true&&!historicalOwnerGpsOnly(unit,automatic.geocodedAt,now)||!matchesInstallation(parsedOwner.installation,automatic.matchedAddress))return null;
     }else{
       const original=addressParts(unit.address),matched=addressParts(automatic.matchedAddress);
       if(!original||!matched||JSON.stringify(original)!==JSON.stringify(matched))return null;
