@@ -23,6 +23,8 @@ import './fieldMap.css';
 import './fieldLocationVerification.css';
 import { gpsWrite, hasGpsCoordinates } from '../shared/gpsValidation';
 import { checkedFieldMap, createGpsSaver, gpsPopup } from './gpsPersistence';
+import { checkedOwnerCensusOnceBinding, createOwnerCensusOnceAction, ownerCensusPolicyMessage, type OwnerCensusOnceBinding } from './ownerCensusOnce';
+import { checkedOwnerCensusPreparationBinding, createOwnerCensusPreparation, type OwnerCensusPreparationBinding, type OwnerCensusPreparationReceipt } from './ownerCensusPreparation';
 
 type FieldUnit = {
   id:string;
@@ -61,13 +63,14 @@ type FieldUnit = {
 
 type Snapshot = {
   items:FieldUnit[];
+  ownerCensusProofs?:Record<string,unknown>[];
   placementReviews?:{unitNumber:string;reason:string;placementAuditId:string|null}[];
   summary:{fieldUnits:number;mappedUnits:number;unitGps:number;missingGps:number};
   generatedAt:string;
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean };
+type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const recordedPoint=(point:AddressEstimate|null)=>point?.confidence==='source_recorded_unverified';
@@ -75,7 +78,7 @@ const pointTitle=(point:AddressEstimate)=>recordedPoint(point)?'Tracker-recorded
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false}:Props){
+export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false}:Props){
   const [mapRevision,setMapRevision]=useState(0);
   const [filtersOpen,setFiltersOpen]=useState(false);
   const workspaceNode=useRef<HTMLElement|null>(null);
@@ -128,6 +131,40 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const lastAttemptAt = useRef(0);
   const automaticReadPaused = useRef(false);
   const gpsSaver = useRef(createGpsSaver(api));
+  const censusAction=useRef(createOwnerCensusOnceAction(api));
+  const censusPreparation=useRef(createOwnerCensusPreparation(api));
+  const censusContext=useRef({data,selectedId,ownerCensusEnabled});censusContext.current={data,selectedId,ownerCensusEnabled};
+  const censusMounted=useRef(true);
+  const censusSessionRevision=useRef(0);
+  const [censusSessionInvalid,setCensusSessionInvalid]=useState(false);
+  const [censusReady,setCensusReady]=useState<{snapshot:Snapshot;unitId:string;binding:OwnerCensusOnceBinding}|null>(null);
+  const [censusMessage,setCensusMessage]=useState<{snapshot:Snapshot;unitId:string;text:string}|null>(null);
+  const [preparationReady,setPreparationReady]=useState<{snapshot:Snapshot;unitId:string;binding:OwnerCensusPreparationBinding}|null>(null);
+  const [preparationMessage,setPreparationMessage]=useState<{snapshot:Snapshot;unitId:string;text:string}|null>(null);
+  const [preparationReceipt,setPreparationReceipt]=useState<{snapshot:Snapshot;unitId:string;receipt:OwnerCensusPreparationReceipt}|null>(null);
+  useEffect(()=>{
+    censusMounted.current=true;
+    const invalidate=()=>{censusSessionRevision.current++;censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusSessionInvalid(true);setCensusReady(null);setCensusMessage(null);setPreparationReady(null);setPreparationMessage(null);setPreparationReceipt(null);};
+    const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')invalidate();};
+    window.addEventListener('cos-private-data-invalidated',invalidate);window.addEventListener('message',hidden);
+    return()=>{censusMounted.current=false;censusAction.current.invalidate();censusPreparation.current.invalidate();window.removeEventListener('cos-private-data-invalidated',invalidate);window.removeEventListener('message',hidden);};
+  },[]);
+  useEffect(()=>{
+    let current=true;setCensusReady(null);
+    if(data&&selectedId&&ownerCensusEnabled&&!censusSessionInvalid)void checkedOwnerCensusOnceBinding(data,selectedId).then(binding=>{
+      if(current&&binding)setCensusReady({snapshot:data,unitId:selectedId,binding});
+    }).catch(()=>{/* Incomplete or unavailable proof never enables an action. */});
+    return()=>{current=false;};
+  },[data,selectedId,censusSessionInvalid,ownerCensusEnabled]);
+  useEffect(()=>{
+    let current=true;setPreparationReady(null);
+    if(data&&selectedId&&ownerCensusEnabled&&!censusSessionInvalid)void checkedOwnerCensusPreparationBinding(data,selectedId).then(binding=>{
+      if(current&&binding)setPreparationReady({snapshot:data,unitId:selectedId,binding});
+    }).catch(()=>{/* Private preparation requires exact server eligibility. */});
+    return()=>{current=false;};
+  },[data,selectedId,censusSessionInvalid,ownerCensusEnabled]);
+  useEffect(()=>{setPreparationReceipt(value=>ownerCensusEnabled&&!censusSessionInvalid&&value?.snapshot===data&&value.unitId===selectedId?value:null);},[data,selectedId,censusSessionInvalid,ownerCensusEnabled]);
+  useEffect(()=>{censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusMessage(null);setPreparationMessage(null);},[selectedId]);
   const mapNode=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<L.Map|null>(null);
   const layerRef=useRef<L.LayerGroup|null>(null);
@@ -146,10 +183,12 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     lastAttemptAt.current = Date.now();
     setBusy(true);
     setError('');
+    setCensusMessage(null);setPreparationReceipt(null);setPreparationMessage(null);
     try{
       const response=await api.get('/api/field-map');
       const snapshot = checkedFieldMap(response.data) as unknown as Snapshot;
       setData(snapshot);
+      setCensusSessionInvalid(false);
       cameras.updateClock();
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
@@ -181,6 +220,12 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
 
   const items=data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
+  const censusBinding=ownerCensusEnabled&&censusReady?.snapshot===data&&censusReady.unitId===selectedId&&!censusSessionInvalid&&!censusAction.current.wasAttempted(censusReady.binding)?censusReady.binding:null;
+  const censusPolicyMessage=selected?ownerCensusPolicyMessage(selected):null;
+  const visibleCensusMessage=censusMessage?.snapshot===data&&censusMessage.unitId===selectedId?censusMessage.text:null;
+  const preparationBinding=ownerCensusEnabled&&!censusSessionInvalid&&preparationReady?.snapshot===data&&preparationReady.unitId===selectedId?preparationReady.binding:null;
+  const visiblePreparation=ownerCensusEnabled&&!censusSessionInvalid&&preparationReceipt?.snapshot===data&&preparationReceipt.unitId===selectedId?preparationReceipt.receipt:null;
+  const visiblePreparationMessage=preparationMessage?.snapshot===data&&preparationMessage.unitId===selectedId?preparationMessage.text:null;
   const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,items,cameras.data,cameras.now)])),[items,cameras.data,cameras.now]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
@@ -460,6 +505,35 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     }
   };
 
+  const runApprovedCensus = async () => {
+    if(working.current||!censusBinding||!data||!selected)return;
+    const snapshot=data,unitId=selected.id,binding=censusBinding,sessionRevision=censusSessionRevision.current;
+    const current=()=>censusMounted.current&&sessionRevision===censusSessionRevision.current&&censusContext.current.ownerCensusEnabled&&censusContext.current.data===snapshot&&censusContext.current.selectedId===unitId;
+    working.current=true;setBusy(true);setCensusReady(null);setCensusMessage({snapshot,unitId,text:'Checking the approved one-use Census lookup…'});
+    try{
+      const result=await censusAction.current.run(binding,current);
+      if(current()){setData(result.snapshot as Snapshot);setCensusMessage({snapshot:result.snapshot as Snapshot,unitId,text:result.message});cameras.updateClock();}
+    }catch(cause){
+      if(current())setCensusMessage({snapshot,unitId,text:cause instanceof Error?cause.message:'The approved lookup could not be confirmed. Refresh to inspect its saved state.'});
+    }finally{working.current=false;if(censusMounted.current)setBusy(false);}
+  };
+
+  const prepareApprovedCensus = async () => {
+    if(working.current||!preparationBinding||!data||!selected)return;
+    const snapshot=data,unitId=selected.id,binding=preparationBinding,sessionRevision=censusSessionRevision.current;
+    const current=()=>censusMounted.current&&sessionRevision===censusSessionRevision.current&&censusContext.current.ownerCensusEnabled&&censusContext.current.data===snapshot&&censusContext.current.selectedId===unitId;
+    working.current=true;setBusy(true);setPreparationReady(null);setPreparationReceipt(null);setPreparationMessage({snapshot,unitId,text:'Reading saved installation evidence…'});
+    try{
+      const result=await censusPreparation.current.prepare(binding,current);
+      if(current()){
+        const fresh=result.snapshot as Snapshot;setData(fresh);setPreparationReceipt({snapshot:fresh,unitId,receipt:result.receipt});
+        setPreparationMessage({snapshot:fresh,unitId,text:'Preparation is eligible for review. No lookup was started and no allowance was enrolled.'});
+      }
+    }catch(cause){
+      if(current())setPreparationMessage({snapshot,unitId,text:cause instanceof Error?cause.message:'Preparation could not be confirmed. No lookup was started.'});
+    }finally{working.current=false;if(censusMounted.current)setBusy(false);}
+  };
+
   return <section ref={workspaceNode} className={'field-map-workspace'+(tvMode?' field-map-tv':'')}>
     <header className='field-map-display-bar'><div><b>COS Field Map</b><span className={!data||busy?'field-map-load-state':undefined} role='status'>{!data?(error?'Field locations unavailable':'Loading field locations…'):busy?'Refreshing field locations…':'Select a pin or unit for details'}</span></div><button className='secondary' aria-label='TV / fullscreen map' aria-pressed={tvMode} disabled={!data} onClick={toggleTv}>Fullscreen</button></header>
     <section className='field-map-kpis' aria-label='Field inventory totals'>
@@ -551,6 +625,21 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {!routers.data ? <p>{routers.error?'Router data could not be verified.':'Loading router records…'}</p> : selectedRouters.length ? selectedRouters.map(row=><div key={row.id}><RouterBadge row={row} now={routers.now}/><p>{row.name} · {row.publicIp||row.unitIp||'IP not recorded'}{row.port?' · port '+row.port:''}</p><p>Checked: {routerTime(row.checkedAt)}</p><p>Same-name match only. Router-to-unit link is unconfirmed. No router GPS.</p></div>) : <p>No unique same-name router is available for this COS unit. Nothing is automatically assigned from aliases or duplicate names.</p>}
           </section>
           {(selected.locationGeocode||selected.locationImportedGeocode)&&!selectedEstimate&&<section aria-label='Automatic address lookup'><h3>Automatic address lookup</h3><p role='status'>{locationExplanation(selected)}</p>{openUnitHealth&&<button className='secondary' onClick={()=>openUnitHealth(selected.id)}>Open Camera Health to correct address</button>}</section>}
+          {ownerCensusEnabled&&(preparationBinding||visiblePreparationMessage||visiblePreparation)&&<section className='field-map-estimate-detail' aria-label='Approved lookup preparation'>
+            <h3>Prepare approved lookup</h3><p>Preparation only checks saved installation evidence. It does not start a Census lookup, enroll an allowance, or change GPS.</p>
+            {preparationBinding&&<button className='secondary' disabled={busy} onClick={()=>void prepareApprovedCensus()}>Prepare approved lookup</button>}
+            {visiblePreparationMessage&&<p role='status'>{visiblePreparationMessage}</p>}
+            {visiblePreparation&&<div aria-label='Read-only preparation receipt'><p>Read-only review values for this installation:</p><dl>
+              <dt>Server prepared at</dt><dd><time dateTime={visiblePreparation.preparedAt}>{visiblePreparation.preparedAt}</time></dd>
+              <dt>Native guard digest</dt><dd style={{overflowWrap:'anywhere'}}>{visiblePreparation.nativeGuardSha256}</dd>
+              <dt>Native source digest</dt><dd style={{overflowWrap:'anywhere'}}>{visiblePreparation.nativeSourceSha256}</dd>
+            </dl><p>Preparation and running an enrolled lookup are separate actions. Refresh or a changed selection clears these review values.</p></div>}
+          </section>}
+          {ownerCensusEnabled&&(censusBinding||visibleCensusMessage||censusPolicyMessage)&&<section className='field-map-estimate-detail' aria-label='Approved Census lookup'>
+            <h3>Approved one-use Census lookup</h3>
+            {censusBinding&&<><p>This uses the existing approval for this exact saved installation. Any result is an unverified building estimate; saved GPS history stays unchanged.</p><button className='secondary' disabled={busy} onClick={()=>void runApprovedCensus()}>Run approved Census lookup</button></>}
+            {visibleCensusMessage?<p role='status'>{visibleCensusMessage}</p>:censusPolicyMessage?<p role='status'>{censusPolicyMessage}</p>:null}
+          </section>}
           {selected.locationSourceRecordedConflict&&<section className='field-map-location-conflict' aria-label='Tracker point conflict'><h3>Tracker point needs review</h3><p>The unverified tracker point conflicts with {selected.locationSourceRecordedConflict.kind==='current_address_disagreement'?'the current address estimate':'another point for this installation'} by {selected.locationSourceRecordedConflict.distanceKm} km. Its original coordinates are retained: {selected.locationSourceRecordedConflict.recordedLatitude}, {selected.locationSourceRecordedConflict.recordedLongitude}.</p><p>The conflicting source point is withheld. Any address estimate shown is still approximate.</p></section>}
           {selectedEstimate&&<section className='field-map-estimate-detail' aria-label={recordedPoint(selectedEstimate)?'Tracker-recorded coordinates':'Address estimate'}><h3>{pointTitle(selectedEstimate)}</h3>
             {'secondaryUnit' in selectedEstimate&&selectedEstimate.secondaryUnit?<p>Original installation address: {selectedEstimate.originalAddress}. {selectedEstimate.secondaryUnit.sourceText} is retained in the saved address. This estimate locates the building address; the suite and installed unit position remain unverified.</p>:null}

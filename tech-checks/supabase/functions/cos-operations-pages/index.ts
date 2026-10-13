@@ -20,6 +20,7 @@ import {projectImportedSourceAddresses,projectImportedGeocodes,checkedImportedBi
 import {verifiedItFleet, fleetRouteAllowed, fleetFeatures} from './fleetAccess.ts';
 import { projectReviewedAddressEstimates } from './reviewedAddressEstimates.ts';
 import { projectFieldGeocodes } from './fieldGeocodeProjection.ts';
+import {OWNER_CENSUS_NATIVE_FIELDS,OWNER_CENSUS_SITE_FIELDS,readOwnerCensusEvidence,readOwnerCensusPreparation,readOwnerCensusJson,matchesOwnerCensusProof} from './ownerCensusProof.ts';
 import { projectOwnerPlacement, projectCameraOwnerPlacement, placementMatchKey } from './placementProjection.ts';
 import { withDeliveryGoBacks } from './deliveryGoBack.ts';
 import { createMhelpImportHandler, readMhelpAwareJson, readMhelpAwareJsonWithSize, MHELP_JSON_LIMIT, MhelpImportError } from './mhelpImport.ts';
@@ -309,10 +310,103 @@ export function createOperationsHandler(options) {
     const sources={units,matches,providers,devices,audits,ownerCrosswalk:crosswalk,ownerEpochs:epochs};
     return {sources,identity:await verifiedHealthIdentities(sources),reviewSources:{units,matches,providers,devices,epochs,crosswalk}};
   };
+  // The same exact read and actor predicate serve execution and shared admission.
+  const readOwnerCensusTarget=async(context,key,id,signal=undefined)=>{
+    const bounded=async(url,init)=>readOwnerCensusJson(await requestFetch(url,{...init,redirect:'error',cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)}));
+    const history=await bounded(platformUrl+'/rest/v1/rpc/appdeploy_unit_location_history',{
+      method:'POST',headers:platformHeaders(),body:JSON.stringify({p_actor_user_id:context.actorId,p_unit_id:id}),
+    });
+    const native=await bounded(platformUrl+'/rest/v1/equipment_units?select='+OWNER_CENSUS_NATIVE_FIELDS.join(',')+'&organization_id=eq.'+ORGANIZATION_ID+'&id=eq.'+id+'&limit=2',{headers:platformHeaders()});
+    if(!Array.isArray(native)||native.length!==1)throw Error('Exact native authority unavailable');
+    let site=null;
+    if(native[0].installed_site_id!==null){
+      const siteId=idValue(native[0].installed_site_id,'Installed site');
+      const sites=await bounded(platformUrl+'/rest/v1/sites?select='+OWNER_CENSUS_SITE_FIELDS.join(',')+'&organization_id=eq.'+ORGANIZATION_ID+'&id=eq.'+siteId+'&limit=2',{headers:platformHeaders()});
+      if(!Array.isArray(sites)||sites.length!==1)throw Error('Exact native site unavailable');site=sites[0];
+    }
+    if(typeof key!=='string')throw Error('Exact camera epoch unavailable');
+    const epochs=await bounded(LEGACY_URL+'/rest/v1/rpc/cos_camera_identity_epochs_v1',{
+      method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_unit_keys:[key]}),
+    });
+    return {native:native[0],history,epochs,site};
+  };
+  /** Read-only execution evidence. Keep full identity/collision rosters while
+   * avoiding unrelated provider result hydration. Never accepts actor/source keys. */
+  const readOwnerCensusEnvelope=async(context,nativeId,binding,requestSignal,prepare=false)=>{
+    const signal=AbortSignal.any([requestSignal,AbortSignal.timeout(45000)]);
+    const actorPayload={p_actor_user_id:context.actorId,p_organization_id:ORGANIZATION_ID};
+    const readArchives=async()=>{
+      const rows=await rpc('cos_archived_representation_projection',{p_organization_id:ORGANIZATION_ID},signal);
+      if(!Array.isArray(rows)||rows.length>50)fail('Current archive evidence is unavailable.',503);return rows;
+    };
+    const readSources=async(snapshot,archives)=>{
+      // All archive endpoints are retained so final archive validation sees the
+      // same imported protection state. Full raw inventory is never filtered.
+      const ids=new Set([nativeId,...archives.flatMap(a=>[a.archivedNativeId,a.canonicalNativeId,a.archivedTrackerId,a.canonicalTrackerId])]);
+      const identities=snapshot.inventoryItems.filter(r=>ids.has(r.id)).map(r=>({entityKind:r.readOnly===true?'tracker':'equipment_unit',nativeUnitId:r.id}));
+      const rows=[];
+      for(let offset=0;offset<identities.length;offset+=250){
+        const batch=identities.slice(offset,offset+250),page=await rpc('cos_geocode_sources_map_projection',{p_organization_id:ORGANIZATION_ID,p_identities:batch},signal);
+        if(!Array.isArray(page)||page.length>batch.length)fail('Current target source evidence is unavailable.',503);rows.push(...page);
+      }
+      return rows;
+    };
+    const readPrecedence=async(sources)=>{
+      const bindings=(await Promise.all(sources.filter(s=>s?.sourcePrecedence!==undefined).map(checkedImportedBinding))).filter(Boolean);
+      if(!bindings.length)return [];
+      const confirmed=[];
+      for(let offset=0;offset<bindings.length;offset+=250){
+        const batch=bindings.slice(offset,offset+250),rows=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_imported_precedence_read_current',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_bindings:batch}),signal},'Reviewed source precedence is unavailable.');
+        if(!Array.isArray(rows)||rows.length>batch.length)fail('Reviewed source precedence is unavailable.',503);
+        confirmed.push(...(await Promise.all(rows.map(checkedImportedBinding))).filter(Boolean));
+      }
+      return confirmed;
+    };
+    const [initialSnapshot,initialBundle,initialArchives,records]=await Promise.all([
+      rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readArchives(),
+      readJson(LEGACY_URL+'/rest/v1/rpc/cos_field_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_audit_ids:[binding.auditId]}),signal},'Saved target lookup is unavailable.'),
+    ]);
+    if(!Array.isArray(records)||records.length!==1)fail('The enrolled Owner lookup is unavailable.',409);
+    const record=records[0];
+    if(record?.auditId!==binding.auditId||record.unitKey!==binding.unitKey||record.addressSha256!==binding.addressSha256)fail('The exact Owner lookup binding changed.',409);
+    if(prepare){
+      const marker=record.censusPreparation;
+      if(record.status!=='invalid_address'||record.censusOnly===true||Object.hasOwn(record,'censusOnlyGuard')||Object.hasOwn(record,'censusOnlyState')
+        ||!marker||typeof marker!=='object'||Array.isArray(marker)||Object.keys(marker).length!==1||marker.nativeUnitId!==nativeId)fail('Current Owner preparation authorization is unavailable.',409);
+    }else if(record.censusOnly!==true||!['draining','ready','consumed'].includes(record.censusOnlyState)||record.censusOnlyGuard?.nativeUnitId!==nativeId||record.censusOnlyGuard?.nativeGuardSha256!==binding.nativeGuardSha256)fail('The enrolled Owner lookup binding changed.',409);
+    const initialSources=await readSources(initialSnapshot,initialArchives);
+    const initialContext={nativeUnits:initialBundle.sources.units,identity:initialBundle.identity,archivedRepresentations:initialArchives,confirmedPrecedenceBindings:await readPrecedence(initialSources)};
+    const initial=await projectOwnerPlacement(await projectImportedSourceAddresses(initialSnapshot,initialSources,initialBundle.sources.audits,initialBundle.sources.devices,[],initialContext),initialBundle.sources.audits,initialBundle.sources.devices,initialBundle.identity,initialBundle.sources.units);
+    if(!initial.items.some(r=>r.id===nativeId&&r.placementSource==='owner'&&r.placementAuditId===binding.auditId))fail('Current Owner placement is unavailable.',409);
+    const [rawSnapshot,bundle,archives,mhelpReceipt]=await Promise.all([rpc('appdeploy_field_map_snapshot',actorPayload,signal),readIdentitySources(context,null,signal),readArchives(),readMhelpPlacements(actorPayload,signal)]);
+    const sources=await readSources(rawSnapshot,[...initialArchives,...archives]);
+    const archiveContext={nativeUnits:bundle.sources.units,identity:bundle.identity,archivedRepresentations:archives,previousArchivedRepresentations:initialArchives};
+    const sourceContext={...archiveContext,currentSources:sources,confirmedPrecedenceBindings:await readPrecedence(sources)};
+    const base=await projectOwnerPlacement(await projectImportedSourceAddresses(rawSnapshot,sources,bundle.sources.audits,bundle.sources.devices,initialSources,sourceContext),bundle.sources.audits,bundle.sources.devices,bundle.identity,bundle.sources.units);
+    const inputs={actorId:context.actorId,rawSnapshot,snapshot:base,bundle,mhelpReceipt,readTarget:id=>readOwnerCensusTarget(context,binding.unitKey,id,signal)};
+    const preparation=prepare?await readOwnerCensusPreparation({...inputs,binding:{nativeUnitId:nativeId,auditId:binding.auditId,unitKey:binding.unitKey,addressSha256:binding.addressSha256}}):null;
+    const evidence=prepare?null:await readOwnerCensusEvidence({...inputs,records},true);
+    const final=projectMhelpFieldPlacement(projectArchivedRepresentations(base,archives,bundle.sources.audits,bundle.sources.devices,archiveContext),mhelpReceipt,bundle.sources.audits,bundle.identity);
+    const aliases=final.nativePlacementAliases.filter(a=>a.unitId===nativeId),items=final.items.filter(r=>r.id===nativeId),inventory=final.inventoryItems.filter(r=>r.id===nativeId);
+    if(signal.aborted||aliases.length!==1||items.length!==1||inventory.length!==1
+      ||[items[0],inventory[0]].some(r=>r.placementSource!=='owner'||r.placement!=='FIELD'||r.status!=='field'||r.currentLocationType!=='field'||r.placementStatus==='needs_identity_review'||r.locationVerification==='owner_verified'))fail('Current complete Owner source proof is unavailable.',409);
+    if(prepare){
+      if(!preparation)fail('Current complete Owner preparation proof is unavailable.',409);
+      // A separate preparation marker never substitutes for an enrolled policy.
+      // Re-read its exact SQL before-image after source reads, without changing it.
+      const latest=await readJson(LEGACY_URL+'/rest/v1/rpc/cos_field_geocode_read_many',{method:'POST',headers:{...context.headers,'Content-Type':'application/json'},body:JSON.stringify({p_organization_id:ORGANIZATION_ID,p_audit_ids:[binding.auditId]}),signal},'Current preparation authorization is unavailable.');
+      if(signal.aborted||!Array.isArray(latest)||latest.length!==1||JSON.stringify(latest[0])!==JSON.stringify(record))fail('Owner preparation authorization changed.',409);
+      return {preparation:{...preparation,preparedAt:new Date().toISOString()}};
+    }
+    const proofs=evidence.proofs.filter(p=>p.nativeUnitId===nativeId);
+    if(proofs.length!==1||!matchesOwnerCensusProof(proofs[0],record,nativeId))fail('Current complete Owner source proof is unavailable.',409);
+    const safeRow=r=>Object.fromEntries(['id','unitNumber','readOnly','placementSource','placement','status','currentLocationType','placementAuditId','placementUnitKey','address','locationVerification'].map(k=>[k,r[k]]));
+    return {record,map:{placementProjectionVersion:2,ownerCensusProofs:proofs,nativePlacementAliases:aliases,items:items.map(safeRow),inventoryItems:inventory.map(safeRow)}};
+  };
   // Share one large-transfer slot across imports, original PDF downloads, and private evidence.
   // Binary responses retain their slot until drained/canceled; small requests remain usable.
   let activeLargeBodies = 0;
-  return async request => {
+  return async function handle(request) {
     let ownsLargeBodyPermit = false;
     let keepPermitForResponse = false, responseOwnsPermit = false;
     const releaseLargeBody = () => {
@@ -480,6 +574,36 @@ export function createOperationsHandler(options) {
       });
       if (!context.actorId) fail('This Owner account is not linked to COS production. Use the existing Tech Check tools.', 403);
       const actorPayload = { p_actor_user_id: context.actorId, p_organization_id: ORGANIZATION_ID };
+      const censusOnce=/^\/api\/field-map\/([^/]+)\/(owner-census-once|owner-census-proof|owner-census-prepare)$/.exec(path);
+      if(censusOnce){
+        if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
+        if(method!=='POST')fail('An explicit Owner request is required.',405);
+        if(new URL(request.url).search)fail('Query parameters are unsupported.');
+        const nativeId=idValue(censusOnce[1],'Unit');
+        if(body===null)body=await requestBody(request);
+        const prepare=censusOnce[2]==='owner-census-prepare';
+        allowedFields(body,prepare?['auditId','unitKey','addressSha256']:['auditId','unitKey','addressSha256','nativeGuardSha256']);
+        if(typeof body.auditId!=='string'||!/^[1-9]\d{0,18}$/.test(body.auditId)||BigInt(body.auditId)>9223372036854775807n
+          ||typeof body.unitKey!=='string'||!body.unitKey.trim()||body.unitKey!==body.unitKey.trim()||body.unitKey.length>250
+          ||!(prepare?['addressSha256']:['addressSha256','nativeGuardSha256']).every(k=>typeof body[k]==='string'&&/^[a-f0-9]{64}$/.test(body[k])))fail('Exact reviewed lookup binding is required.');
+        const fresh=await readOwnerCensusEnvelope(context,nativeId,body,request.signal,prepare);
+        if(prepare)return json(fresh.preparation);
+        if(censusOnce[2]==='owner-census-proof')return json(fresh.map);
+        if(fresh.record.censusOnlyState!=='ready')fail('The enrolled Owner lookup changed or its allowance is unavailable.',409);
+        let upstream;
+        try{upstream=await requestFetch(LEGACY_URL+'/functions/v1/camera-field-geocode',{
+            method:'POST',headers:{Authorization:context.authorization,'Content-Type':'application/json'},
+            body:JSON.stringify({auditId:body.auditId,unitKey:body.unitKey}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(210000),
+          });}
+        catch{return json({error:'The lookup outcome is uncertain. Refresh to inspect its saved hold; do not repeat the request.',censusOnly:true,allowance:'unknown'},503);}
+        if(!upstream.ok){await upstream.body?.cancel();return json({error:'The Census-only lookup could not finish. Refresh to check its hold.',censusOnly:true,allowance:'unknown'},upstream.status>=500?503:409);}
+        let result;try{result=await readOwnerCensusJson(upstream,32768);}catch{fail('The lookup outcome is uncertain. Refresh before taking further action.',503);}
+        if(result?.ok!==true||result.censusOnly!==true||!['unknown','available','consumed'].includes(result.allowance)||!Array.isArray(result.results)||result.results.length>1
+          ||!Array.isArray(result.fallbackResults)||result.fallbackResults.length||result.importedResults!==null
+          ||result.results.some(r=>r?.auditId!==body.auditId||r.censusOnly!==true||!['pending','success','no_match','invalid_address','provider_error','held','superseded','draining'].includes(r.status)||!['unknown','available','consumed'].includes(r.allowance)
+            ||r.censusOnlyNotBefore!==undefined&&(typeof r.censusOnlyNotBefore!=='string'||!Number.isFinite(Date.parse(r.censusOnlyNotBefore)))))fail('The lookup outcome is uncertain. Refresh to inspect the saved result.',503);
+        return json({ok:true,results:result.results.map(r=>({auditId:r.auditId,status:r.status,censusOnly:true,allowance:r.allowance,...(r.censusOnlyNotBefore?{censusOnlyNotBefore:r.censusOnlyNotBefore}:{})})),fallbackResults:[],importedResults:null,censusOnly:true,allowance:result.allowance});
+      }
       if(path==='/api/owner-review/legacy-evidence'){
         if(!context.legacyOwner)fail('An active COS Owner account is required.',403);
         if(method!=='GET')fail('Method not supported.',405);
@@ -731,12 +855,14 @@ export function createOperationsHandler(options) {
           const archiveContext={nativeUnits:freshUnits,identity:freshBundle.identity,archivedRepresentations:freshArchivedRepresentations,previousArchivedRepresentations:archivedRepresentations};
           const freshSourceContext={...archiveContext,currentSources:freshSources,confirmedPrecedenceBindings:await readPrecedenceBindings(freshSources)};
           const base=await projectOwnerPlacement(await projectImportedSourceAddresses(freshSnapshot,freshSources,freshAudits,freshDevices,importedSources,freshSourceContext),freshAudits,freshDevices,freshBundle.identity,freshUnits);
-          let projected=await projectFieldGeocodes(base,geocodes,censusUnavailable);
+          const mhelpReceipt=await readMhelpPlacements(actorPayload);
+          const ownerCensusEvidence=await readOwnerCensusEvidence({actorId:context.actorId,records:context.legacyOwner?geocodes:geocodes.filter(r=>r.censusOnlyState==='consumed'&&r.status==='success'),rawSnapshot:freshSnapshot,snapshot:base,bundle:freshBundle,mhelpReceipt,
+            readTarget:id=>readOwnerCensusTarget(context,geocodes.find(r=>r.censusOnlyGuard?.nativeUnitId===id)?.unitKey,id)},context.legacyOwner);
+          let projected=await projectFieldGeocodes({...base,ownerCensusProofs:ownerCensusEvidence.proofs},geocodes,censusUnavailable,ownerCensusEvidence.receipts,context.legacyOwner);
           try{projected=await projectFallbackGeocodes(projected,fallbackGeocodes);}catch{/* Fail closed for malformed fallback results. */}
           try{projected=await projectImportedGeocodes(projected,importedGeocodes,freshAudits,freshDevices,freshSourceContext);}catch{fail('Imported address lookup results are unavailable. The map could not be refreshed.',503);}
           projected=await projectReviewedAddressEstimates(projected,freshAudits,freshDevices,placementMatchKey);
           projected=await projectSourceRecordedCoordinates(projected,sourceRecorded,freshAudits,freshDevices);
-          const mhelpReceipt=await readMhelpPlacements(actorPayload);
           projected=await projectFieldRecorderAuthority(projectArchivedRepresentations(projected,freshArchivedRepresentations,freshAudits,freshDevices,archiveContext),freshBundle.sources,freshBundle.identity);
           return json(mhelpReceipt?projectMhelpFieldPlacement(projected,mhelpReceipt,freshAudits,freshBundle.identity):projected);
         }

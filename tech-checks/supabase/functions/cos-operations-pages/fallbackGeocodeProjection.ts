@@ -12,7 +12,7 @@ export async function projectFallbackGeocodes(snapshot:Row,records:unknown):Prom
  const byAudit=new Map<string,Row>();
  for(const r of records){if(!object(r)||typeof r.auditId!=='string'||byAudit.has(r.auditId))throw Error('Address fallback identity invalid');byAudit.set(r.auditId,r);}
  const apply=async(row:Row)=>{
-  if(row.placement!=='FIELD'||row.placementSource!=='owner'||row.placementStatus==='needs_identity_review'||typeof row.placementAuditId!=='string'||typeof row.placementUnitKey!=='string'||typeof row.address!=='string'||row.locationVerification==='owner_verified'||row.locationGeocode?.status==='success')return row;
+  if(row.placement!=='FIELD'||row.placementSource!=='owner'||row.placementStatus==='needs_identity_review'||typeof row.placementAuditId!=='string'||typeof row.placementUnitKey!=='string'||typeof row.address!=='string'||row.locationVerification==='owner_verified'||row.locationGeocode?.status==='success'||row.locationGeocode?.censusOnly===true)return row;
   const r=byAudit.get(row.placementAuditId);
   if(!r||r.unitKey!==row.placementUnitKey||r.addressSha256!==await addressDigest(row.address)||!statuses.has(r.status)||r.provider!=='geocodio'||r.verified!==false||r.liveGps!==false||r.confidence!=='estimate')return row;
   if(r.status==='success'){
