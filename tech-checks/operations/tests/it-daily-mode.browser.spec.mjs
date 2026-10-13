@@ -299,6 +299,16 @@ test('Owner persona preview has no iframe/token and can still return to Owner', 
   await page.locator('#fixtureReturnOwner').click(); await expect(page.locator('#fixtureOwnerControl')).toBeVisible();
 });
 
+test('the integrated fleet deep link opens through the existing verified IT daily gate', async ({page}) => {
+  const {frame,state}=await mount(page,{deepLink:'?fleetDashboard=1',fieldDiagnostics:true});
+  await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/mode=fleet.*#fleet-dashboard$/);
+  await expect(frame.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
+  await expect(frame.locator('.cos-fleet-stat-field strong')).toHaveText('1');
+  await expect(page.locator('#existing-it-tool')).toBeHidden();
+  await expect(frame.getByRole('button',{name:'Register in COS inventory →'})).toHaveCount(0);
+  await assertReads(page,state);
+});
+
 for (const options of [{role: 'service'}, {linked: false}, {active: false}, {archived: true}, {capability: false}]) test('availability preserves existing identity limits ' + JSON.stringify(options), async ({page}) => {
   const {state} = await mount(page, options);
   await expect.poll(() => page.evaluate(() => window.COS_IT_DAILY_ONLY)).toBe(true);
