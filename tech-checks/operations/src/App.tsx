@@ -9,6 +9,7 @@ import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
+import FleetDashboard from './FleetDashboard';
 import {ownerCensusSessionAllowed} from './ownerCensusOnce';
 import UnitTrackerWorkspace from './UnitTrackerWorkspace';
 import HomeUnitTracker from './HomeUnitTracker';
@@ -40,7 +41,7 @@ type Row = Record<string, any>;
 type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Unit Tracker' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
 const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Unit Tracker","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
 const legacy: Record<string,string> = { Vision:'vision' };
-const baseFleetWorkspaces = ['IT Dashboard','Field Map','InHand Routers','Camera Health','Victron VRM','Unit Tracker','MHelp','Tech Check'];
+const baseFleetWorkspaces = ['IT Dashboard','Fleet Dashboard','Field Map','InHand Routers','Camera Health','Victron VRM','Unit Tracker','MHelp','Tech Check'];
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'IT Dashboard':'Your field, connectivity, power, tracker and ticket information in one place.',
@@ -178,6 +179,7 @@ function OwnerTasksWorkspace({show}:{show:(message:string)=>void}) {
 }
 function OwnerApp() {
   const [mapUnitId, setMapUnitId] = useState('');
+  const [registerUnitName,setRegisterUnitName]=useState('');
   const [heliosUnit,setHeliosUnit]=useState(1);
   // Keep old layout bookmarks compatible with the single responsive workspace.
   useEffect(()=>{
@@ -216,7 +218,7 @@ function OwnerApp() {
   },[setRouteLocation]);
   const [session,setSession]=useState<Row|null>(null);
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
-  const fleetWorkspaces = useMemo(()=>(dailyOnly?['IT Dashboard',...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
+  const fleetWorkspaces = useMemo(()=>(dailyOnly?['IT Dashboard','Fleet Dashboard',...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
   const label=(name:string)=>dailyOnly?itDailyLabel(name):workspaceLabel(name);
   const [sessionError,setSessionError]=useState('');
@@ -339,12 +341,14 @@ function OwnerApp() {
         <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu <span aria-hidden='true'>☰</span></button>
       </section>
 
-      {active!=='Today'&&active!=='IT Dashboard'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
+      {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
+      {authorized&&active==='Today'&&!route.detail&&<div className='cos-fleet-launch'><div><strong>COS Camera Health & Field Map</strong><p>The complete fleet dashboard: map, device health, locations and unit setup.</p></div><button onClick={()=>navigate('Fleet Dashboard')}>Open Fleet Dashboard →</button></div>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>{!dailyOnly&&<TechChecksWorkspace/>}</section>
         :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening IT dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Field Map')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!tvDisplay&&!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>} {!tvDisplay&&<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>} {!route.createType&&<DailyBoard api={api} openWorkspace={navigate} onTvChange={setTvDisplay} createTicket={createTicket}/>}</>
+        :active==='Fleet Dashboard'?<FleetDashboard key={session?.userId||session?.name||'current'} session={session!} navigate={navigate} createTicket={fleetOnly?undefined:createTicket} openUnitMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} registerEquipment={name=>{setRegisterUnitName(name);navigate('Equipment');}}/>
         :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)}/></section>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialUnitId={route.unitId} onSelectUnit={unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true)} openMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
@@ -355,7 +359,7 @@ function OwnerApp() {
         :active==='Calendar'?<OperationsCalendar show={show}/>
         :active==='Handoffs'?<HandoffsWorkspace show={show}/>
         :active==='Customers'||active==='Sites'?<DirectoryWorkspace kind={active} show={show}/>
-        :active==='Equipment'?<EquipmentWorkspace show={show}/>
+        :active==='Equipment'?<EquipmentWorkspace show={show} initialUnitName={registerUnitName}/>
         :active==='Team'?<TeamWorkspace show={show} openWorkspace={navigate}/>
         :active==='Quotes'?<QuotesWorkspace show={show}/>
         :active==='Invoices'||active==='Billing'?<InvoicesWorkspace show={show}/>

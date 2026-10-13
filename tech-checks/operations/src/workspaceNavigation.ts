@@ -2,13 +2,13 @@ import { isTicketUnitId } from './ticketContext';
 import { isTicketType, type TicketType } from './ticketTypes';
 
 /** Presentation routes only. Authorization and actions stay in their existing workspaces. */
-export const itWorkspaces = ['IT Dashboard','MHelp'];
-export const workspaces = ['Operations','Units On Hand','Today','Daily Board','Field Map','Unit Tracker','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
+export const itWorkspaces = ['IT Dashboard','Fleet Dashboard','MHelp'];
+export const workspaces = ['Operations','Units On Hand','Today','Daily Board','Fleet Dashboard','Field Map','Unit Tracker','Vision','Camera Health','InHand Routers','Victron VRM','Dispatch','Calendar','Unscheduled','Customers','Sites','Work Requests','CRM','Quotes','Jobs','Tech Check','Owner Tasks','Handoffs','Owner Review','Equipment','Team','Purchasing','Billing','Invoices','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 export const workspaceGroups = [
   { label:'Overview', home:'Today', items:['Operations','Today','Daily Board','Needs Attention','Activity'] },
   { label:'Job flow', home:'Jobs', items:['Jobs','Owner Review','Handoffs','Tech Check'] },
   { label:'Schedule', home:'Calendar', items:['Calendar','Unscheduled','Dispatch'] },
-  { label:'Equipment', home:'Equipment', items:['Units On Hand','Equipment','Field Map','Unit Tracker','Camera Health','InHand Routers','Victron VRM'] },
+  { label:'Equipment', home:'Equipment', items:['Fleet Dashboard','Units On Hand','Equipment','Field Map','Unit Tracker','Camera Health','InHand Routers','Victron VRM'] },
   { label:'Customers', home:'Customers', items:['Customers','Sites','Work Requests','CRM'] },
   { label:'Team', home:'Team', items:['Team','Owner Tasks'] },
   { label:'Finance', home:'Billing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },

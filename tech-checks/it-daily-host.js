@@ -76,8 +76,8 @@ async function open(value, generation) {
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   const q = new URLSearchParams(location.search), unit = q.get('fieldUnit');
-  const route = q.get('fieldView') === '1' || unit ? '#field-map'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : '#it-dashboard';
-  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=it-daily-four-20261012'+route;
+  const route = q.get('fleetDashboard') === '1' ? '#fleet-dashboard' : q.get('cameraView') === '1' ? '#camera-health' : q.get('fieldView') === '1' || unit ? '#field-map'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : '#it-dashboard';
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=fleet-dashboard-20261012'+route;
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
   root.replaceChildren(frame);
   scheduleFrameFit();

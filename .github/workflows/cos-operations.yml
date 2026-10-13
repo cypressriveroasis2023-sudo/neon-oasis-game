@@ -154,6 +154,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - name: Verify integrated Fleet Dashboard for Owner and IT
+        run: npm run test:browser -- tests/fleet-dashboard.browser.spec.mjs tests/company-platform.browser.spec.mjs
       - name: Verify guarded Owner Census preparation and one-use action
         run: npm run test:browser -- tests/owner-census-preparation.browser.spec.mjs tests/owner-census-once.browser.spec.mjs
       - name: Verify Tech Check TV and IT daily navigation and camera scope
