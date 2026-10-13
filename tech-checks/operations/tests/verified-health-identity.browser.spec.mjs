@@ -57,7 +57,7 @@ async function mount(page,{sourceCases=false,overview=false}={}){
 }
 const listUnit=(frame,label)=>frame.locator('.field-map-list>button').filter({has:frame.locator('strong').filter({hasText:new RegExp('^'+label+'$')})});
 async function expand(frame){await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').first().click();await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);}
-async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);}
+async function navigate(page,hash){await page.frames().find(frame=>frame.parentFrame()).evaluate(value=>{location.hash=value;},hash);const frame=page.frameLocator('iframe');if(hash==='field-map'){const filters=frame.getByRole('button',{name:/^Filters/});if(await filters.getAttribute('aria-expanded')!=='true')await filters.click();await frame.getByLabel('Field health filter').selectOption('all');}else if(hash==='camera-health')await frame.getByLabel('Camera Health unit filter').selectOption('all');}
 async function noOverflow(frame){expect(await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1)).toBe(false);}
 function noWrites(state){expect(state.writes).toEqual([]);expect(state.requests.every(request=>request.method==='GET')).toBe(true);expect(state.requests.some(request=>/probe|verify|diagnos|refresh-source/i.test(request.path))).toBe(false);}
 
