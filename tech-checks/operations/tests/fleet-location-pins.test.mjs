@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {checkedAddressEstimate} from '../src/fieldAddressEstimates.ts';
 import {now as browserFixtureNow} from './fixtures/camera-evidence-fixtures.mjs';
 import {fleetLocationPins} from '../src/fleetLocationPins.ts';
-import {fleetDashboardRows,initialFleetFilters,filterFleetDashboard} from '../src/fleetDashboardModel.ts';
+import {fleetDashboardRows,fleetLocationReview,initialFleetFilters,filterFleetDashboard} from '../src/fleetDashboardModel.ts';
 import {withSyntheticEstimate} from './fixtures/fleet-location-fixtures.mjs';
 const unit=(n,patch={})=>({id:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,unitNumber:'Sniper '+n,address:'100 Example Road, Test City, TX 77001',placement:'FIELD',currentLocationType:'field',status:'field',...patch});
 test('one validated point population separates missing locations, estimates and verified installations',async()=>{
@@ -22,3 +22,5 @@ test('a rejected or changed-address estimate stays missing; raw coordinates are 
 });
 
 test('the synthetic accepted estimate predates the actual browser clock and future evidence still fails closed',async()=>{const row=withSyntheticEstimate(unit(9));assert(await checkedAddressEstimate(row,browserFixtureNow));const note=JSON.parse(row.locationNote.split('|')[1]);note.geocodedAt=note.appliedAt='2026-10-07T12:00:00Z';assert.equal(await checkedAddressEstimate({...row,locationNote:'COS_ADDRESS_ESTIMATE_V1|'+JSON.stringify(note)},browserFixtureNow),null);});
+
+test('accepted estimate disclosure preserves separate camera and source warnings',()=>{const row=fleetDashboardRows([withSyntheticEstimate(unit(10,{mhelpLocationReviewReason:'Synthetic source update delayed'}))],null,null,null)[0];const notes=fleetLocationReview(row,true);assert(notes.some(note=>note.includes('point is shown on the map')));assert(notes.includes('Synthetic source update delayed'));assert(notes.includes(row.camera.reason));assert.deepEqual(fleetLocationReview(row,false),row.review);});

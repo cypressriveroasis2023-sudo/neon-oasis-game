@@ -68,3 +68,6 @@ export function fleetDashboardCsv(rows:FleetDashboardRow[]){
 }
 
 export function fleetVrmReadAllowed(session:{role?:unknown;legacyOwner?:unknown;features?:Record<string,unknown>}){return session.features?.vrmRead===true||(session.role==='Owner'&&session.legacyOwner!==false&&session.features?.vrmRead!==false);}
+
+/** Describe an already validated estimate without dropping independent health/source warnings. */
+export function fleetLocationReview(row:FleetDashboardRow,acceptedEstimate=false){return row.review.map(note=>acceptedEstimate&&note===locationExplanation(row.unit)?'Unverified estimated / source-recorded point is shown on the map. Confirm the installation before treating it as verified or using nearby-distance results.':note);}
