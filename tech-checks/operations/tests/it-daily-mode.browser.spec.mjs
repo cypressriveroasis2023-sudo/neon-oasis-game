@@ -13,7 +13,7 @@ const dist = resolve(process.env.COS_IT_DAILY_TEST_DIST || fileURLToPath(new URL
 const readHost = name => readFileSync(new URL('../../' + name, import.meta.url), 'utf8');
 const sources = ['cameras', 'field', 'victron', 'tracker'];
 const labels = ['Camera Health', 'Fleet Dashboard', 'Victron View', '2027 Unit Tracker'];
-const routes = { cameras: '#camera-health', field: '#field-map', victron: '#victron-vrm', tracker: '#unit-tracker' };
+const routes = { cameras: '#camera-health', field: '#fleet-dashboard', victron: '#victron-vrm', tracker: '#unit-tracker' };
 const sourcePaths = { cameras: '/api/camera-health/summary-v3', field: '/api/field-map', victron: '/api/vrm-fleet', tracker: '/api/unit-tracker' };
 const gate = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
 const daily = frame => frame.getByRole('region', { name: 'IT daily dashboard', exact: true });

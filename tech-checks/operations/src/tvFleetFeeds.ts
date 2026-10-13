@@ -11,11 +11,11 @@ type Callbacks={
 };
 
 /** Accept each verified feed as it arrives; an optional outage cannot hide locations. */
-export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks):Promise<string[]> {
+export async function loadTvFleetFeeds(api:Api,callbacks:Callbacks,force=false):Promise<string[]> {
   const errors:string[]=[];
   let field:ReturnType<typeof checkedFieldMap>|null=null,health:Health|null=null;
   const read=async<T>(label:string,path:string,check:(value:any)=>T,accept:(value:T)=>void|Promise<void>)=>{
-    try {const value=api.fleetSource&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)?await api.fleetSource(path==='/api/field-map'?'fieldMap':'health'):(await api.get(path)).data;await accept(check(value));}
+    try {const value=api.fleetSource&&['/api/field-map','/api/camera-health/summary-v3'].includes(path)?await api.fleetSource(path==='/api/field-map'?'fieldMap':'health',force):(await api.get(path)).data;await accept(check(value));}
     catch(cause){errors.push(label+': '+(cause instanceof Error?cause.message:'Information is unavailable.'));}
   };
   await Promise.all([

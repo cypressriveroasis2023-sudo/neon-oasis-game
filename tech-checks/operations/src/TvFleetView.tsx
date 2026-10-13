@@ -20,7 +20,7 @@ const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),alive=useRef(false);
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(force=false)=>{
     if(running.current)return;
     running.current=true;lastAttempt.current=Date.now();const request=generation.current;
     try{
@@ -33,7 +33,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         },
         health:health=>{if(current())setData(previous=>({...previous,health}));},
         routers:routers=>{if(current())setData(previous=>({...previous,routers}));}
-      });
+      },force);
       if(current()){setClock(Date.now());setError(errors.join(' '));}
     }catch(cause){if(alive.current&&request===generation.current)setError(cause instanceof Error?cause.message:'Fleet information is unavailable.');}
     finally{running.current=false;}
@@ -41,13 +41,13 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   useEffect(()=>{
     if(!enabled){setData(empty);return;}
     alive.current=true;void refresh();
-    const tick=()=>{setClock(Date.now());if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh();};
+    const tick=()=>{setClock(Date.now());if(automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden))void refresh(true);};
     const timer=window.setInterval(tick,60000);
     const invalid=()=>{generation.current++;setData(empty);setError('Sign in again to load fleet information.');};
     document.addEventListener('visibilitychange',tick);window.addEventListener('cos-private-data-invalidated',invalid);
     return()=>{alive.current=false;generation.current++;window.clearInterval(timer);document.removeEventListener('visibilitychange',tick);window.removeEventListener('cos-private-data-invalidated',invalid);};
   },[enabled,refresh]);
-  useEffect(()=>{if(enabled&&refreshId>0)void refresh();},[refreshId,enabled,refresh]);
+  useEffect(()=>{if(enabled&&refreshId>0)void refresh(true);},[refreshId,enabled,refresh]);
   const rows=useMemo(()=>data.units.map(unit=>({unit,health:fieldCameraHealth(unit,data.inventory,data.health,clock),router:fieldReachability(unit,data.routers?.items,clock),point:isCurrentFieldPin(unit)?{latitude:Number(unit.latitude),longitude:Number(unit.longitude)}:data.estimates.get(unit.id),estimate:data.estimates.get(unit.id)})).sort((a,b)=>({offline:0,unknown:1,online:2,support:3}[a.health.state]-{offline:0,unknown:1,online:2,support:3}[b.health.state])||a.unit.unitNumber.localeCompare(b.unit.unitNumber)),[data,clock]);
   const outages=useMemo(()=>tvOutageRows(rows),[rows]);
   const areas=useMemo(()=>tvMapTour(rows),[rows]);
