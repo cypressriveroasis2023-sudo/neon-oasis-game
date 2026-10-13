@@ -40,7 +40,7 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){
  const q=filters.query.trim().toLowerCase();
  return rows.filter(r=>{
-  const state=r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
+  const state=r.support?'support':r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
   return (filters.retired||!r.retired)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||r.family===filters.family)&&(filters.provider==='all'||r.provider===filters.provider)
    &&(!q||[r.name,r.family,r.provider,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
    &&(filters.status==='all'||filters.status==='operational'&&['online','offline','support'].includes(state)||filters.status===state)
