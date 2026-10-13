@@ -2,13 +2,13 @@ import { hasGpsCoordinates } from '../shared/gpsValidation';
 import { routerStatus, type RouterRow, type RouterStatus } from '../../supabase/functions/cos-operations-pages/routers';
 export type FieldLocation = {
   mhelpLocation?:Record<string,any>;mhelpLocationReviewReason?:string|null;
-  id: string; unitNumber: string; placementAuditId?:string; placementUnitKey?:string; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>; locationSourceRecorded?:Record<string,any>;
+  id: string; unitNumber: string; placementAuditId?:string; placementUnitKey?:string; placementUpdatedAt?:string|null; locationGeocode?:Record<string,any>; importedInstallation?:Record<string,any>; locationImportedGeocode?:Record<string,any>; locationSourceRecorded?:Record<string,any>;
   addressEstimateOrganizationId?:string|null; addressEstimateReviewEpoch?:string|null; addressEstimateNativeRevision?:string|null; addressEstimateLegacyEvidenceSha256?:string|null;
   installedSiteId?:string|null; placementSource?:string; placementStatus?:string; placement?:string;
   addressEstimateTrackerId?: string|null; addressEstimateUnitNumber?: string|null; address?: string; latitude?: number|string|null; longitude?: number|string|null;
   coordinateSource?: string|null; gpsRecordedAt?: string|null; hasUnitGps?: boolean; readOnly?: boolean;
   addressSource?: string|null; addressUpdatedAt?: string|null; sourceVerifiedAt?: string|null;
-  locationVerification?: string|null; locationVerifiedAt?: string|null; locationNote?: string|null;
+  locationVerification?: string|null; locationVerifiedAt?: string|null; locationHistoryId?:string|null; locationNote?: string|null;
   historicalLatitude?:number|string|null; historicalLongitude?:number|string|null;
   historicalCoordinateSource?:string|null; historicalRecordedAt?:string|null;
 };

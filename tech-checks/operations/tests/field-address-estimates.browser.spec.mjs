@@ -231,3 +231,48 @@ test('Owner suite estimate preserves the complete address, discloses building pr
  await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(1);
  expect(state.units[0].address).toBe(original);expect(state.writes).toHaveLength(0);
 });
+
+function historicalOwnerSuite(row){
+ const address='12345 Fixture Road, Ste#700, Test City, TX 77001-1234',older='2026-10-04T01:00:00.032265+00:00',moved='2026-10-05T02:00:00.248717+00:00';
+ return {...row,address,currentLocationType:'field',placement:'FIELD',placementSource:'owner',placementAuditId:'901',placementUnitKey:'SNIPER 901',
+  readOnly:false,hasUnitGps:true,addressSource:'Owner confirmed installation address',placementUpdatedAt:moved,addressUpdatedAt:moved,
+  locationVerification:'address_changed',latitude:null,longitude:null,coordinateSource:null,locationVerifiedAt:null,locationHistoryId:null,
+  gpsRecordedAt:older,historicalRecordedAt:older,historicalLatitude:33,historicalLongitude:-99,historicalCoordinateSource:'site',locationNote:'Synthetic older manual site history remains unchanged.',
+  locationGeocode:{status:'success',auditId:'901',unitKey:'SNIPER 901',provider:'us_census_address_range',benchmark:'Public_AR_Current',latitude:30,longitude:-95,matchedAddress:'12345 FIXTURE RD, TEST CITY, TX, 77001',geocodedAt:fresh,addressSha256:createHash('sha256').update(address.toLowerCase()).digest('hex')}};
+}
+test('historical-only Owner suite Census shows EST with disclosure, preserves history and stays out of nearby',async({page})=>{
+ const {frame,state}=await mount(page,{registered:true});state.units[0]=historicalOwnerSuite(state.units[0]);const before=structuredClone(state.units[0]);
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();
+ const estimate=frame.getByRole('region',{name:'Address estimate'});
+ await expect(estimate).toContainText('30, -95');await expect(estimate).toContainText(before.address);
+ await expect(estimate).toContainText('This estimate locates the building address; the suite and installed unit position remain unverified.');
+ await expect.poll(()=>estimatedCount(frame)).toBe(2);await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);
+ await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+before.id+'"]')).toHaveCount(0);
+ await page.reload();await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();await expect(estimate).toContainText(before.address);
+ await revealMapFilters(frame);await frame.getByLabel('Nearby unit center').selectOption(ids[2]);await expect.poll(()=>estimatedCount(frame)).toBe(0);
+ await revealMapFilters(frame);await frame.getByLabel('Nearby unit center').selectOption('');await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ expect(state.units[0]).toEqual(before);expect(state.writes).toHaveLength(0);
+ state.units[0]={...before,historicalRecordedAt:null};await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect(estimate).toHaveCount(0);await expect.poll(()=>estimatedCount(frame)).toBe(1);
+ await expect(frame.locator('.cos-field-pin-historical')).toHaveCount(0);expect(state.writes).toHaveLength(0);
+});
+
+for(const change of ['suite revision','newer verified GPS'])test('pending historical suite estimate cannot overwrite '+change,async({page})=>{
+ const {frame,state}=await mount(page,{registered:true,holdHashes:true});
+ await expect.poll(()=>frame.locator('body').evaluate(()=>window.__hashResolvers.length)).toBe(2);
+ await frame.locator('body').evaluate(()=>window.__hashResolvers.splice(0).forEach(resolve=>resolve()));await expect.poll(()=>estimatedCount(frame)).toBe(2);
+ state.units[0]=historicalOwnerSuite(state.units[0]);const oldHistory={latitude:state.units[0].historicalLatitude,longitude:state.units[0].historicalLongitude,source:state.units[0].historicalCoordinateSource,at:state.units[0].historicalRecordedAt,note:state.units[0].locationNote};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>window.__hashResolvers.length)).toBe(2);
+ state.units[0]=change==='suite revision'?{...state.units[0],address:state.units[0].address.replace('700','701'),placementAuditId:'902'}
+  :{...state.units[0],locationVerification:'owner_verified',latitude:30.5,longitude:-95.5,coordinateSource:'manual',gpsRecordedAt:fresh,locationVerifiedAt:fresh,locationHistoryId:'88888888-8888-4888-8888-888888888888'};
+ await frame.getByRole('button',{name:'Refresh',exact:true}).click();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>window.__hashResolvers.length)).toBe(3);
+ await frame.locator('body').evaluate(()=>window.__hashResolvers.splice(0).reverse().forEach(resolve=>resolve()));
+ await frame.locator('.field-map-list>button').filter({hasText:'Sniper 901'}).click();await expect(frame.getByRole('region',{name:'Address estimate'})).toHaveCount(0);
+ await expect.poll(()=>estimatedCount(frame)).toBe(1);
+ await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+state.units[0].id+'"]')).toHaveCount(change==='newer verified GPS'?1:0);
+ if(change==='newer verified GPS')await expect(frame.locator('.field-map-detail')).toContainText('VERIFIED PIN');
+ expect({latitude:state.units[0].historicalLatitude,longitude:state.units[0].historicalLongitude,source:state.units[0].historicalCoordinateSource,at:state.units[0].historicalRecordedAt,note:state.units[0].locationNote}).toEqual(oldHistory);
+ expect(state.writes).toHaveLength(0);
+});

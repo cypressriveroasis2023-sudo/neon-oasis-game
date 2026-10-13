@@ -10,6 +10,7 @@ import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
 import FieldMap from './FieldMap';
 import FleetDashboard from './FleetDashboard';
+import {ownerCensusSessionAllowed} from './ownerCensusOnce';
 import UnitTrackerWorkspace from './UnitTrackerWorkspace';
 import HomeUnitTracker from './HomeUnitTracker';
 import {trackerAccess} from './unitTracker';
@@ -347,8 +348,8 @@ function OwnerApp() {
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!tvDisplay&&!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>} {!tvDisplay&&<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>} {!route.createType&&<DailyBoard api={api} openWorkspace={navigate} onTvChange={setTvDisplay} createTicket={createTicket}/>}</>
-        :active==='Fleet Dashboard'?<FleetDashboard key={session?.userId||session?.name||'current'} session={session!} navigate={navigate} openUnitMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} registerEquipment={name=>{setRegisterUnitName(name);navigate('Equipment');}}/>
-        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true}/></section>
+        :active==='Fleet Dashboard'?<FleetDashboard key={session?.userId||session?.name||'current'} session={session!} navigate={navigate} createTicket={fleetOnly?undefined:createTicket} openUnitMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} registerEquipment={name=>{setRegisterUnitName(name);navigate('Equipment');}}/>
+        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)}/></section>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialUnitId={route.unitId} onSelectUnit={unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true)} openMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
