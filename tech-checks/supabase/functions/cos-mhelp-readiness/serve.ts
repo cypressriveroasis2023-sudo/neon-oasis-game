@@ -7,7 +7,7 @@ const ORGANIZATION = 'ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
 // Existing camera-cron authorization is verified by its original project; no credential is copied or created.
 const tokens=nativeMhelpTokens(name=>Deno.env.get(name));
 const getConfig=tokens.getPartnerConfig;
-const tickets=createMhelpTicketReader({fetch,getConfig,renewAccess:tokens.renewAccess});
+const tickets=createMhelpTicketReader({fetch:tokens.fetch,getConfig,renewAccess:tokens.renewAccess});
 const readNativeUnits=async()=>{
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (Deno.env.get('SUPABASE_URL') !== NATIVE || !service) throw Error('Backend unavailable');
@@ -22,8 +22,8 @@ const readNativeUnits=async()=>{
   }
   throw Error('Backend unavailable');
 };
-const partner = createMhelpPartnerHandler({fetch,getConfig,readNativeUnits,renewAccess:tokens.renewAccess});
-const fullPartner = createMhelpPartnerHandler({fetch,getConfig,readNativeUnits,fullEquipmentReview:true,renewAccess:tokens.renewAccess});
+const partner = createMhelpPartnerHandler({fetch:tokens.fetch,getConfig,readNativeUnits,renewAccess:tokens.renewAccess});
+const fullPartner = createMhelpPartnerHandler({fetch:tokens.fetch,getConfig,readNativeUnits,fullEquipmentReview:true,renewAccess:tokens.renewAccess});
 const configured=(name:string)=>{const value=Deno.env.get(name);return !!value && value.length<=16384 && !/\s/.test(value)};
 Deno.serve(createMhelpReadinessHandler({authenticate:async req=>{
   if (Deno.env.get('SUPABASE_URL')!==NATIVE) return false;

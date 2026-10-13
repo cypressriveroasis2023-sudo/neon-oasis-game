@@ -1,39 +1,82 @@
 import {addressDigest} from './censusAddress.ts';
+
 import {parseOwnerInstallationAddress} from '../_shared/ownerInstallationAddress.ts';
+
 import {fullMatchedParts} from './importedAddressContract.ts';
+
 import {placementMatchKey,placementIdentityConcernKey,currentOwnerPlacements} from './placementProjection.ts';
+
 import {checkedMhelpPlacements} from './mhelpPlacementProjection.ts';
 
+
 type Row=Record<string,any>;
-export const OWNER_CENSUS_PROOF_CONTRACT='COS_OWNER_ONE_CENSUS_NATIVE_V1';
-export const OWNER_CENSUS_SOURCE_CONTRACT='COS_OWNER_ONE_CENSUS_SOURCE_V1';
-export const OWNER_CENSUS_NATIVE_FIELDS=['id','organization_id','model_id','unit_number','serial_number','status','current_location_type','current_location_ref','installed_site_id','retired_at','updated_at','gps_latitude','gps_longitude','gps_accuracy_m','gps_source','gps_recorded_at','gps_recorded_by'] as const;
-export const OWNER_CENSUS_SITE_FIELDS=['id','organization_id','name','address_line1','address_line2','city','state_region','postal_code','latitude','longitude','updated_at'] as const;
-const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
-const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
-const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
-const sha=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
-const decimal=(v:unknown)=>typeof v==='string'&&/^[1-9]\d{0,18}$/.test(v)&&BigInt(v)<=9223372036854775807n;
-const text=(v:unknown,max=600)=>typeof v==='string'&&v.length>0&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v);
-const date=(v:unknown)=>typeof v==='string'&&Number.isFinite(Date.parse(v));
-const sameSet=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(v=>b.includes(v));
-const fields=(row:Row,keys:readonly string[])=>keys.map(k=>{if(!Object.hasOwn(row,k))throw Error('Incomplete native source');return row[k];});
-const coordinate=(v:unknown,max:number)=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=max;
-function stable(v:any):string {if(v===undefined)return 'null';if(v===null||typeof v!=='object')return JSON.stringify(v);if(Array.isArray(v))return '['+v.map(stable).join(',')+']';return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';}
-const sorted=(rows:any[])=>rows.map(stable).sort();
-async function digest(value:unknown){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(value)))),x=>x.toString(16).padStart(2,'0')).join('');}
-export type OwnerCensusNativeProof={contract:typeof OWNER_CENSUS_PROOF_CONTRACT;nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string;nativeGuardSha256:string;complete:true};
-export type OwnerCensusSourceReceipt={contract:typeof OWNER_CENSUS_SOURCE_CONTRACT;nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string;nativeSourceSha256:string;complete:true};
+
+export type OwnerCensusNativeProof={contract:'COS_OWNER_ONE_CENSUS_NATIVE_V1';nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string;nativeGuardSha256:string;complete:true};
+
+export type OwnerCensusSourceReceipt={contract:'COS_OWNER_ONE_CENSUS_SOURCE_V1';nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string;nativeSourceSha256:string;complete:true};
+
 type OwnerCensusEvidence={proof:OwnerCensusNativeProof;receipt:OwnerCensusSourceReceipt};
+
 export type OwnerCensusTargetRead={native:unknown;history:unknown;epochs:unknown;site:unknown};
 
-export async function readOwnerCensusJson(response:Response,maxBytes=2097152):Promise<any>{
+
+/** Opaque current-source commitment. Actor identity is bound privately. No cache,
+ * lease, lookup status, request time or health observation enters this hash. */
+export type OwnerCensusProofInputs={actorId:string;record:Row;rawSnapshot:Row;snapshot:Row;bundle:Row;mhelpReceipt:unknown;target:OwnerCensusTargetRead};
+
+export type OwnerCensusPreflightBinding={nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string};
+
+
+/** Exact-target reads use the requesting already-authorized Field View actor.
+ * Execution proof output remains Owner-only; source receipts stay backend-private. */
+type OwnerCensusReadInputs={actorId:string;records:Row[];rawSnapshot:Row;snapshot:Row;bundle:Row;mhelpReceipt:unknown;readTarget:(id:string)=>Promise<OwnerCensusTargetRead>};
+
+// Preserve the isolated Owner Census scope already deployed in production.
+export const { OWNER_CENSUS_PROOF_CONTRACT, OWNER_CENSUS_SOURCE_CONTRACT, OWNER_CENSUS_NATIVE_FIELDS, OWNER_CENSUS_SITE_FIELDS, readOwnerCensusJson, ownerCensusProof, ownerCensusSourceReceipt, readOwnerCensusPreparation, preflightOwnerCensusBinding, readOwnerCensusEvidence, readOwnerCensusProofs, matchesOwnerCensusReceipt, matchesOwnerCensusProof } = /* @__PURE__ */ (() => {
+
+const OWNER_CENSUS_PROOF_CONTRACT='COS_OWNER_ONE_CENSUS_NATIVE_V1';
+
+const OWNER_CENSUS_SOURCE_CONTRACT='COS_OWNER_ONE_CENSUS_SOURCE_V1';
+
+const OWNER_CENSUS_NATIVE_FIELDS=['id','organization_id','model_id','unit_number','serial_number','status','current_location_type','current_location_ref','installed_site_id','retired_at','updated_at','gps_latitude','gps_longitude','gps_accuracy_m','gps_source','gps_recorded_at','gps_recorded_by'] as const;
+
+const OWNER_CENSUS_SITE_FIELDS=['id','organization_id','name','address_line1','address_line2','city','state_region','postal_code','latitude','longitude','updated_at'] as const;
+
+const ORG='ece6d2a2-fd19-4cc7-b56a-2fa004a6d8f5';
+
+const object=(v:unknown):v is Row=>!!v&&typeof v==='object'&&!Array.isArray(v);
+
+const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
+
+const sha=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+
+const decimal=(v:unknown)=>typeof v==='string'&&/^[1-9]\d{0,18}$/.test(v)&&BigInt(v)<=9223372036854775807n;
+
+const text=(v:unknown,max=600)=>typeof v==='string'&&v.length>0&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v);
+
+const date=(v:unknown)=>typeof v==='string'&&Number.isFinite(Date.parse(v));
+
+const sameSet=(a:unknown[],b:unknown[])=>a.length===b.length&&new Set(a).size===a.length&&new Set(b).size===b.length&&a.every(v=>b.includes(v));
+
+const fields=(row:Row,keys:readonly string[])=>keys.map(k=>{if(!Object.hasOwn(row,k))throw Error('Incomplete native source');return row[k];});
+
+const coordinate=(v:unknown,max:number)=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=max;
+
+function stable(v:any):string {if(v===undefined)return 'null';if(v===null||typeof v!=='object')return JSON.stringify(v);if(Array.isArray(v))return '['+v.map(stable).join(',')+']';return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';}
+
+const sorted=(rows:any[])=>rows.map(stable).sort();
+
+async function digest(value:unknown){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(value)))),x=>x.toString(16).padStart(2,'0')).join('');}
+
+
+async function readOwnerCensusJson(response:Response,maxBytes=2097152):Promise<any>{
  if(!response.ok||Number(response.headers.get('content-length')||0)>maxBytes){await response.body?.cancel();throw Error('Owner source unavailable');}
  const reader=response.body?.getReader();if(!reader)throw Error('Owner source unavailable');
  const decoder=new TextDecoder('utf-8',{fatal:true});let body='',size=0;
  try{for(;;){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;if(size>maxBytes)throw Error('Owner source unavailable');body+=decoder.decode(chunk.value,{stream:true});}return JSON.parse(body+decoder.decode());}
  finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
 }
+
 
 /** Full existing Owner history RPC, not a direct history-table read. Its actor
  * permission gate and unpaginated full-list contract were inspected in production.
@@ -74,10 +117,6 @@ function targetTuple(value:OwnerCensusTargetRead,unitId:string,auditAt:string){
  return {native:nativeTuple,history:sorted(rows),site:siteTuple};
 }
 
-/** Opaque current-source commitment. Actor identity is bound privately. No cache,
- * lease, lookup status, request time or health observation enters this hash. */
-export type OwnerCensusProofInputs={actorId:string;record:Row;rawSnapshot:Row;snapshot:Row;bundle:Row;mhelpReceipt:unknown;target:OwnerCensusTargetRead};
-export type OwnerCensusPreflightBinding={nativeUnitId:string;auditId:string;unitKey:string;addressSha256:string};
 async function computeOwnerCensusProof(input:Omit<OwnerCensusProofInputs,'record'>&{binding:OwnerCensusPreflightBinding}):Promise<OwnerCensusEvidence|null>{
  try{
   const {actorId,binding:r,rawSnapshot,snapshot,bundle,mhelpReceipt,target}=input;
@@ -143,19 +182,23 @@ async function computeOwnerCensusProof(input:Omit<OwnerCensusProofInputs,'record
  }catch{return null;}
 }
 
+
 async function ownerCensusEvidence(input:OwnerCensusProofInputs):Promise<OwnerCensusEvidence|null>{
  const r=input.record;
  if(!object(r)||r.censusOnly!==true||!['draining','ready','consumed'].includes(r.censusOnlyState)||!object(r.censusOnlyGuard)||!sha(r.censusOnlyGuard.nativeGuardSha256))return null;
  return computeOwnerCensusProof({...input,binding:{nativeUnitId:r.censusOnlyGuard.nativeUnitId,auditId:r.auditId,unitKey:r.unitKey,addressSha256:r.addressSha256}});
 }
 
-export async function ownerCensusProof(input:OwnerCensusProofInputs):Promise<OwnerCensusNativeProof|null>{return (await ownerCensusEvidence(input))?.proof??null;}
-export async function ownerCensusSourceReceipt(input:OwnerCensusProofInputs):Promise<OwnerCensusSourceReceipt|null>{return (await ownerCensusEvidence(input))?.receipt??null;}
+
+async function ownerCensusProof(input:OwnerCensusProofInputs):Promise<OwnerCensusNativeProof|null>{return (await ownerCensusEvidence(input))?.proof??null;}
+
+async function ownerCensusSourceReceipt(input:OwnerCensusProofInputs):Promise<OwnerCensusSourceReceipt|null>{return (await ownerCensusEvidence(input))?.receipt??null;}
+
 
 /** Normal authenticated Owner preparation after an exact server-issued marker.
  * No enrolled record or placeholder guard is synthesized. Both target reads use
  * that current actor's existing history permission and original legacy bearer. */
-export async function readOwnerCensusPreparation(input:Omit<OwnerCensusProofInputs,'record'|'target'>&{binding:OwnerCensusPreflightBinding;readTarget:(id:string)=>Promise<OwnerCensusTargetRead>}):Promise<{eligible:true;nativeGuardSha256:string;nativeSourceSha256:string}|null>{
+async function readOwnerCensusPreparation(input:Omit<OwnerCensusProofInputs,'record'|'target'>&{binding:OwnerCensusPreflightBinding;readTarget:(id:string)=>Promise<OwnerCensusTargetRead>}):Promise<{eligible:true;nativeGuardSha256:string;nativeSourceSha256:string}|null>{
  try{
   if(!uuid(input.actorId)||!uuid(input.binding.nativeUnitId)||!decimal(input.binding.auditId)||!text(input.binding.unitKey,250)||!sha(input.binding.addressSha256))return null;
   const a=await computeOwnerCensusProof({...input,target:await input.readTarget(input.binding.nativeUnitId)});if(!a)return null;
@@ -164,10 +207,11 @@ export async function readOwnerCensusPreparation(input:Omit<OwnerCensusProofInpu
  }catch{return null;}
 }
 
+
 /** Private offline enrollment preparation only. Call with independently obtained
  * CURRENT Owner/session and successful existing history-RPC authorization evidence.
  * This does not authenticate a browser assertion, create policy or call a provider. */
-export async function preflightOwnerCensusBinding(input:Omit<OwnerCensusProofInputs,'record'>&{binding:OwnerCensusPreflightBinding;authorization:unknown},now:number){
+async function preflightOwnerCensusBinding(input:Omit<OwnerCensusProofInputs,'record'>&{binding:OwnerCensusPreflightBinding;authorization:unknown},now:number){
  const a=input.authorization;
  if(!Number.isFinite(now)||!object(a)||a.contract!=='COS_CURRENT_OWNER_READ_AUTHORIZATION_V1'||a.actorId!==input.actorId||a.organizationId!==ORG||a.role!=='owner'||a.active!==true||a.equipmentView!==true
   ||!date(a.verifiedAt)||Date.parse(a.verifiedAt)>now||now-Date.parse(a.verifiedAt)>60000||!object(a.history)||a.history.actorId!==input.actorId
@@ -184,10 +228,7 @@ export async function preflightOwnerCensusBinding(input:Omit<OwnerCensusProofInp
  return proof?{eligible:true,nativeGuardSha256:proof.proof.nativeGuardSha256,nativeSourceSha256:proof.receipt.nativeSourceSha256,identity:'complete',history:'historical_only',placement:'owner_field'}:{eligible:false,reason:'complete_current_source_unavailable'};
 }
 
-/** Exact-target reads use the requesting already-authorized Field View actor.
- * Execution proof output remains Owner-only; source receipts stay backend-private. */
-type OwnerCensusReadInputs={actorId:string;records:Row[];rawSnapshot:Row;snapshot:Row;bundle:Row;mhelpReceipt:unknown;readTarget:(id:string)=>Promise<OwnerCensusTargetRead>};
-export async function readOwnerCensusEvidence(input:OwnerCensusReadInputs,allowExecutionProofs:boolean):Promise<{proofs:OwnerCensusNativeProof[];receipts:OwnerCensusSourceReceipt[]}>{
+async function readOwnerCensusEvidence(input:OwnerCensusReadInputs,allowExecutionProofs:boolean):Promise<{proofs:OwnerCensusNativeProof[];receipts:OwnerCensusSourceReceipt[]}>{
  const candidates=input.records.filter(r=>r?.censusOnly===true),result={proofs:[] as OwnerCensusNativeProof[],receipts:[] as OwnerCensusSourceReceipt[]};
  if(candidates.length>1000||new Set(candidates.map(r=>r.censusOnlyGuard?.nativeUnitId)).size!==candidates.length)return result;
  for(const record of candidates){
@@ -200,14 +241,19 @@ export async function readOwnerCensusEvidence(input:OwnerCensusReadInputs,allowE
  }
  return result;
 }
-export async function readOwnerCensusProofs(input:OwnerCensusReadInputs):Promise<OwnerCensusNativeProof[]>{return (await readOwnerCensusEvidence(input,true)).proofs;}
-export function matchesOwnerCensusReceipt(receipt:OwnerCensusSourceReceipt|undefined,record:Row,id:string){
+
+async function readOwnerCensusProofs(input:OwnerCensusReadInputs):Promise<OwnerCensusNativeProof[]>{return (await readOwnerCensusEvidence(input,true)).proofs;}
+
+function matchesOwnerCensusReceipt(receipt:OwnerCensusSourceReceipt|undefined,record:Row,id:string){
  return !!receipt&&receipt.contract===OWNER_CENSUS_SOURCE_CONTRACT&&receipt.complete===true&&Object.keys(receipt).length===7&&sha(receipt.nativeSourceSha256)&&record.censusOnly===true
   &&receipt.nativeUnitId===id&&record.censusOnlyGuard?.nativeUnitId===id&&receipt.auditId===record.auditId&&receipt.unitKey===record.unitKey&&receipt.addressSha256===record.addressSha256
   &&sha(record.censusOnlySourceSha256)&&receipt.nativeSourceSha256===record.censusOnlySourceSha256;
 }
 
-export function matchesOwnerCensusProof(proof:OwnerCensusNativeProof|undefined,record:Row,id:string){
+
+function matchesOwnerCensusProof(proof:OwnerCensusNativeProof|undefined,record:Row,id:string){
  return !!proof&&proof.contract===OWNER_CENSUS_PROOF_CONTRACT&&proof.complete===true&&Object.keys(proof).length===7&&sha(proof.nativeGuardSha256)&&record.censusOnly===true&&proof.nativeUnitId===id&&proof.auditId===record.auditId&&proof.unitKey===record.unitKey&&proof.addressSha256===record.addressSha256
   &&proof.nativeGuardSha256===record.censusOnlyGuard?.nativeGuardSha256&&record.censusOnlyGuard?.nativeUnitId===id;
 }
+return { OWNER_CENSUS_PROOF_CONTRACT, OWNER_CENSUS_SOURCE_CONTRACT, OWNER_CENSUS_NATIVE_FIELDS, OWNER_CENSUS_SITE_FIELDS, readOwnerCensusJson, ownerCensusProof, ownerCensusSourceReceipt, readOwnerCensusPreparation, preflightOwnerCensusBinding, readOwnerCensusEvidence, readOwnerCensusProofs, matchesOwnerCensusReceipt, matchesOwnerCensusProof } as const;
+})();

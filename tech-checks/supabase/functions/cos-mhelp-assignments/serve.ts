@@ -3,7 +3,7 @@ import {createMhelpPartnerHandler} from '../cos-operations-pages/mhelpPartner.ts
 import {nativeMhelpTokens} from '../cos-operations-pages/mhelpTokenRuntime.ts';
 const NATIVE='https://tughscoxralhofrckvxy.supabase.co';
 const tokens=nativeMhelpTokens(name=>Deno.env.get(name));
-const partner=createMhelpPartnerHandler({fetch,getConfig:tokens.getPartnerConfig,renewAccess:tokens.renewAccess,readNativeUnits:async()=>[],fullEquipmentReview:true});
+const partner=createMhelpPartnerHandler({fetch:tokens.fetch,getConfig:tokens.getPartnerConfig,renewAccess:tokens.renewAccess,readNativeUnits:async()=>[],fullEquipmentReview:true});
 async function boundedJson(response:Response){
  if(!response.ok||!response.body)throw Error('Provider unavailable');
  const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let raw='',size=0;
@@ -17,6 +17,6 @@ Deno.serve(createAssignmentHandler({authenticate:async req=>{
 },equipment:()=>partner('/api/mhelpdesk/partner/preview','POST',{}),customers:async ids=>{
  const config=await tokens.getPartnerConfig();if(!config.accessToken||!config.portalId||!/^224643$/.test(config.portalId))throw Error('Account unavailable');
  const results:any[]=[];let next=0;
- await Promise.all(Array.from({length:Math.min(4,ids.length)},async()=>{while(next<ids.length){const id=ids[next++];const response=await fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+config.portalId+'/customers/'+id+'?fields=customerId,portalId,name,isServiceLocation',{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});results.push(projectCustomer(await boundedJson(response),id,config.portalId));}}));
+ await Promise.all(Array.from({length:Math.min(4,ids.length)},async()=>{while(next<ids.length){const id=ids[next++];const response=await tokens.fetch('https://connect.mhelpdesk.com/api/v1.0/portal/'+config.portalId+'/customers/'+id+'?fields=customerId,portalId,name,isServiceLocation',{headers:{Authorization:'Bearer '+config.accessToken,Accept:'application/json'},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000)});results.push(projectCustomer(await boundedJson(response),id,config.portalId));}}));
  return results.sort((a,b)=>Number(a.customerId)-Number(b.customerId));
 }}));

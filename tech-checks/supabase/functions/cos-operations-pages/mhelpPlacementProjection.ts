@@ -45,7 +45,7 @@ export function projectMhelpFieldPlacement(snapshot:Row,receipt:unknown,audits:R
    ...(link.placement==='SHOP'?{latitude:null,longitude:null,coordinateSource:null}:{} )};
  });
  const items=inventoryItems.filter((r:Row)=>r.placementSource==='mhelpdesk'?r.placement==='FIELD':fieldIds.has(r.id)).map((r:Row)=>{const{_sourceField,_placementProof,...item}=r;return item;});
- return {...snapshot,inventoryItems,items,mhelpPlacementSync:{contract:'COS_MHELP_PLACEMENT_V1',confirmedLinks:links.length,lastSuccessAt:(receipt as Row).lastSuccessAt,sheetsPublisher:false},
+ return {...snapshot,inventoryItems,items,mhelpPlacementSync:{contract:'COS_MHELP_PLACEMENT_V1',confirmedLinks:links.length,lastSuccessAt:(receipt as Row).lastSuccessAt,lastAttemptAt:(receipt as Row).lastAttemptAt,errorCode:(receipt as Row).errorCode,nextReadAt:(receipt as Row).readBackoff?.retryAt||null,sheetsPublisher:false},
   summary:{...snapshot.summary,fieldUnits:items.length,mappedUnits:items.filter((r:Row)=>r.latitude!=null&&r.longitude!=null).length,missingGps:items.filter((r:Row)=>r.latitude==null||r.longitude==null).length,addressUnits:items.filter((r:Row)=>typeof r.address==='string'&&r.address.trim()).length}};
 }
 /** Only complete, current provider/native UUID proofs can carry placement onto camera cards. */
