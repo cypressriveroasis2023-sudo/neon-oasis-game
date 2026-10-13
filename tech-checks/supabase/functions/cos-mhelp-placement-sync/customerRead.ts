@@ -89,12 +89,14 @@ export async function readPlacementCustomer(id: string, options: {
   onAttempt?: (event: CustomerReadAttempt) => void;
   beforeAttempt?: () => Promise<boolean>;
   onRateLimit?: (delay: number | null) => void;
+  includeActive?: boolean;
+  onVerified?: (row: unknown) => void;
 }) {
   if (options.portalId !== PORTAL || !/^[1-9]\d{0,14}$/.test(id)) return null;
   const skip = () => { options.onAttempt?.({attempt: 0, outcome: options.signal.aborted ? 'deadline' : 'cooldown_deferred'}); return null; };
   if (options.signal.aborted) return skip();
   const pause = options.pause ?? waitForCustomerRetry;
-  const url = 'https://connect.mhelpdesk.com/api/v1.0/portal/' + PORTAL + '/customers/' + id + '?fields=customerId,portalId,name,isServiceLocation';
+  const url = 'https://connect.mhelpdesk.com/api/v1.0/portal/' + PORTAL + '/customers/' + id + '?fields=customerId,portalId,name,isServiceLocation' + (options.includeActive ? ',isActive' : '');
   for (let attempt = 0; attempt < 2 && !options.signal.aborted; attempt++) {
     if (options.beforeAttempt && !await options.beforeAttempt()) return skip();
     if (options.signal.aborted) return skip();
@@ -122,7 +124,7 @@ export async function readPlacementCustomer(id: string, options: {
       try { row = await options.readJson(response); }
       catch { report(options.signal.aborted ? 'deadline' : signal.aborted ? 'request_timeout' : 'response_unreadable'); return null; }
       if (options.signal.aborted) { report('deadline'); return null; }
-      try { const result = projectCustomer(row, id, PORTAL); report('verified'); return result; }
+      try { const result = projectCustomer(row, id, PORTAL); options.onVerified?.(row); report('verified'); return result; }
       catch { report('identity_unverified'); return null; }
     }
     void response.body?.cancel().catch(() => {});
