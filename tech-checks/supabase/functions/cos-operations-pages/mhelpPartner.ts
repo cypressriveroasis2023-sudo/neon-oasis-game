@@ -64,7 +64,7 @@ export function reviewPartnerIdentity(equipment: PartnerEquipment, nativeUnits: 
   };
 }
 async function boundedJson(response: Response, signal: AbortSignal, maxBytes = 1048576) {
-  if (!response.body || Number(response.headers.get('Content-Length')) > maxBytes) fail('mHelpDesk returned an oversized response.');
+  if (!response.body || Number(response.headers.get('Content-Length')) > maxBytes) return fail('mHelpDesk returned an oversized response.');
   const reader = response.body.getReader(); let size = 0, raw = '';
   const decoder = new TextDecoder('utf-8', {fatal: true});
   try {

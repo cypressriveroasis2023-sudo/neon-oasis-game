@@ -37,6 +37,9 @@ const read=async(path:string)=>{if(deadline.aborted){locationFailure('deadline')
  if(!response.ok)locationFailure('http_'+response.status);
  try{const value=await json(response);locationHttpReads.readable++;return value;}catch{if(response.ok)locationFailure('response_unreadable');throw Error('Read unavailable');}
 })());return reads.get(path)!;};
+const boundedFetch:typeof fetch=(url,init={})=>fetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
+const locationReader=createFleetLocationReader(read,boundedFetch,PORTAL,code=>{locationReviews[code]=(locationReviews[code]||0)+1;});
+const placementServiceReads={verified:0,held:0};
 return createPlacementSyncHandler({authenticate:async req=>{
  if(Deno.env.get('SUPABASE_URL')!==NATIVE)return false;
  const secret=req.headers.get('x-camera-cron-secret');if(!secret||secret.length>1024||/\s/.test(secret))return false;
@@ -49,12 +52,13 @@ return createPlacementSyncHandler({authenticate:async req=>{
 },customer:async id=>{
  const current=config;if(!current?.accessToken||current.portalId!==PORTAL)return null;
  return readPlacementCustomer(id,{accessToken:current.accessToken,portalId:PORTAL,signal:deadline,fetch,readJson:json,onAttempt:diagnostics.record,beforeAttempt:gate.acquire,onRateLimit:gate.rateLimited,includeActive:true,onVerified:row=>parentCache.remember(id,row)});
+},service:async(parent,site)=>{
+ try{const value=await locationReader.placementService(parent,site);placementServiceReads.verified++;return value;}catch{placementServiceReads.held++;return null;}
 },locations:async equipment=>{
  const candidates=await rpc('cos_mhelp_location_candidates',{});
- const boundedFetch:typeof fetch=(url,init={})=>fetch(url,{...init,signal:AbortSignal.any([deadline,...(init.signal?[init.signal]:[])])});
- const result=await collectFleetLocations(candidates,equipment,createFleetLocationReader(read,boundedFetch,PORTAL,code=>{locationReviews[code]=(locationReviews[code]||0)+1;}));
+ const result=await collectFleetLocations(candidates,equipment,locationReader);
  // The collector returns every candidate, holding individual reads that could
  // not finish. Keep verified addresses and explicit holds in one full receipt.
  return result;
-},readDiagnostics:()=>({...diagnostics.snapshot(),locationHttpReads,locationReviews})})(request);
+},readDiagnostics:()=>({...diagnostics.snapshot(),placementServiceReads,locationHttpReads,locationReviews})})(request);
 });
