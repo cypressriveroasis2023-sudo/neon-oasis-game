@@ -8,6 +8,7 @@ const portal = 'https://v2.watchful.co.nz/sites';
 const shortcut = frame => frame.getByRole('region', {name: 'Watchful', exact: true});
 
 // Synthetic sessions and records only. Even the portal's new tab is intercepted.
+// This shortcut belongs to the explicit Owner overview, not the default Fleet landing.
 async function mount(page, context, {authorized = true, role = 'Owner', mode = ''} = {}) {
   const state = {calls: [], portalRequests: []};
   await context.route('**/*', async route => {
@@ -16,7 +17,7 @@ async function mount(page, context, {authorized = true, role = 'Owner', mode = '
       state.portalRequests.push({url, headers: request.headers()});
       return route.fulfill({contentType: 'text/html', body: '<title>Synthetic Watchful portal</title><h1>Synthetic portal</h1>'});
     }
-    if (url === origin + '/watchful-shortcut-fixture') return route.fulfill({contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/${mode ? '?mode=' + mode : ''}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${mode === 'fleet' ? 'it' : 'owner'}',accessToken:'synthetic-only'},location.origin)})</script>`});
+    if (url === origin + '/watchful-shortcut-fixture') return route.fulfill({contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/${mode ? '?mode=' + mode + '#it-dashboard' : '#today'}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${mode === 'fleet' ? 'it' : 'owner'}',accessToken:'synthetic-only'},location.origin)})</script>`});
     if (url.startsWith(origin + '/')) return route.continue();
     if (!url.endsWith('/functions/v1/cos-operations-pages')) return route.abort('blockedbyclient');
     const headers = {'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type'};
