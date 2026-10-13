@@ -89,7 +89,7 @@ async function mount(page,{role='owner',verifiedIt=true,active=true,token=true,n
     return route.abort('blockedbyclient');
   });
   await page.goto(origin+(entry==='map'?'/synthetic-map-entry':entry==='health'?'/tech-checks/camera-health.html?unit='+encodeURIComponent(key)+'&action=edit-field':'/tech-checks/camera-detail.html?id=9101'));
-  if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else await expect(page.frameLocator('iframe').locator('.field-map-workspace')).toBeVisible();
+  if(entry==='detail')await expect(page.locator('#content')).toBeVisible();else if(entry==='health')await expect(page.locator('.compact-unit')).toHaveCount(1);else await expect(page.frameLocator('iframe').locator('.cos-fleet-dashboard')).toBeVisible();
   if(entry!=='map'){
     await expect.poll(()=>page.evaluate(()=>['ready','unresolved','unavailable'].includes(CameraEffectivePlacement.get(fixtureDevice)?.status))).toBe(true);
     if(token){expect(fixture.displayReads.map(read=>read.body.path).sort()).toEqual(['/api/camera-health/summary-v3','/api/field-map']);expect(fixture.displayReads.every(read=>read.headers.authorization==='Bearer synthetic-only'&&read.body.method==='GET')).toBe(true);}

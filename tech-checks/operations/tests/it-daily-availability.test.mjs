@@ -14,8 +14,8 @@ async function repairGate(role,{active=true,fail=false,subject='synthetic'}={}) 
 }
 test('daily switch is explicit and lists exactly the four approved views',()=>{
   assert.equal(availability.IT_DAILY_ONLY,true);
-  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Camera Health','Field Map','Victron VRM','Unit Tracker']);
-  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Camera Health','Field View','Victron View','2027 Unit Tracker']);
+  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Camera Health','Fleet Dashboard','Victron VRM','Unit Tracker']);
+  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Camera Health','Fleet Dashboard','Victron View','2027 Unit Tracker']);
   assert.doesNotMatch(read('it-feature-availability.js'),/localStorage|fetch\(|mhelp.*===|setTimeout/);
 });
 test('standalone repair pauses IT before any ticket read or release, including restored sessions',async()=>{

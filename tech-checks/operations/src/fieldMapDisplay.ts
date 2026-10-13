@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
 /** Keep fallback fullscreen as isolated as native fullscreen, including keyboard access. */
-export function isolateMapDisplay(element: HTMLElement) {
+export function isolateMapDisplay(element: HTMLElement, allow='') {
   const siblings: {element: HTMLElement; visibility: string; pointerEvents: string; inert: boolean; aria: string|null}[] = [];
   for (let child: HTMLElement|null = element; child?.parentElement; child = child.parentElement) {
     for (const sibling of Array.from(child.parentElement.children)) {
       if (sibling === child || !(sibling instanceof HTMLElement)) continue;
+      if(allow&&sibling.matches(allow))continue;
       siblings.push({element:sibling,visibility:sibling.style.visibility,pointerEvents:sibling.style.pointerEvents,inert:sibling.inert,aria:sibling.getAttribute('aria-hidden')});
       sibling.style.visibility='hidden';sibling.style.pointerEvents='none';sibling.inert=true;sibling.setAttribute('aria-hidden','true');
     }
@@ -21,7 +22,7 @@ export function isolateMapDisplay(element: HTMLElement) {
   };
 }
 
-export function useFieldMapDisplay(workspace: RefObject<HTMLElement|null>, readView:()=>unknown) {
+export function useFieldMapDisplay(workspace: RefObject<HTMLElement|null>, readView:()=>unknown, options:{native?:boolean;allow?:string}={}) {
   const [active,setActive]=useState(false);
   const activeRef=useRef(false), nativeRef=useRef(false), historyToken=useRef('');
   const opener=useRef<HTMLElement|null>(null);
@@ -38,7 +39,7 @@ export function useFieldMapDisplay(workspace: RefObject<HTMLElement|null>, readV
   };
   useEffect(()=>{
     const changed=()=>{if(document.fullscreenElement===workspace.current)nativeRef.current=true;else if(nativeRef.current){nativeRef.current=false;exit();}};
-    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&activeRef.current){event.preventDefault();exit();}};
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&activeRef.current&&!document.querySelector('.cos-fleet-drawer:not([hidden])')){event.preventDefault();exit();}};
     const back=()=>{traversing.current=false;if(activeRef.current&&history.state?.cosFieldMapDisplay!==historyToken.current){historyToken.current='';exit();}else if(!activeRef.current)restoreView();};
     document.addEventListener('fullscreenchange',changed);document.addEventListener('keydown',escape);window.addEventListener('popstate',back);
     return()=>{document.removeEventListener('fullscreenchange',changed);document.removeEventListener('keydown',escape);window.removeEventListener('popstate',back);if(historyToken.current&&history.state?.cosFieldMapDisplay===historyToken.current){const {cosFieldMapDisplay,...state}=history.state;history.replaceState(state,'');}};
@@ -46,7 +47,7 @@ export function useFieldMapDisplay(workspace: RefObject<HTMLElement|null>, readV
   useEffect(()=>{
     if(window.parent!==window)window.parent.postMessage({type:'COS_FIELD_MAP_DISPLAY_MODE',active},window.location.origin);
     if(!active||!workspace.current)return;
-    const restore=isolateMapDisplay(workspace.current);
+    const restore=isolateMapDisplay(workspace.current,options.allow);
     workspace.current.querySelector<HTMLButtonElement>('.field-map-fullscreen-exit')?.focus({preventScroll:true});
     return()=>{
       restore();opener.current?.isConnected&&opener.current.focus({preventScroll:true});
@@ -62,7 +63,7 @@ export function useFieldMapDisplay(workspace: RefObject<HTMLElement|null>, readV
     history.pushState({...history.state,cosFieldMapDisplay:historyToken.current},'');
     activeRef.current=true;setActive(true);
     // iPhone Safari and embedded frames can reject or omit this API; the same map-only layout remains available.
-    try{void workspace.current?.requestFullscreen?.().then(()=>{if(!activeRef.current&&document.fullscreenElement===workspace.current)void document.exitFullscreen().catch(()=>{});}).catch(()=>{});}catch{/* Presentation fallback. */}
+    if(options.native!==false)try{void workspace.current?.requestFullscreen?.().then(()=>{if(!activeRef.current&&document.fullscreenElement===workspace.current)void document.exitFullscreen().catch(()=>{});}).catch(()=>{});}catch{/* Presentation fallback. */}
   };
   return {active,toggle};
 }

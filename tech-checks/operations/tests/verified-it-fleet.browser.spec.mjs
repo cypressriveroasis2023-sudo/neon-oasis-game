@@ -32,43 +32,43 @@ async function mount(page,role='it',linked=true,options={}){
  await page.goto(role==='owner'?'/owner-fixture':'/fleet-fixture'+(options.deepLink?'?fieldView=1':''));return requests;
 }
 test('verified IT host authenticates fleet frame, limits navigation and avoids Owner GPS history',async({page})=>{
- const calls=await mount(page);await page.getByRole('button',{name:'Field View',exact:true}).click();const frame=page.frameLocator('iframe');
- await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.locator('.field-map-list>button').click();
+ const calls=await mount(page);await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();
  await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();const nav=frame.getByRole('navigation',{name:'COS Operations',exact:true});
  await expect(nav.getByRole('button',{name:'Camera Health',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:/Money|Team|Dispatch/})).toHaveCount(0);
  await nav.getByRole('button',{name:'Camera Health',exact:true}).click();await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
- // Field View has already read saved router observations; opening More must not mount the paused Router workspace.
+ // Fleet Dashboard has already read saved router observations; opening More must not mount the paused Router workspace.
  const routerReads=calls.filter(c=>c.path==='/api/routers').length;
  expect(routerReads).toBeGreaterThan(0);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
  expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(c.path))).toBe(true);
- expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Field View'})).toBeFocused();
+ expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });
-for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Field View'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
-test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.locator('.field-map-list>button').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
+for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
+test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
 
 for(const role of ['it','owner'])test(role+' fullscreen fallback fills host and restores its original frame',async({page})=>{
- await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Field View',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  const original=await page.locator('iframe').getAttribute('style')||'';
  // Force the supported presentation fallback; this does not grant a permission.
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=()=>Promise.reject(new Error('Fixture unsupported'));});
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
  await expect(page.locator('iframe')).toHaveCSS('position','fixed');await expect(page.locator('body')).toHaveCSS('overflow','hidden');
  const bounds=await page.locator('iframe').boundingBox();expect(bounds.x).toBe(0);expect(bounds.y).toBe(0);expect(bounds.width).toBe(page.viewportSize().width);expect(bounds.height).toBe(page.viewportSize().height);
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await expect(page.locator('iframe')).toHaveAttribute('style',original);
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await page.keyboard.press('Escape');await expect(frame.getByRole('button',{name:'TV / fullscreen map',exact:true})).toBeVisible();await expect(page.locator('iframe')).toHaveAttribute('style',original);
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();await expect(page.locator('iframe')).toHaveAttribute('style',original);
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await page.keyboard.press('Escape');await expect(frame.getByRole('button',{name:'Fullscreen fleet map',exact:true})).toBeVisible();await expect(page.locator('iframe')).toHaveAttribute('style',original);
 });
 
 
 test('IT Home keeps one clear entry through real legacy redraws, keyboard, return and role changes',async({page},testInfo)=>{
  await mount(page);const entry=page.locator('#wlItHome .wl-it-command-workspace [data-cos-field-view]');
- await expect(entry).toBeVisible();await expect(entry).toHaveText('Field View');expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
+ await expect(entry).toBeVisible();await expect(entry).toHaveText('Fleet Dashboard');expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
  await page.screenshot({path:testInfo.outputPath('verified-it-home-field-view.png'),fullPage:true});
  for(let i=0;i<3;i++){
   await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('[data-cos-field-view]')).toHaveCount(1);
-  await entry.focus();await page.keyboard.press('Enter');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+  await entry.focus();await page.keyboard.press('Enter');const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
   if(i===0)await page.screenshot({path:testInfo.outputPath('verified-it-open-field-map.png'),fullPage:true});
   if(i===1){await page.evaluate(()=>window.renderITHome());await expect(entry).toHaveCount(1);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();}
   else await page.keyboard.press('Escape');
@@ -86,9 +86,9 @@ test('IT Home keeps one clear entry through real legacy redraws, keyboard, retur
 for(const action of ['role change','logout'])test(`IT ${action} during fullscreen restores the parent and removes stale access`,async({page})=>{
  await mount(page);const entry=page.locator('[data-cos-field-view]');await expect(entry).toBeVisible();
  const readParent=()=>page.evaluate(()=>({overflow:document.body.style.overflow,visibility:document.getElementById('appView').style.visibility,pointerEvents:document.getElementById('appView').style.pointerEvents,inert:document.getElementById('appView').inert}));
- const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
  await expect(page.locator('body')).toHaveCSS('overflow','hidden');await expect(page.locator('#appView')).toHaveCSS('visibility','hidden');expect((await readParent()).inert).toBe(true);
  await page.evaluate(action=>{if(action==='logout'){window.fixtureSubject=null;window.fixtureAuthChanged();}else{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');}},action);
  await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);await expect.poll(readParent).toEqual(original);
@@ -100,19 +100,19 @@ for(const [label,options] of [['capability denied',{capability:false}],['inactiv
  await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);
 });
 
-test('Owner Home Field View supports keyboard, browser Back and repeated entry without losing Owner access',async({page},testInfo)=>{
- const calls=await mount(page,'owner',true,{ownerHome:true});const frame=page.frameLocator('iframe');const entry=frame.getByRole('region',{name:'Field View shortcut'}).getByRole('button',{name:'Field View',exact:true});
+test('Owner Home Fleet Dashboard supports keyboard, browser Back and repeated entry without losing Owner access',async({page},testInfo)=>{
+ const calls=await mount(page,'owner',true,{ownerHome:true});const frame=page.frameLocator('iframe');const entry=frame.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true});
  await expect(entry).toBeVisible();expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
  await page.screenshot({path:testInfo.outputPath('owner-home-field-view.png'),fullPage:true});
- await entry.focus();await page.keyboard.press('Enter');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await entry.focus();await page.keyboard.press('Enter');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  await page.evaluate(()=>history.back());await expect(entry).toBeVisible();await expect(frame.locator('.home-field-view')).toHaveCount(1);
- await entry.click();await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.locator('.field-map-list>button').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);
+ await entry.click();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await frame.locator('.cos-fleet-unit-row').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);
  await page.evaluate(()=>history.back());await expect(entry).toBeVisible();expect(calls.every(c=>c.method==='GET')).toBe(true);
 });
 
 test('IT entry uses touch activation and daily views without paused Tech Checks',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,baseURL:origin});const page=await context.newPage();
- try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ try{await mount(page);const entry=page.locator('[data-cos-field-view]');await entry.tap();const frame=page.frameLocator('iframe');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
   await expect(frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Tech Checks',exact:true})).toHaveCount(0);
   await frame.getByRole('navigation',{name:'Mobile Operations navigation'}).getByRole('button',{name:'Daily views',exact:true}).tap();
   await expect(frame.getByRole('region',{name:'IT daily dashboard',exact:true})).toBeVisible();
@@ -123,7 +123,7 @@ test('IT entry uses touch activation and daily views without paused Tech Checks'
 
 test('second verified IT identity keeps deep-link entry one-time through redraws and repeated clicks',async({page})=>{
  await mount(page,'it',true,{secondVerified:true,deepLink:true});const entry=page.locator('[data-cos-field-view]');
- await expect(page.frameLocator('iframe').locator('.field-map-list>button')).toHaveCount(1);
+ await expect(page.frameLocator('iframe').locator('.cos-fleet-unit-row')).toHaveCount(1);
  await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(entry).toBeFocused();
  await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('dialog,iframe')).toHaveCount(0);
  await entry.evaluate(button=>{button.click();button.click();});await expect(page.locator('dialog')).toHaveCount(1);await expect(page.locator('iframe')).toHaveCount(1);

@@ -78,7 +78,7 @@ const routerSnapshot = () => routers.routerSnapshot([
 test('six cards render immediately without reading sources during render', () => {
   const f = fixture(), html = f.render();
   assert.equal((html.match(/<article /g) || []).length, 6);
-  for (const label of ['Field View', 'InHand Routers', 'Camera Health', 'Victron', 'Unit Tracker', 'MHelp information']) assert.ok(html.includes('Open ' + label));
+  for (const label of ['Fleet Dashboard', 'InHand Routers', 'Camera Health', 'Victron', 'Unit Tracker', 'MHelp information']) assert.ok(html.includes('Open ' + label));
   assert.equal((html.match(/Checking authorized records/g) || []).length, 6);
   assert.equal(f.calls.length, 0);
   assert.ok(html.indexOf('data-source="field"') < html.indexOf('data-source="cameras"'));
@@ -185,7 +185,7 @@ test('a changed session creates fresh stores before any effect can run', () => {
   assert.match(source, /\[source, session, enabled\]/);
 });
 
-test('Field View counts validated field rows and never calls historical coordinates verified pins', () => {
+test('Fleet Dashboard counts validated field rows and never calls historical coordinates verified pins', () => {
   const f = fixture(), summary = f.summarizeITFieldMap(field());
   assert.equal(summary.count, 2);
   assert.equal(summary.metrics[0].value, 2);

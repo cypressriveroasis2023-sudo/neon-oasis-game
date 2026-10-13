@@ -39,7 +39,7 @@ async function mount(page,{role='Owner',proof=true,outcome='success',holdPost=fa
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-once-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
  return {frame,state};
 }
 test('complete enrolled Owner proof enables one deliberate lookup, duplicate clicks send once, reload reads consumed result',async({page})=>{
@@ -50,7 +50,7 @@ test('complete enrolled Owner proof enables one deliberate lookup, duplicate cli
  state.postGate.resolve();await expect(frame.getByRole('region',{name:'Address estimate'})).toContainText('suite and installed unit position remain unverified');
  await expect(button).toHaveCount(0);await expect(frame.getByLabel('Nearby unit center').locator('option[value="'+id+'"]')).toHaveCount(0);
  expect(state.snapshot.items[0].hasUnitGps).toBe(before.hasUnitGps);expect(state.snapshot.items[0].historicalRecordedAt).toBe(before.historicalRecordedAt);expect(state.snapshot.items[0].locationNote).toBe(before.locationNote);
- await page.reload();await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();
+ await page.reload();await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();
  await expect(button).toHaveCount(0);await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toContainText('already used');expect(state.writes).toHaveLength(1);
 });
 for(const role of ['IT','Service'])test(role+' cannot see or dispatch the Owner-only lookup',async({page})=>{
@@ -82,18 +82,18 @@ test('selection change during fresh preflight cannot send the prior unit lookup'
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
  // Keep the API deadline frozen: disabled list clicks must not wait out the preflight.
  await page.clock.pauseAt(new Date(now+60000));
- const workspace=await frame.locator('.field-map-workspace').elementHandle();
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();
  const button=frame.getByRole('button',{name:'Run approved Census lookup',exact:true});await expect(button).toBeVisible();await button.click();
  await expect.poll(()=>state.mapGate===null).toBe(true);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
  await frame.locator('body').evaluate((_body,unitId)=>{location.hash='#field-map?unit='+unitId;},otherId);
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+otherId);
- await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',otherId);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
- expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+ await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',otherId);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+ expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
  // Busy clears only after the action's finally block has settled.
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  expect(state.writes).toHaveLength(0);await expect(frame.getByRole('region',{name:'Approved Census lookup'})).toHaveCount(0);
 });
 test('session-role change clears pending action and rejects a late response',async({page})=>{
@@ -125,20 +125,20 @@ test('refresh after a successful lookup replaces its message with the latest hel
 test('selection away and back during Run preflight invalidates the old action without a POST',async({page})=>{
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
  await page.clock.pauseAt(new Date(now+60000));
- const workspace=await frame.locator('.field-map-workspace').elementHandle();
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();
  await frame.getByRole('button',{name:'Run approved Census lookup',exact:true}).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  // Hash-route unit selection is supported while busy; unlike list clicks it does not wait for a timeout.
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
   await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
-  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
-  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
-  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
+  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
  // The same component is back at the original unit, so selection equality alone would admit the stale action.
  await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeDisabled();
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  expect(state.writes).toHaveLength(0);
  await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeEnabled();
 });

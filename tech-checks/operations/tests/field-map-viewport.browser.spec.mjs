@@ -38,12 +38,12 @@ async function mount(page) {
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
   await openWorkspace(frame, 'Field Map');await showAllFieldHealth(frame);
-  await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
+  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(815);
   return { frame, requests };
 }
 async function bounded(frame) {
-  const size = await frame.locator('.field-map-layout').evaluate(layout => {
-    const list = layout.querySelector('.field-map-list'), map = layout.querySelector('.field-map-center'), detail = layout.querySelector('.field-map-detail');
+  const size = await frame.locator('.cos-fleet-workspace').evaluate(layout => {
+    const list = layout.querySelector('.cos-fleet-unit-list'), map = layout.querySelector('.cos-fleet-map-panel'), detail = layout.querySelector('.cos-fleet-drawer');
     return { mapHeight: map.getBoundingClientRect().height, listHeight: list.clientHeight, listContent: list.scrollHeight, detailHeight: detail.getBoundingClientRect().height, width: innerWidth, documentWidth: document.documentElement.scrollWidth };
   });
   expect(size.mapHeight).toBeGreaterThanOrEqual(400);
@@ -57,37 +57,37 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   const { frame, requests } = await mount(page);
   const initial = await bounded(frame);
   expect(initial.listContent).toBeGreaterThan(initial.listHeight * 10);
-  const map = frame.locator('.field-map-center');
+  const map = frame.locator('.cos-fleet-map-panel');
   await map.scrollIntoViewIfNeeded();
   const before = await map.boundingBox();
-  await frame.locator('.field-map-list').evaluate(list => { list.scrollTop = list.scrollHeight; });
+  await frame.locator('.cos-fleet-unit-list').evaluate(list => { list.scrollTop = list.scrollHeight; });
   expect((await map.boundingBox()).y).toBeCloseTo(before.y, 0);
-  await frame.locator('.field-map-list > button').last().click();
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-815');
+  await frame.locator('.cos-fleet-unit-list > button').last().click();
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-815');
   await page.keyboard.press('Shift+Tab');
-  await expect(frame.locator('.field-map-list > button').nth(813)).toBeFocused();
+  await expect(frame.locator('.cos-fleet-unit-list > button').nth(813)).toBeFocused();
   await page.keyboard.press('Space');
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-814');
-  await expect(frame.locator('.field-map-list > button').nth(813)).toBeInViewport();
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-814');
+  await expect(frame.locator('.cos-fleet-unit-list > button').nth(813)).toBeInViewport();
   await bounded(frame);
-  await frame.getByLabel('Search field units').fill('FIELD-FIX-001');
-  await expect(frame.locator('.field-map-list > button')).toHaveCount(1);
-  await frame.locator('.field-map-list > button').click();
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-001');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
+  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(1);
+  await frame.locator('.cos-fleet-unit-list > button').click();
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIELD-FIX-001');
   await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await expect(frame.locator('.leaflet-marker-icon')).toHaveCount(1);
   await expect.poll(async () => frame.locator('.leaflet-marker-icon').evaluate(marker => {
-    const pin = marker.getBoundingClientRect(), canvas = marker.closest('.field-map-canvas').getBoundingClientRect();
+    const pin = marker.getBoundingClientRect(), canvas = marker.closest('.cos-fleet-map-canvas').getBoundingClientRect();
     return pin.x >= canvas.x && pin.right <= canvas.right && pin.y >= canvas.y && pin.bottom <= canvas.bottom;
   })).toBe(true);
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
   await page.screenshot({ path: testInfo.outputPath('field-map-selected.png') });
-  await frame.getByLabel('Search field units').fill('no-matching-fixture');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('no-matching-fixture');
   await expect(frame.locator('.field-map-empty')).toContainText('No units match');
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
-  await frame.getByLabel('Search field units').fill('');
-  await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('');
+  await expect(frame.locator('.cos-fleet-unit-list > button')).toHaveCount(815);
   await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
@@ -98,15 +98,15 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
 });
 test('field map responds to narrow windows and repeated resizing without a fleet-sized canvas', async ({ page }) => {
   const { frame, requests } = await mount(page);
-  await frame.getByLabel('Search field units').fill('FIELD-FIX-001');
-  await frame.locator('.field-map-list > button').click();
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
+  await frame.locator('.cos-fleet-unit-list > button').click();
   for (const [width, height] of [[2048, 900], [1440, 900], [1366, 768], [1280, 576], [1220, 800], [1201, 800], [1200, 800], [1024, 576], [701, 800], [700, 800], [390, 844], [320, 568], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await bounded(frame);
     await expect.poll(async () => frame.locator('.leaflet-marker-icon').evaluate(marker => {
       // Resizing replaces Leaflet markers; a detached sample must retry rather
       // than throw before the next rendered marker can be measured.
-      const parent = marker.closest('.field-map-canvas');
+      const parent = marker.closest('.cos-fleet-map-canvas');
       if (!marker.isConnected || !parent) return false;
       const pin = marker.getBoundingClientRect(), canvas = parent.getBoundingClientRect();
       return pin.x >= canvas.x && pin.right <= canvas.right && pin.y >= canvas.y && pin.bottom <= canvas.bottom;

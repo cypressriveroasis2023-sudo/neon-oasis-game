@@ -18,7 +18,7 @@ function fixture(role) {
     <a id="detailLink" href="./camera-detail.html?id=17&action=edit-ip">Open saved IP / ports</a>
     <a id="providerLink" href="https://na.reconeyez.com" target="_blank" rel="noopener noreferrer">Open Reconeyez</a>
     <a id="deviceLink" href="http://192.0.2.5:8443" target="_blank" rel="noopener noreferrer">Open saved device</a>
-    <a id="fieldLink" href="./?fieldUnit=HELIOS%20001">Field View</a>
+    <a id="fieldLink" href="./?fieldUnit=HELIOS%20001">Fleet Dashboard</a>
     <button id="backBtn">Back to Camera Health</button>
     <button id="openDetailBtn" onclick="openCameraDetail(17)">Open selected camera</button>
     <script>

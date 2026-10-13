@@ -12,7 +12,7 @@ const origin = process.env.COS_IT_DAILY_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const dist = resolve(process.env.COS_IT_DAILY_TEST_DIST || fileURLToPath(new URL('../dist', import.meta.url)));
 const readHost = name => readFileSync(new URL('../../' + name, import.meta.url), 'utf8');
 const sources = ['cameras', 'field', 'victron', 'tracker'];
-const labels = ['Camera Health', 'Field View', 'Victron View', '2027 Unit Tracker'];
+const labels = ['Camera Health', 'Fleet Dashboard', 'Victron View', '2027 Unit Tracker'];
 const routes = { cameras: '#camera-health', field: '#field-map', victron: '#victron-vrm', tracker: '#unit-tracker' };
 const sourcePaths = { cameras: '/api/camera-health/summary-v3', field: '/api/field-map', victron: '/api/vrm-fleet', tracker: '/api/unit-tracker' };
 const gate = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
@@ -125,7 +125,7 @@ async function mount(page, options = {}) {
       '/api/session': {authorized: true, legacyOwner: owner, role: owner ? 'Owner' : 'IT', name: 'Synthetic Technician', features: {fleetAccess: true, unitTracker: options.unitTracker !== false, vrmRead: options.vrmRead !== false, importedUnitAddressEdit: false}},
       '/api/tech/session': {authorized: true, legacyTechnician: true, department: 'it', productionTechnicianUserId: '22222222-2222-4222-8222-222222222222'},
       '/api/field-map': {items: [unit], inventoryItems: [unit], summary: {fieldUnits: 1, mappedUnits: 1, unitGps: 1, missingGps: 0}, generatedAt: now},
-      // Field View reads saved router observations without opening the paused Router workspace.
+      // Fleet Dashboard reads saved router observations without opening the paused Router workspace.
       '/api/routers': {items: [], source: 'camera_health', gpsAvailable: false, generatedAt: now},
       '/api/camera-health/summary-v3': snapshot([resource(1, 'Helios 001', {name: 'Synthetic camera', status: 'online', checkedAt: now, evidence: {kind: 'provider', source: 'Star4Live', resource: 'camera', active: true, status: 'online', observedAt: now, lastOnlineAt: now}})]),
       '/api/vrm-fleet': {items: [{installationId: 9100001, name: 'Synthetic power site', portalUrl: 'https://vrm.victronenergy.com/installation/9100001/dashboard', embedUrl: null}], sync: {state: 'current', lastAttemptAt: now, lastSuccessAt: now, nextSyncAt: now, error: null, scheduleActive: true}},
@@ -183,7 +183,7 @@ test('each allowed view survives Back, Forward and reload', async ({page}) => {
     await card(frame, source).getByRole('button', {name: /^Open /}).click();
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
     if (source === 'cameras') await expect(frame.locator('.camera-overview-card')).toHaveCount(1);
-    if (source === 'field') await expect(frame.getByLabel('COS field unit map')).toBeVisible();
+    if (source === 'field') await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible();
     if (source === 'victron') await expect(frame.getByRole('navigation', {name: 'Helios installations'}).getByRole('button')).toHaveCount(1);
     if (source === 'tracker') await expect(frame.getByRole('region', {name: 'Unit Tracker workspace'})).toBeVisible();
     await traverseIframeHistory(frame, 'back', '#it-dashboard'); await ready(frame);
@@ -245,7 +245,7 @@ test('legacy redraw, repeated clicks, synthetic events and old overlays remain u
     });
     expect(await page.evaluate(() => window.fixtureLegacyActions)).toBe(0);
     await card(frame, 'field').getByRole('button', {name: /^Open /}).evaluate(button => {button.click(); button.click();});
-    await expect(frame.getByLabel('COS field unit map')).toBeVisible(); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
+    await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible(); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
     await (await menu(frame)).getByRole('button', {name: /^(Daily views|IT Dashboard)$/}).click(); await ready(frame);
   }
   await assertReads(page, state);

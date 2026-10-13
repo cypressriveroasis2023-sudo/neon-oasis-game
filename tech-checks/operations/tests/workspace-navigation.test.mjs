@@ -41,14 +41,14 @@ test('ticket bookmarks use only existing job types on Dispatch Board without a j
 
 test('map, unit health and ticket routes retain a validated stable unit identifier',()=>{
  const unitId='11111111-1111-4111-8111-111111111111';
- for(const workspace of ['Field Map','Camera Health','Unit Tracker','Daily Board']){
+ for(const workspace of ['Fleet Dashboard','Camera Health','Unit Tracker','Daily Board']){
   const route={workspace,jobId:'',detail:false,unitId,...(workspace==='Daily Board'?{createType:'SWAP'}:{})};
   assert.deepEqual(readWorkspaceRoute(workspaceHash(route)),route);
  }
  for(const hash of ['#today?unit='+unitId,'#jobs?unit='+unitId,'#camera-health?unit=Some%20unit','#daily-board?unit='+unitId,'#camera-health?job=42&unit='+unitId])assert.equal(readWorkspaceRoute(hash).unitId,undefined);
 });
 
-test('legacy camera field links preserve full unit labels without treating numbers as IDs',()=>{const route=readWorkspaceRoute('#field-map?unitLabel=SNIPER%20312');assert.equal(route.unitLabel,'SNIPER 312');assert.equal(workspaceHash(route),'#field-map?unitLabel=SNIPER+312');assert.equal(readWorkspaceRoute('#camera-health?unitLabel=312').unitLabel,undefined);});
+test('legacy camera field links preserve full unit labels without treating numbers as IDs',()=>{const route=readWorkspaceRoute('#field-map?unitLabel=SNIPER%20312');assert.equal(route.unitLabel,'SNIPER 312');assert.equal(workspaceHash(route),'#fleet-dashboard?unitLabel=SNIPER+312');assert.equal(readWorkspaceRoute('#camera-health?unitLabel=312').unitLabel,undefined);});
 
 test('Victron bookmarks preserve only positive safe installation IDs',()=>{
  const route={workspace:'Victron VRM',jobId:'',detail:false,installationId:2048123};

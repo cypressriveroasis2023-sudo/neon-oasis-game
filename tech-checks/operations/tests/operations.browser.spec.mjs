@@ -256,12 +256,12 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
   await open(frame, 'Field Map');
   const units = frame.getByRole('complementary', { name: 'Field units' });
   await expect(units.getByRole('button')).toHaveCount(2);
-  await expect(frame.locator('.field-map-canvas .leaflet-container, .field-map-canvas.leaflet-container')).toBeVisible();
+  await expect(frame.locator('.cos-fleet-map-canvas .leaflet-container, .cos-fleet-map-canvas.leaflet-container')).toBeVisible();
   await noOverflow(page);
   await units.getByRole('button').filter({ hasText: 'FIX-RG-002' }).click();
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('FIX-RG-002');
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIX-RG-002');
   await units.getByRole('button').filter({ hasText: 'FIX-SN-001' }).click();
-  await expect(frame.locator('.field-map-detail h2')).toHaveText('FIX-SN-001');
+  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('FIX-SN-001');
   await units.getByRole('button').filter({ hasText: 'FIX-RG-002' }).click();
   await frame.getByLabel('Latitude', { exact: true }).fill('91');
   await frame.getByLabel('Longitude', { exact: true }).fill('-95.400000');
@@ -294,7 +294,7 @@ test('Field Map selection, GPS validation and one confirmed write survive browse
 test('Field Map blocks another GPS write until a successful manual refresh', async ({ page }) => {
   const { state, frame } = await fixturePage(page);
   await open(frame, 'Field Map');
-  await frame.locator('.field-map-list>button').first().click();
+  await frame.locator('.cos-fleet-unit-row').first().click();
   const save = frame.getByRole('button', { name: 'Save verified location' });
   await expect(save).toBeDisabled();
   await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
@@ -375,7 +375,7 @@ test('a stale Overview job link never substitutes another record or action',asyn
   expect(state.writes).toEqual([]);
 });
 
-test('Field View keeps address verification explicit and hides changed-address pins',async({page},info)=>{
+test('Fleet Dashboard keeps address verification explicit and hides changed-address pins',async({page},info)=>{
  const {state,frame}=await fixturePage(page);
  state.units[0].address='1 Fixture St, Test City';
  state.units[1].address='2 Fixture St, Test City';
@@ -384,7 +384,7 @@ test('Field View keeps address verification explicit and hides changed-address p
  await expect(units).toContainText('HISTORICAL PIN');
  await expect(units).toContainText('ADDRESS ONLY');
  await expect(units).toContainText('Camera status unverified');
- await frame.locator('.field-map-list>button').first().click();
+ await frame.locator('.cos-fleet-unit-row').first().click();
  const save=frame.getByRole('button',{name:'Save verified location'});
  await expect(save).toBeDisabled();
  await expect(frame.getByRole('link',{name:'Look up recorded installation address ↗'})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=1%20Fixture%20St%2C%20Test%20City');
@@ -394,30 +394,30 @@ test('Field View keeps address verification explicit and hides changed-address p
  await expect(save).toBeDisabled();
  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).check();
  await save.click();
- await expect(frame.locator('.field-map-detail')).toContainText('VERIFIED PIN');
+ await expect(frame.locator('.cos-fleet-drawer')).toContainText('VERIFIED PIN');
  expect(state.writes).toHaveLength(1);
  Object.assign(state.units[0],{address:'3 New Fixture St, Test City',latitude:null,longitude:null,locationVerification:'address_changed',locationVerifiedAt:null});state.generation++;
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(units).toContainText('ADDRESS CHANGED');
  await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(0);
- await expect(frame.locator('.field-map-detail')).toContainText('3 New Fixture St');
- await expect(frame.locator('.field-map-detail')).toContainText('Verify the new location');
+ await expect(frame.locator('.cos-fleet-drawer')).toContainText('3 New Fixture St');
+ await expect(frame.locator('.cos-fleet-drawer')).toContainText('Verify the new location');
  expect(state.writes).toHaveLength(1);
  state.units[0].address='';state.generation++;
  await frame.getByRole('button',{name:'Refresh',exact:true}).click();
  await expect(save).toBeDisabled();
  await expect(frame.getByRole('checkbox',{name:/I checked that these coordinates match/})).toBeDisabled();
  await units.getByRole('button').filter({hasText:'FIX-RG-002'}).click();
- await frame.locator('.field-map-detail').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-drawer').scrollIntoViewIfNeeded();
  await page.screenshot({path:info.outputPath('field-location-verification.png'),fullPage:true});
  await frame.getByRole('checkbox',{name:/I checked that these coordinates match/}).scrollIntoViewIfNeeded();
  await page.screenshot({path:info.outputPath('field-location-verification-form.png'),fullPage:true});
 });
 
-test('Field View never offers GPS writes before verified projection capability is enabled',async({page})=>{
+test('Fleet Dashboard never offers GPS writes before verified projection capability is enabled',async({page})=>{
  const {frame,state}=await fixturePage(page,{locationWritesEnabled:false});
  await open(frame,'Field Map');
- await frame.locator('.field-map-list>button').first().click();
+ await frame.locator('.cos-fleet-unit-row').first().click();
  await expect(frame.getByText('Verified location editing is not enabled for this backend yet.',{exact:false})).toBeVisible();
  await expect(frame.getByRole('button',{name:'Save verified location'})).toHaveCount(0);
  await expect(frame.getByRole('button',{name:'Use My Current GPS'})).toHaveCount(0);

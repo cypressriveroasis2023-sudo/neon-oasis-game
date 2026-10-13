@@ -157,7 +157,7 @@ type Source = {
 };
 const read = (path: string) => async () => (await api.get(path)).data;
 export const sources: Source[] = [
-  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
+  { id: 'field', label: 'Fleet Dashboard', route: 'Fleet Dashboard', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
   { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('health',force):(await api.get('/api/camera-health/summary-v3')).data, summarize: summarizeITCameras },
   { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'victron', label: 'Victron', route: 'Victron VRM', description: 'Solar, battery and power dashboards for your fleet.', icon: 'power', read: read('/api/vrm-fleet'), summarize: summarizeITVrm,

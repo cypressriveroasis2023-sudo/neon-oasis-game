@@ -48,18 +48,18 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
- await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else await expect(frame.locator('.field-map-list>button')).toHaveCount(state.units.length);return {frame,state};
+ await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(state.units.length);return {frame,state};
 }
 test('provider colors, nearby center and unit health ticket draft stay on the selected identity',async({page},testInfo)=>{
  const {frame,state}=await mount(page);
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-field-pin').nth(0)).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-field-pin').nth(1)).toHaveAttribute('data-health','offline');await expect(frame.locator('.cos-field-pin').nth(2)).toHaveAttribute('data-health','unknown');
- await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await expect(frame.getByLabel('Nearby distance')).toBeVisible();await expect(frame.locator('.field-map-list>button')).toHaveCount(3);
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?unit='+id2);
+ await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await expect(frame.getByLabel('Nearby distance')).toBeVisible();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?unit='+id2);
  await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');
+ await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
 test('staleness and unavailable health fail gray without moving map or writing',async({page})=>{
@@ -74,11 +74,11 @@ test('historical coordinates are opt-in OLD-tagged review only, never nearby or 
 });
 test('old backend evidence and ambiguous identities stay gray',async({page})=>{const {frame}=await mount(page,{oldApi:true,ambiguous:true});for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveAttribute('data-health','unknown');});
 test('pasted address pin is an unsaved candidate; moving it clears confirmation',async({page})=>{
- const {frame,state}=await mount(page);await frame.locator('.field-map-list>button').first().click();await frame.getByLabel('Paste coordinates or a Google Maps point link').fill('30.01, -95.41');await frame.getByRole('button',{name:'Use pasted coordinates',exact:true}).click();await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('30.01');await expect(frame.getByLabel('Location source',{exact:true})).toHaveValue('site');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeDisabled();await frame.getByRole('checkbox',{name:/I checked/}).check();await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeEnabled();await frame.getByLabel('Latitude',{exact:true}).fill('30.02');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeDisabled();expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page);await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByLabel('Paste coordinates or a Google Maps point link').fill('30.01, -95.41');await frame.getByRole('button',{name:'Use pasted coordinates',exact:true}).click();await expect(frame.getByLabel('Latitude',{exact:true})).toHaveValue('30.01');await expect(frame.getByLabel('Location source',{exact:true})).toHaveValue('site');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeDisabled();await frame.getByRole('checkbox',{name:/I checked/}).check();await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeEnabled();await frame.getByLabel('Latitude',{exact:true}).fill('30.02');await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toBeDisabled();expect(state.writes).toHaveLength(0);
 });
 
 test('Back and Forward retain map filters, nearby center and selected unit',async({page})=>{
- const {frame,state}=await mount(page);await frame.getByLabel('Search field units').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.getByLabel('Search field units')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 test('native Camera Health shows units and individual cameras separately with filter and accessible drill-down',async({page},testInfo)=>{
@@ -93,7 +93,7 @@ test('native unit details can open Install Delivery draft without guessing recor
 
 test('unified Dispatch Board preserves import access without mixing a unit ticket context',async({page})=>{
  const {frame,state}=await mount(page);
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await frame.locator('.cos-field-pin').nth(1).click();
  await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);
@@ -121,7 +121,7 @@ test('native recorder, service-only, and old Recon observations keep separate st
  await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 53'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('DETECTOR NOT VERIFIED');await expect(detail).toContainText('Last reported detector state: OFFLINE');await expect(detail).toContainText('2 hr ago');await expect(detail).toContainText('older observation; current status unverified');await detail.getByRole('button',{name:'Back to units',exact:true}).click();
  const child=page.frames().find(child=>child.parentFrame());await child.evaluate(()=>{location.hash='field-map';});await showAllFieldHealth(frame);await expect(frame.locator('.cos-field-pin')).toHaveCount(3);for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveAttribute('data-health','unknown');
- await frame.locator('.field-map-list>button').filter({hasText:'Solar Spotter 51'}).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');expect(state.writes).toHaveLength(0);
+ await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 51'}).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');expect(state.writes).toHaveLength(0);
 });
 
 test('native location review stays visible while shop and inactive scopes reconcile separately',async({page})=>{
@@ -150,9 +150,9 @@ test('Sniper and CAM V family navigation restores service views and exact saved-
 
 test('imported tracker families stay visible and colored without inventing map coordinates',async({page})=>{
  const {frame,state}=await mount(page,{trackerCase:true});
- await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
- await expect(frame.locator('.field-map-list>button').filter({hasText:'Sniper 2 344'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-map-list>button').filter({hasText:'CAMV 010'})).toContainText('IP / PORT OFFLINE');
- await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('all');
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
+ await expect(frame.locator('.cos-fleet-unit-row').filter({hasText:'Sniper 2 344'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.cos-fleet-unit-row').filter({hasText:'CAMV 010'})).toContainText('IP / PORT OFFLINE');
+ await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('all');
  const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>location.hash='camera-health');await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(3);
  await frame.getByLabel('Camera Health equipment family').selectOption('sniper');await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await frame.locator('.camera-overview-card').filter({hasText:'Sniper 334'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('IP / PORT UNKNOWN');await expect(detail.getByRole('link',{name:'Find unit in Camera Health diagnostics'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20334');expect(state.writes).toHaveLength(0);
@@ -166,7 +166,7 @@ test('native card quick actions expose safe endpoints, exact field identity and 
  await expect(card.locator('a[href*="554"],a[href*="38880"]')).toHaveCount(0);
  await expect(card.getByRole('link',{name:'Edit IP address',exact:true})).toHaveAttribute('href','../../camera-detail.html?id=101&action=edit-ip');
  await expect(card.getByRole('link',{name:'Edit field information',exact:true})).toHaveAttribute('href','../../camera-health.html?unit=SNIPER%202%20005&action=edit-field');
- await expect(card.getByRole('link',{name:'Field View',exact:true})).toHaveAttribute('href','../../?fieldUnit=SNIPER%202%20005');
+ await expect(card.getByRole('link',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('href','../../?fieldUnit=SNIPER%202%20005');
  await expect(card.locator('.camera-card-times')).toContainText('Last successful connection');await expect(card.locator('.camera-card-times')).toContainText('No successful connection recorded');await expect(card.locator('.camera-card-times')).toContainText('Last check attempted');
  await card.locator('.camera-card-main').focus();await page.keyboard.press('Enter');await expect(frame.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(card.locator('.camera-card-main')).toBeFocused();
  expect(state.writes).toHaveLength(0);const overflow=await frame.locator('body').evaluate(el=>el.scrollWidth>innerWidth+1);expect(overflow).toBe(false);await page.screenshot({path:info.outputPath('camera-card-quick-actions.png'),fullPage:true});
@@ -175,7 +175,7 @@ test('native card quick actions expose safe endpoints, exact field identity and 
 test('compact clusters expose every colocated unit and support equipment has no false camera outage',async({page},testInfo)=>{
  const {frame,state}=await mount(page,{crowded:true});
  await expect(frame.locator('.cos-field-cluster>b')).toHaveText('3');
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await frame.locator('.cos-field-cluster-wrap').focus();await page.keyboard.press('Enter');
  await expect(frame.locator('.field-cluster-list button')).toHaveCount(4);
  await expect(frame.locator('.field-cluster-list')).toContainText('Solar Stand 72 044 · SUPPORT EQUIPMENT · 0 CAMERAS');
@@ -188,20 +188,20 @@ test('compact clusters expose every colocated unit and support equipment has no 
  await expect(frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'})).toHaveCount(1);
  await frame.locator('.field-cluster-list button').filter({hasText:'Solar Stand 72 044'}).click();
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('100 Fixture Road');
- await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
+ await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Stand 72 044');
  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('support');
- await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);
  await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);
- await expect(frame.locator('.field-map-list')).not.toContainText('Camera status unverified');
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
- await expect(frame.locator('.field-map-workspace')).toHaveClass(/field-map-tv/);
- await expect(frame.getByRole('button',{name:'Exit TV view',exact:true})).toBeVisible();
+ await expect(frame.locator('.cos-fleet-unit-list')).not.toContainText('Camera status unverified');
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
+ await expect(frame.locator('.cos-fleet-dashboard')).toHaveClass(/field-map-tv/);
+ await expect(frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true})).toBeVisible();
  await expect(frame.locator('.field-map-display-bar')).not.toBeVisible();
- await expect(frame.locator('.field-map-list')).not.toBeVisible();
- const canvas=await frame.locator('.field-map-center').boundingBox();expect(canvas.height).toBeGreaterThan(200);expect(canvas.y+canvas.height).toBeLessThanOrEqual(page.viewportSize().height+1);
+ await expect(frame.locator('.cos-fleet-unit-list')).not.toBeVisible();
+ const canvas=await frame.locator('.cos-fleet-map-panel').boundingBox();expect(canvas.height).toBeGreaterThan(200);expect(canvas.y+canvas.height).toBeLessThanOrEqual(page.viewportSize().height+1);
  await page.screenshot({path:testInfo.outputPath('map-tv-support.png'),fullPage:true});
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
- await expect(frame.locator('.field-map-workspace')).not.toHaveClass(/field-map-tv/);
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();
+ await expect(frame.locator('.cos-fleet-dashboard')).not.toHaveClass(/field-map-tv/);
  expect(state.writes).toHaveLength(0);
 });
 
@@ -211,7 +211,7 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await expect(cluster).toHaveAttribute('data-health','mixed');
  await expect(cluster.locator('.cos-cluster-support')).toContainText('1');
  await expect(cluster.locator('.cos-cluster-caption')).toHaveText('MIX');
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await frame.locator('.cos-field-cluster-wrap').click();
  await expect(frame.locator('.field-cluster-summary')).toContainText('1 online · 1 offline · 0 unknown · 1 support');
  await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
@@ -223,29 +223,29 @@ test('approved reticles expand colocated camera units beside a bright-blue solar
  await expect(frame.locator(' .cos-field-pin[data-health="offline"] .cos-reticle-artwork')).toHaveCSS('color','rgb(255, 39, 52)');
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
  await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await expect.poll(()=>frame.locator('.cos-field-pin:not(.cos-field-pin-support)').evaluateAll(pins=>pins.every(pin=>{const circle=pin.getBoundingClientRect(),number=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return document.elementFromPoint((number.left+number.right)/2,(number.top+number.bottom)/2)===pin.querySelector('.cos-pin-unit-number')&&number.left>=circle.left&&number.right<=circle.right&&number.top>=circle.top&&number.bottom<=circle.bottom+14;}))).toBe(true);
- await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-same-site.png')});
+ await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('approved-reticles-same-site.png')});
  await frame.locator('.cos-field-pin-support').click();
- await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
+ await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Stand 72 044');
  await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');
  await frame.locator('.leaflet-popup-close-button').click();
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
- await expect(frame.locator('.field-map-workspace')).toHaveClass(/field-map-tv/);
- await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect();const map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
+ await expect(frame.locator('.cos-fleet-dashboard')).toHaveClass(/field-map-tv/);
+ await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect();const map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
  await page.screenshot({path:info.outputPath('approved-reticles-tv.png')});
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();
  await page.clock.fastForward(16*60*1000);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);
  await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-reticle-approved-eye')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="unknown"] .cos-pin-unit-number')).toHaveText(['51','52']);
  await expect(frame.locator('.cos-field-pin-support .cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');
- await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-circles-grey-unknown.png')});
+ await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('approved-circles-grey-unknown.png')});
  expect(state.writes).toHaveLength(0);
 });
 
 test('HTML-like imported unit and site names stay literal text in map labels',async({page})=>{
- const {frame,state}=await mount(page,{htmlLabel:true});await frame.locator('.field-map-list>button').first().click();await expect(frame.locator('.field-pin-label')).toContainText('<img src=x');
- await expect(frame.locator('.field-map-list')).toContainText('Site <b>literal</b>');await expect(frame.locator('.field-map-detail')).toContainText('100 <img src=x');
+ const {frame,state}=await mount(page,{htmlLabel:true});await frame.locator('.cos-fleet-unit-row').first().click();await expect(frame.locator('.field-pin-label')).toContainText('<img src=x');
+ await expect(frame.locator('.cos-fleet-unit-list')).toContainText('Site <b>literal</b>');await expect(frame.locator('.cos-fleet-drawer')).toContainText('100 <img src=x');
  await expect(frame.locator('img[src="x"]')).toHaveCount(0);expect(await frame.locator('body').evaluate(()=>Boolean(window.mapLabelExecuted||window.mapAddressExecuted))).toBe(false);expect(state.writes).toHaveLength(0);
 });
 
@@ -253,35 +253,35 @@ test('HTML-like imported unit and site names stay literal text in map labels',as
 test('larger shared sites keep all nine unit markers and the stand selectable',async({page},info)=>{
  const {frame,state}=await mount(page,{crowded:true,crowdedCount:9});
  await expect(frame.locator('.cos-field-cluster>b')).toHaveText('9');
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();
  await expect(frame.locator('.cos-field-pin')).toHaveCount(9);await expect(frame.locator('.cos-site-leader')).toHaveCount(9);
- await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button')).toHaveCount(10);
+ await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list button')).toHaveCount(10);
  await frame.locator('.leaflet-popup-close-button').click();await frame.locator('.cos-field-pin-support').click();
- await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');
+ await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Stand 72 044');
  await expect(frame.locator('.field-cluster-support-detail')).toContainText('0 cameras');
  await frame.locator('.leaflet-popup-close-button').click();
- await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
+ await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
  await expect(frame.locator('.cos-pin-unit-number')).toHaveCount(9);
- const clearLabels=await frame.locator('.field-map-center').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')];const decorations=[...el.querySelectorAll('.cos-field-cluster,.cos-cluster-caption,.cos-cluster-support,.field-pin-label')].filter(node=>node.getClientRects().length);const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return decorations.every(node=>!overlaps(label,node.getBoundingClientRect()))&&pins.every((other,j)=>i===j||!overlaps(label,other.querySelector('.cos-reticle-artwork').getBoundingClientRect())&&!overlaps(label,other.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});expect(clearLabels).toBe(true);
- await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
- await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
- await frame.locator('.field-map-center').screenshot({path:info.outputPath('approved-reticles-nine-units-tv.png')});
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();
+ const clearLabels=await frame.locator('.cos-fleet-map-panel').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')];const decorations=[...el.querySelectorAll('.cos-field-cluster,.cos-cluster-caption,.cos-cluster-support,.field-pin-label')].filter(node=>node.getClientRects().length);const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return decorations.every(node=>!overlaps(label,node.getBoundingClientRect()))&&pins.every((other,j)=>i===j||!overlaps(label,other.querySelector('.cos-reticle-artwork').getBoundingClientRect())&&!overlaps(label,other.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});expect(clearLabels).toBe(true);
+ await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('approved-reticles-nine-units.png')});
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
+ await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const legend=el.querySelector('.field-map-legend').getBoundingClientRect(),map=el.getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top)&&Math.min(box.left,label.left)>=map.left&&Math.max(box.right,label.right)<=map.right;});})).toBe(true);
+ await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('approved-reticles-nine-units-tv.png')});
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();
  expect(state.writes).toHaveLength(0);
 });
 
 test('closing a shared-site popup restores its auto-pan but preserves a subsequent user pan',async({page})=>{
  const {frame,state}=await mount(page,{crowded:true});
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await frame.getByRole('button',{name:'Zoom into this group',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
  const before=await center();await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list')).toBeVisible();
  await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(before);
  await frame.locator('.cos-field-cluster-wrap').click();await expect(frame.locator('.field-cluster-list')).toBeVisible();
  await page.clock.runFor(600);const afterPopup=await center();
- const box=await frame.locator('.field-map-center').boundingBox();
+ const box=await frame.locator('.cos-fleet-map-panel').boundingBox();
  await page.mouse.move(box.x+box.width-10,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width-55,box.y+box.height/2+25,{steps:8});await page.mouse.up();await page.clock.runFor(600);
  const panned=await center();expect(panned).not.toEqual(afterPopup);
  await frame.locator('.leaflet-popup-close-button').click();await expect.poll(center).toEqual(panned);
@@ -291,7 +291,7 @@ test('closing a shared-site popup restores its auto-pan but preserves a subseque
 
 test('filtering away an open cluster discards its old popup-pan snapshot',async({page})=>{
  const {frame,state}=await mount(page,{crowded:true});
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-cluster-wrap').click();
  await expect(frame.locator('.field-cluster-list')).toBeVisible();
  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('support');await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
  const center=()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.center);
@@ -303,33 +303,33 @@ test('filtering away an open cluster discards its old popup-pan snapshot',async(
 test('zoom alone exposes twelve same-site statuses and blue support without opening a group',async({page},info)=>{
  const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true});
  const zoom=frame.locator('.leaflet-control-zoom-in'),out=frame.locator('.leaflet-control-zoom-out');
- await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom)).toBe(14);await out.click();await expect.poll(()=>frame.locator('body').evaluate(()=>history.state.cosFieldMapView.zoom)).toBe(13);
  await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-field-cluster>b')).toHaveText('12');
  await zoom.click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);expect(await frame.locator('.cos-field-pin-wrap').evaluateAll(nodes=>nodes.map(node=>node.dataset.unitId).sort())).toEqual(state.units.map(unit=>unit.id).sort());await expect(frame.locator('.cos-site-leader')).toHaveCount(12);
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(9);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
- const visible=()=>frame.locator('.field-map-center').evaluate(el=>{const map=el.getBoundingClientRect(),legend=el.querySelector('.field-map-legend').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const b=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect(),p=pin.getBoundingClientRect();return p.left>=map.left&&p.right<=map.right&&p.top>=map.top&&Math.max(p.bottom,b.bottom)<=map.bottom&&(!legend.height||Math.max(p.bottom,b.bottom)<legend.top);});});
- await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units.png')});
- await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');await frame.locator('.leaflet-popup-close-button').click();
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units-tv.png')});
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await frame.locator('.cos-field-pin[data-health="offline"]').click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ const visible=()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const map=el.getBoundingClientRect(),legend=el.querySelector('.field-map-legend').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const b=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect(),p=pin.getBoundingClientRect();return p.left>=map.left&&p.right<=map.right&&p.top>=map.top&&Math.max(p.bottom,b.bottom)<=map.bottom&&(!legend.height||Math.max(p.bottom,b.bottom)<legend.top);});});
+ await expect.poll(visible).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('zoom-only-twelve-units.png')});
+ await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Solar Stand 72 044');await frame.locator('.leaflet-popup-close-button').click();
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(visible).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('zoom-only-twelve-units-tv.png')});
+ await frame.getByRole('button',{name:'Exit fullscreen fleet map',exact:true}).click();await frame.locator('.cos-field-pin[data-health="offline"]').click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 
 test('automatically separated adjacent sites do not cover each other',async({page},info)=>{
  const {frame,state}=await mount(page,{crowded:true,crowdedCount:12,mixedCrowd:true,nearbyCrowd:true});
  await expect(frame.locator('.cos-field-pin')).toHaveCount(15);await expect(frame.locator('.cos-field-cluster')).toHaveCount(2);await expect(frame.locator('.field-cluster-list')).toHaveCount(0);
- const clear=()=>frame.locator('.field-map-center').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')],clusters=[...el.querySelectorAll('.cos-field-cluster')];const overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return clusters.every(c=>!overlap(box,c.getBoundingClientRect())&&!overlap(label,c.getBoundingClientRect()))&&pins.every((p,j)=>i===j||!overlap(box,p.getBoundingClientRect())&&!overlap(label,p.getBoundingClientRect())&&!overlap(label,p.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});
- await expect.poll(clear).toBe(true);await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(15);await expect.poll(clear).toBe(true);await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const controls=[...el.querySelectorAll('.leaflet-control')].map(c=>c.getBoundingClientRect());return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return controls.every(c=>!(box.left<c.right&&box.right>c.left&&box.top<c.bottom&&Math.max(box.bottom,label.bottom)>c.top));});})).toBe(true);await expect.poll(()=>frame.locator('.field-map-center').evaluate(el=>{const map=el.getBoundingClientRect(),legend=el.querySelector('.field-map-legend').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.left>=map.left&&box.right<=map.right&&box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top);});})).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('adjacent-sites-automatic-tv.png')});expect(state.writes).toHaveLength(0);
+ const clear=()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const pins=[...el.querySelectorAll('.cos-field-pin')],clusters=[...el.querySelectorAll('.cos-field-cluster')];const overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return pins.every((pin,i)=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return clusters.every(c=>!overlap(box,c.getBoundingClientRect())&&!overlap(label,c.getBoundingClientRect()))&&pins.every((p,j)=>i===j||!overlap(box,p.getBoundingClientRect())&&!overlap(label,p.getBoundingClientRect())&&!overlap(label,p.querySelector('.cos-pin-unit-number').getBoundingClientRect()));});});
+ await expect.poll(clear).toBe(true);await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(15);await expect.poll(clear).toBe(true);await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const controls=[...el.querySelectorAll('.leaflet-control')].map(c=>c.getBoundingClientRect());return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return controls.every(c=>!(box.left<c.right&&box.right>c.left&&box.top<c.bottom&&Math.max(box.bottom,label.bottom)>c.top));});})).toBe(true);await expect.poll(()=>frame.locator('.cos-fleet-map-panel').evaluate(el=>{const map=el.getBoundingClientRect(),legend=el.querySelector('.field-map-legend').getBoundingClientRect();return [...el.querySelectorAll('.cos-field-pin')].every(pin=>{const box=pin.getBoundingClientRect(),label=pin.querySelector('.cos-pin-unit-number').getBoundingClientRect();return box.left>=map.left&&box.right<=map.right&&box.top>=map.top&&Math.max(box.bottom,label.bottom)<=map.bottom&&(!legend.height||Math.max(box.bottom,label.bottom)<legend.top);});})).toBe(true);await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('adjacent-sites-automatic-tv.png')});expect(state.writes).toHaveLength(0);
 });
 
 
 test('ordinary ST stands stay blue and outside camera-health totals alongside colocated cameras',async({page},info)=>{
- const {frame,state}=await mount(page,{crowded:true,ordinaryStand:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await frame.locator('.field-map-center').scrollIntoViewIfNeeded();
+ const {frame,state}=await mount(page,{crowded:true,ordinaryStand:true});await expect(frame.locator('.cos-field-pin')).toHaveCount(3);await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();
  const stand=frame.locator('.cos-field-pin-support');await expect(stand.locator('.cos-pin-unit-number')).toHaveText('001');await expect(stand.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(21, 168, 255)');await expect(stand.locator('.cos-reticle-solar-panel')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(1);await expect(frame.locator('.router-map-note')).toContainText('1 support units have 0 cameras and are excluded from health totals');
- await stand.click();await expect(frame.locator('.field-map-detail h2')).toHaveText('ST 001');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');await frame.locator('.leaflet-popup-close-button').click();await frame.locator('.field-map-center').screenshot({path:info.outputPath('ordinary-ST-stand-blue.png')});expect(state.writes).toHaveLength(0);
+ await stand.click();await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('ST 001');await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('SUPPORT EQUIPMENT · 0 CAMERAS');await frame.locator('.leaflet-popup-close-button').click();await frame.locator('.cos-fleet-map-panel').screenshot({path:info.outputPath('ordinary-ST-stand-blue.png')});expect(state.writes).toHaveLength(0);
 });
 
 test('changing the health filter excludes a previously selected unit with another status',async({page})=>{
- const {frame,state}=await mount(page);await frame.locator('.field-map-list>button').filter({hasText:'Solar Spotter 52'}).click();await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await expect(frame.locator('.field-map-list>button')).toContainText('Solar Spotter 51');await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);expect(state.writes).toEqual([]);
+ const {frame,state}=await mount(page);await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 52'}).click();await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(1);await expect(frame.locator('.cos-fleet-unit-row')).toContainText('Solar Spotter 51');await expect(frame.locator('.cos-field-pin[data-health="offline"]')).toHaveCount(0);expect(state.writes).toEqual([]);
 });

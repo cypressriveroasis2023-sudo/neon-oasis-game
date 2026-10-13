@@ -37,7 +37,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
  // Synthetic unknown-health rows are deliberately reviewed through the existing All health filter.
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
  await page.goto('/owner-preparation-fixture');const frame=page.frameLocator('iframe');
- if(role!=='Service'){await expect(frame.locator('.field-map-list>button')).toHaveCount(2);await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
+ if(role!=='Service'){await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(2);await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();}
  return {frame,state};
 }
 const prepare=frame=>frame.getByRole('button',{name:'Prepare approved lookup',exact:true});
@@ -64,8 +64,8 @@ test('missing private marker never enables preparation',async({page})=>{
 test('duplicate clicks prepare once and selection away and back clears the visible receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await expect(prepare(frame)).toBeVisible();await prepare(frame).evaluate(el=>{el.click();el.click();});await expect.poll(()=>state.posts.length).toBe(1);
  state.postGate.resolve();await expect(proof(frame)).toBeVisible();
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC OTHER 901'}).click();await expect(proof(frame)).toHaveCount(0);
- await frame.locator('.field-map-list>button').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC OTHER 901'}).click();await expect(proof(frame)).toHaveCount(0);
+ await frame.locator('.cos-fleet-unit-row').filter({hasText:'SYNTHETIC BOUNDARY 900'}).click();await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 test('changed source before preparation sends no proof request',async({page})=>{
  const {frame,state}=await mount(page);await expect(prepare(frame)).toBeVisible();state.snapshot=structuredClone(state.snapshot);state.snapshot.items[0].historicalRecordedAt='2026-10-09T00:00:00Z';
@@ -78,31 +78,31 @@ test('later source change rejects a proof receipt and does not start a lookup',a
 });
 test('selection away and back during preparation preflight sends zero preparation requests',async({page})=>{
  const {frame,state}=await mount(page),gate=deferred();state.mapGate=gate;
- await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.field-map-workspace').elementHandle();
+ await page.clock.pauseAt(new Date(now+60000));const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();
  await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
   await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
-  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
-  await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
-  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
+  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
  await expect(prepare(frame)).toBeDisabled();gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toBeEnabled();
 });
 test('selection away and back during preparation cannot admit a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await page.clock.pauseAt(new Date(now+60000));
- const workspace=await frame.locator('.field-map-workspace').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','true');
+ const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','true');
  for(const unitId of [otherId,id]){
   await frame.locator('body').evaluate((_body,value)=>{location.hash='#field-map?unit='+value;},unitId);
   await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#field-map?unit='+unitId);
-  await expect(frame.locator('.field-map-list>button.selected')).toHaveAttribute('data-unit-id',unitId);
-  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.field-map-workspace'))).toBe(true);
+  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',unitId);
+  expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  }
  state.postGate.resolve();await expect.poll(()=>state.postResponses).toBe(1);
- await expect(frame.locator('.field-map-list')).toHaveAttribute('aria-busy','false');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
+ await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');await expect(proof(frame)).toHaveCount(0);expect(state.posts).toHaveLength(1);
 });
 test('session-role invalidation clears preparation and rejects a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await prepare(frame).click();await expect.poll(()=>state.posts.length).toBe(1);

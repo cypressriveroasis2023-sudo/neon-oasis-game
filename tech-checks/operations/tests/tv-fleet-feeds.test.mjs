@@ -16,7 +16,7 @@ test('field locations arrive while an optional health feed is still waiting',asy
  const accepted={};
  const loading=loadTvFleetFeeds({get:async path=>({data:path==='/api/camera-health/summary-v3'?await waiting:values[path]})},{...callbacks(accepted),field:value=>{accepted.field=value;fieldArrived();}});
  await arrived;assert.equal(accepted.field.items[0].unitNumber,'Sniper 312');assert.equal(accepted.health,undefined);
- finishHealth(health);assert.deepEqual(await loading,[]);assert.equal(accepted.health,health);
+ finishHealth(health);assert.deepEqual(await loading,[]);assert.deepEqual(accepted.health.rows,health.rows);assert.deepEqual(accepted.health.fleetFieldUnits,field.items);
 });
 
 test('camera and router outages leave verified field locations available and identify each failed feed',async()=>{
