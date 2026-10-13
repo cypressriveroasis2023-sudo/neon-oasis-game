@@ -141,5 +141,8 @@ test('selection away and back during Run preflight invalidates the old action wi
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  expect(state.writes).toHaveLength(0);
- await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeEnabled();
+ await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toHaveCount(0);
+ // External unit navigation discards the old editor; a deliberate reopen uses fresh guarded context.
+ await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();
+ await expect(frame.getByRole('button',{name:'Run approved Census lookup',exact:true})).toBeEnabled();expect(state.writes).toHaveLength(0);
 });

@@ -92,7 +92,9 @@ test('selection away and back during preparation preflight sends zero preparatio
  }
  await expect(proof(frame)).toHaveCount(0);gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);
  await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
- expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toBeEnabled();
+ expect(state.posts).toHaveLength(0);await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toHaveCount(0);
+ // External unit navigation returns to diagnostics; reopen the current unit's editor deliberately.
+ await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();await expect(prepare(frame)).toBeEnabled();expect(state.posts).toHaveLength(0);
 });
 test('selection away and back during preparation cannot admit a late receipt',async({page})=>{
  const {frame,state}=await mount(page,{holdPost:true});await page.clock.pauseAt(new Date(now+60000));
@@ -184,7 +186,7 @@ test('changed-source shared fleet refresh during Prepare preflight cancels with 
  const workspace=await frame.locator('.cos-fleet-dashboard').elementHandle();await prepare(frame).click();await expect.poll(()=>state.mapGate===null).toBe(true);
  state.snapshot=structuredClone(state.snapshot);state.snapshot.items[0].address='999 Changed Fixture Road, Testville, TX 77002';state.snapshot.generatedAt=new Date(fleetRefreshTime).toISOString();
  const healthReads=state.healthReads,mapReads=state.mapReads;await waitForNewFleetPair(frame,state,healthReads,mapReads);
- await expect(frame.getByRole('dialog').getByText(state.snapshot.items[0].address,{exact:true})).toBeVisible();
+ await expect(frame.getByLabel('Selected unit details',{exact:true}).getByText(state.snapshot.items[0].address,{exact:true})).toBeVisible();
  gate.resolve();await expect.poll(()=>state.heldMapFinished).toBe(1);await expect(frame.locator('.cos-fleet-unit-list')).toHaveAttribute('aria-busy','false');
  await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',id);expect(await workspace.evaluate(node=>node.isConnected&&node===document.querySelector('.cos-fleet-dashboard'))).toBe(true);
  await expect(proof(frame)).toHaveCount(0);await expect(prepare(frame)).toHaveCount(0);expect(state.posts).toHaveLength(0);
