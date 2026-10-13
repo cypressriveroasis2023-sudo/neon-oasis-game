@@ -75,7 +75,7 @@ test('enrollment preserves exact terminal cache and current audit; prefix alone 
  assert.deepEqual((await db.query('select to_jsonb(c) value from app_private.cos_field_geocode_cache c')).rows,before);
  assert.deepEqual(await due(),[]);assert.equal((await due(key))[0].censusOnly,true);
  assert.equal((await claim(key)).claimed,false);assert.equal((await policy()).claimToken,null);
- const c=await claim(key,true);assert.equal(c.claimed,true);assert.equal(c.record.attempts,2);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),120000);assert.equal(c.censusOnly,true);assert.equal((await policy()).claimToken,c.claimToken);
+ const c=await claim(key,true);assert.equal(c.claimed,true);assert.equal(c.record.attempts,2);assert.equal(Date.parse(c.record.leaseUntil)-Date.parse(c.record.updatedAt),220000);assert.equal(c.censusOnly,true);assert.equal((await policy()).claimToken,c.claimToken);
  assert.equal((await claim(key,true)).claimed,false);assert.equal((await claim(key)).claimed,false);
 });
 test('no-match, timeout, successful estimate, crash and lease expiry never release allowance or Geocodio',async()=>{
@@ -225,4 +225,25 @@ test('preparation refuses ordinary no-match fallback and shared work, and real p
  await enroll(key,{binding:{...binding,address:key.p_address,nativeGuardSha256:'a'.repeat(64),nativeSourceSha256:'b'.repeat(64),auditSha256:p.auditSha256,deviceIds:p.deviceIds}});
  assert.equal((await policy()).binding.nativeUnitId,p.binding.nativeUnitId);
  await db.query("select set_config('test.actor',$1,false)",[OWNER]);const r=await call('cos_field_geocode_read_many',{p_organization_id:ORG,p_audit_ids:[key.p_audit_id]});assert.equal(r[0].censusPreparation,undefined);
+});
+
+const leaseBudgetSql=()=>sql('../db/owner-one-census-lease-budget-v1.sql');
+const claimDefinition=async()=> (await db.query("select pg_get_functiondef('public.cos_field_geocode_claim(uuid,text,text,text,text)'::regprocedure) definition")).rows[0].definition;
+async function syntheticLease120(){const d=await claimDefinition();assert.equal(d.split("lease_until=v_now+interval '220 seconds'").length,2);await db.exec(d.replace("lease_until=v_now+interval '220 seconds'","lease_until=v_now+interval '120 seconds'"));}
+test('supplemental lease patch changes only120 to220 and preserves installed preparation/account/cache/ACL',async()=>{
+ await reset();const key=await seed(db,{status:'invalid_address'});await preparation(key);await syntheticLease120();
+ const old=await claimDefinition(),security=await acl(),account=(await db.query('select to_jsonb(g) value from app_private.cos_geocodio_account_state g')).rows,cache=(await db.query('select to_jsonb(c) value from app_private.cos_field_geocode_cache c')).rows;
+ await db.exec(await leaseBudgetSql());await db.exec(await leaseBudgetSql());
+ assert.equal(await claimDefinition(),old.replace("lease_until=v_now+interval '120 seconds'","lease_until=v_now+interval '220 seconds'"));
+ assert.deepEqual(await acl(),security);assert.deepEqual((await db.query('select to_jsonb(g) value from app_private.cos_geocodio_account_state g')).rows,account);assert.deepEqual((await db.query('select to_jsonb(c) value from app_private.cos_field_geocode_cache c')).rows,cache);
+});
+test('supplemental lease patch fails closed if an allowance is already enrolled',async()=>{
+ await reset();const key=await seed(db,{status:'invalid_address'});await syntheticLease120();await enroll(key);const before=await claimDefinition(),saved=await policy();
+ await assert.rejects(db.exec(await leaseBudgetSql()),e=>e.code==='40001');await db.exec('rollback');assert.equal(await claimDefinition(),before);assert.deepEqual(await policy(),saved);
+ await reset();await db.exec(await leaseBudgetSql());
+});
+test('supplemental lease patch refuses source drift without changing preparation',async()=>{
+ await reset();await syntheticLease120();const exact=await claimDefinition();await db.exec(exact.replace('declare r app_private','declare  r app_private'));
+ const changed=await claimDefinition();await assert.rejects(db.exec(await leaseBudgetSql()),e=>e.code==='40001');await db.exec('rollback');assert.equal(await claimDefinition(),changed);
+ await db.exec(exact);await db.exec(await leaseBudgetSql());
 });

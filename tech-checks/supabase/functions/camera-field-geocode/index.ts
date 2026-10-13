@@ -33,7 +33,7 @@ export function createGeocodeHandler(options:Options){return async(req:Request)=
   censusOnly=rows.some(row=>row?.censusOnly===true);
   // Only this explicitly enrolled target needs three fresh authenticated native
   // snapshots. Ordinary Owner jobs and scheduled sweeps keep their 100s budget.
-  if(censusOnly&&targeted)deadlineMs=startedAt+200000;
+  if(censusOnly&&targeted)deadlineMs=startedAt+310000;
   // A secret-authenticated target is a narrow one-Census invocation, never a
   // back door into an ordinary job or the scheduled imported/fallback sweeps.
   if(isCron&&targeted&&(!rows.length||!rows.every(row=>row?.censusOnly===true)))return reply({error:'No enrolled Census-only target is available.'},409);
@@ -54,13 +54,13 @@ export function createGeocodeHandler(options:Options){return async(req:Request)=
     // An immutable consumed marker is sufficient to refuse any new work. Do not
     // depend on a native read to explain a duplicate, expired lease or crash.
     if(guarded.censusOnlyState==='consumed'){results.push({auditId:row.auditId,status:row.status||'held',censusOnly:true,allowance});continue;}
-    if(deadlineMs-now()<170000){results.push({auditId:row.auditId,status:'held',censusOnly:true,allowance});continue;}
+    if(deadlineMs-now()<280000){results.push({auditId:row.auditId,status:'held',censusOnly:true,allowance});continue;}
     // The native and legacy databases are separate. A missing or failed fresh native
     // proof must never be replaced with an old enrollment proof or a label match.
     if(!options.verifyOwnerCensusSource||!/^Bearer [^\s]+$/i.test(authorization)||authorization.length>8192)throw Error('Owner source verifier unavailable');
     if(await options.verifyOwnerCensusSource(guarded,authorization)!==true){results.push({auditId:row.auditId,status:'superseded',censusOnly:true,allowance});continue;}
    }
-   if(deadlineMs-now()<(guarded?125000:35000))break;
+   if(deadlineMs-now()<(guarded?200000:35000))break;
    const key={p_organization_id:ORG,p_audit_id:row.auditId,p_unit_key:row.unitKey,p_address:row.address,p_address_sha256:row.addressSha256};
    const claimed=await options.rpc('cos_field_geocode_claim',guarded?{...key,p_audit_id:OWNER_ONE_CENSUS_PREFIX+row.auditId}:key);
    // A policy acquired after list_due also blocks fallback, even when no claim was issued.
@@ -72,16 +72,17 @@ export function createGeocodeHandler(options:Options){return async(req:Request)=
    if(guarded&&!validCensusClaimToken(claimed.claimToken))throw Error('Census-only claim unavailable');
    const leaseUntil=guarded?Date.parse(claimed?.record?.leaseUntil):NaN;
    if(guarded&&!Number.isFinite(leaseUntil))throw Error('Census-only lease unavailable');
-   if(guarded&&leaseUntil-now()<115000){results.push({auditId:row.auditId,status:'held',...policy});continue;}
+   if(guarded&&leaseUntil-now()<210000){results.push({auditId:row.auditId,status:'held',...policy});continue;}
    // A database lock wait can outlive the pre-claim proof. Recheck the same Owner
    // after consumption, immediately before the only permitted provider send.
    // Any uncertainty burns the allowance; it never authorizes another claim.
    if(guarded&&await options.verifyOwnerCensusSource!(guarded,authorization)!==true){results.push({auditId:row.auditId,status:'superseded',...policy});continue;}
-   if(guarded&&(deadlineMs-now()<70000||leaseUntil-now()<70000)){results.push({auditId:row.auditId,status:'held',...policy});continue;}
+   if(guarded&&(deadlineMs-now()<110000||leaseUntil-now()<110000)){results.push({auditId:row.auditId,status:'held',...policy});continue;}
    const result=await (guarded?censusOnlyOwnerAddress:censusAddress)(row.address,options.fetch||fetch);
    // Do not finish an uncertain/stale native result. The consumed allowance and
    // persistent SQL hold survive crashes, source-read failures and lease expiry.
    if(guarded&&await options.verifyOwnerCensusSource!(guarded,authorization)!==true){results.push({auditId:row.auditId,status:'superseded',...policy});continue;}
+   if(guarded&&(deadlineMs-now()<10000||leaseUntil-now()<10000)){results.push({auditId:row.auditId,status:'held',...policy});continue;}
    const saved=await options.rpc('cos_field_geocode_finish',{...key,p_claim_token:claimed.claimToken,p_status:result.status,p_latitude:result.latitude??null,p_longitude:result.longitude??null,p_matched_address:result.matchedAddress??null,p_reason:guarded?censusOnlyReason(result):reasonCode(result.status,result.reason)});
    results.push({auditId:row.auditId,status:saved?.accepted===true?saved.record.status:'superseded',...policy});
   }
