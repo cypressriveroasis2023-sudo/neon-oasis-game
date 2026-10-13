@@ -40,3 +40,11 @@ test('location diagnostics report fixed review categories without record data',a
   await assert.rejects(reader({customerId:'2',serviceLocationId:'3'},null));assert.deepEqual(codes,[expected]);assert.doesNotMatch(JSON.stringify(codes),/Private|Synthetic|123 Main/);
  }
 });
+
+test('separate service-location IDs qualify under the verified parent while cross-parent records are held',async()=>{
+ const services=[{...service,serviceLocationId:'3',customerId:'2'},{...service,serviceLocationId:'4',customerId:'2',name:'Another synthetic job'}],calls=[];
+ const reader=createFleetLocationReader(async p=>{calls.push(p);return p.includes('servicelocations')?{totalRows:2,results:services}:parent;},async()=>{throw Error('Unexpected geocoder');});
+ const result=await reader({customerId:'2',serviceLocationId:'3'},null);assert.equal(result.site,service.name);assert.equal(result.address,'123 Main St, Houston, TX 77002');assert.match(calls[1],/Fields=serviceLocationId,customerId,/);
+ const wrong=createFleetLocationReader(async p=>p.includes('servicelocations')?{totalRows:1,results:[{...services[0],customerId:'99'}]}:parent,async()=>{throw Error();});await assert.rejects(wrong({customerId:'2',serviceLocationId:'3'},null),/membership/);
+ const duplicate=createFleetLocationReader(async p=>p.includes('servicelocations')?{totalRows:2,results:[services[0],services[0]]}:parent,async()=>{throw Error();});await assert.rejects(duplicate({customerId:'2',serviceLocationId:'3'},null),/Duplicate service/);
+});
