@@ -5,7 +5,7 @@ const origin='http://127.0.0.1:4173';
 const stamp=new Date(now).toISOString();
 const units=Array.from({length:3},(_,index)=>({id:`00000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`,unitNumber:`Solar Spotter ${index+1}`,modelName:'Solar Spotter',status:'field',currentLocationType:'field',address:`${index+1} Fixture Street`,latitude:index<2?29.5+index: null,longitude:index<2?-95+index:null,hasUnitGps:false,coordinateSource:index<2?'site':null,locationVerification:index<2?'owner_verified':'address_only',gpsRecordedAt:index<2?stamp:null,locationVerifiedAt:index<2?stamp:null}));
 const field={items:units,summary:{fieldUnits:3,mappedUnits:2,unitGps:0,missingGps:1},generatedAt:stamp};
-async function mount(page,{workspace='field-map'}={}){
+async function mount(page,{workspace='field-map',healthFail=false}={}){
  const state={calls:[],tiles:0,pending:[],hold:true,fail:false,errors:[]};
  page.on('pageerror',error=>state.errors.push(error.message));
  await page.clock.setFixedTime(new Date(now));
@@ -20,6 +20,7 @@ async function mount(page,{workspace='field-map'}={}){
   const request=route.request().postDataJSON();state.calls.push(request);expect(request.method).toBe('GET');
   if(request.path==='/api/field-map'&&state.hold)await new Promise(resolve=>state.pending.push(resolve));
   if(request.path==='/api/field-map'&&state.fail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic field read unavailable'})});
+  if(request.path==='/api/camera-health/summary-v3'&&healthFail)return route.fulfill({status:503,headers,contentType:'application/json',body:JSON.stringify({error:'Synthetic camera read unavailable'})});
   const data=request.path==='/api/session'?{authorized:true,name:'Fixture owner',role:'Owner'}:request.path==='/api/field-map'?field:request.path==='/api/camera-health/summary-v3'?snapshot([resource(1,'Solar Spotter 1'),resource(2,'Solar Spotter 2')]):request.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:stamp}:request.path==='/api/daily-board'?{jobs:[],tasks:[],readiness:[],asOf:stamp}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
@@ -51,6 +52,13 @@ test('basemap renders while field records wait, with no invented pins or empty f
  await expect(canvas).toHaveAttribute('data-persistent-map','yes');
  await expect(frame.getByRole('button',{name:'TV / fullscreen map'})).toBeEnabled();
  expect(state.errors).toEqual([]);expect(state.calls.every(call=>call.method==='GET')).toBe(true);
+});
+
+test('verified field locations remain available when the first camera read fails',async({page})=>{
+ const {frame,state}=await mount(page,{healthFail:true});state.release();
+ const filters=frame.getByRole('button',{name:/^Filters/});if(await filters.getAttribute('aria-expanded')!=='true')await filters.click();await frame.getByLabel('Field health filter').selectOption('all');
+ await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"],.cos-field-pin[data-health="offline"]')).toHaveCount(0);
+ expect(state.calls.filter(r=>r.path==='/api/field-map')).toHaveLength(1);expect(state.calls.filter(r=>r.path==='/api/camera-health/summary-v3')).toHaveLength(1);expect(state.errors).toEqual([]);
 });
 
 test('initial field failure preserves the basemap and retry fills the same canvas',async({page})=>{
