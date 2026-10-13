@@ -74,6 +74,10 @@ test('company overview orders real health sources before the eight-stage custome
 
 test('refresh replaces failed sources with unavailable values and recovers verified zero separately', async ({ page }) => {
   const { frame, state } = await mount(page);
+  // Change the fixture only after the initial independent sources have settled.
+  await expect(frame.getByText('2 field units need review', { exact: true })).toBeVisible();
+  await expect(frame.getByText('1 stored router record', { exact: true })).toBeVisible();
+  await expect(frame.getByRole('button', { name: 'Schedule & Parts: 2 jobs', exact: true })).toBeVisible();
   state.failures.add('/api/jobs');
   state.failures.add('/api/camera-health/summary-v3');
   state.failures.add('/api/routers');
@@ -247,7 +251,7 @@ test('dashboard cards and native Camera Health share source-separated unit total
  const company=frame.getByRole('region',{name:'Company overview',exact:true}).locator('.company-health-card').filter({hasText:'Camera Health'}),area=frame.getByRole('region',{name:'VISION dashboard'}).getByRole('button',{name:/Camera Health/});
  const systems='Field units: 1 online · 1 offline · 1 need review';
  await expect(company).toContainText(systems);await expect(area).toContainText(systems);await expect(company).toContainText('Camera/detector evidence by unit: 1 online · 1 offline · 1 mixed/unverified · 0 channel status unavailable');await expect(company).toContainText('3 confirmed-field units · 0 location review');
- await area.click();await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
+ await area.click();await expect(frame.locator('.cos-fleet-table-wrap tbody tr')).toHaveCount(2);await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['3','1','1','1','3']);await frame.getByText('Authorized tools',{exact:true}).click();await frame.getByRole('button',{name:'Advanced camera diagnostics',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?diagnostics=1');await expect(frame.locator('.camera-unit-kpis button b')).toHaveText(['2','1','1','1']);expect(state.requests.every(request=>request.method==='GET')).toBe(true);
 });
 
 test('legacy health stays unavailable on both dashboards while other metrics remain useful',async({page})=>{

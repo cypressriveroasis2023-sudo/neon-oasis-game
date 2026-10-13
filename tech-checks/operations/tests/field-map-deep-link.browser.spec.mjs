@@ -172,6 +172,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
   await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-message')).toContainText('not in the current inventory');
+  await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
   expect(state.writes).toHaveLength(0);
 }], ['Canonical alias collision never selects a first pin', async page => {
   const units = [{
@@ -187,6 +188,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   } = await mount(page, 'RANGER 022', units);
   await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveCount(0);
   await expect(frame.locator('.cos-fleet-message')).toContainText('conflicting identities');
+  await expect(frame.getByRole('button',{name:'Create ticket',exact:true})).toHaveCount(0);
   expect(state.writes).toHaveLength(0);
 }], ['Back and Forward from native same-unit health preserve label match', async page => {
   const {
@@ -198,7 +200,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();
   await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
-  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toContain('#fleet-dashboard?unitId=');
+  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+ids[1]);
   expect(state.writes).toHaveLength(0);
 }], ['Explicit deep link clears stale nearby filter that hides target pin', async page => {
   const {

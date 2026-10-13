@@ -43,13 +43,13 @@ async function mount(page,view,late='map'){
  await expect.poll(()=>state.reads).toEqual({map:1,summary:1});await expect.poll(()=>state.responses[late==='map'?'summary':'map']).toBe(1);
  await page.clock.runFor(2000);state.gates[late].release();state.gates[late]=null;await expect.poll(()=>state.responses).toEqual({map:1,summary:1});
  if(view==='overview')await frame.getByLabel('Camera Health unit filter').selectOption('all');
- if(view==='map'){await frame.getByRole('button',{name:/Filters/}).click();await frame.getByLabel('Fleet status').selectOption('all');}
+ if(view==='map')await frame.getByLabel('Fleet status').selectOption('all');
  return {frame,state};
 }
 async function expectLabels(frame,view,valid){
  if(view==='map'){
   await expect(frame.locator('.cos-fleet-unit-row').nth(0)).toContainText(valid?'RECORDER ONLINE':'RECORDER UNVERIFIED');await expect(frame.locator('.cos-fleet-unit-row').nth(1)).toContainText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
-  await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(valid?['3','1','2','0','0']:['3','0','1','2','0']);
+  await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(valid?['3','1','2','0','3']:['3','0','1','2','3']);
  }else if(view==='workspace')await expect(frame.locator('.camera-unit-state')).toHaveText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
  else {for(const [label,status] of [['Spotter 901HDC2','RECORDER ONLINE'],['Spotter 902HDC2','RECORDER OFFLINE']])await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+label}).locator('.camera-status-pill')).toHaveText(valid?status:'RECORDER UNVERIFIED');await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: Spotter 903HDC2'}).locator('.camera-status-pill')).toHaveText('CAMERA RECORDS OFFLINE');}
 }

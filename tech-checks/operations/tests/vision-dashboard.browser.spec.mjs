@@ -43,7 +43,9 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(dashboard).toContainText('1 confirmed on hand');
   await expect(dashboard).toContainText('1 placement not recorded');
   await dashboard.getByRole('button',{name:/Camera Health/}).click();
-  await expect(frame.getByRole('region',{name:'Camera Health',exact:true})).toBeVisible();
+  await expect(frame.getByRole('region',{name:'COS Fleet Dashboard',exact:true})).toBeVisible();
+  await expect(frame.locator('.cos-fleet-table-wrap')).toBeVisible();
+  await expect(frame.getByRole('navigation',{name:'Fleet dashboard views'}).getByRole('button',{name:'Fleet health',exact:true})).toHaveAttribute('aria-current','page');
   await openWorkspace(frame,'Units On Hand');
   const inventory=frame.getByRole('region',{name:'Units On Hand',exact:true});
   await expect(inventory).toContainText(shop.unitNumber);
@@ -51,12 +53,15 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(inventory).not.toContainText(unknown.unitNumber);
   await expect(inventory).toContainText('1 registry units have no recorded placement');
   await openWorkspace(frame,'Field Map');await showAllFieldHealth(frame);
-  await frame.getByRole('button',{name:'Show all verified pins',exact:true}).click();
-  await frame.getByRole('button',{name:/FIELD-FIX-002/}).click();
+  await frame.getByRole('button',{name:'Fit pins',exact:true}).click();
+  await frame.locator('.cos-fleet-unit-row[data-unit-id="'+address.id+'"]').click();
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(address.unitNumber);
+  await frame.getByRole('button',{name:'Edit / verify installation →',exact:true}).click();
   await expect(frame.getByRole('link',{name:/Look up recorded installation address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');
   await expect(frame.getByText('Installed address available. A map pin needs verified coordinates.')).toBeVisible();
   await expect(frame.getByRole('button',{name:'Save verified location',exact:true})).toHaveCount(0);
   await expect(frame.getByRole('heading',{name:'Tracker location',exact:true})).toBeVisible();
+  await frame.getByRole('button',{name:'Close unit details',exact:true}).click();
   await openWorkspace(frame,'Today');
   const size=await frame.locator('body').evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   expect(size.scroll).toBeLessThanOrEqual(size.width+1);

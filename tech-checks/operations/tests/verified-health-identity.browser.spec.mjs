@@ -148,9 +148,9 @@ for(const failure of ['summary failure','expired authorization'])test(failure+' 
  const {frame,state}=await mount(page);await expand(frame);await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(1);
  if(failure==='summary failure')state.summaryError=503;else await page.evaluate(()=>{window.fixtureAuth=false;});
  await frame.getByRole('button',{name:/Refresh data/}).click();
- await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'session is unavailable'}).first()).toBeVisible();
+ await expect(frame.getByRole('alert').filter({hasText:failure==='summary failure'?'Synthetic saved summary unavailable':'Your fleet session changed. Reload to verify the current account.'}).first()).toBeVisible();
  await expect(frame.locator('.cos-field-pin[data-health="online"]')).toHaveCount(0);
- if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}
+ if(failure==='summary failure'){await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin-support')).toHaveCount(1);}else{await expect(frame.locator('.cos-field-pin')).toHaveCount(0);await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(0);}
  noWrites(state);
 });
 

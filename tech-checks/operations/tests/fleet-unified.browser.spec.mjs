@@ -152,3 +152,12 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} repeated Camera Health and
  expect(state.errors).toEqual([]);
  expect(state.calls.every(call=>call.method==='GET')).toBe(true);
 });
+
+for(const it of [false,true])test(`${it?'IT':'Owner'} direct Camera Health unit link restores focus to its own table action`,async({page})=>{
+ const {app,state}=await mountFleet(page,it,{hash:'#camera-health?unit='+units[0].id});
+ await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toBeVisible();
+ await app.getByRole('button',{name:'Close unit details',exact:true}).click();
+ await expect(app.getByRole('dialog',{name:'Helios 1 unit intelligence'})).toHaveCount(0);
+ await expect(app.locator('.cos-fleet-table-wrap tbody tr').filter({hasText:'Helios 1'}).getByRole('button',{name:'Details →',exact:true})).toBeFocused();
+ expect(state.calls.every(call=>call.method==='GET')).toBe(true);expect(state.errors).toEqual([]);
+});

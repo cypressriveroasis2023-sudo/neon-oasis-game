@@ -15,9 +15,11 @@ import HomeUnitTracker from './HomeUnitTracker';
 import {trackerAccess} from './unitTracker';
 import OwnerBoardControls from './OwnerBoardControls';
 import TicketActions from './TicketActions';
+import OwnerWatchfulShortcut from './OwnerWatchfulShortcut';
 import HomeFieldView from './HomeFieldView';
 import MhelpTicketImport from './MhelpTicketImport';
 import type { TicketType } from './ticketTypes';
+import {isTicketUnitId} from './ticketContext';
 import ProductionAssignments from './ProductionAssignments';
 import CameraHealthWorkspace from './CameraHealthWorkspace';
 import VrmWorkspace from './VrmWorkspace';
@@ -291,9 +293,11 @@ function OwnerApp() {
   },[setRouteLocation]);
   const createTicket=useCallback((createType:TicketType,unitId?:string)=>{
     setMenu(false);
-    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType,...(unitId?{unitId}:{})},false,unitId&&active==='Camera Health'&&route.unitId===unitId?{cosTicketFromUnitHealth:unitId}:null);
+    // A label route reaches this callback only after the shared drawer resolves one saved unit.
+    const fromUnitHealth=isTicketUnitId(unitId)&&(['Camera Health','Fleet Dashboard'].includes(active)&&route.unitId===unitId||active==='Fleet Dashboard'&&!route.unitId&&Boolean(route.unitLabel));
+    setRouteLocation({workspace:'Daily Board',jobId:'',detail:false,createType,...(unitId?{unitId}:{})},false,fromUnitHealth?{cosTicketFromUnitHealth:unitId}:null);
     window.scrollTo({top:0,behavior:'instant'});
-  },[setRouteLocation,active,route.unitId]);
+  },[setRouteLocation,active,route.unitId,route.unitLabel]);
   const cancelCreateTicket=useCallback(()=>{
     if(route.unitId){if(history.state?.cosTicketFromUnitHealth===route.unitId)history.back();else openUnitHealth(route.unitId);}
     else navigate('Today');
@@ -345,7 +349,7 @@ function OwnerApp() {
 
       {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&(active!=='Camera Health'||route.diagnostics)&&!route.createType&&<header className='command-page-header'><div><label>{active==='Fleet Dashboard'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>{!dailyOnly&&<TechChecksWorkspace/>}</section>
-        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening IT dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening IT dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{!fleetOnly&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/>{!fleetOnly&&!dailyOnly&&session?.role==='Owner'&&<OwnerWatchfulShortcut/>}</>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!tvDisplay&&!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>} {!tvDisplay&&<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>} {!route.createType&&<DailyBoard api={api} openWorkspace={navigate} onTvChange={setTvDisplay} createTicket={createTicket}/>}</>

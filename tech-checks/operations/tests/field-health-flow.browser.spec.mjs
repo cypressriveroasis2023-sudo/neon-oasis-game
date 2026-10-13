@@ -5,7 +5,7 @@ import {port,snapshot,resource} from './fixtures/camera-evidence-fixtures.mjs';
 const origin=process.env.COS_MAP_TEST_ORIGIN||'http://127.0.0.1:4173';
 const id='11111111-1111-4111-8111-111111111111',id2='22222222-2222-4222-8222-222222222222',id3='33333333-3333-4333-8333-333333333333',site='44444444-4444-4444-8444-444444444444',customer='55555555-5555-4555-8555-555555555555';
 const now='2026-10-06T18:00:00Z',fresh='2026-10-06T17:55:00Z';
-async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,mixedCrowd=false,nearbyCrowd=false,ordinaryStand=false,htmlLabel=false}={}){
+async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeOverview=false,entryLabel='',evidenceCase=false,scopeCase=false,accessCase=false,trackerCase=false,crowded=false,crowdedCount=3,mixedCrowd=false,nearbyCrowd=false,ordinaryStand=false,htmlLabel=false}={}){
  const state={writes:[],requests:[],fail:false};
  const base={status:'installed',currentLocationType:'site',modelName:'Solar Spotter',address:'100 Fixture Road',site:'Synthetic site',customer:'Synthetic customer',installedSiteId:site,latitude:29.76,longitude:-95.37,locationVerification:'owner_verified',gpsRecordedAt:fresh,locationVerifiedAt:fresh,coordinateSource:'site',hasUnitGps:true};
  state.units=[{...base,id,unitNumber:'Solar Spotter 51'}, {...base,id:id2,unitNumber:'Solar Spotter 52',latitude:29.79}, {...base,id:id3,unitNumber:'Solar Spotter 53',latitude:29.82}];
@@ -28,7 +28,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
  await page.clock.install({time:new Date(now)});
  await page.route('**/*',async route=>{
   const url=route.request().url();
-  if(url===origin+'/field-health-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${nativeOverview?'camera-health?diagnostics=1':'field-map'}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});
+  if(url===origin+'/field-health-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#${nativeOverview?'camera-health?diagnostics=1':'field-map'+(entryLabel?'?unitLabel='+encodeURIComponent(entryLabel):'')}"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});
   if(url.startsWith(origin+'/'))return route.continue();
   if(/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(url))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e5eadd"/><path d="M0 75H256M0 195H256M78 0V256M198 0V256" stroke="#fff" stroke-width="5"/><path d="M0 75H256M78 0V256" stroke="#d4cdb9" stroke-width="1"/></svg>'});
   if(!url.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
@@ -48,7 +48,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
- await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else {await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(state.units.length);if(!crowded&&!trackerCase&&state.units.some(unit=>unit.locationVerification==='owner_verified')){await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toHaveCount(1);if(await frame.locator('.cos-field-cluster-wrap').count())await frame.locator('.leaflet-control-zoom-in').click();}}return {frame,state};
+ await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else if(entryLabel)await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(entryLabel);else {await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(state.units.length);if(!crowded&&!trackerCase&&state.units.some(unit=>unit.locationVerification==='owner_verified')){await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toHaveCount(1);if(await frame.locator('.cos-field-cluster-wrap').count())await frame.locator('.leaflet-control-zoom-in').click();}}return {frame,state};
 }
 
 async function closeUnit(frame){const button=frame.getByRole('button',{name:'Close unit details'});if(await button.isVisible())await button.click();}
@@ -60,13 +60,29 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.cos-field-pin')).toHaveCount(3);
  await expect(frame.locator('.cos-field-pin').nth(0)).toHaveAttribute('data-health','online');await expect(frame.locator('.cos-field-pin').nth(1)).toHaveAttribute('data-health','offline');await expect(frame.locator('.cos-field-pin').nth(2)).toHaveAttribute('data-health','unknown');
  await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await expect(frame.getByLabel('Nearby radius miles')).toBeVisible();await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(3);
- await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unitId='+id2);
+ await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText('Solar Spotter 52');await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);
  await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');
+ expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
+test('a uniquely resolved label deep link returns a cancelled ticket to the same map unit',async({page})=>{
+ const label='Solar Spotter 52',hash='#fleet-dashboard?'+new URLSearchParams({unitLabel:label});
+ const {frame,state}=await mount(page,{entryLabel:label});
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
+ await expect(frame.getByRole('region',{name:'Selected field unit Camera Health'})).toContainText(label);
+ await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=SERVICE&unit='+id2);
+ expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);
+ await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
+ await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe(hash);
+ await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText(label);
+ await expect(frame.locator('.cos-fleet-unit-row.selected')).toHaveAttribute('data-unit-id',id2);
+ expect(state.writes).toEqual([]);
+});
+
 test('staleness and unavailable health fail gray without moving map or writing',async({page})=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','online');
  await frame.locator('.leaflet-control-zoom-in').click();const transform=await frame.locator('.leaflet-map-pane').getAttribute('style');await page.clock.fastForward(16*60*1000);await expect(frame.locator('.cos-field-pin').first()).toHaveAttribute('data-health','unknown');expect(await frame.locator('.leaflet-map-pane').getAttribute('style')).toBe(transform);
@@ -124,7 +140,7 @@ test('native recorder, service-only, and old Recon observations keep separate st
  await frame.getByLabel('Camera Health unit filter').selectOption('service');await expect(frame.locator('.camera-overview-card')).toHaveCount(1);await expect(frame.locator('.camera-overview-card')).toContainText('Camera status unverified');await expect(frame.locator('.camera-overview-card')).toContainText('Camera channel status unavailable');
  await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.locator('.camera-overview-card').filter({hasText:'SOLARSPOTTER 53'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('DETECTOR NOT VERIFIED');await expect(detail).toContainText('Last reported detector state: OFFLINE');await expect(detail).toContainText('2 hr ago');await expect(detail).toContainText('older observation; current status unverified');await detail.getByRole('button',{name:'Back to units',exact:true}).click();
- const child=page.frames().find(child=>child.parentFrame());await child.evaluate(()=>{location.hash='field-map';});await showAllFieldHealth(frame);await expect(frame.locator('.cos-field-pin')).toHaveCount(3);for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveAttribute('data-health','unknown');
+ const child=page.frames().find(child=>child.parentFrame());await child.evaluate(()=>{location.hash='field-map';});await showAllFieldHealth(frame);await expect(frame.locator('.cos-field-pin,.cos-field-cluster').first()).toBeVisible();const group=frame.locator('.cos-field-cluster-wrap');if(await group.count()){await expect(group).toHaveCount(1);await group.click();}await expect(frame.locator('.cos-field-pin')).toHaveCount(3);for(const pin of await frame.locator('.cos-field-pin').all())await expect(pin).toHaveAttribute('data-health','unknown');
  await frame.locator('.cos-fleet-unit-row').filter({hasText:'Solar Spotter 51'}).click();await expect(frame.getByRole('region',{name:'Selected unit camera health'})).toContainText('RECORDER ONLINE');expect(state.writes).toHaveLength(0);
 });
 

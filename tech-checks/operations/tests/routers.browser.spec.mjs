@@ -25,6 +25,7 @@ test('router overview, filtering, IP drilldown and stored map context remain rea
  await expect(frame.getByLabel('Selected router details')).toContainText('192.0.2.1/32');
  await expect(frame.getByLabel('Selected router details')).toContainText('Last recorded recovery');
  await frame.getByRole('button',{name:'View same-name COS unit'}).click();
+ await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-fleet-drawer')).toContainText('Manual');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
@@ -70,6 +71,7 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin-wrap')).toHaveCount(1);
  await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
+ await frame.getByRole('button',{name:'Close unit details'}).click();
  await frame.getByLabel('Interactive fleet installation map').scrollIntoViewIfNeeded();
  const canvas=await frame.getByLabel('Interactive fleet installation map').boundingBox();
  await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);
@@ -81,7 +83,8 @@ test('fifteen-minute router polling preserves the map viewport and cannot supply
  expect(state.requests.filter(r=>r.path==='/api/routers').length).toBe(readsBefore);
  await page.clock.fastForward(15*60*1000);
  await expect.poll(()=>state.requests.filter(r=>r.path==='/api/routers').length).toBeGreaterThan(readsBefore);
+ expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
+ await frame.locator('.cos-fleet-unit-row').first().click();await frame.getByRole('button',{name:'Edit / verify installation →'}).click();
  await expect(frame.getByLabel('Router context for selected unit')).toContainText('Same-name match only');
  await expect(frame.locator('.cos-field-pin')).toHaveAttribute('data-health','unknown');await expect(frame.locator('.cos-reticle-artwork')).toHaveCSS('color','rgb(148, 163, 184)');await expect(frame.locator('.cos-reticle-approved-eye')).toHaveCount(1);
- expect(await frame.locator('.leaflet-map-pane').evaluate(el=>el.style.transform)).toBe(transform);
 });

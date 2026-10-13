@@ -28,8 +28,8 @@ function makeFixture() {
       { userId: '99999999-9999-4999-8999-999999999999', name: 'Jordan IT', department: 'it', status: 'not started', result: {} },
     ],
     units: [
-      { id: unitId, unitNumber: 'FIX-SN-001', modelName: 'Sniper', status: 'installed', customer: 'Fixture North Yard', site: 'North Gate', address:'1 Fixture St, Test City', latitude: 29.7604, longitude: -95.3698, gpsAccuracyM: null, coordinateSource: 'manual', gpsRecordedAt: now, hasUnitGps: true },
-      { id: missingUnitId, unitNumber: 'FIX-RG-002', modelName: 'Ranger', status: 'assigned', customer: 'Fixture East Gate', site: 'East Entrance', address:'2 Fixture St, Test City', latitude: null, longitude: null, gpsAccuracyM: null, coordinateSource: null, gpsRecordedAt: null, hasUnitGps: false },
+      { id: unitId, unitNumber: 'FIX-SN-001', modelName: 'Sniper', status: 'installed', currentLocationType:'field', customer: 'Fixture North Yard', site: 'North Gate', address:'1 Fixture St, Test City', latitude: 29.7604, longitude: -95.3698, gpsAccuracyM: null, coordinateSource: 'manual', gpsRecordedAt: now, hasUnitGps: true },
+      { id: missingUnitId, unitNumber: 'FIX-RG-002', modelName: 'Ranger', status: 'assigned', currentLocationType:'field', customer: 'Fixture East Gate', site: 'East Entrance', address:'2 Fixture St, Test City', latitude: null, longitude: null, gpsAccuracyM: null, coordinateSource: null, gpsRecordedAt: null, hasUnitGps: false },
     ],
     histories: new Map(),
     requests: [],
@@ -221,7 +221,7 @@ test('Daily Board keeps the last snapshot when refresh fails and reports unverif
   await open(frame, 'Daily Board');
   await expect(frame.locator('.daily-board-card')).toHaveCount(3);
   state.failedPaths.add('/api/daily-board');
-  await frame.getByRole('button', { name: /Refresh data/ }).click();
+  await frame.getByRole('button', { name: 'Refresh', exact:true }).click();
   await expect(frame.getByRole('alert')).toContainText('Showing the last successful snapshot.');
   await expect(frame.locator('.daily-board-card')).toHaveCount(3);
   state.failedPaths.delete('/api/daily-board');
