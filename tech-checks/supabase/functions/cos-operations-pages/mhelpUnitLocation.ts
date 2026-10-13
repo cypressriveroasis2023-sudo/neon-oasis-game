@@ -38,7 +38,7 @@ export function createMhelpUnitLocationReader(options:Options){return async(inpu
  const prefix='/portal/'+portal;
  const readPages=async(path:string,max=5000)=>{const all:Row[]=[];let total:number|null=null;for(let index=0;index<Math.ceil(max/200);index++){
   const value=object(await read(path+'&pageSize=200&rowIndex='+index*200)),rows=value.data??value.results;
-  if(!Array.isArray(rows)||!Number.isSafeInteger(value.totalRows)||Number(value.totalRows)>max||Number(value.totalRows)<0||total!==null&&total!==value.totalRows)fail('The mHelpDesk location lookup is incomplete.');total=Number(value.totalRows);
+  if(!Array.isArray(rows)||!Number.isSafeInteger(value.totalRows)||Number(value.totalRows)>max||Number(value.totalRows)<0||total!==null&&total!==value.totalRows)return fail('The mHelpDesk location lookup is incomplete.');total=Number(value.totalRows);
   if(rows.length!==Math.min(200,total-all.length))fail('mHelpDesk returned an incomplete location page.');all.push(...rows.map(object));if(all.length===total)return all;
  }return fail('The mHelpDesk location lookup is incomplete.');};
  const family=({CAMV:'CAM V',SOLARPOLE:'Solar Pole',SOLARSPOTTER:'Solar Spotter',SSHYBRID:'SS Hybrid'} as Record<string,string>)[requestedIdentity.family]||requestedIdentity.family.replace(/2$|4$/,'');
@@ -47,14 +47,14 @@ export function createMhelpUnitLocationReader(options:Options){return async(inpu
  const candidates=inventory.map(r=>projectPartnerEquipment(r,portal)).filter(r=>mhelpUnitIdentity(r.name)?.key===requestedIdentity.key&&r.active!==false);if(candidates.length!==1)fail(candidates.length?'More than one mHelpDesk unit matches. Resolve its identity before importing.':'No active mHelpDesk equipment record matches this unit.',409);
  const equipment=candidates[0];let customerId=equipment.customerId,locationId=equipment.serviceLocationId,ticketNumber:string|null=null,ticketId:string|null=null;
  if(request.ticketNumber){const tickets=page(await read(prefix+'/Equipment/'+equipment.equipmentId+'/Tickets?pageSize=200&rowIndex=0&Fields=ticketId,ticketNumber,portalId,customerId,serviceLocationId,deleted'),200);const matches=tickets.filter(t=>String(t.ticketNumber)===request.ticketNumber&&t.deleted===false);if(matches.length!==1)fail('That job could not be uniquely confirmed for this equipment. Use the assigned unit location or review the job in mHelpDesk.',409);const ticket=matches[0];if(id(ticket.portalId)!==portal)fail('The ticket belongs to a different portal.');ticketNumber=id(ticket.ticketNumber);ticketId=id(ticket.ticketId);customerId=id(ticket.customerId);locationId=id(ticket.serviceLocationId);}
- if(!customerId)fail('This mHelpDesk unit has no verified customer assignment.',409);
+ if(!customerId)return fail('This mHelpDesk unit has no verified customer assignment.',409);
  const customer=object(await read(prefix+'/customers/'+customerId+'?Fields=customerId,portalId,name,isServiceLocation'));if(id(customer.customerId)!==customerId||id(customer.portalId)!==portal)fail('The assigned customer identity changed.');
  const customerName=text(customer.name),shop=['cameras onsite','cameras onsite llc'].includes(customerName.toLowerCase());let location={site:'Shop / ROOT',address:'',point:null as number[]|null},coordinateSource:string|null=null;
- if(!shop){if(!locationId)fail('This assignment has no service location. A billing address will not be used.',409);
+ if(!shop){if(!locationId)return fail('This assignment has no service location. A billing address will not be used.',409);
   let service:Row|undefined;
   if(customer.isServiceLocation===true&&customerId===locationId)service=object(await read(prefix+'/customers/'+locationId+'?Fields=customerId,portalId,name,isServiceLocation,isActive,address1,address2,city,state,zip,countryId,latitude,longitude'));
   else{const services=(await readPages(prefix+'/customers/'+customerId+'/servicelocations?Fields=serviceLocationId,customerId,portalId,name,isActive,address1,address2,city,state,zip,countryId,latitude,longitude')).filter(s=>String(s.serviceLocationId??s.customerId)===locationId&&(s.serviceLocationId==null||String(s.customerId)===customerId));if(services.length===1)service=services[0];}
-  if(!service)fail('The job or equipment service location was not confirmed under its customer.',409);location=projectServiceLocation(service,portal,locationId,customerId);coordinateSource=location.point?'mHelpDesk service location':null;
+  if(!service)return fail('The job or equipment service location was not confirmed under its customer.',409);location=projectServiceLocation(service,portal,locationId,customerId);coordinateSource=location.point?'mHelpDesk service location':null;
   if(!location.point){const geo=await censusAddress(location.address,boundedFetch,now);if(geo.status==='success'){location.point=[geo.latitude!,geo.longitude!];coordinateSource='Census address estimate';}}
  }
  const fresh=projectPartnerEquipment(await read(prefix+'/equipment/'+equipment.equipmentId+'?Fields=equipmentId,portalId,name,model,equipmentTypeId,customerId,serviceLocationId,IsActive,lastUpdateUTC'),portal);if(fresh.name!==equipment.name||fresh.model!==equipment.model||fresh.customerId!==equipment.customerId||fresh.serviceLocationId!==equipment.serviceLocationId||fresh.active===false)fail('The unit assignment changed during lookup. Refresh before importing.',409);
