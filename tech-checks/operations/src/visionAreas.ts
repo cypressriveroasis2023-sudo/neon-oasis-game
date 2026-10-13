@@ -3,7 +3,7 @@ export const visionAreas = [
   { workspace: 'InHand Routers', label: 'InHand Routers', icon: 'router', description: 'Connections, router inventory and last checks.' },
   { workspace: 'Victron VRM', label: 'Victron Power', icon: 'power', description: 'Battery, solar and power dashboards.' },
   { workspace: 'Units On Hand', label: 'Units On Hand', icon: 'units', description: 'Shop inventory and units ready for deployment.' },
-  { workspace: 'Field Map', label: 'Field View', icon: 'map', description: 'Installed units, GPS locations and site addresses.' },
+  { workspace: 'Fleet Dashboard', label: 'Fleet Dashboard', icon: 'map', description: 'One map, fleet health, installation locations and unit setup.' },
   { workspace: 'Team', label: 'Team', icon: 'team', description: 'Your people, assignments and daily readiness.' },
 ] as const;
 export const primaryAreas = [

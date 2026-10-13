@@ -43,7 +43,7 @@ async function mount(page,view,late='map'){
  await expect.poll(()=>state.reads).toEqual({map:1,summary:1});await expect.poll(()=>state.responses[late==='map'?'summary':'map']).toBe(1);
  await page.clock.runFor(2000);state.gates[late].release();state.gates[late]=null;await expect.poll(()=>state.responses).toEqual({map:1,summary:1});
  if(view==='overview')await frame.getByLabel('Camera Health unit filter').selectOption('all');
- if(view==='map'){await frame.getByRole('button',{name:/Filters/}).click();await frame.getByLabel('Field health filter').selectOption('all');}
+ if(view==='map'){await frame.getByRole('button',{name:/Filters/}).click();await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');}
  return {frame,state};
 }
 async function expectLabels(frame,view,valid){

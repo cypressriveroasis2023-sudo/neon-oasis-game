@@ -6,7 +6,7 @@ test('seven company areas cover every canonical destination with only the delibe
   assert.deepEqual(workspaceGroups.map(group=>group.label),['Overview','Job flow','Schedule','Equipment','Customers','Team','Finance']);
   const items=workspaceGroups.flatMap(group=>group.items);
   assert.equal(new Set(items).size,items.length);
-  assert.deepEqual([...items,'Invoices','Vision'].sort(),[...workspaces].sort());
+  assert.deepEqual([...items,'Invoices','Vision','Field Map'].sort(),[...workspaces].sort());
   assert.equal(workspaceGroup('Invoices').label,'Finance');
   assert.equal(workspaceLabel('Today'),'Overview');
   assert.equal(workspaceLabel('Daily Board'),'Dispatch Board');

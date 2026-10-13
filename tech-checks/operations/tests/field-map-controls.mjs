@@ -8,4 +8,4 @@ export async function revealMapInfo(frame) {
 }
 
 // Review scenarios explicitly opt into unknown health; production defaults remain operational.
-export async function showAllFieldHealth(frame){await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');}
+export async function showAllFieldHealth(frame){await revealMapFilters(frame);await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');}

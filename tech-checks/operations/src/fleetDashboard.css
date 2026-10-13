@@ -31,3 +31,13 @@
 #root#root .cos-fleet-dashboard .cos-fleet-unit-row:hover{background:#1c293a!important;border-color:#74869e!important}
 #root#root .cos-fleet-dashboard .cos-fleet-search button{background:transparent!important;border:0!important}
 #root#root .cos-fleet-dashboard .cos-fleet-refresh{background:#d71935!important;border-color:#ff4157!important}
+
+.cos-fleet-drawer[hidden],.cos-fleet-drawer-backdrop[hidden]{display:none}.cos-fleet-installation-tools .field-map-detail{max-height:none!important;height:auto!important;position:static;width:auto;max-width:none;padding:0;border:0;overflow:visible;box-shadow:none}.cos-fleet-installation-tools .field-camera-status{display:none}.cos-fleet-pick-note{padding:14px;border:1px solid #f4c658;background:#161616;color:#fff;display:flex;gap:16px;align-items:center}.cos-fleet-pick-note button{margin-left:auto}
+
+.cos-fleet-display .cos-fleet-brand,.cos-fleet-display .cos-fleet-tabs,.cos-fleet-display .cos-fleet-heading,.cos-fleet-display .cos-fleet-stats,.cos-fleet-display .cos-fleet-filters,.cos-fleet-display .cos-fleet-unit-panel,.cos-fleet-display .cos-fleet-map-footnote{display:none}
+
+.cos-fleet-dashboard-map>.field-map-kpis{display:none}
+.cos-fleet-dashboard-map [hidden]{display:none!important}
+.cos-fleet-dashboard-map .field-map-detail{max-height:none;height:auto}
+.cos-fleet-dashboard-map .field-map-display-bar{border-radius:12px;margin:14px 0;background:#111822}
+.cos-fleet-dashboard-map .field-map-layout{min-height:520px}

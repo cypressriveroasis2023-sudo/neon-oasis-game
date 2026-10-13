@@ -8,7 +8,6 @@ import { api, openLegacy } from './api';
 import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
 import DailyBoard from './DailyBoard';
-import FieldMap from './FieldMap';
 import FleetDashboard from './FleetDashboard';
 import {ownerCensusSessionAllowed} from './ownerCensusOnce';
 import UnitTrackerWorkspace from './UnitTrackerWorkspace';
@@ -41,7 +40,7 @@ type Row = Record<string, any>;
 type NativeWorkspace = 'Today' | 'Daily Board' | 'Field Map' | 'Unit Tracker' | 'Owner Tasks' | 'Jobs' | 'Tech Check' | 'Camera Health' | 'InHand Routers' | 'Victron VRM' | 'Unscheduled' | 'Dispatch' | 'Owner Review' | 'Calendar' | 'Handoffs' | 'Customers' | 'Sites' | 'Equipment' | 'Team' | 'Quotes' | 'Invoices' | 'Billing' | 'Purchasing';
 const native: NativeWorkspace[] = ["Today","Daily Board","Field Map","Unit Tracker","Owner Tasks","Jobs","Tech Check","Camera Health","InHand Routers","Victron VRM","Unscheduled","Dispatch","Owner Review","Calendar","Handoffs","Customers","Sites","Equipment","Team","Quotes","Invoices","Billing","Purchasing"];
 const legacy: Record<string,string> = { Vision:'vision' };
-const baseFleetWorkspaces = ['IT Dashboard','Fleet Dashboard','Field Map','InHand Routers','Camera Health','Victron VRM','Unit Tracker','MHelp','Tech Check'];
+const baseFleetWorkspaces = ['IT Dashboard','Fleet Dashboard','InHand Routers','Camera Health','Victron VRM','Unit Tracker','MHelp','Tech Check'];
 const referenceUrl = 'https://cos-operations-platform-preview-wpbf1y.v2.appdeploy.ai/';
 const descriptions: Record<string,string> = {
   'IT Dashboard':'Your field, connectivity, power, tracker and ticket information in one place.',
@@ -192,13 +191,14 @@ function OwnerApp() {
   const [route,setRoute]=useState(readWorkspaceRoute);
   const [tvDisplay,setTvDisplay]=useState(()=>new URLSearchParams(location.search).get('tvBoard')==='1');
   const lastRouteHash=useRef(location.hash);
-  const active=route.workspace;
+  const active=route.workspace==='Field Map'?'Fleet Dashboard':route.workspace;
   useEffect(()=>{
     if(window.parent!==window)window.parent.postMessage({type:'COS_OPERATIONS_WORKSPACE_ACTIVE',workspace:active},location.origin);
   },[active]);
   const group=workspaceGroup(active);
   const focusedJob=route.jobId;
   const setRouteLocation=useCallback((next:WorkspaceRoute,replace=false,state:unknown=null)=>{
+    next=next.workspace==='Field Map'?{...next,workspace:'Fleet Dashboard'}:next;
     const hash=workspaceHash(next);
     lastRouteHash.current=hash;
     if(location.hash!==hash){
@@ -216,9 +216,10 @@ function OwnerApp() {
     window.addEventListener('message',returnToChecks);
     return()=>window.removeEventListener('message',returnToChecks);
   },[setRouteLocation]);
+  useEffect(()=>{if(route.workspace==='Field Map')setRouteLocation({...route,workspace:'Fleet Dashboard'},true,history.state);},[route,setRouteLocation]);
   const [session,setSession]=useState<Row|null>(null);
   const dailyOnly=IT_DAILY_ONLY&&(session?.legacyOwner===false&&session?.features?.fleetAccess===true||['fleet','it-daily'].includes(new URLSearchParams(location.search).get('mode')||''));
-  const fleetWorkspaces = useMemo(()=>(dailyOnly?['IT Dashboard','Fleet Dashboard',...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
+  const fleetWorkspaces = useMemo(()=>(dailyOnly?['IT Dashboard',...IT_DAILY_WORKSPACES]:baseFleetWorkspaces).filter(name=>(name!=='Unit Tracker'||trackerAccess(session))&&(name!=='Victron VRM'||session?.features?.vrmRead===true)),[session,dailyOnly]);
   const fleetOnly=session?.authorized===true&&(dailyOnly||session?.legacyOwner===false&&session?.features?.fleetAccess===true);
   const label=(name:string)=>dailyOnly?itDailyLabel(name):workspaceLabel(name);
   const [sessionError,setSessionError]=useState('');
@@ -269,6 +270,7 @@ function OwnerApp() {
     },()=>{setWeather(null);setWeatherStatus('Enable local weather');},{enableHighAccuracy:false,timeout:10000,maximumAge:300000});
   },[]);
   const navigate=useCallback((name:string)=>{
+    name=name==='Field Map'?'Fleet Dashboard':name;
     setMenu(false);
     if(fleetOnly&&!fleetWorkspaces.includes(name))return;
     if(legacy[name]){openLegacy(legacy[name]);return;}
@@ -278,8 +280,8 @@ function OwnerApp() {
   },[setRouteLocation,active,fleetOnly,fleetWorkspaces]);
   const openUnitHealth=useCallback((unitId:string)=>{
     setMenu(false);
-    if(active==='Field Map')setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId},true,history.state);
-    setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,unitId},false,active==='Field Map'?{cosUnitHealthFromMap:unitId}:null);
+    if(active==='Fleet Dashboard')setRouteLocation({workspace:active,jobId:'',detail:false,unitId},true,history.state);
+    setRouteLocation({workspace:'Camera Health',jobId:'',detail:false,unitId},false,['Field Map','Fleet Dashboard'].includes(active)?{cosUnitHealthFromMap:unitId}:null);
     window.scrollTo({top:0,behavior:'instant'});
   },[active,setRouteLocation]);
   const returnToMap=useCallback((unitId:string)=>{
@@ -324,7 +326,7 @@ function OwnerApp() {
   const asset=(path:string)=>import.meta.env.BASE_URL+'resources/'+path;
   const selectedArea=fleetOnly||dailyOnly?active:primaryWorkspace(active);
   const ownerInitials=String(session?.name||'Owner').split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase();
-  return <div className={'shell operations-shell company-shell'+(active==='Field Map'?' operations-field-view':'')}>
+  return <div className={'shell operations-shell company-shell'+(active==='Fleet Dashboard'?' operations-field-view':'')}>
     {menu&&<button type='button' className='operations-menu-backdrop' aria-label='Dismiss menu' tabIndex={-1} onClick={()=>setMenu(false)}/>}
     <aside ref={menuRef} role={menu?'dialog':undefined} aria-modal={menu?true:undefined} className={'operations-sidebar'+(menu?' operations-sidebar-open':'')} aria-label='Operations navigation'>
       <div className='company-brand'><AnimatedEye/><span className='company-brand-copy'><strong>VISION</strong><small>COS Operations</small></span></div>
@@ -341,15 +343,13 @@ function OwnerApp() {
         <button type='button' className='operations-open-menu' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu <span aria-hidden='true'>☰</span></button>
       </section>
 
-      {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Field Map'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
-      {authorized&&active==='Today'&&!route.detail&&<div className='cos-fleet-launch'><div><strong>COS Camera Health & Field Map</strong><p>The complete fleet dashboard: map, device health, locations and unit setup.</p></div><button onClick={()=>navigate('Fleet Dashboard')}>Open Fleet Dashboard →</button></div>}
+      {active!=='Today'&&active!=='IT Dashboard'&&active!=='Fleet Dashboard'&&!route.createType&&<header className='command-page-header'><div><label>{active==='Fleet Dashboard'?'FIELD ASSET LOCATION':active==='Daily Board'?'DAILY OPERATIONS':'COS OPERATIONS'}</label><h1>{label(active)}</h1><p>{descriptions[active]||'Open this existing Operations workspace in AppDeploy.'}</p></div></header>}
       {checking&&!session?<section className='panel module' role='status'>Verifying your current Operations account…</section>:!authorized?<section className='panel module operations-access' role='alert'><h2>Operations access needs attention</h2><p>{session?.reason||sessionError||'This Owner account is not linked to COS Operations.'}</p><div className='purchase-actions'><button onClick={()=>void check()} disabled={checking}>{checking?'Checking…':'Retry Operations access'}</button></div>{!dailyOnly&&<TechChecksWorkspace/>}</section>
-        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening IT dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Field Map')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
+        :fleetOnly&&!fleetWorkspaces.includes(active)?<p role='status'>Opening IT dashboard…</p>:active==='IT Dashboard'?(dailyOnly?<ITDailyDashboard session={session} navigate={navigate}/>:<ITDashboard session={session} navigate={navigate}/>):active==='MHelp'?<ITMhelpWorkspace/>:active==='Today'?<>{!route.detail&&<>{session?.legacyOwner===true&&<HomeFieldView open={()=>navigate('Fleet Dashboard')}/>}<HomeUnitTracker session={session} open={()=>navigate('Unit Tracker')}/><TicketActions createTicket={createTicket}/><VisionAreas api={api} navigate={navigate}/></>}<TodayDashboard setActive={navigate} openJob={openJob} openUnit={unit=>{setHeliosUnit(unit);navigate('Victron VRM');}} selectedJobId={route.jobId} detailOpen={route.detail} selectJob={selectOverviewJob} backToJobs={backToOverviewJobs}/></>
         :active==='Operations'?<OperationsAreas navigate={navigate}/>
         :active==='Units On Hand'?<UnitsOnHand api={api} navigate={navigate}/>
         :active==='Daily Board'?<>{!tvDisplay&&!route.createType&&session?.features?.mhelpTicketImport===true&&<MhelpTicketImport show={show} openJob={id=>openJob(id,'Unscheduled')}/>} {!tvDisplay&&<OwnerBoardControls key={route.createType?'create-ticket-'+(route.unitId||''):'board-controls'} show={show} createType={route.createType} unitId={route.unitId} cancelCreateLabel={route.unitId?'Back to unit health':'Back to dashboard'} cancelCreate={cancelCreateTicket} openCreatedJob={id=>openJob(id,'Unscheduled')}/>} {!route.createType&&<DailyBoard api={api} openWorkspace={navigate} onTvChange={setTvDisplay} createTicket={createTicket}/>}</>
-        :active==='Fleet Dashboard'?<FleetDashboard key={session?.userId||session?.name||'current'} session={session!} navigate={navigate} createTicket={fleetOnly?undefined:createTicket} openUnitMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} registerEquipment={name=>{setRegisterUnitName(name);navigate('Equipment');}}/>
-        :active==='Field Map'?<section className='panel module field-map-module'><FieldMap show={show} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} openWorkspace={navigate} openUnitHealth={openUnitHealth} historyReadEnabled={!fleetOnly} locationWritesEnabled={session?.features?.fieldLocationVerification===true} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)}/></section>
+        :active==='Fleet Dashboard'?<FleetDashboard key={session?.userId||session?.name||'current'} session={session!} navigate={navigate} show={show} openUnitHealth={openUnitHealth} initialUnitId={route.unitId||mapUnitId} initialUnitLabel={route.unitLabel} selectionChanged={unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,...(unitId?{unitId}:{})},true)} locationWritesEnabled={session?.features?.fieldLocationVerification===true} ownerCensusEnabled={!fleetOnly&&!dailyOnly&&ownerCensusSessionAllowed(session)} historyReadEnabled={!fleetOnly} createTicket={fleetOnly?undefined:createTicket} registerEquipment={name=>{setRegisterUnitName(name);navigate('Equipment');}}/>
         :active==='Unit Tracker'?<UnitTrackerWorkspace session={session} show={show} initialUnitId={route.unitId} onSelectUnit={unitId=>setRouteLocation({workspace:'Unit Tracker',jobId:'',detail:false,unitId},true)} openMap={unitId=>setRouteLocation({workspace:'Field Map',jobId:'',detail:false,unitId})} openHealth={openUnitHealth}/>
         :active==='Owner Tasks'?<OwnerTasksWorkspace show={show}/>
         :active==='Jobs'?<OperationsJobs key='jobs' mode='jobs' show={show} openLifecycle={openLifecycle} initialJobId={focusedJob} clearFocusedJob={()=>setRouteLocation({workspace:'Jobs',jobId:'',detail:false},true)}/>
@@ -370,7 +370,7 @@ function OwnerApp() {
         :active==='Victron VRM'?<VrmWorkspace canDiscover={!fleetOnly} initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true)}/>
         :<section className='panel module operations-reference' aria-label={active+' workspace'}><h2>{active}</h2><p>This workspace remains available in AppDeploy COS Operations. Open the platform and select <b>{active}</b> from its navigation. AppDeploy may ask you to sign in separately.</p><a className='operations-reference-link' href={referenceUrl} target='_blank' rel='noopener noreferrer'>Open AppDeploy COS Operations ↗</a><p>Your existing IT and Service workspaces remain accessible here.</p><button className='secondary' onClick={()=>navigate('Today')}>Back to Overview</button></section>}
     </main>
-    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{(dailyOnly?[{label:'Daily views',workspace:'IT Dashboard'},{label:'Camera Health',workspace:'Camera Health'},{label:'Field View',workspace:'Field Map'}]:fleetOnly?[{label:'Dashboard',workspace:'IT Dashboard'},{label:'Field View',workspace:'Field Map'},{label:'Tech Checks',workspace:'Tech Check'}]:[{label:'Dashboard',workspace:'Today'},{label:'Field View',workspace:'Field Map'},{label:'Team',workspace:'Team'}]).map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>
+    <nav className='operations-bottom-nav' aria-label='Mobile Operations navigation' inert={menu}>{(dailyOnly?[{label:'Daily views',workspace:'IT Dashboard'},{label:'Camera Health',workspace:'Camera Health'},{label:'Fleet Dashboard',workspace:'Fleet Dashboard'}]:fleetOnly?[{label:'Dashboard',workspace:'IT Dashboard'},{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Tech Checks',workspace:'Tech Check'}]:[{label:'Dashboard',workspace:'Today'},{label:'Fleet Dashboard',workspace:'Fleet Dashboard'},{label:'Team',workspace:'Team'}]).map(area=><button type='button' key={area.workspace} className={active===area.workspace?'active':''} aria-current={active===area.workspace?'page':undefined} onClick={()=>navigate(area.workspace)}>{area.label}</button>)}<button type='button' aria-label='More' aria-expanded={menu} onClick={openMenu}>Menu</button></nav>
     {toast&&<div className='toast operations-toast' role='status'>{toast}</div>}
   </div>;
 }

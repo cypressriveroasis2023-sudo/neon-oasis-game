@@ -1,3 +1,5 @@
+import {inventoryPlacement} from './fleetSnapshot';
+import type {FleetDashboardRow} from './fleetDashboardModel';
 import {ReconBatteryDetails} from './CameraHealthOverview';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import HeliosPowerDetails from './HeliosPowerDetails';
@@ -14,7 +16,7 @@ import { checkedAddressEstimate, addressEstimateHumanNote, addressEstimateLabel,
 import { readFieldMapView,saveFieldMapView } from './fieldMapViewState';
 import { useFieldMapDisplay } from './fieldMapDisplay';
 import { useCameraHealth } from './useCameraHealth';
-import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime } from './fieldCameraHealth';
+import { fieldCameraHealth, isSupportEquipment, unitHealthLabel, cameraTime,type UnitCameraHealth } from './fieldCameraHealth';
 import {type FieldRecorderAuthority} from './fieldRecorderObservation';
 import { unitEvidenceLabel, serviceEvidenceLabel } from './cameraEvidence';
 import { useRouters } from './useRouters';
@@ -75,7 +77,8 @@ type Snapshot = {
   trackerSnapshot?:{source:string;importedAt:string;fieldRows:number};
 };
 
-type Props = { show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean };
+export type InstallationPinRequest={pick:(latitude:number,longitude:number)=>void;cancel:()=>void};
+type Props = { dashboardMap?:boolean;dashboardRows?:FleetDashboardRow[];signalLayer?:'camera'|'router'|'battery';dashboardQuery?:string;dashboardHealth?:string;hideInstallationDetails?:boolean;externalPin?:InstallationPinRequest|null;selectionChanged?:(id:string)=>void;installationOnly?:boolean;requestPin?:(request:InstallationPinRequest|null)=>void;editingChanged?:(dirty:boolean)=>void;show:(message:string)=>void; initialUnitId?:string; initialUnitLabel?:string; openWorkspace?:(name:string)=>void; openUnitHealth?:(unitId:string)=>void; historyReadEnabled?:boolean;locationWritesEnabled?:boolean;ownerCensusEnabled?:boolean };
 
 const hasCoords = (unit: FieldUnit) => isCurrentFieldPin(unit);
 const recordedPoint=(point:AddressEstimate|null)=>point?.confidence==='source_recorded_unverified';
@@ -83,7 +86,7 @@ const pointTitle=(point:AddressEstimate)=>recordedPoint(point)?'Tracker-recorded
 const noEstimates = new Map<string,AddressEstimate>();
 const sourceLabel=(source?:string|null)=>source?source.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()):'No coordinates';
 
-export default function FieldMap({show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled=false,ownerCensusEnabled=false}:Props){
+export default function FieldMap({dashboardMap=false,dashboardRows,signalLayer='camera',dashboardQuery='',dashboardHealth='operational',hideInstallationDetails=false,externalPin,selectionChanged,show,initialUnitId='',initialUnitLabel='',openWorkspace,openUnitHealth,historyReadEnabled=true,locationWritesEnabled:requestedLocationWrites=false,ownerCensusEnabled=false,installationOnly=false,requestPin,editingChanged}:Props){
   const [mapRevision,setMapRevision]=useState(0);
   const [filtersOpen,setFiltersOpen]=useState(false);
   const workspaceNode=useRef<HTMLElement|null>(null);
@@ -95,6 +98,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const routers=useRouters();
   const cameras=useCameraHealth();
   const [data,setData]=useState<Snapshot|null>(null);
+  const privateFieldInvalid=useRef(false),fieldReadRevision=useRef(0);
   const [error,setError]=useState('');
   const [estimateState,setEstimateState]=useState<{snapshot:Snapshot;points:Map<string,AddressEstimate>}|null>(null);
   const estimates=estimateState?.snapshot===data?estimateState.points:noEstimates;
@@ -106,7 +110,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     });
     return()=>{current=false;};
   },[data]);
-  useEffect(()=>{if(cameras.fleet)setData(cameras.fleet.fieldMap as unknown as Snapshot);},[cameras.fleet]);
+  useEffect(()=>{if(cameras.fleet&&!automaticReadPaused.current&&!privateFieldInvalid.current)setData(cameras.fleet.fieldMap as unknown as Snapshot);},[cameras.fleet]);
   const [search,setSearch]=useState(restored.current.search||'');
   const [status,setStatus]=useState(restored.current.status||'field');
   const dismissedDeepLink=useRef('');
@@ -126,7 +130,6 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const [coordinatePaste,setCoordinatePaste]=useState('');
   const [pickingPin,setPickingPin]=useState(false);
   const pickingRef=useRef(false);
-  useEffect(()=>{if(!locationWritesEnabled){pickingRef.current=false;setPickingPin(false);setConfirmedLocation(false);}},[locationWritesEnabled]);
   const [busy,setBusy]=useState(false);
   const [refreshRequired,setRefreshRequired]=useState(false);
   const [history,setHistory]=useState<any[]>([]);
@@ -152,8 +155,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     censusMounted.current=true;
     const invalidate=()=>{censusSessionRevision.current++;censusAction.current.invalidate();censusPreparation.current.invalidate();setCensusSessionInvalid(true);setCensusReady(null);setCensusMessage(null);setPreparationReady(null);setPreparationMessage(null);setPreparationReceipt(null);};
     const hidden=(event:MessageEvent)=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='COS_OPERATIONS_HIDE_PRIVATE_EVIDENCE')invalidate();};
-    window.addEventListener('cos-private-data-invalidated',invalidate);window.addEventListener('message',hidden);
-    return()=>{censusMounted.current=false;censusAction.current.invalidate();censusPreparation.current.invalidate();window.removeEventListener('cos-private-data-invalidated',invalidate);window.removeEventListener('message',hidden);};
+    const clearPrivateFleet=()=>{invalidate();privateFieldInvalid.current=true;fieldReadRevision.current++;setData(null);setSelectedId('');setHistory([]);setGpsMessage('');setError('Your session changed. Reload COS Operations.');};
+    window.addEventListener('cos-private-data-invalidated',clearPrivateFleet);window.addEventListener('message',hidden);
+    return()=>{censusMounted.current=false;censusAction.current.invalidate();censusPreparation.current.invalidate();window.removeEventListener('cos-private-data-invalidated',clearPrivateFleet);window.removeEventListener('message',hidden);};
   },[]);
   useEffect(()=>{
     let current=true;setCensusReady(null);
@@ -184,7 +188,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const markersRef=useRef(new Map<string,L.Marker>());
 
   const load=async(force=false)=>{
-    if (working.current) return;
+    if (working.current||privateFieldInvalid.current) return;
+    const readRevision=fieldReadRevision.current;
     working.current = true;
     lastAttemptAt.current = Date.now();
     setBusy(true);
@@ -192,15 +197,17 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     setCensusMessage(null);setPreparationReceipt(null);setPreparationMessage(null);
     try{
       const snapshot = await api.fleetSource('fieldMap',force) as unknown as Snapshot;
+      if(privateFieldInvalid.current||readRevision!==fieldReadRevision.current)return;
+      const selectionItems=installationOnly&&Array.isArray((snapshot as any).inventoryItems)?(snapshot as any).inventoryItems as FieldUnit[]:snapshot.items;
       setData(snapshot);
       setCensusSessionInvalid(false);
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
-      const matches = initialUnitLabel ? fieldMapLabelMatches(snapshot.items,initialUnitLabel) : [];
-      const first = initialUnitId ? snapshot.items.find(unit => unit.id === initialUnitId) : initialUnitLabel ? matches.length===1?matches[0]:undefined : undefined;
+      const matches = initialUnitLabel ? fieldMapLabelMatches(selectionItems,initialUnitLabel) : [];
+      const first = initialUnitId ? selectionItems.find(unit => unit.id === initialUnitId) : initialUnitLabel ? matches.length===1?matches[0]:undefined : undefined;
       if(initialUnitLabel && matches.length!==1)show(matches.length>1?'This unit has conflicting field records. Select the verified installation.':'This unit is not currently in the field map. Shop units stay off the installed field map.');
-      if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
-      setSelectedId(current => !data&&dismissedDeepLink.current!==deepLinkKey&&(initialUnitId||initialUnitLabel)?first?.id||'':snapshot.items.some(unit => unit.id === current) ? current : '');
+      if (initialUnitId && !selectionItems.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
+      setSelectedId(current => !data&&dismissedDeepLink.current!==deepLinkKey&&(initialUnitId||initialUnitLabel)?first?.id||'':selectionItems.some(unit => unit.id === current) ? current : '');
       if(initialUnitId&&(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId)){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}
       if(initialUnitLabel){setSearch(first?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');}
     }catch(e:any){
@@ -219,12 +226,17 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};
   },[]);
 
-  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');if(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
+  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;const selectionItems=installationOnly&&Array.isArray((data as any).inventoryItems)?(data as any).inventoryItems as FieldUnit[]:data.items;if(initialUnitId){setSelectedId(selectionItems.some(unit=>unit.id===initialUnitId)?initialUnitId:'');if(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(selectionItems,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
 
   useEffect(()=>{if(data)saveFieldMapView({search,status,health,selectedId,selectionExplicit:Boolean(selectedId),nearbyId,radius,showHistorical});},[search,status,health,selectedId,nearbyId,radius,showHistorical,Boolean(data)]);
 
-  const items=data?.items||[];
+  const items=(installationOnly||dashboardMap)&&Array.isArray((data as any)?.inventoryItems)?(data as any).inventoryItems as Snapshot['items']:data?.items||[];
   const selected=items.find(x=>x.id===selectedId)||null;
+  const locationWritesEnabled=requestedLocationWrites&&(!dashboardMap||Boolean(selected&&(inventoryPlacement(selected as any)==='field'||!Array.isArray((data as any)?.inventoryItems)&&['field','installed','assigned'].includes(selected.status))&&!['retired','decommissioned','deleted','stolen'].includes(selected.status)));
+  useEffect(()=>{if(!locationWritesEnabled){pickingRef.current=false;setPickingPin(false);setConfirmedLocation(false);}},[locationWritesEnabled]);
+  const sentSelection=useRef(initialUnitId),selectionRef=useRef(selectionChanged);selectionRef.current=selectionChanged;
+  useEffect(()=>{if(dashboardMap&&data&&sentSelection.current!==selectedId){sentSelection.current=selectedId;selectionRef.current?.(selectedId);}},[dashboardMap,Boolean(data),selectedId]);
+  useEffect(()=>{if(dashboardMap){setSearch(dashboardQuery);setHealth(dashboardHealth);}},[dashboardMap,dashboardQuery,dashboardHealth]);
   const censusBinding=ownerCensusEnabled&&censusReady?.snapshot===data&&censusReady.unitId===selectedId&&!censusSessionInvalid&&!censusAction.current.wasAttempted(censusReady.binding)?censusReady.binding:null;
   const censusPolicyMessage=selected?ownerCensusPolicyMessage(selected):null;
   const visibleCensusMessage=censusMessage?.snapshot===data&&censusMessage.unitId===selectedId?censusMessage.text:null;
@@ -233,7 +245,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const visiblePreparationMessage=preparationMessage?.snapshot===data&&preparationMessage.unitId===selectedId?preparationMessage.text:null;
   const currentCameraData=error?null:cameras.data;
   const healthInventory=(data as unknown as {inventoryItems?:FieldUnit[]})?.inventoryItems||items;
-  const healthById=useMemo(()=>new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,healthInventory,currentCameraData,cameras.now)])),[items,healthInventory,currentCameraData,cameras.now]);
+  const healthById=useMemo(()=>dashboardMap&&dashboardRows?new Map(dashboardRows.map(row=>[row.id,row.camera])):new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,healthInventory,currentCameraData,cameras.now)])),[items,healthInventory,currentCameraData,cameras.now,dashboardMap,dashboardRows]);
   const previousHealthById=useMemo(()=>error||cameras.error?new Map(items.map(unit=>[unit.id,fieldCameraHealth(unit,healthInventory,cameras.fleet?.health||null,cameras.now)])):healthById,[items,healthInventory,error,cameras.error,cameras.fleet,cameras.now,healthById]);
   automaticReadPaused.current=Boolean(locationWritesEnabled&&selected&&!selected.readOnly&&(pickingPin||coordinatePaste.trim()||note.trim()||confirmedLocation||lat!==(hasCoords(selected)?String(selected.latitude):'')||lon!==(hasCoords(selected)?String(selected.longitude):'')||accuracy!==(selected.gpsAccuracyM==null?'':String(selected.gpsAccuracyM))||source!==(selected.hasUnitGps?(selected.coordinateSource||'manual'):'manual')));
   const onlineBasis={camera:0,recorder:0,connection:0,provider:0},offlineBasis={camera:0,recorder:0,connection:0,provider:0};
@@ -246,7 +258,9 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const nearby=items.find(unit=>unit.id===nearbyId&&hasCoords(unit));
   const distance=(unit:FieldUnit)=>nearby&&hasCoords(unit)?L.latLng(Number(nearby.latitude),Number(nearby.longitude)).distanceTo(L.latLng(Number(unit.latitude),Number(unit.longitude)))/1609.344:null;
   const selectedRouters=routers.data?.items.filter(row=>row.match==='exact_name' && row.candidateUnit?.id===selectedId)||[];
+  const mapHealthById=useMemo(()=>!dashboardMap||!dashboardRows?healthById:new Map(dashboardRows.map(row=>{const state=row.support?'support':row[signalLayer+'State' as 'cameraState'|'routerState'|'batteryState'];return [row.id,{...row.camera,state:state==='not_available'?'unknown':state} as UnitCameraHealth];})),[dashboardMap,dashboardRows,signalLayer,healthById]);
   const filtered=useMemo(()=>{
+    if(dashboardMap&&dashboardRows)return dashboardRows.map(row=>row.unit as FieldUnit).filter(unit=>{const miles=distance(unit);return (!nearby||miles!==null&&miles<=radius)&&(['field','all'].includes(status)||status==='missing'&&!hasCoords(unit)||status==='tracker'&&unit.readOnly===true||unit.status===status);});
     const q=search.trim().toLowerCase();
     return items.filter(unit=>{
       const text=[unit.unitNumber,unit.modelName,unit.customer,unit.site,unit.activeJobNumber,unit.address].filter(Boolean).join(' ').toLowerCase();
@@ -255,7 +269,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       const miles=distance(unit);
       return statusOk&&healthOk&&(!nearby||miles!==null&&miles<=radius)&&(!q||text.includes(q));
     });
-  },[items,search,status,health,health==='all'?null:healthById,previousHealthById,nearbyId,radius]);
+  },[items,search,status,health,health==='all'?null:healthById,previousHealthById,nearbyId,radius,dashboardMap,dashboardRows]);
 
   useEffect(()=>{
     if(!selected)return;
@@ -317,7 +331,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     rebuildingMarkers.current=true;
     layer.clearLayers();
     markersRef.current.clear();clusterButtons.current.clear();clusterMarkers.current=[];
-    const mapped=filtered.filter(unit=>hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit));
+    const mapped=filtered.filter(unit=>(!dashboardMap||inventoryPlacement(unit as any)==='field'&&!['retired','decommissioned','deleted','stolen'].includes(unit.status))&&(hasCoords(unit)||!nearby&&estimateFor(unit)||showHistorical&&!nearby&&historicalFieldCoordinates(unit)));
     const bounds:L.LatLngExpression[]=[];
     const groups=clusterMapPoints(mapped.map(unit=>{const point=mapPoint(unit)||historicalFieldCoordinates(unit)!;const pixel=map.project([point.latitude,point.longitude],map.getZoom());return {item:unit,x:pixel.x,y:pixel.y};}),tvMode?56:44,16);
     const mapBox=map.getContainer().getBoundingClientRect();
@@ -333,12 +347,12 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
         const points=group.map(({item})=>mapPoint(item)||historicalFieldCoordinates(item)!);
         points.forEach(point=>bounds.push([point.latitude,point.longitude]));
         const first=points[0];
-        const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[healthById.get(item.id)?.state||'unknown']++);
+        const counts={online:0,offline:0,unknown:0,support:0};group.forEach(({item})=>counts[mapHealthById.get(item.id)?.state||'unknown']++);
         const cluster=L.marker([first.latitude,first.longitude],{title:group.length+' units nearby. Open unit list.',icon:L.divIcon({className:'cos-field-cluster-wrap'+(offsets.length?' cos-field-cluster-expanded':''),html:clusterReticleMarkup(counts,group.filter(({item})=>Boolean(estimateFor(item))&&!recordedPoint(estimateFor(item))).length,group.filter(({item})=>!hasCoords(item)&&!estimateFor(item)).length,group.filter(({item})=>recordedPoint(estimateFor(item))).length),iconSize:[44,44],iconAnchor:[22,22]})});
         const popup=document.createElement('div');popup.className='field-cluster-list';
         const heading=document.createElement('strong');heading.textContent=group.length+' units here';popup.append(heading);const summary=document.createElement('p');summary.className='field-cluster-summary';popup.append(summary);
         const zoom=document.createElement('button');zoom.type='button';zoom.textContent='Zoom into this group';zoom.onclick=()=>{restoreViewport.current=true;pendingPopup.current='';popupSelection.current='';map.closePopup();map.fitBounds(points.map(p=>[p.latitude,p.longitude]) as L.LatLngBoundsExpression,{maxZoom:19,padding:[50,50]});};popup.append(zoom);
-        for(const {item} of group){const button=document.createElement('button');button.type='button';button.textContent=item.unitNumber+' · '+unitHealthLabel(healthById.get(item.id))+' · '+tag(item)+' · Observation '+cameraTime(healthById.get(item.id)?.checkedAt,cameras.now);clusterButtons.current.set(item.id,button);button.onclick=()=>{if(working.current||pickingRef.current)return;popupSelection.current=item.id;if(isSupportEquipment(item))pendingPopup.current=item.id;restoreViewport.current=true;setSelectedId(item.id);saveFieldMapView({selectedId:item.id,selectionExplicit:true});if(!isSupportEquipment(item)){openUnitHealth?.(item.id);map.closePopup();}};popup.append(button);}
+        for(const {item} of group){const button=document.createElement('button');button.type='button';button.textContent=item.unitNumber+' · '+unitHealthLabel(mapHealthById.get(item.id))+' · '+tag(item)+' · Observation '+cameraTime(mapHealthById.get(item.id)?.checkedAt,cameras.now);clusterButtons.current.set(item.id,button);button.onclick=()=>{if(working.current||pickingRef.current)return;popupSelection.current=item.id;if(isSupportEquipment(item))pendingPopup.current=item.id;restoreViewport.current=true;setSelectedId(item.id);saveFieldMapView({selectedId:item.id,selectionExplicit:true});if(!isSupportEquipment(item)){openUnitHealth?.(item.id);map.closePopup();}};popup.append(button);}
         const selectedSupport=group.find(({item})=>item.id===selectedId&&isSupportEquipment(item))?.item;if(selectedSupport){const detail=document.createElement('p');detail.className='field-cluster-support-detail';detail.textContent=selectedSupport.unitNumber+' · '+(selectedSupport.address||'Address missing')+' · Support equipment, 0 cameras. No linked power evidence available in this view.';popup.append(detail);}
         cluster.bindPopup(popup,{minWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxWidth:Math.max(160,Math.min(300,map.getSize().x-72)),maxHeight:Math.max(120,Math.min(300,map.getSize().y-100))}).addTo(layer);cluster.getElement()?.setAttribute('data-unit-ids',JSON.stringify(group.map(p=>p.item.id)));cluster.getElement()?.setAttribute('data-estimate-unit-ids',JSON.stringify(group.filter(p=>Boolean(estimateFor(p.item))).map(p=>p.item.id)));clusterMarkers.current.push({marker:cluster,ids:group.map(p=>p.item.id)});if(reopenId&&group.some(p=>p.item.id===reopenId))cluster.openPopup();if(!offsets.length)continue;
       }
@@ -354,10 +368,10 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       if(offsets.length)L.polyline([anchor,position],{color:'#a6bbcf',weight:1,opacity:.75,interactive:false,className:'cos-site-leader'}).addTo(layer);
       const marker=L.marker(position,{
         zIndexOffset:unit.id===selectedId?1000:0,
-        title:unit.unitNumber+(estimate?' · '+pointTitle(estimate):historic?' · Unverified historical location':' · '+unitHealthLabel(healthById.get(unit.id))),
+        title:unit.unitNumber+(estimate?' · '+pointTitle(estimate):historic?' · Unverified historical location':' · '+unitHealthLabel(mapHealthById.get(unit.id))),
         icon:L.divIcon({
           className:'cos-field-pin-wrap',
-          html:mapReticleMarkup(unit.unitNumber,healthById.get(unit.id)?.state||'unknown',estimate?(recordedPoint(estimate)?'recorded':'estimate'):historic?'historical':'current'),
+          html:mapReticleMarkup(unit.unitNumber,mapHealthById.get(unit.id)?.state||'unknown',estimate?(recordedPoint(estimate)?'recorded':'estimate'):historic?'historical':'current'),
           iconSize:[44,44],
           iconAnchor:[22,22]
         })
@@ -384,7 +398,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     }else if(bounds.length>1){
       moveViewport(()=>map.fitBounds(bounds as L.LatLngBoundsExpression,{paddingTopLeft:[40,tvMode?104:40],paddingBottomRight:[40,40],maxZoom:14,animate:false}));
     }
-  },[filtered,selectedId,data?.generatedAt,focusSelected,showHistorical,estimates,mapRevision,tvMode]);
+  },[filtered,selectedId,data?.generatedAt,focusSelected,showHistorical,estimates,mapRevision,tvMode,mapHealthById,dashboardMap]);
 
   const fitAllLocations=()=>{
     restoreViewport.current=false;
@@ -438,6 +452,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     }
   },[filtered,selectedId,data?.generatedAt,routers.data,routers.now,healthById,estimates,mapRevision,tvMode,focusSelected,showHistorical]);
 
+  useEffect(()=>{const map=mapRef.current;if(!dashboardMap||!externalPin||!map)return;const choose=(e:L.LeafletMouseEvent)=>externalPin.pick(e.latlng.lat,e.latlng.lng);map.on('click',choose);map.getContainer().style.cursor='crosshair';return()=>{map.off('click',choose);map.getContainer().style.cursor='';};},[dashboardMap,externalPin]);
   useEffect(()=>{
     const map=mapRef.current;
     if(!locationWritesEnabled||!map||!pickingPin||!selected||selected.readOnly)return;
@@ -542,76 +557,18 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     }finally{working.current=false;if(censusMounted.current)setBusy(false);}
   };
 
-  return <section ref={workspaceNode} className={'field-map-workspace'+(tvMode?' field-map-tv':'')}>
-    <header className='field-map-display-bar'><div><b>COS Field Map</b><span className={!data||busy?'field-map-load-state':undefined} role='status'>{!data?(error?'Field locations unavailable':'Loading field locations…'):busy?'Refreshing field locations…':'Select a pin or unit for details'}</span></div><button className='secondary' aria-label='TV / fullscreen map' aria-pressed={tvMode} disabled={!data} onClick={toggleTv}>Fullscreen</button></header>
-    <section className='field-map-kpis' aria-label='Field inventory totals'>
-      <article><b>{data?.summary?.fieldUnits??'—'}</b><span>FIELD UNITS</span></article>
-      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='online').length:'—'}</b><span>ONLINE OBSERVATIONS</span></article>
-      <article className={items.some(unit=>healthById.get(unit.id)?.state==='offline')?'attention':''}><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='offline').length:'—'}</b><span>OFFLINE OBSERVATIONS</span></article>
-      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length:'—'}</b><span>UNKNOWN / STALE</span></article>
-      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='support').length:'—'}</b><span>SUPPORT · 0 CAMERAS</span></article>
-    </section>
-    <div className='field-map-toolbar'>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search unit, customer, site, job…' aria-label='Search field units'/>
-      <button className='secondary' aria-expanded={filtersOpen} aria-controls='field-map-filters' onClick={()=>setFiltersOpen(value=>!value)}>Filters{status!=='field'||health!=='all'||nearbyId||showHistorical?' · active':''}</button>
-      <button className='secondary' disabled={busy} onClick={()=>{void load(true);void routers.refresh()}}>Refresh</button>
-      <button className='secondary' aria-label={estimates.size?'Show all map pins':'Show all verified pins'} disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations}>Fit pins</button>
-    </div>
-
-    <div id='field-map-filters' className='field-map-filters' hidden={!filtersOpen}>
-      <select value={status} onChange={e=>setStatus(e.target.value)} aria-label='Field map filter'>
-        <option value='field'>Field units</option>
-        <option value='all'>All returned field records</option>
-        <option value='installed'>Installed</option>
-        <option value='tracker'>Tracker field units</option>
-        <option value='assigned'>Assigned</option>
-        <option value='in_transit'>In transit</option>
-        <option value='returning'>Returning</option>
-        <option value='missing'>Coordinates pending</option>
-      </select>
-      <select value={health} onChange={e=>setHealth(e.target.value)} aria-label='Field health filter'><option value='operational'>Field online / offline</option><option value='all'>All health / review</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option><option value='support'>Support equipment · 0 cameras</option></select>
-    <div className='field-map-nearby'>
-      <label>Nearby a job / unit<select aria-label='Nearby unit center' value={nearbyId} onChange={e=>{setNearbyId(e.target.value);setFocusSelected(false)}}><option value=''>Entire field fleet</option>{items.filter(hasCoords).map(unit=><option key={unit.id} value={unit.id}>{unit.activeJobNumber?unit.activeJobNumber+' · ':''}{unit.unitNumber} · {unit.site||unit.address}</option>)}</select></label>
-      <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations{data?' ('+items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length+')':''}</label>
-      {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
-    </div>
-    </div>
-    <details className='field-map-info'><summary>Map info &amp; review{data?.placementReviews?.length?' · '+data.placementReviews.length+' placement to review':''}</summary>
-      <p className='field-map-count-explanation'>Field units = online + offline + unknown / stale + support. Unknown means current status is missing, older or unmatched. Support equipment has no cameras.</p>
-      <p>Online observations: {onlineBasis.camera} camera / detector, {onlineBasis.recorder} recorder, {onlineBasis.connection} IP / port{onlineBasis.provider?', '+onlineBasis.provider+' other source':''}. These observations do not verify video or complete camera coverage.</p>
-      <p>Offline observations: {offlineBasis.camera} camera / detector, {offlineBasis.recorder} recorder, {offlineBasis.connection} IP / port{offlineBasis.provider?', '+offlineBasis.provider+' other source':''}. Recorder and service outages do not establish individual camera outages.</p>
-      <p>{data?items.filter(hasCoords).length:'—'} verified map pins. Status and location verification are separate.</p>
-      <p>Saved status refreshes every 15 minutes · Map loaded {data?new Date(data.generatedAt).toLocaleString():'pending'}</p>
-      <p>Health data read {cameras.data?cameraTime(cameras.data.refreshedAt,cameras.now):'not available'} · Pin colors use each source observation’s age.</p>
-    {!!data?.placementReviews?.length&&<section className='panel' aria-label='Placement records needing review'><h3>Placement needs review ({data.placementReviews.length})</h3><p>These units remain in inventory. Their map pins are held until the unit mapping is resolved.</p><ul>{data.placementReviews.filter(row=>!search||[row.unitNumber,row.reason].some(value=>value.toLowerCase().includes(search.toLowerCase()))).map((row,index)=><li key={row.unitNumber+'-'+index}><strong>{row.unitNumber}</strong> · {row.reason} <a href={itDailyCameraUrl('../../camera-health.html?q='+encodeURIComponent(row.unitNumber))} target='_top'>Open Camera Health →</a></li>)}</ul></section>}
-    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} unverified map points available outside nearby mode. EST marks an address estimate; SRC marks literal tracker-recorded coordinates with unknown measurement time. Each point needs verification. Address estimates may share a site point. Tracker coordinates retain each recorded point. Connection colors are independent; tracker coordinates and address estimates are excluded from nearby distances.</p>}
-    <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector or recorder observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{data&&cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
-    </details>
-    {cameras.error&&!error&&<p className='field-map-error' role='alert'>Camera Health unavailable: {cameras.error}</p>}
-    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error} Camera Health unavailable until the shared snapshot is verified.</span> <button className='secondary' disabled={busy} onClick={()=>void load(true)}>Retry map load</button></div>}
-    {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
-    {gpsMessage&&<p role='status'>{gpsMessage}</p>}
-    <div className={'field-map-layout'+(selected?' has-selection':'')}>
-      <aside className='field-map-list' aria-label='Field units' aria-busy={busy}>
-        {!data?<div className='loading' role='status'>{error?'Map data unavailable. Retry loading your field units.':'Loading production field units… Pins appear after locations are verified.'}</div>:filtered.length?filtered.map(unit=><button key={unit.id} data-unit-id={unit.id} disabled={busy} className={unit.id===selectedId?'selected':''} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
-          <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {unit.status.replaceAll('_',' ')}</small></div>
-          <span className={hasCoords(unit)?'mapped':'missing'}>{tag(unit)}</span>
-          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))}{!isSupportEquipment(unit)&&<> · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}</>}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
-        </button>):<div className='field-map-empty'>No units match this filter.</div>}
-      </aside>
-
-      <section className='field-map-center'>
-        <div ref={mapNode} className='field-map-canvas' aria-label='COS field unit map'/>
-        <div className='field-map-fullscreen-controls'><button className='secondary field-map-fullscreen-exit' onClick={toggleTv}>Exit TV view</button><button className='secondary' disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations} aria-label='Fit map pins'>Fit pins</button></div>
-        <div className='field-map-legend'>
-          <span><i style={{color:cameraColors.online}}/>Online observation</span>
-          <span><i style={{color:cameraColors.offline}}/>Offline observation</span>
-          <span><i style={{color:cameraColors.unknown}}/>Stale / unknown</span><span><i style={{color:cameraColors.support}}/>Stand / support · 0 cameras</span>{estimates.size>0&&!nearby&&<span>EST: address estimate · SRC: tracker-recorded coordinates</span>}{showHistorical&&!nearby&&<span>OLD tag: unverified historical location</span>}
-        </div>
-      </section>
-
-      <aside className='field-map-detail' aria-label='Selected unit details' hidden={!selected}>
-        {selected&&<button className='secondary field-map-close-detail' disabled={busy||automaticReadPaused.current} onClick={()=>{dismissedDeepLink.current=deepLinkKey;restoreViewport.current=true;(workspaceNode.current?.querySelector<HTMLElement>('.field-map-list [data-unit-id="'+CSS.escape(selected.id)+'"]')||workspaceNode.current?.querySelector<HTMLElement>('[aria-label="Search field units"]'))?.focus({preventScroll:true});setSelectedId('');setFocusSelected(false);mapRef.current?.closePopup();}}>Close unit details</button>}
+  useEffect(()=>{
+    if(!installationOnly||!requestPin)return;
+    requestPin(pickingPin?{cancel:()=>{setPickingPin(false);pickingRef.current=false;},pick:(latitude,longitude)=>{
+      if(!locationWritesEnabled||working.current||!pickingRef.current)return;
+      setLat(latitude.toFixed(6));setLon(longitude.toFixed(6));setAccuracy('');setSource('manual');setConfirmedLocation(false);
+      setPickingPin(false);pickingRef.current=false;setGpsMessage('Candidate pin selected. Review it against the installation address and confirm before saving.');
+    }}:null);
+    return()=>requestPin(null);
+  },[installationOnly,requestPin,pickingPin,locationWritesEnabled,selectedId]);
+  useEffect(()=>{editingChanged?.(automaticReadPaused.current||busy);return()=>editingChanged?.(false);},[editingChanged,busy,lat,lon,accuracy,source,note,coordinatePaste,confirmedLocation,pickingPin,selectedId]);
+  const installationDetails=<aside className='field-map-detail' aria-label='Selected unit details' hidden={!selected}>
+        {selected&&!installationOnly&&<button className='secondary field-map-close-detail' disabled={busy||automaticReadPaused.current} onClick={()=>{dismissedDeepLink.current=deepLinkKey;restoreViewport.current=true;(workspaceNode.current?.querySelector<HTMLElement>('.field-map-list [data-unit-id="'+CSS.escape(selected.id)+'"]')||workspaceNode.current?.querySelector<HTMLElement>('[aria-label="Search field units"]'))?.focus({preventScroll:true});setSelectedId('');setFocusSelected(false);mapRef.current?.closePopup();}}>Close unit details</button>}
         {selected?<><small>FIELD UNIT</small><h2>{selected.unitNumber}</h2>
           <p>{selected.modelName||'Equipment'} · <b>{selected.status.replaceAll('_',' ')}</b></p>
           <section className='field-camera-status' aria-label='Selected unit camera health'><b style={{color:cameraColors[selectedHealth?.state||'unknown']}}>{unitHealthLabel(selectedHealth)}</b><p>{selectedHealth?.reason}</p>{selectedHealth?.classification&&<p>{unitEvidenceLabel(selectedHealth.classification)} · {serviceEvidenceLabel(selectedHealth.classification.serviceState)}</p>}{!isSupportEquipment(selected)&&<p>Latest source observation: {cameraTime(selectedHealth?.checkedAt,cameras.now)}</p>}{openUnitHealth&&!isSupportEquipment(selected)&&<button onClick={()=>openUnitHealth(selected.id)}>Open Camera Health</button>}</section>
@@ -686,7 +643,82 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
             {historyError ? <p role='alert'>{historyError}</p> : historyLoading ? <p role='status'>Loading GPS history…</p> : history.length?history.slice(0,8).map(row=><div key={row.id}><b>{Number(row.latitude).toFixed(6)}, {Number(row.longitude).toFixed(6)}</b><small>{sourceLabel(row.source)} · {new Date(row.recordedAt).toLocaleString()}{row.recordedBy?' · '+row.recordedBy:''}</small>{row.note&&<span>{locationHistoryNote(row.note)}</span>}</div>):<p>No unit-level GPS history yet.</p>}
           </div>}
         </>:<div className='field-map-empty'>Select a field unit.</div>}
+      </aside>;
+  if(installationOnly)return <section ref={workspaceNode} className='cos-fleet-installation-tools' aria-label='Installation verification tools'>
+    {!data&&<p role='status'>Loading saved installation evidence…</p>}{error&&<p role='alert'>{error}</p>}
+    {refreshRequired&&<p role='status'>Refresh saved location evidence before saving GPS again.</p>}{gpsMessage&&<p role='status'>{gpsMessage}</p>}
+    {installationDetails}
+  </section>;
+
+  return <section ref={workspaceNode} className={'field-map-workspace'+(dashboardMap?' cos-fleet-dashboard-map':'')+(tvMode?' field-map-tv':'')}>
+    <header className='field-map-display-bar'><div><b>{dashboardMap?'Fleet map':'COS Field Map'}</b><span className={!data||busy?'field-map-load-state':undefined} role='status'>{!data?(error?'Field locations unavailable':'Loading field locations…'):busy?'Refreshing field locations…':'Select a pin or unit for details'}</span></div><button className='secondary' aria-label={dashboardMap?'Fullscreen fleet map':'TV / fullscreen map'} aria-pressed={tvMode} disabled={!data} onClick={toggleTv}>Fullscreen</button></header>
+    <section className='field-map-kpis' aria-label='Field inventory totals'>
+      <article><b>{data?.summary?.fieldUnits??'—'}</b><span>FIELD UNITS</span></article>
+      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='online').length:'—'}</b><span>ONLINE OBSERVATIONS</span></article>
+      <article className={items.some(unit=>healthById.get(unit.id)?.state==='offline')?'attention':''}><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='offline').length:'—'}</b><span>OFFLINE OBSERVATIONS</span></article>
+      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length:'—'}</b><span>UNKNOWN / STALE</span></article>
+      <article><b>{data?items.filter(unit=>healthById.get(unit.id)?.state==='support').length:'—'}</b><span>SUPPORT · 0 CAMERAS</span></article>
+    </section>
+    <div className='field-map-toolbar'>
+      <input hidden={dashboardMap} value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search unit, customer, site, job…' aria-label='Search field units'/>
+      <button className='secondary' aria-expanded={filtersOpen} aria-controls='field-map-filters' onClick={()=>setFiltersOpen(value=>!value)}>Filters{status!=='field'||health!=='all'||nearbyId||showHistorical?' · active':''}</button>
+      <button className='secondary' disabled={busy} onClick={()=>{void load(true);void routers.refresh()}}>Refresh</button>
+      <button className='secondary' aria-label={estimates.size?'Show all map pins':'Show all verified pins'} disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations}>Fit pins</button>
+    </div>
+
+    <div id='field-map-filters' className='field-map-filters' hidden={!filtersOpen}>
+      <select value={status} onChange={e=>setStatus(e.target.value)} aria-label='Field map filter'>
+        <option value='field'>Field units</option>
+        <option value='all'>All returned field records</option>
+        <option value='installed'>Installed</option>
+        <option value='tracker'>Tracker field units</option>
+        <option value='assigned'>Assigned</option>
+        <option value='in_transit'>In transit</option>
+        <option value='returning'>Returning</option>
+        <option value='missing'>Coordinates pending</option>
+      </select>
+      <select value={health} onChange={e=>setHealth(e.target.value)} hidden={dashboardMap} aria-label='Field health filter'><option value='operational'>Field online / offline</option><option value='all'>All health / review</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Stale / unknown</option><option value='support'>Support equipment · 0 cameras</option></select>
+    <div className='field-map-nearby'>
+      <label>Nearby a job / unit<select aria-label='Nearby unit center' value={nearbyId} onChange={e=>{setNearbyId(e.target.value);setFocusSelected(false)}}><option value=''>Entire field fleet</option>{items.filter(unit=>hasCoords(unit)&&(!dashboardMap||inventoryPlacement(unit as any)==='field')).map(unit=><option key={unit.id} value={unit.id}>{unit.activeJobNumber?unit.activeJobNumber+' · ':''}{unit.unitNumber} · {unit.site||unit.address}</option>)}</select></label>
+      <label><input type='checkbox' aria-label='Review unverified historical locations' checked={showHistorical} disabled={Boolean(nearby)} onChange={e=>setShowHistorical(e.target.checked)}/>Review unverified historical locations{data?' ('+items.filter(unit=>!estimateFor(unit)&&historicalFieldCoordinates(unit)).length+')':''}</label>
+      {nearby&&<label>Within<select aria-label='Nearby distance' value={radius} onChange={e=>setRadius(Number(e.target.value))}>{[5,10,25,50].map(n=><option key={n} value={n}>{n} miles</option>)}</select></label>}
+    </div>
+    </div>
+    <details className='field-map-info'><summary>Map info &amp; review{data?.placementReviews?.length?' · '+data.placementReviews.length+' placement to review':''}</summary>
+      <p className='field-map-count-explanation'>Field units = online + offline + unknown / stale + support. Unknown means current status is missing, older or unmatched. Support equipment has no cameras.</p>
+      <p>Online observations: {onlineBasis.camera} camera / detector, {onlineBasis.recorder} recorder, {onlineBasis.connection} IP / port{onlineBasis.provider?', '+onlineBasis.provider+' other source':''}. These observations do not verify video or complete camera coverage.</p>
+      <p>Offline observations: {offlineBasis.camera} camera / detector, {offlineBasis.recorder} recorder, {offlineBasis.connection} IP / port{offlineBasis.provider?', '+offlineBasis.provider+' other source':''}. Recorder and service outages do not establish individual camera outages.</p>
+      <p>{data?items.filter(hasCoords).length:'—'} verified map pins. Status and location verification are separate.</p>
+      <p>Saved status refreshes every 15 minutes · Map loaded {data?new Date(data.generatedAt).toLocaleString():'pending'}</p>
+      <p>Health data read {cameras.data?cameraTime(cameras.data.refreshedAt,cameras.now):'not available'} · Pin colors use each source observation’s age.</p>
+    {!!data?.placementReviews?.length&&<section className='panel' aria-label='Placement records needing review'><h3>Placement needs review ({data.placementReviews.length})</h3><p>These units remain in inventory. Their map pins are held until the unit mapping is resolved.</p><ul>{data.placementReviews.filter(row=>!search||[row.unitNumber,row.reason].some(value=>value.toLowerCase().includes(search.toLowerCase()))).map((row,index)=><li key={row.unitNumber+'-'+index}><strong>{row.unitNumber}</strong> · {row.reason} <a href={itDailyCameraUrl('../../camera-health.html?q='+encodeURIComponent(row.unitNumber))} target='_top'>Open Camera Health →</a></li>)}</ul></section>}
+    {estimates.size>0&&<p className='field-map-estimate-notice' role='status'>{estimates.size} unverified map points available outside nearby mode. EST marks an address estimate; SRC marks literal tracker-recorded coordinates with unknown measurement time. Each point needs verification. Address estimates may share a site point. Tracker coordinates retain each recorded point. Connection colors are independent; tracker coordinates and address estimates are excluded from nearby distances.</p>}
+    <div className='router-map-note'><b>Unit connection and camera observations · separate locations</b><p>Sniper/CAM V green and red show recent saved IP / port connection results. Other units use reported camera/detector or recorder observations. Gray means older, missing or unmatched evidence. Service reachability does not verify video. The 20-minute presentation window allows for the 15-minute refresh cadence and timing jitter; it is not an expected heartbeat; silence is not an outage. Reported records do not establish full camera coverage. Location confidence is separate.</p><p>{data?items.filter(unit=>!hasCoords(unit)).length+' units need verified coordinates. ':''}Historical pins are excluded from the map and nearby results. Select a listed job / unit with verified coordinates to see its neighbors.</p>{data&&cameras.data&&<p>Automatic saved-data refresh every 15 minutes while visible. Camera records refreshed {cameraTime(cameras.data.refreshedAt,cameras.now)}. {items.filter(unit=>healthById.get(unit.id)?.state==='unknown').length} camera-capable / unclassified units without verified current status. {items.filter(isSupportEquipment).length} support units have 0 cameras and are excluded from health totals.</p>}{data?.trackerSnapshot?.importedAt&&<p>{data.trackerSnapshot.source} snapshot · imported {new Date(data.trackerSnapshot.importedAt).toLocaleString()}. Locations are recorded addresses, not live router GPS.</p>}</div>
+    </details>
+    {cameras.error&&!error&&<p className='field-map-error' role='alert'>Camera Health unavailable: {cameras.error}</p>}
+    {error&&<div className='field-map-error' role='alert'>{data?'Map refresh failed. Showing the last successfully loaded units.':'Field units could not be loaded. This does not mean the fleet is empty.'} <span>{error} Camera Health unavailable until the shared snapshot is verified.</span> <button className='secondary' disabled={busy} onClick={()=>void load(true)}>Retry map load</button></div>}
+    {refreshRequired&&<p role='status'>Refresh the Field Map before saving GPS again.</p>}
+    {gpsMessage&&<p role='status'>{gpsMessage}</p>}
+    <div className={'field-map-layout'+(selected?' has-selection':'')}>
+      <aside className={'field-map-list'+(dashboardMap?' cos-fleet-unit-list':'')} aria-label={dashboardMap?'Fleet units in view':'Field units'} aria-busy={busy}>
+        {!data?<div className='loading' role='status'>{error?'Map data unavailable. Retry loading your field units.':'Loading production field units… Pins appear after locations are verified.'}</div>:filtered.length?filtered.map(unit=><button key={unit.id} data-unit-id={unit.id} disabled={busy} className={(dashboardMap?'cos-fleet-unit-row ':'')+(unit.id===selectedId?'selected':'')} onClick={()=>{restoreViewport.current=false;setGpsMessage('');setFocusSelected(true);setSelectedId(unit.id)}}>
+          <div><strong>{unit.unitNumber}</strong><small>{unit.modelName||'Equipment'} · {String(unit.status||'unknown').replaceAll('_',' ')}</small></div>
+          <span className={hasCoords(unit)?'mapped':'missing'}>{tag(unit)}</span>{dashboardMap&&<span className='cos-fleet-signals'>{(['camera','router','battery'] as const).map(signal=>{const row=dashboardRows?.find(r=>r.id===unit.id),state=row?.[signal+'State' as 'cameraState'|'routerState'|'batteryState'];if(!state||signal==='battery'&&state==='not_available')return null;return <span key={signal} className={'cos-signal-'+state} aria-label={signal+': '+(state==='unknown'?'Unverified':state==='support'?'Solar support':state[0].toUpperCase()+state.slice(1))}>{signal[0].toUpperCase()}</span>;})}</span>}
+          <small>{[unit.customer,unit.site].filter(Boolean).join(' · ')||'No installed site'}</small><small>{unit.address||(!hasCoords(unit)?'Location missing — needs follow-up':'GPS recorded')}</small><small className='field-unit-health' style={{color:cameraColors[healthById.get(unit.id)?.state||'unknown']}}>{unitHealthLabel(healthById.get(unit.id))}{!isSupportEquipment(unit)&&<> · Latest observation {cameraTime(healthById.get(unit.id)?.checkedAt,cameras.now)}</>}{nearby&&distance(unit)!==null?' · '+distance(unit)!.toFixed(1)+' mi':''}</small><small>{unit.locationVerifiedAt?'Location verified '+routerTime(unit.locationVerifiedAt):'Location verification pending'}</small>
+        </button>):<div className='field-map-empty'>No units match this filter.</div>}
       </aside>
+
+      <section className='field-map-center'>
+        <div ref={mapNode} className={'field-map-canvas'+(dashboardMap?' cos-fleet-map-canvas':'')} aria-label={dashboardMap?'Interactive fleet installation map':'COS field unit map'}/>
+        <div className='field-map-fullscreen-controls'><button className='secondary field-map-fullscreen-exit' aria-label={dashboardMap?'Exit fullscreen fleet map':undefined} onClick={toggleTv}>Exit TV view</button><button className='secondary' disabled={busy||!filtered.some(unit=>mapPoint(unit))} onClick={fitAllLocations} aria-label='Fit map pins'>Fit pins</button></div>
+        <div className='field-map-legend'>
+          <span><i style={{color:cameraColors.online}}/>Online observation</span>
+          <span><i style={{color:cameraColors.offline}}/>Offline observation</span>
+          <span><i style={{color:cameraColors.unknown}}/>Stale / unknown</span><span><i style={{color:cameraColors.support}}/>Stand / support · 0 cameras</span>{estimates.size>0&&!nearby&&<span>EST: address estimate · SRC: tracker-recorded coordinates</span>}{showHistorical&&!nearby&&<span>OLD tag: unverified historical location</span>}
+        </div>
+      </section>
+
+      {!hideInstallationDetails&&installationDetails}
     </div>
     <footer className='field-map-footer'>Map tiles © OpenStreetMap contributors. Unit GPS is operational location data only and never changes equipment lifecycle placement automatically.</footer>
   </section>;

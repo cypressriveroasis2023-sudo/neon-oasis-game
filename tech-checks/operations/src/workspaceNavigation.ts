@@ -8,12 +8,12 @@ export const workspaceGroups = [
   { label:'Overview', home:'Today', items:['Operations','Today','Daily Board','Needs Attention','Activity'] },
   { label:'Job flow', home:'Jobs', items:['Jobs','Owner Review','Handoffs','Tech Check'] },
   { label:'Schedule', home:'Calendar', items:['Calendar','Unscheduled','Dispatch'] },
-  { label:'Equipment', home:'Equipment', items:['Fleet Dashboard','Units On Hand','Equipment','Field Map','Unit Tracker','Camera Health','InHand Routers','Victron VRM'] },
+  { label:'Equipment', home:'Equipment', items:['Fleet Dashboard','Units On Hand','Equipment','Unit Tracker','Camera Health','InHand Routers','Victron VRM'] },
   { label:'Customers', home:'Customers', items:['Customers','Sites','Work Requests','CRM'] },
   { label:'Team', home:'Team', items:['Team','Owner Tasks'] },
   { label:'Finance', home:'Billing', items:['Quotes','Purchasing','Billing','Accounting','Collections','Payments','History','Reports'] },
 ];
-export const workspaceLabel = (name:string) => ({'Tech Check':'Tech Checks',Today:'Overview','Daily Board':'Dispatch Board','Field Map':'Field View','Victron VRM':'Victron Power',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
+export const workspaceLabel = (name:string) => ({'Tech Check':'Tech Checks',Today:'Overview','Daily Board':'Dispatch Board','Field Map':'Fleet Dashboard','Victron VRM':'Victron Power',Jobs:'Job flow',Calendar:'Calendar',Billing:'Billing & Invoices',Invoices:'Billing & Invoices'} as Record<string,string>)[name] || name;
 export const workspaceGroup = (name:string) => workspaceGroups.find(group=>group.items.includes(name==='Invoices'?'Billing':name)) || workspaceGroups[0];
 export type WorkspaceRoute = { workspace:string; jobId:string; detail:boolean; createType?:TicketType; unitId?:string; unitLabel?:string; installationId?:number };
 export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {
@@ -27,8 +27,8 @@ export function readWorkspaceRoute(hash:string=location.hash):WorkspaceRoute {
   const installation = params.get('installationId');
   const installationId = installation && /^[1-9]\d*$/.test(installation) ? Number(installation) : NaN;
   const installationContext = workspace==='Victron VRM'&&!params.get('job')&&Number.isSafeInteger(installationId)?{installationId}:{};
-  const labelContext=workspace==='Field Map'&&!unitId&&unitLabel&&unitLabel.length<=120&&!/[\u0000-\u001f]/.test(unitLabel)?{unitLabel}:{};
-  const unitContext=(!params.get('job')&&(['Field Map','Camera Health','Unit Tracker'].includes(workspace)||(workspace==='Daily Board'&&isTicketType(createType)))&&isTicketUnitId(unitId))?{unitId}:{};
+  const labelContext=['Field Map','Fleet Dashboard'].includes(workspace)&&!unitId&&unitLabel&&unitLabel.length<=120&&!/[\u0000-\u001f]/.test(unitLabel)?{unitLabel}:{};
+  const unitContext=(!params.get('job')&&(['Fleet Dashboard','Field Map','Camera Health','Unit Tracker'].includes(workspace)||(workspace==='Daily Board'&&isTicketType(createType)))&&isTicketUnitId(unitId))?{unitId}:{};
   return {workspace,...unitContext,...labelContext,...installationContext,jobId:params.get('job')||'',detail:workspace==='Today'&&params.get('detail')==='1',...(workspace==='Daily Board'&&!params.get('job')&&isTicketType(createType)?{createType}:{})};
 }
 export function workspaceHash(route:WorkspaceRoute) {
@@ -36,8 +36,8 @@ export function workspaceHash(route:WorkspaceRoute) {
   if(route.jobId)params.set('job',route.jobId);
   if(route.workspace==='Victron VRM'&&!route.jobId&&Number.isSafeInteger(route.installationId)&&(route.installationId??0)>0)params.set('installationId',String(route.installationId));
   if(route.workspace==='Daily Board'&&!route.jobId&&isTicketType(route.createType))params.set('create',route.createType);
-  if(!route.jobId&&(['Field Map','Camera Health','Unit Tracker'].includes(route.workspace)||(route.workspace==='Daily Board'&&isTicketType(route.createType)))&&isTicketUnitId(route.unitId))params.set('unit',route.unitId);
-  if(route.workspace==='Field Map'&&!route.unitId&&route.unitLabel&&route.unitLabel.length<=120&&!/[\u0000-\u001f]/.test(route.unitLabel))params.set('unitLabel',route.unitLabel);
+  if(!route.jobId&&(['Fleet Dashboard','Field Map','Camera Health','Unit Tracker'].includes(route.workspace)||(route.workspace==='Daily Board'&&isTicketType(route.createType)))&&isTicketUnitId(route.unitId))params.set('unit',route.unitId);
+  if(['Field Map','Fleet Dashboard'].includes(route.workspace)&&!route.unitId&&route.unitLabel&&route.unitLabel.length<=120&&!/[\u0000-\u001f]/.test(route.unitLabel))params.set('unitLabel',route.unitLabel);
   if(route.workspace==='Today'&&route.detail&&route.jobId)params.set('detail','1');
   return '#'+route.workspace.toLowerCase().replaceAll(' ','-')+(params.size?'?'+params:'');
 }

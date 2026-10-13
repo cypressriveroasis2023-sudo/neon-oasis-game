@@ -165,7 +165,7 @@ function harness({ role = 'owner', userId = ownerId, search = '' } = {}) {
 
 test('owner mounts isolated Operations and retains existing legacy controls', () => {
   const h = harness();
-  assert.equal(h.frame().src, './operations/dist/index.html?v=fleet-dashboard-20261012');
+  assert.equal(h.frame().src, './operations/dist/index.html?v=fleet-map-unified-20261013');
   assert.equal(h.frame().allow, 'geolocation; fullscreen');assert.equal(h.frame().allowFullscreen,true);
   assert.equal(h.frame().referrerPolicy, 'same-origin');
   assert.equal(h.body.classList.contains('cos-operations-host'), true);
@@ -178,7 +178,7 @@ test('owner mounts isolated Operations and retains existing legacy controls', ()
 
 test('the integrated dashboard bookmark keeps the existing Owner-only frame authorization', () => {
   const owner=harness({search:'?fleetDashboard=1'});
-  assert.equal(owner.frame().src,'./operations/dist/index.html?v=fleet-dashboard-20261012#fleet-dashboard');
+  assert.equal(owner.frame().src,'./operations/dist/index.html?v=fleet-map-unified-20261013#fleet-dashboard');
   assert.equal(owner.calls.auth,0);
   for(const role of ['it','service'])assert.equal(harness({role,search:'?fleetDashboard=1'}).frame(),null);
 });
@@ -569,3 +569,10 @@ test('TV presentation is origin/source checked and restores frame styling on exi
  await h.message({type:'COS_FIELD_MAP_DISPLAY_MODE',active:true});h.state.role='service';h.state.effectiveRole='service';h.nodes.get('appView').classList.add('hidden');h.flushMutations();assert.equal(h.body.style.overflow,'auto');
 });
 
+
+test('old field launch URLs and combined dashboard/unit launch preserve the selected unit on Fleet Dashboard',()=>{
+ for(const query of ['?fieldView=1&fieldUnit=Helios%20009','?fleetDashboard=1&fieldUnit=Helios%20009','?fieldUnit=Helios%20009']){
+  const h=harness({search:query});assert(h.frame().src.endsWith('#fleet-dashboard?unitLabel=Helios%20009'));assert.equal(h.calls.auth,0);
+ }
+ const invalid=harness({search:'?fleetDashboard=1&fieldUnit='+encodeURIComponent('x'.repeat(121))});assert(invalid.frame().src.endsWith('#fleet-dashboard'));
+});

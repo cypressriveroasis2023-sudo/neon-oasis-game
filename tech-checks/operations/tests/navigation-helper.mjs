@@ -1,8 +1,11 @@
 import { expect } from '@playwright/test';
-const labels = { Today: 'Dashboard', 'Camera Health': 'Camera Health', 'InHand Routers': 'InHand Routers', 'Victron VRM': 'Victron Power', 'Units On Hand': 'Units On Hand', 'Field Map': 'Field View', 'Unit Tracker': 'Unit Tracker', Team: 'Team', Operations: 'Operations' };
+const labels = { Today: 'Dashboard', 'Camera Health': 'Camera Health', 'InHand Routers': 'InHand Routers', 'Victron VRM': 'Victron Power', 'Units On Hand': 'Units On Hand', 'Fleet Dashboard': 'Fleet Dashboard', 'Unit Tracker': 'Unit Tracker', Team: 'Team', Operations: 'Operations' };
 const directoryLabels = { 'Tech Check':'Tech Checks', Jobs: 'Job flow', Billing: 'Billing & Invoices', Invoices: 'Billing & Invoices', 'Daily Board': 'Dispatch Board' };
 
 export async function openWorkspace(frame, workspace) {
+  // Exercise supported legacy bookmarks without adding a second menu destination.
+  if(workspace==='Field Map'){await frame.locator('body').evaluate(()=>{location.hash='#field-map';});await expect(frame.locator('.field-map-workspace')).toBeVisible();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toMatch(/^#fleet-dashboard/);return;}
+
   const label = labels[workspace];
   const menu = frame.getByRole('dialog', { name: 'Operations navigation' });
   if (!(await menu.count())) await frame.getByRole('button', { name: 'More', exact: true }).click();

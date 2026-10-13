@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { api, openLegacy } from './api';
 import { checkedFieldMap } from './gpsPersistence';
+import {inventoryPlacement} from './fleetSnapshot';
 import { isCurrentFieldPin, type FieldLocation } from './fieldLocations';
 import { cameraDashboardSummary } from './cameraDashboardSummary';
 import { checkedTrackerSnapshot, trackerAccess } from './unitTracker';
@@ -57,7 +58,7 @@ export function createITSourceReader<T>(load: (force?:boolean) => Promise<T>, en
 
 export function summarizeITFieldMap(value: unknown): Summary {
   const field = checkedFieldMap(value);
-  const rows = field.items as FieldLocation[];
+  const rows = (Array.isArray(field.inventoryItems)?field.inventoryItems.filter((row:any)=>inventoryPlacement(row)==='field'&&!['retired','decommissioned','deleted','stolen'].includes(String(row.status||''))):field.items) as FieldLocation[];
   return { count: rows.length, label: 'field units', metrics: [
     { label: 'Saved addresses', value: rows.filter(row => typeof row.address === 'string' && row.address.trim()).length },
     { label: 'Owner-verified pins', value: rows.filter(isCurrentFieldPin).length },
@@ -157,7 +158,7 @@ type Source = {
 };
 const read = (path: string) => async () => (await api.get(path)).data;
 export const sources: Source[] = [
-  { id: 'field', label: 'Field View', route: 'Field Map', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
+  { id: 'field', label: 'Fleet Dashboard', route: 'Fleet Dashboard', description: 'Locate units and review saved installation details.', icon: 'map', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('fieldMap',force):(await api.get('/api/field-map')).data, summarize: summarizeITFieldMap },
   { id: 'cameras', label: 'Camera Health', route: 'Camera Health', description: 'Provider observations and camera coverage by unit.', icon: 'camera', read:async(force=false)=>typeof api.fleetSource==='function'?api.fleetSource('health',force):(await api.get('/api/camera-health/summary-v3')).data, summarize: summarizeITCameras },
   { id: 'routers', label: 'InHand Routers', route: 'InHand Routers', description: 'Router inventory and timestamped connection checks.', icon: 'router', read: read('/api/routers'), summarize: summarizeITRouters },
   { id: 'victron', label: 'Victron', route: 'Victron VRM', description: 'Solar, battery and power dashboards for your fleet.', icon: 'power', read: read('/api/vrm-fleet'), summarize: summarizeITVrm,

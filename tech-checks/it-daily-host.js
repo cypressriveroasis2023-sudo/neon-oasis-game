@@ -76,8 +76,9 @@ async function open(value, generation) {
   frame = document.createElement('iframe'); frame.id='cosITDailyFrame'; frame.title='IT daily views';
   frame.allow='geolocation; fullscreen'; frame.allowFullscreen=true; frame.referrerPolicy='same-origin';
   const q = new URLSearchParams(location.search), unit = q.get('fieldUnit');
-  const route = q.get('fleetDashboard') === '1' ? '#fleet-dashboard' : q.get('cameraView') === '1' ? '#camera-health' : q.get('fieldView') === '1' || unit ? '#field-map'+(unit && unit.length<=120 && !/[\u0000-\u001f]/.test(unit) ? '?unitLabel='+encodeURIComponent(unit) : '') : '#it-dashboard';
-  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=fleet-dashboard-20261012'+route;
+  const fleetRoute='#fleet-dashboard'+(unit&&unit.length<=120&&!/[\u0000-\u001f]/.test(unit)?'?unitLabel='+encodeURIComponent(unit):'');
+  const route=q.get('fleetDashboard')==='1'?fleetRoute:q.get('cameraView')==='1'?'#camera-health':q.get('fieldView')==='1'||unit?fleetRoute:'#it-dashboard';
+  frame.src='./operations/dist/index.html?mode='+(value.role==='it'?'fleet':'it-daily')+'&v=fleet-map-unified-20261013'+route;
   frame.addEventListener('load',()=>{setFieldMapDisplay(frame,false);scheduleFrameFit();});
   root.replaceChildren(frame);
   scheduleFrameFit();
@@ -102,7 +103,7 @@ function present() {
   if (value.role==='it') for (const id of ['view-owner','view-svc','view-morning']) shield(document.getElementById(id));
   scheduleFrameFit();
   if (next===scopeKey) return;
-  revision++;scopeKey=next;clearFrame();status('Opening Camera Health, Field View, Victron View and the 2027 Unit Tracker…');void open(value,revision);
+  revision++;scopeKey=next;clearFrame();status('Opening Camera Health, Fleet Dashboard, Victron View and the 2027 Unit Tracker…');void open(value,revision);
 }
 if (IT_DAILY_ONLY) {
   const style=document.createElement('style');
