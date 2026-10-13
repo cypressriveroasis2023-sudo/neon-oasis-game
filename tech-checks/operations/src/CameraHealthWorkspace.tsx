@@ -10,8 +10,8 @@ import CameraHealthOverview,{CameraCardActions,CameraResourceObservations,UnitEv
 import UnitDiagnosticReport from './UnitDiagnosticReport';
 import {cameraOverview} from './cameraHealthCounts';
 export { validateCameraHealth } from './fieldCameraHealth';
-type Props={initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
-export default function CameraHealthWorkspace({initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
+type Props={embedded?:boolean;initialUnitId?:string;backToMap?:(unitId:string)=>void;createTicket?:(type:'SERVICE'|'PICKUP'|'DELIVERY'|'SWAP',unitId:string)=>void;canEditPlacement?:boolean;canEditConnection?:boolean;canReviewIdentity?:boolean};
+export default function CameraHealthWorkspace({embedded=false,initialUnitId='',backToMap,createTicket,canEditPlacement=false,canEditConnection=false,canReviewIdentity=false}:Props){
   const {data:health,error,loading,refresh,now,fleet}=useCameraHealth();
   const units=(fleet?((fleet.fieldMap as any).inventoryItems||fleet.fieldMap.items):null) as FieldHealthUnit[]|null;
   const unitError=error;const loadUnits=()=>refresh();
@@ -20,18 +20,18 @@ export default function CameraHealthWorkspace({initialUnitId='',backToMap,create
   const detail=selected?fieldCameraHealth(selected,units||[],health,now):null;
   const rows=initialUnitId?detail?.rows||[]:health?.rows||[];
   const group=selected&&health?cameraOverview(health,now,units||[]).groups.find(group=>group.unitIdentity?.unitId===selected.id):undefined;
-  return <section className='panel module camera-health-native' aria-label='Camera Health'>
-    <div className='panelhead'><div><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Fleet Dashboard</button>}<button disabled={loading} onClick={()=>{void refresh(true);}}>{loading?'Reading saved results…':'Reload saved results'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
+  return <section className={'panel module camera-health-native'+(embedded?' cos-fleet-camera-troubleshooting':'')} aria-label='Camera Health'>
+    <div className='panelhead'><div>{embedded?<h3>Camera troubleshooting</h3>:<><h2>Camera Health</h2><span>{selected?selected.unitNumber:'Camera Health source observations'}</span></>}</div><div className='purchase-actions'>{initialUnitId&&backToMap&&<button className='secondary' onClick={()=>backToMap(initialUnitId)}>Back to Fleet Dashboard</button>}<button disabled={loading} onClick={()=>{void refresh(true);}}>{loading?'Reading saved results…':'Reload saved results'}</button><button className='secondary' onClick={()=>openLegacy('camera-health')}>Open Camera Health diagnostics</button></div></div>
     {error&&<div className='operations-error' role='alert'>{error} Current camera state cannot be verified.</div>}
 
     {initialUnitId&&<section className='camera-unit-detail' aria-label='Selected field unit Camera Health'>
       {!units?<p role={unitError?'alert':'status'}>{unitError?'The selected field unit could not be verified. Reload saved results to retry.':'Verifying the selected field unit…'}</p>:!selected?<p role='alert'>This unit is not in the current field records. Return to the map and select a current unit.</p>:<>
-        <h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
-        <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p>
+        {!embedded&&<><h3>{selected.unitNumber}</h3><p>{[selected.customer,selected.site].filter(Boolean).join(' · ')||'Customer / site not linked'}</p><p>{selected.address||'Installation address not recorded'}</p>
+        <b className={'camera-unit-state camera-status-'+(detail?.state||'unknown')} style={{color:cameraColors[detail?.state||'unknown']}}>{unitHealthLabel(detail)}</b><p>{detail?.reason}</p></>}
         <UnitEvidenceDetails classification={detail?.classification||null}/><ReconProviderAreaDetails identity={detail?.association} rows={rows} now={now}/><p>Latest source observation: {cameraTime(detail?.checkedAt,now)}. Review each device below for stale or missing observations.</p>
         {detail?.identity==='matched'&&<p>{detail.association?'Matched through the verified saved equipment-to-resource association.':'Matched by unique equipment family and unit number.'} Camera Health unit: <b>{detail.unitKey}</b>.</p>}
         {group&&<CameraCardActions group={group} now={now} onDetails={()=>openLegacy('camera-health')} canEditPlacement={canEditPlacement} canEditConnection={canEditConnection}/>}
-        <HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>
+        {!embedded&&<HeliosPowerDetails key={selected.unitNumber} unitNumber={selected.unitNumber}/>}
         <MhelpUnitRefresh key={'mhelp-location-'+selected.id} unit={selected} onUpdated={()=>void refresh(true)}/>
         <UnitDiagnosticReport key={'unit-report-'+selected.id} unit={selected} rows={rows} now={now} trusted={health?.evidenceVersion===2} refreshedAt={health?.refreshedAt} identity={detail?.identity}/>
         {createTicket&&<section className='camera-unit-ticket' aria-label='Create ticket for selected field unit'><h4>Create a ticket</h4><label>Work needed<select aria-label='Camera unit ticket type' value={ticketType} onChange={event=>setTicketType(event.target.value as typeof ticketType)}><option value='SERVICE'>Service / repair</option><option value='PICKUP'>Pick up</option><option value='DELIVERY'>Install / Delivery</option><option value='SWAP'>Swap out</option></select></label><button onClick={()=>createTicket(ticketType,selected.id)}>Create ticket</button><p>Review the ticket before saving. Customer and site are filled only when current Operations records verify them; the unit is a ticket reference, not an equipment assignment.</p>{selected.readOnly&&<p>This tracker-only unit needs manual customer / site selection unless its registered equipment identity is resolved.</p>}</section>}

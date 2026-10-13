@@ -19,7 +19,7 @@ test('every existing workspace bookmark retains its canonical destination',()=>{
   }
   assert.equal(readWorkspaceRoute('#overview').workspace,'Today');
   assert.equal(readWorkspaceRoute('#dispatch-board').workspace,'Daily Board');
-  assert.equal(readWorkspaceRoute('#unknown').workspace,'Today');
+  assert.equal(readWorkspaceRoute('#unknown').workspace,'Fleet Dashboard');
 });
 test('job identity and mobile detail survive URL encoding without creating another destination',()=>{
   const route={workspace:'Today',jobId:'job / 42?&',detail:true};
@@ -67,4 +67,15 @@ test('advanced camera diagnostics is an explicit mode, not a new primary workspa
  assert.equal(readWorkspaceRoute('#camera-health').diagnostics,undefined);
  for(const hash of ['#fleet-dashboard?diagnostics=1','#it-dashboard?diagnostics=1','#camera-health?diagnostics=yes'])assert.equal(readWorkspaceRoute(hash).diagnostics,undefined);
  assert.equal(workspaces.includes('Advanced camera diagnostics'),false);
+});
+
+
+test('an empty entry opens Fleet while explicit overview, job and TV bookmarks retain their intent',()=>{
+  for(const hash of ['', '#', '#unrecognized'])assert.equal(readWorkspaceRoute(hash).workspace,'Fleet Dashboard');
+  for(const hash of ['#today?job=42&detail=1','#overview?job=42&detail=1','#dashboard?job=42&detail=1']){
+    assert.deepEqual(readWorkspaceRoute(hash),{workspace:'Today',jobId:'42',detail:true});
+  }
+  assert.equal(readWorkspaceRoute('#daily-board').workspace,'Daily Board');
+  assert.equal(readWorkspaceRoute('#tech-check').workspace,'Tech Check');
+  assert.equal(readWorkspaceRoute('#it-dashboard').workspace,'IT Dashboard');
 });

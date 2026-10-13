@@ -4,12 +4,12 @@ import {traverseIframeHistory} from './helpers/iframeHistory.mjs';
 
 for(const it of [false,true])test(`${it?'Verified IT':'Owner'} has a visible direct Fleet Dashboard entry and one operational map`,async({page})=>{
  const {app,state}=await mountFleet(page,it,{hash:it?'#it-dashboard':'#today'});
- if(it)await app.getByRole('region',{name:'IT daily dashboard',exact:true}).locator('[data-source="field"]').getByRole('button',{name:'Open Field View',exact:true}).click();
+ if(it)await app.getByRole('region',{name:'IT daily dashboard',exact:true}).locator('[data-source="field"]').getByRole('button',{name:'Open Fleet Dashboard',exact:true}).click();
  else await app.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
  await expect(app.getByRole('heading',{name:'Know what’s in the field.'})).toBeVisible();
  const navigation=app.getByRole('navigation',{name:page.viewportSize().width<=700?'Mobile Operations navigation':'COS Operations',exact:true});
- await expect(navigation.getByRole('button',{name:it?'Field View':'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
- await expect(navigation.getByRole('button',{name:it?'Fleet Dashboard':'Field View',exact:true})).toHaveCount(0);
+ await expect(navigation.getByRole('button',{name:'Fleet Dashboard',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(navigation.getByRole('button',{name:'Field View',exact:true})).toHaveCount(0);
  await expect(app.locator('.cos-fleet-map-canvas')).toHaveCount(1);
  await expect(app.locator('.field-map-canvas')).toHaveCount(0);
  expect(state.errors).toEqual([]);
@@ -94,7 +94,7 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} Camera Health and Field Vi
  await expect.poll(()=>app.locator('body').evaluate(()=>location.hash)).toBe('#camera-health?unit='+units[0].id);
  await app.getByRole('button',{name:'Close unit details',exact:true}).click();
  await app.getByRole('button',{name:'More',exact:true}).first().click();
- await app.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:it?'Field View':'Fleet Dashboard',exact:true}).click();
+ await app.getByRole('dialog',{name:'Operations navigation'}).getByRole('button',{name:'Fleet Dashboard',exact:true}).click();
  await expect(app.locator('.cos-fleet-map-canvas')).toHaveCount(1);
  await expect(app.locator('.cos-fleet-table-wrap')).toHaveCount(0);
  await app.locator('.cos-fleet-unit-row').filter({hasText:'Helios 1'}).click();
@@ -141,10 +141,10 @@ for(const it of [false,true])test(`${it?'IT':'Owner'} repeated Camera Health and
   await enter('Camera Health');
   await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
   await expect(app.locator('.cos-fleet-map-canvas')).toHaveCount(0);
-  await enter(it?'Field View':'Fleet Dashboard');
+  await enter('Fleet Dashboard');
   await entries.getByRole('button',{name:/Fleet health/}).click();
   await expect(app.locator('.cos-fleet-table-wrap')).toBeVisible();
-  await enter(it?'Field View':'Fleet Dashboard');
+  await enter('Fleet Dashboard');
   await expect(app.locator('.cos-fleet-map-canvas')).toBeVisible();
   await expect(app.locator('.cos-fleet-table-wrap')).toHaveCount(0);
   await enter('Camera Health');

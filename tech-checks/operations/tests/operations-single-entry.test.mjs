@@ -46,8 +46,23 @@ async function verify(main,source){
   const response=await handlers[0](request('/api/field-map'));
   assert.equal(response.status,200,await response.clone().text());
   const map=await response.json();
-  assert.equal(map.items.length,0,'current receipt holds must remove FIELD presentation');
-  assert.equal(map.inventoryItems[0].placement,'UNKNOWN');
+  assert.equal(map.items.length,1,'a service-location read failure retains existing recorded placement');
+  assert.equal(map.inventoryItems[0].placement,'FIELD');
+  assert.equal(map.inventoryItems[0].effectivePlacement.freshness,'recorded');
+  assert.equal(map.inventoryItems[0].latitude,null,'retained placement never promotes a stale point');
+  for(const reason of [undefined,'equipment_missing','identity_or_lifecycle_changed','customer_unverified']){
+    receipt.items[0].reason=reason;
+    const held=await handlers[0](request('/api/field-map'));assert.equal(held.status,200);const value=await held.json();
+    assert.equal(value.items.length,0,'missing or conflicting placement evidence must still remove FIELD presentation');
+    assert.equal(value.inventoryItems[0].placement,'UNKNOWN');
+  }
+  // The actual bundled API must run the complete upload/finalizer/roster seam.
+  receipt.items[0].reason='service_location_unverified';
+  receipt.items[0].observedAt=new Date(Date.now()-3*3600000).toISOString();
+  const receivedAt=new Date(Date.now()-60000).toISOString(),sha='a'.repeat(64);
+  receipt.upload={contract:'COS_MHELP_UPLOAD_V1',reviewed:true,sourceSha256:sha,payloadSha256:'b'.repeat(64),receivedAt,receivedAtPrecision:'second',exportAsOf:null,records:[{productId:'101',unitNumber:row.unitNumber,category:'Synthetic',customerId:'11',customer:'Synthetic customer',sourceAddress:{},sourceRow:2,placement:'FIELD',lifecycle:'DO_NOT_USE',binding:{productId:'101',trackerId:id,trackerLabel:row.unitNumber,nativeUnitId:null,nativeLabel:null,fullLabel:row.unitNumber,matchMethod:'reviewed_product_id',evidenceSha256:sha,expectedGuard:sha,guardCurrent:true}}]};
+  const uploadedResponse=await handlers[0](request('/api/field-map'));assert.equal(uploadedResponse.status,200,await uploadedResponse.clone().text());
+  const uploaded=await uploadedResponse.json();assert.equal(uploaded.items.length,0);assert.equal(uploaded.inventoryItems[0].placement,'FIELD');assert.equal(uploaded.inventoryItems[0].activeInventoryEligible,false);assert.equal(uploaded.fleetRoster.summary.field,0);assert.equal(uploaded.fleetRoster.summary.excludedLifecycle,1);
   assert(calls.some(url=>url.endsWith('/rpc/cos_mhelp_placement_snapshot')));
   assert.equal(JSON.stringify(snapshot),saved,'projection must not mutate saved input');
   const session=await handlers[0](request('/api/session'));

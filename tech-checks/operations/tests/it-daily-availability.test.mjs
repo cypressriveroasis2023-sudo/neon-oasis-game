@@ -14,8 +14,8 @@ async function repairGate(role,{active=true,fail=false,subject='synthetic'}={}) 
 }
 test('daily switch is explicit and lists exactly the four approved views',()=>{
   assert.equal(availability.IT_DAILY_ONLY,true);
-  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Camera Health','Fleet Dashboard','Victron VRM','Unit Tracker']);
-  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Camera Health','Field View','Victron View','2027 Unit Tracker']);
+  assert.deepEqual([...availability.IT_DAILY_WORKSPACES],['Fleet Dashboard','Camera Health','Victron VRM','Unit Tracker']);
+  assert.deepEqual(availability.IT_DAILY_WORKSPACES.map(availability.itDailyLabel),['Fleet Dashboard','Camera Health','Victron Power','2027 Unit Tracker']);
   assert.doesNotMatch(read('it-feature-availability.js'),/localStorage|fetch\(|mhelp.*===|setTimeout/);
 });
 test('standalone repair pauses IT before any ticket read or release, including restored sessions',async()=>{
@@ -55,8 +55,18 @@ test('daily frame follows available viewport height without resizing fullscreen 
 test('daily landing has no extra Fleet launch and shared modes preserve existing tool labels',()=>{
  const daily=read('operations/src/ITDailyDashboard.tsx'),app=read('operations/src/App.tsx');
  assert.doesNotMatch(daily,/cos-fleet-launch|Open Fleet Dashboard/);
- assert.match(daily,/Camera Health, Field View, Victron View and the 2027 Unit Tracker/);
+ assert.match(daily,/Fleet Dashboard, Camera Health, Victron Power and the 2027 Unit Tracker/);
  assert.match(app,/active==='Fleet Dashboard'\|\|active==='Camera Health'&&!route.diagnostics/);
  assert.match(app,/initialView=\{active==='Camera Health'\?'fleet':'map'\}/);
  assert.match(app,/openAdvancedDiagnostics=\{!fleetOnly&&!dailyOnly\?/);
+});
+
+
+test('authorized IT lands on Fleet without a fifth competing daily navigation entry',()=>{
+ const host=read('it-daily-host.js'),app=read('operations/src/App.tsx');
+ assert.match(host,/: '#fleet-dashboard';/);
+ assert.match(host,/location.hash === '#it-dashboard' \? '#it-dashboard' : '#fleet-dashboard'/);
+ assert.match(app,/fleetWorkspaces.filter\(workspace=>!dailyOnly\|\|workspace!=='IT Dashboard'\)/);
+ assert.match(app,/if\(fleetOnly&&!fleetWorkspaces.includes\(active\)\) setRouteLocation\(\{workspace:'Fleet Dashboard'/);
+ assert.match(app,/active==='IT Dashboard'\?\(dailyOnly\?<ITDailyDashboard/);
 });

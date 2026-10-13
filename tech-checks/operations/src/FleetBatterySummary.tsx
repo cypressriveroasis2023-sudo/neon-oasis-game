@@ -17,9 +17,9 @@ export default function FleetBatterySummary({row,now,compact=false}:{row:FleetDa
   {alarm&&<p className='cos-signal-offline'>Recent Victron battery alarm reported. Review the power evidence below.</p>}
   {minimum&&<small>{minimum.source} · Measured {cameraTime(minimum.observedAt,now)}</small>}
   {row.batteryReadIssue&&<small>Saved readings below do not establish current charge.</small>}
-  {readings.length>0&&<dl aria-label='Battery charge source readings'>{readings.map((reading,index)=><div key={reading.source+'|'+index}>
+  {readings.length>0&&<details><summary>{readings.length} reported charge {readings.length===1?'source':'sources'}</summary><dl aria-label='Battery charge source readings'>{readings.map((reading,index)=><div key={reading.source+'|'+index}>
    <dt>{reading.source}</dt><dd><b>{reading.percent}%</b> · {row.batteryReadIssue?'Current charge unverified':reading.fresh?'Recent observation':'Stale / unverified'}<small>Measured {cameraTime(reading.observedAt,now)}</small></dd>
-  </div>)}</dl>}
+  </div>)}</dl></details>}
   {row.power&&<small>Victron last read attempt {cameraTime(row.power.lastAttemptAt,now)}. Measurements retain their own times.</small>}
  </section>;
 }

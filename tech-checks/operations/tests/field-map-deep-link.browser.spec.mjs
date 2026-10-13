@@ -195,7 +195,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     frame,
     state
   } = await mount(page, 'RII-022');
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Recon II 022');
   await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();
   await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);
   await frame.locator('.cos-field-pin').click();
@@ -269,8 +269,14 @@ test('hardware-suffixed field pin shows its number and unit cards keep dark high
  await expect(frame.locator('.cos-pin-unit-number')).toHaveText('211');
  const card=frame.locator('.cos-fleet-unit-row').first();
  await expect(card).toHaveCSS('background-color','rgb(32, 52, 86)');
- await expect(card.locator('strong')).toHaveCSS('color','rgb(243, 246, 251)');
- await expect(card.locator('small').first()).toHaveCSS('color','rgb(192, 206, 224)');
+ await expect(card.locator('strong')).toHaveCSS('color','rgb(230, 237, 247)');
+ await expect(card.locator('small').first()).toHaveCSS('color','rgb(163, 179, 202)');
+ const contrast=await card.evaluate(el=>{
+  const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+  const background=luminance(getComputedStyle(el).backgroundColor);
+  return ['strong','small'].map(selector=>{const foreground=luminance(getComputedStyle(el.querySelector(selector)).color);return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);});
+ });
+ expect(contrast.every(ratio=>ratio>=4.5)).toBe(true);
 });
 
 test('closing a deep-linked unit remains closed through manual and automatic refresh',async({page})=>{

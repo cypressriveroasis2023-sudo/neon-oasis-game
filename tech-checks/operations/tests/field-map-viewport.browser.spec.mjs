@@ -19,7 +19,7 @@ async function mount(page) {
   const tile = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#d6e8df"/><path d="M0 64H256M0 192H256M64 0V256M192 0V256" stroke="#fff" stroke-width="12"/><text x="16" y="125" font-size="14" fill="#446957">Synthetic map tile</text></svg>';
   await page.route('**/*', async route => {
     const url = route.request().url();
-    if (url === origin + '/field-map-viewport-fixture') return route.fulfill({ contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0;display:block}</style><iframe src="/"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>` });
+    if (url === origin + '/field-map-viewport-fixture') return route.fulfill({ contentType: 'text/html', body: `<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0;display:block}</style><iframe src="/#today"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>` });
     if (url.startsWith(origin + '/')) return route.continue();
     if (/^https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\//.test(url)) return route.fulfill({ contentType: 'image/svg+xml', body: tile });
     if (url !== edge) return route.abort('blockedbyclient');
@@ -68,7 +68,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await expect(frame.locator('.cos-fleet-drawer').getByRole('button').last()).toBeFocused();
   await frame.getByRole('button',{name:'Close unit details'}).click();
   await expect(last).toBeFocused();
-  await frame.getByRole('button',{name:'Show more units (735)'}).click();
+  await frame.getByRole('button',{name:'Show more equipment (735)'}).click();
   await expect(frame.locator('.cos-fleet-unit-row')).toHaveCount(160);
   await bounded(frame);
   await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');

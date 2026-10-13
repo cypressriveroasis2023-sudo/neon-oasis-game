@@ -11,8 +11,8 @@ import { traverseIframeHistory } from './helpers/iframeHistory.mjs';
 const origin = process.env.COS_IT_DAILY_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const dist = resolve(process.env.COS_IT_DAILY_TEST_DIST || fileURLToPath(new URL('../dist', import.meta.url)));
 const readHost = name => readFileSync(new URL('../../' + name, import.meta.url), 'utf8');
-const sources = ['cameras', 'field', 'victron', 'tracker'];
-const labels = ['Camera Health', 'Field View', 'Victron View', '2027 Unit Tracker'];
+const sources = ['field', 'cameras', 'victron', 'tracker'];
+const labels = ['Fleet Dashboard', 'Camera Health', 'Victron Power', '2027 Unit Tracker'];
 const routes = { cameras: '#camera-health', field: '#fleet-dashboard', victron: '#victron-vrm', tracker: '#unit-tracker' };
 const sourcePaths = { cameras: '/api/camera-health/summary-v3', field: '/api/field-map', victron: '/api/vrm-fleet', tracker: '/api/unit-tracker' };
 const gate = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
@@ -133,7 +133,7 @@ async function mount(page, options = {}) {
     }[call.path];
     return route.fulfill({headers, contentType: 'application/json', body: JSON.stringify(data)});
   });
-  await page.goto(origin + '/it-daily-fixture' + (options.deepLink || ''));
+  await page.goto(origin + '/it-daily-fixture' + (options.deepLink ?? '#it-dashboard'));
   return {state, frame: page.frameLocator('#cosITDailyFrame')};
 }
 
@@ -155,7 +155,7 @@ async function menu(frame) {
   return frame.getByRole('dialog', {name: 'Operations navigation'});
 }
 
-for (const secondVerified of [false, true]) test('daily mode has exactly four views for verified IT ' + (secondVerified ? 'second' : 'first'), async ({page}, info) => {
+for (const secondVerified of [false, true]) test('explicit daily overview keeps four source cards for verified IT ' + (secondVerified ? 'second' : 'first'), async ({page}, info) => {
   const {frame, state} = await mount(page, {secondVerified}); await ready(frame);
   await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
   await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('title', 'IT daily views');
@@ -166,7 +166,7 @@ for (const secondVerified of [false, true]) test('daily mode has exactly four vi
     expect((await card(frame, sources[index]).getByRole('button', {name: /^Open /}).boundingBox()).height).toBeGreaterThanOrEqual(44);
   }
   await expect(daily(frame)).not.toContainText(/MHelp information|Assigned checks|Router inventory/);
-  await expect(daily(frame).getByRole('button',{name:'Open Fleet Dashboard →',exact:true})).toHaveCount(0);
+  await expect(daily(frame).getByRole('button',{name:'Open Fleet Dashboard',exact:true})).toHaveCount(1);
   const nav = await menu(frame);
   for (const label of labels) await expect(nav.getByRole('button', {name: label, exact: true})).toBeVisible();
   await expect(nav.getByRole('button', {name: /Tech Checks|InHand Routers|MHelp|Team|Dispatch|Money|Vision assistant/})).toHaveCount(0);
@@ -191,7 +191,7 @@ test('each allowed view survives Back, Forward and reload', async ({page}) => {
     await traverseIframeHistory(frame, 'forward', routes[source]);
     await frame.locator('body').evaluate(() => location.reload());
     await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe(routes[source]);
-    await (await menu(frame)).getByRole('button', {name: /^(Daily views|IT Dashboard)$/}).click(); await ready(frame);
+    await frame.locator('body').evaluate(() => {location.hash='#it-dashboard';}); await ready(frame);
   }
   await page.reload(); await ready(frame); await assertReads(page, state);
 });
@@ -222,13 +222,13 @@ for (const role of ['it', 'owner']) test(role + ' daily menu stays on screen thr
 });
 
 test('blocked direct and history routes cannot mount paused features', async ({page}) => {
-  const {frame, state} = await mount(page, {deepLink: '?itHome=checks#tech-checks/it'}); await ready(frame);
+  const {frame, state} = await mount(page, {deepLink: '?itHome=checks#tech-checks/it',fieldDiagnostics:true}); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
   for (const hash of ['#mhelp', '#tech-check', '#inhand-routers', '#team', '#jobs', '#calendar']) {
     await frame.locator('body').evaluate((_node, hash) => { location.hash = hash; }, hash);
-    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#it-dashboard'); await ready(frame);
-    await frame.locator('body').evaluate(() => history.back()); await ready(frame);
+    await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#fleet-dashboard'); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+    await frame.locator('body').evaluate(() => history.back()); await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
   }
-  expect(state.calls.some(call => call.path === '/api/routers')).toBe(false);
+  expect(state.calls.some(call => call.path === '/api/routers')).toBe(true);
   await assertReads(page, state);
 });
 
@@ -247,7 +247,7 @@ test('legacy redraw, repeated clicks, synthetic events and old overlays remain u
     expect(await page.evaluate(() => window.fixtureLegacyActions)).toBe(0);
     await card(frame, 'field').getByRole('button', {name: /^Open /}).evaluate(button => {button.click(); button.click();});
     await expect(frame.getByLabel('Interactive fleet installation map')).toBeVisible(); await expect(page.locator('#cosITDailyFrame')).toHaveCount(1);
-    await (await menu(frame)).getByRole('button', {name: /^(Daily views|IT Dashboard)$/}).click(); await ready(frame);
+    await frame.locator('body').evaluate(() => {location.hash='#it-dashboard';}); await ready(frame);
   }
   await assertReads(page, state);
 });
@@ -355,15 +355,15 @@ test('a late source response cannot replace a new login or revive an old iframe'
 });
 
 
-for (const [feature, source, label] of [['unitTracker', 'tracker', '2027 Unit Tracker'], ['vrmRead', 'victron', 'Victron View']]) test(feature + ' remains disabled when the current account lacks its capability', async ({page}) => {
-  const {frame, state} = await mount(page, {[feature]: false}); await ready(frame, source);
+for (const [feature, source, label] of [['unitTracker', 'tracker', '2027 Unit Tracker'], ['vrmRead', 'victron', 'Victron Power']]) test(feature + ' remains disabled when the current account lacks its capability', async ({page}) => {
+  const {frame, state} = await mount(page, {[feature]: false,fieldDiagnostics:true}); await ready(frame, source);
   await expect(card(frame, source).locator('.it-dashboard-status')).toHaveText('Access not enabled');
   await expect(card(frame, source).getByRole('button', {name: /^Open /})).toBeDisabled();
   expect(state.calls.some(call => call.path === sourcePaths[source])).toBe(false);
   const nav = await menu(frame); await expect(nav.getByRole('button', {name: label, exact: true})).toHaveCount(0);
   await nav.getByRole('button', {name: /Close menu/}).click();
   await frame.locator('body').evaluate((_node, hash) => {location.hash = hash;}, routes[source]);
-  await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#it-dashboard');
+  await expect.poll(() => frame.locator('body').evaluate(() => location.hash)).toBe('#fleet-dashboard');
   expect(state.calls.some(call => call.path === sourcePaths[source])).toBe(false); await assertReads(page, state);
 });
 
@@ -436,4 +436,23 @@ test('daily tracker source link is absent when the current account lacks tracker
   await expect(card(frame, 'tracker').getByRole('button', {name: 'Open COS inventory'})).toBeDisabled();
   expect(state.calls.some(call => call.path === '/api/unit-tracker')).toBe(false);
   await assertReads(page, state);
+});
+
+
+for(const role of ['it','owner'])test(role+' protected host defaults to Fleet with four existing capabilities',async({page},info)=>{
+ const {frame,state}=await mount(page,{role,deepLink:'',fieldDiagnostics:true});
+ if(role==='owner')await page.evaluate(()=>window.show('it'));
+ await expect(page.locator('#cosITDailyFrame')).toHaveAttribute('src',/#fleet-dashboard$/);
+ await expect(frame.locator('.cos-fleet-dashboard')).toBeVisible();
+ await expect(daily(frame)).toHaveCount(0);
+ await expect(frame.locator('.cos-fleet-map-canvas')).toHaveCount(1);
+ const nav=await menu(frame),links=nav.getByRole('navigation',{name:'COS Operations',exact:true});
+ await expect(links.getByRole('button')).toHaveCount(4);
+ await expect(links.getByRole('button').first()).toHaveText('Fleet Dashboard');
+ await expect(links.getByRole('button',{name:'IT Dashboard',exact:true})).toHaveCount(0);
+ await expect(links.getByRole('button',{name:/InHand Routers|MHelp|Tech Checks/})).toHaveCount(0);
+ await nav.getByRole('button',{name:/Close menu/}).click();
+ await expect(page.locator('#existing-it-tool')).toBeHidden();
+ await page.screenshot({path:info.outputPath(role+'-protected-fleet-first.png'),fullPage:true});
+ await assertReads(page,state);
 });

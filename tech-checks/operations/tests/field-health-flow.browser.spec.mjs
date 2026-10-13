@@ -64,7 +64,7 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
+ expect(await frame.locator('body').evaluate(()=>history.state.cosTicketFromUnitHealth)).toBe(id2);await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard?unit='+id2);await expect(frame.locator('.cos-fleet-map-panel')).toBeVisible();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Fleet Dashboard',exact:true}).click();await expect(frame.locator('.cos-fleet-drawer')).toHaveCount(0);await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#fleet-dashboard');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
 test('a uniquely resolved label deep link returns a cancelled ticket to the same map unit',async({page})=>{
@@ -98,7 +98,7 @@ test('pasted address pin is an unsaved candidate; moving it clears confirmation'
 });
 
 test('closing and reopening unit diagnostics preserves search, nearby center and distance filters',async({page})=>{
- const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar');await revealMapFilters(frame);await frame.getByLabel('Nearby unit center').selectOption(id);await frame.getByLabel('Nearby radius miles').selectOption('25');await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await closeUnit(frame);await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby radius miles')).toHaveValue('25');await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page);await frame.getByLabel('Search units, customers, sites or addresses').fill('Solar');await revealMapFilters(frame);await frame.getByLabel('Nearby unit center').selectOption(id);await frame.getByLabel('Nearby radius miles').selectOption('25');await frame.locator('.cos-fleet-map-panel').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');await closeUnit(frame);await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby radius miles')).toHaveValue('25');await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 test('native Camera Health shows units and individual cameras separately with filter and accessible drill-down',async({page},testInfo)=>{
@@ -119,7 +119,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
- await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');
+ await expect(frame.locator('.cos-fleet-drawer>h2')).toHaveText('Solar Spotter 52');
  const child=page.frames().find(child=>child.parentFrame());
  await child.evaluate(()=>{location.hash='daily-board';});
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toBeVisible();

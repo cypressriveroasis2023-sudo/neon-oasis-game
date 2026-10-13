@@ -8,9 +8,9 @@ import {cameraTimestamp} from './cameraEvidence';
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
 export type DashboardUnit=FieldHealthUnit & Record<string,any>;
 export type BatteryReading={source:string;percent:number;observedAt:string|null;fresh:boolean};
-export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
+export type FleetDashboardRow={unit:DashboardUnit;id:string;name:string;displayName:string;family:string;provider:string;placement:'field'|'shop'|'unknown';retired:boolean;support:boolean;camera:UnitCameraHealth;cameraState:Signal;routerState:Signal;batteryState:Signal;batteryPercent:number|null;batteryReadIssue:string|null;batteryReadings:BatteryReading[];routers:RouterRow[];power:SafeVrmPower|null;locationVerified:boolean;locationNeedsReview:boolean;review:string[]};
 export type FleetFilters={query:string;placement:string;family:string;provider:string;layer:'camera'|'router'|'battery';status:string;retired:boolean;nearbyId?:string;radius?:number;installationStatus?:string};
-export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'operational',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
+export const initialFleetFilters: FleetFilters={query:'',placement:'field',family:'all',provider:'all',layer:'camera',status:'all',retired:false,nearbyId:'',radius:10,installationStatus:'all'};
 const combine=(states:Signal[]):Signal=>states.includes('offline')?'offline':states.length&&states.every(x=>x==='online')?'online':'unknown';
 export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,routers:RouterRow[]|null,vrm:any,now=Date.now()):FleetDashboardRow[]{
  const power=vrm&&Array.isArray(vrm.items)&&Array.isArray(vrm.power)?safeVrmPower(vrm.power,vrm.items,now):[];
@@ -40,7 +40,7 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const locationVerified=isCurrentFieldPin(unit),locationNeedsReview=placement==='field'&&!locationVerified;
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];
   const providers=[...new Set(camera.rows.map(r=>r.evidence?.source).filter(Boolean))];
-  return {unit,id:unit.id,name:unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,locationVerified,locationNeedsReview,review};
+  return {unit,id:unit.id,name:unit.unitNumber,displayName:unit.uploadDisplayUnitNumber||unit.unitNumber,family,provider:providers.join(' / ')||'Unmatched provider',placement,retired:unit.activeInventoryEligible===false||['retired','decommissioned','deleted','stolen'].includes(String(unit.status||'')),support,camera,cameraState:camera.state,routerState:routers?combine(routerStates):'unknown',batteryState,batteryPercent,batteryReadIssue,batteryReadings,routers:linkedRouters,power:p,locationVerified,locationNeedsReview,review};
  });
 }
 export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilters,view='map'){
@@ -49,7 +49,7 @@ export function filterFleetDashboard(rows:FleetDashboardRow[],filters:FleetFilte
  return rows.filter(r=>{
   const state=r.support?'support':r[filters.layer+'State' as 'cameraState'|'routerState'|'batteryState'];
   return (filters.retired||!r.retired)&&(filters.placement==='all'||r.placement===filters.placement)&&(filters.family==='all'||r.family===filters.family)&&(filters.provider==='all'||r.provider===filters.provider)
-   &&(!q||[r.name,r.family,r.provider,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
+   &&(!q||[r.name,r.displayName,r.family,r.provider,r.unit.customer,r.unit.site,r.unit.address,r.unit.activeJobNumber].filter(Boolean).join(' ').toLowerCase().includes(q))
    &&(filters.status==='all'||filters.status==='operational'&&['online','offline','support'].includes(state)||filters.status===state)
    &&(!nearby||r.placement==='field'&&r.locationVerified&&miles(r)<=(filters.radius||10))
    &&(!filters.installationStatus||filters.installationStatus==='all'||filters.installationStatus==='tracker'&&r.unit.readOnly===true||filters.installationStatus==='missing'&&r.locationNeedsReview||filters.installationStatus===r.unit.status)
@@ -63,5 +63,5 @@ export function discoveryNeedsSetup(items:any[],rows:FleetDashboardRow[]){
 /** Export only displayed safe fields; neutralize spreadsheet formulas. */
 export function fleetDashboardCsv(rows:FleetDashboardRow[]){
  const cell=(v:unknown)=>{const text=String(v??'');return '"'+(/^[\s]*[=+@-]/.test(text)?"'":'')+text.replaceAll('"','""')+'"';};
- return ['Unit,Family,Provider,Placement,Customer,Site,Address,Camera,Router,Battery,Location verified,Review',...rows.map(r=>[r.name,r.family,r.provider,r.placement,r.unit.customer,r.unit.site,r.unit.address,r.cameraState,r.routerState,r.batteryState,r.locationVerified,r.review.join('; ')].map(cell).join(','))].join('\r\n');
+ return ['Unit,Display label,Family,Provider,Placement,Customer,Site,Address,Camera,Router,Battery,Location verified,Review',...rows.map(r=>[r.name,r.displayName,r.family,r.provider,r.placement,r.unit.customer,r.unit.site,r.unit.address,r.cameraState,r.routerState,r.batteryState,r.locationVerified,r.review.join('; ')].map(cell).join(','))].join('\r\n');
 }

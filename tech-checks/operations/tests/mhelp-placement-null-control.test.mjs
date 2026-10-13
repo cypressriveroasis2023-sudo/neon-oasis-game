@@ -31,8 +31,8 @@ test('verified native device history still preserves manual authority',()=>{
 for(const rowPatch of [{placementSource:'owner'},{hasUnitGps:true},{installedSiteId:unrelatedId},{placementReviewReason:'Identity review required'}])test(`existing stronger row authority is unchanged: ${Object.keys(rowPatch)[0]}`,()=>{
  const f=fixture({rowPatch});const out=projectMhelpFieldPlacement(f.snapshot,f.receipt,[audit(null)],undefined,now);assert.equal(out.items.length,1);assert.deepEqual(out.items[0],f.snapshot.items[0]);
 });
-test('a stale confirmed tracker receipt holds rather than resurrecting old FIELD',()=>{
- const f=fixture({state:'confirmed',placement:'FIELD',age:41*60000});const out=projectMhelpFieldPlacement(f.snapshot,f.receipt,[audit(null)],undefined,now);assert.equal(out.items.length,0);assert.equal(out.inventoryItems[0].placement,'UNKNOWN');
+test('a stale confirmed tracker receipt retains recorded FIELD without certifying a current location',()=>{
+ const f=fixture({state:'confirmed',placement:'FIELD',age:41*60000});const out=projectMhelpFieldPlacement(f.snapshot,f.receipt,[audit(null)],undefined,now);assert.equal(out.items.length,1);assert.equal(out.inventoryItems[0].placement,'FIELD');assert.equal(out.items[0].placementEvidence.fresh,false);assert.equal(out.items[0].latitude,null);
 });
 test('current confirmed FIELD receipt remains available',()=>{
  const f=fixture({state:'confirmed',placement:'FIELD'});const out=projectMhelpFieldPlacement(f.snapshot,f.receipt,[audit(null)],undefined,now);assert.equal(out.items.length,1);assert.equal(out.items[0].placementSource,'mhelpdesk');
