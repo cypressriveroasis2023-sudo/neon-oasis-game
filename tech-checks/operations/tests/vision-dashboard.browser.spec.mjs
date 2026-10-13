@@ -1,3 +1,4 @@
+import {showAllFieldHealth} from './field-map-controls.mjs';
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
@@ -38,7 +39,7 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   const {frame,requests}=await mount(page);
   const dashboard=frame.getByRole('region',{name:'VISION dashboard'});
   await expect(dashboard.locator('.vision-area-card')).toHaveCount(6);
-  await expect(dashboard.getByRole('button',{name:/Camera Health/})).toContainText('2 active / unresolved units · Provider systems: 1 online · 1 offline · 0 review');
+  await expect(dashboard.getByRole('button',{name:/Camera Health/})).toContainText('Field units: 0 online · 0 offline · 2 need review');
   await expect(dashboard).toContainText('1 confirmed on hand');
   await expect(dashboard).toContainText('1 placement not recorded');
   await dashboard.getByRole('button',{name:/Camera Health/}).click();
@@ -49,7 +50,7 @@ test('six dashboard areas use one menu and retain the approved theme', async ({p
   await expect(inventory).not.toContainText(gps.unitNumber);
   await expect(inventory).not.toContainText(unknown.unitNumber);
   await expect(inventory).toContainText('1 registry units have no recorded placement');
-  await openWorkspace(frame,'Field Map');
+  await openWorkspace(frame,'Field Map');await showAllFieldHealth(frame);
   await frame.getByRole('button',{name:'Show all verified pins',exact:true}).click();
   await frame.getByRole('button',{name:/FIELD-FIX-002/}).click();
   await expect(frame.getByRole('link',{name:/Look up recorded installation address/})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=2%20Fixture%20St%2C%20Houston%2C%20TX');

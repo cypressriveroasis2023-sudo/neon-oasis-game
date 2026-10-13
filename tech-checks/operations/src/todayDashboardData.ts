@@ -11,7 +11,7 @@ export const dashboardSources = [
 ] as const;
 export type SourceKey = typeof dashboardSources[number][0];
 export type DashboardData = Record<SourceKey, DashboardRow[] | null> & { errors: Partial<Record<SourceKey, string>> };
-export type DashboardApi = { fleet?:(force?:boolean)=>Promise<{health:unknown}>;get: (path: string) => Promise<{ data: unknown }> };
+export type DashboardApi = { fleetSource?:(source:'health',force?:boolean)=>Promise<unknown>;fleet?:(force?:boolean)=>Promise<{health:unknown}>;get: (path: string) => Promise<{ data: unknown }> };
 export const emptyTodayDashboard = (): DashboardData => ({ jobs: null, quotes: null, invoices: null, pos: null, tasks: null, errors: {} });
 
 /** A failed source is null, never an invented empty list. Each source is independent. */
@@ -74,7 +74,7 @@ export async function loadCompanyEquipment(api: DashboardApi, onProgress?: (snap
   const result: CompanyEquipmentData = { camera: null, routers: null, errors: {} };
   await Promise.all([
     (async () => {
-      try { result.camera = validateCameraHealth(api.fleet?(await api.fleet(force)).health:(await api.get('/api/camera-health/summary-v3')).data); }
+      try { result.camera = validateCameraHealth(api.fleetSource?await api.fleetSource('health',force):api.fleet?(await api.fleet(force)).health:(await api.get('/api/camera-health/summary-v3')).data); }
       catch (cause) { result.errors.camera = equipmentError(cause, 'Camera Health'); }
       onProgress?.({ ...result, errors: { ...result.errors } });
     })(),

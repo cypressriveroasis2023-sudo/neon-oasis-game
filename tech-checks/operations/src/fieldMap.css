@@ -138,6 +138,6 @@
 
 
 /* Approved eye artwork; the bright ring carries status independently of the logo. */
-.cos-field-pin .cos-reticle-approved-eye{width:44px!important;height:44px!important;overflow:visible;background:#080b12;border-radius:50%}
-.cos-field-pin:not(.cos-field-pin-support)>b.cos-pin-unit-number{top:35px;left:8px;max-width:34px;min-width:28px;padding:1px 3px;background:#080b12;border:1px solid var(--pin);border-radius:5px;font-size:11px;line-height:14px;z-index:2}
+.cos-field-pin .cos-reticle-approved-eye{width:44px!important;height:44px!important;overflow:visible;background:#080b12;border-radius:50%;position:absolute;z-index:1}
+.cos-field-pin:not(.cos-field-pin-support)>b.cos-pin-unit-number{position:absolute;box-sizing:border-box;top:35px;left:8px;max-width:34px;min-width:28px;padding:1px 3px;background:#080b12;border:1px solid var(--pin);border-radius:5px;font-size:11px;line-height:14px;z-index:2}
 @media(prefers-reduced-motion:reduce){.cos-reticle-approved-eye .company-eye-gaze{animation:none!important}}

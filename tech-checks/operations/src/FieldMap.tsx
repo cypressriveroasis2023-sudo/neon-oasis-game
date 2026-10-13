@@ -206,11 +206,11 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return items.filter(unit=>{
       const text=[unit.unitNumber,unit.modelName,unit.customer,unit.site,unit.activeJobNumber,unit.address].filter(Boolean).join(' ').toLowerCase();
       const statusOk=status==='all'||(status==='field'&&['field','assigned','in_transit','installed','returning'].includes(unit.status))||status==='tracker'&&unit.readOnly===true||status===unit.status||status==='missing'&&!hasCoords(unit);
-      const healthOk=health==='all'||(health==='operational'?['online','offline','support'].includes(previousHealthById.get(unit.id)?.state||'unknown'):healthById.get(unit.id)?.state===health);
+      const healthOk=unit.id===selectedId||health==='all'||(health==='operational'?['online','offline','support'].includes(previousHealthById.get(unit.id)?.state||'unknown'):healthById.get(unit.id)?.state===health);
       const miles=distance(unit);
       return statusOk&&healthOk&&(!nearby||miles!==null&&miles<=radius)&&(!q||text.includes(q));
     });
-  },[items,search,status,health,health==='all'?null:healthById,previousHealthById,nearbyId,radius]);
+  },[items,search,status,health,selectedId,health==='all'?null:healthById,previousHealthById,nearbyId,radius]);
 
   useEffect(()=>{
     if(!selected)return;

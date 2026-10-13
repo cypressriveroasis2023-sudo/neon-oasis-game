@@ -51,7 +51,7 @@ async function expectLabels(frame,view,valid){
   await expect(frame.locator('.field-map-list>button').nth(0)).toContainText(valid?'RECORDER ONLINE':'RECORDER UNVERIFIED');await expect(frame.locator('.field-map-list>button').nth(1)).toContainText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
   await expect(frame.locator('.field-map-kpis article b')).toHaveText(valid?['3','1','2','0','0']:['3','0','1','2','0']);
  }else if(view==='workspace')await expect(frame.locator('.camera-unit-state')).toHaveText(valid?'RECORDER OFFLINE':'RECORDER UNVERIFIED');
- else await expect(frame.locator('.camera-overview-card .camera-status-pill')).toHaveText(valid?['RECORDER ONLINE','RECORDER OFFLINE']:['RECORDER UNVERIFIED','RECORDER UNVERIFIED']);
+ else {for(const [label,status] of [['Spotter 901HDC2','RECORDER ONLINE'],['Spotter 902HDC2','RECORDER OFFLINE']])await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: '+label}).locator('.camera-status-pill')).toHaveText(valid?status:'RECORDER UNVERIFIED');await expect(frame.locator('.camera-overview-card').filter({hasText:'Verified equipment: Spotter 903HDC2'}).locator('.camera-status-pill')).toHaveText('CAMERA RECORDS OFFLINE');}
 }
 async function delayedRefresh(page,frame,state,view){
  state.gates.map=deferred();const before={...state.reads};await frame.getByRole('button',{name:view==='map'?'Refresh':'Reload saved results',exact:true}).click();
