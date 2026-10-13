@@ -245,8 +245,7 @@ test('initial map failure shows unavailable state and retry restores units',asyn
  await expect(frame.locator('.cos-fleet-message[role="alert"]')).toContainText('This does not mean the fleet is empty');
  await expect(frame.getByText('No units match this filter.',{exact:true})).toHaveCount(0);
  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();await expect(frame.locator('.cos-field-pin,.cos-field-cluster')).toHaveCount(0);
- await expect(frame.locator('.router-map-note')).not.toContainText('0 support units');
- await expect(frame.getByLabel('Review unverified historical locations').locator('..')).not.toContainText('(0)');
+ await expect(frame.locator('.cos-fleet-stats button strong')).toHaveText(['—','—','—','—','—']);
  state.mapFailure=false;await frame.getByRole('button',{name:/Refresh data/}).click();
  await expect(frame.locator('.cos-fleet-drawer h2')).toHaveText('Ranger 022');
  await expect(frame.locator('.cos-field-pin')).toHaveCount(1);

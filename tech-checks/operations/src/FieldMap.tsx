@@ -229,7 +229,10 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
   const selected=items.find(x=>x.id===selectedId)||null;
   const censusBinding=ownerCensusEnabled&&censusReady?.snapshot===data&&censusReady.unitId===selectedId&&!censusSessionInvalid&&!censusAction.current.wasAttempted(censusReady.binding)?censusReady.binding:null;
   const censusPolicyMessage=selected?ownerCensusPolicyMessage(selected):null;
-  const visibleCensusMessage=censusMessage?.snapshot===data&&censusMessage.unitId===selectedId?censusMessage.text:null;
+  const sameCensusEvidence=(before:Snapshot,after:Snapshot)=>JSON.stringify({items:before.items,inventory:(before as any).inventoryItems,proofs:(before as any).ownerCensusProofs})===JSON.stringify({items:after.items,inventory:(after as any).inventoryItems,proofs:(after as any).ownerCensusProofs});
+  // A shared health refresh may read identical installation evidence into a new object.
+  // Completion feedback survives that read; action bindings still require the exact snapshot.
+  const visibleCensusMessage=!censusSessionInvalid&&data&&censusMessage?.unitId===selectedId&&(censusMessage.snapshot===data||sameCensusEvidence(censusMessage.snapshot,data))?censusMessage.text:null;
   const preparationBinding=ownerCensusEnabled&&!censusSessionInvalid&&preparationReady?.snapshot===data&&preparationReady.unitId===selectedId?preparationReady.binding:null;
   const visiblePreparation=ownerCensusEnabled&&!censusSessionInvalid&&preparationReceipt?.snapshot===data&&preparationReceipt.unitId===selectedId?preparationReceipt.receipt:null;
   const visiblePreparationMessage=preparationMessage?.snapshot===data&&preparationMessage.unitId===selectedId?preparationMessage.text:null;

@@ -13,7 +13,7 @@ export default function FleetDashboardMap({rows,layer,onSelect,selectedId='',pic
  const node=useRef<HTMLDivElement>(null),panel=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),select=useRef(onSelect),picker=useRef(pickLocation),pinRef=useRef<Pin[]>([]);
  const restored=useRef(readFieldMapView(history.state)),viewportChanged=useRef(false);
  const [pins,setPins]=useState<Pin[]>([]),[revision,setRevision]=useState(0),[expandedIds,setExpandedIds]=useState<string[]>([]);
- const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({selectedId,selectionExplicit:Boolean(selectedId)}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
+ const {active:expanded,toggle:full}=useFieldMapDisplay(panel,()=>({...readFieldMapView(history.state),selectedId,selectionExplicit:Boolean(selectedId),...(map.current?{center:[map.current.getCenter().lat,map.current.getCenter().lng],zoom:map.current.getZoom()}:{})}),{native:false,allow:'.cos-fleet-drawer,.cos-fleet-drawer-backdrop'});
  select.current=onSelect;picker.current=pickLocation;
  useEffect(()=>{let alive=true;void Promise.all(rows.filter(r=>r.placement==='field'&&!r.retired).map(async row=>{
   if(row.locationVerified)return {row,point:[Number(row.unit.latitude),Number(row.unit.longitude)] as [number,number],kind:'current' as const};
