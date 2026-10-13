@@ -7,7 +7,7 @@ test('approved seven company areas preserve every route and billing alias',()=>{
   assert.deepEqual(workspaceGroups.map(g=>g.label),['Overview','Job flow','Schedule','Equipment','Customers','Team','Finance']);
   const destinations=workspaceGroups.flatMap(g=>g.items);
   assert.equal(new Set(destinations).size,destinations.length);
-  assert.deepEqual([...destinations,'Vision','Invoices'].sort(),[...workspaces].sort());
+  assert.deepEqual([...destinations,'Field Map','Vision','Invoices'].sort(),[...workspaces].sort());
   assert.equal(workspaceGroup('Invoices').label,'Finance');
   for(const workspace of workspaces) assert.equal(readWorkspaceRoute(workspaceHash({workspace,jobId:'',detail:false})).workspace,workspace);
 });

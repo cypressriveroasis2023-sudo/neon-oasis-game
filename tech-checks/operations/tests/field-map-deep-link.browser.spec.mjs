@@ -146,7 +146,7 @@ async function mount(page, label, units = defaultUnits, {
   await page.goto(origin + '/fixture');
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('.field-map-workspace')).toBeVisible();
-  if(!mapFailure)await expect(frame.getByLabel('Search field units')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
+  if(!mapFailure)await expect(frame.getByLabel('Search units, customers, sites or addresses')).toHaveValue(label === 'RII-022' ? 'Recon II 022' : label);
   return {
     state,
     frame,
@@ -223,7 +223,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   const {
     frame
   } = await mount(page, 'RII-022');
-  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('offline');
+  await revealMapFilters(frame); await frame.getByLabel('Fleet status',{exact:true}).selectOption('offline');
   await frame.locator('body').evaluate(() => location.hash = '#field-map?unitLabel=Ranger%20022');
   await expect(frame.locator('.field-map-detail h2')).toHaveText('Ranger 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);

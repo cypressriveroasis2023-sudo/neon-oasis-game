@@ -53,7 +53,7 @@ export function CameraCardActions({group,now,onDetails,canEditPlacement=false,ca
     {links.map(link=><a key={link.url} href={link.url} target='_blank' rel='noopener noreferrer'>{link.label} ↗</a>)}
     {!links.length&&<button type='button' onClick={onDetails}>Camera access details</button>}
     <a href={unitCardPath(group.name)} target='_blank' rel='noopener noreferrer'>Troubleshoot</a>
-    {!group.identityConflict&&<a href={'../../?fieldUnit='+encodeURIComponent(group.unitIdentity?.unitNumber||group.name)} target='_blank' rel='noopener noreferrer'>Field View</a>}
+    {!group.identityConflict&&<a href={'../../?fieldUnit='+encodeURIComponent(group.unitIdentity?.unitNumber||group.name)} target='_blank' rel='noopener noreferrer'>Fleet Dashboard</a>}
     {canEditPlacement&&group.linkedIdentity&&group.rows.some(row=>!row.trackerOnly)&&<a href={unitCardPath(group.name,'edit-field')} target='_blank' rel='noopener noreferrer'>{['shop','inactive'].includes(group.scope)?'Move to Field':'Edit field information'}</a>}
     {canEditConnection&&(edits.length===1?<a href={edits[0].url} target='_blank' rel='noopener noreferrer'>Edit IP address</a>:edits.length>1?<details><summary>Edit IP address</summary>{edits.map(link=><a key={link.url} href={link.url} target='_blank' rel='noopener noreferrer'>{link.name}</a>)}</details>:null)}
   </div></>;

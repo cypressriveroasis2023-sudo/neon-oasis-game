@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { auditDarkPresentation } from './dark-presentation-audit.mjs';
 import { workspaces, workspaceLabel } from '../src/workspaceNavigation.ts';
 
-const origin = 'http://127.0.0.1:4173';
+const origin = process.env.COS_OPERATIONS_BROWSER_ORIGIN||'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const external = ['Work Requests','CRM','Accounting','Collections','Payments','Needs Attention','History','Reports','Activity'];
 // This complete navigation sweep uses synthetic empty source snapshots only.
@@ -41,7 +41,7 @@ async function mount(page, denied = false) {
 test('every company destination remains reachable with a dark responsive boundary', async ({page}, testInfo) => {
   test.setTimeout(120000);
   const {frame, requests} = await mount(page);
-  for (const workspace of workspaces.filter(name => !['Vision','Invoices'].includes(name))) {
+  for (const workspace of workspaces.filter(name => !['Vision','Invoices','Field Map'].includes(name))) {
     await openWorkspace(frame, workspace);
     await expect.poll(() => frame.locator('body').evaluate(()=>location.hash)).toBe('#' + workspace.toLowerCase().replaceAll(' ','-'));
     await expect(frame.locator('.owner-it-main')).toBeVisible();

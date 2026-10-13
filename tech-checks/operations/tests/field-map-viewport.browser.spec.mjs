@@ -70,7 +70,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-814');
   await expect(frame.locator('.field-map-list > button').nth(813)).toBeInViewport();
   await bounded(frame);
-  await frame.getByLabel('Search field units').fill('FIELD-FIX-001');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
   await expect(frame.locator('.field-map-list > button')).toHaveCount(1);
   await frame.locator('.field-map-list > button').click();
   await expect(frame.locator('.field-map-detail h2')).toHaveText('FIELD-FIX-001');
@@ -83,10 +83,10 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   })).toBe(true);
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
   await page.screenshot({ path: testInfo.outputPath('field-map-selected.png') });
-  await frame.getByLabel('Search field units').fill('no-matching-fixture');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('no-matching-fixture');
   await expect(frame.locator('.field-map-empty')).toContainText('No units match');
   expect((await bounded(frame)).mapHeight).toBeCloseTo(initial.mapHeight, 0);
-  await frame.getByLabel('Search field units').fill('');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('');
   await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
   await frame.getByRole('button', { name: 'Show all verified pins', exact: true }).click();
   await map.scrollIntoViewIfNeeded();
@@ -98,7 +98,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
 });
 test('field map responds to narrow windows and repeated resizing without a fleet-sized canvas', async ({ page }) => {
   const { frame, requests } = await mount(page);
-  await frame.getByLabel('Search field units').fill('FIELD-FIX-001');
+  await frame.getByLabel('Search units, customers, sites or addresses').fill('FIELD-FIX-001');
   await frame.locator('.field-map-list > button').click();
   for (const [width, height] of [[2048, 900], [1440, 900], [1366, 768], [1280, 576], [1220, 800], [1201, 800], [1200, 800], [1024, 576], [701, 800], [700, 800], [390, 844], [320, 568], [1440, 900]]) {
     await page.setViewportSize({ width, height });

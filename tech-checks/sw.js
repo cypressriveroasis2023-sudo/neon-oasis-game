@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-check-tv-tour-20261012';
+const CACHE_NAME = 'tech-check-fleet-map-unified-20261013';
 // The same worker is published at the GitHub subpath and Cloudflare root.
 const APP_SHELL = new URL('./', self.registration.scope).href;
 const VISION_SHELL = new URL('onsite-vision.html', APP_SHELL).href;

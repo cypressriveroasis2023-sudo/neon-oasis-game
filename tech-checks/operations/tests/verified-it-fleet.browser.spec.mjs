@@ -14,7 +14,7 @@ async function mount(page,role='it',linked=true,options={}){
   if(url.startsWith(origin+'/resources/fonts/'))return route.fulfill({path:new URL('../../resources/fonts/'+url.split('/').pop(),import.meta.url).pathname});
   if(url===origin+'/techcheck-eye-favicon-32.png')return route.fulfill({path:new URL('../../techcheck-eye-favicon-32.png',import.meta.url).pathname});
   if(url===origin+'/fleet-host-fixture.js')return route.fulfill({contentType:'text/javascript',body:host+'\nwindow.fixtureHostLoaded=true;'});
-  if(url.startsWith(origin+'/operations/dist/index.html'))return route.fulfill({status:302,headers:{location:url.includes('mode=fleet')?'/?mode=fleet#field-map':options.ownerHome?'/#today':'/#field-map'}});
+  if(url.startsWith(origin+'/operations/dist/index.html'))return route.fulfill({status:302,headers:{location:url.includes('mode=fleet')?'/?mode=fleet':options.ownerHome?'/#today':'/#field-map'}});
   if(url===origin+'/owner-host-fixture.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('../../operations-host.js',import.meta.url),'utf8')});
   if(url===origin+'/owner-fixture')return route.fulfill({contentType:'text/html',body:`<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#0b111c}iframe{width:100%;height:100vh;border:0;display:block}</style><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=> 'owner',getEffectiveRole:()=> 'owner',getSession:()=>({user:{id:'synthetic-owner'}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:'synthetic-owner'},access_token:'synthetic-only'}}})}}};</script><script type="module" src="/owner-host-fixture.js"></script>`});
   if(url.startsWith(origin+'/'))return route.continue();
@@ -32,7 +32,7 @@ async function mount(page,role='it',linked=true,options={}){
  await page.goto(role==='owner'?'/owner-fixture':'/fleet-fixture'+(options.deepLink?'?fieldView=1':''));return requests;
 }
 test('verified IT host authenticates fleet frame, limits navigation and avoids Owner GPS history',async({page})=>{
- const calls=await mount(page);await page.getByRole('button',{name:'Field View',exact:true}).click();const frame=page.frameLocator('iframe');
+ const calls=await mount(page);await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');
  await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.locator('.field-map-list>button').click();
  await expect(frame.getByRole('heading',{name:'GPS history',exact:true})).toHaveCount(0);
  expect(calls.some(c=>c.path.endsWith('/history'))).toBe(false);
@@ -44,27 +44,27 @@ test('verified IT host authenticates fleet frame, limits navigation and avoids O
  expect(routerReads).toBeGreaterThan(0);
  await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(nav.getByRole('button',{name:'InHand Routers',exact:true})).toHaveCount(0);expect(calls.filter(c=>c.path==='/api/routers')).toHaveLength(routerReads);
  expect(calls.every(c=>c.method==='GET'&&['/api/session','/api/field-map','/api/camera-health/summary-v3','/api/routers'].includes(c.path))).toBe(true);
- expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Field View'})).toBeFocused();
+ expect(await page.evaluate(()=>window.fixtureTokens)).toBeGreaterThan(0);await page.getByRole('button',{name:'Return to IT Tech Checks'}).click();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toBeFocused();
 });
-for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Field View'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
+for(const [role,linked] of [['service',true],['it',false]])test(`${role} linked=${linked} gets no fleet button or session token`,async({page})=>{await mount(page,role,linked);await expect.poll(()=>page.evaluate(()=>window.fixtureHostLoaded)).toBe(true);await expect(page.getByRole('button',{name:'Fleet Dashboard'})).toHaveCount(0);expect(await page.evaluate(()=>window.fixtureTokens)).toBe(0);});
 test('Owner retains full navigation and location history',async({page})=>{const calls=await mount(page,'owner');const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await frame.locator('.field-map-list>button').click();await expect.poll(()=>calls.some(c=>c.path.endsWith('/history'))).toBe(true);await frame.getByRole('button',{name:'More',exact:true}).first().click();await expect(frame.getByRole('navigation',{name:'COS Operations',exact:true})).toContainText('Team');});
 
 for(const role of ['it','owner'])test(role+' fullscreen fallback fills host and restores its original frame',async({page})=>{
- await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Field View',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
+ await mount(page,role);if(role==='it')await page.getByRole('button',{name:'Fleet Dashboard',exact:true}).click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
  const original=await page.locator('iframe').getAttribute('style')||'';
  // Force the supported presentation fallback; this does not grant a permission.
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=()=>Promise.reject(new Error('Fixture unsupported'));});
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await frame.getByRole('button',{name:role==='it'?'Fullscreen fleet map':'TV / fullscreen map',exact:true}).click();
  await expect(page.locator('iframe')).toHaveCSS('position','fixed');await expect(page.locator('body')).toHaveCSS('overflow','hidden');
  const bounds=await page.locator('iframe').boundingBox();expect(bounds.x).toBe(0);expect(bounds.y).toBe(0);expect(bounds.width).toBe(page.viewportSize().width);expect(bounds.height).toBe(page.viewportSize().height);
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await expect(page.locator('iframe')).toHaveAttribute('style',original);
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await page.keyboard.press('Escape');await expect(frame.getByRole('button',{name:'TV / fullscreen map',exact:true})).toBeVisible();await expect(page.locator('iframe')).toHaveAttribute('style',original);
+ await frame.getByRole('button',{name:role==='it'?'Exit fullscreen fleet map':'Exit TV view',exact:true}).click();await expect(page.locator('iframe')).toHaveAttribute('style',original);
+ await frame.getByRole('button',{name:role==='it'?'Fullscreen fleet map':'TV / fullscreen map',exact:true}).click();await page.keyboard.press('Escape');await expect(frame.getByRole('button',{name:role==='it'?'Fullscreen fleet map':'TV / fullscreen map',exact:true})).toBeVisible();await expect(page.locator('iframe')).toHaveAttribute('style',original);
 });
 
 
 test('IT Home keeps one clear entry through real legacy redraws, keyboard, return and role changes',async({page},testInfo)=>{
  await mount(page);const entry=page.locator('#wlItHome .wl-it-command-workspace [data-cos-field-view]');
- await expect(entry).toBeVisible();await expect(entry).toHaveText('Field View');expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
+ await expect(entry).toBeVisible();await expect(entry).toHaveText('Fleet Dashboard');expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
  await page.screenshot({path:testInfo.outputPath('verified-it-home-field-view.png'),fullPage:true});
  for(let i=0;i<3;i++){
   await page.evaluate(()=>window.renderITHome());await expect(entry).toBeVisible();await expect(page.locator('[data-cos-field-view]')).toHaveCount(1);
@@ -88,7 +88,7 @@ for(const action of ['role change','logout'])test(`IT ${action} during fullscree
  const readParent=()=>page.evaluate(()=>({overflow:document.body.style.overflow,visibility:document.getElementById('appView').style.visibility,pointerEvents:document.getElementById('appView').style.pointerEvents,inert:document.getElementById('appView').inert}));
  const original=await readParent();await entry.click();const frame=page.frameLocator('iframe');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);
  await frame.locator('body').evaluate(()=>{HTMLElement.prototype.requestFullscreen=undefined;});
- await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();
+ await frame.getByRole('button',{name:'Fullscreen fleet map',exact:true}).click();
  await expect(page.locator('body')).toHaveCSS('overflow','hidden');await expect(page.locator('#appView')).toHaveCSS('visibility','hidden');expect((await readParent()).inert).toBe(true);
  await page.evaluate(action=>{if(action==='logout'){window.fixtureSubject=null;window.fixtureAuthChanged();}else{window.fixtureRole='service';document.getElementById('appView').classList.add('role-changed');}},action);
  await expect(page.locator('[data-cos-field-view],dialog,iframe')).toHaveCount(0);await expect.poll(readParent).toEqual(original);
@@ -101,7 +101,7 @@ for(const [label,options] of [['capability denied',{capability:false}],['inactiv
 });
 
 test('Owner Home Field View supports keyboard, browser Back and repeated entry without losing Owner access',async({page},testInfo)=>{
- const calls=await mount(page,'owner',true,{ownerHome:true});const frame=page.frameLocator('iframe');const entry=frame.getByRole('region',{name:'Field View shortcut'}).getByRole('button',{name:'Field View',exact:true});
+ const calls=await mount(page,'owner',true,{ownerHome:true});const frame=page.frameLocator('iframe');const entry=frame.getByRole('region',{name:'Fleet Dashboard shortcut'}).getByRole('button',{name:'Fleet Dashboard',exact:true});
  await expect(entry).toBeVisible();expect((await entry.boundingBox()).height).toBeGreaterThanOrEqual(44);
  await page.screenshot({path:testInfo.outputPath('owner-home-field-view.png'),fullPage:true});
  await entry.focus();await page.keyboard.press('Enter');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);

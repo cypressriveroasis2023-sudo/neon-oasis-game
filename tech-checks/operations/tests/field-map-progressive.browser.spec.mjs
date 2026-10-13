@@ -56,7 +56,7 @@ test('basemap renders while field records wait, with no invented pins or empty f
 
 test('verified field locations remain available when the first camera read fails',async({page})=>{
  const {frame,state}=await mount(page,{healthFail:true});state.release();
- const filters=frame.getByRole('button',{name:/^Filters/});if(await filters.getAttribute('aria-expanded')!=='true')await filters.click();await frame.getByLabel('Field health filter').selectOption('all');
+ const filters=frame.getByRole('button',{name:/^Filters/});if(await filters.getAttribute('aria-expanded')!=='true')await filters.click();await frame.getByLabel('Fleet status',{exact:true}).selectOption('all');
  await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin[data-health="unknown"]')).toHaveCount(2);await expect(frame.locator('.cos-field-pin[data-health="online"],.cos-field-pin[data-health="offline"]')).toHaveCount(0);
  expect(state.calls.filter(r=>r.path==='/api/field-map')).toHaveLength(1);expect(state.calls.filter(r=>r.path==='/api/camera-health/summary-v3')).toHaveLength(1);expect(state.errors).toEqual([]);
 });

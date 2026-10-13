@@ -8,6 +8,7 @@ import ts from 'typescript';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as gps from '../src/gpsPersistence.ts';
+import * as fleet from '../src/fleetSnapshot.ts';
 import * as locations from '../src/fieldLocations.ts';
 import * as cameras from '../src/cameraDashboardSummary.ts';
 import * as tracker from '../src/unitTracker.ts';
@@ -41,7 +42,7 @@ function fixture() {
     },
     'react/jsx-runtime': require('react/jsx-runtime'),
     './api': { api: { get(path) { const next = deferred(); calls.push({ path, ...next }); return next.promise; } } },
-    './gpsPersistence': gps, './fieldLocations': locations, './cameraDashboardSummary': cameras,
+    './gpsPersistence': gps, './fleetSnapshot':fleet, './fieldLocations': locations, './cameraDashboardSummary': cameras,
     './unitTracker': tracker,
     '../../supabase/functions/cos-operations-pages/routers': routers,
     '../../supabase/functions/cos-operations-pages/vrm': vrm,
@@ -78,7 +79,7 @@ const routerSnapshot = () => routers.routerSnapshot([
 test('six cards render immediately without reading sources during render', () => {
   const f = fixture(), html = f.render();
   assert.equal((html.match(/<article /g) || []).length, 6);
-  for (const label of ['Field View', 'InHand Routers', 'Camera Health', 'Victron', 'Unit Tracker', 'MHelp information']) assert.ok(html.includes('Open ' + label));
+  for (const label of ['Fleet Dashboard', 'InHand Routers', 'Camera Health', 'Victron', 'Unit Tracker', 'MHelp information']) assert.ok(html.includes('Open ' + label));
   assert.equal((html.match(/Checking authorized records/g) || []).length, 6);
   assert.equal(f.calls.length, 0);
   assert.ok(html.indexOf('data-source="field"') < html.indexOf('data-source="cameras"'));
@@ -287,4 +288,9 @@ test('queue refresh clears stale assignments while its sibling references stay a
   f.calls[7].reject(new Error('Queue unavailable')); await refresh;
   assert.equal(f.readers[6].getSnapshot().data, null); assert.equal(f.readers[6].getSnapshot().readAt, null);
   f.cleanup();
+});
+
+test('Fleet Dashboard card uses the same active field inventory scope as the board',()=>{
+ const f=fixture(),v=field();v.inventoryItems=[{...v.items[0],placement:'FIELD'}, {...v.items[1],placement:'SHOP'}, {...v.items[1],id:'44444444-4444-4444-8444-444444444444',placement:'FIELD',status:'retired'}];
+ const summary=f.summarizeITFieldMap(v);assert.equal(summary.count,1);assert.equal(summary.metrics[1].value,1);
 });
