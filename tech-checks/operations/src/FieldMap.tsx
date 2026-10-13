@@ -153,10 +153,8 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     setBusy(true);
     setError('');
     try{
-      const response=await api.fleet(force);
-      const snapshot = response.fieldMap as unknown as Snapshot;
+      const snapshot = await api.fleetSource('fieldMap',force) as unknown as Snapshot;
       setData(snapshot);
-      void cameras.refresh();
       gpsSaver.current.acknowledgeRefresh(snapshot);
       setRefreshRequired(gpsSaver.current.needsRefresh);
       const matches = initialUnitLabel ? fieldMapLabelMatches(snapshot.items,initialUnitLabel) : [];
@@ -164,6 +162,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
       if(initialUnitLabel && matches.length!==1)show(matches.length>1?'This unit has conflicting field records. Select the verified installation.':'This unit is not currently in the field map. Shop units stay off the installed field map.');
       if (initialUnitId && !snapshot.items.some(unit => unit.id === initialUnitId)) show('This unit is not in the current field map. Refresh or select another field unit.');
       setSelectedId(current => !data&&dismissedDeepLink.current!==deepLinkKey&&(initialUnitId||initialUnitLabel)?first?.id||'':snapshot.items.some(unit => unit.id === current) ? current : '');
+      if(initialUnitId&&(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId)){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}
       if(initialUnitLabel){setSearch(first?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');}
     }catch(e:any){
       setError(e?.response?.data?.error||e?.message||'Field Map could not be loaded.');
@@ -181,7 +180,7 @@ export default function FieldMap({show,initialUnitId='',initialUnitLabel='',open
     return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',check);};
   },[]);
 
-  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
+  useEffect(()=>{if(!data||dismissedDeepLink.current===deepLinkKey)return;if(initialUnitId){setSelectedId(data.items.some(unit=>unit.id===initialUnitId)?initialUnitId:'');if(!restored.current.selectionExplicit||restored.current.selectedId!==initialUnitId){setSearch('');setStatus('all');setHealth('all');setNearbyId('');}setFocusSelected(true);}else if(initialUnitLabel){const matches=fieldMapLabelMatches(data.items,initialUnitLabel),unit=matches.length===1?matches[0]:null;setSelectedId(unit?.id||'');setSearch(unit?.unitNumber||initialUnitLabel);setStatus('all');setHealth('all');setNearbyId('');setFocusSelected(true);}},[initialUnitId,initialUnitLabel,Boolean(data)]);
 
   useEffect(()=>{if(data)saveFieldMapView({search,status,health,selectedId,selectionExplicit:Boolean(selectedId),nearbyId,radius,showHistorical});},[search,status,health,selectedId,nearbyId,radius,showHistorical,Boolean(data)]);
 

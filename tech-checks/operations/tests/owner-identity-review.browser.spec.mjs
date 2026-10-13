@@ -9,13 +9,13 @@ async function mount(page,{owner=true,fail=false,existing=false}={}){
  const {_sourceField,...unit}=row();
  await page.route('**/*',async route=>{
   const url=route.request().url();
-  if(url===origin+'/owner-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/#camera-health"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-only'},location.origin)})</script>`});
+  if(url===origin+'/owner-identity-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/${owner?'':'?mode=fleet'}#camera-health"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${owner?'owner':'it'}',accessToken:'synthetic-only'},location.origin)})</script>`});
   if(url.startsWith(origin+'/'))return route.continue();
   if(!url.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   const request=route.request().postDataJSON();state.requests.push(request);let data,status=200;
-  if(request.path==='/api/session')data={authorized:true,name:'Synthetic Owner',role:owner?'Owner':'IT',features:{fleetAccess:true,ownerIdentityReview:owner}};
+  if(['/api/session','/api/fleet/session'].includes(request.path))data={authorized:true,name:'Synthetic '+(owner?'Owner':'IT'),role:owner?'Owner':'IT',features:{fleetAccess:true,ownerIdentityReview:owner}};
   else if(request.path==='/api/field-map')data={items:[unit],inventoryItems:[unit],summary:{fieldUnits:1,mappedUnits:1,unitGps:1,missingGps:0},generatedAt:new Date().toISOString()};
   else if(request.path==='/api/camera-health/summary-v3')data=health;
   else if(request.path==='/api/owner-identity/review')data={contract,nativeUnits:[{id:unitId,unitNumber:label}],rawKeys:[key],confirmations:state.confirmations};
@@ -26,7 +26,7 @@ async function mount(page,{owner=true,fail=false,existing=false}={}){
   else data={items:[]};
   return route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
  });
- await page.goto('/owner-identity-fixture');const frame=page.frameLocator('iframe');await frame.locator('.camera-card-main').first().click();return {frame,state};
+ await page.goto('/owner-identity-fixture');const frame=page.frameLocator('iframe');await frame.getByLabel('Camera Health unit filter').selectOption('all');await frame.getByRole('button',{name:'Open '+key+' unit details',exact:true}).click();return {frame,state};
 }
 async function open(frame){await frame.getByRole('button',{name:'Review equipment identity',exact:true}).click();await expect(frame.getByLabel('Exact registered equipment')).toBeVisible();}
 async function preview(frame){await open(frame);await expect(frame.getByLabel('Exact registered equipment')).toHaveValue('');await frame.getByLabel('Exact registered equipment').selectOption(unitId);await frame.getByRole('button',{name:'Review exact association',exact:true}).click();await expect(frame.getByRole('checkbox',{name:/same physical equipment/})).toBeVisible();}

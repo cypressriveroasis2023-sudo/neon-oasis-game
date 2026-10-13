@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './navigation-helper.mjs';
+import {revealMapFilters} from './field-map-controls.mjs';
 
 const origin = process.env.COS_MAP_TEST_ORIGIN || 'http://127.0.0.1:4173';
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
@@ -37,6 +38,7 @@ async function mount(page) {
   const frame = page.frameLocator('iframe');
   await expect(frame.getByRole('region', { name: 'VISION dashboard' })).toBeVisible();
   await openWorkspace(frame, 'Field Map');
+  await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');
   await expect(frame.locator('.field-map-list > button')).toHaveCount(815);
   return { frame, requests };
 }
@@ -92,6 +94,7 @@ test('large field fleet keeps map bounded through scrolling, filters, selection,
   await page.screenshot({ path: testInfo.outputPath('field-map-815-units.png') });
   await openWorkspace(frame, 'Today');
   await openWorkspace(frame, 'Field Map');
+  await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');
   await bounded(frame);
   expect(requests.every(request => request.method === 'GET')).toBe(true);
 });

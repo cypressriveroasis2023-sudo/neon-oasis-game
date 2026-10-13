@@ -194,7 +194,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
     state
   } = await mount(page, 'RII-022');
   await frame.locator('.cos-field-pin').click();
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Recon II 022');
   await frame.getByRole('button', {
     name: 'Back to Field Map',
     exact: true
@@ -202,7 +202,7 @@ const cases = [['Exact native alias chooses same family/unit and one pin', async
   await expect(frame.locator('.field-map-detail h2')).toHaveText('Recon II 022');
   await expect(frame.locator('.cos-field-pin')).toHaveCount(1);
   await frame.locator('body').evaluate(() => history.forward());
-  await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 022');
+  await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Recon II 022');
   expect(state.writes).toHaveLength(0);
 }], ['Explicit deep link clears stale nearby filter that hides target pin', async page => {
   const {

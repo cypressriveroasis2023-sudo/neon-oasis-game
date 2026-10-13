@@ -20,7 +20,7 @@ async function mount(page,{stale=false}={}){
    :body.path==='/api/routers'?{items:[],source:'camera_health',gpsAvailable:false,generatedAt:now}:{items:[]};
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
- await page.goto('/recon-area-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.camera-unit-detail h3')).toHaveText(unit.unitNumber);await expect(frame.locator('.camera-device-cards article')).toHaveCount(6);return {frame,state};
+ await page.goto('/recon-area-fixture');const frame=page.frameLocator('iframe');await expect(frame.locator('.camera-unit-detail > h3')).toHaveText(unit.unitNumber);await expect(frame.locator('.camera-device-cards article')).toHaveCount(6);return {frame,state};
 }
 test('provider-area, bridge contact and six detector battery observations remain separate on desktop and mobile',async({page},info)=>{
  const {frame,state}=await mount(page);await expect(frame.locator('.camera-unit-state')).toContainText('MIXED / PARTLY VERIFIED');
@@ -30,6 +30,6 @@ test('provider-area, bridge contact and six detector battery observations remain
 });
 test('fresh bridge cannot green stale detectors; revoked membership keeps field record and raw provider records visible',async({page})=>{
  const {frame,state}=await mount(page,{stale:true});await expect(frame.locator('.camera-unit-state')).toContainText('UNVERIFIED');
- state.warnings=[{unitId:id,reason:'Provider-area detector membership changed.',deviceIds:['1','2','3','4','5','6'],unitKeys:[key]}];await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Recon II 901');await expect(frame.locator('.camera-unit-detail')).toContainText('Provider-area detector membership changed.');
- await frame.locator('body').evaluate(()=>{location.hash='camera-health';});await expect(frame.locator('.camera-overview-card')).toHaveCount(2);const raw=frame.getByRole('button',{name:'Open '+key+' unit details',exact:true});await raw.click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail.locator('.camera-device-cards article')).toHaveCount(6);await expect(detail).toContainText('EQUIPMENT LINK UNVERIFIED');await detail.getByRole('button',{name:'Back to units',exact:true}).click();await expect(raw).toBeFocused();expect(state.writes).toEqual([]);
+ state.warnings=[{unitId:id,reason:'Provider-area detector membership changed.',deviceIds:['1','2','3','4','5','6'],unitKeys:[key]}];await frame.getByRole('button',{name:'Reload saved results',exact:true}).click();await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Recon II 901');await expect(frame.locator('.camera-unit-detail')).toContainText('Provider-area detector membership changed.');
+ await frame.locator('body').evaluate(()=>{location.hash='camera-health';});await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);const raw=frame.getByRole('button',{name:'Open '+key+' unit details',exact:true});await raw.click();const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail.locator('.camera-device-cards article')).toHaveCount(6);await expect(detail).toContainText('EQUIPMENT LINK UNVERIFIED');await detail.getByRole('button',{name:'Back to units',exact:true}).click();await expect(raw).toBeFocused();expect(state.writes).toEqual([]);
 });

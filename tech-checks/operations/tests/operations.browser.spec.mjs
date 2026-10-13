@@ -1,4 +1,5 @@
 import { openWorkspace } from './navigation-helper.mjs';
+import {revealMapFilters} from './field-map-controls.mjs';
 import { test, expect } from '@playwright/test';
 
 // Synthetic records exist only in this test file. Every external request is
@@ -105,6 +106,7 @@ async function fixturePage(page,{locationWritesEnabled=true}={}) {
   return { state, frame };
 }
 async function open(frame, name) { await openWorkspace(frame, name);
+  if(name==='Field Map'){await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');}
 }
 async function noOverflow(page) {
   const iframe = page.frames().find(frame => frame.parentFrame());

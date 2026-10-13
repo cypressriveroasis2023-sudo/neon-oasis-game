@@ -47,7 +47,7 @@ async function mount(page,{historical=false,ambiguous=false,oldApi=false,nativeO
   return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(data)});
  });
  await page.addInitScript(()=>{if(parent!==window)history.replaceState({...history.state,cosFieldMapView:{...history.state?.cosFieldMapView,health:'all'}},'');});
- await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else await expect(frame.locator('.field-map-list>button')).toHaveCount(state.units.length);return {frame,state};
+ await page.goto('/field-health-fixture');const frame=page.frameLocator('iframe');if(nativeOverview)await frame.getByLabel('Camera Health unit filter').selectOption('all');else{await revealMapFilters(frame);await frame.getByLabel('Field health filter').selectOption('all');}if(nativeOverview)await expect(frame.locator('.camera-overview-card')).toHaveCount(scopeCase?1:3);else await expect(frame.locator('.field-map-list>button')).toHaveCount(state.units.length);return {frame,state};
 }
 test('provider colors, nearby center and unit health ticket draft stay on the selected identity',async({page},testInfo)=>{
  const {frame,state}=await mount(page);
@@ -58,7 +58,7 @@ test('provider colors, nearby center and unit health ticket draft stay on the se
  await expect(frame.locator('.camera-unit-state')).toHaveText('Camera outage observed');await frame.getByLabel('Camera unit ticket type').selectOption('PICKUP');await frame.getByRole('button',{name:'Create ticket',exact:true}).click();
  await expect.poll(()=>frame.locator('body').evaluate(()=>location.hash)).toBe('#daily-board?create=PICKUP&unit='+id2);
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);await expect(frame.locator('.owner-board-controls')).toContainText('Synthetic customer');await expect(frame.locator('.owner-board-controls')).toContainText('does not assign equipment');
- await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');
+ await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');
  await page.screenshot({path:testInfo.outputPath('field-camera-flow.png')});expect(state.writes).toHaveLength(0);
 });
 test('staleness and unavailable health fail gray without moving map or writing',async({page})=>{
@@ -77,7 +77,7 @@ test('pasted address pin is an unsaved candidate; moving it clears confirmation'
 });
 
 test('Back and Forward retain map filters, nearby center and selected unit',async({page})=>{
- const {frame,state}=await mount(page);await frame.getByLabel('Search field units').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.getByLabel('Search field units')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ const {frame,state}=await mount(page);await frame.getByLabel('Search field units').fill('Solar');await revealMapFilters(frame); await frame.getByLabel('Nearby unit center').selectOption(id);await revealMapFilters(frame); await frame.getByLabel('Nearby distance').selectOption('25');await frame.locator('.field-map-center').scrollIntoViewIfNeeded();await frame.locator('.cos-field-pin').nth(1).click();await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Solar Spotter 52');await frame.getByRole('button',{name:'Back to Field Map',exact:true}).click();await expect(frame.getByLabel('Search field units')).toHaveValue('Solar');await expect(frame.getByLabel('Nearby unit center')).toHaveValue(id);await expect(frame.getByLabel('Nearby distance')).toHaveValue('25');await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Spotter 52');await frame.locator('body').evaluate(()=>history.forward());await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 test('native Camera Health shows units and individual cameras separately with filter and accessible drill-down',async({page},testInfo)=>{
@@ -98,7 +98,7 @@ test('unified Dispatch Board preserves import access without mixing a unit ticke
  await expect(frame.getByLabel('Title',{exact:true})).toHaveValue(/Solar Spotter 52/);
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toHaveCount(0);
  await frame.getByRole('button',{name:'Back to unit health',exact:true}).click();
- await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');
+ await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Solar Spotter 52');
  const child=page.frames().find(child=>child.parentFrame());
  await child.evaluate(()=>{location.hash='daily-board';});
  await expect(frame.getByRole('region',{name:'mHelpDesk ticket import',exact:true})).toBeVisible();
@@ -152,7 +152,7 @@ test('imported tracker families stay visible and colored without inventing map c
  await expect(frame.locator('.field-map-list>button')).toHaveCount(3);await expect(frame.locator('.cos-field-pin')).toHaveCount(0);
  await expect(frame.locator('.field-map-list>button').filter({hasText:'Sniper 2 344'})).toContainText('IP / PORT ONLINE');await expect(frame.locator('.field-map-list>button').filter({hasText:'CAMV 010'})).toContainText('IP / PORT OFFLINE');
  await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('online');await expect(frame.locator('.field-map-list>button')).toHaveCount(1);await revealMapFilters(frame); await frame.getByLabel('Field health filter').selectOption('all');
- const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>location.hash='camera-health');await expect(frame.locator('.camera-overview-card')).toHaveCount(3);
+ const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>location.hash='camera-health');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await frame.getByLabel('Camera Health unit filter').selectOption('all');await expect(frame.locator('.camera-overview-card')).toHaveCount(3);
  await frame.getByLabel('Camera Health equipment family').selectOption('sniper');await expect(frame.locator('.camera-overview-card')).toHaveCount(2);await frame.locator('.camera-overview-card').filter({hasText:'Sniper 334'}).locator('.camera-card-main').click();
  const detail=frame.getByRole('dialog',{name:'Camera Health unit details'});await expect(detail).toContainText('IP / PORT UNVERIFIED');await expect(detail.getByRole('link',{name:'Find unit in Camera Health diagnostics'})).toHaveAttribute('href','../../camera-health.html?q=Sniper%20334');expect(state.writes).toHaveLength(0);
 });
@@ -311,7 +311,7 @@ test('zoom alone exposes twelve same-site statuses and blue support without open
  await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units.png')});
  await frame.locator('.cos-field-pin-support').click();await expect(frame.locator('.field-map-detail h2')).toHaveText('Solar Stand 72 044');await frame.locator('.leaflet-popup-close-button').click();
  await frame.getByRole('button',{name:'TV / fullscreen map',exact:true}).click();await expect(frame.locator('.cos-field-pin')).toHaveCount(12);await expect.poll(visible).toBe(true);await frame.locator('.field-map-center').screenshot({path:info.outputPath('zoom-only-twelve-units-tv.png')});
- await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await frame.locator('.cos-field-pin[data-health="offline"]').click();await expect(frame.locator('.camera-unit-detail h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
+ await frame.getByRole('button',{name:'Exit TV view',exact:true}).click();await frame.locator('.cos-field-pin[data-health="offline"]').click();await expect(frame.locator('.camera-unit-detail > h3')).toHaveText('Solar Spotter 52');expect(state.writes).toHaveLength(0);
 });
 
 
